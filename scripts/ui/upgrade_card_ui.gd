@@ -20,6 +20,10 @@ func _ready() -> void:
 
 
 func _on_leveled_up(new_level: int) -> void:
+	# Run-end wins over a level-up landing the same frame: once the run is
+	# over, the run-end screen (layer 20) owns the pause and the mouse.
+	if not RunState.run_active:
+		return
 	if visible:
 		_pending_levels += 1
 		return

@@ -14,6 +14,10 @@ var level: int = 1
 var xp_to_next: int = 8
 var kills: int = 0
 var run_time: float = 0.0
+## True while the run is in progress; RunManager clears it when the run
+## ends (death or victory) so late same-frame events like a level-up
+## card stand down.
+var run_active: bool = true
 ## Multiplies every gem's magnet radius; raised by pickup-radius upgrades.
 var pickup_radius_multiplier: float = 1.0
 
@@ -32,6 +36,7 @@ func reset() -> void:
 	level = 1
 	kills = 0
 	run_time = 0.0
+	run_active = true
 	pickup_radius_multiplier = 1.0
 	xp_to_next = _xp_required(level)
 	xp_changed.emit(xp, xp_to_next)

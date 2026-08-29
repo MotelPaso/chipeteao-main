@@ -1,0 +1,108 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/ui/run_end_screen.gd" id="1_runend"]
+
+[node name="RunEndScreen" type="CanvasLayer"]
+process_mode = 3
+layer = 20
+script = ExtResource("1_runend")
+
+[node name="Root" type="Control" parent="."]
+unique_name_in_owner = true
+anchor_right = 1.0
+anchor_bottom = 1.0
+
+[node name="Dim" type="ColorRect" parent="Root"]
+anchor_right = 1.0
+anchor_bottom = 1.0
+color = Color(0.03, 0.03, 0.05, 0.85)
+
+[node name="Center" type="CenterContainer" parent="Root"]
+anchor_right = 1.0
+anchor_bottom = 1.0
+
+[node name="VBox" type="VBoxContainer" parent="Root/Center"]
+theme_override_constants/separation = 20
+
+[node name="TitleLabel" type="Label" parent="Root/Center/VBox"]
+unique_name_in_owner = true
+theme_override_font_sizes/font_size = 72
+horizontal_alignment = 1
+text = "YOU DIED"
+
+[node name="SubtitleLabel" type="Label" parent="Root/Center/VBox"]
+unique_name_in_owner = true
+theme_override_colors/font_color = Color(0.72, 0.74, 0.78, 1)
+theme_override_font_sizes/font_size = 20
+horizontal_alignment = 1
+text = "The horde got you."
+
+[node name="StatsPanel" type="PanelContainer" parent="Root/Center/VBox"]
+unique_name_in_owner = true
+
+[node name="StatsBox" type="VBoxContainer" parent="Root/Center/VBox/StatsPanel"]
+theme_override_constants/separation = 8
+
+[node name="TimeRow" type="HBoxContainer" parent="Root/Center/VBox/StatsPanel/StatsBox"]
+custom_minimum_size = Vector2(360, 0)
+
+[node name="TimeName" type="Label" parent="Root/Center/VBox/StatsPanel/StatsBox/TimeRow"]
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(0.62, 0.65, 0.7, 1)
+theme_override_font_sizes/font_size = 18
+text = "Time survived"
+
+[node name="TimeValue" type="Label" parent="Root/Center/VBox/StatsPanel/StatsBox/TimeRow"]
+unique_name_in_owner = true
+theme_override_colors/font_color = Color(0.95, 0.96, 0.98, 1)
+theme_override_font_sizes/font_size = 18
+horizontal_alignment = 2
+text = "00:00"
+
+[node name="LevelRow" type="HBoxContainer" parent="Root/Center/VBox/StatsPanel/StatsBox"]
+custom_minimum_size = Vector2(360, 0)
+
+[node name="LevelName" type="Label" parent="Root/Center/VBox/StatsPanel/StatsBox/LevelRow"]
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(0.62, 0.65, 0.7, 1)
+theme_override_font_sizes/font_size = 18
+text = "Level reached"
+
+[node name="LevelValue" type="Label" parent="Root/Center/VBox/StatsPanel/StatsBox/LevelRow"]
+unique_name_in_owner = true
+theme_override_colors/font_color = Color(0.95, 0.96, 0.98, 1)
+theme_override_font_sizes/font_size = 18
+horizontal_alignment = 2
+text = "1"
+
+[node name="KillsRow" type="HBoxContainer" parent="Root/Center/VBox/StatsPanel/StatsBox"]
+custom_minimum_size = Vector2(360, 0)
+
+[node name="KillsName" type="Label" parent="Root/Center/VBox/StatsPanel/StatsBox/KillsRow"]
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(0.62, 0.65, 0.7, 1)
+theme_override_font_sizes/font_size = 18
+text = "Total kills"
+
+[node name="KillsValue" type="Label" parent="Root/Center/VBox/StatsPanel/StatsBox/KillsRow"]
+unique_name_in_owner = true
+theme_override_colors/font_color = Color(0.95, 0.96, 0.98, 1)
+theme_override_font_sizes/font_size = 18
+horizontal_alignment = 2
+text = "0"
+
+[node name="Buttons" type="HBoxContainer" parent="Root/Center/VBox"]
+theme_override_constants/separation = 20
+alignment = 1
+
+[node name="RetryButton" type="Button" parent="Root/Center/VBox/Buttons"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(160, 46)
+theme_override_font_sizes/font_size = 20
+text = "Retry"
+
+[node name="QuitButton" type="Button" parent="Root/Center/VBox/Buttons"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(160, 46)
+theme_override_font_sizes/font_size = 20
+text = "Quit"

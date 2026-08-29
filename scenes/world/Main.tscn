@@ -1,4 +1,4 @@
-[gd_scene load_steps=23 format=3 uid="uid://dqv5m2x8rk1fj"]
+[gd_scene load_steps=25 format=3 uid="uid://dqv5m2x8rk1fj"]
 
 [ext_resource type="PackedScene" uid="uid://c8k2h1n3m5p0a" path="res://scenes/player/Player.tscn" id="1_player"]
 [ext_resource type="PackedScene" uid="uid://dn4r8t2ycv5qb" path="res://scenes/enemies/TargetDummy.tscn" id="2_dummy"]
@@ -6,6 +6,8 @@
 [ext_resource type="PackedScene" uid="uid://bqgr4nt0h3v2e" path="res://scenes/enemies/Grunt.tscn" id="4_grunt"]
 [ext_resource type="PackedScene" path="res://scenes/ui/UpgradeCardUI.tscn" id="5_cardui"]
 [ext_resource type="PackedScene" path="res://scenes/ui/HUD.tscn" id="6_hud"]
+[ext_resource type="Script" path="res://scripts/systems/run_manager.gd" id="7_runmgr"]
+[ext_resource type="PackedScene" path="res://scenes/ui/RunEndScreen.tscn" id="8_runend"]
 
 [sub_resource type="Shader" id="Shader_grid"]
 code = "shader_type spatial;
@@ -149,6 +151,14 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.2, 0, -2.2)
 script = ExtResource("3_spawner")
 grunt_scene = ExtResource("4_grunt")
 
+[node name="RunManager" type="Node" parent="."]
+script = ExtResource("7_runmgr")
+spawner_path = NodePath("../EnemySpawner")
+
 [node name="UpgradeCardUI" parent="." instance=ExtResource("5_cardui")]
 
 [node name="HUD" parent="." instance=ExtResource("6_hud")]
+
+[node name="RunEndScreen" parent="." instance=ExtResource("8_runend")]
+
+[connection signal="run_ended" from="RunManager" to="RunEndScreen" method="open"]

@@ -37,6 +37,8 @@ var _slide_timer: float = 0.0
 var _slide_cooldown_timer: float = 0.0
 var _slide_direction: Vector3 = Vector3.ZERO
 
+var _is_dead: bool = false
+
 
 func _ready() -> void:
 	health.died.connect(_on_health_died)
@@ -53,6 +55,8 @@ func _ready() -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
+	if _is_dead:
+		return
 	if event is InputEventMouseMotion and Input.get_mouse_mode() == Input.MOUSE_MODE_CAPTURED:
 		_yaw -= event.relative.x * mouse_sensitivity
 		_pitch = clamp(_pitch - event.relative.y * mouse_sensitivity,
@@ -104,8 +108,24 @@ func _physics_process(delta: float) -> void:
 
 
 func _on_health_died() -> void:
-	# Death/run-end screen comes in a later iteration; just log for now.
-	print("Player died. Run over.")
+	if _is_dead:
+		return
+	_is_dead = true
+	if _is_sliding:
+		_end_slide()
+	# Freeze control and physics; RunManager pauses the whole tree right
+	# after this handler, so the fall-over tween must be pause-immune to
+	# play out under the fading run-end screen.
+	set_physics_process(false)
+	var tween := create_tween()
+	tween.set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
+	tween.set_parallel(true)
+	# Face-plant: tip the capsule forward (-Z) with a comedic bounce and
+	# drop its center to rest on the floor (capsule radius 0.4).
+	tween.tween_property(mesh_instance, "rotation:x", -TAU * 0.25, 0.5) \
+			.set_trans(Tween.TRANS_BOUNCE).set_ease(Tween.EASE_OUT)
+	tween.tween_property(mesh_instance, "position:y", 0.45, 0.5) \
+			.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
 
 
 func _can_start_slide(wish_dir: Vector3) -> bool:
