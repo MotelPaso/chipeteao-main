@@ -23,6 +23,7 @@ extends CharacterBody3D
 @onready var spring_arm: SpringArm3D = $SpringArm3D
 @onready var collision_shape: CollisionShape3D = $CollisionShape3D
 @onready var mesh_instance: MeshInstance3D = $MeshInstance3D
+@onready var health: Health = $Health
 
 var _gravity: float = ProjectSettings.get_setting("physics/3d/default_gravity", 9.8)
 var _default_collision_height: float = 1.8
@@ -38,6 +39,7 @@ var _slide_direction: Vector3 = Vector3.ZERO
 
 
 func _ready() -> void:
+	health.died.connect(_on_health_died)
 	Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
 	# The camera arm must ignore our own capsule or it pushes the camera in.
 	spring_arm.add_excluded_object(get_rid())
@@ -99,6 +101,11 @@ func _physics_process(delta: float) -> void:
 		velocity.y = jump_velocity
 
 	move_and_slide()
+
+
+func _on_health_died() -> void:
+	# Death/run-end screen comes in a later iteration; just log for now.
+	print("Player died. Run over.")
 
 
 func _can_start_slide(wish_dir: Vector3) -> bool:

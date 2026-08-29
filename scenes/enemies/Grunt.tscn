@@ -1,0 +1,76 @@
+[gd_scene load_steps=10 format=3 uid="uid://bqgr4nt0h3v2e"]
+
+[ext_resource type="Script" path="res://scripts/enemies/grunt.gd" id="1_grunt"]
+[ext_resource type="Script" path="res://scripts/systems/health.gd" id="2_health"]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_skin"]
+albedo_color = Color(0.38, 0.62, 0.28, 1)
+roughness = 0.9
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_eye"]
+albedo_color = Color(0.14, 0.09, 0.08, 1)
+roughness = 0.4
+
+[sub_resource type="CapsuleMesh" id="CapsuleMesh_body"]
+material = SubResource("StandardMaterial3D_skin")
+radius = 0.42
+height = 1.0
+
+[sub_resource type="SphereMesh" id="SphereMesh_head"]
+material = SubResource("StandardMaterial3D_skin")
+radius = 0.34
+height = 0.68
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_horn"]
+material = SubResource("StandardMaterial3D_skin")
+top_radius = 0.0
+bottom_radius = 0.09
+height = 0.32
+
+[sub_resource type="SphereMesh" id="SphereMesh_eye"]
+material = SubResource("StandardMaterial3D_eye")
+radius = 0.06
+height = 0.12
+
+[sub_resource type="CapsuleShape3D" id="CapsuleShape3D_grunt"]
+radius = 0.42
+height = 1.2
+
+[node name="Grunt" type="CharacterBody3D" groups=["enemies"]]
+collision_layer = 2
+collision_mask = 3
+script = ExtResource("1_grunt")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.6, 0)
+shape = SubResource("CapsuleShape3D_grunt")
+
+[node name="Visual" type="Node3D" parent="."]
+
+[node name="Body" type="MeshInstance3D" parent="Visual"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.5, 0)
+mesh = SubResource("CapsuleMesh_body")
+
+[node name="Head" type="MeshInstance3D" parent="Visual"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.12, 0)
+mesh = SubResource("SphereMesh_head")
+
+[node name="HornL" type="MeshInstance3D" parent="Visual"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.2, 1.42, 0)
+mesh = SubResource("CylinderMesh_horn")
+
+[node name="HornR" type="MeshInstance3D" parent="Visual"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.2, 1.42, 0)
+mesh = SubResource("CylinderMesh_horn")
+
+[node name="EyeL" type="MeshInstance3D" parent="Visual"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.13, 1.18, -0.31)
+mesh = SubResource("SphereMesh_eye")
+
+[node name="EyeR" type="MeshInstance3D" parent="Visual"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.13, 1.18, -0.31)
+mesh = SubResource("SphereMesh_eye")
+
+[node name="Health" type="Node" parent="."]
+script = ExtResource("2_health")
+max_hp = 20.0
