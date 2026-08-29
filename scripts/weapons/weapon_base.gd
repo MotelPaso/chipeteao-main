@@ -14,6 +14,10 @@ const MIN_COOLDOWN: float = 0.05
 @export var cooldown: float = 1.0
 @export var attack_range: float = 3.0
 @export var projectile_count: int = 1
+## Per-weapon cooldown multiplier ("Flurry"-style upgrades lower it); stacks
+## multiplicatively with the player-wide cooldown multiplier, leaving the
+## base cooldown untouched.
+@export var cooldown_scale: float = 1.0
 
 var _cooldown_left: float = 0.0
 
@@ -39,7 +43,7 @@ func effective_damage() -> float:
 
 func effective_cooldown() -> float:
 	var multiplier := _stats.cooldown_multiplier if _stats != null else 1.0
-	return maxf(cooldown * multiplier, MIN_COOLDOWN)
+	return maxf(cooldown * multiplier * cooldown_scale, MIN_COOLDOWN)
 
 
 ## Multiplier subclasses apply to their area-like reach (burst radius,
@@ -49,8 +53,10 @@ func area_scale() -> float:
 
 
 ## Shared damage funnel: applies effective damage, rolls crit, and heals
-## the player for lifesteal. Every weapon hit goes through here.
-func deal_damage(target_health: Health) -> void:
+## the player for lifesteal. Every weapon hit goes through here. Returns
+## the damage dealt so callers with damage-derived effects (Blood Vial's
+## innate drain) can read it; most callers ignore it.
+func deal_damage(target_health: Health) -> float:
 	var amount := effective_damage()
 	var is_crit := _stats != null and randf() < _stats.crit_chance
 	if is_crit:
@@ -58,6 +64,7 @@ func deal_damage(target_health: Health) -> void:
 	target_health.take_damage(amount, is_crit)
 	if _stats != null and _stats.lifesteal > 0.0:
 		_lifesteal_heal(amount * _stats.lifesteal)
+	return amount
 
 
 func _lifesteal_heal(amount: float) -> void:

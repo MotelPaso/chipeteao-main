@@ -14,6 +14,11 @@ extends Node
 @export var base_luck: float = 0.0
 ## Stacked haste can never push the global cooldown multiplier below this.
 @export var min_cooldown_multiplier: float = 0.25
+## Evasion can never exceed this dodge chance, however many sources stack.
+@export var max_evasion: float = 0.6
+## Dodge-execute passives kill a non-boss attacker whose HP ratio is
+## strictly below this when the dodge lands.
+@export var execute_threshold: float = 0.25
 
 # Derived values — change them via add_tome()/recompute(), never directly.
 var damage_multiplier: float = 1.0
@@ -25,6 +30,9 @@ var crit_damage: float = 2.0
 var lifesteal: float = 0.0
 var armor: float = 0.0
 var luck: float = 0.0
+## Chance (0-1, capped at max_evasion) to fully dodge incoming damage; the
+## sibling Health rolls it per hit.
+var evasion: float = 0.0
 ## Flat damage reflected to a contact attacker whenever the player is hit.
 var thorns: float = 0.0
 ## Max-HP granted on top of the Health node's own max_hp (which generic
@@ -36,13 +44,17 @@ var bonus_max_hp: float = 0.0
 var _tome_stacks: Dictionary[String, PackedFloat32Array] = {}
 
 ## Character passive (CharacterCatalog row data). Kinds:
-##   "per_level":       _passive_stat gains _passive_amount per level past 1.
+##   "per_level":       _passive_stat gains _passive_base plus
+##                      _passive_amount per level past 1.
 ##   "speed_to_damage": bonus move speed converts to bonus damage at the
 ##                      _passive_amount ratio (0.6 = +0.6% dmg per +1% speed).
-## Empty stat id with "per_level" = no passive.
+##   "evasion_execute": per_level scaling, plus every successful dodge
+##                      executes a weakened non-boss attacker (_on_dodged).
+## Empty stat id with a per-level kind = no passive.
 var _passive_kind: String = "per_level"
 var _passive_stat: String = ""
 var _passive_amount: float = 0.0
+var _passive_base: float = 0.0
 
 ## Portion of bonus_max_hp already applied to Health, so recomputes adjust
 ## by the difference instead of re-adding the whole bonus.
@@ -57,6 +69,8 @@ func _ready() -> void:
 	var health := Health.find_in(get_parent())
 	if health != null:
 		health.damaged_by.connect(_on_damaged_by)
+		# Dodge-execute passives resolve off the dodge that Health rolled.
+		health.dodged.connect(_on_dodged)
 	recompute()
 
 
@@ -91,12 +105,15 @@ func add_tome(tome_id: String, potency: float) -> void:
 
 
 ## Registers the selected character's passive (stat ids match _apply_effect;
-## kinds are documented on _passive_kind). Called by the player at spawn
-## with catalog row data.
-func set_character_passive(stat: String, amount: float, kind: String = "per_level") -> void:
+## kinds are documented on _passive_kind). base_amount is granted already at
+## level 1 (Doc's starting lifesteal). Called by the player at spawn with
+## catalog row data.
+func set_character_passive(stat: String, amount: float, kind: String = "per_level",
+		base_amount: float = 0.0) -> void:
 	_passive_kind = kind
 	_passive_stat = stat
 	_passive_amount = amount
+	_passive_base = base_amount
 	recompute()
 
 
@@ -112,6 +129,7 @@ func recompute() -> void:
 	lifesteal = 0.0
 	armor = 0.0
 	luck = base_luck
+	evasion = 0.0
 	thorns = 0.0
 	bonus_max_hp = 0.0
 	for tome_id: String in _tome_stacks:
@@ -128,6 +146,7 @@ func recompute() -> void:
 	_apply_character_passive()
 	cooldown_multiplier = maxf(cooldown_multiplier, min_cooldown_multiplier)
 	crit_chance = clampf(crit_chance, 0.0, 1.0)
+	evasion = clampf(evasion, 0.0, max_evasion)
 	luck = maxf(luck, 0.0)
 	_push_armor_to_health()
 	_push_bonus_max_hp_to_health()
@@ -137,12 +156,14 @@ func recompute() -> void:
 ## no per-character branches).
 func _apply_character_passive() -> void:
 	match _passive_kind:
-		"per_level":
-			# Level 1 contributes nothing, each level gained adds one
-			# increment (no roundf — sub-percent steps must accumulate).
+		"per_level", "evasion_execute":
+			# Level 1 contributes only the base amount, each level gained
+			# adds one increment (no roundf — sub-percent steps must
+			# accumulate). "evasion_execute" also kills on dodge; that part
+			# lives in _on_dodged, not here.
 			if not _passive_stat.is_empty():
-				_apply_effect(_passive_stat,
-						_passive_amount * float(maxi(RunState.level - 1, 0)))
+				_apply_effect(_passive_stat, _passive_base
+						+ _passive_amount * float(maxi(RunState.level - 1, 0)))
 		"speed_to_damage":
 			# Bonus move speed (multiplier above 1) converts into a direct
 			# damage-multiplier bonus at the configured ratio.
@@ -169,6 +190,8 @@ func _apply_effect(stat: String, amount: float) -> void:
 			crit_damage += amount / 100.0
 		"lifesteal":
 			lifesteal += amount / 100.0
+		"evasion":
+			evasion += amount / 100.0
 		"armor":
 			armor += amount
 		"luck":
@@ -209,6 +232,25 @@ func _push_bonus_max_hp_to_health() -> void:
 		health.heal(delta)
 	else:
 		health.current_hp = minf(health.current_hp, health.max_hp)
+
+
+## Dodge-execute ("evasion_execute" kind): a successful dodge instantly
+## kills the attacker when it is a non-boss enemy below the execute
+## threshold — through take_damage, so the normal death flow (kill credit,
+## XP gem, squash-out) runs unchanged.
+func _on_dodged(attacker: Node3D) -> void:
+	if _passive_kind != "evasion_execute":
+		return
+	if attacker == null or not is_instance_valid(attacker) \
+			or attacker.is_in_group("boss"):
+		return
+	var attacker_health := Health.find_in(attacker)
+	if attacker_health == null or attacker_health.is_dead:
+		return
+	if attacker_health.current_hp >= attacker_health.max_hp * execute_threshold:
+		return
+	# current_hp plus armor guarantees the post-armor amount is lethal.
+	attacker_health.take_damage(attacker_health.current_hp + attacker_health.armor)
 
 
 ## Thorns retaliation: reflect flat damage to whoever just struck the

@@ -56,6 +56,11 @@ const TOME_LIBRARY: Array[Dictionary] = [
 		"description": "Armor +%d (flat damage reduction)",
 		"effects": [{"stat": "armor", "amount": 2.0}],
 	},
+	{
+		"id": "tome_mist", "display_name": "Tome of Mist",
+		"description": "Evasion: %d%% chance to dodge hits",
+		"effects": [{"stat": "evasion", "amount": 4.0}],
+	},
 ]
 
 

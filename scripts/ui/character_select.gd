@@ -2,22 +2,18 @@ extends Control
 ## Character select screen (GDD 5), the game's entry scene: pick a raider,
 ## then Start Run loads Main (which recaptures the mouse itself). Cards
 ## are built from CharacterCatalog at runtime, so a new playable character
-## is one catalog row; grayed "???" slots pad the roster out to
-## CharacterCatalog.ROSTER_SIZE to telegraph future unlocks. The pick
-## lands in the GameConfig autoload, which the player reads at spawn.
+## is one catalog row; the full 8-raider roster shows as a 4x2 grid. The
+## pick lands in the GameConfig autoload, which the player reads at spawn.
 ## Styling matches the run UI: code-built dark StyleBoxFlat panels.
 
 const MAIN_SCENE_PATH := "res://scenes/world/Main.tscn"
 
-# Sized so the full ROSTER_SIZE row (6 cards + locked slots as of wave 2)
-# fits the default 1152px window with the row separations.
-const CARD_SIZE := Vector2(172, 324)
-const LOCKED_CARD_SIZE := Vector2(110, 150)
+# Sized so two grid rows of four cards fit the default 1152x648 window
+# alongside the title and start button.
+const CARD_SIZE := Vector2(172, 220)
 const UNSELECTED_BORDER_COLOR := Color(0.32, 0.34, 0.42)
-const LOCKED_TEXT_COLOR := Color(0.4, 0.42, 0.48)
 
-@onready var _cards_row: HBoxContainer = %CardsRow
-@onready var _locked_row: HBoxContainer = %LockedRow
+@onready var _cards_grid: GridContainer = %CardsGrid
 @onready var _start_button: Button = %StartButton
 
 ## Card button per playable character id, for selection restyling.
@@ -28,10 +24,8 @@ func _ready() -> void:
 	Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
 	for character: Dictionary in CharacterCatalog.CHARACTER_LIBRARY:
 		var card := _build_character_card(character)
-		_cards_row.add_child(card)
+		_cards_grid.add_child(card)
 		_cards_by_id[String(character.id)] = card
-	for _i: int in CharacterCatalog.ROSTER_SIZE - CharacterCatalog.CHARACTER_LIBRARY.size():
-		_locked_row.add_child(_build_locked_card())
 	_style_button(_start_button)
 	_start_button.pressed.connect(_on_start_pressed)
 	# Reopening mid-session keeps the previous pick; unknown ids fall back.
@@ -64,35 +58,20 @@ func _build_character_card(character: Dictionary) -> Button:
 	card.pressed.connect(_select.bind(String(character.id)))
 	var box := _card_box(card)
 	box.add_child(_portrait_swatch(Color(character.tint)))
-	box.add_child(_label(String(character.display_name), 22, Color(0.95, 0.96, 0.98)))
-	box.add_child(_label(String(character.weapon_display_name), 13, Color(0.62, 0.65, 0.7)))
-	var passive := _label(String(character.passive_description), 13, Color(0.85, 0.78, 0.5))
+	box.add_child(_label(String(character.display_name), 20, Color(0.95, 0.96, 0.98)))
+	box.add_child(_label(String(character.weapon_display_name), 12, Color(0.62, 0.65, 0.7)))
+	var passive := _label(String(character.passive_description), 12, Color(0.85, 0.78, 0.5))
 	passive.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	box.add_child(passive)
-	var blurb := _label(String(character.blurb), 12, Color(0.6, 0.62, 0.68))
+	var blurb := _label(String(character.blurb), 11, Color(0.6, 0.62, 0.68))
 	blurb.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	# The passive line takes priority in the compact grid card; the flavor
+	# blurb takes the leftover space and trims rather than overflowing.
+	blurb.max_lines_visible = 2
+	blurb.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	blurb.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	blurb.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	box.add_child(blurb)
-	return card
-
-
-## Grayed non-clickable "???" slot telegraphing a future roster unlock.
-func _build_locked_card() -> Button:
-	var card := Button.new()
-	card.custom_minimum_size = LOCKED_CARD_SIZE
-	card.disabled = true
-	card.focus_mode = Control.FOCUS_NONE
-	var style := StyleBoxFlat.new()
-	style.bg_color = Color(0.08, 0.09, 0.12, 0.9)
-	style.border_color = Color(0.19, 0.2, 0.25)
-	style.set_border_width_all(2)
-	style.set_corner_radius_all(10)
-	card.add_theme_stylebox_override("disabled", style)
-	var box := _card_box(card)
-	box.alignment = BoxContainer.ALIGNMENT_CENTER
-	box.add_child(_label("???", 30, LOCKED_TEXT_COLOR))
-	box.add_child(_label("Locked", 12, LOCKED_TEXT_COLOR))
 	return card
 
 
@@ -113,7 +92,7 @@ func _card_box(card: Button) -> VBoxContainer:
 ## Tinted stand-in for character art in the body color.
 func _portrait_swatch(tint: Color) -> Panel:
 	var swatch := Panel.new()
-	swatch.custom_minimum_size = Vector2(0.0, 84.0)
+	swatch.custom_minimum_size = Vector2(0.0, 40.0)
 	var style := StyleBoxFlat.new()
 	style.bg_color = tint
 	style.border_color = tint.lightened(0.25)

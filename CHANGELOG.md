@@ -14,3 +14,4 @@
 - Iteration 12: Shrines & chests (channel-under-pressure Charge, HP-gamble Greed, boss-curse stacks, verticality-payoff chests, interact system)
 - Iteration 13: Characters (Rook/Vex/Ash with per-level passives, character select screen, starting-weapon swap, change-character flow)
 - Iteration 14: Weapons & roster wave 2 (piercing bow, slowing whip, out-and-back boomerang; Juno speed-to-damage, Bramble thorns, Otto HP growth)
+- Iteration 15: Roster complete (rapid twin daggers, cluster-seeking blood pools, evasion + dodge-execute Nyx, lifesteal Doc, Tome of Mist)

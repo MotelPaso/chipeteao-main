@@ -1,0 +1,39 @@
+[gd_scene load_steps=6 format=3]
+
+[ext_resource type="Script" path="res://scripts/weapons/blood_vial.gd" id="1_vial"]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_glass"]
+albedo_color = Color(0.55, 0.08, 0.12, 1)
+roughness = 0.25
+emission_enabled = true
+emission = Color(0.7, 0.08, 0.1, 1)
+emission_energy_multiplier = 0.8
+
+[sub_resource type="SphereMesh" id="SphereMesh_bulb"]
+material = SubResource("StandardMaterial3D_glass")
+radius = 0.11
+height = 0.2
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_cork"]
+albedo_color = Color(0.62, 0.48, 0.3, 1)
+roughness = 0.9
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_cork"]
+material = SubResource("StandardMaterial3D_cork")
+top_radius = 0.035
+bottom_radius = 0.035
+height = 0.09
+
+[node name="BloodVial" type="Node3D"]
+script = ExtResource("1_vial")
+damage = 4.0
+cooldown = 2.2
+attack_range = 12.0
+
+[node name="Bulb" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.35, 0.95, -0.05)
+mesh = SubResource("SphereMesh_bulb")
+
+[node name="Cork" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.35, 1.09, -0.05)
+mesh = SubResource("CylinderMesh_cork")

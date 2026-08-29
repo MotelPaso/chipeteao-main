@@ -88,13 +88,42 @@ const WEAPON_LIBRARY: Array[Dictionary] = [
 			},
 		],
 	},
+	{
+		"id": "twin_daggers", "display_name": "Twin Daggers",
+		"node_name": "TwinDaggers", "scene": "res://scenes/weapons/TwinDaggers.tscn",
+		"flavor": "shreds the nearest foe with rapid left-right stabs",
+		"extra_entries": [
+			{
+				# Attack-speed flavor on its own knob (cooldown_scale), so it
+				# stacks with Quick Grip without touching the base cooldown.
+				"id": "twin_daggers_flurry", "title": "Flurry",
+				"description": "Twin Daggers cooldown -%d%%",
+				"target": "weapon/TwinDaggers", "property": "cooldown_scale",
+				"op": "mul_percent", "amount": -15.0,
+			},
+		],
+	},
+	{
+		"id": "blood_vial", "display_name": "Blood Vial",
+		"node_name": "BloodVial", "scene": "res://scenes/weapons/BloodVial.tscn",
+		"flavor": "lobs flasks that pool blood under the thickest packs",
+		"extra_entries": [
+			{
+				# One extra pulse = one extra tick_interval of pool lifetime.
+				"id": "blood_vial_coagulate", "title": "Coagulate",
+				"description": "Blood Vial pools pulse %d more time(s)",
+				"target": "weapon/BloodVial", "property": "pool_ticks",
+				"op": "add", "amount": 1.0,
+			},
+		],
+	},
 ]
 
 ## Fallback weapon cap when the player script doesn't export max_weapons.
 const DEFAULT_MAX_WEAPONS: int = 4
 ## New-weapon cards show up meaningfully but less often than stat cards.
 const NEW_WEAPON_OFFER_WEIGHT: float = 0.6
-## Eight tome entries would otherwise crowd the pool; damp each a little.
+## Nine tome entries would otherwise crowd the pool; damp each a little.
 const TOME_OFFER_WEIGHT: float = 0.8
 ## Each luck point moves this fraction of Common's rarity weight upward.
 const LUCK_TILT_PER_POINT: float = 0.01

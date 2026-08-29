@@ -18,14 +18,15 @@ extends RefCounted
 ##   passive_kind (optional, default "per_level"): how PlayerStats applies
 ##             the passive — "per_level" scales with run level;
 ##             "speed_to_damage" converts bonus move speed into bonus
-##             damage at the passive_amount ratio (stat id unused).
+##             damage at the passive_amount ratio (stat id unused);
+##             "evasion_execute" is per_level scaling plus every dodge
+##             executing a weakened non-boss attacker.
+##   passive_base (optional, default 0): amount already granted at level 1,
+##             before any per-level increments (Doc's starting lifesteal).
 ##   tint:     placeholder capsule body color (also the card swatch).
 
 ## Fallback character when no selection was made (Main booted directly).
 const DEFAULT_ID: String = "rook"
-## Launch roster size (GDD 5): the select screen pads the missing
-## characters with locked slots until their weapons exist.
-const ROSTER_SIZE: int = 8
 
 const CHARACTER_LIBRARY: Array[Dictionary] = [
 	{
@@ -90,6 +91,28 @@ const CHARACTER_LIBRARY: Array[Dictionary] = [
 		"passive_description": "+2 max HP per level",
 		"passive_stat": "max_hp", "passive_amount": 2.0,
 		"tint": Color(0.62, 0.44, 0.26),
+	},
+	{
+		"id": "nyx", "display_name": "Nyx",
+		"blurb": "A dusk-veiled blur who answers every whiffed swing with steel.",
+		"weapon_scene": "res://scenes/weapons/TwinDaggers.tscn",
+		"weapon_node_name": "TwinDaggers",
+		"weapon_display_name": "Twin Daggers",
+		"passive_description": "+0.5% evasion per level; dodges execute weakened non-boss enemies",
+		"passive_stat": "evasion", "passive_amount": 0.5,
+		"passive_kind": "evasion_execute",
+		"tint": Color(0.42, 0.3, 0.58),
+	},
+	{
+		"id": "doc", "display_name": "Doc",
+		"blurb": "A cheery field surgeon who bills every patient in blood.",
+		"weapon_scene": "res://scenes/weapons/BloodVial.tscn",
+		"weapon_node_name": "BloodVial",
+		"weapon_display_name": "Blood Vial",
+		"passive_description": "+1% lifesteal per level (base +5%)",
+		"passive_stat": "lifesteal", "passive_amount": 1.0,
+		"passive_base": 5.0,
+		"tint": Color(0.72, 0.16, 0.2),
 	},
 ]
 

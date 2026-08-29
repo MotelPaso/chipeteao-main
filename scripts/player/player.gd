@@ -138,7 +138,8 @@ func _apply_character(character: Dictionary) -> void:
 	mesh_instance.set_surface_override_material(0, material)
 	_stats.set_character_passive(String(character.passive_stat),
 			float(character.passive_amount),
-			String(character.get("passive_kind", "per_level")))
+			String(character.get("passive_kind", "per_level")),
+			float(character.get("passive_base", 0.0)))
 
 
 func _on_health_died() -> void:
