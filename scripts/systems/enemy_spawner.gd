@@ -249,6 +249,8 @@ func _spawn_boss(stat_multiplier: float, title_override: String = "") -> void:
 func _on_boss_died() -> void:
 	_bosses_alive = maxi(_bosses_alive - 1, 0)
 	_relief_timer = boss_relief_duration
+	# Meta counter for boss-kill quests; persisted at the run-end save.
+	SaveData.bump("bosses_killed")
 
 
 ## Ring position around the player at spawn distance, clamped to the arena

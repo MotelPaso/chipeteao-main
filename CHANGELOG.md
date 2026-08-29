@@ -15,3 +15,4 @@
 - Iteration 13: Characters (Rook/Vex/Ash with per-level passives, character select screen, starting-weapon swap, change-character flow)
 - Iteration 14: Weapons & roster wave 2 (piercing bow, slowing whip, out-and-back boomerang; Juno speed-to-damage, Bramble thorns, Otto HP growth)
 - Iteration 15: Roster complete (rapid twin daggers, cluster-seeking blood pools, evasion + dodge-execute Nyx, lifesteal Doc, Tome of Mist)
+- Iteration 16: Meta-progression (shards + save file, quest catalog with claims, character unlock gating on the select screen, run-end earnings summary)

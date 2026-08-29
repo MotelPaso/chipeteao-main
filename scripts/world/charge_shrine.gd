@@ -29,6 +29,10 @@ var _surge_timer: float = 0.0
 var _time: float = 0.0
 
 
+func _init() -> void:
+	meta_stat_id = "shrines_used"
+
+
 func _physics_process(delta: float) -> void:
 	_time += delta
 	# Idle motion: the crystal slowly spins and bobs; channeling adds a

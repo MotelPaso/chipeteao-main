@@ -23,6 +23,10 @@ extends Interactable
 @export var flavor_text: String = "The altar is pleased."
 
 
+func _init() -> void:
+	meta_stat_id = "shrines_used"
+
+
 func _interact(player: Node) -> void:
 	var health := Health.find_in(player)
 	if health == null:

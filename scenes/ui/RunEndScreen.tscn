@@ -91,6 +91,14 @@ theme_override_font_sizes/font_size = 18
 horizontal_alignment = 2
 text = "0"
 
+[node name="RewardsLabel" type="Label" parent="Root/Center/VBox"]
+unique_name_in_owner = true
+visible = false
+theme_override_colors/font_color = Color(0.55, 0.8, 0.92, 1)
+theme_override_font_sizes/font_size = 18
+horizontal_alignment = 1
+text = "+0 shards"
+
 [node name="Buttons" type="HBoxContainer" parent="Root/Center/VBox"]
 theme_override_constants/separation = 20
 alignment = 1

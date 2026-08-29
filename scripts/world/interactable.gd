@@ -17,6 +17,11 @@ signal interaction_cancelled
 @export var prompt_text: String = "[E] Interact"
 ## Height of the prompt label above the interactable's origin.
 @export var prompt_height: float = 3.4
+## SaveData counter bumped when this interactable is consumed ("" records
+## nothing). Lets the quest log count shrine/chest usage without the
+## subclasses knowing anything about persistence (subclasses set a default
+## in _init; scenes may still override per instance).
+@export var meta_stat_id: String = ""
 
 ## Cleared by consume(); a spent interactable ignores the interact action.
 var available: bool = true
@@ -67,6 +72,8 @@ func _on_range_exited() -> void:
 
 ## Marks this interactable spent: prompt gone, further input ignored.
 func consume() -> void:
+	if available and meta_stat_id != "":
+		SaveData.bump(meta_stat_id)
 	available = false
 	_refresh_prompt()
 

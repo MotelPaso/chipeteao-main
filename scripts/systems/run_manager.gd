@@ -50,4 +50,12 @@ func _end_run(victory: bool) -> void:
 	print("Run ended: %s at %.1fs (level %d, %d kills)" % [
 			"victory" if victory else "defeat",
 			RunState.run_time, RunState.level, RunState.kills])
+	# Fold the finished run into the meta-progression ledger (GDD 8) before
+	# the end screen opens: lifetime counters, quest completion marks, and
+	# the save write all happen here, exactly once per run. The screen reads
+	# the outcome from SaveData.last_* so the signal shape stays unchanged.
+	var fold := SaveData.fold_run_results(victory, GameConfig.selected_character_id,
+			RunState.level, RunState.kills, RunState.run_time)
+	print("Meta saved: %d quest(s) newly completed, %d shard(s) to claim" % [
+			(fold.new_quest_ids as Array).size(), int(fold.reward_shards)])
 	run_ended.emit(victory)

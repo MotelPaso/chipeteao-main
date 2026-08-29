@@ -19,6 +19,7 @@ const CHARACTER_SELECT_SCENE_PATH := "res://scenes/ui/CharacterSelect.tscn"
 @onready var _time_value: Label = %TimeValue
 @onready var _level_value: Label = %LevelValue
 @onready var _kills_value: Label = %KillsValue
+@onready var _rewards_label: Label = %RewardsLabel
 @onready var _retry_button: Button = %RetryButton
 @onready var _change_character_button: Button = %ChangeCharacterButton
 @onready var _quit_button: Button = %QuitButton
@@ -45,6 +46,15 @@ func open(victory: bool) -> void:
 	_time_value.text = "%02d:%02d" % [floori(total / 60.0), total % 60]
 	_level_value.text = str(RunState.level)
 	_kills_value.text = str(RunState.kills)
+	# Meta earnings from this run's fold (RunManager ran it just before
+	# emitting run_ended): quests newly completed, with their claimable
+	# Shard value waiting in the quest log.
+	var quest_count := SaveData.last_new_quest_ids.size()
+	_rewards_label.visible = quest_count > 0
+	if quest_count > 0:
+		_rewards_label.text = "+%d shards · %d quest%s completed — claim in the quest log" % [
+				SaveData.last_reward_shards, quest_count,
+				"" if quest_count == 1 else "s"]
 	Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
 	visible = true
 	_retry_button.grab_focus()

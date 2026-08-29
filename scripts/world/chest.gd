@@ -15,6 +15,10 @@ extends Interactable
 @onready var _lid_pivot: Node3D = $Visual/LidPivot
 
 
+func _init() -> void:
+	meta_stat_id = "chests_opened"
+
+
 func _interact(_player: Node) -> void:
 	_emit_started()
 	consume()

@@ -4,45 +4,102 @@ extends Control
 ## are built from CharacterCatalog at runtime, so a new playable character
 ## is one catalog row; the full 8-raider roster shows as a 4x2 grid. The
 ## pick lands in the GameConfig autoload, which the player reads at spawn.
-## Styling matches the run UI: code-built dark StyleBoxFlat panels.
+##
+## Meta-progression (GDD 8): SaveData gates the roster. Locked characters
+## show grayed with a lock glyph and their Shard price; clicking one with
+## enough Shards flips the card into an inline "Unlock for N? [Yes]"
+## confirm (second click cancels), while a short balance earns a red-flash
+## shake instead. The Shard balance sits top-right and the Quests button
+## opens the quest log. Styling matches the run UI: dark StyleBoxFlat.
 
 const MAIN_SCENE_PATH := "res://scenes/world/Main.tscn"
+const QUEST_LOG_SCENE_PATH := "res://scenes/ui/QuestLog.tscn"
 
 # Sized so two grid rows of four cards fit the default 1152x648 window
 # alongside the title and start button.
 const CARD_SIZE := Vector2(172, 220)
 const UNSELECTED_BORDER_COLOR := Color(0.32, 0.34, 0.42)
+const LOCKED_BORDER_COLOR := Color(0.22, 0.23, 0.28)
+const LOCKED_TEXT_COLOR := Color(0.45, 0.47, 0.52)
+const SHARD_TEXT_COLOR := Color(0.55, 0.8, 0.92)
+const REJECT_FLASH_COLOR := Color(1.0, 0.42, 0.42)
 
 @onready var _cards_grid: GridContainer = %CardsGrid
 @onready var _start_button: Button = %StartButton
+@onready var _quests_button: Button = %QuestsButton
+@onready var _shards_label: Label = %ShardsLabel
 
 ## Card button per playable character id, for selection restyling.
 var _cards_by_id: Dictionary[String, Button] = {}
+## Character id whose card currently shows the inline unlock confirm.
+var _pending_unlock_id: String = ""
 
 
 func _ready() -> void:
 	Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
 	for character: Dictionary in CharacterCatalog.CHARACTER_LIBRARY:
-		var card := _build_character_card(character)
+		var card := Button.new()
+		card.custom_minimum_size = CARD_SIZE
+		card.pressed.connect(_on_card_pressed.bind(String(character.id)))
 		_cards_grid.add_child(card)
 		_cards_by_id[String(character.id)] = card
 	_style_button(_start_button)
+	_style_button(_quests_button)
 	_start_button.pressed.connect(_on_start_pressed)
-	# Reopening mid-session keeps the previous pick; unknown ids fall back.
-	_select(String(CharacterCatalog.by_id_or_default(GameConfig.selected_character_id).id))
+	_quests_button.pressed.connect(_on_quests_pressed)
+	SaveData.shards_changed.connect(func(_balance: int) -> void: _refresh_shards())
+	_refresh_shards()
+	# Reopening mid-session keeps the previous pick; unknown ids fall back,
+	# and a locked id (stale selection) falls back to the free default.
+	var remembered := String(
+			CharacterCatalog.by_id_or_default(GameConfig.selected_character_id).id)
+	if not SaveData.is_unlocked(remembered):
+		remembered = CharacterCatalog.DEFAULT_ID
+	_select(remembered)
 	_start_button.grab_focus()
 
 
+func _refresh_shards() -> void:
+	_shards_label.text = "Shards: %d" % SaveData.shards
+
+
+## Selection is only ever offered for unlocked characters (_on_card_pressed
+## routes locked clicks into the unlock flow instead).
 func _select(character_id: String) -> void:
 	GameConfig.selected_character_id = character_id
-	for id: String in _cards_by_id:
-		var character := CharacterCatalog.by_id(id)
-		var selected := id == character_id
-		_style_card(_cards_by_id[id],
-				Color(character.tint) if selected else UNSELECTED_BORDER_COLOR,
-				4 if selected else 2)
+	_refresh_all_cards()
 	var picked := CharacterCatalog.by_id(character_id)
 	_start_button.text = "Start Run — %s" % String(picked.display_name)
+
+
+func _on_card_pressed(character_id: String) -> void:
+	if SaveData.is_unlocked(character_id):
+		_cancel_pending_unlock()
+		_select(character_id)
+		return
+	if _pending_unlock_id == character_id:
+		# Second click on the confirm card backs out.
+		_cancel_pending_unlock()
+		_refresh_all_cards()
+		return
+	var cost := int(CharacterCatalog.by_id(character_id).get("unlock_cost", 0))
+	if SaveData.can_afford(cost):
+		_pending_unlock_id = character_id
+		_refresh_all_cards()
+	else:
+		_reject_card(_cards_by_id[character_id])
+
+
+func _on_unlock_confirmed(character_id: String) -> void:
+	_pending_unlock_id = ""
+	if SaveData.purchase_character(character_id):
+		_select(character_id)  # also refreshes every card
+	else:
+		_refresh_all_cards()
+
+
+func _cancel_pending_unlock() -> void:
+	_pending_unlock_id = ""
 
 
 func _on_start_pressed() -> void:
@@ -52,10 +109,27 @@ func _on_start_pressed() -> void:
 	get_tree().change_scene_to_file(MAIN_SCENE_PATH)
 
 
-func _build_character_card(character: Dictionary) -> Button:
-	var card := Button.new()
-	card.custom_minimum_size = CARD_SIZE
-	card.pressed.connect(_select.bind(String(character.id)))
+func _on_quests_pressed() -> void:
+	get_tree().change_scene_to_file(QUEST_LOG_SCENE_PATH)
+
+
+## --- Card content (rebuilt whenever lock/selection state changes) ------
+
+func _refresh_all_cards() -> void:
+	for id: String in _cards_by_id:
+		_populate_card(_cards_by_id[id], CharacterCatalog.by_id(id))
+
+
+func _populate_card(card: Button, character: Dictionary) -> void:
+	for child: Node in card.get_children():
+		child.queue_free()
+	var character_id := String(character.id)
+	if not SaveData.is_unlocked(character_id):
+		if _pending_unlock_id == character_id:
+			_populate_confirm_card(card, character)
+		else:
+			_populate_locked_card(card, character)
+		return
 	var box := _card_box(card)
 	box.add_child(_portrait_swatch(Color(character.tint)))
 	box.add_child(_label(String(character.display_name), 20, Color(0.95, 0.96, 0.98)))
@@ -72,7 +146,65 @@ func _build_character_card(character: Dictionary) -> Button:
 	blurb.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	blurb.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	box.add_child(blurb)
-	return card
+	var selected := character_id == GameConfig.selected_character_id
+	_style_card(card,
+			Color(character.tint) if selected else UNSELECTED_BORDER_COLOR,
+			4 if selected else 2)
+
+
+## Grayed roster slot: lock glyph in place of the portrait, dimmed
+## identity lines, and the Shard price as the call to action.
+func _populate_locked_card(card: Button, character: Dictionary) -> void:
+	var box := _card_box(card)
+	box.add_child(_lock_glyph())
+	box.add_child(_label(String(character.display_name), 20, LOCKED_TEXT_COLOR))
+	box.add_child(_label(String(character.weapon_display_name), 12,
+			LOCKED_TEXT_COLOR.darkened(0.15)))
+	var passive := _label(String(character.passive_description), 12,
+			LOCKED_TEXT_COLOR.darkened(0.15))
+	passive.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	box.add_child(passive)
+	var cost := _label("Unlock — %d Shards" % int(character.get("unlock_cost", 0)),
+			13, SHARD_TEXT_COLOR)
+	cost.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	cost.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	box.add_child(cost)
+	_style_card(card, LOCKED_BORDER_COLOR, 2)
+
+
+## The inline purchase prompt the locked card flips into when affordable.
+func _populate_confirm_card(card: Button, character: Dictionary) -> void:
+	var box := _card_box(card)
+	box.add_child(_portrait_swatch(Color(character.tint)))
+	box.add_child(_label(String(character.display_name), 20, Color(0.95, 0.96, 0.98)))
+	var ask := _label("Unlock for %d Shards?" % int(character.get("unlock_cost", 0)),
+			13, SHARD_TEXT_COLOR)
+	ask.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	box.add_child(ask)
+	var yes := Button.new()
+	yes.text = "Yes"
+	yes.custom_minimum_size = Vector2(0.0, 36.0)
+	yes.pressed.connect(_on_unlock_confirmed.bind(String(character.id)))
+	_style_button(yes)
+	box.add_child(yes)
+	var hint := _label("click card to cancel", 10, Color(0.5, 0.52, 0.58))
+	hint.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	hint.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	box.add_child(hint)
+	_style_card(card, SHARD_TEXT_COLOR, 3)
+
+
+## Can't-afford feedback: quick red flash plus a rotation wobble (rotation
+## doesn't fight the GridContainer's layout the way position would).
+func _reject_card(card: Button) -> void:
+	card.pivot_offset = card.size / 2.0
+	var tween := create_tween()
+	tween.tween_property(card, "modulate", REJECT_FLASH_COLOR, 0.06)
+	tween.parallel().tween_property(card, "rotation_degrees", -4.0, 0.05)
+	tween.tween_property(card, "rotation_degrees", 4.0, 0.08)
+	tween.tween_property(card, "rotation_degrees", -2.0, 0.07)
+	tween.tween_property(card, "rotation_degrees", 0.0, 0.06)
+	tween.parallel().tween_property(card, "modulate", Color.WHITE, 0.18)
 
 
 ## Full-rect content VBox inside a card button (UpgradeCardUI convention).
@@ -100,6 +232,40 @@ func _portrait_swatch(tint: Color) -> Panel:
 	style.set_corner_radius_all(8)
 	swatch.add_theme_stylebox_override("panel", style)
 	return swatch
+
+
+## Small code-drawn padlock (shackle arch over a body box) standing where
+## the portrait swatch would be, so "locked" reads without any glyph font.
+func _lock_glyph() -> Control:
+	var glyph := Control.new()
+	glyph.custom_minimum_size = Vector2(0.0, 40.0)
+	glyph.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var shackle := Panel.new()
+	shackle.set_anchors_preset(Control.PRESET_CENTER_TOP)
+	shackle.offset_left = -8.0
+	shackle.offset_right = 8.0
+	shackle.offset_top = 4.0
+	shackle.offset_bottom = 20.0
+	var arch := StyleBoxFlat.new()
+	arch.draw_center = false
+	arch.border_color = LOCKED_TEXT_COLOR
+	arch.set_border_width_all(3)
+	arch.corner_radius_top_left = 8
+	arch.corner_radius_top_right = 8
+	shackle.add_theme_stylebox_override("panel", arch)
+	glyph.add_child(shackle)
+	var body := Panel.new()
+	body.set_anchors_preset(Control.PRESET_CENTER_TOP)
+	body.offset_left = -11.0
+	body.offset_right = 11.0
+	body.offset_top = 16.0
+	body.offset_bottom = 34.0
+	var block := StyleBoxFlat.new()
+	block.bg_color = LOCKED_TEXT_COLOR
+	block.set_corner_radius_all(3)
+	body.add_theme_stylebox_override("panel", block)
+	glyph.add_child(body)
+	return glyph
 
 
 func _label(label_text: String, font_size: int, color: Color) -> Label:

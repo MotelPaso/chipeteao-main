@@ -10,6 +10,10 @@ extends Interactable
 @export var activation_text: String = "A grudge binds itself to the next great foe..."
 
 
+func _init() -> void:
+	meta_stat_id = "shrines_used"
+
+
 func _interact(_player: Node) -> void:
 	_emit_started()
 	RunState.add_curse(stacks_per_use)

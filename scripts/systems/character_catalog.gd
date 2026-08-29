@@ -23,6 +23,9 @@ extends RefCounted
 ##             executing a weakened non-boss attacker.
 ##   passive_base (optional, default 0): amount already granted at level 1,
 ##             before any per-level increments (Doc's starting lifesteal).
+##   unlock_cost: Shards to unlock on the select screen (GDD 5/8); 0 means
+##             playable from the start. SaveData gates and persists the
+##             actual unlocks — this is only the price data.
 ##   tint:     placeholder capsule body color (also the card swatch).
 
 ## Fallback character when no selection was made (Main booted directly).
@@ -37,6 +40,7 @@ const CHARACTER_LIBRARY: Array[Dictionary] = [
 		"weapon_display_name": "Shortsword",
 		"passive_description": "+0.8% damage per level",
 		"passive_stat": "damage", "passive_amount": 0.8,
+		"unlock_cost": 0,
 		"tint": Color(0.35, 0.51, 0.74),
 	},
 	{
@@ -47,6 +51,7 @@ const CHARACTER_LIBRARY: Array[Dictionary] = [
 		"weapon_display_name": "Dart Pistol",
 		"passive_description": "+0.5% crit chance per level",
 		"passive_stat": "crit_chance", "passive_amount": 0.5,
+		"unlock_cost": 0,
 		"tint": Color(0.58, 0.38, 0.82),
 	},
 	{
@@ -57,6 +62,7 @@ const CHARACTER_LIBRARY: Array[Dictionary] = [
 		"weapon_display_name": "Ember Wand",
 		"passive_description": "+0.7% area per level",
 		"passive_stat": "area", "passive_amount": 0.7,
+		"unlock_cost": 50,
 		"tint": Color(0.89, 0.45, 0.18),
 	},
 	{
@@ -68,6 +74,7 @@ const CHARACTER_LIBRARY: Array[Dictionary] = [
 		"passive_description": "+0.6% damage per 1% bonus move speed",
 		"passive_stat": "damage", "passive_amount": 0.6,
 		"passive_kind": "speed_to_damage",
+		"unlock_cost": 80,
 		"tint": Color(0.24, 0.55, 0.32),
 	},
 	{
@@ -78,6 +85,7 @@ const CHARACTER_LIBRARY: Array[Dictionary] = [
 		"weapon_display_name": "Thorn Whip",
 		"passive_description": "+1 thorns per level",
 		"passive_stat": "thorns", "passive_amount": 1.0,
+		"unlock_cost": 80,
 		"tint": Color(0.5, 0.58, 0.28),
 	},
 	{
@@ -90,6 +98,7 @@ const CHARACTER_LIBRARY: Array[Dictionary] = [
 		"weapon_display_name": "Boomerang",
 		"passive_description": "+2 max HP per level",
 		"passive_stat": "max_hp", "passive_amount": 2.0,
+		"unlock_cost": 100,
 		"tint": Color(0.62, 0.44, 0.26),
 	},
 	{
@@ -101,6 +110,7 @@ const CHARACTER_LIBRARY: Array[Dictionary] = [
 		"passive_description": "+0.5% evasion per level; dodges execute weakened non-boss enemies",
 		"passive_stat": "evasion", "passive_amount": 0.5,
 		"passive_kind": "evasion_execute",
+		"unlock_cost": 150,
 		"tint": Color(0.42, 0.3, 0.58),
 	},
 	{
@@ -112,6 +122,7 @@ const CHARACTER_LIBRARY: Array[Dictionary] = [
 		"passive_description": "+1% lifesteal per level (base +5%)",
 		"passive_stat": "lifesteal", "passive_amount": 1.0,
 		"passive_base": 5.0,
+		"unlock_cost": 150,
 		"tint": Color(0.72, 0.16, 0.2),
 	},
 ]
@@ -130,3 +141,13 @@ static func by_id(character_id: String) -> Dictionary:
 static func by_id_or_default(character_id: String) -> Dictionary:
 	var row := by_id(character_id)
 	return row if not row.is_empty() else by_id(DEFAULT_ID)
+
+
+## Ids playable from the start (unlock_cost 0) — GDD 5: Rook and Vex.
+## SaveData seeds a fresh save's unlocked list from this.
+static func starter_ids() -> Array[String]:
+	var ids: Array[String] = []
+	for row: Dictionary in CHARACTER_LIBRARY:
+		if int(row.get("unlock_cost", 0)) == 0:
+			ids.append(String(row.id))
+	return ids
