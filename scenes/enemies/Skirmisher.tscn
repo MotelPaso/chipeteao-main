@@ -1,0 +1,84 @@
+[gd_scene load_steps=13 format=3]
+
+[ext_resource type="Script" path="res://scripts/enemies/skirmisher.gd" id="1_skirmisher"]
+[ext_resource type="Script" path="res://scripts/systems/health.gd" id="2_health"]
+[ext_resource type="PackedScene" path="res://scenes/systems/XpGem.tscn" id="3_gem"]
+[ext_resource type="PackedScene" path="res://scenes/enemies/EnemyBolt.tscn" id="4_bolt"]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_robe"]
+albedo_color = Color(0.46, 0.3, 0.64, 1)
+roughness = 0.85
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_hood"]
+albedo_color = Color(0.29, 0.17, 0.44, 1)
+roughness = 0.9
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_glow"]
+shading_mode = 0
+albedo_color = Color(0.85, 0.55, 1, 1)
+emission_enabled = true
+emission = Color(0.72, 0.38, 1, 1)
+emission_energy_multiplier = 1.8
+
+[sub_resource type="CapsuleMesh" id="CapsuleMesh_robe"]
+material = SubResource("StandardMaterial3D_robe")
+radius = 0.28
+height = 1.1
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_hood"]
+material = SubResource("StandardMaterial3D_hood")
+top_radius = 0.0
+bottom_radius = 0.3
+height = 0.55
+
+[sub_resource type="SphereMesh" id="SphereMesh_orb"]
+material = SubResource("StandardMaterial3D_glow")
+radius = 0.09
+height = 0.18
+
+[sub_resource type="SphereMesh" id="SphereMesh_eye"]
+material = SubResource("StandardMaterial3D_glow")
+radius = 0.05
+height = 0.1
+
+[sub_resource type="CapsuleShape3D" id="CapsuleShape3D_skirmisher"]
+radius = 0.32
+height = 1.4
+
+[node name="Skirmisher" type="CharacterBody3D" groups=["enemies"]]
+collision_layer = 2
+collision_mask = 3
+script = ExtResource("1_skirmisher")
+move_speed = 5.0
+xp_gem_scene = ExtResource("3_gem")
+bolt_scene = ExtResource("4_bolt")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.7, 0)
+shape = SubResource("CapsuleShape3D_skirmisher")
+
+[node name="Visual" type="Node3D" parent="."]
+
+[node name="Robe" type="MeshInstance3D" parent="Visual"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.6, 0)
+mesh = SubResource("CapsuleMesh_robe")
+
+[node name="Hood" type="MeshInstance3D" parent="Visual"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.38, 0)
+mesh = SubResource("CylinderMesh_hood")
+
+[node name="EyeL" type="MeshInstance3D" parent="Visual"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.09, 1.16, -0.23)
+mesh = SubResource("SphereMesh_eye")
+
+[node name="EyeR" type="MeshInstance3D" parent="Visual"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.09, 1.16, -0.23)
+mesh = SubResource("SphereMesh_eye")
+
+[node name="Orb" type="MeshInstance3D" parent="Visual"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.0, -0.42)
+mesh = SubResource("SphereMesh_orb")
+
+[node name="Health" type="Node" parent="."]
+script = ExtResource("2_health")
+max_hp = 14.0

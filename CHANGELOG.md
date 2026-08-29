@@ -9,3 +9,4 @@
 - Iteration 7: Hollow Woods arena (low-poly trees/rocks/ramps/platforms, forest mood lighting and fog, perimeter treatment)
 - Iteration 8: Weapon variety (Dart Pistol projectiles, Ember Wand AoE bursts, new-weapon acquisition cards, per-owned-weapon upgrades, 4-weapon cap)
 - Iteration 9: Tomes + stats layer (8 stackable tomes, global multipliers, crit/lifesteal/armor/luck, luck-tilted rarity)
+- Iteration 10: Enemy variety (skirmisher ranged AI, armored tank, glowing elites with 5x XP, time-phased spawn composition)

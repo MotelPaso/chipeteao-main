@@ -1,3 +1,4 @@
+class_name XpGem
 extends Area3D
 ## XP gem dropped by enemies. Idles with a spin/bob, then homes to the
 ## player with accelerating speed once inside the magnet radius (scaled by

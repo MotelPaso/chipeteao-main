@@ -1,0 +1,39 @@
+[gd_scene load_steps=6 format=3]
+
+[ext_resource type="Script" path="res://scripts/enemies/enemy_bolt.gd" id="1_bolt"]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_bolt"]
+shading_mode = 0
+albedo_color = Color(0.75, 0.4, 1, 1)
+emission_enabled = true
+emission = Color(0.62, 0.28, 0.95, 1)
+emission_energy_multiplier = 2.2
+
+[sub_resource type="SphereMesh" id="SphereMesh_core"]
+material = SubResource("StandardMaterial3D_bolt")
+radius = 0.16
+height = 0.32
+
+[sub_resource type="BoxMesh" id="BoxMesh_tail"]
+material = SubResource("StandardMaterial3D_bolt")
+size = Vector3(0.06, 0.06, 0.5)
+
+[sub_resource type="SphereShape3D" id="SphereShape3D_hit"]
+radius = 0.2
+
+[node name="EnemyBolt" type="Area3D"]
+collision_layer = 0
+collision_mask = 1
+script = ExtResource("1_bolt")
+
+[node name="Core" type="MeshInstance3D" parent="."]
+cast_shadow = 0
+mesh = SubResource("SphereMesh_core")
+
+[node name="Tail" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0.3)
+cast_shadow = 0
+mesh = SubResource("BoxMesh_tail")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+shape = SubResource("SphereShape3D_hit")

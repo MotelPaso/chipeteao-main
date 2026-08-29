@@ -1,9 +1,11 @@
-[gd_scene load_steps=21 format=3 uid="uid://dqv5m2x8rk1fj"]
+[gd_scene load_steps=23 format=3 uid="uid://dqv5m2x8rk1fj"]
 
 [ext_resource type="PackedScene" uid="uid://c8k2h1n3m5p0a" path="res://scenes/player/Player.tscn" id="1_player"]
 [ext_resource type="PackedScene" uid="uid://dn4r8t2ycv5qb" path="res://scenes/enemies/TargetDummy.tscn" id="2_dummy"]
 [ext_resource type="Script" path="res://scripts/systems/enemy_spawner.gd" id="3_spawner"]
 [ext_resource type="PackedScene" uid="uid://bqgr4nt0h3v2e" path="res://scenes/enemies/Grunt.tscn" id="4_grunt"]
+[ext_resource type="PackedScene" path="res://scenes/enemies/Skirmisher.tscn" id="15_skirmisher"]
+[ext_resource type="PackedScene" path="res://scenes/enemies/Tank.tscn" id="16_tank"]
 [ext_resource type="PackedScene" path="res://scenes/ui/UpgradeCardUI.tscn" id="5_cardui"]
 [ext_resource type="PackedScene" path="res://scenes/ui/HUD.tscn" id="6_hud"]
 [ext_resource type="Script" path="res://scripts/systems/run_manager.gd" id="7_runmgr"]
@@ -142,6 +144,8 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.2, 0, -2.2)
 [node name="EnemySpawner" type="Node3D" parent="."]
 script = ExtResource("3_spawner")
 grunt_scene = ExtResource("4_grunt")
+skirmisher_scene = ExtResource("15_skirmisher")
+tank_scene = ExtResource("16_tank")
 
 [node name="RunManager" type="Node" parent="."]
 script = ExtResource("7_runmgr")

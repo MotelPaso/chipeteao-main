@@ -1,10 +1,25 @@
 extends Node3D
-## Spawns grunts on a timer in a ring around the player, off-screen-ish.
+## Spawns enemies on a timer in a ring around the player, off-screen-ish.
 ## Difficulty ramps with elapsed run time: the interval shrinks and the
-## per-tick count grows (GDD 6: swarms scale over the run timer). Spawned
-## grunts are added as children, so the active count is just child count.
+## per-tick count grows (GDD 6: swarms scale over the run timer), while
+## SPAWN_PHASES only decides WHAT spawns — grunts first, skirmishers from
+## minute 2, tanks from minute 5 — and an elite roll (chance ramping from
+## minute 3) can promote any spawn. Spawned enemies are added as children,
+## so the active count is just child count.
+
+## Time-phased spawn mix. Each entry activates at from_minute and stays
+## active until a later entry takes over; weights are relative within the
+## phase. Kinds map to the exported scenes in _scene_for().
+const SPAWN_PHASES: Array[Dictionary] = [
+	{"from_minute": 0.0, "weights": {"grunt": 1.0}},
+	{"from_minute": 2.0, "weights": {"grunt": 0.8, "skirmisher": 0.2}},
+	{"from_minute": 5.0, "weights": {"grunt": 0.7, "skirmisher": 0.2, "tank": 0.1}},
+	{"from_minute": 8.0, "weights": {"grunt": 0.55, "skirmisher": 0.25, "tank": 0.2}},
+]
 
 @export var grunt_scene: PackedScene
+@export var skirmisher_scene: PackedScene
+@export var tank_scene: PackedScene
 @export var max_active: int = 80
 @export_group("Spawn Ring")
 @export var min_radius: float = 18.0
@@ -18,6 +33,11 @@ extends Node3D
 @export var interval_shrink_per_minute: float = 0.35
 @export var base_count_per_tick: int = 1
 @export var extra_count_per_minute: float = 0.5
+@export_group("Elites")
+@export var elite_start_minute: float = 3.0
+@export var elite_full_minute: float = 12.0
+@export var elite_start_chance: float = 0.02
+@export var elite_full_chance: float = 0.10
 
 ## Elapsed run time in seconds; the HUD run timer will read this later.
 var run_time: float = 0.0
@@ -46,8 +66,52 @@ func current_count_per_tick() -> int:
 	return base_count_per_tick + int(minutes * extra_count_per_minute)
 
 
+## Weighted pick from the phase active at the current run_time.
+func pick_spawn_scene() -> PackedScene:
+	var minutes := run_time / 60.0
+	var weights: Dictionary = SPAWN_PHASES[0]["weights"]
+	for phase: Dictionary in SPAWN_PHASES:
+		var from_minute: float = phase["from_minute"]
+		if minutes >= from_minute:
+			weights = phase["weights"]
+	var total := 0.0
+	for kind: String in weights:
+		var weight: float = weights[kind]
+		total += weight
+	var roll := randf() * total
+	for kind: String in weights:
+		var weight: float = weights[kind]
+		roll -= weight
+		if roll <= 0.0:
+			return _scene_for(kind)
+	return grunt_scene
+
+
+## Chance that a fresh spawn is promoted to an elite: zero before
+## elite_start_minute, then a linear ramp that caps at elite_full_minute.
+func elite_chance() -> float:
+	var minutes := run_time / 60.0
+	if minutes < elite_start_minute:
+		return 0.0
+	var ramp := clampf(
+			(minutes - elite_start_minute) / (elite_full_minute - elite_start_minute),
+			0.0, 1.0)
+	return lerpf(elite_start_chance, elite_full_chance, ramp)
+
+
+func _scene_for(kind: String) -> PackedScene:
+	match kind:
+		"skirmisher":
+			return skirmisher_scene
+		"tank":
+			return tank_scene
+		_:
+			return grunt_scene
+
+
 func _spawn_one() -> void:
-	if grunt_scene == null:
+	var scene := pick_spawn_scene()
+	if scene == null:
 		return
 	var player := get_tree().get_first_node_in_group("player") as Node3D
 	if player == null:
@@ -58,14 +122,21 @@ func _spawn_one() -> void:
 	pos.x = clampf(pos.x, -arena_half_extent, arena_half_extent)
 	pos.z = clampf(pos.z, -arena_half_extent, arena_half_extent)
 	pos.y = _ground_height(pos, player) + 0.05
-	var grunt := grunt_scene.instantiate() as Node3D
-	add_child(grunt)
-	grunt.global_position = pos
+	var node := scene.instantiate()
+	var enemy := node as EnemyBase
+	if enemy == null:
+		node.free()
+		push_warning("EnemySpawner: spawn scene root does not extend EnemyBase.")
+		return
+	add_child(enemy)
+	enemy.global_position = pos
+	if randf() < elite_chance():
+		enemy.make_elite()
 
 
 ## Drops the spawn point onto whatever world geometry (layer 1) is below it —
 ## forest floor, boulder, platform deck — so a ring position that lands on a
-## Hollow Woods prop never embeds a grunt inside it. Tree canopies carry no
+## Hollow Woods prop never embeds an enemy inside it. Tree canopies carry no
 ## collision, so under-canopy spawns still hit the floor. Falls back to the
 ## flat-floor height if the ray somehow misses everything.
 func _ground_height(pos: Vector3, player: Node3D) -> float:
@@ -73,7 +144,7 @@ func _ground_height(pos: Vector3, player: Node3D) -> float:
 			Vector3(pos.x, 12.0, pos.z), Vector3(pos.x, -1.0, pos.z), 1)
 	var player_body := player as CollisionObject3D
 	if player_body != null:
-		# The player is also on layer 1; never spawn a grunt on their head.
+		# The player is also on layer 1; never spawn an enemy on their head.
 		var excluded: Array[RID] = [player_body.get_rid()]
 		ray.exclude = excluded
 	var hit := get_world_3d().direct_space_state.intersect_ray(ray)
