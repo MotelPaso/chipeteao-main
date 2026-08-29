@@ -1,7 +1,9 @@
 extends CanvasLayer
 ## In-game HUD (GDD 9.5): HP bar with numeric readout, thin XP bar with a
-## level tag, MM:SS run timer, and kill counter. Loose coupling: finds the
-## player via its group at ready and RunState via the autoload; signals
+## level tag, MM:SS run timer, kill counter, plus a top-center boss HP bar
+## (shown only while a boss lives) and a boss-arrival banner, both driven
+## through the "boss_ui" group. Loose coupling: finds the player via its
+## group at ready and RunState via the autoload; signals
 ## drive every update (only the timer text polls, in _process). Default
 ## pausable process mode is fine — run_time freezes with the tree and the
 ## upgrade-card layer (10) draws above this one (5).
@@ -16,6 +18,8 @@ const HP_FULL_COLOR := Color(0.36, 0.8, 0.42)
 const HP_LOW_COLOR := Color(0.9, 0.22, 0.2)
 ## Matches the XP gem material, so the bar reads as "gems collected".
 const XP_COLOR := Color(0.35, 0.95, 0.6)
+## Matches the Rotking's amber core seams.
+const BOSS_BAR_COLOR := Color(0.98, 0.62, 0.16)
 
 @onready var _hp_bar: ProgressBar = %HpBar
 @onready var _hp_label: Label = %HpLabel
@@ -23,12 +27,21 @@ const XP_COLOR := Color(0.35, 0.95, 0.6)
 @onready var _level_label: Label = %LevelLabel
 @onready var _timer_label: Label = %TimerLabel
 @onready var _kills_label: Label = %KillsLabel
+@onready var _boss_bar: ProgressBar = %BossBar
+@onready var _boss_name_label: Label = %BossNameLabel
+@onready var _announce_label: Label = %AnnounceLabel
 
 var _hp_fill: StyleBoxFlat
 var _health: Health
+var _tracked_boss: Node3D = null
+var _boss_health: Health = null
+var _announce_tween: Tween
 
 
 func _ready() -> void:
+	# Bosses and the spawner reach this layer through the group, never by
+	# node path.
+	add_to_group("boss_ui")
 	_apply_styles()
 	RunState.xp_changed.connect(_on_xp_changed)
 	RunState.leveled_up.connect(_on_leveled_up)
@@ -80,6 +93,70 @@ func _on_kills_changed(kills: int) -> void:
 	_kills_label.text = "Kills: %d" % kills
 
 
+## Called through the "boss_ui" group by a boss entering the arena. If one
+## is already tracked, the bar re-targets to the newest boss (bosses are
+## sequential by design; two alive shows the latest).
+func track_boss(boss: Node3D, title: String) -> void:
+	_untrack_boss()
+	var boss_health := Health.find_in(boss)
+	if boss_health == null:
+		return
+	_tracked_boss = boss
+	_boss_health = boss_health
+	boss_health.damaged.connect(_on_boss_damaged)
+	boss_health.hp_changed.connect(_on_boss_hp_changed)
+	boss_health.died.connect(_on_boss_health_died)
+	boss.tree_exited.connect(_on_boss_gone)
+	_boss_name_label.text = title
+	_boss_bar.visible = true
+	_on_boss_hp_changed(boss_health.current_hp, boss_health.max_hp)
+
+
+## Called through the "boss_ui" group (boss arrival warnings): a brief
+## centered banner that fades itself out.
+func announce(message: String) -> void:
+	_announce_label.text = message
+	_announce_label.visible = true
+	_announce_label.modulate.a = 0.0
+	if _announce_tween != null and _announce_tween.is_valid():
+		_announce_tween.kill()
+	_announce_tween = create_tween()
+	_announce_tween.tween_property(_announce_label, "modulate:a", 1.0, 0.3)
+	_announce_tween.tween_interval(2.4)
+	_announce_tween.tween_property(_announce_label, "modulate:a", 0.0, 0.6)
+	_announce_tween.tween_callback(_announce_label.hide)
+
+
+func _on_boss_damaged(_amount: float, current: float) -> void:
+	_boss_bar.value = current
+
+
+func _on_boss_hp_changed(current: float, max_hp: float) -> void:
+	_boss_bar.max_value = max_hp
+	_boss_bar.value = current
+
+
+func _on_boss_health_died() -> void:
+	_boss_bar.visible = false
+
+
+## Fallback for a boss leaving the tree without dying (scene teardown).
+func _on_boss_gone() -> void:
+	_untrack_boss()
+	_boss_bar.visible = false
+
+
+func _untrack_boss() -> void:
+	if _boss_health != null and is_instance_valid(_boss_health):
+		_boss_health.damaged.disconnect(_on_boss_damaged)
+		_boss_health.hp_changed.disconnect(_on_boss_hp_changed)
+		_boss_health.died.disconnect(_on_boss_health_died)
+	if _tracked_boss != null and is_instance_valid(_tracked_boss):
+		_tracked_boss.tree_exited.disconnect(_on_boss_gone)
+	_boss_health = null
+	_tracked_boss = null
+
+
 ## Placeholder look built in code (no assets): dark translucent flat boxes,
 ## rounded HP bar, edge-to-edge XP strip, padded pill panels on the labels.
 func _apply_styles() -> void:
@@ -93,6 +170,13 @@ func _apply_styles() -> void:
 
 	_xp_bar.add_theme_stylebox_override("background", _flat_box(BAR_BG_COLOR, 0))
 	_xp_bar.add_theme_stylebox_override("fill", _flat_box(XP_COLOR, 0))
+
+	var boss_bg := _flat_box(BAR_BG_COLOR, 6)
+	boss_bg.set_border_width_all(2)
+	boss_bg.border_color = Color(0.0, 0.0, 0.0, 0.55)
+	boss_bg.set_content_margin_all(3)
+	_boss_bar.add_theme_stylebox_override("background", boss_bg)
+	_boss_bar.add_theme_stylebox_override("fill", _flat_box(BOSS_BAR_COLOR, 4))
 
 	for label: Label in [_level_label, _timer_label, _kills_label]:
 		var panel := _flat_box(PANEL_COLOR, 6)

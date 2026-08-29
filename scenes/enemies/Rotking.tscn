@@ -1,0 +1,160 @@
+[gd_scene load_steps=20 format=3]
+
+[ext_resource type="Script" path="res://scripts/enemies/rotking.gd" id="1_rotking"]
+[ext_resource type="Script" path="res://scripts/systems/health.gd" id="2_health"]
+[ext_resource type="PackedScene" path="res://scenes/systems/XpGem.tscn" id="3_gem"]
+[ext_resource type="PackedScene" uid="uid://bqgr4nt0h3v2e" path="res://scenes/enemies/Grunt.tscn" id="4_grunt"]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_bark"]
+albedo_color = Color(0.32, 0.23, 0.15, 1)
+roughness = 0.95
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_bark_dark"]
+albedo_color = Color(0.23, 0.16, 0.11, 1)
+roughness = 1.0
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_moss"]
+albedo_color = Color(0.27, 0.44, 0.21, 1)
+roughness = 1.0
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_amber"]
+shading_mode = 0
+albedo_color = Color(1, 0.65, 0.2, 1)
+emission_enabled = true
+emission = Color(1, 0.55, 0.12, 1)
+emission_energy_multiplier = 2.2
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_trunk"]
+material = SubResource("StandardMaterial3D_bark")
+top_radius = 0.78
+bottom_radius = 1.05
+height = 1.9
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_root"]
+material = SubResource("StandardMaterial3D_bark_dark")
+top_radius = 0.34
+bottom_radius = 0.44
+height = 0.6
+
+[sub_resource type="SphereMesh" id="SphereMesh_head"]
+material = SubResource("StandardMaterial3D_bark_dark")
+radius = 0.5
+height = 1.0
+
+[sub_resource type="SphereMesh" id="SphereMesh_crown"]
+material = SubResource("StandardMaterial3D_moss")
+radius = 0.9
+height = 0.85
+
+[sub_resource type="SphereMesh" id="SphereMesh_tuft"]
+material = SubResource("StandardMaterial3D_moss")
+radius = 0.32
+height = 0.6
+
+[sub_resource type="CapsuleMesh" id="CapsuleMesh_arm"]
+material = SubResource("StandardMaterial3D_bark_dark")
+radius = 0.26
+height = 1.7
+
+[sub_resource type="SphereMesh" id="SphereMesh_fist"]
+material = SubResource("StandardMaterial3D_bark")
+radius = 0.36
+height = 0.72
+
+[sub_resource type="BoxMesh" id="BoxMesh_seam"]
+material = SubResource("StandardMaterial3D_amber")
+size = Vector3(0.18, 0.85, 0.22)
+
+[sub_resource type="BoxMesh" id="BoxMesh_seam_small"]
+material = SubResource("StandardMaterial3D_amber")
+size = Vector3(0.13, 0.55, 0.2)
+
+[sub_resource type="SphereMesh" id="SphereMesh_eye"]
+material = SubResource("StandardMaterial3D_amber")
+radius = 0.1
+height = 0.2
+
+[sub_resource type="CapsuleShape3D" id="CapsuleShape3D_boss"]
+radius = 1.05
+height = 3.0
+
+[node name="Rotking" type="CharacterBody3D" groups=["boss", "enemies"]]
+collision_layer = 2
+collision_mask = 3
+script = ExtResource("1_rotking")
+summon_scene = ExtResource("4_grunt")
+move_speed = 2.0
+turn_speed = 3.5
+separation_strength = 0.0
+xp_gem_scene = ExtResource("3_gem")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.5, 0)
+shape = SubResource("CapsuleShape3D_boss")
+
+[node name="Visual" type="Node3D" parent="."]
+
+[node name="RootL" type="MeshInstance3D" parent="Visual"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.5, 0.3, 0)
+mesh = SubResource("CylinderMesh_root")
+
+[node name="RootR" type="MeshInstance3D" parent="Visual"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, 0.3, 0)
+mesh = SubResource("CylinderMesh_root")
+
+[node name="Trunk" type="MeshInstance3D" parent="Visual"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.5, 0)
+mesh = SubResource("CylinderMesh_trunk")
+
+[node name="ArmL" type="MeshInstance3D" parent="Visual"]
+transform = Transform3D(0.988771, 0.149438, 0, -0.149438, 0.988771, 0, 0, 0, 1, -1.08, 1.55, 0)
+mesh = SubResource("CapsuleMesh_arm")
+
+[node name="ArmR" type="MeshInstance3D" parent="Visual"]
+transform = Transform3D(0.988771, -0.149438, 0, 0.149438, 0.988771, 0, 0, 0, 1, 1.08, 1.55, 0)
+mesh = SubResource("CapsuleMesh_arm")
+
+[node name="FistL" type="MeshInstance3D" parent="Visual"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.22, 0.72, -0.05)
+mesh = SubResource("SphereMesh_fist")
+
+[node name="FistR" type="MeshInstance3D" parent="Visual"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.22, 0.72, -0.05)
+mesh = SubResource("SphereMesh_fist")
+
+[node name="Head" type="MeshInstance3D" parent="Visual"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.55, -0.15)
+mesh = SubResource("SphereMesh_head")
+
+[node name="Crown" type="MeshInstance3D" parent="Visual"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 3.0, 0)
+mesh = SubResource("SphereMesh_crown")
+
+[node name="CrownTuft" type="MeshInstance3D" parent="Visual"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.42, 3.32, 0.18)
+mesh = SubResource("SphereMesh_tuft")
+
+[node name="SeamMain" type="MeshInstance3D" parent="Visual"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.45, -0.88)
+mesh = SubResource("BoxMesh_seam")
+
+[node name="SeamLeft" type="MeshInstance3D" parent="Visual"]
+transform = Transform3D(0.939693, 0, -0.34202, 0, 1, 0, 0.34202, 0, 0.939693, -0.44, 1.1, -0.82)
+mesh = SubResource("BoxMesh_seam_small")
+
+[node name="SeamRight" type="MeshInstance3D" parent="Visual"]
+transform = Transform3D(0.939693, 0, 0.34202, 0, 1, 0, -0.34202, 0, 0.939693, 0.42, 1.82, -0.78)
+mesh = SubResource("BoxMesh_seam_small")
+
+[node name="EyeL" type="MeshInstance3D" parent="Visual"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.2, 2.62, -0.56)
+mesh = SubResource("SphereMesh_eye")
+
+[node name="EyeR" type="MeshInstance3D" parent="Visual"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.2, 2.62, -0.56)
+mesh = SubResource("SphereMesh_eye")
+
+[node name="Health" type="Node" parent="."]
+script = ExtResource("2_health")
+max_hp = 800.0
+armor = 3.0
