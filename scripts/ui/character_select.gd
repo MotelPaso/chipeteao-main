@@ -9,8 +9,10 @@ extends Control
 
 const MAIN_SCENE_PATH := "res://scenes/world/Main.tscn"
 
-const CARD_SIZE := Vector2(236, 330)
-const LOCKED_CARD_SIZE := Vector2(128, 170)
+# Sized so the full ROSTER_SIZE row (6 cards + locked slots as of wave 2)
+# fits the default 1152px window with the row separations.
+const CARD_SIZE := Vector2(172, 324)
+const LOCKED_CARD_SIZE := Vector2(110, 150)
 const UNSELECTED_BORDER_COLOR := Color(0.32, 0.34, 0.42)
 const LOCKED_TEXT_COLOR := Color(0.4, 0.42, 0.48)
 
@@ -62,10 +64,12 @@ func _build_character_card(character: Dictionary) -> Button:
 	card.pressed.connect(_select.bind(String(character.id)))
 	var box := _card_box(card)
 	box.add_child(_portrait_swatch(Color(character.tint)))
-	box.add_child(_label(String(character.display_name), 26, Color(0.95, 0.96, 0.98)))
-	box.add_child(_label(String(character.weapon_display_name), 15, Color(0.62, 0.65, 0.7)))
-	box.add_child(_label(String(character.passive_description), 15, Color(0.85, 0.78, 0.5)))
-	var blurb := _label(String(character.blurb), 13, Color(0.6, 0.62, 0.68))
+	box.add_child(_label(String(character.display_name), 22, Color(0.95, 0.96, 0.98)))
+	box.add_child(_label(String(character.weapon_display_name), 13, Color(0.62, 0.65, 0.7)))
+	var passive := _label(String(character.passive_description), 13, Color(0.85, 0.78, 0.5))
+	passive.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	box.add_child(passive)
+	var blurb := _label(String(character.blurb), 12, Color(0.6, 0.62, 0.68))
 	blurb.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	blurb.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	blurb.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
@@ -96,12 +100,12 @@ func _build_locked_card() -> Button:
 func _card_box(card: Button) -> VBoxContainer:
 	var box := VBoxContainer.new()
 	box.set_anchors_preset(Control.PRESET_FULL_RECT)
-	box.offset_left = 16.0
-	box.offset_top = 14.0
-	box.offset_right = -16.0
-	box.offset_bottom = -14.0
+	box.offset_left = 12.0
+	box.offset_top = 12.0
+	box.offset_right = -12.0
+	box.offset_bottom = -12.0
 	box.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	box.add_theme_constant_override("separation", 10)
+	box.add_theme_constant_override("separation", 8)
 	card.add_child(box)
 	return box
 
@@ -109,7 +113,7 @@ func _card_box(card: Button) -> VBoxContainer:
 ## Tinted stand-in for character art in the body color.
 func _portrait_swatch(tint: Color) -> Panel:
 	var swatch := Panel.new()
-	swatch.custom_minimum_size = Vector2(0.0, 104.0)
+	swatch.custom_minimum_size = Vector2(0.0, 84.0)
 	var style := StyleBoxFlat.new()
 	style.bg_color = tint
 	style.border_color = tint.lightened(0.25)

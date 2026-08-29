@@ -1,0 +1,48 @@
+[gd_scene load_steps=7 format=3]
+
+[ext_resource type="Script" path="res://scripts/weapons/projectile.gd" id="1_arrow"]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_shaft"]
+shading_mode = 0
+albedo_color = Color(0.85, 0.92, 0.72, 1)
+emission_enabled = true
+emission = Color(0.6, 0.85, 0.45, 1)
+emission_energy_multiplier = 1.6
+
+[sub_resource type="BoxMesh" id="BoxMesh_shaft"]
+material = SubResource("StandardMaterial3D_shaft")
+size = Vector3(0.035, 0.035, 0.72)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_head"]
+shading_mode = 0
+albedo_color = Color(0.95, 0.98, 0.9, 1)
+emission_enabled = true
+emission = Color(0.9, 0.95, 0.8, 1)
+emission_energy_multiplier = 2.2
+
+[sub_resource type="BoxMesh" id="BoxMesh_head"]
+material = SubResource("StandardMaterial3D_head")
+size = Vector3(0.06, 0.06, 0.12)
+
+[sub_resource type="SphereShape3D" id="SphereShape3D_hit"]
+radius = 0.16
+
+[node name="Arrow" type="Area3D"]
+collision_layer = 0
+collision_mask = 2
+script = ExtResource("1_arrow")
+speed = 40.0
+homing_enabled = false
+spawn_stretch = 1.6
+
+[node name="Tracer" type="MeshInstance3D" parent="."]
+cast_shadow = 0
+mesh = SubResource("BoxMesh_shaft")
+
+[node name="Head" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -0.38)
+cast_shadow = 0
+mesh = SubResource("BoxMesh_head")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+shape = SubResource("SphereShape3D_hit")

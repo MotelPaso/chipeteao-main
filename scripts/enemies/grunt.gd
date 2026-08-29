@@ -25,7 +25,8 @@ func _combat_tick(player: Node3D, distance: float) -> void:
 	if player_health == null or player_health.is_dead:
 		return
 	_attack_timer = attack_cooldown
-	player_health.take_damage(contact_damage)
+	# Passing ourselves as attacker lets player thorns retaliate.
+	player_health.take_damage(contact_damage, false, self)
 
 
 func _apply_elite_damage(multiplier: float) -> void:

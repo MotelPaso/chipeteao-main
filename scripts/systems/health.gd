@@ -5,6 +5,9 @@ extends Node
 ## Emits died once when HP reaches zero; heal_full() re-arms it.
 
 signal damaged(amount: float, current: float)
+## Emitted alongside `damaged` when the hit named its attacker (enemy
+## contact damage does); thorns-style retaliation hooks onto this.
+signal damaged_by(attacker: Node3D)
 ## Non-damage HP changes (max_hp raises, full heals) so health bars can
 ## re-read both values; damage keeps the dedicated signal above.
 signal hp_changed(current: float, max_hp: float)
@@ -36,7 +39,9 @@ static func find_in(body: Node) -> Health:
 	return null
 
 
-func take_damage(amount: float, is_crit: bool = false) -> void:
+## `attacker` (optional) is the body that dealt the hit; contact attackers
+## pass themselves so thorns can retaliate through damaged_by.
+func take_damage(amount: float, is_crit: bool = false, attacker: Node3D = null) -> void:
 	if is_dead or amount <= 0.0:
 		return
 	var final_amount := minf(amount, maxf(amount - armor, 1.0))
@@ -44,6 +49,9 @@ func take_damage(amount: float, is_crit: bool = false) -> void:
 	if show_damage_popups:
 		_spawn_damage_popup(final_amount, is_crit)
 	damaged.emit(final_amount, current_hp)
+	# Before the death check so even a lethal blow is repaid.
+	if attacker != null:
+		damaged_by.emit(attacker)
 	if current_hp <= 0.0:
 		is_dead = true
 		died.emit()

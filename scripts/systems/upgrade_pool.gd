@@ -49,6 +49,45 @@ const WEAPON_LIBRARY: Array[Dictionary] = [
 		"node_name": "EmberWand", "scene": "res://scenes/weapons/EmberWand.tscn",
 		"flavor": "detonates fire bursts on distant packs",
 	},
+	{
+		"id": "hunting_bow", "display_name": "Hunting Bow",
+		"node_name": "HuntingBow", "scene": "res://scenes/weapons/HuntingBow.tscn",
+		"flavor": "looses straight arrows that skewer whole ranks",
+		"extra_entries": [
+			{
+				"id": "hunting_bow_pierce", "title": "Barbed Heads",
+				"description": "Hunting Bow arrows pierce %d more enemies",
+				"target": "weapon/HuntingBow", "property": "pierce_count",
+				"op": "add", "amount": 1.0,
+			},
+		],
+	},
+	{
+		"id": "thorn_whip", "display_name": "Thorn Whip",
+		"node_name": "ThornWhip", "scene": "res://scenes/weapons/ThornWhip.tscn",
+		"flavor": "rakes a bramble line that snags and slows",
+		"extra_entries": [
+			{
+				"id": "thorn_whip_slow", "title": "Clinging Thorns",
+				"description": "Thorn Whip slow %d%% stronger",
+				"target": "weapon/ThornWhip", "property": "slow_percent",
+				"op": "add", "amount": 8.0,
+			},
+		],
+	},
+	{
+		"id": "boomerang", "display_name": "Boomerang",
+		"node_name": "Boomerang", "scene": "res://scenes/weapons/Boomerang.tscn",
+		"flavor": "hurls a returning blade that cuts coming and going",
+		"extra_entries": [
+			{
+				"id": "boomerang_travel", "title": "Far Flight",
+				"description": "Boomerang travel distance +%d%%",
+				"target": "weapon/Boomerang", "property": "travel_scale",
+				"op": "mul_percent", "amount": 20.0,
+			},
+		],
+	},
 ]
 
 ## Fallback weapon cap when the player script doesn't export max_weapons.

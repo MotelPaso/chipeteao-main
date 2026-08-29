@@ -1,13 +1,19 @@
 class_name Projectile
 extends Area3D
 ## Weapon bullet: flies along -Z (bending lightly toward the target it was
-## fired at) and damages the first "enemies"-group body it overlaps.
+## fired at) and damages "enemies"-group bodies it overlaps — each body at
+## most once — until its pierce budget runs out (1 = classic dart).
 ## The firing weapon parents it to the scene root so it survives player
-## movement; it despawns on hit or after max_distance so strays never linger.
+## movement; it despawns on hit-out or after max_distance so strays never linger.
 
 @export var speed: float = 26.0
+## Whether the flight bends toward the target at all (arrows fly straight).
+@export var homing_enabled: bool = true
 ## Radians/sec the flight direction may bend toward the target; 0 disables homing.
 @export var homing_turn_speed: float = 3.5
+## How many distinct enemies this projectile may damage before despawning.
+## The firing weapon can raise it per shot (Hunting Bow pierce upgrades).
+@export var pierce_remaining: int = 1
 ## Aim above the target's origin so bullets converge on body height, not feet.
 @export var aim_height: float = 0.8
 ## Tracer spawns stretched along its length and relaxes to 1 (cheap trail feel).
@@ -19,6 +25,9 @@ var _source: WeaponBase = null
 var _max_distance: float = 20.0
 var _travelled: float = 0.0
 var _target: Node3D = null
+## Instance ids already damaged, so a body re-entering (or hugging) the
+## hitbox of a piercing shot is never hit twice by the same projectile.
+var _hit_ids: Dictionary[int, bool] = {}
 
 
 func _ready() -> void:
@@ -67,16 +76,23 @@ func _steer_toward_target(delta: float) -> void:
 func _homing_active() -> bool:
 	# A dying enemy leaves the "enemies" group; the bullet stops chasing the
 	# corpse and just flies out its remaining range.
-	return homing_turn_speed > 0.0 and _target != null and is_instance_valid(_target) \
-			and _target.is_inside_tree() and _target.is_in_group("enemies")
+	return homing_enabled and homing_turn_speed > 0.0 and _target != null \
+			and is_instance_valid(_target) and _target.is_inside_tree() \
+			and _target.is_in_group("enemies")
 
 
 func _on_body_entered(body: Node3D) -> void:
 	if not body.is_in_group("enemies"):
 		return
+	var body_id := body.get_instance_id()
+	if _hit_ids.has(body_id):
+		return
+	_hit_ids[body_id] = true
 	var health := Health.find_in(body)
 	# A dart whose weapon was freed mid-flight fizzles (cannot happen with
 	# the current no-weapon-removal rules; belt and braces).
 	if health != null and _source != null and is_instance_valid(_source):
 		_source.deal_damage(health)
-	queue_free()
+	pierce_remaining -= 1
+	if pierce_remaining <= 0:
+		queue_free()

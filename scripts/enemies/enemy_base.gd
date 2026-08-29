@@ -27,6 +27,10 @@ var is_elite: bool = false
 
 var _gravity: float = ProjectSettings.get_setting("physics/3d/default_gravity", 9.8)
 var _xp_multiplier: int = 1
+# Timed slow (Thorn Whip etc.): a speed multiplier active while the timer
+# runs; expiry restores full speed. See apply_slow for the refresh rules.
+var _slow_multiplier: float = 1.0
+var _slow_time_left: float = 0.0
 
 
 func _ready() -> void:
@@ -36,6 +40,7 @@ func _ready() -> void:
 func _physics_process(delta: float) -> void:
 	if not is_on_floor():
 		velocity.y -= _gravity * delta
+	_slow_time_left = maxf(_slow_time_left - delta, 0.0)
 	_behavior_tick(delta)
 
 	var steer := Vector3.ZERO
@@ -54,8 +59,9 @@ func _physics_process(delta: float) -> void:
 	steer.y = 0.0
 	if steer.length_squared() > 1.0:
 		steer = steer.normalized()
-	velocity.x = steer.x * move_speed
-	velocity.z = steer.z * move_speed
+	var slowed_speed := move_speed * active_slow_multiplier()
+	velocity.x = steer.x * slowed_speed
+	velocity.z = steer.z * slowed_speed
 
 	var face := _facing_direction(steer, seek)
 	if face.length_squared() > 0.0001:
@@ -91,6 +97,22 @@ func _facing_direction(steer: Vector3, _seek: Vector3) -> Vector3:
 ## by make_elite().
 func _apply_elite_damage(_multiplier: float) -> void:
 	pass
+
+
+## Applies a timed slow: this enemy moves at speed_multiplier of its normal
+## speed for `duration` seconds. Re-application REFRESHES (overwrites both
+## strength and timer) rather than stacking, so repeated whip lashes can
+## never compound a slow toward zero.
+func apply_slow(speed_multiplier: float, duration: float) -> void:
+	if duration <= 0.0:
+		return
+	_slow_multiplier = clampf(speed_multiplier, 0.05, 1.0)
+	_slow_time_left = duration
+
+
+## Current external speed multiplier: 1.0 whenever no slow is active.
+func active_slow_multiplier() -> float:
+	return _slow_multiplier if _slow_time_left > 0.0 else 1.0
 
 
 ## Promotes this enemy to an elite: more HP (healed to the new max), speed,

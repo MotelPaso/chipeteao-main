@@ -136,7 +136,9 @@ func _apply_character(character: Dictionary) -> void:
 	var material := StandardMaterial3D.new()
 	material.albedo_color = Color(character.tint)
 	mesh_instance.set_surface_override_material(0, material)
-	_stats.set_character_passive(String(character.passive_stat), float(character.passive_amount))
+	_stats.set_character_passive(String(character.passive_stat),
+			float(character.passive_amount),
+			String(character.get("passive_kind", "per_level")))
 
 
 func _on_health_died() -> void:
