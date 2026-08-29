@@ -6,3 +6,4 @@
 - Iteration 4: XP/leveling loop (gem drops with magnet pickup, RunState autoload, pause-and-pick 3-card upgrade UI, data-driven upgrade pool)
 - Iteration 5: HUD (HP/XP bars, level, MM:SS run timer, kill counter, low-HP color shift)
 - Iteration 6: Run-end flow (death + 15-min survival victory, stats screen, retry/quit, player death state)
+- Iteration 7: Hollow Woods arena (low-poly trees/rocks/ramps/platforms, forest mood lighting and fog, perimeter treatment)

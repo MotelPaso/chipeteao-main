@@ -57,7 +57,27 @@ func _spawn_one() -> void:
 			+ Vector3(cos(angle), 0.0, sin(angle)) * randf_range(min_radius, max_radius)
 	pos.x = clampf(pos.x, -arena_half_extent, arena_half_extent)
 	pos.z = clampf(pos.z, -arena_half_extent, arena_half_extent)
-	pos.y = 0.05
+	pos.y = _ground_height(pos, player) + 0.05
 	var grunt := grunt_scene.instantiate() as Node3D
 	add_child(grunt)
 	grunt.global_position = pos
+
+
+## Drops the spawn point onto whatever world geometry (layer 1) is below it —
+## forest floor, boulder, platform deck — so a ring position that lands on a
+## Hollow Woods prop never embeds a grunt inside it. Tree canopies carry no
+## collision, so under-canopy spawns still hit the floor. Falls back to the
+## flat-floor height if the ray somehow misses everything.
+func _ground_height(pos: Vector3, player: Node3D) -> float:
+	var ray := PhysicsRayQueryParameters3D.create(
+			Vector3(pos.x, 12.0, pos.z), Vector3(pos.x, -1.0, pos.z), 1)
+	var player_body := player as CollisionObject3D
+	if player_body != null:
+		# The player is also on layer 1; never spawn a grunt on their head.
+		var excluded: Array[RID] = [player_body.get_rid()]
+		ray.exclude = excluded
+	var hit := get_world_3d().direct_space_state.intersect_ray(ray)
+	if hit.is_empty():
+		return 0.0
+	var hit_position: Vector3 = hit["position"]
+	return hit_position.y

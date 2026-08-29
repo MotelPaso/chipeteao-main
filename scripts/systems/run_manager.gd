@@ -45,4 +45,9 @@ func _end_run(victory: bool) -> void:
 	if _spawner != null:
 		_spawner.set_physics_process(false)
 	get_tree().paused = true
+	# One-line log so headless soak runs can confirm the loop end-to-end
+	# (grunts reached the player / the clock ran out).
+	print("Run ended: %s at %.1fs (level %d, %d kills)" % [
+			"victory" if victory else "defeat",
+			RunState.run_time, RunState.level, RunState.kills])
 	run_ended.emit(victory)

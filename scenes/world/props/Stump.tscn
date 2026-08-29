@@ -1,0 +1,38 @@
+[gd_scene load_steps=6 format=3 uid="uid://bstum8hw1tj5e"]
+
+[ext_resource type="Material" uid="uid://cbark4hw6px3a" path="res://assets/materials/bark.tres" id="1_bark"]
+[ext_resource type="Material" uid="uid://dwood2hw7zb9e" path="res://assets/materials/wood_cut.tres" id="2_wood"]
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_stump"]
+material = ExtResource("1_bark")
+top_radius = 0.48
+bottom_radius = 0.58
+height = 0.7
+radial_segments = 7
+rings = 1
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_cut"]
+material = ExtResource("2_wood")
+top_radius = 0.44
+bottom_radius = 0.44
+height = 0.06
+radial_segments = 7
+rings = 1
+
+[sub_resource type="CylinderShape3D" id="CylinderShape3D_stump"]
+radius = 0.52
+height = 0.74
+
+[node name="Stump" type="StaticBody3D"]
+
+[node name="Trunk" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.35, 0)
+mesh = SubResource("CylinderMesh_stump")
+
+[node name="CutTop" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.73, 0)
+mesh = SubResource("CylinderMesh_cut")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.37, 0)
+shape = SubResource("CylinderShape3D_stump")
