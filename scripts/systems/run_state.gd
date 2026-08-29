@@ -7,6 +7,7 @@ extends Node
 
 signal xp_changed(current_xp: int, xp_to_next: int)
 signal leveled_up(new_level: int)
+signal kills_changed(total_kills: int)
 
 var xp: int = 0
 var level: int = 1
@@ -34,6 +35,7 @@ func reset() -> void:
 	pickup_radius_multiplier = 1.0
 	xp_to_next = _xp_required(level)
 	xp_changed.emit(xp, xp_to_next)
+	kills_changed.emit(kills)
 
 
 func add_xp(amount: int) -> void:
@@ -52,6 +54,7 @@ func add_xp(amount: int) -> void:
 
 func add_kill() -> void:
 	kills += 1
+	kills_changed.emit(kills)
 
 
 func _xp_required(for_level: int) -> int:

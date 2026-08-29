@@ -5,9 +5,15 @@ extends Node
 ## Emits died once when HP reaches zero; heal_full() re-arms it.
 
 signal damaged(amount: float, current: float)
+## Non-damage HP changes (max_hp raises, full heals) so health bars can
+## re-read both values; damage keeps the dedicated signal above.
+signal hp_changed(current: float, max_hp: float)
 signal died
 
-@export var max_hp: float = 50.0
+@export var max_hp: float = 50.0:
+	set(value):
+		max_hp = value
+		hp_changed.emit(current_hp, max_hp)
 @export var show_damage_popups: bool = true
 
 var current_hp: float
@@ -41,6 +47,7 @@ func take_damage(amount: float) -> void:
 func heal_full() -> void:
 	current_hp = max_hp
 	is_dead = false
+	hp_changed.emit(current_hp, max_hp)
 
 
 func _spawn_damage_popup(amount: float) -> void:
