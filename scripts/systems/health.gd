@@ -49,6 +49,18 @@ func take_damage(amount: float, is_crit: bool = false) -> void:
 		died.emit()
 
 
+## Voluntary HP payment (Greed Shrine): unlike take_damage it ignores
+## armor, spawns no popup, and can never kill — the cost is clamped so at
+## least min_remaining HP stays. Returns the HP actually paid.
+func pay(amount: float, min_remaining: float = 1.0) -> float:
+	if is_dead or amount <= 0.0:
+		return 0.0
+	var paid := minf(amount, maxf(current_hp - min_remaining, 0.0))
+	current_hp -= paid
+	hp_changed.emit(current_hp, max_hp)
+	return paid
+
+
 ## Partial heal (lifesteal etc.): clamped to max_hp, no-op once dead.
 func heal(amount: float) -> void:
 	if is_dead or amount <= 0.0:

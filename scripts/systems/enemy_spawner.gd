@@ -57,6 +57,11 @@ const SPAWN_PHASES: Array[Dictionary] = [
 @export var boss_relief_interval_multiplier: float = 2.0
 @export var boss_relief_duration: float = 15.0
 @export var boss_warning_text: String = "A monstrous presence approaches..."
+@export_group("Pressure Surge")
+## Ring band around a requesting shrine where surge enemies land
+## (spawn_pressure_burst, called by the Charge Shrine via group).
+@export var surge_min_radius: float = 7.0
+@export var surge_max_radius: float = 10.0
 
 ## Elapsed run time in seconds; the HUD run timer will read this later.
 var run_time: float = 0.0
@@ -66,6 +71,11 @@ var _boss_spawned: bool = false
 var _elder_spawned: bool = false
 var _bosses_alive: int = 0
 var _relief_timer: float = 0.0
+
+
+func _ready() -> void:
+	# Shrines reach the spawner through this group, never by node path.
+	add_to_group("enemy_spawner")
 
 
 func _physics_process(delta: float) -> void:
@@ -158,6 +168,37 @@ func _spawn_one() -> void:
 		enemy.make_elite()
 
 
+## Charge Shrine pressure hook (called via the "enemy_spawner" group): an
+## immediate burst of current-phase enemies in a ring around `center`, on
+## top of the normal cadence but still respecting max_active. The usual
+## elite roll applies, so late-run surges stay threatening.
+func spawn_pressure_burst(center: Vector3, count: int) -> void:
+	var player := get_tree().get_first_node_in_group("player") as Node3D
+	if player == null:
+		return
+	var budget := mini(count, max_active - get_child_count())
+	for i in budget:
+		var scene := pick_spawn_scene()
+		if scene == null:
+			return
+		var node := scene.instantiate()
+		var enemy := node as EnemyBase
+		if enemy == null:
+			node.free()
+			return
+		add_child(enemy)
+		# Even ring slots with jitter, so a burst surrounds instead of clumping.
+		var angle := TAU * float(i) / float(budget) + randf_range(-0.35, 0.35)
+		var pos := center + Vector3(cos(angle), 0.0, sin(angle)) \
+				* randf_range(surge_min_radius, surge_max_radius)
+		pos.x = clampf(pos.x, -arena_half_extent, arena_half_extent)
+		pos.z = clampf(pos.z, -arena_half_extent, arena_half_extent)
+		pos.y = _ground_height(pos, player) + 0.05
+		enemy.global_position = pos
+		if randf() < elite_chance():
+			enemy.make_elite()
+
+
 ## Boss timetable, read off RunState.run_time — the canonical run clock the
 ## HUD timer and victory check already use — so the schedule can never
 ## drift from what the player sees. Each entry fires once per run.
@@ -189,6 +230,12 @@ func _spawn_boss(stat_multiplier: float, title_override: String = "") -> void:
 	boss.global_position = _ring_position(player)
 	if stat_multiplier > 1.0:
 		boss.apply_tier(stat_multiplier)
+	# Curse Shrine payoff: the next boss consumes every banked stack and
+	# spawns harder but richer (multipliers exported on the boss).
+	var curse_stacks := RunState.consume_curses()
+	if curse_stacks > 0:
+		boss.apply_curse(curse_stacks)
+		print("Boss cursed: %d stack(s)" % curse_stacks)
 	_bosses_alive += 1
 	var health := Health.find_in(boss)
 	if health != null:

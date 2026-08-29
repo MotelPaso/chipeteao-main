@@ -30,6 +30,7 @@ const BOSS_BAR_COLOR := Color(0.98, 0.62, 0.16)
 @onready var _boss_bar: ProgressBar = %BossBar
 @onready var _boss_name_label: Label = %BossNameLabel
 @onready var _announce_label: Label = %AnnounceLabel
+@onready var _curse_label: Label = %CurseLabel
 
 var _hp_fill: StyleBoxFlat
 var _health: Health
@@ -39,16 +40,19 @@ var _announce_tween: Tween
 
 
 func _ready() -> void:
-	# Bosses and the spawner reach this layer through the group, never by
-	# node path.
+	# Bosses and the spawner reach this layer through "boss_ui"; shrines
+	# use the plain "hud" group (announce, curse readout). Never node paths.
 	add_to_group("boss_ui")
+	add_to_group("hud")
 	_apply_styles()
 	RunState.xp_changed.connect(_on_xp_changed)
 	RunState.leveled_up.connect(_on_leveled_up)
 	RunState.kills_changed.connect(_on_kills_changed)
+	RunState.curse_changed.connect(_on_curse_changed)
 	_on_xp_changed(RunState.xp, RunState.xp_to_next)
 	_on_leveled_up(RunState.level)
 	_on_kills_changed(RunState.kills)
+	_on_curse_changed(RunState.curse_stacks)
 	var player := get_tree().get_first_node_in_group("player")
 	_health = Health.find_in(player) if player != null else null
 	if _health != null:
@@ -91,6 +95,13 @@ func _on_leveled_up(new_level: int) -> void:
 
 func _on_kills_changed(kills: int) -> void:
 	_kills_label.text = "Kills: %d" % kills
+
+
+## Subtle Curse Shrine readout beside the run timer; hidden at 0 stacks
+## (each boss spawn consumes the stacks, which re-hides it).
+func _on_curse_changed(stacks: int) -> void:
+	_curse_label.visible = stacks > 0
+	_curse_label.text = "Cursed x%d" % stacks
 
 
 ## Called through the "boss_ui" group by a boss entering the arena. If one

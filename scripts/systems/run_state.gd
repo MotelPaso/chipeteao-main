@@ -8,6 +8,7 @@ extends Node
 signal xp_changed(current_xp: int, xp_to_next: int)
 signal leveled_up(new_level: int)
 signal kills_changed(total_kills: int)
+signal curse_changed(stacks: int)
 
 var xp: int = 0
 var level: int = 1
@@ -20,6 +21,8 @@ var run_time: float = 0.0
 var run_active: bool = true
 ## Multiplies every gem's magnet radius; raised by pickup-radius upgrades.
 var pickup_radius_multiplier: float = 1.0
+## Curse Shrine stacks waiting for the next boss (see consume_curses).
+var curse_stacks: int = 0
 
 
 func _ready() -> void:
@@ -38,9 +41,11 @@ func reset() -> void:
 	run_time = 0.0
 	run_active = true
 	pickup_radius_multiplier = 1.0
+	curse_stacks = 0
 	xp_to_next = _xp_required(level)
 	xp_changed.emit(xp, xp_to_next)
 	kills_changed.emit(kills)
+	curse_changed.emit(curse_stacks)
 
 
 func add_xp(amount: int) -> void:
@@ -60,6 +65,24 @@ func add_xp(amount: int) -> void:
 func add_kill() -> void:
 	kills += 1
 	kills_changed.emit(kills)
+
+
+## Curse Shrine hook: banks stacks for the next boss spawn.
+func add_curse(stacks: int = 1) -> void:
+	if stacks <= 0:
+		return
+	curse_stacks += stacks
+	curse_changed.emit(curse_stacks)
+
+
+## The next boss to spawn consumes EVERY banked stack at once; returns how
+## many it took (the spawner scales the boss with them).
+func consume_curses() -> int:
+	var stacks := curse_stacks
+	if stacks > 0:
+		curse_stacks = 0
+		curse_changed.emit(curse_stacks)
+	return stacks
 
 
 func _xp_required(for_level: int) -> int:

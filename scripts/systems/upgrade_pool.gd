@@ -90,12 +90,17 @@ const RARITIES: Array[Dictionary] = [
 ## Rolls `count` distinct upgrades from the pool valid for this player's
 ## loadout, each with an independently weighted rarity. Returns
 ## display-ready dicts: entry, rarity, amount, title, description.
-static func roll_offer(player: Node, count: int = 3) -> Array[Dictionary]:
+## Shrine/chest picks pass luck_bonus (temporary rarity-tilt luck on top
+## of PlayerStats) and/or min_rarity (a tier name every ROLLED rarity is
+## floored to; entries with a fixed rarity keep it).
+static func roll_offer(player: Node, count: int = 3, luck_bonus: float = 0.0,
+		min_rarity: String = "") -> Array[Dictionary]:
 	var offer: Array[Dictionary] = []
 	var stats := PlayerStats.find_in(player)
-	var luck := stats.luck if stats != null else 0.0
+	var luck := (stats.luck if stats != null else 0.0) + luck_bonus
+	var floor_index := rarity_index(min_rarity)
 	for entry: Dictionary in _weighted_pick(build_pool(player), count):
-		var rarity := _rarity_for(entry, luck)
+		var rarity := _rarity_for(entry, luck, floor_index)
 		if String(entry.get("kind", "stat")) == "new_weapon":
 			offer.append({
 				"entry": entry,
@@ -308,26 +313,37 @@ static func _weighted_pick(entries: Array[Dictionary], count: int) -> Array[Dict
 	return picked
 
 
-static func _rarity_for(entry: Dictionary, luck: float) -> Dictionary:
+## Index of a rarity tier by name; unknown or empty names map to the base
+## tier (index 0), which floors nothing.
+static func rarity_index(rarity_name: String) -> int:
+	for i: int in RARITIES.size():
+		if String(RARITIES[i].name) == rarity_name:
+			return i
+	return 0
+
+
+static func _rarity_for(entry: Dictionary, luck: float, floor_index: int = 0) -> Dictionary:
 	var fixed_name: String = String(entry.get("rarity", ""))
 	if not fixed_name.is_empty():
 		for rarity: Dictionary in RARITIES:
 			if String(rarity.name) == fixed_name:
 				return rarity
-	return _roll_rarity(luck)
+	return _roll_rarity(luck, floor_index)
 
 
-static func _roll_rarity(luck: float) -> Dictionary:
+static func _roll_rarity(luck: float, floor_index: int = 0) -> Dictionary:
 	var weights := _rarity_weights(luck)
 	var total := 0.0
 	for weight: float in weights:
 		total += weight
 	var pick := randf() * total
+	var index := 0
 	for i: int in RARITIES.size():
 		pick -= weights[i]
 		if pick <= 0.0:
-			return RARITIES[i]
-	return RARITIES[0]
+			index = i
+			break
+	return RARITIES[maxi(index, floor_index)]
 
 
 ## Roll-time rarity weights: luck linearly moves a capped fraction of the

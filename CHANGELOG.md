@@ -11,3 +11,4 @@
 - Iteration 9: Tomes + stats layer (8 stackable tomes, global multipliers, crit/lifesteal/armor/luck, luck-tilted rarity)
 - Iteration 10: Enemy variety (skirmisher ranged AI, armored tank, glowing elites with 5x XP, time-phased spawn composition)
 - Iteration 11: Rotking boss fight (telegraphed moveset, threshold summons, boss HP bar, minute-5 and minute-11 Elder spawns)
+- Iteration 12: Shrines & chests (channel-under-pressure Charge, HP-gamble Greed, boss-curse stacks, verticality-payoff chests, interact system)

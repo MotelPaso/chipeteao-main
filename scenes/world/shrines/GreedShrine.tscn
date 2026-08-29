@@ -1,0 +1,133 @@
+[gd_scene load_steps=17 format=3 uid="uid://bshrn2grd5me1"]
+
+[ext_resource type="Script" path="res://scripts/world/greed_shrine.gd" id="1_greed"]
+[ext_resource type="PackedScene" path="res://scenes/systems/XpGem.tscn" id="2_gem"]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_darkstone"]
+albedo_color = Color(0.21, 0.19, 0.24, 1)
+roughness = 0.9
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_slab"]
+albedo_color = Color(0.14, 0.13, 0.17, 1)
+roughness = 0.85
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_bone"]
+albedo_color = Color(0.85, 0.8, 0.66, 1)
+roughness = 0.7
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_eye"]
+shading_mode = 0
+albedo_color = Color(0.9, 0.15, 0.1, 1)
+emission_enabled = true
+emission = Color(1, 0.18, 0.1, 1)
+emission_energy_multiplier = 1.8
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_wax"]
+albedo_color = Color(0.78, 0.73, 0.6, 1)
+roughness = 0.8
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_flame"]
+shading_mode = 0
+albedo_color = Color(1, 0.62, 0.2, 1)
+emission_enabled = true
+emission = Color(1, 0.55, 0.15, 1)
+emission_energy_multiplier = 2.2
+
+[sub_resource type="BoxMesh" id="BoxMesh_base"]
+material = SubResource("StandardMaterial3D_darkstone")
+size = Vector3(1.7, 0.8, 1.1)
+
+[sub_resource type="BoxMesh" id="BoxMesh_top"]
+material = SubResource("StandardMaterial3D_slab")
+size = Vector3(1.95, 0.16, 1.3)
+
+[sub_resource type="SphereMesh" id="SphereMesh_skull"]
+material = SubResource("StandardMaterial3D_bone")
+radius = 0.24
+height = 0.44
+radial_segments = 6
+rings = 4
+
+[sub_resource type="BoxMesh" id="BoxMesh_eye"]
+material = SubResource("StandardMaterial3D_eye")
+size = Vector3(0.07, 0.07, 0.07)
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_candle"]
+material = SubResource("StandardMaterial3D_wax")
+top_radius = 0.055
+bottom_radius = 0.07
+height = 0.3
+
+[sub_resource type="SphereMesh" id="SphereMesh_flame"]
+material = SubResource("StandardMaterial3D_flame")
+radius = 0.045
+height = 0.1
+
+[sub_resource type="CylinderShape3D" id="CylinderShape3D_zone"]
+radius = 2.6
+height = 3.0
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_body"]
+size = Vector3(1.7, 0.95, 1.1)
+
+[node name="GreedShrine" type="Area3D"]
+collision_layer = 0
+collision_mask = 1
+script = ExtResource("1_greed")
+xp_gem_scene = ExtResource("2_gem")
+prompt_text = "[E] Offer blood"
+prompt_height = 2.6
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.5, 0)
+shape = SubResource("CylinderShape3D_zone")
+
+[node name="Visual" type="Node3D" parent="."]
+
+[node name="AltarBase" type="MeshInstance3D" parent="Visual"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.4, 0)
+mesh = SubResource("BoxMesh_base")
+
+[node name="AltarTop" type="MeshInstance3D" parent="Visual"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.88, 0)
+mesh = SubResource("BoxMesh_top")
+
+[node name="Skull" type="MeshInstance3D" parent="Visual"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.14, 0.18)
+mesh = SubResource("SphereMesh_skull")
+
+[node name="EyeLeft" type="MeshInstance3D" parent="Visual"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.085, 1.18, 0.37)
+mesh = SubResource("BoxMesh_eye")
+
+[node name="EyeRight" type="MeshInstance3D" parent="Visual"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.085, 1.18, 0.37)
+mesh = SubResource("BoxMesh_eye")
+
+[node name="CandleLeft" type="MeshInstance3D" parent="Visual"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.72, 1.11, -0.2)
+mesh = SubResource("CylinderMesh_candle")
+
+[node name="FlameLeft" type="MeshInstance3D" parent="Visual"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.72, 1.31, -0.2)
+mesh = SubResource("SphereMesh_flame")
+
+[node name="CandleRight" type="MeshInstance3D" parent="Visual"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.72, 1.11, -0.2)
+mesh = SubResource("CylinderMesh_candle")
+
+[node name="FlameRight" type="MeshInstance3D" parent="Visual"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.72, 1.31, -0.2)
+mesh = SubResource("SphereMesh_flame")
+
+[node name="Glow" type="OmniLight3D" parent="Visual"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.7, 0.2)
+light_color = Color(0.85, 0.3, 0.45, 1)
+light_energy = 0.9
+omni_range = 4.5
+
+[node name="Body" type="StaticBody3D" parent="."]
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Body"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.475, 0)
+shape = SubResource("BoxShape3D_body")

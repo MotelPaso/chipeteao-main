@@ -1,4 +1,4 @@
-[gd_scene load_steps=24 format=3 uid="uid://dqv5m2x8rk1fj"]
+[gd_scene load_steps=28 format=3 uid="uid://dqv5m2x8rk1fj"]
 
 [ext_resource type="PackedScene" uid="uid://c8k2h1n3m5p0a" path="res://scenes/player/Player.tscn" id="1_player"]
 [ext_resource type="PackedScene" uid="uid://dn4r8t2ycv5qb" path="res://scenes/enemies/TargetDummy.tscn" id="2_dummy"]
@@ -17,6 +17,10 @@
 [ext_resource type="PackedScene" uid="uid://bstum8hw1tj5e" path="res://scenes/world/props/Stump.tscn" id="12_stump"]
 [ext_resource type="PackedScene" uid="uid://dramp7hw4qe1c" path="res://scenes/world/props/Ramp.tscn" id="13_ramp"]
 [ext_resource type="PackedScene" uid="uid://cplat2hw9rn6b" path="res://scenes/world/props/Platform.tscn" id="14_platform"]
+[ext_resource type="PackedScene" uid="uid://cshrn1chrg4ka" path="res://scenes/world/shrines/ChargeShrine.tscn" id="18_chargeshrine"]
+[ext_resource type="PackedScene" uid="uid://bshrn2grd5me1" path="res://scenes/world/shrines/GreedShrine.tscn" id="19_greedshrine"]
+[ext_resource type="PackedScene" uid="uid://dshrn3crs6pa2" path="res://scenes/world/shrines/CurseShrine.tscn" id="20_curseshrine"]
+[ext_resource type="PackedScene" uid="uid://cchst4lut7qb3" path="res://scenes/world/chests/Chest.tscn" id="21_chest"]
 
 [sub_resource type="Shader" id="Shader_grass"]
 code = "shader_type spatial;
@@ -128,6 +132,26 @@ transform = Transform3D(0.75, 0, 0, 0, 0.75, 0, 0, 0, 0.75, -6, 0, 1.2)
 
 [node name="RockStepHigh" parent="Verticality/KnollSouth" instance=ExtResource("11_rock")]
 transform = Transform3D(1.05, 0, 0, 0, 1.05, 0, 0, 0, 1.05, -4.2, 0, -0.8)
+
+[node name="Interactables" type="Node3D" parent="."]
+
+[node name="ChargeShrine" parent="Interactables" groups=["scatter_keepout"] instance=ExtResource("18_chargeshrine")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -24, 0, -24)
+
+[node name="GreedShrine" parent="Interactables" groups=["scatter_keepout"] instance=ExtResource("19_greedshrine")]
+transform = Transform3D(-0.5, 0, -0.866025, 0, 1, 0, 0.866025, 0, -0.5, 26, 0, 18)
+
+[node name="CurseShrine" parent="Interactables" groups=["scatter_keepout"] instance=ExtResource("20_curseshrine")]
+transform = Transform3D(0.866025, 0, 0.5, 0, 1, 0, -0.5, 0, 0.866025, -2, 0, -30)
+
+[node name="ChestGround" parent="Interactables" groups=["scatter_keepout"] instance=ExtResource("21_chest")]
+transform = Transform3D(0.707107, 0, 0.707107, 0, 1, 0, -0.707107, 0, 0.707107, -12, 0, 18)
+
+[node name="ChestRiseEast" parent="Interactables" instance=ExtResource("21_chest")]
+transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, 18, 2, -14)
+
+[node name="ChestKnollSouth" parent="Interactables" instance=ExtResource("21_chest")]
+transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, 2, 2, 24)
 
 [node name="ForestScatter" type="Node3D" parent="."]
 script = ExtResource("9_scatter")

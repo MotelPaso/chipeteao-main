@@ -63,6 +63,12 @@ const IMPACT_COLOR := Color(1.0, 0.8, 0.35)
 ## Extra body scale applied per apply_tier() call (Elder and beyond).
 @export var tier_body_scale: float = 1.15
 
+@export_group("Curse")
+## Extra HP/damage fraction per curse stack (0.4 = +40% each).
+@export var curse_stat_bonus_per_stack: float = 0.4
+## Death-payout gem count is multiplied by this once per curse stack.
+@export var curse_gem_factor_per_stack: int = 2
+
 var _state: State = State.ENTRANCE
 var _state_timer: float = 0.0
 var _entrance_played: bool = false
@@ -108,6 +114,21 @@ func apply_tier(multiplier: float) -> void:
 	root_burst_damage *= multiplier
 	boss_gem_value = ceili(float(boss_gem_value) * multiplier)
 	scale *= tier_body_scale
+
+
+## Curse Shrine payoff, applied by the spawner right after any apply_tier:
+## every consumed stack adds curse_stat_bonus_per_stack HP/damage, and the
+## death gem payout doubles per stack. Call while the boss is in the tree.
+func apply_curse(stacks: int) -> void:
+	if stacks <= 0:
+		return
+	var multiplier := 1.0 + curse_stat_bonus_per_stack * float(stacks)
+	_health.max_hp *= multiplier
+	_health.heal_full()
+	smash_damage *= multiplier
+	root_burst_damage *= multiplier
+	for i in stacks:
+		boss_gem_count *= curse_gem_factor_per_stack
 
 
 func _behavior_tick(delta: float) -> void:

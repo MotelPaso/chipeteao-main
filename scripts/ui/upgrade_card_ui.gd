@@ -1,8 +1,11 @@
 extends CanvasLayer
-## Level-up card picker: on RunState.leveled_up it pauses the tree, frees
-## the mouse, and offers 3 rolled upgrades from UpgradePool. Runs with
+## Card picker: on RunState.leveled_up it pauses the tree, frees the
+## mouse, and offers 3 rolled upgrades from UpgradePool. Runs with
 ## process_mode ALWAYS so its buttons work while everything else is
-## paused. Level-ups arriving while already open are queued and served as
+## paused. Shrines and chests reach it through the "upgrade_ui" group via
+## open_bonus_pick() for free picks (optionally luck-boosted or
+## rarity-floored). Level-ups or bonus picks arriving while already open
+## are queued — pending levels first, then bonus picks — and served as
 ## consecutive rerolls before unpausing.
 
 @onready var _level_label: Label = %LevelLabel
@@ -10,13 +13,34 @@ extends CanvasLayer
 
 var _offer: Array[Dictionary] = []
 var _pending_levels: int = 0
+## Queued open_bonus_pick requests ({title, luck_bonus, min_rarity}).
+var _pending_bonus: Array[Dictionary] = []
+## Roll context for the pick currently on screen (zeroed for level picks).
+var _luck_bonus: float = 0.0
+var _min_rarity: String = ""
 
 
 func _ready() -> void:
 	visible = false
+	add_to_group("upgrade_ui")
 	RunState.leveled_up.connect(_on_leveled_up)
 	for i in _cards.size():
 		_cards[i].pressed.connect(_on_card_pressed.bind(i))
+
+
+## Public (shrines/chests via the "upgrade_ui" group): a free card pick
+## outside the level-up flow. luck_bonus is temporary rarity-tilt luck for
+## this roll only; min_rarity (e.g. "Rare") floors every rolled rarity.
+## Queues behind whatever pick is already open; same-frame level-ups and
+## bonus picks therefore never eat each other.
+func open_bonus_pick(title: String, luck_bonus: float = 0.0, min_rarity: String = "") -> void:
+	if not RunState.run_active:
+		return
+	var request := {"title": title, "luck_bonus": luck_bonus, "min_rarity": min_rarity}
+	if visible:
+		_pending_bonus.append(request)
+		return
+	_open_bonus_pick(request)
 
 
 func _on_leveled_up(new_level: int) -> void:
@@ -27,13 +51,25 @@ func _on_leveled_up(new_level: int) -> void:
 	if visible:
 		_pending_levels += 1
 		return
-	_open(new_level)
+	_open_level_pick(new_level)
 
 
-func _open(new_level: int) -> void:
+func _open_level_pick(new_level: int) -> void:
+	_luck_bonus = 0.0
+	_min_rarity = ""
+	_open("Level %d — choose an upgrade" % new_level)
+
+
+func _open_bonus_pick(request: Dictionary) -> void:
+	_luck_bonus = float(request.luck_bonus)
+	_min_rarity = String(request.min_rarity)
+	_open(String(request.title))
+
+
+func _open(title: String) -> void:
 	get_tree().paused = true
 	Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
-	_level_label.text = "Level %d — choose an upgrade" % new_level
+	_level_label.text = title
 	_roll()
 	visible = true
 
@@ -42,7 +78,7 @@ func _roll() -> void:
 	# The pool needs the player to offer only owned-weapon upgrades and
 	# unowned new-weapon cards (re-derived on every reroll).
 	var player := get_tree().get_first_node_in_group("player")
-	_offer = UpgradePool.roll_offer(player, _cards.size())
+	_offer = UpgradePool.roll_offer(player, _cards.size(), _luck_bonus, _min_rarity)
 	for i in _cards.size():
 		_cards[i].visible = i < _offer.size()
 		if i < _offer.size():
@@ -83,8 +119,11 @@ func _on_card_pressed(index: int) -> void:
 		UpgradePool.apply(_offer[index], player)
 	if _pending_levels > 0:
 		_pending_levels -= 1
-		_level_label.text = "Level %d — choose an upgrade" % RunState.level
-		_roll()
+		_open_level_pick(RunState.level)
+		return
+	if not _pending_bonus.is_empty():
+		var request: Dictionary = _pending_bonus.pop_front()
+		_open_bonus_pick(request)
 		return
 	_close()
 
