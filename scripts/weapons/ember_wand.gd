@@ -26,7 +26,9 @@ func _ready() -> void:
 
 func fire(target: Node3D) -> void:
 	var center := target.global_position
-	var radius_sq := burst_radius * burst_radius
+	# Area tomes grow the burst; the visual expands to the same radius.
+	var radius := burst_radius * area_scale()
+	var radius_sq := radius * radius
 	for enemy in get_tree().get_nodes_in_group("enemies"):
 		var body := enemy as Node3D
 		if body == null or not body.is_inside_tree():
@@ -35,11 +37,11 @@ func fire(target: Node3D) -> void:
 			continue
 		var health := Health.find_in(body)
 		if health != null:
-			health.take_damage(damage)
-	_spawn_burst_visual(center)
+			deal_damage(health)
+	_spawn_burst_visual(center, radius)
 
 
-func _spawn_burst_visual(center: Vector3) -> void:
+func _spawn_burst_visual(center: Vector3, radius: float) -> void:
 	var burst := MeshInstance3D.new()
 	burst.mesh = _burst_mesh
 	burst.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
@@ -52,7 +54,7 @@ func _spawn_burst_visual(center: Vector3) -> void:
 	burst.scale = Vector3.ONE * 0.2
 	var tween := burst.create_tween()
 	tween.set_parallel(true)
-	tween.tween_property(burst, "scale", Vector3.ONE * burst_radius, burst_effect_time) \
+	tween.tween_property(burst, "scale", Vector3.ONE * radius, burst_effect_time) \
 			.set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
 	tween.tween_property(burst, "transparency", 1.0, burst_effect_time) \
 			.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)

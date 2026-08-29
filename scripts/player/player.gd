@@ -29,6 +29,7 @@ extends CharacterBody3D
 @onready var collision_shape: CollisionShape3D = $CollisionShape3D
 @onready var mesh_instance: MeshInstance3D = $MeshInstance3D
 @onready var health: Health = $Health
+@onready var _stats: PlayerStats = $Stats
 
 var _gravity: float = ProjectSettings.get_setting("physics/3d/default_gravity", 9.8)
 var _default_collision_height: float = 1.8
@@ -84,6 +85,9 @@ func _physics_process(delta: float) -> void:
 	wish_dir.y = 0.0
 	wish_dir = wish_dir.normalized() if wish_dir.length_squared() > 0.0 else Vector3.ZERO
 
+	# Tome of Swiftness etc. scale on top of the exported base speed.
+	var effective_speed: float = move_speed * _stats.move_speed_multiplier
+
 	if _slide_cooldown_timer > 0.0:
 		_slide_cooldown_timer -= delta
 
@@ -91,15 +95,15 @@ func _physics_process(delta: float) -> void:
 		_slide_timer -= delta
 		if _slide_timer <= 0.0 or not is_on_floor():
 			_end_slide()
-	elif _can_start_slide(wish_dir):
+	elif _can_start_slide(wish_dir, effective_speed):
 		_start_slide(wish_dir)
 
 	if _is_sliding:
-		var slide_velocity: Vector3 = _slide_direction * move_speed * slide_speed_multiplier
+		var slide_velocity: Vector3 = _slide_direction * effective_speed * slide_speed_multiplier
 		velocity.x = slide_velocity.x
 		velocity.z = slide_velocity.z
 	else:
-		var target: Vector3 = wish_dir * move_speed
+		var target: Vector3 = wish_dir * effective_speed
 		var accel: float = acceleration if is_on_floor() else air_acceleration
 		velocity.x = move_toward(velocity.x, target.x, accel * delta)
 		velocity.z = move_toward(velocity.z, target.z, accel * delta)
@@ -133,13 +137,13 @@ func _on_health_died() -> void:
 			.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
 
 
-func _can_start_slide(wish_dir: Vector3) -> bool:
+func _can_start_slide(wish_dir: Vector3, effective_speed: float) -> bool:
 	if not Input.is_action_pressed("sprint") or wish_dir == Vector3.ZERO:
 		return false
 	if not is_on_floor() or _slide_cooldown_timer > 0.0:
 		return false
 	var horizontal_speed: float = Vector2(velocity.x, velocity.z).length()
-	return horizontal_speed > move_speed * 0.5
+	return horizontal_speed > effective_speed * 0.5
 
 
 func _start_slide(direction: Vector3) -> void:

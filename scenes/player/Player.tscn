@@ -1,8 +1,9 @@
-[gd_scene load_steps=8 format=3 uid="uid://c8k2h1n3m5p0a"]
+[gd_scene load_steps=9 format=3 uid="uid://c8k2h1n3m5p0a"]
 
 [ext_resource type="Script" path="res://scripts/player/player.gd" id="1_player"]
 [ext_resource type="PackedScene" uid="uid://bqw7e3f1xk2ma" path="res://scenes/weapons/Shortsword.tscn" id="2_shortsword"]
 [ext_resource type="Script" path="res://scripts/systems/health.gd" id="3_health"]
+[ext_resource type="Script" path="res://scripts/systems/player_stats.gd" id="4_stats"]
 
 [sub_resource type="CapsuleShape3D" id="CapsuleShape3D_1"]
 radius = 0.4
@@ -48,3 +49,6 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.1, 0)
 [node name="Health" type="Node" parent="."]
 script = ExtResource("3_health")
 max_hp = 100.0
+
+[node name="Stats" type="Node" parent="."]
+script = ExtResource("4_stats")

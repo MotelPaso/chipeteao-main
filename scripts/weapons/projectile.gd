@@ -15,7 +15,7 @@ extends Area3D
 
 @onready var _tracer: MeshInstance3D = $Tracer
 
-var _damage: float = 0.0
+var _source: WeaponBase = null
 var _max_distance: float = 20.0
 var _travelled: float = 0.0
 var _target: Node3D = null
@@ -28,9 +28,11 @@ func _ready() -> void:
 	tween.tween_property(_tracer, "scale", Vector3.ONE, 0.12)
 
 
-## Called by the firing weapon right after spawning and orienting the bullet.
-func launch(damage: float, max_distance: float, target: Node3D) -> void:
-	_damage = damage
+## Called by the firing weapon right after spawning and orienting the
+## bullet. Damage is resolved at impact through the weapon's shared
+## deal_damage funnel so global stats (crit, lifesteal) apply.
+func launch(source: WeaponBase, max_distance: float, target: Node3D) -> void:
+	_source = source
 	_max_distance = max_distance
 	_target = target
 
@@ -73,6 +75,8 @@ func _on_body_entered(body: Node3D) -> void:
 	if not body.is_in_group("enemies"):
 		return
 	var health := Health.find_in(body)
-	if health != null:
-		health.take_damage(_damage)
+	# A dart whose weapon was freed mid-flight fizzles (cannot happen with
+	# the current no-weapon-removal rules; belt and braces).
+	if health != null and _source != null and is_instance_valid(_source):
+		_source.deal_damage(health)
 	queue_free()

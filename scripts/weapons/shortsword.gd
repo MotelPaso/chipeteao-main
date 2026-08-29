@@ -23,7 +23,9 @@ func fire(target: Node3D) -> void:
 
 func _hit_enemies_in_arc(center_dir: Vector3) -> void:
 	var half_arc := deg_to_rad(arc_angle_deg * 0.5)
-	var range_sq := attack_range * attack_range
+	# Area tomes extend the swing's reach past the base targeting range.
+	var reach := attack_range * area_scale()
+	var range_sq := reach * reach
 	for enemy in get_tree().get_nodes_in_group("enemies"):
 		var body := enemy as Node3D
 		if body == null or not body.is_inside_tree():
@@ -38,7 +40,7 @@ func _hit_enemies_in_arc(center_dir: Vector3) -> void:
 			continue
 		var health := Health.find_in(body)
 		if health != null:
-			health.take_damage(damage)
+			deal_damage(health)
 
 
 func _play_swing(center_dir: Vector3) -> void:

@@ -3,12 +3,14 @@ extends RefCounted
 ## Data-driven pool of level-up upgrades with rarity weighting (GDD 3/4).
 ## The offer pool is rebuilt per roll from:
 ##   - GENERIC_POOL: player/health/run_state tweaks, always available.
+##   - Tome cards (Tome.TOME_LIBRARY): the next stack of every tome the
+##     player has not capped yet; applying adds a stack to PlayerStats.
 ##   - Per-OWNED-weapon stat entries (damage/cooldown/range, plus extras
 ##     declared in WEAPON_LIBRARY), so every carried weapon keeps scaling.
 ##   - "new_weapon" cards for library weapons the player does NOT own yet,
 ##     hidden entirely once the player's max_weapons cap is reached.
 ## Entry fields:
-##   kind:     "stat" (default, omitted) or "new_weapon"
+##   kind:     "stat" (default, omitted), "new_weapon", or "tome"
 ##   target:   "player" | "health" | "run_state" | "weapon/<NodeName>"
 ##             (weapons are looked up under the player's Weapons mount)
 ##   op:       "mul_percent" (amount = +/- percent) | "add" (flat amount)
@@ -18,6 +20,8 @@ extends RefCounted
 ##   rarity:   fixes the card's rarity tier by name instead of rolling one.
 ## Rarity multiplies the base amount (an Epic +25% card rolls +50%), so
 ## future weapons/tomes just append entries — the card UI never changes.
+## Rolled rarity weights are tilted by the player's luck stat (PlayerStats):
+## luck linearly moves a capped fraction of Common's weight up the tiers.
 
 ## Every equippable weapon: new_weapon cards and per-owned-weapon stat
 ## entries are generated from this, so adding a weapon is one new row.
@@ -51,19 +55,21 @@ const WEAPON_LIBRARY: Array[Dictionary] = [
 const DEFAULT_MAX_WEAPONS: int = 4
 ## New-weapon cards show up meaningfully but less often than stat cards.
 const NEW_WEAPON_OFFER_WEIGHT: float = 0.6
+## Eight tome entries would otherwise crowd the pool; damp each a little.
+const TOME_OFFER_WEIGHT: float = 0.8
+## Each luck point moves this fraction of Common's rarity weight upward.
+const LUCK_TILT_PER_POINT: float = 0.01
+## At most half of Common's weight can tilt away, however high luck gets.
+const MAX_LUCK_TILT: float = 0.5
 
+## Stats with a tome equivalent (move speed -> Tome of Swiftness) live only
+## in the tome catalog; entries here have no tome counterpart.
 const GENERIC_POOL: Array[Dictionary] = [
 	{
 		"id": "max_hp", "title": "Stout Heart",
 		"description": "Max HP +%d and heal to full",
 		"target": "health", "property": "max_hp",
 		"op": "add", "amount": 20.0, "full_heal": true,
-	},
-	{
-		"id": "move_speed", "title": "Fleet Feet",
-		"description": "Move speed +%d%%",
-		"target": "player", "property": "move_speed",
-		"op": "mul_percent", "amount": 8.0,
 	},
 	{
 		"id": "pickup_radius", "title": "Greed Aura",
@@ -86,8 +92,10 @@ const RARITIES: Array[Dictionary] = [
 ## display-ready dicts: entry, rarity, amount, title, description.
 static func roll_offer(player: Node, count: int = 3) -> Array[Dictionary]:
 	var offer: Array[Dictionary] = []
+	var stats := PlayerStats.find_in(player)
+	var luck := stats.luck if stats != null else 0.0
 	for entry: Dictionary in _weighted_pick(build_pool(player), count):
-		var rarity := _rarity_for(entry)
+		var rarity := _rarity_for(entry, luck)
 		if String(entry.get("kind", "stat")) == "new_weapon":
 			offer.append({
 				"entry": entry,
@@ -108,12 +116,15 @@ static func roll_offer(player: Node, count: int = 3) -> Array[Dictionary]:
 	return offer
 
 
-## The full pool the player can currently roll from: generic entries, stat
-## entries for each owned weapon, and new_weapon cards for unowned ones
-## (none once the weapon cap is reached).
+## The full pool the player can currently roll from: generic entries, tome
+## cards below their stack cap, stat entries for each owned weapon, and
+## new_weapon cards for unowned ones (none once the weapon cap is reached).
 static func build_pool(player: Node) -> Array[Dictionary]:
 	var pool := GENERIC_POOL.duplicate()
-	var mount := player.get_node_or_null("Weapons") if player != null else null
+	if player == null:
+		return pool
+	pool.append_array(_tome_entries(player))
+	var mount := player.get_node_or_null("Weapons")
 	if mount == null:
 		return pool
 	var owned := 0
@@ -131,9 +142,13 @@ static func build_pool(player: Node) -> Array[Dictionary]:
 ## Applies one rolled offer to the live nodes reachable from `player`.
 static func apply(offer: Dictionary, player: Node) -> void:
 	var entry: Dictionary = offer.entry
-	if String(entry.get("kind", "stat")) == "new_weapon":
-		_grant_weapon(entry, player)
-		return
+	match String(entry.get("kind", "stat")):
+		"new_weapon":
+			_grant_weapon(entry, player)
+			return
+		"tome":
+			_grant_tome(entry, offer, player)
+			return
 	var target := _resolve_target(entry.target, player)
 	if target == null:
 		push_warning("UpgradePool: target '%s' not found for '%s'" % [entry.target, entry.id])
@@ -181,6 +196,32 @@ static func _entries_for_weapon(weapon: Dictionary) -> Array[Dictionary]:
 	return entries
 
 
+## One card per tome below its stack cap, offering the NEXT stack (the
+## title carries the stack numeral, e.g. "Tome of Fury II"). The rolled
+## rarity's potency scales the granted amounts exactly like stat cards.
+static func _tome_entries(player: Node) -> Array[Dictionary]:
+	var stats := PlayerStats.find_in(player)
+	var entries: Array[Dictionary] = []
+	for tome: Dictionary in Tome.TOME_LIBRARY:
+		var tome_id := String(tome.id)
+		var next_stack := (stats.stack_count(tome_id) if stats != null else 0) + 1
+		if next_stack > Tome.MAX_STACKS:
+			continue
+		var effects: Array = tome.effects
+		var primary: Dictionary = effects[0]
+		entries.append({
+			"id": tome_id,
+			"kind": "tome",
+			"tome_id": tome_id,
+			"title": Tome.display_title(tome, next_stack),
+			"description": String(tome.description),
+			# The primary effect drives the number shown on the card.
+			"amount": float(primary.amount),
+			"offer_weight": TOME_OFFER_WEIGHT,
+		})
+	return entries
+
+
 static func _new_weapon_entry(weapon: Dictionary) -> Dictionary:
 	return {
 		"id": "gain_" + String(weapon.id),
@@ -209,6 +250,17 @@ static func _grant_weapon(entry: Dictionary, player: Node) -> void:
 	var weapon := scene.instantiate() as Node3D
 	weapon.name = String(entry.weapon_name)
 	mount.add_child(weapon)
+
+
+## Adds one stack at the rolled rarity's potency; PlayerStats recomputes
+## every derived stat from scratch, so displayed amounts match applied.
+static func _grant_tome(entry: Dictionary, offer: Dictionary, player: Node) -> void:
+	var stats := PlayerStats.find_in(player)
+	if stats == null:
+		push_warning("UpgradePool: no PlayerStats on player for '%s'" % entry.id)
+		return
+	var rarity: Dictionary = offer.rarity
+	stats.add_tome(String(entry.tome_id), float(rarity.potency))
 
 
 static func _max_weapons(player: Node) -> int:
@@ -256,22 +308,43 @@ static func _weighted_pick(entries: Array[Dictionary], count: int) -> Array[Dict
 	return picked
 
 
-static func _rarity_for(entry: Dictionary) -> Dictionary:
+static func _rarity_for(entry: Dictionary, luck: float) -> Dictionary:
 	var fixed_name: String = String(entry.get("rarity", ""))
 	if not fixed_name.is_empty():
 		for rarity: Dictionary in RARITIES:
 			if String(rarity.name) == fixed_name:
 				return rarity
-	return _roll_rarity()
+	return _roll_rarity(luck)
 
 
-static func _roll_rarity() -> Dictionary:
+static func _roll_rarity(luck: float) -> Dictionary:
+	var weights := _rarity_weights(luck)
 	var total := 0.0
-	for rarity in RARITIES:
-		total += rarity.weight
+	for weight: float in weights:
+		total += weight
 	var pick := randf() * total
-	for rarity in RARITIES:
-		pick -= rarity.weight
+	for i: int in RARITIES.size():
+		pick -= weights[i]
 		if pick <= 0.0:
-			return rarity
+			return RARITIES[i]
 	return RARITIES[0]
+
+
+## Roll-time rarity weights: luck linearly moves a capped fraction of the
+## base tier's (RARITIES[0], Common) weight onto the higher tiers,
+## distributed proportionally to their base weights.
+static func _rarity_weights(luck: float) -> PackedFloat32Array:
+	var weights := PackedFloat32Array()
+	var upper_total := 0.0
+	for i: int in RARITIES.size():
+		weights.append(float(RARITIES[i].weight))
+		if i > 0:
+			upper_total += float(RARITIES[i].weight)
+	var tilt := clampf(luck * LUCK_TILT_PER_POINT, 0.0, MAX_LUCK_TILT)
+	if tilt <= 0.0 or upper_total <= 0.0:
+		return weights
+	var moved := weights[0] * tilt
+	weights[0] -= moved
+	for i: int in range(1, weights.size()):
+		weights[i] += moved * float(RARITIES[i].weight) / upper_total
+	return weights

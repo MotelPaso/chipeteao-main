@@ -38,4 +38,4 @@ func _spawn_dart(direction: Vector3, target: Node3D) -> void:
 	parent_node.add_child(dart)
 	dart.global_transform = Transform3D(
 			Basis.looking_at(direction, Vector3.UP), _muzzle.global_position)
-	dart.launch(damage, attack_range * range_grace, target)
+	dart.launch(self, attack_range * range_grace, target)

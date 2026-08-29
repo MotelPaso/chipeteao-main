@@ -8,3 +8,4 @@
 - Iteration 6: Run-end flow (death + 15-min survival victory, stats screen, retry/quit, player death state)
 - Iteration 7: Hollow Woods arena (low-poly trees/rocks/ramps/platforms, forest mood lighting and fog, perimeter treatment)
 - Iteration 8: Weapon variety (Dart Pistol projectiles, Ember Wand AoE bursts, new-weapon acquisition cards, per-owned-weapon upgrades, 4-weapon cap)
+- Iteration 9: Tomes + stats layer (8 stackable tomes, global multipliers, crit/lifesteal/armor/luck, luck-tilted rarity)
