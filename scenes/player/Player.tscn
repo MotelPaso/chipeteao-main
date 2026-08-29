@@ -1,6 +1,7 @@
-[gd_scene load_steps=6 format=3 uid="uid://c8k2h1n3m5p0a"]
+[gd_scene load_steps=7 format=3 uid="uid://c8k2h1n3m5p0a"]
 
 [ext_resource type="Script" path="res://scripts/player/player.gd" id="1_player"]
+[ext_resource type="PackedScene" uid="uid://bqw7e3f1xk2ma" path="res://scenes/weapons/Shortsword.tscn" id="2_shortsword"]
 
 [sub_resource type="CapsuleShape3D" id="CapsuleShape3D_1"]
 radius = 0.4
@@ -36,3 +37,8 @@ spring_length = 5.0
 [node name="Camera3D" type="Camera3D" parent="SpringArm3D"]
 current = true
 fov = 70.0
+
+[node name="Weapons" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.1, 0)
+
+[node name="Shortsword" parent="Weapons" instance=ExtResource("2_shortsword")]

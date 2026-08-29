@@ -1,6 +1,7 @@
-[gd_scene load_steps=18 format=3 uid="uid://dqv5m2x8rk1fj"]
+[gd_scene load_steps=19 format=3 uid="uid://dqv5m2x8rk1fj"]
 
 [ext_resource type="PackedScene" uid="uid://c8k2h1n3m5p0a" path="res://scenes/player/Player.tscn" id="1_player"]
+[ext_resource type="PackedScene" uid="uid://dn4r8t2ycv5qb" path="res://scenes/enemies/TargetDummy.tscn" id="2_dummy"]
 
 [sub_resource type="Shader" id="Shader_grid"]
 code = "shader_type spatial;
@@ -134,3 +135,14 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.5, 0)
 shape = SubResource("BoxShape3D_pillar")
 
 [node name="Player" parent="." instance=ExtResource("1_player")]
+
+[node name="Dummies" type="Node3D" parent="."]
+
+[node name="TargetDummy" parent="Dummies" instance=ExtResource("2_dummy")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.2, 0, -2.2)
+
+[node name="TargetDummy2" parent="Dummies" instance=ExtResource("2_dummy")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -3, 0, -6)
+
+[node name="TargetDummy3" parent="Dummies" instance=ExtResource("2_dummy")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4, 0, -8)
