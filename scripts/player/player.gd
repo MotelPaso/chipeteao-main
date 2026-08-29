@@ -14,6 +14,11 @@ extends CharacterBody3D
 @export var slide_cooldown: float = 0.8
 @export var slide_collision_height: float = 0.9
 
+@export_group("Combat")
+## Cap on simultaneous weapons under the Weapons mount; the upgrade pool
+## stops offering new-weapon cards once it is reached.
+@export var max_weapons: int = 4
+
 @export_group("Camera")
 @export var mouse_sensitivity: float = 0.003
 @export var initial_pitch_deg: float = -20.0

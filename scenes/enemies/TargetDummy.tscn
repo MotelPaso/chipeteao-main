@@ -17,6 +17,7 @@ radius = 0.45
 height = 1.7
 
 [node name="TargetDummy" type="StaticBody3D" groups=["enemies"]]
+collision_layer = 2
 script = ExtResource("1_dummy")
 
 [node name="MeshInstance3D" type="MeshInstance3D" parent="."]

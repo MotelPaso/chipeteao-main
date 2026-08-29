@@ -39,7 +39,10 @@ func _open(new_level: int) -> void:
 
 
 func _roll() -> void:
-	_offer = UpgradePool.roll_offer(_cards.size())
+	# The pool needs the player to offer only owned-weapon upgrades and
+	# unowned new-weapon cards (re-derived on every reroll).
+	var player := get_tree().get_first_node_in_group("player")
+	_offer = UpgradePool.roll_offer(player, _cards.size())
 	for i in _cards.size():
 		_cards[i].visible = i < _offer.size()
 		if i < _offer.size():
