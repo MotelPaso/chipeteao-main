@@ -1,0 +1,35 @@
+[gd_scene load_steps=5 format=3]
+
+[ext_resource type="Script" path="res://scripts/systems/xp_gem.gd" id="1_gem"]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_gem"]
+albedo_color = Color(0.35, 0.95, 0.6, 1)
+metallic = 0.2
+roughness = 0.15
+emission_enabled = true
+emission = Color(0.25, 1.0, 0.55, 1)
+emission_energy_multiplier = 1.4
+
+[sub_resource type="SphereMesh" id="SphereMesh_crystal"]
+material = SubResource("StandardMaterial3D_gem")
+radius = 0.16
+height = 0.5
+radial_segments = 4
+rings = 2
+
+[sub_resource type="SphereShape3D" id="SphereShape3D_pickup"]
+radius = 0.5
+
+[node name="XpGem" type="Area3D" groups=["xp_gems"]]
+collision_layer = 0
+collision_mask = 1
+script = ExtResource("1_gem")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+shape = SubResource("SphereShape3D_pickup")
+
+[node name="Visual" type="Node3D" parent="."]
+
+[node name="Crystal" type="MeshInstance3D" parent="Visual"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.05, 0)
+mesh = SubResource("SphereMesh_crystal")

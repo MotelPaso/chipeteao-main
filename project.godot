@@ -11,6 +11,10 @@ run/main_scene="res://scenes/world/Main.tscn"
 config/features=PackedStringArray("4.7", "Forward Plus")
 config/icon="res://icon.svg"
 
+[autoload]
+
+RunState="*res://scripts/systems/run_state.gd"
+
 [input]
 
 move_forward={

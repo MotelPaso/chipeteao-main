@@ -11,6 +11,7 @@ extends CharacterBody3D
 @export var attack_range: float = 1.3
 @export var separation_radius: float = 1.2
 @export var separation_strength: float = 1.5
+@export var xp_gem_scene: PackedScene
 
 @onready var _health: Health = $Health
 @onready var _visual: Node3D = $Visual
@@ -94,6 +95,8 @@ func _on_died() -> void:
 	remove_from_group("enemies")
 	set_physics_process(false)
 	_collision.set_deferred("disabled", true)
+	RunState.add_kill()
+	_drop_xp_gem()
 	var tween := create_tween()
 	tween.set_parallel(true)
 	tween.tween_property(_visual, "rotation:x", -TAU * 0.25, 0.3) \
@@ -101,3 +104,12 @@ func _on_died() -> void:
 	tween.tween_property(_visual, "scale", Vector3.ONE * 0.05, 0.3) \
 			.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_IN)
 	tween.chain().tween_callback(queue_free)
+
+
+func _drop_xp_gem() -> void:
+	if xp_gem_scene == null:
+		return
+	var gem := xp_gem_scene.instantiate() as Node3D
+	# Parented to the scene root, not this grunt, so it outlives the corpse.
+	get_tree().current_scene.add_child(gem)
+	gem.global_position = global_position + Vector3.UP * 0.6

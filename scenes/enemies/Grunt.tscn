@@ -1,7 +1,8 @@
-[gd_scene load_steps=10 format=3 uid="uid://bqgr4nt0h3v2e"]
+[gd_scene load_steps=11 format=3 uid="uid://bqgr4nt0h3v2e"]
 
 [ext_resource type="Script" path="res://scripts/enemies/grunt.gd" id="1_grunt"]
 [ext_resource type="Script" path="res://scripts/systems/health.gd" id="2_health"]
+[ext_resource type="PackedScene" path="res://scenes/systems/XpGem.tscn" id="3_gem"]
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_skin"]
 albedo_color = Color(0.38, 0.62, 0.28, 1)
@@ -40,6 +41,7 @@ height = 1.2
 collision_layer = 2
 collision_mask = 3
 script = ExtResource("1_grunt")
+xp_gem_scene = ExtResource("3_gem")
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.6, 0)
