@@ -4,11 +4,13 @@ extends CanvasLayer
 ## stats from RunState. Layer 20 draws over the upgrade-card UI (10) and
 ## process_mode ALWAYS keeps the fade and buttons working while the tree
 ## is paused. Retry resets RunState and reloads the scene (the player's
-## _ready recaptures the mouse); Quit exits the game.
+## _ready recaptures the mouse); Change Character does the same cleanup
+## but returns to the character select screen; Quit exits the game.
 
 const DEFEAT_TITLE_COLOR := Color(0.9, 0.25, 0.2)
 const VICTORY_TITLE_COLOR := Color(0.96, 0.78, 0.3)
 const FADE_DURATION := 0.45
+const CHARACTER_SELECT_SCENE_PATH := "res://scenes/ui/CharacterSelect.tscn"
 
 @onready var _root: Control = %Root
 @onready var _title_label: Label = %TitleLabel
@@ -18,6 +20,7 @@ const FADE_DURATION := 0.45
 @onready var _level_value: Label = %LevelValue
 @onready var _kills_value: Label = %KillsValue
 @onready var _retry_button: Button = %RetryButton
+@onready var _change_character_button: Button = %ChangeCharacterButton
 @onready var _quit_button: Button = %QuitButton
 
 
@@ -25,6 +28,7 @@ func _ready() -> void:
 	visible = false
 	_apply_styles()
 	_retry_button.pressed.connect(_on_retry_pressed)
+	_change_character_button.pressed.connect(_on_change_character_pressed)
 	_quit_button.pressed.connect(_on_quit_pressed)
 
 
@@ -58,6 +62,14 @@ func _on_retry_pressed() -> void:
 	get_tree().reload_current_scene()
 
 
+## Retry's cleanup, but back to the select screen for a new loadout (the
+## GameConfig selection survives, so the screen reopens on the last pick).
+func _on_change_character_pressed() -> void:
+	get_tree().paused = false
+	RunState.reset()
+	get_tree().change_scene_to_file(CHARACTER_SELECT_SCENE_PATH)
+
+
 func _on_quit_pressed() -> void:
 	get_tree().quit()
 
@@ -75,7 +87,7 @@ func _apply_styles() -> void:
 	panel.content_margin_top = 16.0
 	panel.content_margin_bottom = 16.0
 	_stats_panel.add_theme_stylebox_override("panel", panel)
-	for button: Button in [_retry_button, _quit_button]:
+	for button: Button in [_retry_button, _change_character_button, _quit_button]:
 		_style_button(button)
 
 

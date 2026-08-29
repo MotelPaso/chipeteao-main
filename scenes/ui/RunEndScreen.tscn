@@ -101,6 +101,12 @@ custom_minimum_size = Vector2(160, 46)
 theme_override_font_sizes/font_size = 20
 text = "Retry"
 
+[node name="ChangeCharacterButton" type="Button" parent="Root/Center/VBox/Buttons"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(220, 46)
+theme_override_font_sizes/font_size = 20
+text = "Change Character"
+
 [node name="QuitButton" type="Button" parent="Root/Center/VBox/Buttons"]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(160, 46)

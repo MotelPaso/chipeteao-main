@@ -1,0 +1,49 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/ui/character_select.gd" id="1_charselect"]
+
+[node name="CharacterSelect" type="Control"]
+anchor_right = 1.0
+anchor_bottom = 1.0
+script = ExtResource("1_charselect")
+
+[node name="Background" type="ColorRect" parent="."]
+anchor_right = 1.0
+anchor_bottom = 1.0
+color = Color(0.05, 0.06, 0.09, 1)
+
+[node name="Center" type="CenterContainer" parent="."]
+anchor_right = 1.0
+anchor_bottom = 1.0
+
+[node name="VBox" type="VBoxContainer" parent="Center"]
+theme_override_constants/separation = 22
+
+[node name="TitleLabel" type="Label" parent="Center/VBox"]
+theme_override_colors/font_color = Color(0.96, 0.78, 0.3, 1)
+theme_override_font_sizes/font_size = 64
+horizontal_alignment = 1
+text = "BONKRAIDERS"
+
+[node name="SubtitleLabel" type="Label" parent="Center/VBox"]
+theme_override_colors/font_color = Color(0.72, 0.74, 0.78, 1)
+theme_override_font_sizes/font_size = 20
+horizontal_alignment = 1
+text = "Choose your raider"
+
+[node name="CardsRow" type="HBoxContainer" parent="Center/VBox"]
+unique_name_in_owner = true
+theme_override_constants/separation = 20
+alignment = 1
+
+[node name="LockedRow" type="HBoxContainer" parent="Center/VBox"]
+unique_name_in_owner = true
+theme_override_constants/separation = 14
+alignment = 1
+
+[node name="StartButton" type="Button" parent="Center/VBox"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(300, 52)
+size_flags_horizontal = 4
+theme_override_font_sizes/font_size = 22
+text = "Start Run"

@@ -2,8 +2,9 @@ class_name PlayerStats
 extends Node
 ## Player-wide derived-stats layer and tome holder in one node, mounted on
 ## the Player beside the Weapons mount. Owns the tome stacks collected this
-## run and recomputes every derived stat FROM SCRATCH on each change, so
-## stacking never drifts. Consumers stay loosely coupled: weapons read the
+## run plus the character's per-level passive, and recomputes every derived
+## stat FROM SCRATCH on each change (tome pickup or level-up), so stacking
+## never drifts. Consumers stay loosely coupled: weapons read the
 ## multipliers through WeaponBase helpers, armor is pushed into the sibling
 ## Health, and UpgradePool reads luck when rolling card rarities.
 
@@ -29,8 +30,16 @@ var luck: float = 0.0
 ## every stat from this, so it is the single source of truth.
 var _tome_stacks: Dictionary[String, PackedFloat32Array] = {}
 
+## Character passive (CharacterCatalog row data): one effect stat id plus
+## the amount gained per level past 1. Empty stat id = no passive.
+var _passive_stat: String = ""
+var _passive_amount_per_level: float = 0.0
+
 
 func _ready() -> void:
+	# Character passives scale with the run level, so every level-up
+	# re-derives the stats (recompute-from-scratch, same as tome pickups).
+	RunState.leveled_up.connect(_on_leveled_up)
 	recompute()
 
 
@@ -64,8 +73,16 @@ func add_tome(tome_id: String, potency: float) -> void:
 	recompute()
 
 
-## Rebuilds every derived stat from the stored tome stacks (recompute, not
-## accumulate). Call after any change to the stacks.
+## Registers the selected character's per-level passive (stat ids match
+## _apply_effect). Called by the player at spawn with catalog row data.
+func set_character_passive(stat: String, amount_per_level: float) -> void:
+	_passive_stat = stat
+	_passive_amount_per_level = amount_per_level
+	recompute()
+
+
+## Rebuilds every derived stat from the stored tome stacks and the
+## character passive (recompute, not accumulate). Call after any change.
 func recompute() -> void:
 	damage_multiplier = 1.0
 	cooldown_multiplier = 1.0
@@ -86,6 +103,11 @@ func recompute() -> void:
 			for effect: Dictionary in effects:
 				# roundf matches the card text, so displayed == applied.
 				_apply_effect(String(effect.stat), roundf(float(effect.amount) * potency))
+	# Character passive: level 1 contributes nothing, each level gained
+	# adds one increment (no roundf — sub-percent steps must accumulate).
+	if not _passive_stat.is_empty():
+		_apply_effect(_passive_stat,
+				_passive_amount_per_level * float(maxi(RunState.level - 1, 0)))
 	cooldown_multiplier = maxf(cooldown_multiplier, min_cooldown_multiplier)
 	crit_chance = clampf(crit_chance, 0.0, 1.0)
 	luck = maxf(luck, 0.0)
@@ -116,6 +138,10 @@ func _apply_effect(stat: String, amount: float) -> void:
 			luck += amount
 		_:
 			push_warning("PlayerStats: unknown effect stat '%s'" % stat)
+
+
+func _on_leveled_up(_new_level: int) -> void:
+	recompute()
 
 
 ## Health applies armor itself in take_damage, so the reduction also covers

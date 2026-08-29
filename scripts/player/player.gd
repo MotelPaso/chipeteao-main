@@ -1,6 +1,8 @@
 extends CharacterBody3D
 ## Player controller: WASD movement relative to camera yaw, mouse-look,
 ## jump, and a Shift+move slide (speed burst + lowered collision).
+## At spawn it applies the selected character's loadout (GameConfig ->
+## CharacterCatalog row): starting weapon, capsule tint, per-level passive.
 
 @export_group("Movement")
 @export var move_speed: float = 6.0
@@ -28,6 +30,7 @@ extends CharacterBody3D
 @onready var spring_arm: SpringArm3D = $SpringArm3D
 @onready var collision_shape: CollisionShape3D = $CollisionShape3D
 @onready var mesh_instance: MeshInstance3D = $MeshInstance3D
+@onready var weapons_mount: Node3D = $Weapons
 @onready var health: Health = $Health
 @onready var _stats: PlayerStats = $Stats
 
@@ -47,6 +50,7 @@ var _is_dead: bool = false
 
 
 func _ready() -> void:
+	_apply_character(CharacterCatalog.by_id_or_default(GameConfig.selected_character_id))
 	health.died.connect(_on_health_died)
 	Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
 	# The camera arm must ignore our own capsule or it pushes the camera in.
@@ -114,6 +118,25 @@ func _physics_process(delta: float) -> void:
 		velocity.y = jump_velocity
 
 	move_and_slide()
+
+
+## Applies a CharacterCatalog row: instances the starting weapon under the
+## Weapons mount, tints the placeholder capsule, registers the passive.
+func _apply_character(character: Dictionary) -> void:
+	var scene := load(String(character.weapon_scene)) as PackedScene
+	if scene == null:
+		push_warning("Player: bad starting weapon scene '%s'" % character.weapon_scene)
+	else:
+		var weapon := scene.instantiate() as Node3D
+		# The name must match the WEAPON_LIBRARY node_name so the upgrade
+		# pool counts the starting weapon as owned.
+		weapon.name = String(character.weapon_node_name)
+		weapons_mount.add_child(weapon)
+	# Fresh material instead of mutating the scene's shared one.
+	var material := StandardMaterial3D.new()
+	material.albedo_color = Color(character.tint)
+	mesh_instance.set_surface_override_material(0, material)
+	_stats.set_character_passive(String(character.passive_stat), float(character.passive_amount))
 
 
 func _on_health_died() -> void:
