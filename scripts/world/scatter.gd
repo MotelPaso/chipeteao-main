@@ -1,12 +1,14 @@
 extends Node3D
-## Deterministic ready-time prop scatter for the Hollow Woods arena (GDD 7).
-## A seeded RandomNumberGenerator fills the field with trees/rocks/stumps and
-## rings the floor edge with a denser tree line so the bounds read as forest.
-## Keeps a clear radius around the player spawn (origin) and around every
-## node in the "scatter_keepout" group (the hand-placed verticality spots),
-## and enforces a minimum spacing between props so the no-navmesh grunt
-## horde always has wide walkable lanes (canopies carry no collision, so
-## only trunks/rocks actually block).
+## Deterministic ready-time prop scatter for the arena maps (GDD 7).
+## A seeded RandomNumberGenerator fills the field with three prop kinds
+## (Hollow Woods: trees/rocks/stumps; Ash Dunes: cacti/boulders/bone
+## piles) and rings the floor edge with a denser prop line so the bounds
+## read as biome instead of void. Keeps a clear radius around the player
+## spawn (origin) and around every node in the "scatter_keepout" group
+## (hand-placed verticality spots, rock clusters, interactables), and
+## enforces a minimum spacing between props so the no-navmesh grunt horde
+## always has wide walkable lanes (canopies carry no collision, so only
+## trunks/rocks actually block).
 
 @export var scatter_seed: int = 71382
 
@@ -30,10 +32,15 @@ extends Node3D
 ## Center-to-center minimum between scattered props: wide horde lanes.
 @export var min_prop_spacing: float = 5.0
 
-@export_group("Perimeter Tree Line")
+@export_group("Perimeter Line")
+## Optional edge-line overrides for biomes whose rim should differ from
+## the interior mix (dunes: boulder rim with obelisk accents). Left null,
+## the rim falls back to tree_scene with rock_scene accents (forest).
+@export var perimeter_scene: PackedScene
+@export var perimeter_accent_scene: PackedScene
 @export var perimeter_inner: float = 44.0
 @export var perimeter_outer: float = 48.0
-## Distance between slots along each edge; every Nth slot is a boulder.
+## Distance between slots along each edge; every Nth slot is an accent.
 @export var perimeter_step: float = 9.0
 @export var perimeter_rock_every: int = 5
 
@@ -88,11 +95,11 @@ func _is_clear(pos: Vector3) -> bool:
 	return true
 
 
-## Walks the four floor edges placing big trees (and the odd boulder) in a
-## jittered band, so the map edge reads as forest instead of void. The band
-## sits outside the interior square, so no spacing checks are needed.
+## Walks the four floor edges placing big rim props (and the odd accent)
+## in a jittered band, so the map edge reads as biome instead of void. The
+## band sits outside the interior square, so no spacing checks are needed.
 func _ring_perimeter() -> void:
-	if tree_scene == null:
+	if _perimeter_main() == null:
 		return
 	var slot := 0
 	var t := -perimeter_outer + 1.0
@@ -110,10 +117,19 @@ func _band_depth() -> float:
 
 
 func _plant_edge_prop(pos: Vector3, slot: int) -> void:
-	if rock_scene != null and perimeter_rock_every > 0 and slot % perimeter_rock_every == 0:
-		_spawn_prop(rock_scene, pos, _rng.randf_range(1.2, 1.7))
+	var accent := _perimeter_accent()
+	if accent != null and perimeter_rock_every > 0 and slot % perimeter_rock_every == 0:
+		_spawn_prop(accent, pos, _rng.randf_range(1.2, 1.7))
 	else:
-		_spawn_prop(tree_scene, pos, _rng.randf_range(1.0, 1.4))
+		_spawn_prop(_perimeter_main(), pos, _rng.randf_range(1.0, 1.4))
+
+
+func _perimeter_main() -> PackedScene:
+	return perimeter_scene if perimeter_scene != null else tree_scene
+
+
+func _perimeter_accent() -> PackedScene:
+	return perimeter_accent_scene if perimeter_accent_scene != null else rock_scene
 
 
 ## Uniform scale only: non-uniform scaling of collision shapes is not

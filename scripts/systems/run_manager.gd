@@ -3,22 +3,17 @@ extends Node
 ## victory when RunState.run_time reaches run_duration (GDD 1: survive the
 ## clock or die). Ends the run exactly once — flags RunState inactive,
 ## stops the spawner, pauses the tree — then emits run_ended, which
-## Main.tscn wires to the RunEndScreen.
+## RunSystems.tscn wires to the RunEndScreen.
 
 signal run_ended(victory: bool)
 
 ## Seconds the player must survive to win the run (default 15 minutes).
 @export var run_duration: float = 900.0
-## The spawner is stopped explicitly on run end so it stays inert even if
-## something later unpauses the tree without reloading the scene.
-@export var spawner_path: NodePath = ^"../EnemySpawner"
 
-var _spawner: Node = null
 var _run_over: bool = false
 
 
 func _ready() -> void:
-	_spawner = get_node_or_null(spawner_path)
 	var player := get_tree().get_first_node_in_group("player")
 	if player == null:
 		push_warning("RunManager: no player in scene; defeat detection disabled.")
@@ -42,8 +37,12 @@ func _end_run(victory: bool) -> void:
 	_run_over = true
 	set_physics_process(false)
 	RunState.run_active = false
-	if _spawner != null:
-		_spawner.set_physics_process(false)
+	# The spawner lives in the arena scene, not in RunSystems, so it is
+	# reached through its group and stopped explicitly — it stays inert
+	# even if something later unpauses the tree without reloading.
+	var spawner := get_tree().get_first_node_in_group("enemy_spawner")
+	if spawner != null:
+		spawner.set_physics_process(false)
 	# Sfx plays through pause, so any shrine-channel hum must end with the run.
 	Sfx.stop_all_loops()
 	get_tree().paused = true
@@ -57,7 +56,7 @@ func _end_run(victory: bool) -> void:
 	# the save write all happen here, exactly once per run. The screen reads
 	# the outcome from SaveData.last_* so the signal shape stays unchanged.
 	var fold := SaveData.fold_run_results(victory, GameConfig.selected_character_id,
-			RunState.level, RunState.kills, RunState.run_time)
+			GameConfig.selected_map_id, RunState.level, RunState.kills, RunState.run_time)
 	print("Meta saved: %d quest(s) newly completed, %d shard(s) to claim" % [
 			(fold.new_quest_ids as Array).size(), int(fold.reward_shards)])
 	run_ended.emit(victory)

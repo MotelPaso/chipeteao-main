@@ -1,7 +1,8 @@
 class_name AmbientBed
 extends AudioStreamPlayer
-## Barely-audible looping ambience (the synthesized forest-wind bed from
-## scripts/tools/generate_sfx.gd) that kills the dead silence in Main.
+## Barely-audible looping ambience (a synthesized wind bed from
+## scripts/tools/generate_sfx.gd — each arena assigns its biome's wav)
+## that kills the dead silence in the arenas.
 ## Forces a seamless forward loop on the imported wav — the generated
 ## files carry no loop metadata — routes into the "Sfx" bus (created by
 ## the Sfx autoload before any scene loads), and keeps breathing while

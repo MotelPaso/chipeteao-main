@@ -1,0 +1,31 @@
+[gd_scene load_steps=4 format=3 uid="uid://bdrock3du4mp7c"]
+
+[ext_resource type="Material" uid="uid://bredrm3du9rc4" path="res://assets/materials/red_rock.tres" id="1_redrock"]
+
+[sub_resource type="SphereMesh" id="SphereMesh_blob"]
+material = ExtResource("1_redrock")
+radius = 1.0
+height = 2.0
+radial_segments = 8
+rings = 4
+
+[sub_resource type="SphereShape3D" id="SphereShape3D_rock"]
+radius = 0.95
+
+[node name="DuneRock" type="StaticBody3D"]
+
+[node name="BlobMain" type="MeshInstance3D" parent="."]
+transform = Transform3D(1.35, 0, 0, 0, 0.8, 0, 0, 0, 1.1, 0, 0.32, 0)
+mesh = SubResource("SphereMesh_blob")
+
+[node name="BlobSide" type="MeshInstance3D" parent="."]
+transform = Transform3D(0.7, 0, 0, 0, 0.5, 0, 0, 0, 0.85, 0.85, 0.14, -0.3)
+mesh = SubResource("SphereMesh_blob")
+
+[node name="BlobTop" type="MeshInstance3D" parent="."]
+transform = Transform3D(0.55, 0, 0, 0, 0.45, 0, 0, 0, 0.6, -0.4, 0.75, 0.25)
+mesh = SubResource("SphereMesh_blob")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.26, 0)
+shape = SubResource("SphereShape3D_rock")

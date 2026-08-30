@@ -1,16 +1,12 @@
-[gd_scene load_steps=30 format=3 uid="uid://dqv5m2x8rk1fj"]
+[gd_scene load_steps=27 format=3 uid="uid://dqv5m2x8rk1fj"]
 
-[ext_resource type="PackedScene" uid="uid://c8k2h1n3m5p0a" path="res://scenes/player/Player.tscn" id="1_player"]
+[ext_resource type="PackedScene" uid="uid://crunsy5te2m8a" path="res://scenes/world/RunSystems.tscn" id="1_runsystems"]
 [ext_resource type="PackedScene" uid="uid://dn4r8t2ycv5qb" path="res://scenes/enemies/TargetDummy.tscn" id="2_dummy"]
 [ext_resource type="Script" path="res://scripts/systems/enemy_spawner.gd" id="3_spawner"]
 [ext_resource type="PackedScene" uid="uid://bqgr4nt0h3v2e" path="res://scenes/enemies/Grunt.tscn" id="4_grunt"]
 [ext_resource type="PackedScene" path="res://scenes/enemies/Skirmisher.tscn" id="15_skirmisher"]
 [ext_resource type="PackedScene" path="res://scenes/enemies/Tank.tscn" id="16_tank"]
 [ext_resource type="PackedScene" path="res://scenes/enemies/Rotking.tscn" id="17_boss"]
-[ext_resource type="PackedScene" path="res://scenes/ui/UpgradeCardUI.tscn" id="5_cardui"]
-[ext_resource type="PackedScene" path="res://scenes/ui/HUD.tscn" id="6_hud"]
-[ext_resource type="Script" path="res://scripts/systems/run_manager.gd" id="7_runmgr"]
-[ext_resource type="PackedScene" path="res://scenes/ui/RunEndScreen.tscn" id="8_runend"]
 [ext_resource type="Script" path="res://scripts/world/scatter.gd" id="9_scatter"]
 [ext_resource type="PackedScene" uid="uid://ctree3hw7ka2f" path="res://scenes/world/props/Tree.tscn" id="10_tree"]
 [ext_resource type="PackedScene" uid="uid://brock5hw2mv8d" path="res://scenes/world/props/Rock.tscn" id="11_rock"]
@@ -78,7 +74,7 @@ fog_light_color = Color(0.73, 0.81, 0.74, 1)
 fog_density = 0.007
 fog_sky_affect = 0.2
 
-[node name="Main" type="Node3D"]
+[node name="HollowWoods" type="Node3D"]
 
 [node name="WorldEnvironment" type="WorldEnvironment" parent="."]
 environment = SubResource("Environment_1")
@@ -161,8 +157,6 @@ tree_scene = ExtResource("10_tree")
 rock_scene = ExtResource("11_rock")
 stump_scene = ExtResource("12_stump")
 
-[node name="Player" parent="." instance=ExtResource("1_player")]
-
 [node name="Dummies" type="Node3D" parent="."]
 
 [node name="TargetDummy" parent="Dummies" instance=ExtResource("2_dummy")]
@@ -175,20 +169,11 @@ skirmisher_scene = ExtResource("15_skirmisher")
 tank_scene = ExtResource("16_tank")
 boss_scene = ExtResource("17_boss")
 
-[node name="RunManager" type="Node" parent="."]
-script = ExtResource("7_runmgr")
-spawner_path = NodePath("../EnemySpawner")
-
-[node name="UpgradeCardUI" parent="." instance=ExtResource("5_cardui")]
-
-[node name="HUD" parent="." instance=ExtResource("6_hud")]
-
-[node name="RunEndScreen" parent="." instance=ExtResource("8_runend")]
+[node name="RunSystems" parent="." instance=ExtResource("1_runsystems")]
+map_id = "hollow_woods"
 
 [node name="AmbientBed" type="AudioStreamPlayer" parent="."]
 stream = ExtResource("23_wind")
 volume_db = -26.0
 autoplay = true
 script = ExtResource("22_ambient")
-
-[connection signal="run_ended" from="RunManager" to="RunEndScreen" method="open"]

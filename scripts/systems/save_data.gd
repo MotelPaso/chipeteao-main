@@ -9,10 +9,12 @@ extends Node
 ## purchases and quest claims. Mid-run systems credit counters with bump()
 ## / raise_to() in memory only, so an abandoned run persists nothing.
 ##
-## Canonical counter stat ids (quest_catalog rows target these):
+## Canonical counter stat ids (quest_catalog rows target these; map
+## unlock rules in map_catalog target them too):
 ##   total_kills, bosses_killed, runs_finished, victories, shrines_used,
 ##   chests_opened, max_level (high-water), best_run_minutes (high-water),
-##   runs_as_<character_id>, wins_as_<character_id>.
+##   runs_as_<character_id>, wins_as_<character_id>,
+##   runs_on_<map_id>, victories_<map_id>.
 
 signal shards_changed(balance: int)
 
@@ -70,14 +72,16 @@ func raise_to(stat_id: String, value: int) -> void:
 ## just hit its target (claiming stays manual, in the quest log), saves,
 ## and returns {"new_quest_ids": Array[String], "reward_shards": int} —
 ## the claimable Shard value of the newly completed quests.
-func fold_run_results(victory: bool, character_id: String,
+func fold_run_results(victory: bool, character_id: String, map_id: String,
 		level: int, kills: int, run_seconds: float) -> Dictionary:
 	bump("total_kills", kills)
 	bump("runs_finished")
 	bump("runs_as_" + character_id)
+	bump("runs_on_" + map_id)
 	if victory:
 		bump("victories")
 		bump("wins_as_" + character_id)
+		bump("victories_" + map_id)
 	raise_to("max_level", level)
 	raise_to("best_run_minutes", int(run_seconds / 60.0))
 	last_new_quest_ids = _evaluate_quests()
@@ -130,6 +134,22 @@ func claim_quest(quest_id: String) -> int:
 	save()
 	shards_changed.emit(shards)
 	return reward
+
+
+## --- Map unlocks --------------------------------------------------------
+
+## A map is playable when its catalog unlock rule is met: rows with an
+## empty unlock_stat are always open; otherwise the named lifetime
+## counter must reach unlock_target (Ash Dunes: victories >= 1). Unknown
+## ids read as locked.
+func is_map_unlocked(map_id: String) -> bool:
+	var row := MapCatalog.by_id(map_id)
+	if row.is_empty():
+		return false
+	var stat_id := String(row.unlock_stat)
+	if stat_id.is_empty():
+		return true
+	return stat(stat_id) >= int(row.unlock_target)
 
 
 ## --- Character unlocks -------------------------------------------------

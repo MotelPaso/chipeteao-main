@@ -10,7 +10,7 @@ extends SceneTree
 ##     godot --headless --path . -s res://scripts/tools/generate_sfx.gd
 ##
 ## Output: assets/audio/sfx/*.wav (one-shots + the shrine channel loop)
-## and assets/audio/ambient/forest_wind.wav (the Main ambient bed).
+## and assets/audio/ambient/*.wav (the per-map ambient wind beds).
 ## Loopable sounds carry no wav loop metadata — Sfx/AmbientBed force
 ## LOOP_FORWARD on the imported streams at runtime.
 
@@ -45,6 +45,7 @@ func _init() -> void:
 	_save_wav(SFX_DIR, "boss_die", _gen_boss_die())
 	_save_wav(SFX_DIR, "streak", _gen_streak())
 	_save_wav(AMBIENT_DIR, "forest_wind", _gen_forest_wind())
+	_save_wav(AMBIENT_DIR, "desert_wind", _gen_desert_wind())
 	if _failed:
 		quit(1)
 		return
@@ -240,6 +241,18 @@ func _gen_forest_wind() -> PackedFloat32Array:
 	_tremolo(out, 0.25, 0.25)
 	var looped := _loop_blend(out, 0.35)
 	_normalize(looped, 0.35)
+	return looped
+
+
+## Drier Ash Dunes wind bed, same 4s loop-blend treatment as the forest
+## bed but a higher, wider hiss band with a faster flutter — reads as sand
+## hiss instead of canopy rustle. LFO 0.75Hz and tremolo 0.5Hz both run
+## integer cycles over the 4s loop, keeping the seam phase-continuous.
+func _gen_desert_wind() -> PackedFloat32Array:
+	var out := _lowpass_lfo(_noise(4.35, _rng(137)), 950.0, 550.0, 0.75)
+	_tremolo(out, 0.5, 0.35)
+	var looped := _loop_blend(out, 0.35)
+	_normalize(looped, 0.3)
 	return looped
 
 

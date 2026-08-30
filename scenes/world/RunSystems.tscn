@@ -1,0 +1,24 @@
+[gd_scene load_steps=7 format=3 uid="uid://crunsy5te2m8a"]
+
+[ext_resource type="Script" path="res://scripts/world/run_systems.gd" id="1_runsys"]
+[ext_resource type="PackedScene" uid="uid://c8k2h1n3m5p0a" path="res://scenes/player/Player.tscn" id="2_player"]
+[ext_resource type="Script" path="res://scripts/systems/run_manager.gd" id="3_runmgr"]
+[ext_resource type="PackedScene" path="res://scenes/ui/UpgradeCardUI.tscn" id="4_cardui"]
+[ext_resource type="PackedScene" path="res://scenes/ui/HUD.tscn" id="5_hud"]
+[ext_resource type="PackedScene" path="res://scenes/ui/RunEndScreen.tscn" id="6_runend"]
+
+[node name="RunSystems" type="Node3D"]
+script = ExtResource("1_runsys")
+
+[node name="Player" parent="." instance=ExtResource("2_player")]
+
+[node name="RunManager" type="Node" parent="."]
+script = ExtResource("3_runmgr")
+
+[node name="UpgradeCardUI" parent="." instance=ExtResource("4_cardui")]
+
+[node name="HUD" parent="." instance=ExtResource("5_hud")]
+
+[node name="RunEndScreen" parent="." instance=ExtResource("6_runend")]
+
+[connection signal="run_ended" from="RunManager" to="RunEndScreen" method="open"]

@@ -142,6 +142,18 @@ const QUEST_LIBRARY: Array[Dictionary] = [
 		"description": "Finish 5 runs as Vex.",
 		"stat": "runs_as_vex", "target": 5, "reward": 30,
 	},
+	# Per-map flavor (Ash Dunes opens after the first victory, so these
+	# double as the reward trail for using the new unlock).
+	{
+		"id": "dunes_run_1", "display_name": "Dune Strider",
+		"description": "Finish a run in Ash Dunes.",
+		"stat": "runs_on_ash_dunes", "target": 1, "reward": 40,
+	},
+	{
+		"id": "dunes_runs_3", "display_name": "Sandblasted",
+		"description": "Finish 3 runs in Ash Dunes.",
+		"stat": "runs_on_ash_dunes", "target": 3, "reward": 50,
+	},
 ]
 
 

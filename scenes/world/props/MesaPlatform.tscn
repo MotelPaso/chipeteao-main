@@ -1,0 +1,38 @@
+[gd_scene load_steps=8 format=3 uid="uid://dmesa5du3pl6e"]
+
+[ext_resource type="Material" uid="uid://csandm2du5qb3" path="res://assets/materials/sandstone.tres" id="1_sandstone"]
+[ext_resource type="Material" uid="uid://bsandt5du6te7" path="res://assets/materials/sand_top.tres" id="2_sandtop"]
+[ext_resource type="Material" uid="uid://bredrm3du9rc4" path="res://assets/materials/red_rock.tres" id="3_redrock"]
+
+[sub_resource type="BoxMesh" id="BoxMesh_base"]
+material = ExtResource("1_sandstone")
+size = Vector3(6, 1.8, 6)
+
+[sub_resource type="BoxMesh" id="BoxMesh_stratum"]
+material = ExtResource("3_redrock")
+size = Vector3(6.06, 0.25, 6.06)
+
+[sub_resource type="BoxMesh" id="BoxMesh_deck"]
+material = ExtResource("2_sandtop")
+size = Vector3(6, 0.2, 6)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_platform"]
+size = Vector3(6, 2, 6)
+
+[node name="MesaPlatform" type="StaticBody3D"]
+
+[node name="Base" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.9, 0)
+mesh = SubResource("BoxMesh_base")
+
+[node name="Stratum" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.55, 0)
+mesh = SubResource("BoxMesh_stratum")
+
+[node name="Deck" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.9, 0)
+mesh = SubResource("BoxMesh_deck")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0)
+shape = SubResource("BoxShape3D_platform")

@@ -1,23 +1,27 @@
 extends Control
-## Character select screen (GDD 5), the game's entry scene: pick a raider,
-## then Start Run loads Main (which recaptures the mouse itself). Cards
-## are built from CharacterCatalog at runtime, so a new playable character
-## is one catalog row; the full 8-raider roster shows as a 4x2 grid. The
-## pick lands in the GameConfig autoload, which the player reads at spawn.
+## Character-and-map select screen (GDD 5/7), the game's entry scene:
+## pick a raider and a hunting ground, then Start Run loads the selected
+## map's arena (which recaptures the mouse itself). Character cards are
+## built from CharacterCatalog and the map row from MapCatalog at
+## runtime, so new content is one catalog row each; both picks land in
+## the GameConfig autoload.
 ##
-## Meta-progression (GDD 8): SaveData gates the roster. Locked characters
-## show grayed with a lock glyph and their Shard price; clicking one with
-## enough Shards flips the card into an inline "Unlock for N? [Yes]"
-## confirm (second click cancels), while a short balance earns a red-flash
-## shake instead. The Shard balance sits top-right and the Quests button
-## opens the quest log. Styling matches the run UI: dark StyleBoxFlat.
+## Meta-progression (GDD 8): SaveData gates the roster and the maps.
+## Locked characters show grayed with a lock glyph and their Shard price;
+## clicking one with enough Shards flips the card into an inline "Unlock
+## for N? [Yes]" confirm (second click cancels), while a short balance
+## earns a red-flash shake instead. Locked maps show grayed with the
+## catalog's unlock hint and reject clicks the same way (map unlocks are
+## earned, never bought). The Shard balance sits top-right and the Quests
+## button opens the quest log. Styling matches the run UI: dark
+## StyleBoxFlat.
 
-const MAIN_SCENE_PATH := "res://scenes/world/Main.tscn"
 const QUEST_LOG_SCENE_PATH := "res://scenes/ui/QuestLog.tscn"
 
-# Sized so two grid rows of four cards fit the default 1152x648 window
-# alongside the title and start button.
-const CARD_SIZE := Vector2(172, 220)
+# Sized so the map row plus two grid rows of four cards fit the default
+# 1152x648 window alongside the title and start button.
+const CARD_SIZE := Vector2(172, 196)
+const MAP_CARD_SIZE := Vector2(252, 54)
 const UNSELECTED_BORDER_COLOR := Color(0.32, 0.34, 0.42)
 const LOCKED_BORDER_COLOR := Color(0.22, 0.23, 0.28)
 const LOCKED_TEXT_COLOR := Color(0.45, 0.47, 0.52)
@@ -25,18 +29,27 @@ const SHARD_TEXT_COLOR := Color(0.55, 0.8, 0.92)
 const REJECT_FLASH_COLOR := Color(1.0, 0.42, 0.42)
 
 @onready var _cards_grid: GridContainer = %CardsGrid
+@onready var _map_row: HBoxContainer = %MapRow
 @onready var _start_button: Button = %StartButton
 @onready var _quests_button: Button = %QuestsButton
 @onready var _shards_label: Label = %ShardsLabel
 
 ## Card button per playable character id, for selection restyling.
 var _cards_by_id: Dictionary[String, Button] = {}
+## Card button per catalog map id, for selection restyling.
+var _map_cards_by_id: Dictionary[String, Button] = {}
 ## Character id whose card currently shows the inline unlock confirm.
 var _pending_unlock_id: String = ""
 
 
 func _ready() -> void:
 	Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
+	for map_row: Dictionary in MapCatalog.MAP_LIBRARY:
+		var map_card := Button.new()
+		map_card.custom_minimum_size = MAP_CARD_SIZE
+		map_card.pressed.connect(_on_map_card_pressed.bind(String(map_row.id)))
+		_map_row.add_child(map_card)
+		_map_cards_by_id[String(map_row.id)] = map_card
 	for character: Dictionary in CharacterCatalog.CHARACTER_LIBRARY:
 		var card := Button.new()
 		card.custom_minimum_size = CARD_SIZE
@@ -49,13 +62,18 @@ func _ready() -> void:
 	_quests_button.pressed.connect(_on_quests_pressed)
 	SaveData.shards_changed.connect(func(_balance: int) -> void: _refresh_shards())
 	_refresh_shards()
-	# Reopening mid-session keeps the previous pick; unknown ids fall back,
-	# and a locked id (stale selection) falls back to the free default.
+	# Reopening mid-session keeps the previous picks; unknown ids fall
+	# back, and a locked id (stale selection) falls back to the default —
+	# so Change Character after a run keeps the map that was just played.
 	var remembered := String(
 			CharacterCatalog.by_id_or_default(GameConfig.selected_character_id).id)
 	if not SaveData.is_unlocked(remembered):
 		remembered = CharacterCatalog.DEFAULT_ID
 	_select(remembered)
+	var remembered_map := String(MapCatalog.by_id_or_default(GameConfig.selected_map_id).id)
+	if not SaveData.is_map_unlocked(remembered_map):
+		remembered_map = MapCatalog.DEFAULT_ID
+	_select_map(remembered_map)
 	_start_button.grab_focus()
 
 
@@ -106,11 +124,79 @@ func _on_start_pressed() -> void:
 	# RunState keeps ticking while this unpaused screen is up, so a fresh
 	# run starts from a clean slate (mirrors the run-end Retry cleanup).
 	RunState.reset()
-	get_tree().change_scene_to_file(MAIN_SCENE_PATH)
+	var map_row := MapCatalog.by_id_or_default(GameConfig.selected_map_id)
+	get_tree().change_scene_to_file(String(map_row.scene_path))
 
 
 func _on_quests_pressed() -> void:
 	get_tree().change_scene_to_file(QUEST_LOG_SCENE_PATH)
+
+
+## --- Map row (GDD 7: pick the biome; victory-gated unlocks) -------------
+
+func _select_map(map_id: String) -> void:
+	GameConfig.selected_map_id = map_id
+	_refresh_map_cards()
+
+
+func _on_map_card_pressed(map_id: String) -> void:
+	if SaveData.is_map_unlocked(map_id):
+		_select_map(map_id)
+	else:
+		_reject_card(_map_cards_by_id[map_id])
+
+
+func _refresh_map_cards() -> void:
+	for id: String in _map_cards_by_id:
+		_populate_map_card(_map_cards_by_id[id], MapCatalog.by_id(id))
+
+
+func _populate_map_card(card: Button, map_row: Dictionary) -> void:
+	for child: Node in card.get_children():
+		child.queue_free()
+	var map_id := String(map_row.id)
+	var box := _map_card_box(card)
+	if not SaveData.is_map_unlocked(map_id):
+		box.add_child(_label(String(map_row.display_name), 16, LOCKED_TEXT_COLOR))
+		box.add_child(_label(String(map_row.locked_hint), 10, SHARD_TEXT_COLOR.darkened(0.2)))
+		_style_card(card, LOCKED_BORDER_COLOR, 2)
+		return
+	box.add_child(_label(String(map_row.display_name), 16, Color(0.95, 0.96, 0.98)))
+	box.add_child(_palette_strip(map_row.palette as Array))
+	var selected := map_id == GameConfig.selected_map_id
+	var accent := (map_row.palette as Array)[0] as Color
+	_style_card(card, accent if selected else UNSELECTED_BORDER_COLOR, 4 if selected else 2)
+
+
+## Compact full-rect VBox for the short map cards (the character _card_box
+## margins are too deep for a 54px card).
+func _map_card_box(card: Button) -> VBoxContainer:
+	var box := VBoxContainer.new()
+	box.set_anchors_preset(Control.PRESET_FULL_RECT)
+	box.offset_left = 10.0
+	box.offset_top = 6.0
+	box.offset_right = -10.0
+	box.offset_bottom = -6.0
+	box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	box.add_theme_constant_override("separation", 4)
+	card.add_child(box)
+	return box
+
+
+## Tiny biome mood strip: the catalog palette as flat color chips.
+func _palette_strip(palette: Array) -> HBoxContainer:
+	var strip := HBoxContainer.new()
+	strip.alignment = BoxContainer.ALIGNMENT_CENTER
+	strip.add_theme_constant_override("separation", 4)
+	for entry: Variant in palette:
+		var chip := Panel.new()
+		chip.custom_minimum_size = Vector2(34.0, 10.0)
+		var style := StyleBoxFlat.new()
+		style.bg_color = entry as Color
+		style.set_corner_radius_all(3)
+		chip.add_theme_stylebox_override("panel", style)
+		strip.add_child(chip)
+	return strip
 
 
 ## --- Card content (rebuilt whenever lock/selection state changes) ------

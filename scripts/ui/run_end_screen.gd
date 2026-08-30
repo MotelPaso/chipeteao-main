@@ -33,8 +33,8 @@ func _ready() -> void:
 	_quit_button.pressed.connect(_on_quit_pressed)
 
 
-## Connected to RunManager.run_ended in Main.tscn. The tree is already
-## paused when this runs.
+## Connected to RunManager.run_ended in RunSystems.tscn. The tree is
+## already paused when this runs.
 func open(victory: bool) -> void:
 	if visible:
 		return

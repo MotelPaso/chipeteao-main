@@ -1,0 +1,56 @@
+[gd_scene load_steps=5 format=3 uid="uid://cbone4du8rv2d"]
+
+[ext_resource type="Material" uid="uid://dbonem4du2sd5" path="res://assets/materials/bone.tres" id="1_bone"]
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_rib"]
+material = ExtResource("1_bone")
+top_radius = 0.03
+bottom_radius = 0.09
+height = 1.5
+radial_segments = 5
+rings = 1
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_spine"]
+material = ExtResource("1_bone")
+top_radius = 0.14
+bottom_radius = 0.17
+height = 1.9
+radial_segments = 6
+rings = 1
+
+[sub_resource type="SphereMesh" id="SphereMesh_knob"]
+material = ExtResource("1_bone")
+radius = 0.28
+height = 0.56
+radial_segments = 7
+rings = 3
+
+[node name="BonePile" type="Node3D"]
+
+[node name="Spine" type="MeshInstance3D" parent="."]
+transform = Transform3D(0, 1, 0, -1, 0, 0, 0, 0, 1, 0.05, 0.12, 0)
+mesh = SubResource("CylinderMesh_spine")
+
+[node name="RibA" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 0.906308, 0.422618, 0, -0.422618, 0.906308, -0.55, 0.5, -0.35)
+mesh = SubResource("CylinderMesh_rib")
+
+[node name="RibB" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 0.882948, 0.469472, 0, -0.469472, 0.882948, -0.15, 0.55, -0.38)
+mesh = SubResource("CylinderMesh_rib")
+
+[node name="RibC" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 0.906308, 0.422618, 0, -0.422618, 0.906308, 0.25, 0.52, -0.35)
+mesh = SubResource("CylinderMesh_rib")
+
+[node name="RibD" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 0.906308, -0.422618, 0, 0.422618, 0.906308, -0.35, 0.5, 0.35)
+mesh = SubResource("CylinderMesh_rib")
+
+[node name="RibE" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 0.882948, -0.469472, 0, 0.469472, 0.882948, 0.05, 0.55, 0.38)
+mesh = SubResource("CylinderMesh_rib")
+
+[node name="Knob" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.95, 0.2, 0.15)
+mesh = SubResource("SphereMesh_knob")

@@ -30,7 +30,7 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 
 [node name="VBox" type="VBoxContainer" parent="Center"]
-theme_override_constants/separation = 14
+theme_override_constants/separation = 12
 
 [node name="TitleLabel" type="Label" parent="Center/VBox"]
 theme_override_colors/font_color = Color(0.96, 0.78, 0.3, 1)
@@ -42,7 +42,12 @@ text = "BONKRAIDERS"
 theme_override_colors/font_color = Color(0.72, 0.74, 0.78, 1)
 theme_override_font_sizes/font_size = 16
 horizontal_alignment = 1
-text = "Choose your raider"
+text = "Choose your hunting ground and raider"
+
+[node name="MapRow" type="HBoxContainer" parent="Center/VBox"]
+unique_name_in_owner = true
+size_flags_horizontal = 4
+theme_override_constants/separation = 18
 
 [node name="CardsGrid" type="GridContainer" parent="Center/VBox"]
 unique_name_in_owner = true
