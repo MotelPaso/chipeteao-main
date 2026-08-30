@@ -8,10 +8,17 @@ extends CanvasLayer
 ## are queued — pending levels first, then bonus picks — and served as
 ## consecutive rerolls before unpausing.
 
+## Seconds between pausing the tree and revealing the cards: a beat for
+## the level-up pulse to read under the freeze-frame. Keep under ~0.25.
+const REVEAL_DELAY := 0.2
+
 @onready var _level_label: Label = %LevelLabel
 @onready var _cards: Array[Button] = [%Card1 as Button, %Card2 as Button, %Card3 as Button]
 
 var _offer: Array[Dictionary] = []
+## True from the pause until the delayed reveal: requests landing in that
+## window must queue exactly as if the picker were already visible.
+var _opening: bool = false
 var _pending_levels: int = 0
 ## Queued open_bonus_pick requests ({title, luck_bonus, min_rarity}).
 var _pending_bonus: Array[Dictionary] = []
@@ -37,7 +44,7 @@ func open_bonus_pick(title: String, luck_bonus: float = 0.0, min_rarity: String 
 	if not RunState.run_active:
 		return
 	var request := {"title": title, "luck_bonus": luck_bonus, "min_rarity": min_rarity}
-	if visible:
+	if visible or _opening:
 		_pending_bonus.append(request)
 		return
 	_open_bonus_pick(request)
@@ -48,7 +55,7 @@ func _on_leveled_up(new_level: int) -> void:
 	# over, the run-end screen (layer 20) owns the pause and the mouse.
 	if not RunState.run_active:
 		return
-	if visible:
+	if visible or _opening:
 		_pending_levels += 1
 		return
 	_open_level_pick(new_level)
@@ -68,9 +75,22 @@ func _open_bonus_pick(request: Dictionary) -> void:
 
 func _open(title: String) -> void:
 	get_tree().paused = true
-	Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
 	_level_label.text = title
 	_roll()
+	if visible:
+		# Chained pick (card just pressed): already on screen, swap in place.
+		return
+	# Pause lands immediately (no combat can race the reveal window); the
+	# cards show after a short beat so the level-up pulse reads first. The
+	# timer processes while paused and ignores hit-stop time scaling.
+	_opening = true
+	var timer := get_tree().create_timer(REVEAL_DELAY, true, false, true)
+	timer.timeout.connect(_reveal, CONNECT_ONE_SHOT)
+
+
+func _reveal() -> void:
+	_opening = false
+	Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
 	visible = true
 
 

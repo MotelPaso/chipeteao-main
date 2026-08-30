@@ -91,6 +91,24 @@ text = "Rotking"
 horizontal_alignment = 1
 vertical_alignment = 1
 
+[node name="StreakLabel" type="Label" parent="."]
+unique_name_in_owner = true
+visible = false
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -200.0
+offset_top = 210.0
+offset_right = 200.0
+offset_bottom = 264.0
+grow_horizontal = 2
+theme_override_colors/font_color = Color(1, 0.86, 0.25, 1)
+theme_override_colors/font_outline_color = Color(0.28, 0.09, 0.02, 0.95)
+theme_override_constants/outline_size = 12
+theme_override_font_sizes/font_size = 44
+text = "SHREDDING!"
+horizontal_alignment = 1
+vertical_alignment = 1
+
 [node name="AnnounceLabel" type="Label" parent="."]
 unique_name_in_owner = true
 visible = false

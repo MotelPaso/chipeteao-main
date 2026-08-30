@@ -61,6 +61,7 @@ func deal_damage(target_health: Health) -> float:
 	var is_crit := _stats != null and randf() < _stats.crit_chance
 	if is_crit:
 		amount *= _stats.crit_damage
+		Juice.crit_punch()
 	target_health.take_damage(amount, is_crit)
 	if _stats != null and _stats.lifesteal > 0.0:
 		_lifesteal_heal(amount * _stats.lifesteal)

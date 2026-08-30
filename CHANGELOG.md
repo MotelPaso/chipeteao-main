@@ -16,3 +16,4 @@
 - Iteration 14: Weapons & roster wave 2 (piercing bow, slowing whip, out-and-back boomerang; Juno speed-to-damage, Bramble thorns, Otto HP growth)
 - Iteration 15: Roster complete (rapid twin daggers, cluster-seeking blood pools, evasion + dodge-execute Nyx, lifesteal Doc, Tome of Mist)
 - Iteration 16: Meta-progression (shards + save file, quest catalog with claims, character unlock gating on the select screen, run-end earnings summary)
+- Iteration 17: Game feel (camera shake + hit-stop + hit flash, death particle bursts, damage vignette, kill-streak popups, level-up pulse, slide FOV kick)

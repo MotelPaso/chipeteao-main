@@ -35,6 +35,7 @@ var _slow_time_left: float = 0.0
 
 func _ready() -> void:
 	_health.died.connect(_on_died)
+	_health.damaged.connect(_on_damaged_flash)
 
 
 func _physics_process(delta: float) -> void:
@@ -147,6 +148,31 @@ func _apply_elite_glow() -> void:
 			mesh_instance.material_overlay = glow
 
 
+func _on_damaged_flash(_amount: float, _current: float) -> void:
+	Juice.flash(_visual)
+
+
+## Virtual: death juice (tiny shake + shard burst tinted like the body);
+## the boss overrides this with its bigger moment.
+func _death_feedback() -> void:
+	Juice.enemy_died(global_position + Vector3.UP * 0.8, death_burst_color())
+
+
+## Tint for this enemy's death burst: the first visual mesh's albedo, so
+## the shards read as pieces of the body. Elites keep their base skin color
+## (the glow is an overlay, which get_active_material ignores).
+func death_burst_color() -> Color:
+	for node: Node in _visual.find_children("*", "MeshInstance3D", true, false):
+		var mesh_instance := node as MeshInstance3D
+		if mesh_instance == null or mesh_instance.mesh == null \
+				or mesh_instance.mesh.get_surface_count() == 0:
+			continue
+		var material := mesh_instance.get_active_material(0) as StandardMaterial3D
+		if material != null:
+			return material.albedo_color
+	return Color(0.75, 0.75, 0.78)
+
+
 ## Sums push-away vectors from living "enemies" within separation_radius,
 ## with falloff (strongest when overlapping, zero at the edge). O(n^2) over
 ## the horde, fine at the spawner's cap on a flat arena.
@@ -176,6 +202,7 @@ func _on_died() -> void:
 	_collision.set_deferred("disabled", true)
 	RunState.add_kill()
 	_drop_xp_gem()
+	_death_feedback()
 	var tween := create_tween()
 	tween.set_parallel(true)
 	tween.tween_property(_visual, "rotation:x", -TAU * 0.25, 0.3) \

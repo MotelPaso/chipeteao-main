@@ -177,12 +177,14 @@ func _start_slide(direction: Vector3) -> void:
 	_slide_timer = slide_duration
 	_slide_direction = direction
 	_set_body_height(slide_collision_height)
+	Juice.fov_kick_begin()
 
 
 func _end_slide() -> void:
 	_is_sliding = false
 	_slide_cooldown_timer = slide_cooldown
 	_set_body_height(_default_collision_height)
+	Juice.fov_kick_end()
 
 
 func _set_body_height(height: float) -> void:

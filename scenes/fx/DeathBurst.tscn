@@ -1,0 +1,39 @@
+[gd_scene load_steps=6 format=3]
+
+[ext_resource type="Script" path="res://scripts/fx/death_burst.gd" id="1_burst"]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_shard"]
+shading_mode = 0
+vertex_color_use_as_albedo = true
+
+[sub_resource type="BoxMesh" id="BoxMesh_shard"]
+material = SubResource("StandardMaterial3D_shard")
+size = Vector3(0.14, 0.14, 0.14)
+
+[sub_resource type="Curve" id="Curve_shrink"]
+_data = [Vector2(0, 1), 0.0, 0.0, 0, 0, Vector2(1, 0), 0.0, 0.0, 0, 0]
+point_count = 2
+
+[sub_resource type="CurveTexture" id="CurveTexture_shrink"]
+curve = SubResource("Curve_shrink")
+
+[sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_burst"]
+resource_local_to_scene = true
+direction = Vector3(0, 1, 0)
+spread = 75.0
+initial_velocity_min = 2.5
+initial_velocity_max = 4.5
+gravity = Vector3(0, -14, 0)
+scale_min = 0.7
+scale_max = 1.3
+scale_curve = SubResource("CurveTexture_shrink")
+
+[node name="DeathBurst" type="GPUParticles3D"]
+emitting = false
+amount = 5
+lifetime = 0.55
+one_shot = true
+explosiveness = 1.0
+process_material = SubResource("ParticleProcessMaterial_burst")
+draw_pass_1 = SubResource("BoxMesh_shard")
+script = ExtResource("1_burst")

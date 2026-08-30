@@ -21,6 +21,13 @@ const XP_COLOR := Color(0.35, 0.95, 0.6)
 ## Matches the Rotking's amber core seams.
 const BOSS_BAR_COLOR := Color(0.98, 0.62, 0.16)
 
+## Kill-streak feedback: kills landing within this rolling window count
+## toward the tier thresholds below; 2s+ without a kill resets the streak
+## so the tiers can fire again.
+const STREAK_WINDOW := 2.0
+const STREAK_KILLS: Array[int] = [8, 15, 25]
+const STREAK_WORDS: Array[String] = ["SHREDDING!", "RAMPAGING!", "UNSTOPPABLE!"]
+
 @onready var _hp_bar: ProgressBar = %HpBar
 @onready var _hp_label: Label = %HpLabel
 @onready var _xp_bar: ProgressBar = %XpBar
@@ -31,12 +38,19 @@ const BOSS_BAR_COLOR := Color(0.98, 0.62, 0.16)
 @onready var _boss_name_label: Label = %BossNameLabel
 @onready var _announce_label: Label = %AnnounceLabel
 @onready var _curse_label: Label = %CurseLabel
+@onready var _streak_label: Label = %StreakLabel
 
 var _hp_fill: StyleBoxFlat
 var _health: Health
 var _tracked_boss: Node3D = null
 var _boss_health: Health = null
 var _announce_tween: Tween
+var _streak_tween: Tween
+## Run-time stamps of recent kills (pruned to STREAK_WINDOW on each kill).
+var _streak_kill_times: Array[float] = []
+## Highest STREAK_KILLS index fired this streak; -1 until one fires.
+var _streak_tier: int = -1
+var _last_kills: int = 0
 
 
 func _ready() -> void:
@@ -69,6 +83,7 @@ func _process(_delta: float) -> void:
 
 func _on_health_damaged(_amount: float, current: float) -> void:
 	_refresh_hp(current, _health.max_hp)
+	Juice.player_hurt()
 
 
 func _on_health_died() -> void:
@@ -95,6 +110,49 @@ func _on_leveled_up(new_level: int) -> void:
 
 func _on_kills_changed(kills: int) -> void:
 	_kills_label.text = "Kills: %d" % kills
+	if kills <= _last_kills:
+		# Counter reset (new run), not a fresh kill: clear the streak.
+		_last_kills = kills
+		_streak_kill_times.clear()
+		_streak_tier = -1
+		return
+	_last_kills = kills
+	_register_streak_kill()
+
+
+func _register_streak_kill() -> void:
+	var now: float = RunState.run_time
+	while not _streak_kill_times.is_empty() and now - _streak_kill_times[0] > STREAK_WINDOW:
+		_streak_kill_times.pop_front()
+	if _streak_kill_times.is_empty():
+		_streak_tier = -1  # streak lapsed: every tier may fire again
+	_streak_kill_times.append(now)
+	var in_window := _streak_kill_times.size()
+	var tier := -1
+	for i in STREAK_KILLS.size():
+		if in_window >= STREAK_KILLS[i]:
+			tier = i
+	if tier > _streak_tier:
+		_streak_tier = tier
+		_pop_streak(STREAK_WORDS[tier])
+
+
+## Punchy scale-pop text (settles from oversized, holds, fades out).
+func _pop_streak(word: String) -> void:
+	_streak_label.text = word
+	_streak_label.reset_size()
+	_streak_label.pivot_offset = _streak_label.size * 0.5
+	_streak_label.visible = true
+	_streak_label.modulate.a = 1.0
+	_streak_label.scale = Vector2(2.1, 2.1)
+	if _streak_tween != null and _streak_tween.is_valid():
+		_streak_tween.kill()
+	_streak_tween = create_tween()
+	_streak_tween.tween_property(_streak_label, "scale", Vector2.ONE, 0.22) \
+			.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	_streak_tween.tween_interval(0.55)
+	_streak_tween.tween_property(_streak_label, "modulate:a", 0.0, 0.3)
+	_streak_tween.tween_callback(_streak_label.hide)
 
 
 ## Subtle Curse Shrine readout beside the run timer; hidden at 0 stacks

@@ -205,6 +205,7 @@ func _resolve_smash() -> void:
 	_state_timer = smash_recover
 	_smash_cooldown_timer = smash_cooldown
 	Telegraph.spawn_disc(self, global_position, smash_radius, 0.2, IMPACT_COLOR)
+	Juice.shake(0.2, 0.4)
 	_play_cue_lean(0.0, 0.25)
 	var player := get_tree().get_first_node_in_group("player") as Node3D
 	if player == null:
@@ -240,6 +241,7 @@ func _start_root_burst(player: Node3D) -> void:
 
 func _resolve_root_burst() -> void:
 	_state = State.PURSUE
+	Juice.shake(0.2, 0.4)
 	for spot: Vector3 in _root_spots:
 		_spawn_spikes(spot)
 	var player := get_tree().get_first_node_in_group("player") as Node3D
@@ -309,6 +311,11 @@ func _on_boss_died() -> void:
 	# The base death flow (kill credit, gems, squash-out) already runs off
 	# this signal; the boss only has to stop reading as an active boss.
 	remove_from_group("boss")
+
+
+## Boss kill moment: big shake, brief slow-mo, oversized shard burst.
+func _death_feedback() -> void:
+	Juice.boss_died(global_position + Vector3.UP * 1.5, death_burst_color())
 
 
 ## Boss payout: a ring of high-value gems instead of the single base gem.

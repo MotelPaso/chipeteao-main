@@ -111,6 +111,7 @@ func _emit_started() -> void:
 
 
 func _emit_completed() -> void:
+	Juice.sparkle(global_position + Vector3.UP * 1.2)
 	interaction_completed.emit()
 
 
