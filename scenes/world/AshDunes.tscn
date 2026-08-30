@@ -1,10 +1,13 @@
-[gd_scene load_steps=26 format=3 uid="uid://bashdu2ne7q4c"]
+[gd_scene load_steps=29 format=3 uid="uid://bashdu2ne7q4c"]
 
 [ext_resource type="PackedScene" uid="uid://crunsy5te2m8a" path="res://scenes/world/RunSystems.tscn" id="1_runsystems"]
 [ext_resource type="Script" path="res://scripts/systems/enemy_spawner.gd" id="2_spawner"]
 [ext_resource type="PackedScene" uid="uid://bqgr4nt0h3v2e" path="res://scenes/enemies/Grunt.tscn" id="3_grunt"]
 [ext_resource type="PackedScene" path="res://scenes/enemies/Skirmisher.tscn" id="4_skirmisher"]
 [ext_resource type="PackedScene" path="res://scenes/enemies/Tank.tscn" id="5_tank"]
+[ext_resource type="PackedScene" path="res://scenes/enemies/Sunspitter.tscn" id="19_sunspitter"]
+[ext_resource type="PackedScene" path="res://scenes/enemies/Duneburrower.tscn" id="20_burrower"]
+[ext_resource type="PackedScene" path="res://scenes/enemies/Sarcognath.tscn" id="21_sarcognath"]
 [ext_resource type="Script" path="res://scripts/world/scatter.gd" id="6_scatter"]
 [ext_resource type="PackedScene" uid="uid://ccact1du9sw3a" path="res://scenes/world/props/Cactus.tscn" id="7_cactus"]
 [ext_resource type="PackedScene" uid="uid://dobel2du6kt5b" path="res://scenes/world/props/Obelisk.tscn" id="8_obelisk"]
@@ -217,9 +220,15 @@ perimeter_rock_every = 6
 
 [node name="EnemySpawner" type="Node3D" parent="."]
 script = ExtResource("2_spawner")
+phase_preset = 1
 grunt_scene = ExtResource("3_grunt")
 skirmisher_scene = ExtResource("4_skirmisher")
 tank_scene = ExtResource("5_tank")
+sunspitter_scene = ExtResource("19_sunspitter")
+burrower_scene = ExtResource("20_burrower")
+boss_scene = ExtResource("21_sarcognath")
+elder_title = "Sarcognath Elder"
+boss_warning_text = "The sand shivers over something entombed..."
 
 [node name="RunSystems" parent="." instance=ExtResource("1_runsystems")]
 map_id = "ash_dunes"

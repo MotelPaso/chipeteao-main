@@ -1,0 +1,91 @@
+[gd_scene load_steps=12 format=3]
+
+[ext_resource type="Script" path="res://scripts/enemies/sunspitter.gd" id="1_sunspitter"]
+[ext_resource type="Script" path="res://scripts/systems/health.gd" id="2_health"]
+[ext_resource type="PackedScene" path="res://scenes/systems/XpGem.tscn" id="3_gem"]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_shell"]
+albedo_color = Color(0.78, 0.55, 0.22, 1)
+roughness = 0.75
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_chitin"]
+albedo_color = Color(0.45, 0.3, 0.15, 1)
+roughness = 0.9
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_eye"]
+shading_mode = 0
+albedo_color = Color(1, 0.72, 0.25, 1)
+emission_enabled = true
+emission = Color(1, 0.58, 0.12, 1)
+emission_energy_multiplier = 2.4
+
+[sub_resource type="SphereMesh" id="SphereMesh_shell"]
+material = SubResource("StandardMaterial3D_shell")
+radius = 0.5
+height = 0.66
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_body"]
+material = SubResource("StandardMaterial3D_chitin")
+top_radius = 0.4
+bottom_radius = 0.34
+height = 0.3
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_leg"]
+material = SubResource("StandardMaterial3D_chitin")
+top_radius = 0.04
+bottom_radius = 0.06
+height = 0.34
+
+[sub_resource type="SphereMesh" id="SphereMesh_eye"]
+material = SubResource("StandardMaterial3D_eye")
+radius = 0.11
+height = 0.22
+
+[sub_resource type="CapsuleShape3D" id="CapsuleShape3D_sunspitter"]
+radius = 0.45
+height = 0.95
+
+[node name="Sunspitter" type="CharacterBody3D" groups=["enemies"]]
+collision_layer = 2
+collision_mask = 3
+script = ExtResource("1_sunspitter")
+move_speed = 2.6
+xp_gem_scene = ExtResource("3_gem")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.48, 0)
+shape = SubResource("CapsuleShape3D_sunspitter")
+
+[node name="Visual" type="Node3D" parent="."]
+
+[node name="Underbody" type="MeshInstance3D" parent="Visual"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.28, 0)
+mesh = SubResource("CylinderMesh_body")
+
+[node name="Shell" type="MeshInstance3D" parent="Visual"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.5, 0.04)
+mesh = SubResource("SphereMesh_shell")
+
+[node name="LegFL" type="MeshInstance3D" parent="Visual"]
+transform = Transform3D(0.939693, -0.34202, 0, 0.34202, 0.939693, 0, 0, 0, 1, -0.4, 0.18, -0.22)
+mesh = SubResource("CylinderMesh_leg")
+
+[node name="LegFR" type="MeshInstance3D" parent="Visual"]
+transform = Transform3D(0.939693, 0.34202, 0, -0.34202, 0.939693, 0, 0, 0, 1, 0.4, 0.18, -0.22)
+mesh = SubResource("CylinderMesh_leg")
+
+[node name="LegBL" type="MeshInstance3D" parent="Visual"]
+transform = Transform3D(0.939693, -0.34202, 0, 0.34202, 0.939693, 0, 0, 0, 1, -0.4, 0.18, 0.22)
+mesh = SubResource("CylinderMesh_leg")
+
+[node name="LegBR" type="MeshInstance3D" parent="Visual"]
+transform = Transform3D(0.939693, 0.34202, 0, -0.34202, 0.939693, 0, 0, 0, 1, 0.4, 0.18, 0.22)
+mesh = SubResource("CylinderMesh_leg")
+
+[node name="Eye" type="MeshInstance3D" parent="Visual"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.55, -0.42)
+mesh = SubResource("SphereMesh_eye")
+
+[node name="Health" type="Node" parent="."]
+script = ExtResource("2_health")
+max_hp = 16.0

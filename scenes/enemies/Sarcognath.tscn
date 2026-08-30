@@ -1,0 +1,145 @@
+[gd_scene load_steps=17 format=3]
+
+[ext_resource type="Script" path="res://scripts/enemies/sarcognath.gd" id="1_sarcognath"]
+[ext_resource type="Script" path="res://scripts/systems/health.gd" id="2_health"]
+[ext_resource type="PackedScene" path="res://scenes/systems/XpGem.tscn" id="3_gem"]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_stone"]
+albedo_color = Color(0.68, 0.6, 0.46, 1)
+roughness = 0.9
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_stone_dark"]
+albedo_color = Color(0.45, 0.39, 0.3, 1)
+roughness = 0.95
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_gilt"]
+albedo_color = Color(0.85, 0.66, 0.22, 1)
+metallic = 0.7
+roughness = 0.35
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_teal"]
+shading_mode = 0
+albedo_color = Color(0.3, 1, 0.85, 1)
+emission_enabled = true
+emission = Color(0.15, 0.95, 0.78, 1)
+emission_energy_multiplier = 2.4
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_hoverbase"]
+material = SubResource("StandardMaterial3D_stone_dark")
+top_radius = 0.85
+bottom_radius = 0.4
+height = 0.7
+
+[sub_resource type="BoxMesh" id="BoxMesh_coffin"]
+material = SubResource("StandardMaterial3D_stone")
+size = Vector3(1.7, 2.7, 1)
+
+[sub_resource type="BoxMesh" id="BoxMesh_lid"]
+material = SubResource("StandardMaterial3D_stone_dark")
+size = Vector3(1.4, 2.4, 0.16)
+
+[sub_resource type="BoxMesh" id="BoxMesh_shoulder"]
+material = SubResource("StandardMaterial3D_stone_dark")
+size = Vector3(0.5, 0.7, 1.1)
+
+[sub_resource type="BoxMesh" id="BoxMesh_head"]
+material = SubResource("StandardMaterial3D_gilt")
+size = Vector3(0.55, 0.5, 0.7)
+
+[sub_resource type="BoxMesh" id="BoxMesh_snout"]
+material = SubResource("StandardMaterial3D_gilt")
+size = Vector3(0.28, 0.24, 0.5)
+
+[sub_resource type="PrismMesh" id="PrismMesh_ear"]
+material = SubResource("StandardMaterial3D_gilt")
+size = Vector3(0.22, 0.5, 0.14)
+
+[sub_resource type="BoxMesh" id="BoxMesh_seam"]
+material = SubResource("StandardMaterial3D_teal")
+size = Vector3(0.14, 1.7, 0.1)
+
+[sub_resource type="SphereMesh" id="SphereMesh_eye"]
+material = SubResource("StandardMaterial3D_teal")
+radius = 0.09
+height = 0.18
+
+[sub_resource type="CapsuleShape3D" id="CapsuleShape3D_boss"]
+radius = 1.05
+height = 3.4
+
+[node name="Sarcognath" type="CharacterBody3D" groups=["boss", "enemies"]]
+collision_layer = 2
+collision_mask = 3
+script = ExtResource("1_sarcognath")
+boss_title = "Sarcognath"
+move_speed = 2.0
+turn_speed = 3.0
+separation_strength = 0.0
+xp_gem_scene = ExtResource("3_gem")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.9, 0)
+shape = SubResource("CapsuleShape3D_boss")
+
+[node name="Visual" type="Node3D" parent="."]
+
+[node name="HoverBase" type="MeshInstance3D" parent="Visual"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.75, 0)
+mesh = SubResource("CylinderMesh_hoverbase")
+
+[node name="Coffin" type="MeshInstance3D" parent="Visual"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.35, 0)
+mesh = SubResource("BoxMesh_coffin")
+
+[node name="Lid" type="MeshInstance3D" parent="Visual"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.35, -0.52)
+mesh = SubResource("BoxMesh_lid")
+
+[node name="ShoulderL" type="MeshInstance3D" parent="Visual"]
+transform = Transform3D(0.996195, 0, 0.0871557, 0, 1, 0, -0.0871557, 0, 0.996195, -1.05, 3.25, 0)
+mesh = SubResource("BoxMesh_shoulder")
+
+[node name="ShoulderR" type="MeshInstance3D" parent="Visual"]
+transform = Transform3D(0.996195, 0, -0.0871557, 0, 1, 0, 0.0871557, 0, 0.996195, 1.05, 3.25, 0)
+mesh = SubResource("BoxMesh_shoulder")
+
+[node name="Head" type="MeshInstance3D" parent="Visual"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 4.0, -0.12)
+mesh = SubResource("BoxMesh_head")
+
+[node name="Snout" type="MeshInstance3D" parent="Visual"]
+transform = Transform3D(1, 0, 0, 0, 0.984808, 0.173648, 0, -0.173648, 0.984808, 0, 3.92, -0.62)
+mesh = SubResource("BoxMesh_snout")
+
+[node name="EarL" type="MeshInstance3D" parent="Visual"]
+transform = Transform3D(0.984808, -0.173648, 0, 0.173648, 0.984808, 0, 0, 0, 1, -0.19, 4.48, -0.08)
+mesh = SubResource("PrismMesh_ear")
+
+[node name="EarR" type="MeshInstance3D" parent="Visual"]
+transform = Transform3D(0.984808, 0.173648, 0, -0.173648, 0.984808, 0, 0, 0, 1, 0.19, 4.48, -0.08)
+mesh = SubResource("PrismMesh_ear")
+
+[node name="SeamMain" type="MeshInstance3D" parent="Visual"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.3, -0.62)
+mesh = SubResource("BoxMesh_seam")
+
+[node name="SeamLeft" type="MeshInstance3D" parent="Visual"]
+transform = Transform3D(0.939693, 0, -0.34202, 0.117062, 0.939693, 0.321594, 0.321394, -0.34202, 0.883022, -0.55, 2.6, -0.45)
+mesh = SubResource("BoxMesh_seam")
+
+[node name="SeamRight" type="MeshInstance3D" parent="Visual"]
+transform = Transform3D(0.939693, 0, 0.34202, -0.117062, 0.939693, 0.321594, -0.321394, -0.34202, 0.883022, 0.55, 1.9, -0.45)
+mesh = SubResource("BoxMesh_seam")
+
+[node name="EyeL" type="MeshInstance3D" parent="Visual"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.15, 4.08, -0.48)
+mesh = SubResource("SphereMesh_eye")
+
+[node name="EyeR" type="MeshInstance3D" parent="Visual"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.15, 4.08, -0.48)
+mesh = SubResource("SphereMesh_eye")
+
+[node name="Health" type="Node" parent="."]
+script = ExtResource("2_health")
+max_hp = 900.0
+armor = 4.0

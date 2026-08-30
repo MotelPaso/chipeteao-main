@@ -1,24 +1,19 @@
 class_name Rotking
-extends EnemyBase
+extends BossBase
 ## Hollow Woods boss: a hulking rotten treant-brute that slowly stalks the
 ## player and fights through a small state machine layered on the EnemyBase
 ## hooks. Moveset: a telegraphed close-range Smash (ground-shockwave AoE
 ## with a jump/slide dodge window), a mid-range Root Burst (three
 ## telegraphed ground spots that erupt into bark spikes), and a one-shot
 ## grunt Summon each time its HP falls through an exported threshold.
-## The spawner sets boss_title and calls apply_tier() for the stronger
-## Elder spawn; the HUD boss bar binds through the "boss_ui" group. Bosses
-## never become elites (make_elite is a no-op) and never leave the arena.
+## Title/tier/curse/payout/arena-clamp plumbing lives on BossBase; the
+## spawner promotes the Elder rematch through apply_tier().
 
 enum State { ENTRANCE, PURSUE, SMASH, ROOT_BURST, SUMMON }
 
 const TELEGRAPH_COLOR := Color(1.0, 0.55, 0.12)
 const IMPACT_COLOR := Color(1.0, 0.8, 0.35)
 
-@export var boss_title: String = "Rotking"
-## Half-size of the arena floor minus a margin; position is clamped so the
-## boss (and its root-burst spots) never leave the field.
-@export var arena_half_extent: float = 46.0
 @export var entrance_duration: float = 0.9
 
 @export_group("Smash")
@@ -54,21 +49,6 @@ const IMPACT_COLOR := Color(1.0, 0.8, 0.35)
 @export var summon_ring_radius: float = 3.2
 @export var summon_duration: float = 1.1
 
-@export_group("Reward")
-## Death payout: a ring of boss_gem_count gems worth boss_gem_value XP each.
-@export var boss_gem_count: int = 8
-@export var boss_gem_value: int = 5
-
-@export_group("Tier")
-## Extra body scale applied per apply_tier() call (Elder and beyond).
-@export var tier_body_scale: float = 1.15
-
-@export_group("Curse")
-## Extra HP/damage fraction per curse stack (0.4 = +40% each).
-@export var curse_stat_bonus_per_stack: float = 0.4
-## Death-payout gem count is multiplied by this once per curse stack.
-@export var curse_gem_factor_per_stack: int = 2
-
 var _state: State = State.ENTRANCE
 var _state_timer: float = 0.0
 var _entrance_played: bool = false
@@ -87,48 +67,11 @@ func _ready() -> void:
 	_root_burst_timer = root_burst_interval
 	_thresholds_remaining = summon_thresholds.duplicate()
 	_health.damaged.connect(_on_damaged)
-	_health.died.connect(_on_boss_died)
-	get_tree().call_group("boss_ui", "track_boss", self, boss_title)
 
 
-func _physics_process(delta: float) -> void:
-	super(delta)
-	# Hard arena bound (also catches any future knockback effects).
-	global_position.x = clampf(global_position.x, -arena_half_extent, arena_half_extent)
-	global_position.z = clampf(global_position.z, -arena_half_extent, arena_half_extent)
-
-
-## The spawner's elite roll must never touch a boss; tiering goes through
-## apply_tier() instead.
-func make_elite() -> void:
-	pass
-
-
-## Stronger boss instance (Rotking Elder, future map tiers): multiplies
-## survivability, damage, and payout, and bulks the body up slightly.
-## Call after the boss is inside the tree.
-func apply_tier(multiplier: float) -> void:
-	_health.max_hp *= multiplier
-	_health.heal_full()
+func _scale_attack_damage(multiplier: float) -> void:
 	smash_damage *= multiplier
 	root_burst_damage *= multiplier
-	boss_gem_value = ceili(float(boss_gem_value) * multiplier)
-	scale *= tier_body_scale
-
-
-## Curse Shrine payoff, applied by the spawner right after any apply_tier:
-## every consumed stack adds curse_stat_bonus_per_stack HP/damage, and the
-## death gem payout doubles per stack. Call while the boss is in the tree.
-func apply_curse(stacks: int) -> void:
-	if stacks <= 0:
-		return
-	var multiplier := 1.0 + curse_stat_bonus_per_stack * float(stacks)
-	_health.max_hp *= multiplier
-	_health.heal_full()
-	smash_damage *= multiplier
-	root_burst_damage *= multiplier
-	for i in stacks:
-		boss_gem_count *= curse_gem_factor_per_stack
 
 
 func _behavior_tick(delta: float) -> void:
@@ -306,37 +249,6 @@ func _on_damaged(_amount: float, current: float) -> void:
 	while not _thresholds_remaining.is_empty() and ratio <= _thresholds_remaining[0]:
 		_thresholds_remaining.remove_at(0)
 		_pending_summons += 1
-
-
-func _on_boss_died() -> void:
-	# The base death flow (kill credit, gems, squash-out) already runs off
-	# this signal; the boss only has to stop reading as an active boss.
-	remove_from_group("boss")
-
-
-## Boss kill moment: big shake, brief slow-mo, oversized shard burst.
-func _death_feedback() -> void:
-	Juice.boss_died(global_position + Vector3.UP * 1.5, death_burst_color())
-
-
-## Boss payout: a ring of high-value gems instead of the single base gem.
-func _drop_xp_gem() -> void:
-	if xp_gem_scene == null:
-		return
-	var scene_root := get_tree().current_scene
-	if scene_root == null:
-		return
-	for i in boss_gem_count:
-		var drop := xp_gem_scene.instantiate()
-		var gem := drop as XpGem
-		if gem == null:
-			drop.free()
-			return
-		gem.xp_value = boss_gem_value
-		scene_root.add_child(gem)
-		var gem_angle := TAU * float(i) / float(boss_gem_count)
-		gem.global_position = global_position + Vector3.UP * 0.6 \
-				+ Vector3(cos(gem_angle), 0.0, sin(gem_angle)) * 1.2
 
 
 func _play_cue_lean(target_x: float, duration: float) -> void:

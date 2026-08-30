@@ -19,3 +19,4 @@
 - Iteration 17: Game feel (camera shake + hit-stop + hit flash, death particle bursts, damage vignette, kill-streak popups, level-up pulse, slide FOV kick)
 - Iteration 18: Audio (14 synthesized original SFX + generator script, pooled Sfx autoload with pitch jitter and rate limiting, forest ambient bed)
 - Iteration 19: Ash Dunes biome (desert arena + props + mood, map select with victory-gated unlock, per-map run/victory counters, dunes quests)
+- Iteration 20: Desert roster (line-of-sight laser Sunspitter, burrowing ambusher, per-map spawn phases, Sarcognath boss with rotating beam/coffin ring/entomb root)

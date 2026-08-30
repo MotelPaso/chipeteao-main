@@ -42,8 +42,11 @@ func _init() -> void:
 	_save_wav(SFX_DIR, "shrine_done", _gen_shrine_done())
 	_save_wav(SFX_DIR, "chest_open", _gen_chest_open())
 	_save_wav(SFX_DIR, "boss_roar", _gen_boss_roar())
+	_save_wav(SFX_DIR, "boss_roar_2", _gen_boss_roar_2())
 	_save_wav(SFX_DIR, "boss_die", _gen_boss_die())
 	_save_wav(SFX_DIR, "streak", _gen_streak())
+	_save_wav(SFX_DIR, "laser_hum", _gen_laser_hum())
+	_save_wav(SFX_DIR, "burrow_pop", _gen_burrow_pop())
 	_save_wav(AMBIENT_DIR, "forest_wind", _gen_forest_wind())
 	_save_wav(AMBIENT_DIR, "desert_wind", _gen_desert_wind())
 	if _failed:
@@ -199,6 +202,48 @@ func _gen_boss_roar() -> PackedFloat32Array:
 	_tremolo(out, 13.0, 0.4)
 	_adsr(out, 0.12, 0.3, 0.85, 0.45)
 	_normalize(out, 0.95)
+	return out
+
+
+## Sarcognath's voice: the boss_roar recipe family dropped into a hollower
+## stone-resonance register — lower detuned saws bending across different
+## anchors, a square sub for the sarcophagus rattle, breathier noise, and
+## a slower 9Hz growl, so the two bosses read as kin but not clones.
+func _gen_boss_roar_2() -> PackedFloat32Array:
+	var out := _tone3(2.0, 48.0, 78.0, 36.0, Wave.SAW)
+	_mix_at(out, _tone3(2.0, 49.0, 79.6, 36.8, Wave.SAW), 0.0, 0.7)
+	_mix_at(out, _tone3(2.0, 24.0, 39.0, 18.0, Wave.SQUARE), 0.0, 0.3)
+	_mix_at(out, _lowpass(_noise(2.0, _rng(155)), 1300.0, 380.0), 0.0, 0.45)
+	out = _lowpass(out, 1400.0, 1400.0)
+	_tremolo(out, 9.0, 0.45)
+	_adsr(out, 0.15, 0.35, 0.8, 0.5)
+	_normalize(out, 0.95)
+	return out
+
+
+## Electric beam hum, loopable: every partial completes integer cycles
+## over the 0.6s loop (f = k / 0.6) and the flutter runs exactly 6 cycles,
+## so the wrap point is phase-continuous (same trick as shrine_channel).
+## The lone saw partial supplies the "energized" buzz.
+func _gen_laser_hum() -> PackedFloat32Array:
+	var out := _tone(0.6, 120.0, 120.0, Wave.SINE)
+	_mix_at(out, _tone(0.6, 200.0, 200.0, Wave.SAW), 0.0, 0.22)
+	_mix_at(out, _tone(0.6, 320.0, 320.0, Wave.SINE), 0.0, 0.3)
+	_mix_at(out, _tone(0.6, 440.0, 440.0, Wave.SINE), 0.0, 0.12)
+	_tremolo(out, 10.0, 0.2)
+	_normalize(out, 0.45)
+	return out
+
+
+## Muffled sand-eruption thump: a fast low sine drop under a burst of
+## heavily lowpassed noise (the settling soil-shower tail).
+func _gen_burrow_pop() -> PackedFloat32Array:
+	var out := _tone(0.32, 130.0, 46.0, Wave.SINE, 0.7)
+	_mix_at(out, _lowpass(_noise(0.28, _rng(144)), 1400.0, 260.0), 0.0, 0.75)
+	_exp_decay(out, 0.07)
+	_fade_in(out, 0.002)
+	_fade_out(out, 0.05)
+	_normalize(out, 0.85)
 	return out
 
 

@@ -26,13 +26,16 @@ const STREAMS: Dictionary[StringName, AudioStream] = {
 	&"shrine_done": preload("res://assets/audio/sfx/shrine_done.wav"),
 	&"chest_open": preload("res://assets/audio/sfx/chest_open.wav"),
 	&"boss_roar": preload("res://assets/audio/sfx/boss_roar.wav"),
+	&"boss_roar_2": preload("res://assets/audio/sfx/boss_roar_2.wav"),
 	&"boss_die": preload("res://assets/audio/sfx/boss_die.wav"),
 	&"streak": preload("res://assets/audio/sfx/streak.wav"),
+	&"laser_hum": preload("res://assets/audio/sfx/laser_hum.wav"),
+	&"burrow_pop": preload("res://assets/audio/sfx/burrow_pop.wav"),
 }
 
 ## Ids meant for play_loop(): forced to LOOP_FORWARD at ready, because the
 ## generated wav files carry no loop metadata.
-const LOOP_IDS: Array[StringName] = [&"shrine_channel"]
+const LOOP_IDS: Array[StringName] = [&"shrine_channel", &"laser_hum"]
 
 ## One-shot voices; overlapping sounds round-robin across these.
 @export var pool_size: int = 12
@@ -43,13 +46,14 @@ const LOOP_IDS: Array[StringName] = [&"shrine_channel"]
 ## Repetitive ids that get default_pitch_jitter when play() is called
 ## without an explicit jitter.
 @export var jittered_ids: Array[StringName] = [
-	&"hit_soft", &"hit_crit", &"enemy_die", &"gem_pickup",
+	&"hit_soft", &"hit_crit", &"enemy_die", &"gem_pickup", &"burrow_pop",
 ]
 ## Per-id cap on plays per rolling second; ids not listed are uncapped.
 @export var rate_limits: Dictionary[StringName, int] = {
 	&"hit_soft": 10,
 	&"hit_crit": 10,
 	&"gem_pickup": 10,
+	&"burrow_pop": 8,
 }
 ## Per-id base volume (dB) so the constant hit_soft sits well under the
 ## rare stingers; play()'s volume_db_offset stacks on top.
@@ -67,8 +71,11 @@ const LOOP_IDS: Array[StringName] = [&"shrine_channel"]
 	&"shrine_done": -5.0,
 	&"chest_open": -5.0,
 	&"boss_roar": -3.0,
+	&"boss_roar_2": -3.0,
 	&"boss_die": -2.0,
 	&"streak": -6.0,
+	&"laser_hum": -16.0,
+	&"burrow_pop": -8.0,
 }
 
 
@@ -84,6 +91,8 @@ var _started_at: Array[float] = []
 var _next_voice: int = 0
 var _rate_state: Dictionary[StringName, RateWindow] = {}
 var _loop_players: Dictionary[StringName, AudioStreamPlayer] = {}
+## Live acquire_loop() holders per id (several lasers share one hum voice).
+var _loop_refcounts: Dictionary[StringName, int] = {}
 
 
 func _ready() -> void:
@@ -161,11 +170,39 @@ func stop_loop(id: StringName) -> void:
 		player.stop()
 
 
+## Reference-counted loop for sounds many emitters share (laser beams):
+## the loop starts on the first acquire and stops only when every acquirer
+## has released. Emitters MUST pair each acquire with exactly one release
+## (guard with a held flag; release from _exit_tree for mid-loop frees).
+func acquire_loop(id: StringName) -> void:
+	var count := int(_loop_refcounts.get(id, 0))
+	_loop_refcounts[id] = count + 1
+	if count == 0:
+		play_loop(id)
+
+
+func release_loop(id: StringName) -> void:
+	var count := int(_loop_refcounts.get(id, 0))
+	if count <= 0:
+		return
+	count -= 1
+	_loop_refcounts[id] = count
+	if count == 0:
+		stop_loop(id)
+
+
+## How many acquire_loop() holders `id` currently has (test hook).
+func loop_refcount(id: StringName) -> int:
+	return int(_loop_refcounts.get(id, 0))
+
+
 ## Run-end safety: the manager processes through pause, so a channel hum
 ## started before a death would otherwise drone over the end screen.
+## Clears loop refcounts too — holders are about to be freed with the run.
 func stop_all_loops() -> void:
 	for id: StringName in _loop_players:
 		_loop_players[id].stop()
+	_loop_refcounts.clear()
 
 
 # --- voice allocation -------------------------------------------------------

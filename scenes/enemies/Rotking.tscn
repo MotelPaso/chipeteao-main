@@ -82,6 +82,7 @@ height = 3.0
 collision_layer = 2
 collision_mask = 3
 script = ExtResource("1_rotking")
+boss_title = "Rotking"
 summon_scene = ExtResource("4_grunt")
 move_speed = 2.0
 turn_speed = 3.5

@@ -1,8 +1,11 @@
+class_name Player
 extends CharacterBody3D
 ## Player controller: WASD movement relative to camera yaw, mouse-look,
 ## jump, and a Shift+move slide (speed burst + lowered collision).
 ## At spawn it applies the selected character's loadout (GameConfig ->
 ## CharacterCatalog row): starting weapon, capsule tint, per-level passive.
+## apply_root() (Sarcognath's Entomb) locks movement without touching the
+## camera or the auto-firing weapons.
 
 @export_group("Movement")
 @export var move_speed: float = 6.0
@@ -46,6 +49,9 @@ var _slide_timer: float = 0.0
 var _slide_cooldown_timer: float = 0.0
 var _slide_direction: Vector3 = Vector3.ZERO
 
+# Time left on an external root (Entomb): movement/jump/slide locked.
+var _root_timer: float = 0.0
+
 var _is_dead: bool = false
 
 
@@ -84,10 +90,14 @@ func _physics_process(delta: float) -> void:
 	if not is_on_floor():
 		velocity.y -= _gravity * delta
 
+	_root_timer = maxf(_root_timer - delta, 0.0)
+
 	var input_dir: Vector2 = Input.get_vector("move_left", "move_right", "move_forward", "move_back")
 	var wish_dir: Vector3 = transform.basis * Vector3(input_dir.x, 0.0, input_dir.y)
 	wish_dir.y = 0.0
 	wish_dir = wish_dir.normalized() if wish_dir.length_squared() > 0.0 else Vector3.ZERO
+	if is_rooted():
+		wish_dir = Vector3.ZERO
 
 	# Tome of Swiftness etc. scale on top of the exported base speed.
 	var effective_speed: float = move_speed * _stats.move_speed_multiplier
@@ -102,7 +112,11 @@ func _physics_process(delta: float) -> void:
 	elif _can_start_slide(wish_dir, effective_speed):
 		_start_slide(wish_dir)
 
-	if _is_sliding:
+	if is_rooted():
+		# Hard stop, not a decel: entombed feet plant instantly.
+		velocity.x = 0.0
+		velocity.z = 0.0
+	elif _is_sliding:
 		var slide_velocity: Vector3 = _slide_direction * effective_speed * slide_speed_multiplier
 		velocity.x = slide_velocity.x
 		velocity.z = slide_velocity.z
@@ -112,12 +126,28 @@ func _physics_process(delta: float) -> void:
 		velocity.x = move_toward(velocity.x, target.x, accel * delta)
 		velocity.z = move_toward(velocity.z, target.z, accel * delta)
 
-	if Input.is_action_just_pressed("jump") and is_on_floor():
+	if Input.is_action_just_pressed("jump") and is_on_floor() and not is_rooted():
 		if _is_sliding:
 			_end_slide()
 		velocity.y = jump_velocity
 
 	move_and_slide()
+
+
+## External snare (Sarcognath's Entomb): locks ground movement, jumping,
+## and sliding for `duration` seconds. Weapons keep auto-firing and the
+## camera stays free, so a rooted player still fights. Re-application
+## extends the lock, never shortens it.
+func apply_root(duration: float) -> void:
+	if _is_dead or duration <= 0.0:
+		return
+	if _is_sliding:
+		_end_slide()
+	_root_timer = maxf(_root_timer, duration)
+
+
+func is_rooted() -> bool:
+	return _root_timer > 0.0
 
 
 ## Applies a CharacterCatalog row: instances the starting weapon under the

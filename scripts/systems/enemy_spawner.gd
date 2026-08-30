@@ -2,27 +2,44 @@ extends Node3D
 ## Spawns enemies on a timer in a ring around the player, off-screen-ish.
 ## Difficulty ramps with elapsed run time: the interval shrinks and the
 ## per-tick count grows (GDD 6: swarms scale over the run timer), while
-## SPAWN_PHASES only decides WHAT spawns — grunts first, skirmishers from
-## minute 2, tanks from minute 5 — and an elite roll (chance ramping from
-## minute 3) can promote any spawn. Spawned enemies are added as children,
-## so the active count is just child count. Also owns the boss timetable:
-## the Rotking at boss_spawn_minute and its Elder at elder_spawn_minute,
-## with eased regular spawns while a boss lives and a short relief window
-## after one dies.
+## the phase table selected by phase_preset only decides WHAT spawns per
+## biome — the forest ramps grunts into skirmishers and tanks, the dunes
+## mix in sunspitters and burrowers — and an elite roll (chance ramping
+## from minute 3) can promote any spawn. Spawned enemies are added as
+## children, so the active count is just child count. Also owns the boss
+## timetable: the biome boss at boss_spawn_minute and its Elder rematch at
+## elder_spawn_minute, with eased regular spawns while a boss lives and a
+## short relief window after one dies.
 
-## Time-phased spawn mix. Each entry activates at from_minute and stays
+## Which time-phased spawn table this arena uses (see the tables below).
+enum PhasePreset { FOREST, DUNES }
+
+## Time-phased spawn mixes. Each entry activates at from_minute and stays
 ## active until a later entry takes over; weights are relative within the
-## phase. Kinds map to the exported scenes in _scene_for().
-const SPAWN_PHASES: Array[Dictionary] = [
+## phase. Kinds map to the exported scenes in _scene_for(). FOREST_PHASES
+## is the original Hollow Woods table, unchanged.
+const FOREST_PHASES: Array[Dictionary] = [
 	{"from_minute": 0.0, "weights": {"grunt": 1.0}},
 	{"from_minute": 2.0, "weights": {"grunt": 0.8, "skirmisher": 0.2}},
 	{"from_minute": 5.0, "weights": {"grunt": 0.7, "skirmisher": 0.2, "tank": 0.1}},
 	{"from_minute": 8.0, "weights": {"grunt": 0.55, "skirmisher": 0.25, "tank": 0.2}},
 ]
 
+const DUNES_PHASES: Array[Dictionary] = [
+	{"from_minute": 0.0, "weights": {"grunt": 0.7, "sunspitter": 0.3}},
+	{"from_minute": 2.0, "weights": {"grunt": 0.55, "sunspitter": 0.3, "burrower": 0.15}},
+	{"from_minute": 5.0,
+			"weights": {"grunt": 0.45, "sunspitter": 0.25, "burrower": 0.15, "tank": 0.15}},
+	{"from_minute": 8.0,
+			"weights": {"grunt": 0.3, "sunspitter": 0.3, "burrower": 0.2, "tank": 0.2}},
+]
+
+@export var phase_preset: PhasePreset = PhasePreset.FOREST
 @export var grunt_scene: PackedScene
 @export var skirmisher_scene: PackedScene
 @export var tank_scene: PackedScene
+@export var sunspitter_scene: PackedScene
+@export var burrower_scene: PackedScene
 @export var max_active: int = 80
 @export_group("Spawn Ring")
 @export var min_radius: float = 18.0
@@ -43,7 +60,7 @@ const SPAWN_PHASES: Array[Dictionary] = [
 @export var elite_full_chance: float = 0.10
 @export_group("Boss")
 @export var boss_scene: PackedScene
-## Run minute the Rotking arrives, and the minute its stronger Elder
+## Run minute the biome boss arrives, and the minute its stronger Elder
 ## rematch arrives (GDD 6: the biome boss line punctuates the run).
 @export var boss_spawn_minute: float = 5.0
 @export var elder_spawn_minute: float = 11.0
@@ -106,11 +123,17 @@ func current_count_per_tick() -> int:
 	return base_count_per_tick + int(minutes * extra_count_per_minute)
 
 
+## The phase table this arena's preset selects.
+func active_phases() -> Array[Dictionary]:
+	return DUNES_PHASES if phase_preset == PhasePreset.DUNES else FOREST_PHASES
+
+
 ## Weighted pick from the phase active at the current run_time.
 func pick_spawn_scene() -> PackedScene:
 	var minutes := run_time / 60.0
-	var weights: Dictionary = SPAWN_PHASES[0]["weights"]
-	for phase: Dictionary in SPAWN_PHASES:
+	var phases := active_phases()
+	var weights: Dictionary = phases[0]["weights"]
+	for phase: Dictionary in phases:
 		var from_minute: float = phase["from_minute"]
 		if minutes >= from_minute:
 			weights = phase["weights"]
@@ -145,6 +168,10 @@ func _scene_for(kind: String) -> PackedScene:
 			return skirmisher_scene
 		"tank":
 			return tank_scene
+		"sunspitter":
+			return sunspitter_scene
+		"burrower":
+			return burrower_scene
 		_:
 			return grunt_scene
 
@@ -218,10 +245,10 @@ func _spawn_boss(stat_multiplier: float, title_override: String = "") -> void:
 	if player == null:
 		return
 	var node := boss_scene.instantiate()
-	var boss := node as Rotking
+	var boss := node as BossBase
 	if boss == null:
 		node.free()
-		push_warning("EnemySpawner: boss scene root does not extend Rotking.")
+		push_warning("EnemySpawner: boss scene root does not extend BossBase.")
 		return
 	if not title_override.is_empty():
 		# Before add_child: the boss announces its title to the HUD in _ready.
