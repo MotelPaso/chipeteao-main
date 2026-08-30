@@ -1,4 +1,4 @@
-[gd_scene load_steps=29 format=3 uid="uid://bashdu2ne7q4c"]
+[gd_scene load_steps=30 format=3 uid="uid://bashdu2ne7q4c"]
 
 [ext_resource type="PackedScene" uid="uid://crunsy5te2m8a" path="res://scenes/world/RunSystems.tscn" id="1_runsystems"]
 [ext_resource type="Script" path="res://scripts/systems/enemy_spawner.gd" id="2_spawner"]
@@ -21,6 +21,7 @@
 [ext_resource type="PackedScene" uid="uid://cchst4lut7qb3" path="res://scenes/world/chests/Chest.tscn" id="16_chest"]
 [ext_resource type="Script" path="res://scripts/systems/ambient_bed.gd" id="17_ambient"]
 [ext_resource type="AudioStream" path="res://assets/audio/ambient/desert_wind.wav" id="18_wind"]
+[ext_resource type="PackedScene" path="res://scenes/world/secrets/HummingSkull.tscn" id="24_skull"]
 
 [sub_resource type="Shader" id="Shader_sand"]
 code = "shader_type spatial;
@@ -202,6 +203,9 @@ transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, 17.4, 4.4, -18)
 
 [node name="ChestMesaWest" parent="Interactables" instance=ExtResource("16_chest")]
 transform = Transform3D(0, 0, -1, 0, 1, 0, 1, 0, 0, -20, 2.4, 10)
+
+[node name="HummingSkull" parent="Interactables" groups=["scatter_keepout"] instance=ExtResource("24_skull")]
+transform = Transform3D(0.453596, 0, 0.891207, 0, 1, 0, -0.891207, 0, 0.453596, -38, 0, -2)
 
 [node name="DuneScatter" type="Node3D" parent="."]
 script = ExtResource("6_scatter")

@@ -252,9 +252,20 @@ func _populate_locked_card(card: Button, character: Dictionary) -> void:
 	box.add_child(passive)
 	var cost := _label("Unlock — %d Shards" % int(character.get("unlock_cost", 0)),
 			13, SHARD_TEXT_COLOR)
-	cost.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	cost.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	box.add_child(cost)
+	var hint_text := String(character.get("unlock_hint", ""))
+	if hint_text.is_empty():
+		cost.size_flags_vertical = Control.SIZE_EXPAND_FILL
+		cost.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		box.add_child(cost)
+	else:
+		# Boss-unlockable characters advertise both paths: the Shard price
+		# and the catalog's vague clue toward the hidden-boss unlock.
+		box.add_child(cost)
+		var hint := _label("— or %s" % hint_text, 10, SHARD_TEXT_COLOR.darkened(0.2))
+		hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		hint.size_flags_vertical = Control.SIZE_EXPAND_FILL
+		hint.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		box.add_child(hint)
 	_style_card(card, LOCKED_BORDER_COLOR, 2)
 
 

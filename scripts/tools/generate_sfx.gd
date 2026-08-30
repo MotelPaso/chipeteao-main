@@ -47,6 +47,7 @@ func _init() -> void:
 	_save_wav(SFX_DIR, "streak", _gen_streak())
 	_save_wav(SFX_DIR, "laser_hum", _gen_laser_hum())
 	_save_wav(SFX_DIR, "burrow_pop", _gen_burrow_pop())
+	_save_wav(SFX_DIR, "secret_fanfare", _gen_secret_fanfare())
 	_save_wav(AMBIENT_DIR, "forest_wind", _gen_forest_wind())
 	_save_wav(AMBIENT_DIR, "desert_wind", _gen_desert_wind())
 	if _failed:
@@ -273,6 +274,22 @@ func _gen_streak() -> PackedFloat32Array:
 	_mix_at(out, high, 0.08, 0.9)
 	out = _lowpass(out, 3000.0, 3000.0)
 	_fade_out(out, 0.03)
+	_normalize(out, 0.85)
+	return out
+
+
+## Hidden-boss payoff fanfare: a rolled G-major "ta-da" climbing two
+## octaves with a faint glitter cap and a warm root under the top note —
+## deliberately a different key and wider spread than level_up's C
+## arpeggio, so finding a secret reads as its own celebration.
+func _gen_secret_fanfare() -> PackedFloat32Array:
+	var out := _silence(1.1)
+	_mix_at(out, _chime(0.3, 587.33, 0.1), 0.0, 0.9)
+	_mix_at(out, _chime(0.3, 783.99, 0.1), 0.09, 0.95)
+	_mix_at(out, _chime(0.34, 987.77, 0.12), 0.18, 1.0)
+	_mix_at(out, _chime(0.55, 1174.66, 0.16), 0.27, 1.0)
+	_mix_at(out, _chime(0.5, 2349.32, 0.14), 0.29, 0.28)
+	_mix_at(out, _chime(0.5, 392.0, 0.15), 0.27, 0.5)
 	_normalize(out, 0.85)
 	return out
 

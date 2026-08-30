@@ -1,4 +1,4 @@
-[gd_scene load_steps=27 format=3 uid="uid://dqv5m2x8rk1fj"]
+[gd_scene load_steps=28 format=3 uid="uid://dqv5m2x8rk1fj"]
 
 [ext_resource type="PackedScene" uid="uid://crunsy5te2m8a" path="res://scenes/world/RunSystems.tscn" id="1_runsystems"]
 [ext_resource type="PackedScene" uid="uid://dn4r8t2ycv5qb" path="res://scenes/enemies/TargetDummy.tscn" id="2_dummy"]
@@ -19,6 +19,7 @@
 [ext_resource type="PackedScene" uid="uid://cchst4lut7qb3" path="res://scenes/world/chests/Chest.tscn" id="21_chest"]
 [ext_resource type="Script" path="res://scripts/systems/ambient_bed.gd" id="22_ambient"]
 [ext_resource type="AudioStream" path="res://assets/audio/ambient/forest_wind.wav" id="23_wind"]
+[ext_resource type="PackedScene" path="res://scenes/world/secrets/OddStump.tscn" id="24_oddstump"]
 
 [sub_resource type="Shader" id="Shader_grass"]
 code = "shader_type spatial;
@@ -150,6 +151,9 @@ transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, 18, 2, -14)
 
 [node name="ChestKnollSouth" parent="Interactables" instance=ExtResource("21_chest")]
 transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, 2, 2, 24)
+
+[node name="OddStump" parent="Interactables" groups=["scatter_keepout"] instance=ExtResource("24_oddstump")]
+transform = Transform3D(-0.801144, 0, 0.598472, 0, 1, 0, -0.598472, 0, -0.801144, 38, 0, 38)
 
 [node name="ForestScatter" type="Node3D" parent="."]
 script = ExtResource("9_scatter")

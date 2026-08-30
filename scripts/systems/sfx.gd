@@ -31,6 +31,7 @@ const STREAMS: Dictionary[StringName, AudioStream] = {
 	&"streak": preload("res://assets/audio/sfx/streak.wav"),
 	&"laser_hum": preload("res://assets/audio/sfx/laser_hum.wav"),
 	&"burrow_pop": preload("res://assets/audio/sfx/burrow_pop.wav"),
+	&"secret_fanfare": preload("res://assets/audio/sfx/secret_fanfare.wav"),
 }
 
 ## Ids meant for play_loop(): forced to LOOP_FORWARD at ready, because the
@@ -76,6 +77,7 @@ const LOOP_IDS: Array[StringName] = [&"shrine_channel", &"laser_hum"]
 	&"streak": -6.0,
 	&"laser_hum": -16.0,
 	&"burrow_pop": -8.0,
+	&"secret_fanfare": -3.0,
 }
 
 

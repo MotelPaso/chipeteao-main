@@ -26,6 +26,12 @@ extends RefCounted
 ##   unlock_cost: Shards to unlock on the select screen (GDD 5/8); 0 means
 ##             playable from the start. SaveData gates and persists the
 ##             actual unlocks — this is only the price data.
+##   unlock_boss (optional): hidden-miniboss id whose kill grants this
+##             character for free, bypassing Shards (GDD 5: skill unlocks).
+##             SecretBossBase resolves the reward through by_unlock_boss on
+##             the kill, so the mapping lives here, not in boss code.
+##   unlock_hint (optional): vague select-screen clue for the boss path,
+##             rendered on the locked card beside the Shard price.
 ##   tint:     placeholder capsule body color (also the card swatch).
 
 ## Fallback character when no selection was made (Main booted directly).
@@ -86,6 +92,8 @@ const CHARACTER_LIBRARY: Array[Dictionary] = [
 		"passive_description": "+1 thorns per level",
 		"passive_stat": "thorns", "passive_amount": 1.0,
 		"unlock_cost": 80,
+		"unlock_boss": "grubthing",
+		"unlock_hint": "find something odd in the Hollow Woods",
 		"tint": Color(0.5, 0.58, 0.28),
 	},
 	{
@@ -111,6 +119,8 @@ const CHARACTER_LIBRARY: Array[Dictionary] = [
 		"passive_stat": "evasion", "passive_amount": 0.5,
 		"passive_kind": "evasion_execute",
 		"unlock_cost": 150,
+		"unlock_boss": "coffer_mimic",
+		"unlock_hint": "follow a strange hum in the Ash Dunes",
 		"tint": Color(0.42, 0.3, 0.58),
 	},
 	{
@@ -141,6 +151,17 @@ static func by_id(character_id: String) -> Dictionary:
 static func by_id_or_default(character_id: String) -> Dictionary:
 	var row := by_id(character_id)
 	return row if not row.is_empty() else by_id(DEFAULT_ID)
+
+
+## Row whose unlock_boss names the given hidden-miniboss id, or an empty
+## Dictionary when no character unlocks off that boss.
+static func by_unlock_boss(boss_id: String) -> Dictionary:
+	if boss_id.is_empty():
+		return {}
+	for row: Dictionary in CHARACTER_LIBRARY:
+		if String(row.get("unlock_boss", "")) == boss_id:
+			return row
+	return {}
 
 
 ## Ids playable from the start (unlock_cost 0) — GDD 5: Rook and Vex.

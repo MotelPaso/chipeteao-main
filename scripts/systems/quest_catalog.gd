@@ -154,6 +154,18 @@ const QUEST_LIBRARY: Array[Dictionary] = [
 		"description": "Finish 3 runs in Ash Dunes.",
 		"stat": "runs_on_ash_dunes", "target": 3, "reward": 50,
 	},
+	# Hidden minibosses (GDD 6 secrets). Descriptions stay vague on purpose:
+	# the quest log teases that a secret exists without mapping the trigger.
+	{
+		"id": "secret_grubthing", "display_name": "What Lurks Below",
+		"description": "Defeat what sleeps beneath the Hollow Woods.",
+		"stat": "slain_grubthing", "target": 1, "reward": 60,
+	},
+	{
+		"id": "secret_coffer_mimic", "display_name": "Tomb Raider",
+		"description": "Unearth and defeat the tomb-thing of the Ash Dunes.",
+		"stat": "slain_coffer_mimic", "target": 1, "reward": 60,
+	},
 ]
 
 

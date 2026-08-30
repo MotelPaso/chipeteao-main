@@ -14,7 +14,8 @@ extends Node
 ##   total_kills, bosses_killed, runs_finished, victories, shrines_used,
 ##   chests_opened, max_level (high-water), best_run_minutes (high-water),
 ##   runs_as_<character_id>, wins_as_<character_id>,
-##   runs_on_<map_id>, victories_<map_id>.
+##   runs_on_<map_id>, victories_<map_id>,
+##   slain_<miniboss_id> (hidden-boss kills, bumped by SecretBossBase).
 
 signal shards_changed(balance: int)
 
@@ -162,6 +163,22 @@ func can_afford(cost: int) -> bool:
 	return shards >= cost
 
 
+## Grants a character outright — the single unlock write both paths share.
+## Boss kills call this directly with source "boss" (no Shard cost, GDD 5's
+## skill-unlock path); purchase_character routes through it with source
+## "purchase", the only tag that also records purchase history. Idempotent:
+## an unknown or already-unlocked/purchased id is a no-op returning false;
+## a fresh unlock persists immediately and returns true.
+func unlock_character(character_id: String, source: String) -> bool:
+	if CharacterCatalog.by_id(character_id).is_empty() or is_unlocked(character_id):
+		return false
+	unlocked_character_ids.append(character_id)
+	if source == "purchase":
+		purchased_character_ids.append(character_id)
+	save()
+	return true
+
+
 ## Buys a locked catalog character at its row's unlock_cost. Deducts,
 ## unlocks, records the purchase, saves. False (and no deduction) when the
 ## id is unknown, already unlocked, or the balance is short.
@@ -173,9 +190,7 @@ func purchase_character(character_id: String) -> bool:
 	if not can_afford(cost):
 		return false
 	shards -= cost
-	unlocked_character_ids.append(character_id)
-	purchased_character_ids.append(character_id)
-	save()
+	unlock_character(character_id, "purchase")
 	shards_changed.emit(shards)
 	return true
 
