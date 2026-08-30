@@ -22,6 +22,10 @@ signal interaction_cancelled
 ## subclasses knowing anything about persistence (subclasses set a default
 ## in _init; scenes may still override per instance).
 @export var meta_stat_id: String = ""
+## Sfx id played on completion; the two resolution chimes are inversions
+## of the same chord, so subclasses just pick their voicing (chests swap
+## in &"chest_open" in _init).
+@export var complete_sound: StringName = &"shrine_done"
 
 ## Cleared by consume(); a spent interactable ignores the interact action.
 var available: bool = true
@@ -112,6 +116,7 @@ func _emit_started() -> void:
 
 func _emit_completed() -> void:
 	Juice.sparkle(global_position + Vector3.UP * 1.2)
+	Sfx.play(complete_sound)
 	interaction_completed.emit()
 
 

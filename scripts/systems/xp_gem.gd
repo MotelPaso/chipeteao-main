@@ -63,5 +63,6 @@ func _collect() -> void:
 	if _collected:
 		return
 	_collected = true
+	Sfx.play(&"gem_pickup")
 	RunState.add_xp(xp_value)
 	queue_free()

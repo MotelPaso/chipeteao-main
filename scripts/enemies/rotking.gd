@@ -185,6 +185,7 @@ func _combat_tick(player: Node3D, distance: float) -> void:
 
 ## Ground-slam arrival: the silhouette pops out of a flash ring.
 func _play_entrance() -> void:
+	Sfx.play(&"boss_roar")
 	Telegraph.spawn_disc(self, global_position, smash_radius * 0.75, 0.45, IMPACT_COLOR)
 	_visual.scale = Vector3.ONE * 0.15
 	var tween := create_tween()

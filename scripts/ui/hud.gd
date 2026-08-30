@@ -139,6 +139,7 @@ func _register_streak_kill() -> void:
 
 ## Punchy scale-pop text (settles from oversized, holds, fades out).
 func _pop_streak(word: String) -> void:
+	Sfx.play(&"streak")
 	_streak_label.text = word
 	_streak_label.reset_size()
 	_streak_label.pivot_offset = _streak_label.size * 0.5

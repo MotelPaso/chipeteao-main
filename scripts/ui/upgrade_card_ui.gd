@@ -134,6 +134,7 @@ func _style_card(card: Button, border_color: Color) -> void:
 func _on_card_pressed(index: int) -> void:
 	if index >= _offer.size():
 		return
+	Sfx.play(&"card_pick")
 	var player := get_tree().get_first_node_in_group("player")
 	if player != null:
 		UpgradePool.apply(_offer[index], player)

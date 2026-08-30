@@ -178,6 +178,7 @@ func _start_slide(direction: Vector3) -> void:
 	_slide_direction = direction
 	_set_body_height(slide_collision_height)
 	Juice.fov_kick_begin()
+	Sfx.play(&"slide")
 
 
 func _end_slide() -> void:

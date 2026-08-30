@@ -62,6 +62,7 @@ func _interact(_player: Node) -> void:
 		return
 	channeling = true
 	_surge_timer = 0.0  # first surge lands immediately: pressure from second one
+	Sfx.play_loop(&"shrine_channel")
 	_emit_started()
 
 
@@ -69,12 +70,21 @@ func _on_range_exited() -> void:
 	if not channeling:
 		return
 	channeling = false
+	Sfx.stop_loop(&"shrine_channel")
 	set_prompt("[E] Resume channel (%d%%)" % roundi(progress / channel_time * 100.0))
 	_emit_cancelled()
 
 
+## The hum lives on the Sfx autoload (which outlives this scene), so a
+## retry/quit mid-channel must silence it here.
+func _exit_tree() -> void:
+	if channeling:
+		Sfx.stop_loop(&"shrine_channel")
+
+
 func _complete() -> void:
 	channeling = false
+	Sfx.stop_loop(&"shrine_channel")
 	progress = channel_time
 	consume()
 	set_physics_process(false)

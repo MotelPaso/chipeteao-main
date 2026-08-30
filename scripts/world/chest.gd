@@ -17,6 +17,7 @@ extends Interactable
 
 func _init() -> void:
 	meta_stat_id = "chests_opened"
+	complete_sound = &"chest_open"
 
 
 func _interact(_player: Node) -> void:

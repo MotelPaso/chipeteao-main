@@ -1,4 +1,4 @@
-[gd_scene load_steps=28 format=3 uid="uid://dqv5m2x8rk1fj"]
+[gd_scene load_steps=30 format=3 uid="uid://dqv5m2x8rk1fj"]
 
 [ext_resource type="PackedScene" uid="uid://c8k2h1n3m5p0a" path="res://scenes/player/Player.tscn" id="1_player"]
 [ext_resource type="PackedScene" uid="uid://dn4r8t2ycv5qb" path="res://scenes/enemies/TargetDummy.tscn" id="2_dummy"]
@@ -21,6 +21,8 @@
 [ext_resource type="PackedScene" uid="uid://bshrn2grd5me1" path="res://scenes/world/shrines/GreedShrine.tscn" id="19_greedshrine"]
 [ext_resource type="PackedScene" uid="uid://dshrn3crs6pa2" path="res://scenes/world/shrines/CurseShrine.tscn" id="20_curseshrine"]
 [ext_resource type="PackedScene" uid="uid://cchst4lut7qb3" path="res://scenes/world/chests/Chest.tscn" id="21_chest"]
+[ext_resource type="Script" path="res://scripts/systems/ambient_bed.gd" id="22_ambient"]
+[ext_resource type="AudioStream" path="res://assets/audio/ambient/forest_wind.wav" id="23_wind"]
 
 [sub_resource type="Shader" id="Shader_grass"]
 code = "shader_type spatial;
@@ -182,5 +184,11 @@ spawner_path = NodePath("../EnemySpawner")
 [node name="HUD" parent="." instance=ExtResource("6_hud")]
 
 [node name="RunEndScreen" parent="." instance=ExtResource("8_runend")]
+
+[node name="AmbientBed" type="AudioStreamPlayer" parent="."]
+stream = ExtResource("23_wind")
+volume_db = -26.0
+autoplay = true
+script = ExtResource("22_ambient")
 
 [connection signal="run_ended" from="RunManager" to="RunEndScreen" method="open"]

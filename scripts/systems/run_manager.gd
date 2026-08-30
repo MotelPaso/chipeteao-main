@@ -44,6 +44,8 @@ func _end_run(victory: bool) -> void:
 	RunState.run_active = false
 	if _spawner != null:
 		_spawner.set_physics_process(false)
+	# Sfx plays through pause, so any shrine-channel hum must end with the run.
+	Sfx.stop_all_loops()
 	get_tree().paused = true
 	# One-line log so headless soak runs can confirm the loop end-to-end
 	# (grunts reached the player / the clock ran out).

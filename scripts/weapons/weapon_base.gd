@@ -62,6 +62,7 @@ func deal_damage(target_health: Health) -> float:
 	if is_crit:
 		amount *= _stats.crit_damage
 		Juice.crit_punch()
+	Sfx.play(&"hit_crit" if is_crit else &"hit_soft")
 	target_health.take_damage(amount, is_crit)
 	if _stats != null and _stats.lifesteal > 0.0:
 		_lifesteal_heal(amount * _stats.lifesteal)

@@ -274,12 +274,14 @@ func burst(at: Vector3, color: Color, amount: int) -> void:
 func enemy_died(at: Vector3, color: Color) -> void:
 	shake(kill_shake_strength, 0.25, kill_shake_cap)
 	burst(at, color, randi_range(death_burst_min, death_burst_max))
+	Sfx.play(&"enemy_die")
 
 
 func boss_died(at: Vector3, color: Color) -> void:
 	shake(boss_death_shake_strength, 0.6)
 	hit_stop(boss_death_stop_scale, boss_death_stop_duration)
 	burst(at, color, boss_burst_amount)
+	Sfx.play(&"boss_die")
 
 
 ## Crit landed: micro hit-stop + a slightly bigger shake, rate-limited so
@@ -295,6 +297,7 @@ func crit_punch() -> void:
 func player_hurt() -> void:
 	shake(hurt_shake_strength, 0.3, hurt_shake_cap)
 	_pulse_vignette()
+	Sfx.play(&"player_hurt")
 
 
 ## Gold completion sparkle for chests and shrines.
@@ -383,6 +386,7 @@ func _pulse_vignette() -> void:
 # --- level-up pulse ---------------------------------------------------------
 
 func _on_leveled_up(_new_level: int) -> void:
+	Sfx.play(&"level_up")
 	var player := get_tree().get_first_node_in_group("player") as Node3D
 	if player == null:
 		return

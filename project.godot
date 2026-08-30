@@ -21,6 +21,7 @@ RunState="*res://scripts/systems/run_state.gd"
 GameConfig="*res://scripts/systems/game_config.gd"
 SaveData="*res://scripts/systems/save_data.gd"
 Juice="*res://scripts/systems/juice.gd"
+Sfx="*res://scripts/systems/sfx.gd"
 
 [input]
 

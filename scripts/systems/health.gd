@@ -54,6 +54,7 @@ func take_damage(amount: float, is_crit: bool = false, attacker: Node3D = null) 
 	if evade_chance > 0.0 and randf() < evade_chance:
 		if show_damage_popups:
 			_spawn_popup("Dodge!", 64, DODGE_POPUP_COLOR)
+		Sfx.play(&"dodge")
 		dodged.emit(attacker)
 		return
 	var final_amount := minf(amount, maxf(amount - armor, 1.0))
