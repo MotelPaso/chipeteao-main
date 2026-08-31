@@ -33,6 +33,7 @@ func _init() -> void:
 	_save_wav(SFX_DIR, "hit_crit", _gen_hit_crit())
 	_save_wav(SFX_DIR, "enemy_die", _gen_enemy_die())
 	_save_wav(SFX_DIR, "gem_pickup", _gen_gem_pickup())
+	_save_wav(SFX_DIR, "heal", _gen_heal())
 	_save_wav(SFX_DIR, "level_up", _gen_level_up())
 	_save_wav(SFX_DIR, "card_pick", _gen_card_pick())
 	_save_wav(SFX_DIR, "player_hurt", _gen_player_hurt())
@@ -100,6 +101,18 @@ func _gen_gem_pickup() -> PackedFloat32Array:
 	var out := _silence(0.13)
 	_mix_at(out, _chime(0.07, 1318.5, 0.03), 0.0, 1.0)
 	_mix_at(out, _chime(0.08, 1975.5, 0.035), 0.05, 0.9)
+	_normalize(out, 0.7)
+	return out
+
+
+## Health-orb pickup: a warm rolled G4-D5-G5 fifth-plus-octave, lower and
+## rounder than gem_pickup's bright chirp so heals read apart from XP even
+## mid-horde (and a different key than the level_up C arpeggio).
+func _gen_heal() -> PackedFloat32Array:
+	var out := _silence(0.32)
+	_mix_at(out, _chime(0.18, 392.0, 0.06), 0.0, 0.9)
+	_mix_at(out, _chime(0.22, 587.33, 0.07), 0.07, 0.85)
+	_mix_at(out, _chime(0.24, 783.99, 0.08), 0.14, 0.7)
 	_normalize(out, 0.7)
 	return out
 

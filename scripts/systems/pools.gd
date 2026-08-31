@@ -9,6 +9,7 @@ extends Node
 ## with a scene change while parked ones (out of tree) carry over clean.
 
 const XP_GEM_SCENE: PackedScene = preload("res://scenes/systems/XpGem.tscn")
+const HEALTH_ORB_SCENE: PackedScene = preload("res://scenes/systems/HealthOrb.tscn")
 const DART_SCENE: PackedScene = preload("res://scenes/weapons/Projectile.tscn")
 const ARROW_SCENE: PackedScene = preload("res://scenes/weapons/Arrow.tscn")
 const BOOMERANG_SCENE: PackedScene = preload("res://scenes/weapons/BoomerangProjectile.tscn")
@@ -21,6 +22,7 @@ const TELEGRAPH_DISC_SCENE: PackedScene = preload("res://scenes/fx/TelegraphDisc
 ## a normal early game; caps absorb the worst late-T3 multi-weapon spikes.
 @export var pool_sizes: Dictionary[String, Vector2i] = {
 	"gem": Vector2i(48, 256),
+	"health_orb": Vector2i(4, 16),
 	"dart": Vector2i(16, 96),
 	"arrow": Vector2i(16, 96),
 	"boomerang": Vector2i(4, 24),
@@ -35,6 +37,7 @@ var _pools_by_path: Dictionary[String, NodePool] = {}
 
 func _ready() -> void:
 	_register("gem", XP_GEM_SCENE)
+	_register("health_orb", HEALTH_ORB_SCENE)
 	_register("dart", DART_SCENE)
 	_register("arrow", ARROW_SCENE)
 	_register("boomerang", BOOMERANG_SCENE)

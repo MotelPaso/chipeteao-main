@@ -38,6 +38,13 @@ const PERF_PROBE_REFRESH := 0.25
 ## in the editor or launch with BONK_PERF=1.
 @export var show_perf_probe: bool = false
 
+## Below this HP ratio the HP bar gains a gentle alpha/scale pulse (on top
+## of the existing color ramp) nudging the player toward health orbs;
+## healing back above it stops the pulse and restores the bar.
+@export var low_hp_pulse_ratio: float = 0.35
+## One full pulse cycle (fade down + back) takes twice this many seconds.
+@export var low_hp_pulse_half_period: float = 0.45
+
 @onready var _hp_bar: ProgressBar = %HpBar
 @onready var _hp_label: Label = %HpLabel
 @onready var _xp_bar: ProgressBar = %XpBar
@@ -53,6 +60,8 @@ const PERF_PROBE_REFRESH := 0.25
 
 var _hp_fill: StyleBoxFlat
 var _health: Health
+var _hp_pulse_tween: Tween = null
+var _hp_pulsing: bool = false
 var _tracked_boss: Node3D = null
 var _boss_health: Health = null
 var _announce_tween: Tween
@@ -117,6 +126,35 @@ func _refresh_hp(current: float, max_hp: float) -> void:
 	_hp_label.text = "%d / %d" % [ceili(current), roundi(max_hp)]
 	var ratio := clampf(current / max_hp, 0.0, 1.0) if max_hp > 0.0 else 0.0
 	_hp_fill.bg_color = HP_LOW_COLOR.lerp(HP_FULL_COLOR, clampf(ratio / LOW_HP_RATIO, 0.0, 1.0))
+	_update_low_hp_pulse(current > 0.0 and ratio < low_hp_pulse_ratio)
+
+
+## Starts/stops the low-HP bar pulse; idempotent per state so damage spam
+## never restarts the loop mid-cycle. Zero HP (death) also stops it — the
+## run-end screen owns that moment.
+func _update_low_hp_pulse(should_pulse: bool) -> void:
+	if should_pulse == _hp_pulsing:
+		return
+	_hp_pulsing = should_pulse
+	if _hp_pulse_tween != null and _hp_pulse_tween.is_valid():
+		_hp_pulse_tween.kill()
+		_hp_pulse_tween = null
+	_hp_bar.pivot_offset = _hp_bar.size * 0.5
+	if not should_pulse:
+		_hp_bar.modulate.a = 1.0
+		_hp_bar.scale = Vector2.ONE
+		return
+	_hp_pulse_tween = create_tween().set_loops()
+	_hp_pulse_tween.tween_property(_hp_bar, "modulate:a", 0.6, low_hp_pulse_half_period) \
+			.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	_hp_pulse_tween.parallel().tween_property(_hp_bar, "scale",
+			Vector2(1.03, 1.08), low_hp_pulse_half_period) \
+			.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	_hp_pulse_tween.chain().tween_property(_hp_bar, "modulate:a", 1.0, low_hp_pulse_half_period) \
+			.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	_hp_pulse_tween.parallel().tween_property(_hp_bar, "scale", Vector2.ONE,
+			low_hp_pulse_half_period) \
+			.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 
 
 func _on_xp_changed(current_xp: int, xp_to_next: int) -> void:

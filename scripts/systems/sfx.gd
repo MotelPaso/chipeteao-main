@@ -21,6 +21,7 @@ const STREAMS: Dictionary[StringName, AudioStream] = {
 	&"hit_crit": preload("res://assets/audio/sfx/hit_crit.wav"),
 	&"enemy_die": preload("res://assets/audio/sfx/enemy_die.wav"),
 	&"gem_pickup": preload("res://assets/audio/sfx/gem_pickup.wav"),
+	&"heal": preload("res://assets/audio/sfx/heal.wav"),
 	&"level_up": preload("res://assets/audio/sfx/level_up.wav"),
 	&"card_pick": preload("res://assets/audio/sfx/card_pick.wav"),
 	&"player_hurt": preload("res://assets/audio/sfx/player_hurt.wav"),
@@ -51,7 +52,7 @@ const LOOP_IDS: Array[StringName] = [&"shrine_channel", &"laser_hum"]
 ## Repetitive ids that get default_pitch_jitter when play() is called
 ## without an explicit jitter.
 @export var jittered_ids: Array[StringName] = [
-	&"hit_soft", &"hit_crit", &"enemy_die", &"gem_pickup", &"burrow_pop",
+	&"hit_soft", &"hit_crit", &"enemy_die", &"gem_pickup", &"burrow_pop", &"heal",
 ]
 ## Per-id cap on plays per rolling second; ids not listed are uncapped.
 @export var rate_limits: Dictionary[StringName, int] = {
@@ -59,6 +60,7 @@ const LOOP_IDS: Array[StringName] = [&"shrine_channel", &"laser_hum"]
 	&"hit_crit": 10,
 	&"gem_pickup": 10,
 	&"burrow_pop": 8,
+	&"heal": 4,
 }
 ## Per-id base volume (dB) so the constant hit_soft sits well under the
 ## rare stingers; play()'s volume_db_offset stacks on top.
@@ -67,6 +69,7 @@ const LOOP_IDS: Array[StringName] = [&"shrine_channel", &"laser_hum"]
 	&"hit_crit": -7.0,
 	&"enemy_die": -10.0,
 	&"gem_pickup": -12.0,
+	&"heal": -7.0,
 	&"level_up": -4.0,
 	&"card_pick": -6.0,
 	&"player_hurt": -5.0,

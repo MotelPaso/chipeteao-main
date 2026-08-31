@@ -18,6 +18,10 @@ extends CharacterBody3D
 @export var elite_damage_multiplier: float = 1.5
 @export var elite_body_scale: float = 1.35
 @export var elite_xp_multiplier: int = 5
+@export_group("Health Orb")
+## Chance an ELITE death also drops a health orb (regular enemies never
+## drop one; bosses override _drop_health_orbs with guaranteed counts).
+@export var elite_health_orb_chance: float = 0.4
 
 var is_elite: bool = false
 
@@ -243,6 +247,7 @@ func _on_died() -> void:
 	_collision.set_deferred("disabled", true)
 	RunState.add_kill()
 	_drop_xp_gem()
+	_drop_health_orbs()
 	_death_feedback()
 	var tween := create_tween()
 	tween.set_parallel(true)
@@ -265,3 +270,23 @@ func _drop_xp_gem() -> void:
 	# both 1 on a baseline spawn, leaving the scene value untouched.
 	gem.xp_value = maxi(roundi(float(gem.xp_value * _xp_multiplier) * _tier_xp_multiplier), 1)
 	gem.global_position = global_position + Vector3.UP * 0.6
+
+
+## Virtual-ish health-orb payout for this death. Base rule: only elites
+## roll (elite_health_orb_chance for one orb); BossBase overrides with
+## guaranteed drops. Heal size is the orb's own flat max-HP fraction —
+## tier XP factors never touch it.
+func _drop_health_orbs() -> void:
+	if is_elite and randf() < elite_health_orb_chance:
+		_spawn_health_orb(global_position + Vector3.UP * 0.6)
+
+
+## One pooled health orb at `at`, skipped at the global live-orb soft cap.
+## Re-checked per orb, so a boss's multi-drop fills exactly up to the cap.
+func _spawn_health_orb(at: Vector3) -> void:
+	if HealthOrb.at_soft_cap(get_tree()):
+		return
+	var orb := Pools.acquire_scene(Pools.HEALTH_ORB_SCENE) as HealthOrb
+	if orb == null:
+		return
+	orb.global_position = at

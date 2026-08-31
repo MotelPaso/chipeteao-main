@@ -7,11 +7,20 @@ extends Area3D
 ## if never magnetized, to keep long runs from littering the arena.
 ## Pooled: spawn via Pools.acquire_scene; every despawn is a Pools.release
 ## and pool_reset() restores the just-dropped state (including xp_value,
-## which droppers scale per gem on top of the scene default).
+## which droppers scale per gem on top of the scene default). Live gems
+## sit in LIVE_GROUP (joined on acquire, left on release) so the level-up
+## vacuum can force-home every gem on the map at once.
+
+## Group every live (dropped, uncollected) gem belongs to; the vacuum
+## reaches gems through it. Distinct from the scene's persistent
+## "xp_gems" group, which the perf probe counts.
+const LIVE_GROUP: StringName = &"gems"
 
 @export var xp_value: int = 1
 @export var magnet_radius: float = 3.5
 @export var magnet_acceleration: float = 45.0
+## Starting homing speed when the level-up vacuum grabs this gem.
+@export var vacuum_speed: float = 26.0
 @export var lifetime: float = 60.0
 @export var spin_speed: float = 2.5
 @export var bob_amplitude: float = 0.12
@@ -40,6 +49,17 @@ func pool_reset() -> void:
 	_speed = 0.0
 	_collected = false
 	_visual.position.y = _visual_rest_y
+	add_to_group(LIVE_GROUP)
+
+
+## Level-up vacuum (reached via LIVE_GROUP): force-enables homing at
+## vacuum speed regardless of the pickup radius — the genre-staple
+## "level-up hoovers the floor" moment.
+func vacuum() -> void:
+	if _collected:
+		return
+	_homing = true
+	_speed = maxf(_speed, vacuum_speed)
 
 
 func _physics_process(delta: float) -> void:
@@ -58,7 +78,7 @@ func _physics_process(delta: float) -> void:
 		if global_position.distance_squared_to(target) <= radius * radius:
 			_homing = true  # sticky: keeps chasing even if the player outruns it
 		elif _age > lifetime:
-			Pools.release(self)
+			_release_to_pool()
 		return
 
 	_speed += magnet_acceleration * delta
@@ -80,4 +100,13 @@ func _collect() -> void:
 	_collected = true
 	Sfx.play(&"gem_pickup")
 	RunState.add_xp(xp_value)
+	_release_to_pool()
+
+
+## Leaves the live group BEFORE the pooled release, so a vacuum firing in
+## the deferred-release window (the node stays in-tree one more frame)
+## never touches a gem already on its way out.
+func _release_to_pool() -> void:
+	if is_in_group(LIVE_GROUP):
+		remove_from_group(LIVE_GROUP)
 	Pools.release(self)

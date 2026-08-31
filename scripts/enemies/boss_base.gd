@@ -18,6 +18,9 @@ extends EnemyBase
 ## Death payout: a ring of boss_gem_count gems worth boss_gem_value XP each.
 @export var boss_gem_count: int = 8
 @export var boss_gem_value: int = 5
+## Health orbs guaranteed on death (map bosses keep the default 2; the
+## miniboss scenes set 1). Still subject to HealthOrb's global soft cap.
+@export var health_orb_count: int = 2
 
 @export_group("Tier")
 ## Extra body scale applied per apply_tier() call (Elder and beyond).
@@ -103,3 +106,12 @@ func _drop_xp_gem() -> void:
 		var gem_angle := TAU * float(i) / float(boss_gem_count)
 		gem.global_position = global_position + Vector3.UP * 0.6 \
 				+ Vector3(cos(gem_angle), 0.0, sin(gem_angle)) * 1.2
+
+
+## Bosses always pay out heals: health_orb_count orbs on a wider ring than
+## the gems, so the two pickups read apart on the floor.
+func _drop_health_orbs() -> void:
+	for i in health_orb_count:
+		var orb_angle := TAU * (float(i) + 0.5) / float(maxi(health_orb_count, 1))
+		_spawn_health_orb(global_position + Vector3.UP * 0.6
+				+ Vector3(cos(orb_angle), 0.0, sin(orb_angle)) * 2.2)

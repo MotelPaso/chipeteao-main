@@ -24,3 +24,4 @@
 - Iteration 22: Pause & settings (Esc pause menu, SFX/ambient volume buses, mouse sensitivity, fullscreen toggle, persisted in save)
 - Iteration 23: Map tiers (T1-T3 per map with scaled enemies/bosses/XP and shard bonuses, win-gated unlocks, tier picker + HUD tag, tier quests)
 - Iteration 24: Performance (NodePool + Pools autoload for the five churn hotspots, staggered separation, hidden perf overlay, zero steady-state allocation)
+- Iteration 25: QoL (screen-edge boss arrow, level-up gem vacuum, elite/boss health orbs with cap, low-HP bar pulse)

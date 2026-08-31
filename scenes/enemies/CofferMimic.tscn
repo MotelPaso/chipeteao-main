@@ -72,6 +72,7 @@ secret_boss_id = "coffer_mimic"
 boss_title = "Coffer Mimic"
 boss_gem_count = 12
 boss_gem_value = 5
+health_orb_count = 1
 move_speed = 7.0
 turn_speed = 8.0
 separation_strength = 0.0

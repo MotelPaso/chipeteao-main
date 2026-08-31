@@ -1,6 +1,7 @@
-[gd_scene load_steps=2 format=3]
+[gd_scene load_steps=3 format=3]
 
 [ext_resource type="Script" path="res://scripts/ui/hud.gd" id="1_hud"]
+[ext_resource type="Script" path="res://scripts/ui/boss_arrow.gd" id="2_bossarrow"]
 
 [node name="HUD" type="CanvasLayer"]
 layer = 5
@@ -174,6 +175,18 @@ theme_override_font_sizes/font_size = 17
 text = "100 / 100"
 horizontal_alignment = 1
 vertical_alignment = 1
+
+[node name="BossArrow" type="Node2D" parent="."]
+visible = false
+script = ExtResource("2_bossarrow")
+
+[node name="Backing" type="Polygon2D" parent="BossArrow"]
+color = Color(0.07, 0.05, 0.02, 0.85)
+polygon = PackedVector2Array(26, 0, -16.5, -17.5, -9, 0, -16.5, 17.5)
+
+[node name="Fill" type="Polygon2D" parent="BossArrow"]
+color = Color(0.98, 0.62, 0.16, 1)
+polygon = PackedVector2Array(20, 0, -12, -13, -6, 0, -12, 13)
 
 [node name="PauseHintLabel" type="Label" parent="."]
 anchor_left = 1.0

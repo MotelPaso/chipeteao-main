@@ -25,3 +25,16 @@ func _ready() -> void:
 	var spec := MapCatalog.tier_spec(map_id, GameConfig.selected_tier)
 	get_tree().call_group("enemy_spawner", "apply_tier_spec", spec)
 	get_tree().call_group("hud", "show_tier_tag", GameConfig.selected_tier)
+	# Level-up gem vacuum: every live pickup force-homes to the player.
+	# Connected here (not inside the gems) so parked pooled nodes never
+	# hold signal state; the connection dies with this run's scene.
+	RunState.leveled_up.connect(_on_leveled_up)
+
+
+## Genre staple: leveling hoovers the floor — all live XP gems and health
+## orbs magnetize at once, regardless of pickup radius. XP collected by
+## the vacuum can chain further level-ups; the card UI queues those picks
+## and each new leveled_up just re-vacuums (idempotent on homing gems).
+func _on_leveled_up(_new_level: int) -> void:
+	get_tree().call_group(XpGem.LIVE_GROUP, "vacuum")
+	get_tree().call_group(HealthOrb.LIVE_GROUP, "vacuum")

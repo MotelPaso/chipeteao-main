@@ -80,6 +80,7 @@ secret_boss_id = "grubthing"
 boss_title = "Grubthing"
 boss_gem_count = 12
 boss_gem_value = 5
+health_orb_count = 1
 move_speed = 2.6
 turn_speed = 6.0
 separation_strength = 0.0

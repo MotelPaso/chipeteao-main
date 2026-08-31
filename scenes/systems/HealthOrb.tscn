@@ -1,0 +1,57 @@
+[gd_scene load_steps=8 format=3]
+
+[ext_resource type="Script" path="res://scripts/systems/health_orb.gd" id="1_orb"]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_core"]
+albedo_color = Color(0.55, 0.95, 0.6, 1)
+roughness = 0.3
+emission_enabled = true
+emission = Color(0.3, 1.0, 0.45, 1)
+emission_energy_multiplier = 1.2
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_cross"]
+albedo_color = Color(0.92, 0.18, 0.16, 1)
+roughness = 0.35
+emission_enabled = true
+emission = Color(1.0, 0.15, 0.1, 1)
+emission_energy_multiplier = 1.5
+
+[sub_resource type="SphereMesh" id="SphereMesh_core"]
+material = SubResource("StandardMaterial3D_core")
+radius = 0.15
+height = 0.3
+radial_segments = 12
+rings = 6
+
+[sub_resource type="BoxMesh" id="BoxMesh_bar_v"]
+material = SubResource("StandardMaterial3D_cross")
+size = Vector3(0.08, 0.3, 0.08)
+
+[sub_resource type="BoxMesh" id="BoxMesh_bar_h"]
+material = SubResource("StandardMaterial3D_cross")
+size = Vector3(0.3, 0.08, 0.08)
+
+[sub_resource type="SphereShape3D" id="SphereShape3D_pickup"]
+radius = 0.5
+
+[node name="HealthOrb" type="Area3D"]
+collision_layer = 0
+collision_mask = 1
+script = ExtResource("1_orb")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+shape = SubResource("SphereShape3D_pickup")
+
+[node name="Visual" type="Node3D" parent="."]
+
+[node name="Core" type="MeshInstance3D" parent="Visual"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.05, 0)
+mesh = SubResource("SphereMesh_core")
+
+[node name="CrossV" type="MeshInstance3D" parent="Visual"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.05, 0)
+mesh = SubResource("BoxMesh_bar_v")
+
+[node name="CrossH" type="MeshInstance3D" parent="Visual"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.05, 0)
+mesh = SubResource("BoxMesh_bar_h")
