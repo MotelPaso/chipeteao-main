@@ -47,14 +47,11 @@ func _combat_tick(player: Node3D, distance: float) -> void:
 
 
 func _fire_bolt(player: Node3D) -> void:
-	var node := bolt_scene.instantiate()
-	var bolt := node as EnemyBolt
+	# Pooled, parented to the scene root so the bolt outlives its caster.
+	var bolt := Pools.acquire_scene(bolt_scene) as EnemyBolt
 	if bolt == null:
-		node.free()
 		return
 	bolt.damage = bolt_damage
-	# Parented to the scene root so the bolt outlives its caster.
-	get_tree().current_scene.add_child(bolt)
 	bolt.global_position = global_position + Vector3.UP * muzzle_height
 	bolt.look_at(player.global_position + Vector3.UP * target_height, Vector3.UP)
 

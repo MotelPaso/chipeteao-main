@@ -23,6 +23,7 @@ SaveData="*res://scripts/systems/save_data.gd"
 Juice="*res://scripts/systems/juice.gd"
 Sfx="*res://scripts/systems/sfx.gd"
 Settings="*res://scripts/systems/settings_apply.gd"
+Pools="*res://scripts/systems/pools.gd"
 
 [input]
 

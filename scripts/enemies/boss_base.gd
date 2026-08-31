@@ -95,17 +95,11 @@ func _death_feedback() -> void:
 func _drop_xp_gem() -> void:
 	if xp_gem_scene == null:
 		return
-	var scene_root := get_tree().current_scene
-	if scene_root == null:
-		return
 	for i in boss_gem_count:
-		var drop := xp_gem_scene.instantiate()
-		var gem := drop as XpGem
+		var gem := Pools.acquire_scene(xp_gem_scene) as XpGem
 		if gem == null:
-			drop.free()
 			return
 		gem.xp_value = boss_gem_value
-		scene_root.add_child(gem)
 		var gem_angle := TAU * float(i) / float(boss_gem_count)
 		gem.global_position = global_position + Vector3.UP * 0.6 \
 				+ Vector3(cos(gem_angle), 0.0, sin(gem_angle)) * 1.2

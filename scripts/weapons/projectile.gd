@@ -3,8 +3,9 @@ extends Area3D
 ## Weapon bullet: flies along -Z (bending lightly toward the target it was
 ## fired at) and damages "enemies"-group bodies it overlaps — each body at
 ## most once — until its pierce budget runs out (1 = classic dart).
-## The firing weapon parents it to the scene root so it survives player
-## movement; it despawns on hit-out or after max_distance so strays never linger.
+## The firing weapon acquires it from Pools (parented to the scene root so
+## it survives player movement); it releases back on hit-out or after
+## max_distance, and pool_reset() re-arms pierce/hit-set/tracer for reuse.
 
 @export var speed: float = 26.0
 ## Whether the flight bends toward the target at all (arrows fly straight).
@@ -28,13 +29,30 @@ var _target: Node3D = null
 ## Instance ids already damaged, so a body re-entering (or hugging) the
 ## hitbox of a piercing shot is never hit twice by the same projectile.
 var _hit_ids: Dictionary[int, bool] = {}
+## Scene-default pierce budget, restored on reuse (the bow overrides it
+## per shot AFTER the pool's reset).
+var _default_pierce: int = 1
+var _stretch_tween: Tween = null
 
 
 func _ready() -> void:
 	body_entered.connect(_on_body_entered)
+	_default_pierce = pierce_remaining
+
+
+## Pooled-node contract: fresh flight state and the tracer stretch replay.
+func pool_reset() -> void:
+	_source = null
+	_target = null
+	_max_distance = 20.0
+	_travelled = 0.0
+	_hit_ids.clear()
+	pierce_remaining = _default_pierce
 	_tracer.scale = Vector3(1.0, 1.0, spawn_stretch)
-	var tween := create_tween()
-	tween.tween_property(_tracer, "scale", Vector3.ONE, 0.12)
+	if _stretch_tween != null and _stretch_tween.is_valid():
+		_stretch_tween.kill()
+	_stretch_tween = create_tween()
+	_stretch_tween.tween_property(_tracer, "scale", Vector3.ONE, 0.12)
 
 
 ## Called by the firing weapon right after spawning and orienting the
@@ -53,7 +71,7 @@ func _physics_process(delta: float) -> void:
 	global_position += -global_transform.basis.z * step
 	_travelled += step
 	if _travelled >= _max_distance:
-		queue_free()
+		Pools.release(self)
 
 
 func _steer_toward_target(delta: float) -> void:
@@ -95,4 +113,4 @@ func _on_body_entered(body: Node3D) -> void:
 		_source.deal_damage(health)
 	pierce_remaining -= 1
 	if pierce_remaining <= 0:
-		queue_free()
+		Pools.release(self)

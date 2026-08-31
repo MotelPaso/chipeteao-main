@@ -112,23 +112,13 @@ func _spawn_damage_popup(amount: float, is_crit: bool) -> void:
 
 
 func _spawn_popup(popup_text: String, popup_font_size: int, color: Color) -> void:
-	var scene_root := get_tree().current_scene
 	var body := get_parent() as Node3D
-	if scene_root == null or body == null:
+	if body == null:
 		return
-	var label := Label3D.new()
-	label.text = popup_text
-	label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
-	label.no_depth_test = true
-	label.font_size = popup_font_size
-	label.outline_size = 16
-	label.modulate = color
-	# Parented to the scene root so the popup survives the body dying.
-	scene_root.add_child(label)
-	label.global_position = body.global_position \
-			+ Vector3(randf_range(-0.3, 0.3), 2.0, randf_range(-0.3, 0.3))
-	var tween := label.create_tween()
-	tween.set_parallel(true)
-	tween.tween_property(label, "position:y", label.position.y + 1.2, 0.6)
-	tween.tween_property(label, "modulate:a", 0.0, 0.35).set_delay(0.25)
-	tween.chain().tween_callback(label.queue_free)
+	# Pooled Label3D with the same look/motion as the old code-built one;
+	# Pools parents it to the scene root so it survives the body dying.
+	var popup := Pools.acquire_scene(Pools.DAMAGE_POPUP_SCENE) as DamagePopup
+	if popup == null:
+		return
+	popup.show_popup(popup_text, popup_font_size, color, body.global_position
+			+ Vector3(randf_range(-0.3, 0.3), 2.0, randf_range(-0.3, 0.3)))

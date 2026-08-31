@@ -80,6 +80,10 @@ func _lifesteal_heal(amount: float) -> void:
 
 ## Nearest body in the "enemies" group within attack_range, or null.
 func acquire_target() -> Node3D:
+	# Empty-horde fast path: while nothing is alive this runs every physics
+	# frame, so skip the Array get_nodes_in_group would build.
+	if get_tree().get_first_node_in_group("enemies") == null:
+		return null
 	var nearest: Node3D = null
 	var nearest_dist_sq := attack_range * attack_range
 	for enemy in get_tree().get_nodes_in_group("enemies"):

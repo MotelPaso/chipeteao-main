@@ -3,18 +3,28 @@ extends Area3D
 ## Enemy projectile: flies straight along -Z at a strafe-dodgeable speed
 ## and hurts only the player. Its collision mask is world + player (layer
 ## 1), so bodies on the enemy layer are never even detected — an enemy
-## bolt can never damage an enemy. Despawns on any body hit (player, floor,
-## prop) or after max_distance so strays never linger.
+## bolt can never damage an enemy. Releases back to Pools on any body hit
+## (player, floor, prop) or after max_distance so strays never linger.
 
 @export var speed: float = 10.0
 @export var damage: float = 8.0
 @export var max_distance: float = 30.0
 
 var _travelled: float = 0.0
+## Scene-default damage, restored on reuse (casters override it per shot
+## AFTER the pool's reset, so an elite's hot bolt never leaks to the next).
+var _default_damage: float = 8.0
 
 
 func _ready() -> void:
 	body_entered.connect(_on_body_entered)
+	_default_damage = damage
+
+
+## Pooled-node contract: fresh flight on every acquire.
+func pool_reset() -> void:
+	damage = _default_damage
+	_travelled = 0.0
 
 
 func _physics_process(delta: float) -> void:
@@ -22,7 +32,7 @@ func _physics_process(delta: float) -> void:
 	global_position += -global_transform.basis.z * step
 	_travelled += step
 	if _travelled >= max_distance:
-		queue_free()
+		Pools.release(self)
 
 
 func _on_body_entered(body: Node3D) -> void:
@@ -30,4 +40,4 @@ func _on_body_entered(body: Node3D) -> void:
 		var health := Health.find_in(body)
 		if health != null:
 			health.take_damage(damage)
-	queue_free()
+	Pools.release(self)

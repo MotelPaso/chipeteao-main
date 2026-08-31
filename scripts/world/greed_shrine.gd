@@ -64,17 +64,11 @@ func _grant(outcome: String) -> void:
 func _burst_gems() -> void:
 	if xp_gem_scene == null:
 		return
-	var scene_root := get_tree().current_scene
-	if scene_root == null:
-		return
 	for i in gem_count:
-		var drop := xp_gem_scene.instantiate()
-		var gem := drop as XpGem
+		var gem := Pools.acquire_scene(xp_gem_scene) as XpGem
 		if gem == null:
-			drop.free()
 			return
 		gem.xp_value = gem_value
-		scene_root.add_child(gem)
 		var angle := TAU * float(i) / float(gem_count)
 		gem.global_position = global_position + Vector3.UP * 0.8 \
 				+ Vector3(cos(angle), 0.0, sin(angle)) * randf_range(1.1, 1.9)

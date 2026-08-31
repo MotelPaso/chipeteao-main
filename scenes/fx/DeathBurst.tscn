@@ -30,7 +30,7 @@ scale_curve = SubResource("CurveTexture_shrink")
 
 [node name="DeathBurst" type="GPUParticles3D"]
 emitting = false
-amount = 5
+amount = 24
 lifetime = 0.55
 one_shot = true
 explosiveness = 1.0

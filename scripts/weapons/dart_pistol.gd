@@ -28,14 +28,11 @@ func fire(target: Node3D) -> void:
 
 
 func _spawn_dart(direction: Vector3, target: Node3D) -> void:
-	var dart := projectile_scene.instantiate() as Projectile
+	# Pooled, parented to the scene root so darts keep flying while the
+	# player moves on.
+	var dart := Pools.acquire_scene(projectile_scene) as Projectile
 	if dart == null:
 		return
-	var parent_node: Node = get_tree().current_scene
-	if parent_node == null:
-		parent_node = get_tree().root
-	# Scene-root parent so darts keep flying while the player moves on.
-	parent_node.add_child(dart)
 	dart.global_transform = Transform3D(
 			Basis.looking_at(direction, Vector3.UP), _muzzle.global_position)
 	dart.launch(self, attack_range * range_grace, target)

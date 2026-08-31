@@ -5,6 +5,9 @@ extends Area3D
 ## RunState.pickup_radius_multiplier so pickup upgrades affect every gem).
 ## Collects on player contact -> RunState.add_xp. Despawns after lifetime
 ## if never magnetized, to keep long runs from littering the arena.
+## Pooled: spawn via Pools.acquire_scene; every despawn is a Pools.release
+## and pool_reset() restores the just-dropped state (including xp_value,
+## which droppers scale per gem on top of the scene default).
 
 @export var xp_value: int = 1
 @export var magnet_radius: float = 3.5
@@ -20,11 +23,23 @@ var _visual_rest_y: float = 0.0
 var _homing: bool = false
 var _speed: float = 0.0
 var _collected: bool = false
+var _default_xp_value: int = 1
 
 
 func _ready() -> void:
 	body_entered.connect(_on_body_entered)
 	_visual_rest_y = _visual.position.y
+	_default_xp_value = xp_value
+
+
+## Pooled-node contract: back to the just-dropped state on every acquire.
+func pool_reset() -> void:
+	xp_value = _default_xp_value
+	_age = 0.0
+	_homing = false
+	_speed = 0.0
+	_collected = false
+	_visual.position.y = _visual_rest_y
 
 
 func _physics_process(delta: float) -> void:
@@ -43,7 +58,7 @@ func _physics_process(delta: float) -> void:
 		if global_position.distance_squared_to(target) <= radius * radius:
 			_homing = true  # sticky: keeps chasing even if the player outruns it
 		elif _age > lifetime:
-			queue_free()
+			Pools.release(self)
 		return
 
 	_speed += magnet_acceleration * delta
@@ -65,4 +80,4 @@ func _collect() -> void:
 	_collected = true
 	Sfx.play(&"gem_pickup")
 	RunState.add_xp(xp_value)
-	queue_free()
+	Pools.release(self)

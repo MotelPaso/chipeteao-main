@@ -25,6 +25,14 @@ var is_elite: bool = false
 @onready var _visual: Node3D = $Visual
 @onready var _collision: CollisionShape3D = $CollisionShape3D
 
+## One shared per-physics-tick snapshot of the "enemies" group, so a horde
+## of n enemies costs one group query per tick instead of n (the arrays
+## get_nodes_in_group builds were the hottest allocation in late-run T3).
+## Entries stay valid instances for the whole tick (frees are deferred);
+## consumers still skip off-group/off-tree bodies like before.
+static var _enemies_snapshot: Array[Node] = []
+static var _enemies_snapshot_frame: int = -1
+
 var _gravity: float = ProjectSettings.get_setting("physics/3d/default_gravity", 9.8)
 var _xp_multiplier: int = 1
 ## Map-tier XP gem value factor (see apply_tier_scaling); 1.0 = baseline.
@@ -33,6 +41,8 @@ var _tier_xp_multiplier: float = 1.0
 # runs; expiry restores full speed. See apply_slow for the refresh rules.
 var _slow_multiplier: float = 1.0
 var _slow_time_left: float = 0.0
+## Last computed separation push, reused on this enemy's off ticks.
+var _separation_cache: Vector3 = Vector3.ZERO
 
 
 func _ready() -> void:
@@ -58,7 +68,12 @@ func _physics_process(delta: float) -> void:
 		steer = _movement_intent(seek, distance)
 		_combat_tick(player, distance)
 
-	steer += _separation_push() * separation_strength
+	# O(n^2) trim: each enemy recomputes separation every 2nd physics tick
+	# (staggered by instance id parity, so half the horde computes per tick)
+	# and reuses its cached push in between — indistinguishable at 60fps.
+	if (Engine.get_physics_frames() + get_instance_id()) & 1 == 0:
+		_separation_cache = _separation_push()
+	steer += _separation_cache * separation_strength
 	steer.y = 0.0
 	if steer.length_squared() > 1.0:
 		steer = steer.normalized()
@@ -192,10 +207,11 @@ func death_burst_color() -> Color:
 
 ## Sums push-away vectors from living "enemies" within separation_radius,
 ## with falloff (strongest when overlapping, zero at the edge). O(n^2) over
-## the horde, fine at the spawner's cap on a flat arena.
+## the horde, halved by the caller's tick stagger and served from the
+## shared per-tick group snapshot.
 func _separation_push() -> Vector3:
 	var push := Vector3.ZERO
-	for enemy in get_tree().get_nodes_in_group("enemies"):
+	for enemy: Node in _enemies_this_tick(get_tree()):
 		var other := enemy as Node3D
 		if other == null or other == self or not other.is_inside_tree():
 			continue
@@ -210,6 +226,14 @@ func _separation_push() -> Vector3:
 			dist = 0.01
 		push += (away / dist) * (1.0 - dist / separation_radius)
 	return push
+
+
+static func _enemies_this_tick(tree: SceneTree) -> Array[Node]:
+	var frame := Engine.get_physics_frames()
+	if frame != _enemies_snapshot_frame:
+		_enemies_snapshot_frame = frame
+		_enemies_snapshot = tree.get_nodes_in_group(&"enemies")
+	return _enemies_snapshot
 
 
 func _on_died() -> void:
@@ -232,14 +256,12 @@ func _on_died() -> void:
 func _drop_xp_gem() -> void:
 	if xp_gem_scene == null:
 		return
-	var drop := xp_gem_scene.instantiate()
-	var gem := drop as XpGem
+	# Pooled, parented to the scene root (not this enemy) so it outlives
+	# the corpse; pool_reset restored the scene-default xp_value.
+	var gem := Pools.acquire_scene(xp_gem_scene) as XpGem
 	if gem == null:
-		drop.free()
 		return
 	# Elite factor first (int), then the map-tier value factor (min 1 XP);
 	# both 1 on a baseline spawn, leaving the scene value untouched.
 	gem.xp_value = maxi(roundi(float(gem.xp_value * _xp_multiplier) * _tier_xp_multiplier), 1)
-	# Parented to the scene root, not this enemy, so it outlives the corpse.
-	get_tree().current_scene.add_child(gem)
 	gem.global_position = global_position + Vector3.UP * 0.6

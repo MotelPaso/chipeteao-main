@@ -4,7 +4,8 @@ extends Area3D
 ## and chases the (moving) player until caught. Damages each enemy at most
 ## once per leg — the per-leg hit set clears at the turn, and a body the
 ## blade passes through re-enters the hitbox on the way back for its second
-## hit. Frees on catch, on a lost player, or after max_lifetime.
+## hit. Releases back to Pools on catch, on a lost player, or after
+## max_lifetime; pool_reset() re-arms the legs and hit set for reuse.
 
 @export var speed: float = 14.0
 ## Radians/sec of the purely visual spin on the Spinner rig.
@@ -28,7 +29,15 @@ var _hit_ids_this_leg: Dictionary[int, bool] = {}
 
 func _ready() -> void:
 	body_entered.connect(_on_body_entered)
+
+
+## Pooled-node contract: fresh out-leg state on every acquire.
+func pool_reset() -> void:
+	_source = null
+	_out_point = Vector3.ZERO
+	_returning = false
 	_life_left = max_lifetime
+	_hit_ids_this_leg.clear()
 
 
 ## Called by the firing weapon right after parenting the blade: sets the
@@ -43,7 +52,7 @@ func _physics_process(delta: float) -> void:
 	_spinner.rotate_y(spin_speed * delta)
 	_life_left -= delta
 	if _life_left <= 0.0:
-		queue_free()
+		Pools.release(self)
 		return
 	var step := speed * delta
 	if not _returning:
@@ -57,11 +66,11 @@ func _physics_process(delta: float) -> void:
 		return
 	var player := get_tree().get_first_node_in_group("player") as Node3D
 	if player == null:
-		queue_free()
+		Pools.release(self)
 		return
 	var to_catch := player.global_position + Vector3.UP * catch_height - global_position
 	if to_catch.length() <= maxf(step, catch_radius):
-		queue_free()
+		Pools.release(self)
 	else:
 		global_position += to_catch.normalized() * step
 

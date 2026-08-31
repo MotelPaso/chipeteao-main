@@ -28,6 +28,16 @@ const STREAK_WINDOW := 2.0
 const STREAK_KILLS: Array[int] = [8, 15, 25]
 const STREAK_WORDS: Array[String] = ["SHREDDING!", "RAMPAGING!", "UNSTOPPABLE!"]
 
+## Env var that force-enables the perf probe (headless perf verification).
+const PERF_PROBE_ENV := "BONK_PERF"
+const PERF_PROBE_REFRESH := 0.25
+
+## Debug-only counter overlay (hidden by default, NOT a user-facing
+## feature): live FPS plus active enemy/gem/projectile counts and per-pool
+## created/parked sizes, for perf verification. Ships disabled; flip this
+## in the editor or launch with BONK_PERF=1.
+@export var show_perf_probe: bool = false
+
 @onready var _hp_bar: ProgressBar = %HpBar
 @onready var _hp_label: Label = %HpLabel
 @onready var _xp_bar: ProgressBar = %XpBar
@@ -52,6 +62,8 @@ var _streak_kill_times: Array[float] = []
 ## Highest STREAK_KILLS index fired this streak; -1 until one fires.
 var _streak_tier: int = -1
 var _last_kills: int = 0
+var _probe_label: Label = null
+var _probe_refresh_left: float = 0.0
 
 
 func _ready() -> void:
@@ -75,11 +87,18 @@ func _ready() -> void:
 		_health.hp_changed.connect(_refresh_hp)
 		_health.died.connect(_on_health_died)
 		_refresh_hp(_health.current_hp, _health.max_hp)
+	if show_perf_probe or OS.get_environment(PERF_PROBE_ENV) == "1":
+		_build_perf_probe()
 
 
-func _process(_delta: float) -> void:
+func _process(delta: float) -> void:
 	var total := int(RunState.run_time)
 	_timer_label.text = "%02d:%02d" % [floori(total / 60.0), total % 60]
+	if _probe_label != null:
+		_probe_refresh_left -= delta
+		if _probe_refresh_left <= 0.0:
+			_probe_refresh_left = PERF_PROBE_REFRESH
+			_probe_label.text = _probe_text()
 
 
 func _on_health_damaged(_amount: float, current: float) -> void:
@@ -162,6 +181,32 @@ func _pop_streak(word: String) -> void:
 func _on_curse_changed(stacks: int) -> void:
 	_curse_label.visible = stacks > 0
 	_curse_label.text = "Cursed x%d" % stacks
+
+
+## Debug-only perf counters, top-right, built in code so the shipping
+## scene carries nothing (see show_perf_probe).
+func _build_perf_probe() -> void:
+	_probe_label = Label.new()
+	_probe_label.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+	_probe_label.offset_left = -560.0
+	_probe_label.offset_right = -12.0
+	_probe_label.offset_top = 46.0
+	_probe_label.offset_bottom = 120.0
+	_probe_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	_probe_label.add_theme_font_size_override("font_size", 12)
+	_probe_label.modulate = Color(1.0, 1.0, 1.0, 0.85)
+	add_child(_probe_label)
+
+
+func _probe_text() -> String:
+	var tree := get_tree()
+	return "FPS %d | enemies %d | gems %d | shots %d | bolts %d\npools (created/parked): %s" % [
+			Engine.get_frames_per_second(),
+			tree.get_node_count_in_group(&"enemies"),
+			tree.get_node_count_in_group(&"xp_gems"),
+			tree.get_node_count_in_group(&"player_shots"),
+			tree.get_node_count_in_group(&"enemy_bolts"),
+			Pools.stats_line()]
 
 
 ## Map-tier tag on the timer's other flank, pushed through the "hud" group

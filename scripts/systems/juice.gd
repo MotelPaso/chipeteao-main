@@ -7,8 +7,6 @@ extends Node
 ## always processes; restores run under a paused tree) and headless-safe
 ## (camera/scene lookups are guarded, so no-window runs never crash).
 
-const DEATH_BURST_SCENE: PackedScene = preload("res://scenes/fx/DeathBurst.tscn")
-
 const VIGNETTE_SHADER: String = """
 shader_type canvas_item;
 
@@ -253,20 +251,14 @@ func _restore_flash(entry: FlashState) -> void:
 
 # --- particle bursts --------------------------------------------------------
 
-## Spawns a one-shot DeathBurst at `at`, tinted `color`. Self-freeing.
+## Plays a one-shot DeathBurst at `at`, tinted `color`. Pooled: the burst
+## releases itself back to Pools when done.
 func burst(at: Vector3, color: Color, amount: int) -> void:
-	var scene_root := get_tree().current_scene
-	if scene_root == null:
-		return
-	var node := DEATH_BURST_SCENE.instantiate()
-	var fx := node as DeathBurst
+	var fx := Pools.acquire_scene(Pools.DEATH_BURST_SCENE) as DeathBurst
 	if fx == null:
-		node.free()
 		return
-	fx.amount = maxi(amount, 1)  # before entering the tree: pre-emit resize
-	scene_root.add_child(fx)
 	fx.global_position = at
-	fx.fire(color)
+	fx.fire(color, maxi(amount, 1))
 
 
 # --- semantic feel moments (tunables above; call sites stay one-liners) -----

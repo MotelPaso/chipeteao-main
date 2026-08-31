@@ -32,14 +32,11 @@ func fire(target: Node3D) -> void:
 
 
 func _spawn_arrow(direction: Vector3, target: Node3D) -> void:
-	var arrow := projectile_scene.instantiate() as Projectile
+	# Pooled, parented to the scene root so arrows keep flying while the
+	# player moves on. Pierce is set per shot, after the pool's reset.
+	var arrow := Pools.acquire_scene(projectile_scene) as Projectile
 	if arrow == null:
 		return
-	var parent_node: Node = get_tree().current_scene
-	if parent_node == null:
-		parent_node = get_tree().root
-	# Scene-root parent so arrows keep flying while the player moves on.
-	parent_node.add_child(arrow)
 	arrow.global_transform = Transform3D(
 			Basis.looking_at(direction, Vector3.UP), _nock.global_position)
 	arrow.pierce_remaining = maxi(pierce_count, 1)

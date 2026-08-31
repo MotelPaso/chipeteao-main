@@ -69,6 +69,9 @@ func _physics_process(delta: float) -> void:
 ## the first max_cluster_candidates found) — the flask lands on packs, not
 ## the nearest straggler. Ties keep the earliest candidate.
 func acquire_target() -> Node3D:
+	# Empty-horde fast path (see WeaponBase.acquire_target).
+	if get_tree().get_first_node_in_group("enemies") == null:
+		return null
 	var candidates: Array[Node3D] = []
 	var range_sq := attack_range * attack_range
 	for node: Node in get_tree().get_nodes_in_group("enemies"):

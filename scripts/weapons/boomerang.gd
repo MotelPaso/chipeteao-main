@@ -23,13 +23,10 @@ func fire(target: Node3D) -> void:
 	throw_dir.y = 0.0
 	throw_dir = throw_dir.normalized() if throw_dir.length_squared() > 0.0001 \
 			else Vector3.FORWARD
-	var blade := projectile_scene.instantiate() as BoomerangProjectile
+	# Pooled, parented to the scene root so the blade keeps flying while
+	# the player moves on.
+	var blade := Pools.acquire_scene(projectile_scene) as BoomerangProjectile
 	if blade == null:
 		return
-	var parent_node: Node = get_tree().current_scene
-	if parent_node == null:
-		parent_node = get_tree().root
-	# Scene-root parent so the blade keeps flying while the player moves on.
-	parent_node.add_child(blade)
 	blade.launch(self, global_position + Vector3.UP * throw_height, throw_dir,
 			attack_range * travel_scale * area_scale())
