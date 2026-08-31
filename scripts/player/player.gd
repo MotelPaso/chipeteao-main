@@ -73,17 +73,26 @@ func _ready() -> void:
 func _unhandled_input(event: InputEvent) -> void:
 	if _is_dead:
 		return
+	# Esc is owned by the PauseMenu layer (this node is pausable, so it
+	# never even sees input while a menu holds the tree paused). Clicking
+	# stays as a recapture fallback if the mouse ever ends up free mid-run.
 	if event is InputEventMouseMotion and Input.get_mouse_mode() == Input.MOUSE_MODE_CAPTURED:
-		_yaw -= event.relative.x * mouse_sensitivity
-		_pitch = clamp(_pitch - event.relative.y * mouse_sensitivity,
-				deg_to_rad(min_pitch_deg), deg_to_rad(max_pitch_deg))
-		rotation.y = _yaw
-		spring_arm.rotation.x = _pitch
-	elif event.is_action_pressed("ui_cancel"):
-		Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
+		_apply_look(event.relative)
 	elif event is InputEventMouseButton and event.pressed \
 			and Input.get_mouse_mode() != Input.MOUSE_MODE_CAPTURED:
 		Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
+
+
+## Mouse-look: the settings sensitivity (SaveData.mouse_sensitivity, a
+## 0.3x-2.0x multiplier) scales the exported base per event — one autoload
+## float read, cheap and always live.
+func _apply_look(relative: Vector2) -> void:
+	var sensitivity: float = mouse_sensitivity * SaveData.mouse_sensitivity
+	_yaw -= relative.x * sensitivity
+	_pitch = clamp(_pitch - relative.y * sensitivity,
+			deg_to_rad(min_pitch_deg), deg_to_rad(max_pitch_deg))
+	rotation.y = _yaw
+	spring_arm.rotation.x = _pitch
 
 
 func _physics_process(delta: float) -> void:

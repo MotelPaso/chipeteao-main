@@ -30,9 +30,16 @@ var _min_rarity: String = ""
 func _ready() -> void:
 	visible = false
 	add_to_group("upgrade_ui")
+	add_to_group("ui_blocking")
 	RunState.leveled_up.connect(_on_leveled_up)
 	for i in _cards.size():
 		_cards[i].pressed.connect(_on_card_pressed.bind(i))
+
+
+## PauseMenu contract ("ui_blocking"): true while this layer owns the tree
+## pause — including the pre-reveal window where nothing is visible yet.
+func is_blocking() -> bool:
+	return visible or _opening
 
 
 ## Public (shrines/chests via the "upgrade_ui" group): a free card pick

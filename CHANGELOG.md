@@ -21,3 +21,4 @@
 - Iteration 19: Ash Dunes biome (desert arena + props + mood, map select with victory-gated unlock, per-map run/victory counters, dunes quests)
 - Iteration 20: Desert roster (line-of-sight laser Sunspitter, burrowing ambusher, per-map spawn phases, Sarcognath boss with rotating beam/coffin ring/entomb root)
 - Iteration 21: Secrets (Odd Stump and Humming Skull triggers, Grubthing and Coffer Mimic minibosses, boss-kill character unlocks with select-screen hints)
+- Iteration 22: Pause & settings (Esc pause menu, SFX/ambient volume buses, mouse sensitivity, fullscreen toggle, persisted in save)

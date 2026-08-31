@@ -4,13 +4,14 @@ extends AudioStreamPlayer
 ## scripts/tools/generate_sfx.gd — each arena assigns its biome's wav)
 ## that kills the dead silence in the arenas.
 ## Forces a seamless forward loop on the imported wav — the generated
-## files carry no loop metadata — routes into the "Sfx" bus (created by
-## the Sfx autoload before any scene loads), and keeps breathing while
-## the card UI or run-end screen has the tree paused.
+## files carry no loop metadata — routes into the "Ambient" bus (created
+## by the Sfx autoload before any scene loads, volume owned by the
+## Settings autoload), and keeps breathing while the card UI or run-end
+## screen has the tree paused.
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
-	bus = Sfx.BUS_NAME
+	bus = Sfx.AMBIENT_BUS_NAME
 	var wav := stream as AudioStreamWAV
 	if wav != null and wav.loop_mode == AudioStreamWAV.LOOP_DISABLED:
 		wav.loop_mode = AudioStreamWAV.LOOP_FORWARD

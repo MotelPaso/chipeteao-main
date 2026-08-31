@@ -1,6 +1,7 @@
-[gd_scene load_steps=2 format=3]
+[gd_scene load_steps=3 format=3]
 
 [ext_resource type="Script" path="res://scripts/ui/character_select.gd" id="1_charselect"]
+[ext_resource type="PackedScene" path="res://scenes/ui/SettingsPanel.tscn" id="2_settingspanel"]
 
 [node name="CharacterSelect" type="Control"]
 anchor_right = 1.0
@@ -71,3 +72,15 @@ unique_name_in_owner = true
 custom_minimum_size = Vector2(150, 52)
 theme_override_font_sizes/font_size = 20
 text = "Quests"
+
+[node name="SettingsButton" type="Button" parent="."]
+unique_name_in_owner = true
+offset_left = 24.0
+offset_top = 18.0
+offset_right = 128.0
+offset_bottom = 46.0
+theme_override_font_sizes/font_size = 14
+text = "Settings"
+
+[node name="SettingsPanel" parent="." instance=ExtResource("2_settingspanel")]
+unique_name_in_owner = true

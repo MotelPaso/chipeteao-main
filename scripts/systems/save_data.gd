@@ -22,6 +22,15 @@ signal shards_changed(balance: int)
 const DEFAULT_SAVE_PATH := "user://save.json"
 const SAVE_VERSION := 1
 
+## Settings defaults (the "settings" dict in the JSON). Volumes are 0..100
+## slider values (100 = the pre-settings mix, see Settings.volume_to_db);
+## sensitivity is a look multiplier on the player's exported base.
+const DEFAULT_SFX_VOLUME := 100.0
+const DEFAULT_AMBIENT_VOLUME := 100.0
+const DEFAULT_MOUSE_SENSITIVITY := 1.0
+const MIN_MOUSE_SENSITIVITY := 0.3
+const MAX_MOUSE_SENSITIVITY := 2.0
+
 ## Test harnesses point this at a scratch file before load_from_disk().
 var save_path: String = DEFAULT_SAVE_PATH
 
@@ -40,6 +49,14 @@ var claimed_quest_ids: Array[String] = []
 ## (the run_ended signal shape stays untouched; loose coupling via here).
 var last_new_quest_ids: Array[String] = []
 var last_reward_shards: int = 0
+
+## --- Settings (persisted values; the Settings autoload applies them to
+## buses/window and is the only writer — see settings_apply.gd) ----------
+var sfx_volume: float = DEFAULT_SFX_VOLUME
+var ambient_volume: float = DEFAULT_AMBIENT_VOLUME
+## Look-speed multiplier the player applies on top of its exported base.
+var mouse_sensitivity: float = DEFAULT_MOUSE_SENSITIVITY
+var fullscreen: bool = false
 
 
 func _ready() -> void:
@@ -218,6 +235,7 @@ func load_from_disk() -> void:
 	counters = _as_int_dict(data.get("counters"))
 	completed_quest_ids = _as_string_array(data.get("completed_quests"))
 	claimed_quest_ids = _as_string_array(data.get("claimed_quests"))
+	_load_settings(data.get("settings"))
 	# Starters are always playable, even if an edited file dropped them.
 	for starter_id: String in CharacterCatalog.starter_ids():
 		if not unlocked_character_ids.has(starter_id):
@@ -239,6 +257,25 @@ func _apply_defaults() -> void:
 	counters = {}
 	completed_quest_ids = []
 	claimed_quest_ids = []
+	sfx_volume = DEFAULT_SFX_VOLUME
+	ambient_volume = DEFAULT_AMBIENT_VOLUME
+	mouse_sensitivity = DEFAULT_MOUSE_SENSITIVITY
+	fullscreen = false
+
+
+## Missing/legacy "settings" (pre-iteration-22 saves) or malformed entries
+## keep the defaults _apply_defaults just set; values clamp to legal ranges.
+func _load_settings(value: Variant) -> void:
+	if value is not Dictionary:
+		return
+	var settings := value as Dictionary
+	sfx_volume = clampf(_as_float(settings.get("sfx_volume"), DEFAULT_SFX_VOLUME), 0.0, 100.0)
+	ambient_volume = clampf(
+			_as_float(settings.get("ambient_volume"), DEFAULT_AMBIENT_VOLUME), 0.0, 100.0)
+	mouse_sensitivity = clampf(
+			_as_float(settings.get("mouse_sensitivity"), DEFAULT_MOUSE_SENSITIVITY),
+			MIN_MOUSE_SENSITIVITY, MAX_MOUSE_SENSITIVITY)
+	fullscreen = _as_bool(settings.get("fullscreen"), false)
 
 
 func _to_save_dict() -> Dictionary:
@@ -250,6 +287,12 @@ func _to_save_dict() -> Dictionary:
 		"counters": counters,
 		"completed_quests": completed_quest_ids,
 		"claimed_quests": claimed_quest_ids,
+		"settings": {
+			"sfx_volume": sfx_volume,
+			"ambient_volume": ambient_volume,
+			"mouse_sensitivity": mouse_sensitivity,
+			"fullscreen": fullscreen,
+		},
 	}
 
 
@@ -259,6 +302,18 @@ func _to_save_dict() -> Dictionary:
 static func _as_int(value: Variant, fallback: int) -> int:
 	if value is int or value is float:
 		return int(value)
+	return fallback
+
+
+static func _as_float(value: Variant, fallback: float) -> float:
+	if value is int or value is float:
+		return float(value)
+	return fallback
+
+
+static func _as_bool(value: Variant, fallback: bool) -> bool:
+	if value is bool:
+		return value
 	return fallback
 
 

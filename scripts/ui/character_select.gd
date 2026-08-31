@@ -32,6 +32,8 @@ const REJECT_FLASH_COLOR := Color(1.0, 0.42, 0.42)
 @onready var _map_row: HBoxContainer = %MapRow
 @onready var _start_button: Button = %StartButton
 @onready var _quests_button: Button = %QuestsButton
+@onready var _settings_button: Button = %SettingsButton
+@onready var _settings_panel: SettingsPanel = %SettingsPanel
 @onready var _shards_label: Label = %ShardsLabel
 
 ## Card button per playable character id, for selection restyling.
@@ -58,8 +60,13 @@ func _ready() -> void:
 		_cards_by_id[String(character.id)] = card
 	_style_button(_start_button)
 	_style_button(_quests_button)
+	_style_button(_settings_button)
 	_start_button.pressed.connect(_on_start_pressed)
 	_quests_button.pressed.connect(_on_quests_pressed)
+	# The shared SettingsPanel (same scene the pause menu embeds) overlays
+	# this whole screen; on close, focus returns to Start.
+	_settings_button.pressed.connect(_settings_panel.open)
+	_settings_panel.closed.connect(func() -> void: _start_button.grab_focus())
 	SaveData.shards_changed.connect(func(_balance: int) -> void: _refresh_shards())
 	_refresh_shards()
 	# Reopening mid-session keeps the previous picks; unknown ids fall

@@ -11,6 +11,10 @@ extends Node
 ## Processes always, so card picks and run-end stingers sound under pause.
 
 const BUS_NAME := &"Sfx"
+## Bus for the arena ambient beds (ambient_bed.gd routes into it), created
+## here with the Sfx bus so all code-built buses have one owner; the
+## Settings autoload only sets volumes on them.
+const AMBIENT_BUS_NAME := &"Ambient"
 
 const STREAMS: Dictionary[StringName, AudioStream] = {
 	&"hit_soft": preload("res://assets/audio/sfx/hit_soft.wav"),
@@ -266,9 +270,15 @@ func _now() -> float:
 
 
 func _setup_bus() -> void:
-	if AudioServer.get_bus_index(BUS_NAME) == -1:
-		AudioServer.add_bus()
-		var idx := AudioServer.get_bus_count() - 1
-		AudioServer.set_bus_name(idx, BUS_NAME)
-		AudioServer.set_bus_send(idx, &"Master")
+	_ensure_bus(BUS_NAME)
+	_ensure_bus(AMBIENT_BUS_NAME)
 	AudioServer.set_bus_volume_db(AudioServer.get_bus_index(BUS_NAME), bus_volume_db)
+
+
+static func _ensure_bus(bus_name: StringName) -> void:
+	if AudioServer.get_bus_index(bus_name) != -1:
+		return
+	AudioServer.add_bus()
+	var idx := AudioServer.get_bus_count() - 1
+	AudioServer.set_bus_name(idx, bus_name)
+	AudioServer.set_bus_send(idx, &"Master")

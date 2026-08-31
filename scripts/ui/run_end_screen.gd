@@ -27,10 +27,17 @@ const CHARACTER_SELECT_SCENE_PATH := "res://scenes/ui/CharacterSelect.tscn"
 
 func _ready() -> void:
 	visible = false
+	add_to_group("ui_blocking")
 	_apply_styles()
 	_retry_button.pressed.connect(_on_retry_pressed)
 	_change_character_button.pressed.connect(_on_change_character_pressed)
 	_quit_button.pressed.connect(_on_quit_pressed)
+
+
+## PauseMenu contract ("ui_blocking"): the end screen owns the run-end
+## pause while it is up, so Esc must not open the pause menu over it.
+func is_blocking() -> bool:
+	return visible
 
 
 ## Connected to RunManager.run_ended in RunSystems.tscn. The tree is
