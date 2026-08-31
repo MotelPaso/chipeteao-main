@@ -12,9 +12,12 @@ extends Control
 ## for N? [Yes]" confirm (second click cancels), while a short balance
 ## earns a red-flash shake instead. Locked maps show grayed with the
 ## catalog's unlock hint and reject clicks the same way (map unlocks are
-## earned, never bought). The Shard balance sits top-right and the Quests
-## button opens the quest log. Styling matches the run UI: dark
-## StyleBoxFlat.
+## earned, never bought). Under the map row, a T1/T2/T3 tier picker for
+## the selected map: tiers are win-gated per map (SaveData
+## .is_tier_unlocked), locked picks gray out and explain the gate, and the
+## last pick per map persists (SaveData.tier_choice). The Shard balance
+## sits top-right and the Quests button opens the quest log. Styling
+## matches the run UI: dark StyleBoxFlat.
 
 const QUEST_LOG_SCENE_PATH := "res://scenes/ui/QuestLog.tscn"
 
@@ -27,9 +30,14 @@ const LOCKED_BORDER_COLOR := Color(0.22, 0.23, 0.28)
 const LOCKED_TEXT_COLOR := Color(0.45, 0.47, 0.52)
 const SHARD_TEXT_COLOR := Color(0.55, 0.8, 0.92)
 const REJECT_FLASH_COLOR := Color(1.0, 0.42, 0.42)
+const TIER_ACCENT_COLOR := Color(0.96, 0.78, 0.3)
+const TIER_SUMMARY_COLOR := Color(0.72, 0.74, 0.78)
+const TIER_BUTTON_SIZE := Vector2(64, 36)
 
 @onready var _cards_grid: GridContainer = %CardsGrid
 @onready var _map_row: HBoxContainer = %MapRow
+@onready var _tier_row: HBoxContainer = %TierRow
+@onready var _tier_summary_label: Label = %TierSummaryLabel
 @onready var _start_button: Button = %StartButton
 @onready var _quests_button: Button = %QuestsButton
 @onready var _settings_button: Button = %SettingsButton
@@ -40,6 +48,8 @@ const REJECT_FLASH_COLOR := Color(1.0, 0.42, 0.42)
 var _cards_by_id: Dictionary[String, Button] = {}
 ## Card button per catalog map id, for selection restyling.
 var _map_cards_by_id: Dictionary[String, Button] = {}
+## Tier picker buttons, index 0 = tier 1; restyled per selected map.
+var _tier_buttons: Array[Button] = []
 ## Character id whose card currently shows the inline unlock confirm.
 var _pending_unlock_id: String = ""
 
@@ -52,6 +62,14 @@ func _ready() -> void:
 		map_card.pressed.connect(_on_map_card_pressed.bind(String(map_row.id)))
 		_map_row.add_child(map_card)
 		_map_cards_by_id[String(map_row.id)] = map_card
+	for tier in range(1, MapCatalog.TIER_COUNT + 1):
+		var tier_button := Button.new()
+		tier_button.custom_minimum_size = TIER_BUTTON_SIZE
+		tier_button.text = "T%d" % tier
+		tier_button.add_theme_font_size_override("font_size", 15)
+		tier_button.pressed.connect(_on_tier_pressed.bind(tier))
+		_tier_row.add_child(tier_button)
+		_tier_buttons.append(tier_button)
 	for character: Dictionary in CharacterCatalog.CHARACTER_LIBRARY:
 		var card := Button.new()
 		card.custom_minimum_size = CARD_SIZE
@@ -143,7 +161,14 @@ func _on_quests_pressed() -> void:
 
 func _select_map(map_id: String) -> void:
 	GameConfig.selected_map_id = map_id
+	# Restore this map's remembered tier pick; a tier the map hasn't
+	# earned yet (or a legacy save with none) drops to the baseline.
+	var remembered_tier := SaveData.tier_choice(map_id)
+	if not SaveData.is_tier_unlocked(map_id, remembered_tier):
+		remembered_tier = 1
+	GameConfig.selected_tier = remembered_tier
 	_refresh_map_cards()
+	_refresh_tier_row()
 
 
 func _on_map_card_pressed(map_id: String) -> void:
@@ -151,6 +176,44 @@ func _on_map_card_pressed(map_id: String) -> void:
 		_select_map(map_id)
 	else:
 		_reject_card(_map_cards_by_id[map_id])
+
+
+## --- Tier picker (win tier N on a map to open its tier N+1) -------------
+
+func _on_tier_pressed(tier: int) -> void:
+	var map_id := GameConfig.selected_map_id
+	if SaveData.is_tier_unlocked(map_id, tier):
+		GameConfig.selected_tier = tier
+		SaveData.set_tier_choice(map_id, tier)
+		_refresh_tier_row()
+		return
+	_reject_card(_tier_buttons[tier - 1])
+	# Locked feedback: the summary line explains the gate until the next
+	# refresh repaints it with the selected tier's summary.
+	_tier_summary_label.text = "Tier %d locked — win Tier %d on %s" % [
+			tier, tier - 1, String(MapCatalog.by_id_or_default(map_id).display_name)]
+	_tier_summary_label.add_theme_color_override("font_color", LOCKED_TEXT_COLOR)
+
+
+func _refresh_tier_row() -> void:
+	var map_id := GameConfig.selected_map_id
+	for i in _tier_buttons.size():
+		var tier := i + 1
+		var tier_button := _tier_buttons[i]
+		if not SaveData.is_tier_unlocked(map_id, tier):
+			tier_button.tooltip_text = "Win Tier %d here to unlock" % (tier - 1)
+			tier_button.add_theme_color_override("font_color", LOCKED_TEXT_COLOR)
+			_style_card(tier_button, LOCKED_BORDER_COLOR, 2)
+			continue
+		tier_button.tooltip_text = ""
+		var selected := tier == GameConfig.selected_tier
+		tier_button.add_theme_color_override("font_color",
+				TIER_ACCENT_COLOR if selected else Color(0.85, 0.87, 0.9))
+		_style_card(tier_button,
+				TIER_ACCENT_COLOR if selected else UNSELECTED_BORDER_COLOR,
+				3 if selected else 2)
+	_tier_summary_label.text = MapCatalog.tier_summary(map_id, GameConfig.selected_tier)
+	_tier_summary_label.add_theme_color_override("font_color", TIER_SUMMARY_COLOR)
 
 
 func _refresh_map_cards() -> void:

@@ -154,6 +154,17 @@ const QUEST_LIBRARY: Array[Dictionary] = [
 		"description": "Finish 3 runs in Ash Dunes.",
 		"stat": "runs_on_ash_dunes", "target": 3, "reward": 50,
 	},
+	# Map tiers (win-gated ladders; any map counts).
+	{
+		"id": "tier2_win", "display_name": "Ascendant",
+		"description": "Win a Tier 2 run on any map.",
+		"stat": "any_t2_win", "target": 1, "reward": 70,
+	},
+	{
+		"id": "tier3_win", "display_name": "Apex Raider",
+		"description": "Win a Tier 3 run on any map.",
+		"stat": "any_t3_win", "target": 1, "reward": 120,
+	},
 	# Hidden minibosses (GDD 6 secrets). Descriptions stay vague on purpose:
 	# the quest log teases that a secret exists without mapping the trigger.
 	{

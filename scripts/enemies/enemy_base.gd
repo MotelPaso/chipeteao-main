@@ -27,6 +27,8 @@ var is_elite: bool = false
 
 var _gravity: float = ProjectSettings.get_setting("physics/3d/default_gravity", 9.8)
 var _xp_multiplier: int = 1
+## Map-tier XP gem value factor (see apply_tier_scaling); 1.0 = baseline.
+var _tier_xp_multiplier: float = 1.0
 # Timed slow (Thorn Whip etc.): a speed multiplier active while the timer
 # runs; expiry restores full speed. See apply_slow for the refresh rules.
 var _slow_multiplier: float = 1.0
@@ -114,6 +116,21 @@ func apply_slow(speed_multiplier: float, duration: float) -> void:
 ## Current external speed multiplier: 1.0 whenever no slow is active.
 func active_slow_multiplier() -> float:
 	return _slow_multiplier if _slow_time_left > 0.0 else 1.0
+
+
+## Map-tier difficulty hook (GDD 6/7), applied by the spawner right after
+## a spawn: multiplies max HP (healed to the new max), attack damage
+## (through the same virtual elites use), and the XP gem payout. Distinct
+## from make_elite() and stacks multiplicatively with it in either order.
+## Every factor at 1.0 (tier 1) is an exact no-op. Call after the enemy is
+## inside the tree (relies on the onready Health child).
+func apply_tier_scaling(hp_mult: float, dmg_mult: float, xp_value_mult: float = 1.0) -> void:
+	if hp_mult != 1.0:
+		_health.max_hp *= hp_mult
+		_health.heal_full()
+	if dmg_mult != 1.0:
+		_apply_elite_damage(dmg_mult)
+	_tier_xp_multiplier = xp_value_mult
 
 
 ## Promotes this enemy to an elite: more HP (healed to the new max), speed,
@@ -220,7 +237,9 @@ func _drop_xp_gem() -> void:
 	if gem == null:
 		drop.free()
 		return
-	gem.xp_value *= _xp_multiplier
+	# Elite factor first (int), then the map-tier value factor (min 1 XP);
+	# both 1 on a baseline spawn, leaving the scene value untouched.
+	gem.xp_value = maxi(roundi(float(gem.xp_value * _xp_multiplier) * _tier_xp_multiplier), 1)
 	# Parented to the scene root, not this enemy, so it outlives the corpse.
 	get_tree().current_scene.add_child(gem)
 	gem.global_position = global_position + Vector3.UP * 0.6

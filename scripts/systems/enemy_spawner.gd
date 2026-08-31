@@ -89,6 +89,24 @@ var _elder_spawned: bool = false
 var _bosses_alive: int = 0
 var _relief_timer: float = 0.0
 
+## Map-tier factors (MapCatalog tier spec), pushed by the arena's
+## RunSystems root at ready through the "enemy_spawner" group. All 1.0
+## until then and at tier 1, so the baseline game is untouched.
+var _tier_hp_multiplier: float = 1.0
+var _tier_damage_multiplier: float = 1.0
+var _tier_spawn_rate_multiplier: float = 1.0
+var _tier_boss_multiplier: float = 1.0
+var _tier_xp_multiplier: float = 1.0
+
+
+## Group hook (RunSystems): adopt the selected map tier's spec.
+func apply_tier_spec(spec: Dictionary) -> void:
+	_tier_hp_multiplier = float(spec.get("enemy_hp_mult", 1.0))
+	_tier_damage_multiplier = float(spec.get("enemy_damage_mult", 1.0))
+	_tier_spawn_rate_multiplier = maxf(float(spec.get("spawn_rate_mult", 1.0)), 0.1)
+	_tier_boss_multiplier = float(spec.get("boss_mult", 1.0))
+	_tier_xp_multiplier = float(spec.get("xp_value_mult", 1.0))
+
 
 func _ready() -> void:
 	# Shrines reach the spawner through this group, never by node path.
@@ -115,7 +133,9 @@ func current_interval() -> float:
 		interval *= boss_alive_interval_multiplier
 	elif _relief_timer > 0.0:
 		interval *= boss_relief_interval_multiplier
-	return interval
+	# Tier pressure divides last, after the min_interval floor, so higher
+	# tiers stay proportionally faster even late-run.
+	return interval / _tier_spawn_rate_multiplier
 
 
 func current_count_per_tick() -> int:
@@ -191,6 +211,7 @@ func _spawn_one() -> void:
 		return
 	add_child(enemy)
 	enemy.global_position = _ring_position(player)
+	enemy.apply_tier_scaling(_tier_hp_multiplier, _tier_damage_multiplier, _tier_xp_multiplier)
 	if randf() < elite_chance():
 		enemy.make_elite()
 
@@ -222,6 +243,7 @@ func spawn_pressure_burst(center: Vector3, count: int) -> void:
 		pos.z = clampf(pos.z, -arena_half_extent, arena_half_extent)
 		pos.y = _ground_height(pos, player) + 0.05
 		enemy.global_position = pos
+		enemy.apply_tier_scaling(_tier_hp_multiplier, _tier_damage_multiplier, _tier_xp_multiplier)
 		if randf() < elite_chance():
 			enemy.make_elite()
 
@@ -255,8 +277,12 @@ func _spawn_boss(stat_multiplier: float, title_override: String = "") -> void:
 		boss.boss_title = title_override
 	add_child(boss)
 	boss.global_position = _ring_position(player)
-	if stat_multiplier > 1.0:
-		boss.apply_tier(stat_multiplier)
+	# Elder rematch factor and map-tier factor land as one apply_tier call
+	# (their product), so tier_body_scale applies once per boss, and tier-1
+	# base bosses (product 1.0) stay exactly baseline.
+	var combined_multiplier := stat_multiplier * _tier_boss_multiplier
+	if combined_multiplier > 1.0:
+		boss.apply_tier(combined_multiplier)
 	# Curse Shrine payoff: the next boss consumes every banked stack and
 	# spawns harder but richer (multipliers exported on the boss).
 	var curse_stacks := RunState.consume_curses()

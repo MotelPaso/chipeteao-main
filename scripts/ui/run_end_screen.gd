@@ -54,14 +54,20 @@ func open(victory: bool) -> void:
 	_level_value.text = str(RunState.level)
 	_kills_value.text = str(RunState.kills)
 	# Meta earnings from this run's fold (RunManager ran it just before
-	# emitting run_ended): quests newly completed, with their claimable
-	# Shard value waiting in the quest log.
+	# emitting run_ended): any map-tier victory bonus (credited outright)
+	# plus quests newly completed, whose claimable Shard value waits in the
+	# quest log.
+	var earning_lines: Array[String] = []
+	if SaveData.last_tier_bonus_shards > 0:
+		earning_lines.append("+%d shards — Tier %d victory bonus" % [
+				SaveData.last_tier_bonus_shards, GameConfig.selected_tier])
 	var quest_count := SaveData.last_new_quest_ids.size()
-	_rewards_label.visible = quest_count > 0
 	if quest_count > 0:
-		_rewards_label.text = "+%d shards · %d quest%s completed — claim in the quest log" % [
+		earning_lines.append("+%d shards · %d quest%s completed — claim in the quest log" % [
 				SaveData.last_reward_shards, quest_count,
-				"" if quest_count == 1 else "s"]
+				"" if quest_count == 1 else "s"])
+	_rewards_label.visible = not earning_lines.is_empty()
+	_rewards_label.text = "\n".join(earning_lines)
 	Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
 	visible = true
 	_retry_button.grab_focus()

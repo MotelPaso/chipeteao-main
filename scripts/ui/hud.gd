@@ -38,6 +38,7 @@ const STREAK_WORDS: Array[String] = ["SHREDDING!", "RAMPAGING!", "UNSTOPPABLE!"]
 @onready var _boss_name_label: Label = %BossNameLabel
 @onready var _announce_label: Label = %AnnounceLabel
 @onready var _curse_label: Label = %CurseLabel
+@onready var _tier_label: Label = %TierLabel
 @onready var _streak_label: Label = %StreakLabel
 
 var _hp_fill: StyleBoxFlat
@@ -161,6 +162,13 @@ func _pop_streak(word: String) -> void:
 func _on_curse_changed(stacks: int) -> void:
 	_curse_label.visible = stacks > 0
 	_curse_label.text = "Cursed x%d" % stacks
+
+
+## Map-tier tag on the timer's other flank, pushed through the "hud" group
+## by RunSystems once it settles the run's tier; hidden on the baseline.
+func show_tier_tag(tier: int) -> void:
+	_tier_label.visible = tier > 1
+	_tier_label.text = "T%d" % tier
 
 
 ## Called through the "boss_ui" group by a boss entering the arena. If one

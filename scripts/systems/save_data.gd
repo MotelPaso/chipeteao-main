@@ -15,6 +15,10 @@ extends Node
 ##   chests_opened, max_level (high-water), best_run_minutes (high-water),
 ##   runs_as_<character_id>, wins_as_<character_id>,
 ##   runs_on_<map_id>, victories_<map_id>,
+##   victories_<map_id>_t<tier> (per-map-tier wins; tier N wins gate tier
+##   N+1 — see is_tier_unlocked; victories_<map_id> keeps counting
+##   any-tier wins so pre-tier quests and unlocks never regress),
+##   any_t2_win / any_t3_win (tier-victory quests),
 ##   slain_<miniboss_id> (hidden-boss kills, bumped by SecretBossBase).
 
 signal shards_changed(balance: int)
@@ -49,6 +53,13 @@ var claimed_quest_ids: Array[String] = []
 ## (the run_ended signal shape stays untouched; loose coupling via here).
 var last_new_quest_ids: Array[String] = []
 var last_reward_shards: int = 0
+## Shards credited outright by the last fold's tier victory bonus (0 for a
+## defeat or a tier-1 win).
+var last_tier_bonus_shards: int = 0
+
+## Last tier picked per map id on the select screen (a remembered-choice
+## nicety, not a gate — the screen still clamps to unlocked tiers).
+var tier_choices: Dictionary[String, int] = {}
 
 ## --- Settings (persisted values; the Settings autoload applies them to
 ## buses/window and is the only writer — see settings_apply.gd) ----------
@@ -87,19 +98,28 @@ func raise_to(stat_id: String, value: int) -> void:
 ## --- Run-end fold (RunManager) ----------------------------------------
 
 ## Folds one finished run into the lifetime counters, marks any quest that
-## just hit its target (claiming stays manual, in the quest log), saves,
-## and returns {"new_quest_ids": Array[String], "reward_shards": int} —
-## the claimable Shard value of the newly completed quests.
-func fold_run_results(victory: bool, character_id: String, map_id: String,
+## just hit its target (claiming stays manual, in the quest log), credits
+## any tier victory bonus outright, saves, and returns
+## {"new_quest_ids": Array[String], "reward_shards": int} — the claimable
+## Shard value of the newly completed quests (the tier bonus is separate,
+## in last_tier_bonus_shards, because it needs no claim).
+func fold_run_results(victory: bool, character_id: String, map_id: String, tier: int,
 		level: int, kills: int, run_seconds: float) -> Dictionary:
+	tier = clampi(tier, 1, MapCatalog.TIER_COUNT)
 	bump("total_kills", kills)
 	bump("runs_finished")
 	bump("runs_as_" + character_id)
 	bump("runs_on_" + map_id)
+	last_tier_bonus_shards = 0
 	if victory:
 		bump("victories")
 		bump("wins_as_" + character_id)
 		bump("victories_" + map_id)
+		bump("victories_%s_t%d" % [map_id, tier])
+		if tier >= 2:
+			bump("any_t%d_win" % tier)
+			last_tier_bonus_shards = MapCatalog.tier_shard_bonus(map_id, tier)
+			shards += last_tier_bonus_shards
 	raise_to("max_level", level)
 	raise_to("best_run_minutes", int(run_seconds / 60.0))
 	last_new_quest_ids = _evaluate_quests()
@@ -107,6 +127,8 @@ func fold_run_results(victory: bool, character_id: String, map_id: String,
 	for quest_id: String in last_new_quest_ids:
 		last_reward_shards += int(QuestCatalog.by_id(quest_id).reward)
 	save()
+	if last_tier_bonus_shards > 0:
+		shards_changed.emit(shards)
 	return {
 		"new_quest_ids": last_new_quest_ids,
 		"reward_shards": last_reward_shards,
@@ -168,6 +190,35 @@ func is_map_unlocked(map_id: String) -> bool:
 	if stat_id.is_empty():
 		return true
 	return stat(stat_id) >= int(row.unlock_target)
+
+
+## --- Map tiers ----------------------------------------------------------
+
+## Tier 1 is always playable on any known map; tier N+1 unlocks by WINNING
+## tier N on that same map (per-map, so a Hollow Woods T2 win says nothing
+## about Ash Dunes). Legacy saves have no per-tier counters, so they read
+## as "only T1 unlocked" — exactly right.
+func is_tier_unlocked(map_id: String, tier: int) -> bool:
+	if MapCatalog.by_id(map_id).is_empty():
+		return false
+	if tier == 1:
+		return true
+	if tier < 1 or tier > MapCatalog.TIER_COUNT:
+		return false
+	return stat("victories_%s_t%d" % [map_id, tier - 1]) >= 1
+
+
+## Remembered select-screen tier pick for a map (1 when never picked).
+func tier_choice(map_id: String) -> int:
+	return clampi(int(tier_choices.get(map_id, 1)), 1, MapCatalog.TIER_COUNT)
+
+
+func set_tier_choice(map_id: String, tier: int) -> void:
+	tier = clampi(tier, 1, MapCatalog.TIER_COUNT)
+	if tier_choice(map_id) == tier:
+		return
+	tier_choices[map_id] = tier
+	save()
 
 
 ## --- Character unlocks -------------------------------------------------
@@ -235,6 +286,8 @@ func load_from_disk() -> void:
 	counters = _as_int_dict(data.get("counters"))
 	completed_quest_ids = _as_string_array(data.get("completed_quests"))
 	claimed_quest_ids = _as_string_array(data.get("claimed_quests"))
+	# Missing on legacy (pre-tier) saves: every map just remembers tier 1.
+	tier_choices = _as_int_dict(data.get("tier_choice"))
 	_load_settings(data.get("settings"))
 	# Starters are always playable, even if an edited file dropped them.
 	for starter_id: String in CharacterCatalog.starter_ids():
@@ -257,6 +310,7 @@ func _apply_defaults() -> void:
 	counters = {}
 	completed_quest_ids = []
 	claimed_quest_ids = []
+	tier_choices = {}
 	sfx_volume = DEFAULT_SFX_VOLUME
 	ambient_volume = DEFAULT_AMBIENT_VOLUME
 	mouse_sensitivity = DEFAULT_MOUSE_SENSITIVITY
@@ -287,6 +341,7 @@ func _to_save_dict() -> Dictionary:
 		"counters": counters,
 		"completed_quests": completed_quest_ids,
 		"claimed_quests": claimed_quest_ids,
+		"tier_choice": tier_choices,
 		"settings": {
 			"sfx_volume": sfx_volume,
 			"ambient_volume": ambient_volume,

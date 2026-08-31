@@ -15,3 +15,13 @@ extends Node3D
 
 func _ready() -> void:
 	GameConfig.selected_map_id = map_id
+	# Settle the run's map tier: a pick this map hasn't earned (stale
+	# cross-map selection, edited config) falls back to the baseline.
+	if not SaveData.is_tier_unlocked(map_id, GameConfig.selected_tier):
+		GameConfig.selected_tier = 1
+	# Push the tier out through groups, never node paths. Works because the
+	# arena's EnemySpawner and this RunSystems' HUD sit earlier in tree
+	# order, so both joined their groups before this _ready runs.
+	var spec := MapCatalog.tier_spec(map_id, GameConfig.selected_tier)
+	get_tree().call_group("enemy_spawner", "apply_tier_spec", spec)
+	get_tree().call_group("hud", "show_tier_tag", GameConfig.selected_tier)

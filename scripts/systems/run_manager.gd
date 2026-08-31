@@ -56,7 +56,11 @@ func _end_run(victory: bool) -> void:
 	# the save write all happen here, exactly once per run. The screen reads
 	# the outcome from SaveData.last_* so the signal shape stays unchanged.
 	var fold := SaveData.fold_run_results(victory, GameConfig.selected_character_id,
-			GameConfig.selected_map_id, RunState.level, RunState.kills, RunState.run_time)
+			GameConfig.selected_map_id, GameConfig.selected_tier,
+			RunState.level, RunState.kills, RunState.run_time)
 	print("Meta saved: %d quest(s) newly completed, %d shard(s) to claim" % [
 			(fold.new_quest_ids as Array).size(), int(fold.reward_shards)])
+	if SaveData.last_tier_bonus_shards > 0:
+		print("Tier %d victory bonus: +%d shards" % [
+				GameConfig.selected_tier, SaveData.last_tier_bonus_shards])
 	run_ended.emit(victory)

@@ -22,3 +22,4 @@
 - Iteration 20: Desert roster (line-of-sight laser Sunspitter, burrowing ambusher, per-map spawn phases, Sarcognath boss with rotating beam/coffin ring/entomb root)
 - Iteration 21: Secrets (Odd Stump and Humming Skull triggers, Grubthing and Coffer Mimic minibosses, boss-kill character unlocks with select-screen hints)
 - Iteration 22: Pause & settings (Esc pause menu, SFX/ambient volume buses, mouse sensitivity, fullscreen toggle, persisted in save)
+- Iteration 23: Map tiers (T1-T3 per map with scaled enemies/bosses/XP and shard bonuses, win-gated unlocks, tier picker + HUD tag, tier quests)

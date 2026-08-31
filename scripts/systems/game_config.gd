@@ -13,3 +13,9 @@ var selected_character_id: String = CharacterCatalog.DEFAULT_ID
 ## being played). Set by the select screen; the arena's RunSystems root
 ## republishes it at ready so direct boots stay consistent.
 var selected_map_id: String = MapCatalog.DEFAULT_ID
+
+## Map tier (1..MapCatalog.TIER_COUNT) the next run plays at. The select
+## screen resets it to 1 when switching to a map where the pick is still
+## locked, and RunSystems clamps it again at ready (direct boots, stale
+## cross-map picks), so an unearned tier can never reach a spawner.
+var selected_tier: int = 1

@@ -138,6 +138,12 @@ func _erupt() -> void:
 		player_health.take_damage(erupt_damage, false, self)
 
 
+# Was missing pre-tiers, so elite/tier damage factors silently skipped the
+# burrower; now both land on the eruption.
+func _apply_elite_damage(multiplier: float) -> void:
+	erupt_damage *= multiplier
+
+
 ## Surfacing squash-and-stretch: the worm pops out of the ground.
 func _play_erupt_pop() -> void:
 	_visual.scale = Vector3(1.3, 0.15, 1.3)
