@@ -37,7 +37,10 @@ func _spawn_arrow(direction: Vector3, target: Node3D) -> void:
 	var arrow := Pools.acquire_scene(projectile_scene) as Projectile
 	if arrow == null:
 		return
+	# Aim can run near-colinear with UP (enemy right below a platform edge);
+	# a sideways up vector keeps the basis buildable, flight unchanged.
+	var up := Vector3.UP if absf(direction.dot(Vector3.UP)) < 0.99 else Vector3.RIGHT
 	arrow.global_transform = Transform3D(
-			Basis.looking_at(direction, Vector3.UP), _nock.global_position)
+			Basis.looking_at(direction, up), _nock.global_position)
 	arrow.pierce_remaining = maxi(pierce_count, 1)
 	arrow.launch(self, attack_range * range_grace, target)

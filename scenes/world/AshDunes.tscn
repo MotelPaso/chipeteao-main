@@ -1,4 +1,4 @@
-[gd_scene load_steps=30 format=3 uid="uid://bashdu2ne7q4c"]
+[gd_scene load_steps=32 format=3 uid="uid://bashdu2ne7q4c"]
 
 [ext_resource type="PackedScene" uid="uid://crunsy5te2m8a" path="res://scenes/world/RunSystems.tscn" id="1_runsystems"]
 [ext_resource type="Script" path="res://scripts/systems/enemy_spawner.gd" id="2_spawner"]
@@ -56,6 +56,12 @@ size = Vector3(100, 1, 100)
 [sub_resource type="BoxShape3D" id="BoxShape3D_floor"]
 size = Vector3(100, 1, 100)
 
+[sub_resource type="BoxShape3D" id="BoxShape3D_wall_x"]
+size = Vector3(1, 12, 102)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_wall_z"]
+size = Vector3(102, 12, 1)
+
 [sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_1"]
 sky_top_color = Color(0.48, 0.32, 0.36, 1)
 sky_horizon_color = Color(0.94, 0.66, 0.42, 1)
@@ -97,6 +103,24 @@ mesh = SubResource("BoxMesh_floor")
 [node name="CollisionShape3D" type="CollisionShape3D" parent="Floor"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.5, 0)
 shape = SubResource("BoxShape3D_floor")
+
+[node name="Perimeter" type="StaticBody3D" parent="."]
+
+[node name="WallEast" type="CollisionShape3D" parent="Perimeter"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 50.5, 6, 0)
+shape = SubResource("BoxShape3D_wall_x")
+
+[node name="WallWest" type="CollisionShape3D" parent="Perimeter"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -50.5, 6, 0)
+shape = SubResource("BoxShape3D_wall_x")
+
+[node name="WallNorth" type="CollisionShape3D" parent="Perimeter"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 6, -50.5)
+shape = SubResource("BoxShape3D_wall_z")
+
+[node name="WallSouth" type="CollisionShape3D" parent="Perimeter"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 6, 50.5)
+shape = SubResource("BoxShape3D_wall_z")
 
 [node name="Verticality" type="Node3D" parent="."]
 

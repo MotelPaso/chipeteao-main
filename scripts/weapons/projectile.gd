@@ -88,7 +88,10 @@ func _steer_toward_target(delta: float) -> void:
 	if axis.length_squared() < 0.000001:
 		return
 	var new_forward := forward.rotated(axis.normalized(), minf(angle, homing_turn_speed * delta))
-	look_at(global_position + new_forward, Vector3.UP)
+	# Near-vertical flight (homing over/under a target from a ledge) is
+	# colinear with UP; a sideways up vector keeps the basis buildable.
+	var up := Vector3.UP if absf(new_forward.dot(Vector3.UP)) < 0.99 else Vector3.RIGHT
+	look_at(global_position + new_forward, up)
 
 
 func _homing_active() -> bool:

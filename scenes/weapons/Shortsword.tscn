@@ -16,7 +16,7 @@ size = Vector3(0.1, 0.05, 1.1)
 
 [node name="Shortsword" type="Node3D"]
 script = ExtResource("1_sword")
-damage = 8.0
+damage = 10.0
 cooldown = 0.9
 attack_range = 3.0
 

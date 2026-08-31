@@ -9,7 +9,12 @@ extends EnemyBase
 @export var band_outer: float = 12.0
 @export var fire_cooldown: float = 3.0
 @export var fire_range: float = 18.0
-@export var bolt_damage: float = 8.0
+## 6 (was 8, iteration-26 balance): once contact damage is kited well,
+## bolts are the run's dominant chip — instrumented T1 soaks measured them
+## at ~55% of all damage taken after minute 3, outpacing every recovery
+## source. 6 keeps the poke meaningful against orb heals without making
+## the skirmisher census a slow death sentence.
+@export var bolt_damage: float = 6.0
 @export var bolt_scene: PackedScene
 ## Bolts leave at hand height and fly at the player's chest.
 @export var muzzle_height: float = 1.2
@@ -53,7 +58,13 @@ func _fire_bolt(player: Node3D) -> void:
 		return
 	bolt.damage = bolt_damage
 	bolt.global_position = global_position + Vector3.UP * muzzle_height
-	bolt.look_at(player.global_position + Vector3.UP * target_height, Vector3.UP)
+	# The bolt flies at the true 3D aim; when that runs near-colinear with UP
+	# (player jumping right overhead) look_at cannot build a basis, so swap
+	# in a sideways up vector — same guard as BeamVisual.span().
+	var aim := (player.global_position + Vector3.UP * target_height
+			- bolt.global_position).normalized()
+	var up := Vector3.UP if absf(aim.dot(Vector3.UP)) < 0.99 else Vector3.RIGHT
+	bolt.look_at(bolt.global_position + aim, up)
 
 
 func _apply_elite_damage(multiplier: float) -> void:

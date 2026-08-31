@@ -33,6 +33,9 @@ func _spawn_dart(direction: Vector3, target: Node3D) -> void:
 	var dart := Pools.acquire_scene(projectile_scene) as Projectile
 	if dart == null:
 		return
+	# Aim can run near-colinear with UP (enemy right below a platform edge);
+	# a sideways up vector keeps the basis buildable, flight unchanged.
+	var up := Vector3.UP if absf(direction.dot(Vector3.UP)) < 0.99 else Vector3.RIGHT
 	dart.global_transform = Transform3D(
-			Basis.looking_at(direction, Vector3.UP), _muzzle.global_position)
+			Basis.looking_at(direction, up), _muzzle.global_position)
 	dart.launch(self, attack_range * range_grace, target)

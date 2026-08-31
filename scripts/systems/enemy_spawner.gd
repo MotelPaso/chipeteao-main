@@ -48,15 +48,31 @@ const DUNES_PHASES: Array[Dictionary] = [
 ## arena edge still land on the floor.
 @export var arena_half_extent: float = 48.0
 @export_group("Difficulty Ramp")
-@export var start_interval: float = 2.5
+## Ramp shape (retuned from instrumented T1 soaks, iteration 26): arrivals
+## build ~20/min at the open and ~27/min by minute 4, then the count steps
+## land AT the recovery beats — 2/tick at minute 5 (~60/min, the biome
+## boss and its orb drops), 3/tick at minute 10 (~180/min, the run's "real
+## danger" turn just before the Elder), 4/tick at 15 — saturating toward
+## max_active around minute 10-11. The previous values (2.5 / 0.35 / 0.5)
+## doubled the stream at minute TWO (28 -> 66/min, against a measured
+## best-build kill capacity near 30/min) and pegged the arena at
+## max_active by minute 4-5, so every soak died in minutes 2-3 instead of
+## facing "real danger by minute 10+".
+@export var start_interval: float = 3.0
 @export var min_interval: float = 0.4
-@export var interval_shrink_per_minute: float = 0.35
+@export var interval_shrink_per_minute: float = 0.2
 @export var base_count_per_tick: int = 1
-@export var extra_count_per_minute: float = 0.5
+@export var extra_count_per_minute: float = 0.2
 @export_group("Elites")
 @export var elite_start_minute: float = 3.0
 @export var elite_full_minute: float = 12.0
-@export var elite_start_chance: float = 0.02
+## 0.05 (was 0.02, iteration-26 balance): elites are the run's only
+## pre-boss health income (40% orb drop). At 2% the minutes 3-5 window
+## produced ~1 elite total, so soak after soak bled out on chip damage
+## 20-30s short of the first boss-orb payday at 5:00; 5% yields ~2-3
+## pre-boss elites (~1 extra orb plus their 5x XP) while also seeding the
+## midgame with minibosses worth focusing.
+@export var elite_start_chance: float = 0.05
 @export var elite_full_chance: float = 0.10
 @export_group("Boss")
 @export var boss_scene: PackedScene

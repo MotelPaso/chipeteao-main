@@ -24,6 +24,10 @@ extends CharacterBody3D
 ## stops offering new-weapon cards once it is reached.
 @export var max_weapons: int = 4
 
+## Fail-safe: falling below this world Y (out-of-bounds through some
+## geometry gap) teleports the player back to spawn, no damage.
+const VOID_RESCUE_Y: float = -10.0
+
 @export_group("Camera")
 @export var mouse_sensitivity: float = 0.003
 @export var initial_pitch_deg: float = -20.0
@@ -54,8 +58,12 @@ var _root_timer: float = 0.0
 
 var _is_dead: bool = false
 
+## Where this run started; the void fail-safe returns the player here.
+var _spawn_position: Vector3 = Vector3.ZERO
+
 
 func _ready() -> void:
+	_spawn_position = global_position
 	_apply_character(CharacterCatalog.by_id_or_default(GameConfig.selected_character_id))
 	health.died.connect(_on_health_died)
 	Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
@@ -96,6 +104,11 @@ func _apply_look(relative: Vector2) -> void:
 
 
 func _physics_process(delta: float) -> void:
+	# Belt-and-braces void rescue on top of the arena perimeter walls.
+	if global_position.y < VOID_RESCUE_Y:
+		global_position = _spawn_position
+		velocity = Vector3.ZERO
+
 	if not is_on_floor():
 		velocity.y -= _gravity * delta
 
