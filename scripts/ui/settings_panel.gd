@@ -12,7 +12,6 @@ extends Control
 signal closed
 
 const SLIDER_TRACK_COLOR := Color(0.05, 0.06, 0.09, 0.9)
-const SLIDER_FILL_COLOR := Color(0.55, 0.8, 0.92)
 
 @onready var _panel: PanelContainer = %Panel
 @onready var _sfx_slider: HSlider = %SfxSlider
@@ -21,6 +20,8 @@ const SLIDER_FILL_COLOR := Color(0.55, 0.8, 0.92)
 @onready var _sensitivity_value: Label = %SensitivityValue
 @onready var _fullscreen_check: CheckButton = %FullscreenCheck
 @onready var _back_button: Button = %BackButton
+
+var _open_tween: Tween = null
 
 
 func _ready() -> void:
@@ -39,17 +40,32 @@ func _unhandled_input(event: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 
 
-## Host entry point: sync every control to the persisted values, show.
+## Host entry point: sync every control to the persisted values, show
+## with a quick pop-in (interruptible; close snaps the final state).
 func open() -> void:
 	_refresh_controls()
 	visible = true
 	_back_button.grab_focus()
+	if _open_tween != null and _open_tween.is_valid():
+		_open_tween.kill()
+	_panel.pivot_offset = _panel.size * 0.5
+	_panel.scale = Vector2(0.94, 0.94)
+	_panel.modulate.a = 0.0
+	_open_tween = create_tween().set_parallel()
+	_open_tween.set_ignore_time_scale(true)
+	_open_tween.tween_property(_panel, "modulate:a", 1.0, 0.14)
+	_open_tween.tween_property(_panel, "scale", Vector2.ONE, 0.2) \
+			.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 
 
 func close() -> void:
 	if not visible:
 		return
 	visible = false
+	if _open_tween != null and _open_tween.is_valid():
+		_open_tween.kill()
+	_panel.scale = Vector2.ONE
+	_panel.modulate.a = 1.0
 	Settings.flush_save()
 	closed.emit()
 
@@ -84,39 +100,29 @@ func _on_fullscreen_toggled(on: bool) -> void:
 	Settings.set_fullscreen(on)
 
 
+## UiTheme design system: shared panel + headline, filled-track sliders
+## with a round teal grabber, teal Back button.
 func _apply_styles() -> void:
-	var panel := StyleBoxFlat.new()
-	panel.bg_color = Color(0.09, 0.1, 0.14, 0.97)
-	panel.set_corner_radius_all(10)
-	panel.set_border_width_all(2)
-	panel.border_color = Color(0.32, 0.34, 0.42)
-	panel.content_margin_left = 30.0
-	panel.content_margin_right = 30.0
-	panel.content_margin_top = 22.0
-	panel.content_margin_bottom = 22.0
-	_panel.add_theme_stylebox_override("panel", panel)
+	_panel.add_theme_stylebox_override("panel",
+			UiTheme.panel(UiTheme.PANEL_BG, UiTheme.BORDER_DIM, 32.0, 24.0))
+	var title := _panel.get_node("VBox/TitleLabel") as Label
+	UiTheme.style_title(title, 30, Color(0.96, 0.93, 0.82), 6, 8)
+	var grabber := UiTheme.grabber_icon(UiTheme.ACCENT)
+	var grabber_hi := UiTheme.grabber_icon(UiTheme.ACCENT.lightened(0.25))
 	for slider: HSlider in [_sfx_slider, _ambient_slider, _sensitivity_slider]:
-		var track := StyleBoxFlat.new()
-		track.bg_color = SLIDER_TRACK_COLOR
-		track.set_corner_radius_all(4)
-		track.content_margin_top = 3.0
-		track.content_margin_bottom = 3.0
+		var track := UiTheme.flat(SLIDER_TRACK_COLOR, 4)
+		track.set_border_width_all(1)
+		track.border_color = Color(0.0, 0.0, 0.0, 0.6)
+		track.content_margin_top = 4.0
+		track.content_margin_bottom = 4.0
 		slider.add_theme_stylebox_override("slider", track)
-		var fill := StyleBoxFlat.new()
-		fill.bg_color = SLIDER_FILL_COLOR
-		fill.set_corner_radius_all(4)
+		var fill := UiTheme.flat(UiTheme.ACCENT.darkened(0.15), 4)
+		fill.border_width_right = 2
+		fill.border_color = UiTheme.ACCENT.lightened(0.3)
 		slider.add_theme_stylebox_override("grabber_area", fill)
 		slider.add_theme_stylebox_override("grabber_area_highlight", fill)
-	var fills := {
-		"normal": Color(0.14, 0.15, 0.2, 0.97),
-		"hover": Color(0.2, 0.22, 0.28, 0.97),
-		"pressed": Color(0.1, 0.11, 0.15, 0.97),
-		"focus": Color(0.2, 0.22, 0.28, 0.97),
-	}
-	for state: String in fills:
-		var style := StyleBoxFlat.new()
-		style.bg_color = fills[state]
-		style.border_color = Color(0.55, 0.58, 0.66)
-		style.set_border_width_all(2)
-		style.set_corner_radius_all(8)
-		_back_button.add_theme_stylebox_override(state, style)
+		slider.add_theme_icon_override("grabber", grabber)
+		slider.add_theme_icon_override("grabber_highlight", grabber_hi)
+		slider.add_theme_icon_override("grabber_disabled", grabber)
+	_sensitivity_value.add_theme_color_override("font_color", UiTheme.ACCENT)
+	UiTheme.style_button(_back_button, UiTheme.ACCENT, true)

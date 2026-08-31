@@ -2,14 +2,20 @@ extends CanvasLayer
 ## Run-end overlay (GDD 9.6): opened by RunManager.run_ended with defeat
 ## ("YOU DIED") or victory ("RUN COMPLETE") styling and the finished run's
 ## stats from RunState. Layer 20 draws over the upgrade-card UI (10) and
-## process_mode ALWAYS keeps the fade and buttons working while the tree
-## is paused. Retry resets RunState and reloads the scene (the player's
-## _ready recaptures the mouse); Change Character does the same cleanup
-## but returns to the character select screen; Quit exits the game.
+## process_mode ALWAYS keeps the animation and buttons working while the
+## tree is paused. Retry resets RunState and reloads the scene (the
+## player's _ready recaptures the mouse); Change Character does the same
+## cleanup but returns to the character select screen; Quit exits.
+##
+## Look (iteration 29): UiTheme system + a title with impact — defeat
+## drops in oversized with a shake, victory lands with a back-ease and a
+## looping golden shimmer — then the stats panel, rewards and buttons
+## stagger in (~0.8s total, buttons clickable throughout). Scene changes
+## go through ScreenFade. All tweens ignore time scale (a death can land
+## mid hit-stop).
 
 const DEFEAT_TITLE_COLOR := Color(0.9, 0.25, 0.2)
 const VICTORY_TITLE_COLOR := Color(0.96, 0.78, 0.3)
-const FADE_DURATION := 0.45
 const CHARACTER_SELECT_SCENE_PATH := "res://scenes/ui/CharacterSelect.tscn"
 
 @onready var _root: Control = %Root
@@ -23,6 +29,9 @@ const CHARACTER_SELECT_SCENE_PATH := "res://scenes/ui/CharacterSelect.tscn"
 @onready var _retry_button: Button = %RetryButton
 @onready var _change_character_button: Button = %ChangeCharacterButton
 @onready var _quit_button: Button = %QuitButton
+
+var _entrance_tween: Tween = null
+var _shimmer_tween: Tween = null
 
 
 func _ready() -> void:
@@ -45,9 +54,9 @@ func is_blocking() -> bool:
 func open(victory: bool) -> void:
 	if visible:
 		return
+	UiTheme.style_title(_title_label, 72,
+			VICTORY_TITLE_COLOR if victory else DEFEAT_TITLE_COLOR, 8, 14)
 	_title_label.text = "RUN COMPLETE" if victory else "YOU DIED"
-	_title_label.add_theme_color_override("font_color",
-			VICTORY_TITLE_COLOR if victory else DEFEAT_TITLE_COLOR)
 	_subtitle_label.text = "You survived!" if victory else "The horde got you."
 	var total: int = int(RunState.run_time)
 	_time_value.text = "%02d:%02d" % [floori(total / 60.0), total % 60]
@@ -71,60 +80,79 @@ func open(victory: bool) -> void:
 	Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
 	visible = true
 	_retry_button.grab_focus()
-	# Fade the whole overlay in; the tween runs through the pause because
-	# it is bound to this ALWAYS-processing layer.
+	_play_entrance(victory)
+
+
+## Dim in, title lands with impact, then stats/rewards/buttons stagger.
+## Runs through the pause (ALWAYS layer) and ignores hit-stop.
+func _play_entrance(victory: bool) -> void:
+	if _entrance_tween != null and _entrance_tween.is_valid():
+		_entrance_tween.kill()
+	if _shimmer_tween != null and _shimmer_tween.is_valid():
+		_shimmer_tween.kill()
 	_root.modulate.a = 0.0
-	var tween := create_tween()
-	tween.tween_property(_root, "modulate:a", 1.0, FADE_DURATION) \
-			.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	_title_label.pivot_offset = _title_label.size * 0.5
+	_title_label.scale = Vector2(1.9, 1.9)
+	_title_label.modulate = Color(1, 1, 1, 0)
+	_title_label.rotation_degrees = 0.0
+	var staggered: Array[Control] = [_stats_panel, _rewards_label,
+			_retry_button.get_parent() as Control]
+	for section: Control in staggered:
+		section.modulate.a = 0.0
+	_entrance_tween = create_tween()
+	_entrance_tween.set_ignore_time_scale(true)
+	_entrance_tween.tween_property(_root, "modulate:a", 1.0, 0.18)
+	# Title: dropped-in scale; defeat slams fast and shakes, victory eases.
+	_entrance_tween.parallel().tween_property(_title_label, "modulate:a", 1.0, 0.12)
+	if victory:
+		_entrance_tween.parallel().tween_property(_title_label, "scale", Vector2.ONE, 0.3) \
+				.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	else:
+		_entrance_tween.parallel().tween_property(_title_label, "scale", Vector2.ONE, 0.14) \
+				.set_trans(Tween.TRANS_QUART).set_ease(Tween.EASE_IN)
+		_entrance_tween.tween_property(_title_label, "rotation_degrees", -2.0, 0.04)
+		_entrance_tween.tween_property(_title_label, "rotation_degrees", 1.6, 0.06)
+		_entrance_tween.tween_property(_title_label, "rotation_degrees", 0.0, 0.06)
+	for i in staggered.size():
+		_entrance_tween.parallel().tween_property(staggered[i], "modulate:a", 1.0, 0.2) \
+				.set_delay(0.22 + 0.09 * i)
+	if victory:
+		# Golden shine: the title breathes brighter, forever.
+		_shimmer_tween = create_tween().set_loops()
+		_shimmer_tween.set_ignore_time_scale(true)
+		_shimmer_tween.tween_property(_title_label, "modulate",
+				Color(1.3, 1.22, 1.0), 0.9).set_delay(0.4) \
+				.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+		_shimmer_tween.tween_property(_title_label, "modulate", Color.WHITE, 0.9) \
+				.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 
 
 func _on_retry_pressed() -> void:
-	get_tree().paused = false
-	RunState.reset()
-	get_tree().reload_current_scene()
+	ScreenFade.transition(func() -> void:
+		get_tree().paused = false
+		RunState.reset()
+		get_tree().reload_current_scene())
 
 
 ## Retry's cleanup, but back to the select screen for a new loadout (the
 ## GameConfig selection survives, so the screen reopens on the last pick).
 func _on_change_character_pressed() -> void:
-	get_tree().paused = false
-	RunState.reset()
-	get_tree().change_scene_to_file(CHARACTER_SELECT_SCENE_PATH)
+	ScreenFade.transition(func() -> void:
+		get_tree().paused = false
+		RunState.reset()
+		get_tree().change_scene_to_file(CHARACTER_SELECT_SCENE_PATH))
 
 
 func _on_quit_pressed() -> void:
 	get_tree().quit()
 
 
-## Placeholder look built in code (no assets), matching the HUD and card
-## UI conventions: dark translucent flat boxes with rounded corners.
+## UiTheme design system: headline typography, stat panel with the header
+## accent line, teal hero Retry with quiet siblings.
 func _apply_styles() -> void:
-	var panel := StyleBoxFlat.new()
-	panel.bg_color = Color(0.09, 0.1, 0.14, 0.9)
-	panel.set_corner_radius_all(10)
-	panel.set_border_width_all(2)
-	panel.border_color = Color(0.0, 0.0, 0.0, 0.5)
-	panel.content_margin_left = 26.0
-	panel.content_margin_right = 26.0
-	panel.content_margin_top = 16.0
-	panel.content_margin_bottom = 16.0
-	_stats_panel.add_theme_stylebox_override("panel", panel)
-	for button: Button in [_retry_button, _change_character_button, _quit_button]:
-		_style_button(button)
-
-
-func _style_button(button: Button) -> void:
-	var fills := {
-		"normal": Color(0.14, 0.15, 0.2, 0.97),
-		"hover": Color(0.2, 0.22, 0.28, 0.97),
-		"pressed": Color(0.1, 0.11, 0.15, 0.97),
-		"focus": Color(0.2, 0.22, 0.28, 0.97),
-	}
-	for state: String in fills:
-		var style := StyleBoxFlat.new()
-		style.bg_color = fills[state]
-		style.border_color = Color(0.55, 0.58, 0.66)
-		style.set_border_width_all(2)
-		style.set_corner_radius_all(8)
-		button.add_theme_stylebox_override(state, style)
+	_subtitle_label.add_theme_font_override("font", UiTheme.spaced_font(2))
+	_stats_panel.add_theme_stylebox_override("panel",
+			UiTheme.panel(UiTheme.PANEL_BG, UiTheme.BORDER_DIM, 26.0, 16.0))
+	UiTheme.style_button(_retry_button, UiTheme.ACCENT, true)
+	UiTheme.style_button(_change_character_button)
+	UiTheme.style_button(_quit_button)

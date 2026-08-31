@@ -12,14 +12,14 @@ extends CanvasLayer
 ## ramps toward red.
 const LOW_HP_RATIO := 0.6
 
-const BAR_BG_COLOR := Color(0.05, 0.06, 0.09, 0.8)
-const PANEL_COLOR := Color(0.07, 0.08, 0.11, 0.72)
 const HP_FULL_COLOR := Color(0.36, 0.8, 0.42)
 const HP_LOW_COLOR := Color(0.9, 0.22, 0.2)
 ## Matches the XP gem material, so the bar reads as "gems collected".
 const XP_COLOR := Color(0.35, 0.95, 0.6)
 ## Matches the Rotking's amber core seams.
 const BOSS_BAR_COLOR := Color(0.98, 0.62, 0.16)
+## Bar value changes ease toward their target instead of snapping.
+const BAR_TWEEN_TIME := 0.15
 
 ## Kill-streak feedback: kills landing within this rolling window count
 ## toward the tier thresholds below; 2s+ without a kill resets the streak
@@ -27,6 +27,9 @@ const BOSS_BAR_COLOR := Color(0.98, 0.62, 0.16)
 const STREAK_WINDOW := 2.0
 const STREAK_KILLS: Array[int] = [8, 15, 25]
 const STREAK_WORDS: Array[String] = ["SHREDDING!", "RAMPAGING!", "UNSTOPPABLE!"]
+## Streak popup color per tier: gold → hot orange → furnace red.
+const STREAK_COLORS: Array[Color] = [
+	Color(1.0, 0.86, 0.25), Color(1.0, 0.62, 0.16), Color(1.0, 0.34, 0.2)]
 
 ## Env var that force-enables the perf probe (headless perf verification).
 const PERF_PROBE_ENV := "BONK_PERF"
@@ -60,6 +63,9 @@ const PERF_PROBE_REFRESH := 0.25
 
 var _hp_fill: StyleBoxFlat
 var _health: Health
+var _hp_value_tween: Tween = null
+var _xp_value_tween: Tween = null
+var _boss_value_tween: Tween = null
 var _hp_pulse_tween: Tween = null
 var _hp_pulsing: bool = false
 var _tracked_boss: Node3D = null
@@ -120,13 +126,30 @@ func _on_health_died() -> void:
 
 
 func _refresh_hp(current: float, max_hp: float) -> void:
-	_hp_bar.max_value = max_hp
-	_hp_bar.value = current
+	# Snap when the scale itself changes (new run / max-HP growth) so the
+	# bar never animates across two different scales; otherwise ease.
+	if not is_equal_approx(_hp_bar.max_value, max_hp):
+		_hp_bar.max_value = max_hp
+		_hp_bar.value = current
+	else:
+		_hp_value_tween = _tween_bar_value(_hp_bar, current, _hp_value_tween)
 	# ceili, so a last sliver of HP reads "1", not a premature "0".
 	_hp_label.text = "%d / %d" % [ceili(current), roundi(max_hp)]
 	var ratio := clampf(current / max_hp, 0.0, 1.0) if max_hp > 0.0 else 0.0
-	_hp_fill.bg_color = HP_LOW_COLOR.lerp(HP_FULL_COLOR, clampf(ratio / LOW_HP_RATIO, 0.0, 1.0))
+	UiTheme.recolor_fill(_hp_fill,
+			HP_LOW_COLOR.lerp(HP_FULL_COLOR, clampf(ratio / LOW_HP_RATIO, 0.0, 1.0)))
 	_update_low_hp_pulse(current > 0.0 and ratio < low_hp_pulse_ratio)
+
+
+## Shared ~0.15s ease toward a bar's new value (kills the previous ease
+## first, so damage spam converges instead of stacking).
+func _tween_bar_value(bar: ProgressBar, target: float, previous: Tween) -> Tween:
+	if previous != null and previous.is_valid():
+		previous.kill()
+	var tween := create_tween()
+	tween.tween_property(bar, "value", target, BAR_TWEEN_TIME) \
+			.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	return tween
 
 
 ## Starts/stops the low-HP bar pulse; idempotent per state so damage spam
@@ -158,12 +181,17 @@ func _update_low_hp_pulse(should_pulse: bool) -> void:
 
 
 func _on_xp_changed(current_xp: int, xp_to_next: int) -> void:
-	_xp_bar.max_value = xp_to_next
-	_xp_bar.value = current_xp
+	# A new threshold means a level rolled over: snap to the fresh scale.
+	if not is_equal_approx(_xp_bar.max_value, float(xp_to_next)):
+		_xp_bar.max_value = xp_to_next
+		_xp_bar.value = current_xp
+	else:
+		_xp_value_tween = _tween_bar_value(_xp_bar, float(current_xp), _xp_value_tween)
 
 
 func _on_leveled_up(new_level: int) -> void:
 	_level_label.text = "Lv %d" % new_level
+	UiTheme.pop(_level_label, 1.3, 0.3)
 
 
 func _on_kills_changed(kills: int) -> void:
@@ -192,22 +220,27 @@ func _register_streak_kill() -> void:
 			tier = i
 	if tier > _streak_tier:
 		_streak_tier = tier
-		_pop_streak(STREAK_WORDS[tier])
+		_pop_streak(STREAK_WORDS[tier], tier)
 
 
-## Punchy scale-pop text (settles from oversized, holds, fades out).
-func _pop_streak(word: String) -> void:
+## Punchy scale-pop text (slams in oversized with a tilt, settles, holds,
+## fades). Color escalates per tier so bigger streaks read hotter.
+func _pop_streak(word: String, tier: int) -> void:
 	Sfx.play(&"streak")
 	_streak_label.text = word
+	_streak_label.add_theme_color_override("font_color", STREAK_COLORS[tier])
 	_streak_label.reset_size()
 	_streak_label.pivot_offset = _streak_label.size * 0.5
 	_streak_label.visible = true
 	_streak_label.modulate.a = 1.0
-	_streak_label.scale = Vector2(2.1, 2.1)
+	_streak_label.scale = Vector2(2.3, 2.3)
+	_streak_label.rotation_degrees = -5.0
 	if _streak_tween != null and _streak_tween.is_valid():
 		_streak_tween.kill()
 	_streak_tween = create_tween()
-	_streak_tween.tween_property(_streak_label, "scale", Vector2.ONE, 0.22) \
+	_streak_tween.tween_property(_streak_label, "scale", Vector2.ONE, 0.2) \
+			.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	_streak_tween.parallel().tween_property(_streak_label, "rotation_degrees", 0.0, 0.2) \
 			.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 	_streak_tween.tween_interval(0.55)
 	_streak_tween.tween_property(_streak_label, "modulate:a", 0.0, 0.3)
@@ -289,12 +322,15 @@ func announce(message: String) -> void:
 
 
 func _on_boss_damaged(_amount: float, current: float) -> void:
-	_boss_bar.value = current
+	_boss_value_tween = _tween_bar_value(_boss_bar, current, _boss_value_tween)
 
 
 func _on_boss_hp_changed(current: float, max_hp: float) -> void:
-	_boss_bar.max_value = max_hp
-	_boss_bar.value = current
+	if not is_equal_approx(_boss_bar.max_value, max_hp):
+		_boss_bar.max_value = max_hp
+		_boss_bar.value = current
+	else:
+		_boss_value_tween = _tween_bar_value(_boss_bar, current, _boss_value_tween)
 
 
 func _on_boss_health_died() -> void:
@@ -318,38 +354,52 @@ func _untrack_boss() -> void:
 	_tracked_boss = null
 
 
-## Placeholder look built in code (no assets): dark translucent flat boxes,
-## rounded HP bar, edge-to-edge XP strip, padded pill panels on the labels.
+## UiTheme design system (iteration 29): layered rounded bars (trough /
+## fill / gloss line / leading-edge tick), badge pills for level and
+## kills, spaced timer numerals, and an amber boss bar with quarter
+## segment ticks under a spaced name plate. Contrast over 3D chaos first:
+## everything keeps a dark trough and an outline.
 func _apply_styles() -> void:
-	var hp_bg := _flat_box(BAR_BG_COLOR, 7)
-	hp_bg.set_border_width_all(2)
-	hp_bg.border_color = Color(0.0, 0.0, 0.0, 0.55)
-	hp_bg.set_content_margin_all(3)
-	_hp_fill = _flat_box(HP_FULL_COLOR, 5)
-	_hp_bar.add_theme_stylebox_override("background", hp_bg)
-	_hp_bar.add_theme_stylebox_override("fill", _hp_fill)
+	_hp_fill = UiTheme.style_bar(_hp_bar, HP_FULL_COLOR, 8)
 
-	_xp_bar.add_theme_stylebox_override("background", _flat_box(BAR_BG_COLOR, 0))
-	_xp_bar.add_theme_stylebox_override("fill", _flat_box(XP_COLOR, 0))
+	# The XP strip stays edge-to-edge and square, but gains the gloss line
+	# and a bright leading-edge tick so progress reads at a glance.
+	var xp_bg := UiTheme.flat(Color(0.04, 0.045, 0.07, 0.85), 0)
+	xp_bg.border_width_bottom = 1
+	xp_bg.border_color = Color(0.0, 0.0, 0.0, 0.6)
+	_xp_bar.add_theme_stylebox_override("background", xp_bg)
+	_xp_bar.add_theme_stylebox_override("fill", UiTheme.bar_fill(XP_COLOR, 0))
 
-	var boss_bg := _flat_box(BAR_BG_COLOR, 6)
-	boss_bg.set_border_width_all(2)
-	boss_bg.border_color = Color(0.0, 0.0, 0.0, 0.55)
-	boss_bg.set_content_margin_all(3)
-	_boss_bar.add_theme_stylebox_override("background", boss_bg)
-	_boss_bar.add_theme_stylebox_override("fill", _flat_box(BOSS_BAR_COLOR, 4))
+	var boss_fill := UiTheme.style_bar(_boss_bar, BOSS_BAR_COLOR, 7)
+	UiTheme.recolor_fill(boss_fill, BOSS_BAR_COLOR)
+	var boss_bg := _boss_bar.get_theme_stylebox("background") as StyleBoxFlat
+	boss_bg.border_color = Color(0.35, 0.22, 0.06, 0.9)
+	UiTheme.add_glow(boss_bg, BOSS_BAR_COLOR, 6, 0.25)
+	_build_boss_ticks()
+	_boss_name_label.add_theme_font_override("font", UiTheme.spaced_font(3))
 
-	for label: Label in [_level_label, _timer_label, _kills_label]:
-		var panel := _flat_box(PANEL_COLOR, 6)
-		panel.content_margin_left = 10.0
-		panel.content_margin_right = 10.0
-		panel.content_margin_top = 3.0
-		panel.content_margin_bottom = 3.0
-		label.add_theme_stylebox_override("normal", panel)
+	UiTheme.style_badge(_level_label, UiTheme.TEXT_BRIGHT)
+	UiTheme.style_badge(_kills_label, UiTheme.TEXT_BRIGHT)
+	UiTheme.style_badge(_timer_label, UiTheme.TEXT_BRIGHT)
+	_timer_label.add_theme_font_override("font", UiTheme.spaced_font(4))
+	_streak_label.add_theme_font_override("font", UiTheme.spaced_font(3))
+	_announce_label.add_theme_font_override("font", UiTheme.spaced_font(3))
 
 
-static func _flat_box(color: Color, corner_radius: int) -> StyleBoxFlat:
-	var box := StyleBoxFlat.new()
-	box.bg_color = color
-	box.set_corner_radius_all(corner_radius)
-	return box
+## Quarter-mark ticks over the boss bar: thin dark lines at 25/50/75% so
+## phase thresholds read like a segmented health pool.
+func _build_boss_ticks() -> void:
+	for quarter in range(1, 4):
+		var tick := ColorRect.new()
+		tick.color = Color(0.0, 0.0, 0.0, 0.5)
+		tick.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		tick.anchor_left = 0.25 * quarter
+		tick.anchor_right = 0.25 * quarter
+		tick.anchor_top = 0.0
+		tick.anchor_bottom = 1.0
+		tick.offset_left = -1.0
+		tick.offset_right = 1.0
+		tick.offset_top = 4.0
+		tick.offset_bottom = -4.0
+		_boss_bar.add_child(tick)
+		_boss_bar.move_child(tick, 0)  # under the name label

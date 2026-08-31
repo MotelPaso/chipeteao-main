@@ -13,11 +13,14 @@ extends CanvasLayer
 const CHARACTER_SELECT_SCENE_PATH := "res://scenes/ui/CharacterSelect.tscn"
 
 @onready var _root: Control = %Root
+@onready var _dim: ColorRect = %Dim
 @onready var _menu_panel: PanelContainer = %MenuPanel
 @onready var _resume_button: Button = %ResumeButton
 @onready var _settings_button: Button = %SettingsButton
 @onready var _quit_button: Button = %QuitButton
 @onready var _settings_panel: SettingsPanel = %SettingsPanel
+
+var _open_tween: Tween = null
 
 
 func _ready() -> void:
@@ -62,10 +65,29 @@ func _open() -> void:
 	_root.visible = true
 	visible = true
 	_resume_button.grab_focus()
+	# Entrance: dim fades up, panel scales in. Interruptible — Esc-spam
+	# kills the tween and _close snaps the final state anyway.
+	if _open_tween != null and _open_tween.is_valid():
+		_open_tween.kill()
+	_dim.modulate.a = 0.0
+	_menu_panel.pivot_offset = _menu_panel.size * 0.5
+	_menu_panel.scale = Vector2(0.94, 0.94)
+	_menu_panel.modulate.a = 0.0
+	_open_tween = create_tween().set_parallel()
+	_open_tween.set_ignore_time_scale(true)
+	_open_tween.tween_property(_dim, "modulate:a", 1.0, 0.15)
+	_open_tween.tween_property(_menu_panel, "modulate:a", 1.0, 0.14)
+	_open_tween.tween_property(_menu_panel, "scale", Vector2.ONE, 0.2) \
+			.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 
 
 func _close() -> void:
 	visible = false
+	if _open_tween != null and _open_tween.is_valid():
+		_open_tween.kill()
+	_dim.modulate.a = 1.0
+	_menu_panel.scale = Vector2.ONE
+	_menu_panel.modulate.a = 1.0
 	get_tree().paused = false
 	Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
 
@@ -88,38 +110,19 @@ func _on_settings_closed() -> void:
 func _on_quit_pressed() -> void:
 	Settings.flush_save()
 	Sfx.stop_all_loops()
-	get_tree().paused = false
-	RunState.reset()
-	get_tree().change_scene_to_file(CHARACTER_SELECT_SCENE_PATH)
+	ScreenFade.transition(func() -> void:
+		get_tree().paused = false
+		RunState.reset()
+		get_tree().change_scene_to_file(CHARACTER_SELECT_SCENE_PATH))
 
 
-## Placeholder look built in code, matching the run-end screen.
+## UiTheme design system: shared panel treatment, spaced headline, teal
+## Resume as the primary action.
 func _apply_styles() -> void:
-	var panel := StyleBoxFlat.new()
-	panel.bg_color = Color(0.09, 0.1, 0.14, 0.95)
-	panel.set_corner_radius_all(10)
-	panel.set_border_width_all(2)
-	panel.border_color = Color(0.32, 0.34, 0.42)
-	panel.content_margin_left = 40.0
-	panel.content_margin_right = 40.0
-	panel.content_margin_top = 24.0
-	panel.content_margin_bottom = 28.0
-	_menu_panel.add_theme_stylebox_override("panel", panel)
-	for button: Button in [_resume_button, _settings_button, _quit_button]:
-		_style_button(button)
-
-
-func _style_button(button: Button) -> void:
-	var fills := {
-		"normal": Color(0.14, 0.15, 0.2, 0.97),
-		"hover": Color(0.2, 0.22, 0.28, 0.97),
-		"pressed": Color(0.1, 0.11, 0.15, 0.97),
-		"focus": Color(0.2, 0.22, 0.28, 0.97),
-	}
-	for state: String in fills:
-		var style := StyleBoxFlat.new()
-		style.bg_color = fills[state]
-		style.border_color = Color(0.55, 0.58, 0.66)
-		style.set_border_width_all(2)
-		style.set_corner_radius_all(8)
-		button.add_theme_stylebox_override(state, style)
+	_menu_panel.add_theme_stylebox_override("panel",
+			UiTheme.panel(UiTheme.PANEL_BG, UiTheme.BORDER_DIM, 40.0, 26.0))
+	var title := _menu_panel.get_node("VBox/TitleLabel") as Label
+	UiTheme.style_title(title, 44, UiTheme.TEXT_BRIGHT, 8, 10)
+	UiTheme.style_button(_resume_button, UiTheme.ACCENT, true)
+	UiTheme.style_button(_settings_button)
+	UiTheme.style_button(_quit_button)

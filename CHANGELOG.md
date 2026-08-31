@@ -28,3 +28,4 @@
 - Iteration 26: Containment & balance (perimeter walls + void fail-safe, aim flatten guards, tuned spawn ramp/weapon values validated by soaks)
 - Iteration 27: Export & build (macOS/Windows/Linux presets, v0.1.0 stamp, verified exported macOS build boots clean)
 - Iteration 28: Handoff docs (Spanish README with run/build/verify instructions, ARQUITECTURA.md extension map for every system)
+- Iteration 29: UI overhaul (design system theme, animated character select and upgrade cards, restyled HUD bars/badges, screen transitions, menu polish)
