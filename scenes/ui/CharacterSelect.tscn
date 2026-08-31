@@ -94,5 +94,20 @@ offset_bottom = 46.0
 theme_override_font_sizes/font_size = 14
 text = "Settings"
 
+[node name="VersionLabel" type="Label" parent="."]
+unique_name_in_owner = true
+anchor_left = 1.0
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -160.0
+offset_top = -30.0
+offset_right = -12.0
+offset_bottom = -8.0
+theme_override_colors/font_color = Color(0.45, 0.47, 0.52, 1)
+theme_override_font_sizes/font_size = 12
+horizontal_alignment = 2
+text = "v0.0.0"
+
 [node name="SettingsPanel" parent="." instance=ExtResource("2_settingspanel")]
 unique_name_in_owner = true

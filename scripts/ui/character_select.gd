@@ -43,6 +43,7 @@ const TIER_BUTTON_SIZE := Vector2(64, 36)
 @onready var _settings_button: Button = %SettingsButton
 @onready var _settings_panel: SettingsPanel = %SettingsPanel
 @onready var _shards_label: Label = %ShardsLabel
+@onready var _version_label: Label = %VersionLabel
 
 ## Card button per playable character id, for selection restyling.
 var _cards_by_id: Dictionary[String, Button] = {}
@@ -87,6 +88,8 @@ func _ready() -> void:
 	_settings_panel.closed.connect(func() -> void: _start_button.grab_focus())
 	SaveData.shards_changed.connect(func(_balance: int) -> void: _refresh_shards())
 	_refresh_shards()
+	_version_label.text = "v%s" % String(
+			ProjectSettings.get_setting("application/config/version", "0.0.0"))
 	# Reopening mid-session keeps the previous picks; unknown ids fall
 	# back, and a locked id (stale selection) falls back to the default —
 	# so Change Character after a run keeps the map that was just played.

@@ -1,4 +1,4 @@
 .godot/
-export_presets.cfg
+builds/
 *.translation
 .claude/scheduled_tasks.lock
