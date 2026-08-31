@@ -28,15 +28,16 @@ extends WeaponBase
 @export var arc_height: float = 3.0
 
 ## Active pools: {center: Vector3, radius: float, ticks_left: int,
-## tick_timer: float, visual: MeshInstance3D}.
+## tick_timer: float, visual: BloodPoolFx}.
 var _pools: Array[Dictionary] = []
 
 var _flask_mesh: SphereMesh
-var _pool_mesh: CylinderMesh
 
 
 func _ready() -> void:
-	# One shared mesh per effect kind; per-instance transforms do the rest.
+	# The lobbed flask stays a visible projectile — one shared mesh for
+	# every throw. The landing pool visual is the pooled BloodPool scene
+	# (darker rim + slow bubbles).
 	_flask_mesh = SphereMesh.new()
 	_flask_mesh.radius = 0.14
 	_flask_mesh.height = 0.24
@@ -46,18 +47,6 @@ func _ready() -> void:
 	flask_material.emission = Color(0.7, 0.08, 0.1)
 	flask_material.emission_energy_multiplier = 1.2
 	_flask_mesh.material = flask_material
-	_pool_mesh = CylinderMesh.new()
-	_pool_mesh.top_radius = 1.0
-	_pool_mesh.bottom_radius = 1.0
-	_pool_mesh.height = 0.08
-	var pool_material := StandardMaterial3D.new()
-	pool_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	pool_material.albedo_color = Color(0.42, 0.04, 0.08, 0.85)
-	pool_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	pool_material.emission_enabled = true
-	pool_material.emission = Color(0.75, 0.08, 0.12)
-	pool_material.emission_energy_multiplier = 1.5
-	_pool_mesh.material = pool_material
 
 
 func _physics_process(delta: float) -> void:
@@ -133,23 +122,12 @@ func _shatter(flask: MeshInstance3D, impact: Vector3) -> void:
 
 
 func _spawn_pool(center: Vector3) -> void:
-	var visual := MeshInstance3D.new()
-	visual.mesh = _pool_mesh
-	visual.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	var parent_node: Node = get_tree().current_scene
-	if parent_node == null:
-		parent_node = get_tree().root
-	parent_node.add_child(visual)
+	# Pooled visual (disc + darker rim + slow bubbles), scene-root parented.
+	var visual := Pools.acquire_scene(Pools.BLOOD_POOL_SCENE) as BloodPoolFx
 	var radius := pool_radius * area_scale()
-	# The disc sits near the floor below the struck body's origin.
-	visual.global_position = center + Vector3.DOWN * 0.75
-	visual.scale = Vector3(radius, 1.0, radius)
-	# Bubbling: a slow scale throb until the pool visual is freed.
-	var bubble := visual.create_tween().set_loops()
-	bubble.tween_property(visual, "scale", Vector3(radius * 1.06, 1.4, radius * 1.06), 0.35) \
-			.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
-	bubble.tween_property(visual, "scale", Vector3(radius, 1.0, radius), 0.35) \
-			.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	if visual != null:
+		# The disc sits near the floor below the struck body's origin.
+		visual.play(center + Vector3.DOWN * 0.75, radius)
 	_pools.append({
 		"center": center,
 		"radius": radius,
@@ -205,11 +183,8 @@ func _pulse_pool(pool: Dictionary) -> void:
 
 
 func _expire_pool(pool: Dictionary) -> void:
-	var visual := pool.visual as MeshInstance3D
+	var visual := pool.visual as BloodPoolFx
 	if visual == null or not is_instance_valid(visual):
 		return
-	# Freeing the visual also kills its looping bubble tween.
-	var tween := visual.create_tween()
-	tween.tween_property(visual, "transparency", 1.0, 0.3) \
-			.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
-	tween.tween_callback(visual.queue_free)
+	# Fades out, then parks itself back in the Pools.
+	visual.expire()

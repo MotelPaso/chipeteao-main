@@ -1,19 +1,13 @@
-[gd_scene load_steps=8 format=3 uid="uid://c8k2h1n3m5p0a"]
+[gd_scene load_steps=7 format=3 uid="uid://c8k2h1n3m5p0a"]
 
 [ext_resource type="Script" path="res://scripts/player/player.gd" id="1_player"]
+[ext_resource type="PackedScene" path="res://scenes/player/SealRig.tscn" id="2_rig"]
 [ext_resource type="Script" path="res://scripts/systems/health.gd" id="3_health"]
 [ext_resource type="Script" path="res://scripts/systems/player_stats.gd" id="4_stats"]
 
 [sub_resource type="CapsuleShape3D" id="CapsuleShape3D_1"]
 radius = 0.4
 height = 1.8
-
-[sub_resource type="CapsuleMesh" id="CapsuleMesh_1"]
-radius = 0.4
-height = 1.8
-
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_1"]
-albedo_color = Color(0.2, 0.6, 0.9, 1.0)
 
 [sub_resource type="SphereShape3D" id="SphereShape3D_1"]
 radius = 0.05
@@ -26,13 +20,10 @@ script = ExtResource("1_player")
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.9, 0)
 shape = SubResource("CapsuleShape3D_1")
 
-[node name="MeshInstance3D" type="MeshInstance3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.9, 0)
-mesh = SubResource("CapsuleMesh_1")
-surface_material_override/0 = SubResource("StandardMaterial3D_1")
+[node name="SealRig" parent="." instance=ExtResource("2_rig")]
 
 [node name="SpringArm3D" type="SpringArm3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.6, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.75, 0)
 shape = SubResource("SphereShape3D_1")
 spring_length = 5.0
 

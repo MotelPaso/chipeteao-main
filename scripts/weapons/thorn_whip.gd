@@ -2,8 +2,9 @@ extends WeaponBase
 ## Bramble's starting weapon: cracks a thorned lash along a narrow strip
 ## from the wielder toward the target, damaging every "enemies"-group body
 ## inside it and briefly slowing the EnemyBase ones (refresh, not stack —
-## see EnemyBase.apply_slow). The visual is a stretched thin mesh flashed
-## along the strip for one crack.
+## see EnemyBase.apply_slow). No held model — the crack reads through a
+## pooled WhipCrack: a tapering green strip that whips out along the lane
+## and snaps back, spraying thorn particles.
 
 ## Full width of the lash strip; the strip's length is attack_range. Both
 ## scale with area tomes.
@@ -11,23 +12,8 @@ extends WeaponBase
 ## Percent of move speed removed from lashed enemies (30 = they keep 70%).
 @export var slow_percent: float = 30.0
 @export var slow_duration: float = 1.5
-@export var crack_time: float = 0.16
-
-var _crack_mesh: BoxMesh
-
-
-func _ready() -> void:
-	# One shared 1m box for every crack; per-instance scale stretches it to
-	# the strip and MeshInstance3D.transparency fades it out.
-	_crack_mesh = BoxMesh.new()
-	_crack_mesh.size = Vector3(0.14, 0.14, 1.0)
-	var material := StandardMaterial3D.new()
-	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	material.albedo_color = Color(0.45, 0.72, 0.3)
-	material.emission_enabled = true
-	material.emission = Color(0.4, 0.8, 0.25)
-	material.emission_energy_multiplier = 2.0
-	_crack_mesh.material = material
+## Whip strip tint (verdant, matching the old coil's emission).
+@export var crack_color: Color = Color(0.5, 0.85, 0.3)
 
 
 func fire(target: Node3D) -> void:
@@ -68,21 +54,9 @@ func _lash_strip(lash_dir: Vector3, length: float) -> void:
 
 
 func _spawn_crack_visual(lash_dir: Vector3, length: float) -> void:
-	var crack := MeshInstance3D.new()
-	crack.mesh = _crack_mesh
-	crack.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	var parent_node: Node = get_tree().current_scene
-	if parent_node == null:
-		parent_node = get_tree().root
-	# Scene-root parent so the crack stays put while the player moves on.
-	parent_node.add_child(crack)
-	var mid := global_position + lash_dir * length * 0.5 + Vector3.UP * 0.9
-	crack.global_transform = Transform3D(Basis.looking_at(lash_dir, Vector3.UP), mid)
-	crack.scale = Vector3(0.4, 0.4, length)
-	var tween := crack.create_tween()
-	tween.set_parallel(true)
-	tween.tween_property(crack, "scale:x", 1.0, crack_time) \
-			.set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
-	tween.tween_property(crack, "transparency", 1.0, crack_time) \
-			.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
-	tween.chain().tween_callback(crack.queue_free)
+	# Pooled, scene-root parented so the crack stays put while the player
+	# moves on.
+	var crack := Pools.acquire_scene(Pools.WHIP_CRACK_SCENE) as WhipCrack
+	if crack == null:
+		return
+	crack.play(global_position + Vector3.UP * 0.9, lash_dir, length, crack_color)

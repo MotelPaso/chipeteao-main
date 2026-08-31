@@ -25,19 +25,23 @@ var _life_left: float = 0.0
 var _hit_ids_this_leg: Dictionary[int, bool] = {}
 
 @onready var _spinner: Node3D = $Spinner
+@onready var _trail: GPUParticles3D = $Trail
 
 
 func _ready() -> void:
 	body_entered.connect(_on_body_entered)
 
 
-## Pooled-node contract: fresh out-leg state on every acquire.
+## Pooled-node contract: fresh out-leg state on every acquire. The trail
+## restarts so no world-space puffs from the last flight linger at the
+## old position.
 func pool_reset() -> void:
 	_source = null
 	_out_point = Vector3.ZERO
 	_returning = false
 	_life_left = max_lifetime
 	_hit_ids_this_leg.clear()
+	_trail.restart()
 
 
 ## Called by the firing weapon right after parenting the blade: sets the

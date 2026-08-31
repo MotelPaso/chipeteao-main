@@ -1,0 +1,49 @@
+[gd_scene load_steps=7 format=3]
+
+[ext_resource type="Script" path="res://scripts/fx/whip_crack.gd" id="1_crack"]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_thorn"]
+shading_mode = 0
+albedo_color = Color(0.45, 0.85, 0.3, 1)
+emission_enabled = true
+emission = Color(0.35, 0.75, 0.2, 1)
+emission_energy_multiplier = 1.4
+
+[sub_resource type="BoxMesh" id="BoxMesh_thorn"]
+material = SubResource("StandardMaterial3D_thorn")
+size = Vector3(0.05, 0.05, 0.14)
+
+[sub_resource type="Curve" id="Curve_shrink"]
+_data = [Vector2(0, 1), 0.0, 0.0, 0, 0, Vector2(1, 0), 0.0, 0.0, 0, 0]
+point_count = 2
+
+[sub_resource type="CurveTexture" id="CurveTexture_shrink"]
+curve = SubResource("Curve_shrink")
+
+[sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_thorns"]
+resource_local_to_scene = true
+emission_shape = 3
+emission_box_extents = Vector3(0.25, 0.15, 2.5)
+direction = Vector3(0, 1, 0)
+spread = 60.0
+initial_velocity_min = 1.2
+initial_velocity_max = 2.4
+gravity = Vector3(0, -9, 0)
+scale_min = 0.6
+scale_max = 1.1
+scale_curve = SubResource("CurveTexture_shrink")
+
+[node name="WhipCrack" type="Node3D"]
+script = ExtResource("1_crack")
+
+[node name="Strip" type="MeshInstance3D" parent="."]
+cast_shadow = 0
+
+[node name="Thorns" type="GPUParticles3D" parent="."]
+emitting = false
+amount = 16
+lifetime = 0.35
+one_shot = true
+explosiveness = 1.0
+process_material = SubResource("ParticleProcessMaterial_thorns")
+draw_pass_1 = SubResource("BoxMesh_thorn")

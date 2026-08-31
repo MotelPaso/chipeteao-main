@@ -1,6 +1,24 @@
-[gd_scene load_steps=5 format=3]
+[gd_scene load_steps=10 format=3]
 
 [ext_resource type="Script" path="res://scripts/weapons/boomerang_projectile.gd" id="1_blade"]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_trail"]
+shading_mode = 0
+albedo_color = Color(0.95, 0.72, 0.35, 1)
+emission_enabled = true
+emission = Color(0.9, 0.62, 0.25, 1)
+emission_energy_multiplier = 1.2
+
+[sub_resource type="BoxMesh" id="BoxMesh_trail"]
+material = SubResource("StandardMaterial3D_trail")
+size = Vector3(0.09, 0.09, 0.09)
+
+[sub_resource type="Curve" id="Curve_trail"]
+_data = [Vector2(0, 1), 0.0, 0.0, 0, 0, Vector2(1, 0), 0.0, 0.0, 0, 0]
+point_count = 2
+
+[sub_resource type="CurveTexture" id="CurveTexture_trail"]
+curve = SubResource("Curve_trail")
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_blade"]
 albedo_color = Color(0.76, 0.55, 0.28, 1)
@@ -15,6 +33,12 @@ size = Vector3(0.14, 0.045, 0.62)
 
 [sub_resource type="SphereShape3D" id="SphereShape3D_hit"]
 radius = 0.5
+
+[sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_trail"]
+gravity = Vector3(0, 0, 0)
+scale_min = 0.5
+scale_max = 1.0
+scale_curve = SubResource("CurveTexture_trail")
 
 [node name="BoomerangProjectile" type="Area3D" groups=["player_shots"]]
 collision_layer = 0
@@ -35,3 +59,11 @@ mesh = SubResource("BoxMesh_wing")
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="."]
 shape = SubResource("SphereShape3D_hit")
+
+[node name="Trail" type="GPUParticles3D" parent="."]
+emitting = true
+amount = 24
+lifetime = 0.4
+local_coords = false
+process_material = SubResource("ParticleProcessMaterial_trail")
+draw_pass_1 = SubResource("BoxMesh_trail")

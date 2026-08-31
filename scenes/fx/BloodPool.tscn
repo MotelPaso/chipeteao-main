@@ -1,0 +1,83 @@
+[gd_scene load_steps=10 format=3]
+
+[ext_resource type="Script" path="res://scripts/fx/blood_pool.gd" id="1_pool"]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_disc"]
+shading_mode = 0
+transparency = 1
+albedo_color = Color(0.42, 0.04, 0.08, 0.85)
+emission_enabled = true
+emission = Color(0.75, 0.08, 0.12, 1)
+emission_energy_multiplier = 1.5
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_disc"]
+material = SubResource("StandardMaterial3D_disc")
+top_radius = 1.0
+bottom_radius = 1.0
+height = 0.08
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_rim"]
+shading_mode = 0
+transparency = 1
+albedo_color = Color(0.16, 0.01, 0.03, 0.9)
+emission_enabled = true
+emission = Color(0.3, 0.02, 0.05, 1)
+emission_energy_multiplier = 0.8
+
+[sub_resource type="TorusMesh" id="TorusMesh_rim"]
+material = SubResource("StandardMaterial3D_rim")
+inner_radius = 0.92
+outer_radius = 1.04
+rings = 24
+ring_segments = 8
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_bubble"]
+shading_mode = 0
+albedo_color = Color(0.55, 0.06, 0.1, 1)
+emission_enabled = true
+emission = Color(0.65, 0.08, 0.12, 1)
+emission_energy_multiplier = 1.2
+
+[sub_resource type="SphereMesh" id="SphereMesh_bubble"]
+material = SubResource("StandardMaterial3D_bubble")
+radius = 0.05
+height = 0.1
+radial_segments = 8
+rings = 4
+
+[sub_resource type="Curve" id="Curve_shrink"]
+_data = [Vector2(0, 1), 0.0, 0.0, 0, 0, Vector2(1, 0), 0.0, 0.0, 0, 0]
+point_count = 2
+
+[sub_resource type="CurveTexture" id="CurveTexture_shrink"]
+curve = SubResource("Curve_shrink")
+
+[sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_bubbles"]
+emission_shape = 1
+emission_sphere_radius = 0.85
+direction = Vector3(0, 1, 0)
+spread = 8.0
+initial_velocity_min = 0.25
+initial_velocity_max = 0.6
+gravity = Vector3(0, 0.4, 0)
+scale_min = 0.6
+scale_max = 1.3
+scale_curve = SubResource("CurveTexture_shrink")
+
+[node name="BloodPool" type="Node3D"]
+script = ExtResource("1_pool")
+
+[node name="Disc" type="MeshInstance3D" parent="."]
+cast_shadow = 0
+mesh = SubResource("CylinderMesh_disc")
+
+[node name="Rim" type="MeshInstance3D" parent="."]
+cast_shadow = 0
+mesh = SubResource("TorusMesh_rim")
+
+[node name="Bubbles" type="GPUParticles3D" parent="."]
+emitting = false
+amount = 12
+lifetime = 1.2
+process_material = SubResource("ParticleProcessMaterial_bubbles")
+draw_pass_1 = SubResource("SphereMesh_bubble")

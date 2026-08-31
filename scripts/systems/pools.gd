@@ -17,6 +17,11 @@ const ENEMY_BOLT_SCENE: PackedScene = preload("res://scenes/enemies/EnemyBolt.ts
 const DEATH_BURST_SCENE: PackedScene = preload("res://scenes/fx/DeathBurst.tscn")
 const DAMAGE_POPUP_SCENE: PackedScene = preload("res://scenes/fx/DamagePopup.tscn")
 const TELEGRAPH_DISC_SCENE: PackedScene = preload("res://scenes/fx/TelegraphDisc.tscn")
+const SLASH_ARC_SCENE: PackedScene = preload("res://scenes/fx/SlashArc.tscn")
+const MUZZLE_FLASH_SCENE: PackedScene = preload("res://scenes/fx/MuzzleFlash.tscn")
+const WHIP_CRACK_SCENE: PackedScene = preload("res://scenes/fx/WhipCrack.tscn")
+const EMBER_BURST_SCENE: PackedScene = preload("res://scenes/fx/EmberBurst.tscn")
+const BLOOD_POOL_SCENE: PackedScene = preload("res://scenes/fx/BloodPool.tscn")
 
 ## Per-pool (warm preload count, max parked kept) tunables. Preloads cover
 ## a normal early game; caps absorb the worst late-T3 multi-weapon spikes.
@@ -30,6 +35,11 @@ const TELEGRAPH_DISC_SCENE: PackedScene = preload("res://scenes/fx/TelegraphDisc
 	"death_burst": Vector2i(12, 64),
 	"damage_popup": Vector2i(48, 256),
 	"telegraph_disc": Vector2i(6, 32),
+	"slash_arc": Vector2i(8, 32),
+	"muzzle_flash": Vector2i(6, 24),
+	"whip_crack": Vector2i(4, 16),
+	"ember_burst": Vector2i(4, 16),
+	"blood_pool": Vector2i(4, 16),
 }
 
 var _pools_by_path: Dictionary[String, NodePool] = {}
@@ -45,6 +55,11 @@ func _ready() -> void:
 	_register("death_burst", DEATH_BURST_SCENE)
 	_register("damage_popup", DAMAGE_POPUP_SCENE)
 	_register("telegraph_disc", TELEGRAPH_DISC_SCENE)
+	_register("slash_arc", SLASH_ARC_SCENE)
+	_register("muzzle_flash", MUZZLE_FLASH_SCENE)
+	_register("whip_crack", WHIP_CRACK_SCENE)
+	_register("ember_burst", EMBER_BURST_SCENE)
+	_register("blood_pool", BLOOD_POOL_SCENE)
 
 
 ## Pooled replacement for scene.instantiate() + add_child(current scene):

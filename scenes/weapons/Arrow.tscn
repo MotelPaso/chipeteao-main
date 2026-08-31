@@ -7,11 +7,11 @@ shading_mode = 0
 albedo_color = Color(0.85, 0.92, 0.72, 1)
 emission_enabled = true
 emission = Color(0.6, 0.85, 0.45, 1)
-emission_energy_multiplier = 1.6
+emission_energy_multiplier = 2.4
 
 [sub_resource type="BoxMesh" id="BoxMesh_shaft"]
 material = SubResource("StandardMaterial3D_shaft")
-size = Vector3(0.035, 0.035, 0.72)
+size = Vector3(0.06, 0.06, 0.72)
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_head"]
 shading_mode = 0

@@ -1,14 +1,15 @@
 extends WeaponBase
 ## Rook's starting weapon: sweeps a melee arc toward the nearest enemy and
-## damages every "enemies"-group body inside it, with a placeholder blade
-## swipe (Tween on SwingPivot) as the visual.
+## damages every "enemies"-group body inside it. No held model — the
+## attack reads through a pooled crescent SlashArc swipe flashed through
+## the hit arc, plus a small spark burst on each enemy struck.
 
 @export var arc_angle_deg: float = 150.0
 @export var swing_time: float = 0.25
-
-@onready var _swing_pivot: Node3D = $SwingPivot
-
-var _swing_tween: Tween
+## Slash swipe tint (steel-blue, matching the old blade's emission).
+@export var slash_color: Color = Color(0.75, 0.85, 1.0)
+## Spark tint for per-enemy hit bursts.
+@export var spark_color: Color = Color(0.7, 0.8, 1.0)
 
 
 func fire(target: Node3D) -> void:
@@ -41,18 +42,13 @@ func _hit_enemies_in_arc(center_dir: Vector3) -> void:
 		var health := Health.find_in(body)
 		if health != null:
 			deal_damage(health)
+			# Tiny spark burst where the blade "connects".
+			Juice.burst(body.global_position + Vector3.UP * 0.6, spark_color, 4)
 
 
 func _play_swing(center_dir: Vector3) -> void:
-	if _swing_tween != null and _swing_tween.is_valid():
-		_swing_tween.kill()
-	# Aim the pivot at the target, then sweep across the full arc.
-	_swing_pivot.look_at(_swing_pivot.global_position + center_dir, Vector3.UP)
-	var half_arc := deg_to_rad(arc_angle_deg * 0.5)
-	_swing_pivot.rotation.y += half_arc
-	_swing_pivot.visible = true
-	_swing_tween = create_tween()
-	_swing_tween.tween_property(_swing_pivot, "rotation:y",
-			_swing_pivot.rotation.y - half_arc * 2.0, swing_time) \
-			.set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
-	_swing_tween.tween_callback(func() -> void: _swing_pivot.visible = false)
+	var slash := Pools.acquire_scene(Pools.SLASH_ARC_SCENE) as SlashArc
+	if slash == null:
+		return
+	slash.play(global_position, center_dir, attack_range * area_scale() * 0.9,
+			slash_color, arc_angle_deg * 0.8, swing_time)

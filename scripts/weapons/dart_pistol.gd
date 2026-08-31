@@ -1,8 +1,12 @@
 extends WeaponBase
 ## Vex's starting weapon: fires fast, lightly homing darts at the acquired
 ## target. projectile_count > 1 fans the extra darts around the aim direction.
+## No held model — the shot reads through the bright tracer plus a pooled
+## muzzle-flash pop at the Muzzle marker on every volley.
 
 @export var projectile_scene: PackedScene
+## Muzzle flash tint (matches the dart tracer).
+@export var flash_color: Color = Color(1.0, 0.8, 0.35)
 ## Yaw between neighboring darts when projectile_count > 1.
 @export var fan_spread_deg: float = 8.0
 ## Aim above the target's origin so darts hit body height, not feet.
@@ -25,6 +29,10 @@ func fire(target: Node3D) -> void:
 	for i in count:
 		var yaw := deg_to_rad(fan_spread_deg) * (float(i) - float(count - 1) * 0.5)
 		_spawn_dart(base_dir.rotated(Vector3.UP, yaw), target)
+	# One flash per volley, however many darts fan out.
+	var flash := Pools.acquire_scene(Pools.MUZZLE_FLASH_SCENE) as MuzzleFlash
+	if flash != null:
+		flash.play(_muzzle.global_position, flash_color, 0.5)
 
 
 func _spawn_dart(direction: Vector3, target: Node3D) -> void:

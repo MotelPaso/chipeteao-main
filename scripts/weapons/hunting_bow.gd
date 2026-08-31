@@ -2,9 +2,13 @@ extends WeaponBase
 ## Juno's starting weapon: looses fast, dead-straight arrows that pierce
 ## through up to pierce_count enemies each (the Arrow scene disables the
 ## Projectile homing). projectile_count > 1 fans a volley around the aim
-## direction, Dart Pistol style.
+## direction, Dart Pistol style. No held model — the loose reads through
+## the thick arrow tracer plus a drawn-back charge glint at the Nock that
+## swells and pops as the volley releases.
 
 @export var projectile_scene: PackedScene
+## Charge glint tint (matches the arrow tracer).
+@export var glint_color: Color = Color(0.75, 0.95, 0.55)
 ## Max enemies one arrow damages before despawning ("Barbed Heads" raises it).
 @export var pierce_count: int = 3
 ## Yaw between neighboring arrows when projectile_count > 1.
@@ -29,6 +33,11 @@ func fire(target: Node3D) -> void:
 	for i: int in count:
 		var yaw := deg_to_rad(fan_spread_deg) * (float(i) - float(count - 1) * 0.5)
 		_spawn_arrow(base_dir.rotated(Vector3.UP, yaw), target)
+	# Draw-and-release glint: grows like a pulled string catching light,
+	# then pops as the arrows leave.
+	var glint := Pools.acquire_scene(Pools.MUZZLE_FLASH_SCENE) as MuzzleFlash
+	if glint != null:
+		glint.play(_nock.global_position, glint_color, 0.4, 0.14, 0.1)
 
 
 func _spawn_arrow(direction: Vector3, target: Node3D) -> void:

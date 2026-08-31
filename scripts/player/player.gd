@@ -3,7 +3,9 @@ extends CharacterBody3D
 ## Player controller: WASD movement relative to camera yaw, mouse-look,
 ## jump, and a Shift+move slide (speed burst + lowered collision).
 ## At spawn it applies the selected character's loadout (GameConfig ->
-## CharacterCatalog row): starting weapon, capsule tint, per-level passive.
+## CharacterCatalog row): starting weapon, seal model tint, per-level passive.
+## The visual body is the SealRig child (foca.glb); the gameplay capsule
+## collision shape is unchanged and stays authoritative for physics.
 ## apply_root() (Sarcognath's Entomb) locks movement without touching the
 ## camera or the auto-firing weapons.
 
@@ -36,7 +38,7 @@ const VOID_RESCUE_Y: float = -10.0
 
 @onready var spring_arm: SpringArm3D = $SpringArm3D
 @onready var collision_shape: CollisionShape3D = $CollisionShape3D
-@onready var mesh_instance: MeshInstance3D = $MeshInstance3D
+@onready var seal_rig: SealRig = $SealRig
 @onready var weapons_mount: Node3D = $Weapons
 @onready var health: Health = $Health
 @onready var _stats: PlayerStats = $Stats
@@ -173,7 +175,7 @@ func is_rooted() -> bool:
 
 
 ## Applies a CharacterCatalog row: instances the starting weapon under the
-## Weapons mount, tints the placeholder capsule, registers the passive.
+## Weapons mount, tints the seal model, registers the passive.
 func _apply_character(character: Dictionary) -> void:
 	var scene := load(String(character.weapon_scene)) as PackedScene
 	if scene == null:
@@ -184,10 +186,8 @@ func _apply_character(character: Dictionary) -> void:
 		# pool counts the starting weapon as owned.
 		weapon.name = String(character.weapon_node_name)
 		weapons_mount.add_child(weapon)
-	# Fresh material instead of mutating the scene's shared one.
-	var material := StandardMaterial3D.new()
-	material.albedo_color = Color(character.tint)
-	mesh_instance.set_surface_override_material(0, material)
+	# SealRig duplicates the model's shared material once for this spawn.
+	seal_rig.apply_tint(Color(character.tint))
 	_stats.set_character_passive(String(character.passive_stat),
 			float(character.passive_amount),
 			String(character.get("passive_kind", "per_level")),
@@ -201,18 +201,10 @@ func _on_health_died() -> void:
 	if _is_sliding:
 		_end_slide()
 	# Freeze control and physics; RunManager pauses the whole tree right
-	# after this handler, so the fall-over tween must be pause-immune to
-	# play out under the fading run-end screen.
+	# after this handler. The rig's face-plant tween is pause-immune so it
+	# plays out under the fading run-end screen.
 	set_physics_process(false)
-	var tween := create_tween()
-	tween.set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
-	tween.set_parallel(true)
-	# Face-plant: tip the capsule forward (-Z) with a comedic bounce and
-	# drop its center to rest on the floor (capsule radius 0.4).
-	tween.tween_property(mesh_instance, "rotation:x", -TAU * 0.25, 0.5) \
-			.set_trans(Tween.TRANS_BOUNCE).set_ease(Tween.EASE_OUT)
-	tween.tween_property(mesh_instance, "position:y", 0.45, 0.5) \
-			.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	seal_rig.play_death()
 
 
 func _can_start_slide(wish_dir: Vector3, effective_speed: float) -> bool:
@@ -249,6 +241,5 @@ func _set_body_height(height: float) -> void:
 	capsule.height = height
 	capsule.radius = minf(_default_collision_radius, height * 0.5)
 	collision_shape.position.y = height * 0.5
-	# Squash the placeholder mesh to match, keeping its base on the floor.
-	mesh_instance.scale.y = height / _default_collision_height
-	mesh_instance.position.y = height * 0.5
+	# The seal squashes flat and dips its nose to match the low collider.
+	seal_rig.set_slide_ratio(height / _default_collision_height)
