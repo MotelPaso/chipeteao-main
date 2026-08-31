@@ -12,6 +12,13 @@ extends Node3D
 
 @export var scatter_seed: int = 71382
 
+## Single source of truth for the arena's half-size (floor is a square of
+## side 2x this). Consumers (BossBase clamp, EnemySpawner floor-plate
+## clamp) read it at ready through the "arena_bounds" group and subtract
+## their own margin, so resizing a map is this one number plus the floor/
+## wall geometry in the scene.
+@export var arena_half_extent: float = 80.0
+
 @export_group("Prop Scenes")
 @export var tree_scene: PackedScene
 @export var rock_scene: PackedScene
@@ -20,10 +27,10 @@ extends Node3D
 @export_group("Interior Scatter")
 ## Props land in [-half_extent, half_extent] on X/Z; keep this inside the
 ## perimeter band so the tree line stays visually distinct.
-@export var interior_half_extent: float = 42.0
-@export var tree_count: int = 28
-@export var rock_count: int = 12
-@export var stump_count: int = 7
+@export var interior_half_extent: float = 68.0
+@export var tree_count: int = 57
+@export var rock_count: int = 24
+@export var stump_count: int = 15
 ## No props inside this radius around the origin: spawn/tutorial-dummy space.
 @export var spawn_clear_radius: float = 9.0
 ## No props inside this radius around any "scatter_keepout" node (covers a
@@ -38,8 +45,8 @@ extends Node3D
 ## the rim falls back to tree_scene with rock_scene accents (forest).
 @export var perimeter_scene: PackedScene
 @export var perimeter_accent_scene: PackedScene
-@export var perimeter_inner: float = 44.0
-@export var perimeter_outer: float = 48.0
+@export var perimeter_inner: float = 72.0
+@export var perimeter_outer: float = 78.0
 ## Distance between slots along each edge; every Nth slot is an accent.
 @export var perimeter_step: float = 9.0
 @export var perimeter_rock_every: int = 5
@@ -47,6 +54,16 @@ extends Node3D
 var _rng := RandomNumberGenerator.new()
 var _placed_xz: PackedVector2Array = PackedVector2Array()
 var _keepouts_xz: PackedVector2Array = PackedVector2Array()
+
+## Interior placements that hit the rejection-sampling attempt cap (kept
+## at 0 by tuning counts/spacing; asserted by the resize test harness).
+var failed_placements: int = 0
+
+
+func _enter_tree() -> void:
+	# Published before any sibling's _ready (tree order), so the spawner's
+	# bounds lookup always finds it.
+	add_to_group("arena_bounds")
 
 
 func _ready() -> void:
@@ -80,6 +97,7 @@ func _place_many(scene: PackedScene, count: int, min_scale: float, max_scale: fl
 		_spawn_prop(scene, pos, _rng.randf_range(min_scale, max_scale))
 		_placed_xz.append(Vector2(pos.x, pos.z))
 		placed += 1
+	failed_placements += count - placed
 
 
 func _is_clear(pos: Vector3) -> bool:

@@ -49,16 +49,16 @@ shader = SubResource("Shader_grass")
 
 [sub_resource type="BoxMesh" id="BoxMesh_floor"]
 material = SubResource("ShaderMaterial_grass")
-size = Vector3(100, 1, 100)
+size = Vector3(160, 1, 160)
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_floor"]
-size = Vector3(100, 1, 100)
+size = Vector3(160, 1, 160)
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_wall_x"]
-size = Vector3(1, 12, 102)
+size = Vector3(1, 12, 162)
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_wall_z"]
-size = Vector3(102, 12, 1)
+size = Vector3(162, 12, 1)
 
 [sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_1"]
 sky_top_color = Color(0.35, 0.55, 0.78, 1)
@@ -105,25 +105,25 @@ shape = SubResource("BoxShape3D_floor")
 [node name="Perimeter" type="StaticBody3D" parent="."]
 
 [node name="WallEast" type="CollisionShape3D" parent="Perimeter"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 50.5, 6, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 80.5, 6, 0)
 shape = SubResource("BoxShape3D_wall_x")
 
 [node name="WallWest" type="CollisionShape3D" parent="Perimeter"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -50.5, 6, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -80.5, 6, 0)
 shape = SubResource("BoxShape3D_wall_x")
 
 [node name="WallNorth" type="CollisionShape3D" parent="Perimeter"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 6, -50.5)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 6, -80.5)
 shape = SubResource("BoxShape3D_wall_z")
 
 [node name="WallSouth" type="CollisionShape3D" parent="Perimeter"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 6, 50.5)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 6, 80.5)
 shape = SubResource("BoxShape3D_wall_z")
 
 [node name="Verticality" type="Node3D" parent="."]
 
 [node name="RiseEast" type="Node3D" parent="Verticality" groups=["scatter_keepout"]]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 18, 0, -14)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 34, 0, -26)
 
 [node name="Platform" parent="Verticality/RiseEast" instance=ExtResource("14_platform")]
 
@@ -134,7 +134,7 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -5, 0, 0)
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.1, 0, 3.4)
 
 [node name="RiseWest" type="Node3D" parent="Verticality" groups=["scatter_keepout"]]
-transform = Transform3D(0, 0, -1, 0, 1, 0, 1, 0, 0, -20, 0, 10)
+transform = Transform3D(0, 0, -1, 0, 1, 0, 1, 0, 0, -38, 0, 18)
 
 [node name="Platform" parent="Verticality/RiseWest" instance=ExtResource("14_platform")]
 transform = Transform3D(1.25, 0, 0, 0, 1.25, 0, 0, 0, 1.25, 0, 0, 0)
@@ -146,7 +146,7 @@ transform = Transform3D(1.25, 0, 0, 0, 1.25, 0, 0, 0, 1.25, -6.25, 0, 0)
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.8, 0, -3.6)
 
 [node name="KnollSouth" type="Node3D" parent="Verticality" groups=["scatter_keepout"]]
-transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, 2, 0, 24)
+transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, 6, 0, 46)
 
 [node name="Platform" parent="Verticality/KnollSouth" instance=ExtResource("14_platform")]
 
@@ -156,28 +156,45 @@ transform = Transform3D(0.75, 0, 0, 0, 0.75, 0, 0, 0, 0.75, -6, 0, 1.2)
 [node name="RockStepHigh" parent="Verticality/KnollSouth" instance=ExtResource("11_rock")]
 transform = Transform3D(1.05, 0, 0, 0, 1.05, 0, 0, 0, 1.05, -4.2, 0, -0.8)
 
+[node name="RiseNorth" type="Node3D" parent="Verticality" groups=["scatter_keepout"]]
+transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, -14, 0, -50)
+
+[node name="Platform" parent="Verticality/RiseNorth" instance=ExtResource("14_platform")]
+
+[node name="Ramp" parent="Verticality/RiseNorth" instance=ExtResource("13_ramp")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -5, 0, 0)
+
+[node name="RockStep" parent="Verticality/RiseNorth" instance=ExtResource("11_rock")]
+transform = Transform3D(0.9, 0, 0, 0, 0.9, 0, 0, 0, 0.9, 4.1, 0, -3.2)
+
 [node name="Interactables" type="Node3D" parent="."]
 
 [node name="ChargeShrine" parent="Interactables" groups=["scatter_keepout"] instance=ExtResource("18_chargeshrine")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -24, 0, -24)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -48, 0, -44)
+
+[node name="ChargeShrineFar" parent="Interactables" groups=["scatter_keepout"] instance=ExtResource("18_chargeshrine")]
+transform = Transform3D(0.707107, 0, -0.707107, 0, 1, 0, 0.707107, 0, 0.707107, 44, 0, -52)
 
 [node name="GreedShrine" parent="Interactables" groups=["scatter_keepout"] instance=ExtResource("19_greedshrine")]
-transform = Transform3D(-0.5, 0, -0.866025, 0, 1, 0, 0.866025, 0, -0.5, 26, 0, 18)
+transform = Transform3D(-0.5, 0, -0.866025, 0, 1, 0, 0.866025, 0, -0.5, 52, 0, 30)
 
 [node name="CurseShrine" parent="Interactables" groups=["scatter_keepout"] instance=ExtResource("20_curseshrine")]
-transform = Transform3D(0.866025, 0, 0.5, 0, 1, 0, -0.5, 0, 0.866025, -2, 0, -30)
+transform = Transform3D(0.866025, 0, 0.5, 0, 1, 0, -0.5, 0, 0.866025, -4, 0, 58)
 
 [node name="ChestGround" parent="Interactables" groups=["scatter_keepout"] instance=ExtResource("21_chest")]
-transform = Transform3D(0.707107, 0, 0.707107, 0, 1, 0, -0.707107, 0, 0.707107, -12, 0, 18)
+transform = Transform3D(0.707107, 0, 0.707107, 0, 1, 0, -0.707107, 0, 0.707107, -26, 0, 34)
 
 [node name="ChestRiseEast" parent="Interactables" instance=ExtResource("21_chest")]
-transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, 18, 2, -14)
+transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, 34, 2, -26)
 
 [node name="ChestKnollSouth" parent="Interactables" instance=ExtResource("21_chest")]
-transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, 2, 2, 24)
+transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, 6, 2, 46)
+
+[node name="ChestRiseNorth" parent="Interactables" instance=ExtResource("21_chest")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -14, 2, -50)
 
 [node name="OddStump" parent="Interactables" groups=["scatter_keepout"] instance=ExtResource("24_oddstump")]
-transform = Transform3D(-0.801144, 0, 0.598472, 0, 1, 0, -0.598472, 0, -0.801144, 38, 0, 38)
+transform = Transform3D(-0.801144, 0, 0.598472, 0, 1, 0, -0.598472, 0, -0.801144, 66, 0, 66)
 
 [node name="ForestScatter" type="Node3D" parent="."]
 script = ExtResource("9_scatter")

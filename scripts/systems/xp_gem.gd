@@ -17,7 +17,9 @@ extends Area3D
 const LIVE_GROUP: StringName = &"gems"
 
 @export var xp_value: int = 1
-@export var magnet_radius: float = 3.5
+## 4.0 (was 3.5, iteration-31 balance): +~15% base pickup reach offsets
+## the extra roaming the enlarged 160x160 arenas ask for.
+@export var magnet_radius: float = 4.0
 @export var magnet_acceleration: float = 45.0
 ## Starting homing speed when the level-up vacuum grabs this gem.
 @export var vacuum_speed: float = 26.0

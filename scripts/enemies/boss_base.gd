@@ -10,9 +10,13 @@ extends EnemyBase
 ## promotes rematches with apply_tier() instead.
 
 @export var boss_title: String = "Boss"
-## Half-size of the arena floor minus a margin; position is clamped so the
-## boss (and its ground attacks) never leave the field.
-@export var arena_half_extent: float = 46.0
+## Half-size of the arena floor minus arena_clamp_margin; position is
+## clamped so the boss (and its ground attacks) never leave the field.
+## Fallback only: at ready it is re-derived from the map's "arena_bounds"
+## node (the scatter node's arena_half_extent), so map resizes propagate.
+@export var arena_half_extent: float = 76.0
+## Kept between the boss and the wall so ground attacks stay on the floor.
+@export var arena_clamp_margin: float = 4.0
 
 @export_group("Reward")
 ## Death payout: a ring of boss_gem_count gems worth boss_gem_value XP each.
@@ -35,6 +39,9 @@ extends EnemyBase
 
 func _ready() -> void:
 	super()
+	var bounds := get_tree().get_first_node_in_group("arena_bounds") as Node3D
+	if bounds != null:
+		arena_half_extent = float(bounds.get("arena_half_extent")) - arena_clamp_margin
 	_health.died.connect(_on_boss_base_died)
 	get_tree().call_group("boss_ui", "track_boss", self, boss_title)
 

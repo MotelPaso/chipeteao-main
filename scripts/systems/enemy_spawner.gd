@@ -44,9 +44,12 @@ const DUNES_PHASES: Array[Dictionary] = [
 @export_group("Spawn Ring")
 @export var min_radius: float = 18.0
 @export var max_radius: float = 25.0
-## Half-size of the floor plate, minus a margin, so ring spawns near an
-## arena edge still land on the floor.
-@export var arena_half_extent: float = 48.0
+## Half-size of the floor plate, minus arena_edge_margin, so ring spawns
+## near an arena edge still land on the floor. Fallback only: re-derived
+## at ready from the map's "arena_bounds" node (the scatter node's
+## arena_half_extent), so map resizes propagate automatically.
+@export var arena_half_extent: float = 78.0
+@export var arena_edge_margin: float = 2.0
 @export_group("Difficulty Ramp")
 ## Ramp shape (retuned from instrumented T1 soaks, iteration 26): arrivals
 ## build ~20/min at the open and ~27/min by minute 4, then the count steps
@@ -127,6 +130,9 @@ func apply_tier_spec(spec: Dictionary) -> void:
 func _ready() -> void:
 	# Shrines reach the spawner through this group, never by node path.
 	add_to_group("enemy_spawner")
+	var bounds := get_tree().get_first_node_in_group("arena_bounds") as Node3D
+	if bounds != null:
+		arena_half_extent = float(bounds.get("arena_half_extent")) - arena_edge_margin
 
 
 func _physics_process(delta: float) -> void:

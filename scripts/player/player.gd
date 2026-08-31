@@ -10,7 +10,10 @@ extends CharacterBody3D
 ## camera or the auto-firing weapons.
 
 @export_group("Movement")
-@export var move_speed: float = 6.0
+## 6.6 (was 6.0, iteration-31 balance): the 160x160 arenas mean more
+## travel between points of interest; a ~10% base speed bump keeps the
+## loop's tempo without touching the spawn-ring pressure.
+@export var move_speed: float = 6.6
 @export var acceleration: float = 12.0
 @export var air_acceleration: float = 4.0
 @export var jump_velocity: float = 8.0

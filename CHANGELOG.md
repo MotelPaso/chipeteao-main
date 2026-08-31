@@ -30,3 +30,4 @@
 - Iteration 28: Handoff docs (Spanish README with run/build/verify instructions, ARQUITECTURA.md extension map for every system)
 - Iteration 29: UI overhaul (design system theme, animated character select and upgrade cards, restyled HUD bars/badges, screen transitions, menu polish)
 - Iteration 30: Seal & VFX (foca model with per-character tint and procedural motion, invisible held weapons, effect-first combat visuals per weapon)
+- Iteration 31: Bigger maps (160x160 arenas, denser rims, extra shrines/chests/verticality spots, centralized bounds, travel-speed compensation)
