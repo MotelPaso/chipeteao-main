@@ -8,11 +8,13 @@ extends Node
 signal xp_changed(current_xp: int, xp_to_next: int)
 signal leveled_up(new_level: int)
 signal kills_changed(total_kills: int)
-signal curse_changed(stacks: int)
+## Run-wide difficulty changed (Tome of Peril, demonic altars).
+signal difficulty_changed(bonus: float)
 
 var xp: int = 0
 var level: int = 1
-var xp_to_next: int = 8
+## Cost of the first level-up (reset() re-derives it from the curve).
+var xp_to_next: int = XP_BASE + XP_PER_LEVEL
 var kills: int = 0
 var run_time: float = 0.0
 ## True while the run is in progress; RunManager clears it when the run
@@ -21,8 +23,35 @@ var run_time: float = 0.0
 var run_active: bool = true
 ## Multiplies every gem's magnet radius; raised by pickup-radius upgrades.
 var pickup_radius_multiplier: float = 1.0
-## Curse Shrine stacks waiting for the next boss (see consume_curses).
-var curse_stacks: int = 0
+## Demonic altar completions this run (iteration 41): bosses drop one
+## extra chest per use, elites and hordes read it too.
+var demonic_uses: int = 0
+## Run-wide difficulty bonus (iteration 39), as a fraction: 0.3 = +30%.
+## Shared by the whole party. Fresh spawns scale HP/damage by
+## (1 + bonus) and XP by (1 + bonus * DIFFICULTY_XP_SHARE). Sources add
+## through add_difficulty (tomes re-publish their total per player via
+## set_difficulty_source so recompute-from-scratch stays exact).
+var difficulty_bonus: float = 0.0
+## Per-source difficulty contributions (source id -> fraction).
+var _difficulty_sources: Dictionary[String, float] = {}
+## Fraction of the difficulty bonus that becomes extra XP on every gem.
+const DIFFICULTY_XP_SHARE: float = 0.75
+## Chest economy (iteration 40): base price in run points per rarity, and
+## the GLOBAL multiplier every opened chest applies to all the others.
+const CHEST_BASE_PRICES: Dictionary[String, int] = {
+	"Common": 20, "Rare": 40, "Epic": 80, "Legendary": 160}
+const CHEST_PRICE_GROWTH: float = 1.25
+## Party-wide chest price multiplier, one CHEST_PRICE_GROWTH step per chest
+## opened this run. It is the ONLY chest bookkeeping this run needs — the
+## lifetime "chests_opened" counter the quests read lives in SaveData and
+## is bumped by Interactable.consume, so there is no second copy here to
+## drift out of sync with it.
+var chest_price_multiplier: float = 1.0
+## XP curve: cost of the level being climbed to, in gems (level 1 -> 2
+## costs XP_BASE + XP_PER_LEVEL). The whole pacing of a run rides on these
+## two numbers, so they are named instead of buried in _xp_required.
+const XP_BASE: int = 5
+const XP_PER_LEVEL: int = 3
 
 
 func _ready() -> void:
@@ -30,7 +59,12 @@ func _ready() -> void:
 
 
 func _physics_process(delta: float) -> void:
-	run_time += delta
+	# Only a live run advances the clock: once RunManager flags the run over
+	# (or before one starts), anything reading run_time — victory grading,
+	# timed boons, the daily score — must not see it creep forward on the
+	# frames where something unpauses the tree.
+	if run_active:
+		run_time += delta
 
 
 ## Call at the start of a new run.
@@ -41,11 +75,32 @@ func reset() -> void:
 	run_time = 0.0
 	run_active = true
 	pickup_radius_multiplier = 1.0
-	curse_stacks = 0
+	demonic_uses = 0
+	difficulty_bonus = 0.0
+	_difficulty_sources.clear()
+	chest_price_multiplier = 1.0
+	# Counters credited during a run live in a SaveData buffer that only a
+	# run END merges into the persisted ledger; starting (or abandoning) a
+	# run drops whatever is still pending, which is what makes save_data's
+	# "an abandoned run persists nothing" contract actually hold. Fetched by
+	# path: this autoload loads BEFORE SaveData, so the very first reset
+	# (app startup) must not touch it by name.
+	var ledger := get_node_or_null("/root/SaveData")
+	if ledger != null:
+		ledger.call("discard_run_counters")
+	# Daily Hunt (iteration 36): everyone rolls the same cards, spawns, and
+	# world events for a given date; normal runs re-scramble the stream.
+	# Fetched by path: this autoload loads BEFORE GameConfig, so the very
+	# first reset (app startup, never a daily) must not touch it by name.
+	var config := get_node_or_null("/root/GameConfig")
+	if config != null and bool(config.daily_mode) and int(config.daily_seed) != 0:
+		seed(int(config.daily_seed))
+	else:
+		randomize()
 	xp_to_next = _xp_required(level)
 	xp_changed.emit(xp, xp_to_next)
 	kills_changed.emit(kills)
-	curse_changed.emit(curse_stacks)
+	difficulty_changed.emit(difficulty_bonus)
 
 
 func add_xp(amount: int) -> void:
@@ -67,23 +122,48 @@ func add_kill() -> void:
 	kills_changed.emit(kills)
 
 
-## Curse Shrine hook: banks stacks for the next boss spawn.
-func add_curse(stacks: int = 1) -> void:
-	if stacks <= 0:
+## Sets one source's difficulty contribution (e.g. "tomes_p0" for player
+## 0's Tome of Peril total) and re-sums the run-wide bonus. Sources that
+## recompute from scratch (PlayerStats) call this with their whole total.
+func set_difficulty_source(source: String, fraction: float) -> void:
+	if is_zero_approx(fraction):
+		_difficulty_sources.erase(source)
+	else:
+		_difficulty_sources[source] = fraction
+	_resum_difficulty()
+
+
+## Adds a permanent one-shot contribution (demonic altar uses).
+func add_difficulty(fraction: float, source: String = "altars") -> void:
+	if fraction <= 0.0:
 		return
-	curse_stacks += stacks
-	curse_changed.emit(curse_stacks)
+	_difficulty_sources[source] = float(_difficulty_sources.get(source, 0.0)) + fraction
+	_resum_difficulty()
 
 
-## The next boss to spawn consumes EVERY banked stack at once; returns how
-## many it took (the spawner scales the boss with them).
-func consume_curses() -> int:
-	var stacks := curse_stacks
-	if stacks > 0:
-		curse_stacks = 0
-		curse_changed.emit(curse_stacks)
-	return stacks
+func _resum_difficulty() -> void:
+	var total := 0.0
+	for source: String in _difficulty_sources:
+		total += _difficulty_sources[source]
+	difficulty_bonus = maxf(total, 0.0)
+	difficulty_changed.emit(difficulty_bonus)
+
+
+## Current price of a chest of the given rarity, in run points.
+func chest_price(rarity_name: String) -> int:
+	var base := int(CHEST_BASE_PRICES.get(rarity_name, CHEST_BASE_PRICES["Common"]))
+	return ceili(float(base) * chest_price_multiplier)
+
+
+## Every opened chest makes all the others pricier (global multiplier).
+func register_chest_opened() -> void:
+	chest_price_multiplier *= CHEST_PRICE_GROWTH
+
+
+## XP multiplier the run-wide difficulty grants on every gem.
+func difficulty_xp_multiplier() -> float:
+	return 1.0 + difficulty_bonus * DIFFICULTY_XP_SHARE
 
 
 func _xp_required(for_level: int) -> int:
-	return 5 + for_level * 3
+	return XP_BASE + for_level * XP_PER_LEVEL

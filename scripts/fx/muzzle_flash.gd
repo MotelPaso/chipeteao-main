@@ -10,7 +10,8 @@ var _tween: Tween = null
 
 
 func _ready() -> void:
-	cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	# cast_shadow lives in MuzzleFlash.tscn with the rest of the FX geometry
+	# rules (emissive FX never casts), not here.
 	_material = StandardMaterial3D.new()
 	_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA

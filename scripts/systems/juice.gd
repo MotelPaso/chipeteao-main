@@ -57,6 +57,8 @@ void fragment() {
 @export_group("Bursts")
 @export var death_burst_min: int = 4
 @export var death_burst_max: int = 6
+## Never raise this above DeathBurst.tscn's authored `amount` (24): the
+## burst clamps to its buffer instead of reallocating it mid-death.
 @export var boss_burst_amount: int = 24
 @export var sparkle_amount: int = 6
 @export var sparkle_color: Color = Color(1.0, 0.84, 0.3)
@@ -66,24 +68,47 @@ void fragment() {
 @export var level_pulse_duration: float = 0.5
 
 
+## Cameras the feel layer drives. Split-screen registers each player's own
+## (source) camera here, because that is the one SplitScreen mirrors into
+## the SubViewport that actually renders; with the group empty (solo) the
+## root viewport's active camera is used, exactly as before.
+const FEEL_CAMERA_GROUP: StringName = &"feel_camera"
+
+
 ## Per-owner hit-flash bookkeeping: the meshes touched and the overlays to
 ## put back. One entry per body; repeat hits only refresh the timer.
 class FlashState:
 	extends RefCounted
 	var meshes: Array[MeshInstance3D] = []
 	var prev: Array[Material] = []
+	## Node that owns the COMPOSED overlay (EnemyBase.current_overlay), when
+	## there is one: asking it beats putting `prev` back, which resurrects an
+	## overlay the body dropped during the flash window.
+	var overlay_owner: Node = null
 	var time_left: float = 0.0
+
+
+## One live slide FOV kick. Keyed per camera so co-op raiders sliding at
+## the same time do not fight over a single base FOV.
+class FovKick:
+	extends RefCounted
+	var camera: Camera3D = null
+	var base_fov: float = 0.0
+	var tween: Tween = null
 
 
 # --- shake state ---
 var _trauma: float = 0.0
 var _trauma_decay: float = 0.0
 var _shake_time: float = 0.0
-var _shake_camera: Camera3D = null
-var _shake_rest_h: float = 0.0
-var _shake_rest_v: float = 0.0
+## Cameras currently displaced, with the h/v offset each rested at.
+var _shake_cameras: Array[Camera3D] = []
+var _shake_rest: Dictionary[int, Vector2] = {}
 var _noise_x: FastNoiseLite = FastNoiseLite.new()
 var _noise_y: FastNoiseLite = FastNoiseLite.new()
+## Per-process-frame cache of _feel_cameras() (the shake asks every tick).
+var _feel_cameras_cache: Array[Camera3D] = []
+var _feel_cameras_frame: int = -1
 
 # --- hit-stop state (single accumulator: overlaps extend, never stack) ---
 var _stop_left: float = 0.0
@@ -98,10 +123,14 @@ var _expired_flash_keys: Array[int] = []
 var _vignette_material: ShaderMaterial
 var _vignette_tween: Tween
 
-# --- FOV kick state ---
-var _fov_camera: Camera3D = null
-var _fov_base: float = 0.0
-var _fov_tween: Tween
+# --- FOV kick state (one entry per camera currently kicked) ---
+var _fov_kicks: Dictionary[int, FovKick] = {}
+
+# --- level pulse state ---
+## Process frame the last level ring/sting fired on: RunState emits
+## leveled_up once PER LEVEL, so one fat gem can fire it three times in a
+## single frame.
+var _level_pulse_frame: int = -1
 
 
 func _ready() -> void:
@@ -147,38 +176,66 @@ func shake(strength: float, duration: float = 0.3, trauma_cap: float = 1.0) -> v
 		return
 	if _trauma >= trauma_cap:
 		return
+	# Decay is carried as "time left to drain", not as a sticky maximum
+	# rate: a fast shake used to clamp every later one to its own rate, so
+	# one boss death silenced the horde rumble for the rest of the fight.
+	var time_left := _trauma / _trauma_decay if _trauma_decay > 0.0 else 0.0
 	_trauma = minf(_trauma + strength, clampf(trauma_cap, 0.0, 1.0))
-	_trauma_decay = maxf(_trauma_decay, strength / duration)
+	_trauma_decay = _trauma / maxf(time_left, duration)
 
 
 func _tick_shake(delta: float) -> void:
 	if _trauma <= 0.0:
 		return
 	_shake_time += delta * shake_noise_speed
-	var camera := _active_camera()
-	if camera != _shake_camera:
-		_release_shake_camera()
-		_shake_camera = camera
-		if camera != null:
-			_shake_rest_h = camera.h_offset
-			_shake_rest_v = camera.v_offset
-	if _shake_camera != null:
-		# h/v_offset survive the SpringArm3D (which overwrites the child
-		# transform every frame) and never rotate the rig.
-		var amount := pow(_trauma, 1.5) * shake_max_offset
-		_shake_camera.h_offset = _shake_rest_h + _noise_x.get_noise_1d(_shake_time) * amount
-		_shake_camera.v_offset = _shake_rest_v + _noise_y.get_noise_1d(_shake_time) * amount
+	_sync_shake_cameras(_feel_cameras())
+	# h/v_offset survive the SpringArm3D (which overwrites the child
+	# transform every frame) and never rotate the rig.
+	var amount := pow(_trauma, 1.5) * shake_max_offset
+	var offset_h := _noise_x.get_noise_1d(_shake_time) * amount
+	var offset_v := _noise_y.get_noise_1d(_shake_time) * amount
+	for camera: Camera3D in _shake_cameras:
+		if not is_instance_valid(camera):
+			continue
+		var rest: Vector2 = _shake_rest.get(camera.get_instance_id(), Vector2.ZERO)
+		camera.h_offset = rest.x + offset_h
+		camera.v_offset = rest.y + offset_v
 	_trauma = maxf(_trauma - _trauma_decay * delta, 0.0)
 	if _trauma == 0.0:
 		_trauma_decay = 0.0
-		_release_shake_camera()
+		_release_shake_cameras()
 
 
-func _release_shake_camera() -> void:
-	if _shake_camera != null and is_instance_valid(_shake_camera):
-		_shake_camera.h_offset = _shake_rest_h
-		_shake_camera.v_offset = _shake_rest_v
-	_shake_camera = null
+## Starts displacing cameras that just joined the set and puts back the
+## ones that left it (a view closing mid-shake must not stay offset).
+func _sync_shake_cameras(cameras: Array[Camera3D]) -> void:
+	for i in range(_shake_cameras.size() - 1, -1, -1):
+		var tracked := _shake_cameras[i]
+		if cameras.has(tracked) and is_instance_valid(tracked):
+			continue
+		_rest_camera(tracked)
+		_shake_cameras.remove_at(i)
+	for camera: Camera3D in cameras:
+		if _shake_cameras.has(camera):
+			continue
+		_shake_cameras.append(camera)
+		_shake_rest[camera.get_instance_id()] = Vector2(camera.h_offset, camera.v_offset)
+
+
+func _release_shake_cameras() -> void:
+	for camera: Camera3D in _shake_cameras:
+		_rest_camera(camera)
+	_shake_cameras.clear()
+	_shake_rest.clear()
+
+
+func _rest_camera(camera: Camera3D) -> void:
+	if camera == null or not is_instance_valid(camera):
+		return
+	var rest: Vector2 = _shake_rest.get(camera.get_instance_id(), Vector2.ZERO)
+	camera.h_offset = rest.x
+	camera.v_offset = rest.y
+	_shake_rest.erase(camera.get_instance_id())
 
 
 # --- hit stop ---------------------------------------------------------------
@@ -221,11 +278,24 @@ func flash(mesh_owner: Node3D) -> void:
 			entry.meshes.append(mesh)
 	if entry.meshes.is_empty():
 		return
+	entry.overlay_owner = _overlay_owner(mesh_owner)
 	for mesh: MeshInstance3D in entry.meshes:
 		entry.prev.append(mesh.material_overlay)
 		mesh.material_overlay = _flash_material
 	entry.time_left = flash_duration
 	_flashes[key] = entry
+
+
+## The node that owns the composed overlay for `mesh_owner`, or null when
+## nobody claims the slot. EnemyBase exposes current_overlay() on the body
+## while callers hand us its Visual child, so look one level up too.
+static func _overlay_owner(mesh_owner: Node3D) -> Node:
+	if mesh_owner.has_method(&"current_overlay"):
+		return mesh_owner
+	var parent := mesh_owner.get_parent()
+	if parent != null and parent.has_method(&"current_overlay"):
+		return parent
+	return null
 
 
 func _tick_flashes(delta: float) -> void:
@@ -242,11 +312,19 @@ func _tick_flashes(delta: float) -> void:
 		_flashes.erase(key)
 
 
+## Ends a flash. When the body composes its own overlay (poison tint, elite
+## glow) it is asked for the CURRENT answer instead of replaying the one
+## captured 0.08 s ago — poison wearing off inside the flash window used to
+## be undone by the restore, leaving the body green until it died.
 func _restore_flash(entry: FlashState) -> void:
+	var composed: Material = null
+	var owned := entry.overlay_owner != null and is_instance_valid(entry.overlay_owner)
+	if owned:
+		composed = entry.overlay_owner.call(&"current_overlay") as Material
 	for i in entry.meshes.size():
 		var mesh := entry.meshes[i]
 		if is_instance_valid(mesh):
-			mesh.material_overlay = entry.prev[i]
+			mesh.material_overlay = composed if owned else entry.prev[i]
 
 
 # --- particle bursts --------------------------------------------------------
@@ -299,50 +377,59 @@ func sparkle(at: Vector3) -> void:
 
 # --- slide FOV kick ---------------------------------------------------------
 
-func fov_kick_begin() -> void:
-	var camera := _active_camera()
-	if camera == null:
+## Widens `camera` while a slide lasts. Pass the slider's OWN camera: in
+## split-screen there is no active camera on the root viewport, so the
+## no-argument form has nothing to kick (and kicking every view would flare
+## the FOV of raiders who are not sliding). SplitScreen mirrors the source
+## camera's fov into the view that renders, so the kick propagates for free.
+func fov_kick_begin(camera: Camera3D = null) -> void:
+	var target := camera if camera != null else _active_camera()
+	if target == null or not is_instance_valid(target):
 		return
-	if _fov_camera != camera:
-		# New camera: snap any old one back, then record this one's rest
-		# FOV. While the restore tween of the SAME camera is still mid-
-		# flight, the recorded base stays valid — never re-read a moving fov.
-		_restore_fov_now()
-		_fov_camera = camera
-		_fov_base = camera.fov
-	_kill_fov_tween()
-	_fov_tween = create_tween()
-	_fov_tween.set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
-	_fov_tween.tween_property(camera, "fov", _fov_base + fov_kick_amount, fov_kick_in_time) \
-			.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	var key := target.get_instance_id()
+	var kick: FovKick = _fov_kicks.get(key, null)
+	if kick == null:
+		# First kick on this camera: record its rest FOV. While the restore
+		# tween of the SAME camera is still mid-flight the recorded base
+		# stays valid — never re-read a moving fov.
+		kick = FovKick.new()
+		kick.camera = target
+		kick.base_fov = target.fov
+		_fov_kicks[key] = kick
+	_kill_fov_tween(kick)
+	kick.tween = create_tween()
+	kick.tween.set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
+	kick.tween.tween_property(target, "fov", kick.base_fov + fov_kick_amount,
+			fov_kick_in_time).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 
 
-func fov_kick_end() -> void:
-	if _fov_camera == null or not is_instance_valid(_fov_camera):
-		_fov_camera = null
+func fov_kick_end(camera: Camera3D = null) -> void:
+	var target := camera if camera != null else _active_camera()
+	if target == null:
 		return
-	_kill_fov_tween()
-	_fov_tween = create_tween()
-	_fov_tween.set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
-	_fov_tween.tween_property(_fov_camera, "fov", _fov_base, fov_kick_out_time) \
+	var key := target.get_instance_id()
+	var kick: FovKick = _fov_kicks.get(key, null)
+	if kick == null:
+		return
+	if not is_instance_valid(kick.camera):
+		_kill_fov_tween(kick)
+		_fov_kicks.erase(key)
+		return
+	_kill_fov_tween(kick)
+	kick.tween = create_tween()
+	kick.tween.set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
+	kick.tween.tween_property(kick.camera, "fov", kick.base_fov, fov_kick_out_time) \
 			.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
-	_fov_tween.tween_callback(_on_fov_restored)
+	kick.tween.tween_callback(_on_fov_restored.bind(key))
 
 
-func _on_fov_restored() -> void:
-	_fov_camera = null
+func _on_fov_restored(key: int) -> void:
+	_fov_kicks.erase(key)
 
 
-func _restore_fov_now() -> void:
-	_kill_fov_tween()
-	if _fov_camera != null and is_instance_valid(_fov_camera):
-		_fov_camera.fov = _fov_base
-	_fov_camera = null
-
-
-func _kill_fov_tween() -> void:
-	if _fov_tween != null and _fov_tween.is_valid():
-		_fov_tween.kill()
+func _kill_fov_tween(kick: FovKick) -> void:
+	if kick.tween != null and kick.tween.is_valid():
+		kick.tween.kill()
 
 
 # --- damage vignette --------------------------------------------------------
@@ -378,11 +465,20 @@ func _pulse_vignette() -> void:
 # --- level-up pulse ---------------------------------------------------------
 
 func _on_leveled_up(_new_level: int) -> void:
-	Sfx.play(&"level_up")
-	var player := get_tree().get_first_node_in_group("player") as Node3D
-	if player == null:
+	# RunState emits once PER LEVEL, so a rift gem worth three levels fired
+	# this three times in one frame: three copies of the same wav stacking
+	# on the bus and three rings drawn pixel on pixel. One per frame.
+	var frame := Engine.get_process_frames()
+	if frame == _level_pulse_frame:
 		return
-	_spawn_level_ring(player.global_position + Vector3.UP * 0.15)
+	_level_pulse_frame = frame
+	Sfx.play(&"level_up")
+	# Shared party level: the ring pulses at EVERY standing raider's feet
+	# (one node in solo — identical to the old single-ring behavior).
+	for node: Node in get_tree().get_nodes_in_group(&"player"):
+		var player := node as Node3D
+		if player != null and player.is_inside_tree():
+			_spawn_level_ring(player.global_position + Vector3.UP * 0.15)
 
 
 ## Expanding emissive ring at the player's feet. Its tween ignores pause so
@@ -408,7 +504,10 @@ func _spawn_level_ring(at: Vector3) -> void:
 	scene_root.add_child(ring)
 	ring.global_position = at
 	ring.scale = Vector3(0.4, 0.55, 0.4)
-	var tween := create_tween()
+	# Bound to the RING, not to this autoload: the ring dies with the scene,
+	# and a tween owned by Juice would outlive it (quitting to menu inside
+	# the half-second pulse tweened a freed object).
+	var tween := ring.create_tween()
 	tween.set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
 	tween.set_parallel(true)
 	tween.tween_property(ring, "scale", Vector3(4.6, 0.25, 4.6), level_pulse_duration) \
@@ -418,7 +517,44 @@ func _spawn_level_ring(at: Vector3) -> void:
 	tween.chain().tween_callback(ring.queue_free)
 
 
+# --- shared math ------------------------------------------------------------
+
+## Framerate-independent smoothing weight for `lerp(a, b, Juice.damp(r, d))`.
+## The obvious `rate * delta` is the Euler approximation of this: its error
+## grows with delta, so a smoothed value's response time drifts with the
+## framerate (and below 10 fps it saturates at 1.0 and stops smoothing).
+## Lives on the feel layer so the seal rig, the pets and the camera all
+## settle at the same real speed whatever the frame time is.
+static func damp(rate: float, delta: float) -> float:
+	return 1.0 - exp(-rate * delta)
+
+
 # --- shared lookups ---------------------------------------------------------
+
+## Every camera the feel layer should displace. In split-screen the root
+## viewport has NO active camera (each player's own camera is deactivated
+## in favour of a follow camera inside a SubViewport), which is why the
+## plain lookup below returned null and shake died in co-op; SplitScreen
+## registers the source cameras it mirrors in FEEL_CAMERA_GROUP instead.
+## Cached per process frame: the shake asks for this every tick.
+func _feel_cameras() -> Array[Camera3D]:
+	var frame := Engine.get_process_frames()
+	if frame == _feel_cameras_frame:
+		return _feel_cameras_cache
+	_feel_cameras_frame = frame
+	_feel_cameras_cache.clear()
+	var tree := get_tree()
+	if tree != null:
+		for node: Node in tree.get_nodes_in_group(FEEL_CAMERA_GROUP):
+			var camera := node as Camera3D
+			if camera != null and camera.is_inside_tree():
+				_feel_cameras_cache.append(camera)
+	if _feel_cameras_cache.is_empty():
+		var single := _active_camera()
+		if single != null:
+			_feel_cameras_cache.append(single)
+	return _feel_cameras_cache
+
 
 func _active_camera() -> Camera3D:
 	var viewport := get_viewport()

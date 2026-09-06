@@ -41,6 +41,12 @@ const TINT_MATERIAL_PREFIX := "Azul personaje"
 ## Nose-down pitch (radians) while sliding.
 @export var slide_pitch: float = 0.22
 
+## Convergence rates for the smoothed motion state, in "fraction closed per
+## second" (see _damp): lean/bob/stretch settle quickly, the slide squash a
+## touch faster so the flatten reads as an impact.
+const MOTION_DAMP_RATE: float = 10.0
+const SQUASH_DAMP_RATE: float = 14.0
+
 @onready var _model: Node3D = $Model
 
 ## The player body whose velocity drives lean/bob; null outside a player
@@ -56,6 +62,18 @@ var _lean: Vector2 = Vector2.ZERO
 var _bob: float = 0.0
 var _stretch: float = 0.0
 var _squash_blend: float = 0.0
+## The pause-immune face-plant, kept so a revive can cancel it (see
+## reset_death): a live tween writes the same _model properties _process
+## rewrites every frame, and the two fight over the model.
+var _death_tween: Tween = null
+
+
+## Framerate-independent smoothing weight for `lerp(a, b, _damp(rate, d))`.
+## The obvious `rate * delta` is the Euler approximation of this: its error
+## grows with delta, so the rig's response time drifts with the framerate
+## (and below 10 fps it saturates at 1.0 and stops smoothing altogether).
+static func _damp(rate: float, delta: float) -> float:
+	return 1.0 - exp(-rate * delta)
 
 
 func _ready() -> void:
@@ -100,7 +118,7 @@ func _process(delta: float) -> void:
 	if _dead:
 		return
 	_phase += delta
-	var smoothing := minf(delta * 10.0, 1.0)
+	var smoothing := _damp(MOTION_DAMP_RATE, delta)
 
 	# Movement-driven targets (all zero when idle or outside a player).
 	var target_lean := Vector2.ZERO
@@ -121,7 +139,7 @@ func _process(delta: float) -> void:
 	_bob = lerpf(_bob, bob_amount * speed_factor, smoothing)
 	# Slide ratio 0.5 (the capsule's crouch) maps to a full squash blend.
 	_squash_blend = lerpf(_squash_blend, clampf((1.0 - _slide_ratio) * 2.0, 0.0, 1.0),
-			minf(delta * 14.0, 1.0))
+			_damp(SQUASH_DAMP_RATE, delta))
 
 	# Compose scale: breathe * jump stretch * slide squash (volume-ish kept).
 	var breathe := 1.0 + sin(_phase * breathe_speed) * breathe_amount
@@ -129,10 +147,15 @@ func _process(delta: float) -> void:
 	var scale_xz := (1.0 - _stretch * 0.5) * lerpf(1.0, slide_spread, _squash_blend)
 	_model.scale = Vector3(scale_xz, scale_y, scale_xz)
 
-	# Lean into motion (forward run = nose-down pitch, strafing = roll)
-	# plus the slide nose-dive; bob rides on top when grounded.
-	_model.rotation.x = -_lean.y - slide_pitch * _squash_blend
-	_model.rotation.z = _lean.x
+	# Lean INTO the motion (forward run = nose-down pitch, strafing = roll
+	# toward the strafe) plus the slide nose-dive; bob rides on top when
+	# grounded. Signs: the model's nose points down -Z, so a NEGATIVE pitch
+	# dips it — the same sign the slide dive already uses — and running
+	# forward gives local_velocity.z < 0, hence _lean.y straight through.
+	# Likewise strafing right gives _lean.x > 0 and needs a negative roll to
+	# drop the head toward +X.
+	_model.rotation.x = _lean.y - slide_pitch * _squash_blend
+	_model.rotation.z = -_lean.x
 	_model.position.y = absf(sin(_phase * bob_speed)) * _bob
 
 
@@ -144,12 +167,35 @@ func play_death() -> void:
 	if _dead:
 		return
 	_dead = true
-	var tween := create_tween()
-	tween.set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
-	tween.set_parallel(true)
-	tween.tween_property(_model, "rotation:x", -TAU * 0.25, 0.5) \
+	_kill_death_tween()
+	_death_tween = create_tween()
+	_death_tween.set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
+	_death_tween.set_parallel(true)
+	_death_tween.tween_property(_model, "rotation:x", -TAU * 0.25, 0.5) \
 			.set_trans(Tween.TRANS_BOUNCE).set_ease(Tween.EASE_OUT)
-	tween.tween_property(_model, "position:y", 0.55, 0.5) \
+	_death_tween.tween_property(_model, "position:y", 0.55, 0.5) \
 			.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
-	tween.tween_property(_model, "scale", Vector3(1.0, 1.0, 0.8), 0.5) \
+	_death_tween.tween_property(_model, "scale", Vector3(1.0, 1.0, 0.8), 0.5) \
 			.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+
+
+## Co-op revive: undo the face-plant and hand the model back to the
+## procedural motion loop (which rewrites rotation/scale/position every
+## frame, so a simple snap is enough).
+func reset_death() -> void:
+	if not _dead:
+		return
+	_dead = false
+	# Kill FIRST: the face-plant is pause-immune and 0.5 s long, so a fast
+	# revive would leave it writing rotation/position/scale on top of the
+	# snap below and of _process, flickering the seal between poses.
+	_kill_death_tween()
+	_model.rotation = Vector3.ZERO
+	_model.position.y = 0.0
+	_model.scale = Vector3.ONE
+
+
+func _kill_death_tween() -> void:
+	if _death_tween != null and _death_tween.is_valid():
+		_death_tween.kill()
+	_death_tween = null

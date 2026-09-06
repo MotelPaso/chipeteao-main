@@ -30,9 +30,25 @@ const OUTLINE_DARK := Color(0.03, 0.035, 0.06, 0.92)
 const RADIUS := 10
 const RADIUS_SMALL := 7
 
+## Outer glow a card wears in its own border color (style_card). Hover and
+## focus add the same extra alpha, so a pad player's focus ring reads
+## exactly as loudly as a mouse hover.
+const CARD_GLOW_SIZE := 10
+const CARD_GLOW_ALPHA := 0.3
+const CARD_GLOW_HIGHLIGHT := 0.2
+
 const HOVER_GROW := 1.04
 const PRESS_SQUASH := 0.95
 const MOTION_TIME := 0.12
+
+# --- shared wordings -------------------------------------------------------
+
+## Two different "level" scales the player reads side by side: the RUN
+## level (HUD chip) and a WEAPON's upgrade level (loadout corner tag,
+## Collection rows). One constant each so re-wording either one lands on
+## every screen at once instead of drifting apart.
+const LEVEL_ABBREV := "Nv %d"
+const WEAPON_LEVEL_ABBREV := "N%d"
 
 
 # --- styleboxes ------------------------------------------------------------
@@ -98,6 +114,34 @@ static func button_states(accent: Color = ACCENT,
 			add_glow(box, accent, 6, 0.28 if state != "pressed" else 0.12)
 		states[state] = box
 	return states
+
+
+## THE card look, shared by every "pick one of these" surface (upgrade
+## cards, raider/map/tier/co-op cards): one body palette for the four
+## states, the accent as the border, and an outer glow that strengthens on
+## hover AND on focus — keyboard/pad players navigate by that focus ring,
+## so it must read as loudly as a hover does.
+##
+## `glow` off is the quiet look the unselected and locked cards wear:
+## border only, no shadow, so the picked card is the one that lights up.
+static func style_card(button: Button, border: Color, width: int = 3,
+		glow: bool = true) -> void:
+	var bodies: Dictionary[String, Color] = {
+		"normal": CARD_BG,
+		"hover": CARD_BG_HOVER,
+		"pressed": CARD_BG_PRESSED,
+		"focus": CARD_BG_HOVER,
+	}
+	for state: String in bodies:
+		var highlighted := state == "hover" or state == "focus"
+		var box := flat(bodies[state], RADIUS)
+		box.border_color = border.lightened(0.2) if highlighted else border
+		box.set_border_width_all(width)
+		if glow:
+			add_glow(box, border, CARD_GLOW_SIZE,
+					(CARD_GLOW_ALPHA + CARD_GLOW_HIGHLIGHT) if highlighted
+					else CARD_GLOW_ALPHA)
+		button.add_theme_stylebox_override(state, box)
 
 
 ## Apply the full system to a Button: state styleboxes, font colors, and
@@ -173,13 +217,22 @@ static func kill_meta_tween(node: Node, key: StringName) -> void:
 
 # --- typography ------------------------------------------------------------
 
+## One shared FontVariation per spacing value. They are immutable once
+## built, so sharing is safe — and it matters: a fresh FontVariation per
+## call (3 per card deal, 5 per HUD restyle) invalidates the TextServer
+## shaping cache every time.
+static var _spaced_fonts: Dictionary[int, FontVariation] = {}
+
+
 ## Default font with extra per-glyph spacing: the "small caps label" /
 ## big title treatment without shipping a font asset.
 static func spaced_font(spacing: int) -> FontVariation:
-	var font := FontVariation.new()
-	font.base_font = ThemeDB.fallback_font
-	font.spacing_glyph = spacing
-	return font
+	if not _spaced_fonts.has(spacing):
+		var font := FontVariation.new()
+		font.base_font = ThemeDB.fallback_font
+		font.spacing_glyph = spacing
+		_spaced_fonts[spacing] = font
+	return _spaced_fonts[spacing]
 
 
 ## Headline treatment: letter-spaced, outlined, colored.

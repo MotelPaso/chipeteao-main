@@ -30,9 +30,7 @@ func _play_slash(target: Node3D) -> void:
 	var slash := Pools.acquire_scene(Pools.SLASH_ARC_SCENE) as SlashArc
 	if slash == null:
 		return
-	var aim := target.global_position - global_position
-	aim.y = 0.0
-	if aim.length_squared() < 0.0001:
-		aim = -global_transform.basis.z
+	var aim := flat_dir_or(target.global_position - global_position,
+			-global_transform.basis.z)
 	slash.play(target.global_position + Vector3.UP * 0.3, aim, slash_radius,
 			slash_color, 100.0, slash_time, _stab_left)

@@ -40,6 +40,7 @@ script = ExtResource("1_crack")
 cast_shadow = 0
 
 [node name="Thorns" type="GPUParticles3D" parent="."]
+cast_shadow = 0
 emitting = false
 amount = 16
 lifetime = 0.35

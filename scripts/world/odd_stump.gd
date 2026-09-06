@@ -11,9 +11,9 @@ extends SecretTrigger
 ## Flavor line per interact (index = interact number - 1; the list's last
 ## line repeats if the count somehow exceeds it).
 @export var grumble_lines: Array[String] = [
-	"A muffled grumble rolls up through the roots...",
-	"The grumble swells. The mushroom quivers angrily.",
-	"The roots burst apart!",
+	"Un gruñido sordo sube por las raíces...",
+	"El gruñido crece. El hongo tiembla de rabia.",
+	"¡Las raíces revientan!",
 ]
 @export var grumble_sound: StringName = &"burrow_pop"
 ## First grumble's volume offset; each further interact adds the step, so
@@ -27,6 +27,13 @@ var interact_count: int = 0
 @onready var _visual: Node3D = $Visual
 
 var _shudder_tween: Tween
+
+
+## Prompt and banner defaults live here, next to the other Interactable
+## defaults; the scene only overrides them per instance.
+func _init() -> void:
+	prompt_text = "[E] Hurgar el tocón raro"
+	awaken_text = "¡Algo gordo y furioso se abre paso entre las raíces!"
 
 
 func _interact(_player: Node) -> void:

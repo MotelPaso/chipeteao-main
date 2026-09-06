@@ -12,8 +12,14 @@ extends Control
 signal closed
 
 const SLIDER_TRACK_COLOR := Color(0.05, 0.06, 0.09, 0.9)
+## Volume is a 0-100 percentage everywhere (SettingsApply converts it to
+## dB); sensitivity's range is SaveData's, which is also what clamps the
+## stored value.
+const VOLUME_MIN := 0.0
+const VOLUME_MAX := 100.0
 
 @onready var _panel: PanelContainer = %Panel
+@onready var _title_label: Label = %TitleLabel
 @onready var _sfx_slider: HSlider = %SfxSlider
 @onready var _ambient_slider: HSlider = %AmbientSlider
 @onready var _sensitivity_slider: HSlider = %SensitivitySlider
@@ -70,13 +76,16 @@ func close() -> void:
 	closed.emit()
 
 
-## set_value_no_signal so refreshing never re-applies (or re-saves).
+## set_value_no_signal so refreshing never re-applies (or re-saves). The
+## label reads the slider back, not SaveData: Range snaps the assignment
+## to its step, and a grabber sitting on 0.35 under a label that reads
+## "0.37x" is a bug report waiting to happen.
 func _refresh_controls() -> void:
 	_sfx_slider.set_value_no_signal(SaveData.sfx_volume)
 	_ambient_slider.set_value_no_signal(SaveData.ambient_volume)
 	_sensitivity_slider.set_value_no_signal(SaveData.mouse_sensitivity)
 	_fullscreen_check.set_pressed_no_signal(SaveData.fullscreen)
-	_refresh_sensitivity_label(SaveData.mouse_sensitivity)
+	_refresh_sensitivity_label(_sensitivity_slider.value)
 
 
 func _refresh_sensitivity_label(value: float) -> void:
@@ -100,13 +109,23 @@ func _on_fullscreen_toggled(on: bool) -> void:
 	Settings.set_fullscreen(on)
 
 
+## Slider bounds come from the code that clamps the stored values, not
+## from the scene: two copies of 0.3-2.0 drift the day one of them moves.
+func _apply_ranges() -> void:
+	for slider: HSlider in [_sfx_slider, _ambient_slider]:
+		slider.min_value = VOLUME_MIN
+		slider.max_value = VOLUME_MAX
+	_sensitivity_slider.min_value = SaveData.MIN_MOUSE_SENSITIVITY
+	_sensitivity_slider.max_value = SaveData.MAX_MOUSE_SENSITIVITY
+
+
 ## UiTheme design system: shared panel + headline, filled-track sliders
 ## with a round teal grabber, teal Back button.
 func _apply_styles() -> void:
+	_apply_ranges()
 	_panel.add_theme_stylebox_override("panel",
 			UiTheme.panel(UiTheme.PANEL_BG, UiTheme.BORDER_DIM, 32.0, 24.0))
-	var title := _panel.get_node("VBox/TitleLabel") as Label
-	UiTheme.style_title(title, 30, Color(0.96, 0.93, 0.82), 6, 8)
+	UiTheme.style_title(_title_label, 30, Color(0.96, 0.93, 0.82), 6, 8)
 	var grabber := UiTheme.grabber_icon(UiTheme.ACCENT)
 	var grabber_hi := UiTheme.grabber_icon(UiTheme.ACCENT.lightened(0.25))
 	for slider: HSlider in [_sfx_slider, _ambient_slider, _sensitivity_slider]:

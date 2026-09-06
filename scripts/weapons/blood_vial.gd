@@ -4,8 +4,8 @@ extends WeaponBase
 ## pulses damage ticks (`damage` is per tick, through the shared funnel)
 ## and returns heal_fraction of the damage the pool dealt to the player as
 ## healing — innate drain, on top of any regular lifesteal.
-## Pools are plain dicts ticked by this weapon each physics frame (no pool
-## scene); a pool lives pool_ticks * tick_interval seconds.
+## Pools are BloodPoolEntry records ticked by this weapon each physics frame
+## (no pool scene); a pool lives pool_ticks * tick_interval seconds.
 
 ## Neighborhood radius used to score cluster density around each candidate.
 @export var cluster_radius: float = 3.0
@@ -26,10 +26,33 @@ extends WeaponBase
 @export var lob_time: float = 0.5
 ## Peak height of the flask arc above the straight throw line.
 @export var arc_height: float = 3.0
+## How far above the impact point the pool visual sits. Enemy origins are
+## already at ground level, so this only has to clear the arena floor's top
+## face; going below it buries the disc and the rim inside the opaque floor.
+@export var pool_ground_offset: float = 0.03
 
-## Active pools: {center: Vector3, radius: float, ticks_left: int,
-## tick_timer: float, visual: BloodPoolFx}.
-var _pools: Array[Dictionary] = []
+## Floor on tick_interval when advancing a pool. A designer (or a future
+## evolution row, which WeaponBase.evolve applies generically) setting it to
+## zero would otherwise leave _tick_pools spinning its whole tick budget in
+## one frame, sweeping the horde once per pending tick.
+const MIN_TICK_INTERVAL: float = 0.01
+
+
+## One live blood pool. A record instead of a loose Dictionary because its
+## `visual` is a POOLED node crossing frames: with fields the compiler
+## catches a mistyped name, and every read has one obvious home.
+class BloodPoolEntry extends RefCounted:
+	var center: Vector3 = Vector3.ZERO
+	var radius: float = 0.0
+	var ticks_left: int = 0
+	var tick_timer: float = 0.0
+	var visual: BloodPoolFx = null
+
+
+var _pools: Array[BloodPoolEntry] = []
+## Flask visuals still in the air, so a weapon that dies mid-throw takes its
+## flasks with it instead of leaving them frozen on the arc.
+var _flasks_in_flight: Array[MeshInstance3D] = []
 
 var _flask_mesh: SphereMesh
 
@@ -54,6 +77,23 @@ func _physics_process(delta: float) -> void:
 	_tick_pools(delta)
 
 
+## Pools and flasks live under the scene root, not under this weapon, so
+## nothing frees them when the weapon goes: hand them back by hand or the
+## BloodPoolFx instances throb on forever and never park back in Pools.
+## Parked straight away rather than faded — expire()'s fade tween would have
+## to be created on a node that may already be leaving the tree with us.
+func _exit_tree() -> void:
+	for pool: BloodPoolEntry in _pools:
+		if pool.visual != null and is_instance_valid(pool.visual):
+			Pools.release(pool.visual)
+		pool.visual = null
+	_pools.clear()
+	for flask: MeshInstance3D in _flasks_in_flight:
+		if is_instance_valid(flask):
+			flask.queue_free()
+	_flasks_in_flight.clear()
+
+
 ## The in-range enemy with the most neighbors within cluster_radius (among
 ## the first max_cluster_candidates found) — the flask lands on packs, not
 ## the nearest straggler. Ties keep the earliest candidate.
@@ -61,17 +101,9 @@ func acquire_target() -> Node3D:
 	# Empty-horde fast path (see WeaponBase.acquire_target).
 	if get_tree().get_first_node_in_group("enemies") == null:
 		return null
-	var candidates: Array[Node3D] = []
-	var range_sq := attack_range * attack_range
-	for node: Node in get_tree().get_nodes_in_group("enemies"):
-		var body := node as Node3D
-		if body == null or not body.is_inside_tree():
-			continue
-		if global_position.distance_squared_to(body.global_position) > range_sq:
-			continue
-		candidates.append(body)
-		if candidates.size() >= max_cluster_candidates:
-			break
+	var candidates := enemies_in_sphere(global_position, attack_range)
+	if candidates.size() > max_cluster_candidates:
+		candidates.resize(max_cluster_candidates)
 	var best: Node3D = null
 	var best_neighbors := -1
 	var cluster_sq := cluster_radius * cluster_radius
@@ -94,30 +126,31 @@ func fire(target: Node3D) -> void:
 ## Throws the flask visual along a parabolic arc; the pool spawns where it
 ## lands (the target's position at throw time), lob_time later.
 func _lob_flask(impact: Vector3) -> void:
-	var flask := MeshInstance3D.new()
-	flask.mesh = _flask_mesh
-	flask.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	var parent_node: Node = get_tree().current_scene
-	if parent_node == null:
-		parent_node = get_tree().root
-	# Scene-root parent so the flask keeps flying while the player moves on.
-	parent_node.add_child(flask)
+	var flask := spawn_fx_mesh(_flask_mesh)
 	var start := global_position + Vector3.UP * 1.2
 	flask.global_position = start
-	var tween := flask.create_tween()
+	_flasks_in_flight.append(flask)
+	# The tween is OURS, not the flask's: its steps call back into this
+	# weapon, so binding it to the flask (which lives under the scene root)
+	# left it running against a freed weapon if the weapon went first.
+	var tween := create_tween()
 	tween.tween_method(_arc_flask.bind(flask, start, impact), 0.0, 1.0, lob_time)
 	tween.tween_callback(_shatter.bind(flask, impact))
 
 
 ## Flight sampler: linear lerp plus an arc lift that peaks mid-flight.
 func _arc_flask(progress: float, flask: MeshInstance3D, start: Vector3, impact: Vector3) -> void:
+	if not is_instance_valid(flask):
+		return
 	var pos := start.lerp(impact, progress)
 	pos.y += arc_height * 4.0 * progress * (1.0 - progress)
 	flask.global_position = pos
 
 
 func _shatter(flask: MeshInstance3D, impact: Vector3) -> void:
-	flask.queue_free()
+	_flasks_in_flight.erase(flask)
+	if is_instance_valid(flask):
+		flask.queue_free()
 	_spawn_pool(impact)
 
 
@@ -126,65 +159,50 @@ func _spawn_pool(center: Vector3) -> void:
 	var visual := Pools.acquire_scene(Pools.BLOOD_POOL_SCENE) as BloodPoolFx
 	var radius := pool_radius * area_scale()
 	if visual != null:
-		# The disc sits near the floor below the struck body's origin.
-		visual.play(center + Vector3.DOWN * 0.75, radius)
-	_pools.append({
-		"center": center,
-		"radius": radius,
-		"ticks_left": pool_ticks,
-		"tick_timer": 0.0,
-		"visual": visual,
-	})
+		# Just above the floor: the struck body's origin already sits ON the
+		# ground, so anything below it renders inside the opaque floor slab.
+		visual.play(center + Vector3.UP * pool_ground_offset, radius)
+	var pool := BloodPoolEntry.new()
+	pool.center = center
+	pool.radius = radius
+	pool.ticks_left = maxi(roundi(float(pool_ticks) * duration_scale()), 1)
+	pool.tick_timer = 0.0
+	pool.visual = visual
+	_pools.append(pool)
 
 
 ## Advances every pool: pulses come due every tick_interval (the first one
 ## right after landing); the pool expires one interval after its last
 ## pulse, so lifetime is exactly ticks * interval.
 func _tick_pools(delta: float) -> void:
+	var step := maxf(tick_interval, MIN_TICK_INTERVAL)
 	# Backward so finished pools can be removed in place.
 	for i in range(_pools.size() - 1, -1, -1):
-		var pool: Dictionary = _pools[i]
-		var timer := float(pool.tick_timer) - delta
-		var ticks_left := int(pool.ticks_left)
-		while timer <= 0.0 and ticks_left > 0:
+		var pool := _pools[i]
+		pool.tick_timer -= delta
+		while pool.tick_timer <= 0.0 and pool.ticks_left > 0:
 			_pulse_pool(pool)
-			ticks_left -= 1
-			timer += tick_interval
-		pool.tick_timer = timer
-		pool.ticks_left = ticks_left
-		if ticks_left <= 0 and timer <= 0.0:
+			pool.ticks_left -= 1
+			pool.tick_timer += step
+		if pool.ticks_left <= 0 and pool.tick_timer <= 0.0:
 			_expire_pool(pool)
 			_pools.remove_at(i)
 
 
 ## One damage pulse: every enemy standing in the pool takes a tick through
 ## the shared funnel, then the player drinks a fraction of the total.
-func _pulse_pool(pool: Dictionary) -> void:
-	var center: Vector3 = pool.center
-	var radius := float(pool.radius)
-	var radius_sq := radius * radius
-	var dealt_total := 0.0
-	for node: Node in get_tree().get_nodes_in_group("enemies"):
-		var body := node as Node3D
-		if body == null or not body.is_inside_tree():
-			continue
-		var to_body := body.global_position - center
-		if absf(to_body.y) > pool_height_window:
-			continue
-		to_body.y = 0.0
-		if to_body.length_squared() > radius_sq:
-			continue
-		var health := Health.find_in(body)
-		if health != null:
-			dealt_total += deal_damage(health)
+func _pulse_pool(pool: BloodPoolEntry) -> void:
+	var dealt_total := damage_all(
+			enemies_in_disc(pool.center, pool.radius, pool_height_window))
 	if dealt_total > 0.0:
-		# Innate drain: same player-heal path lifesteal uses.
+		# Innate drain: same player-heal path lifesteal uses, now paid on
+		# the damage that actually landed rather than on the raw roll.
 		_lifesteal_heal(dealt_total * heal_fraction)
 
 
-func _expire_pool(pool: Dictionary) -> void:
-	var visual := pool.visual as BloodPoolFx
-	if visual == null or not is_instance_valid(visual):
+func _expire_pool(pool: BloodPoolEntry) -> void:
+	if pool.visual == null or not is_instance_valid(pool.visual):
 		return
 	# Fades out, then parks itself back in the Pools.
-	visual.expire()
+	pool.visual.expire()
+	pool.visual = null

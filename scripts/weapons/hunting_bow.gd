@@ -25,11 +25,11 @@ func fire(target: Node3D) -> void:
 	if projectile_scene == null:
 		push_warning("%s: projectile_scene not set" % name)
 		return
-	var to_aim := target.global_position + Vector3.UP * aim_height - _nock.global_position
 	# Degenerate case (target on top of the nock): fire where we face.
-	var base_dir := to_aim.normalized() if to_aim.length_squared() > 0.0001 \
-			else -global_transform.basis.z
-	var count := maxi(projectile_count, 1)
+	var base_dir := aim_dir_or(
+			target.global_position + Vector3.UP * aim_height - _nock.global_position,
+			-global_transform.basis.z)
+	var count := maxi(effective_projectile_count(), 1)
 	for i: int in count:
 		var yaw := deg_to_rad(fan_spread_deg) * (float(i) - float(count - 1) * 0.5)
 		_spawn_arrow(base_dir.rotated(Vector3.UP, yaw), target)
@@ -48,8 +48,7 @@ func _spawn_arrow(direction: Vector3, target: Node3D) -> void:
 		return
 	# Aim can run near-colinear with UP (enemy right below a platform edge);
 	# a sideways up vector keeps the basis buildable, flight unchanged.
-	var up := Vector3.UP if absf(direction.dot(Vector3.UP)) < 0.99 else Vector3.RIGHT
 	arrow.global_transform = Transform3D(
-			Basis.looking_at(direction, up), _nock.global_position)
+			Basis.looking_at(direction, safe_up(direction)), _nock.global_position)
 	arrow.pierce_remaining = maxi(pierce_count, 1)
 	arrow.launch(self, attack_range * range_grace, target)

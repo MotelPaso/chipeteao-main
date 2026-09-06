@@ -17,24 +17,47 @@ signal dodged(attacker: Node3D)
 signal hp_changed(current: float, max_hp: float)
 signal died
 
+## Max HP. The setter owns the "current_hp never exceeds max_hp" invariant
+## so no call site has to remember it: a body that was at FULL HP stays
+## full (every "scale this enemy up" site — tiers, elites, sky variants —
+## gets the tank it asked for), a wounded one keeps its HP clamped down,
+## and either way hp_changed reports both values so bars never paint a
+## current above the maximum.
 @export var max_hp: float = 50.0:
 	set(value):
+		var was_full := _initialized and is_equal_approx(current_hp, max_hp)
 		max_hp = value
+		# Scene instantiation writes this export BEFORE _ready seeds
+		# current_hp: there is no invariant to keep yet (and nothing is
+		# connected to hp_changed either), so don't fake one.
+		if not _initialized:
+			return
+		current_hp = max_hp if was_full else minf(current_hp, max_hp)
 		hp_changed.emit(current_hp, max_hp)
 @export var show_damage_popups: bool = true
 ## Flat damage reduction applied before HP loss; the player's PlayerStats
 ## layer writes this from Tome of Stone stacks. A hit always chips at least
-## 1 HP (or the raw amount when it was already below 1).
+## MIN_CHIP_DAMAGE (or the raw amount when it was already below it).
 @export var armor: float = 0.0
+## Floating text on a fully evaded hit (the player's evasion roll). An
+## @export so it travels with the rest of the player-facing strings.
+@export var dodge_text: String = "¡Esquiva!"
 
 const DODGE_POPUP_COLOR := Color(0.5, 0.88, 1.0)
+## Armor can never fully negate a hit: every landed blow chips this much,
+## so a stacked-armor build still has to dodge instead of going immortal.
+const MIN_CHIP_DAMAGE: float = 1.0
 
 var current_hp: float
 var is_dead: bool = false
+## True once _ready seeded current_hp; before that the max_hp setter has
+## no current_hp to keep coherent.
+var _initialized: bool = false
 
 
 func _ready() -> void:
 	current_hp = max_hp
+	_initialized = true
 
 
 ## Finds the Health component on a body, or null if it has none.
@@ -47,17 +70,27 @@ static func find_in(body: Node) -> Health:
 
 ## `attacker` (optional) is the body that dealt the hit; contact attackers
 ## pass themselves so thorns can retaliate through damaged_by.
-func take_damage(amount: float, is_crit: bool = false, attacker: Node3D = null) -> void:
+## RETURNS the HP this hit actually removed: 0.0 when it was refused (dead
+## body, non-positive amount) or fully evaded, the armor-reduced amount
+## otherwise, and only the HP that was LEFT on a killing blow. Callers that
+## pay out on damage dealt (weapon lifesteal, the Blood Vial's drain) read
+## this instead of sampling current_hp before and after — sampling credited
+## an overkill hit for the sliver it happened to find, and could not tell a
+## dodge from a hit that landed for zero.
+func take_damage(amount: float, is_crit: bool = false, attacker: Node3D = null) -> float:
 	if is_dead or amount <= 0.0:
-		return
+		return 0.0
 	var evade_chance := _evasion_chance()
 	if evade_chance > 0.0 and randf() < evade_chance:
 		if show_damage_popups:
-			_spawn_popup("Dodge!", 64, DODGE_POPUP_COLOR)
+			_spawn_popup(dodge_text, 64, DODGE_POPUP_COLOR)
 		Sfx.play(&"dodge")
 		dodged.emit(attacker)
-		return
-	var final_amount := minf(amount, maxf(amount - armor, 1.0))
+		return 0.0
+	var final_amount := minf(amount, maxf(amount - armor, MIN_CHIP_DAMAGE))
+	# What the body could still lose: an overkill blow is credited for the
+	# HP it removed, never for the raw roll.
+	var applied := minf(final_amount, current_hp)
 	current_hp = maxf(current_hp - final_amount, 0.0)
 	if show_damage_popups:
 		_spawn_damage_popup(final_amount, is_crit)
@@ -68,6 +101,7 @@ func take_damage(amount: float, is_crit: bool = false, attacker: Node3D = null) 
 	if current_hp <= 0.0:
 		is_dead = true
 		died.emit()
+	return applied
 
 
 ## Voluntary HP payment (Greed Shrine): unlike take_damage it ignores
@@ -93,6 +127,16 @@ func heal(amount: float) -> void:
 func heal_full() -> void:
 	current_hp = max_hp
 	is_dead = false
+	hp_changed.emit(current_hp, max_hp)
+
+
+## Co-op revive: re-arms a dead Health at `fraction` of max HP (died can
+## fire again on the next fatal hit). No-op on a body that isn't dead.
+func revive(fraction: float) -> void:
+	if not is_dead:
+		return
+	is_dead = false
+	current_hp = clampf(max_hp * fraction, 1.0, max_hp)
 	hp_changed.emit(current_hp, max_hp)
 
 

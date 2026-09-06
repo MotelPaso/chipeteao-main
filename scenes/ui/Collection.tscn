@@ -1,0 +1,55 @@
+[gd_scene load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://scripts/ui/collection.gd" id="1_collection"]
+[ext_resource type="Shader" path="res://assets/ui/menu_backdrop.gdshader" id="2_backdrop"]
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_backdrop"]
+shader = ExtResource("2_backdrop")
+
+[node name="Collection" type="Control"]
+anchor_right = 1.0
+anchor_bottom = 1.0
+script = ExtResource("1_collection")
+
+[node name="Background" type="ColorRect" parent="."]
+material = SubResource("ShaderMaterial_backdrop")
+anchor_right = 1.0
+anchor_bottom = 1.0
+color = Color(1, 1, 1, 1)
+
+[node name="Center" type="CenterContainer" parent="."]
+anchor_right = 1.0
+anchor_bottom = 1.0
+
+[node name="VBox" type="VBoxContainer" parent="Center"]
+theme_override_constants/separation = 12
+
+[node name="TitleLabel" type="Label" parent="Center/VBox"]
+unique_name_in_owner = true
+theme_override_colors/font_color = Color(0.96, 0.78, 0.3, 1)
+theme_override_font_sizes/font_size = 40
+horizontal_alignment = 1
+text = "COLECCIÓN"
+
+[node name="BadgeLabel" type="Label" parent="Center/VBox"]
+unique_name_in_owner = true
+theme_override_colors/font_color = Color(0.3, 0.82, 0.76, 1)
+theme_override_font_sizes/font_size = 18
+horizontal_alignment = 1
+text = "Colección: 0 / 0 — 0%"
+
+[node name="Scroll" type="ScrollContainer" parent="Center/VBox"]
+custom_minimum_size = Vector2(700, 420)
+horizontal_scroll_mode = 0
+
+[node name="List" type="VBoxContainer" parent="Center/VBox/Scroll"]
+unique_name_in_owner = true
+size_flags_horizontal = 3
+theme_override_constants/separation = 8
+
+[node name="BackButton" type="Button" parent="Center/VBox"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(200, 46)
+size_flags_horizontal = 4
+theme_override_font_sizes/font_size = 20
+text = "Volver"

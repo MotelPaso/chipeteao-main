@@ -23,17 +23,23 @@ func fire(tint: Color, particles: int) -> void:
 	var particle_material := process_material as ParticleProcessMaterial
 	if particle_material != null:
 		particle_material.color = tint
-	var wanted := maxi(particles, 1)
-	if wanted > amount:
-		amount = wanted  # grows the buffer once; sticky at the high-water
+	# Clamped to the authored buffer, never grown: raising `amount` at
+	# runtime reallocates the particle buffer mid-death AND sticks, so the
+	# instance that served one boss kept paying for 24+ particles while
+	# serving 4-shard grunt bursts forever after. Bigger bursts = a bigger
+	# `amount` in the scene (see Juice.boss_burst_amount).
+	var wanted := clampi(particles, 1, amount)
 	amount_ratio = float(wanted) / float(amount)
 	restart()
 	# The `finished` signal never fires on the headless dummy renderer, so
-	# release on a pause-immune timer instead; unscaled so a boss-death
-	# slow-mo can't stretch cleanup. The sequence guard drops a stale timer
-	# if this pooled instance was re-fired in the meantime.
+	# release on a timer instead; unscaled so a boss-death slow-mo can't
+	# stretch cleanup, but PAUSABLE like every other pooled FX (which park
+	# themselves from node-bound tweens) — a pause-immune timer recycled
+	# bursts whose particles were frozen on screen by the card UI, so the
+	# explosion simply vanished mid-air. The sequence guard drops a stale
+	# timer if this pooled instance was re-fired in the meantime.
 	_fire_seq += 1
-	get_tree().create_timer(lifetime + 0.3, true, false, true) \
+	get_tree().create_timer(lifetime + 0.3, false, false, true) \
 			.timeout.connect(_on_burst_done.bind(_fire_seq))
 
 

@@ -11,16 +11,9 @@ func fire(target: Node3D) -> void:
 	var center := target.global_position
 	# Area tomes grow the burst; the visual expands to the same radius.
 	var radius := burst_radius * area_scale()
-	var radius_sq := radius * radius
-	for enemy in get_tree().get_nodes_in_group("enemies"):
-		var body := enemy as Node3D
-		if body == null or not body.is_inside_tree():
-			continue
-		if center.distance_squared_to(body.global_position) > radius_sq:
-			continue
-		var health := Health.find_in(body)
-		if health != null:
-			deal_damage(health)
+	# A sphere, not a disc: the detonation should catch bodies above and
+	# below its center as readily as the ones beside it.
+	damage_all(enemies_in_sphere(center, radius))
 	_spawn_burst_visual(center, radius)
 
 

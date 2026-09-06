@@ -1,0 +1,9 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/weapons/stench.gd" id="1_stench"]
+
+[node name="Stench" type="Node3D"]
+script = ExtResource("1_stench")
+damage = 9.0
+cooldown = 2.5
+attack_range = 3.6

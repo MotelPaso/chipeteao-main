@@ -1,4 +1,4 @@
-[gd_scene load_steps=10 format=3]
+[gd_scene load_steps=11 format=3]
 
 [ext_resource type="Script" path="res://scripts/fx/blood_pool.gd" id="1_pool"]
 
@@ -53,6 +53,7 @@ point_count = 2
 curve = SubResource("Curve_shrink")
 
 [sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_bubbles"]
+resource_local_to_scene = true
 emission_shape = 1
 emission_sphere_radius = 0.85
 direction = Vector3(0, 1, 0)
@@ -76,6 +77,7 @@ cast_shadow = 0
 mesh = SubResource("TorusMesh_rim")
 
 [node name="Bubbles" type="GPUParticles3D" parent="."]
+cast_shadow = 0
 emitting = false
 amount = 12
 lifetime = 1.2

@@ -16,8 +16,17 @@ const TELEGRAPH_COLOR := Color(0.25, 0.95, 0.8)
 const BEAM_COLOR := Color(0.15, 1.0, 0.85)
 const SAND_COLOR := Color(0.95, 0.72, 0.28)
 const SAND_IMPACT_COLOR := Color(1.0, 0.86, 0.5)
+## Cut-sandstone skin for the shared spike-cluster cue.
+const SPIKE_COLOR := Color(0.74, 0.6, 0.38)
+const SPIKE_ROUGHNESS: float = 0.9
+const SPIKE_BOTTOM_RADIUS: float = 0.2
+const SPIKE_LENGTH: float = 1.2
+const SPIKE_SINK_DEPTH: float = 1.3
 
 @export var entrance_duration: float = 1.0
+## Arrival ring: sized by hand here (the Sarcognath has no melee radius to
+## derive it from, unlike the other bosses).
+const ENTRANCE_RING_RADIUS: float = 3.0
 
 @export_group("Sweep Beam")
 @export var sweep_windup: float = 1.0
@@ -65,7 +74,10 @@ var _sweep_cooldown_timer: float = 3.0  # first sweep lands early
 var _sweep_firing: bool = false
 var _sweep_angle: float = 0.0
 var _sweep_sign: float = 1.0
-var _sweep_tick_cd: float = 0.0
+## Burn cadence PER raider (instance id -> seconds until this body can be
+## burned again). The beam is an area attack, so two raiders standing in it
+## must both burn on their own sweep_tick_interval instead of sharing one.
+var _sweep_tick_cd: Dictionary[int, float] = {}
 var _coffin_timer: float = 0.0
 var _coffin_spots: Array[Vector3] = []
 var _entomb_spot: Vector3 = Vector3.ZERO
@@ -155,11 +167,7 @@ func _scale_attack_damage(multiplier: float) -> void:
 ## Rises out of a flash ring with the second roar voice.
 func _play_entrance() -> void:
 	Sfx.play(&"boss_roar_2")
-	Telegraph.spawn_disc(self, global_position, 3.0, 0.45, SAND_IMPACT_COLOR)
-	_visual.scale = Vector3.ONE * 0.15
-	var tween := create_tween()
-	tween.tween_property(_visual, "scale", Vector3.ONE, 0.55) \
-			.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	_play_boss_entrance(ENTRANCE_RING_RADIUS, SAND_IMPACT_COLOR)
 
 
 # --- Sweep Beam -------------------------------------------------------------
@@ -192,17 +200,19 @@ func _tick_sweep(delta: float) -> void:
 	var beam_to := origin \
 			+ Vector3(cos(_sweep_angle), 0.0, sin(_sweep_angle)) * sweep_length
 	_beam.span(origin, beam_to)
-	_sweep_tick_cd = maxf(_sweep_tick_cd - delta, 0.0)
-	if _sweep_tick_cd > 0.0:
-		return
-	var player := get_tree().get_first_node_in_group("player") as Node3D
-	if player == null or not _sweep_contact(player):
-		return
-	var player_health := Health.find_in(player)
-	if player_health == null or player_health.is_dead:
-		return
-	_sweep_tick_cd = sweep_tick_interval
-	player_health.take_damage(sweep_tick_damage, false, self)
+	# Every raider the wedge crosses burns, each on their own cadence: the
+	# laser is 120 degrees of area, not a single-target attack.
+	for player: Node3D in Coop.alive_players(get_tree()):
+		var id := player.get_instance_id()
+		var cooldown := maxf(float(_sweep_tick_cd.get(id, 0.0)) - delta, 0.0)
+		_sweep_tick_cd[id] = cooldown
+		if cooldown > 0.0 or not _sweep_contact(player):
+			continue
+		var player_health := Health.find_in(player)
+		if player_health == null or player_health.is_dead:
+			continue
+		_sweep_tick_cd[id] = sweep_tick_interval
+		player_health.take_damage(sweep_tick_damage, false, self)
 
 
 ## True while the player stands in the beam's current wedge: inside its
@@ -225,7 +235,7 @@ func _advance_sweep_phase() -> void:
 	if not _sweep_firing:
 		_sweep_firing = true
 		_state_timer = sweep_duration
-		_sweep_tick_cd = 0.0
+		_sweep_tick_cd.clear()
 		_warn_line.clear()
 		_acquire_hum()
 		return
@@ -236,6 +246,9 @@ func _end_sweep() -> void:
 	_state = State.PURSUE
 	_sweep_firing = false
 	_sweep_cooldown_timer = sweep_cooldown
+	# Dropped here rather than kept: ids of raiders who left (or died) would
+	# otherwise linger in the map for the rest of the fight.
+	_sweep_tick_cd.clear()
 	_beam.clear()
 	_release_hum()
 
@@ -247,7 +260,9 @@ func _start_coffins(player: Node3D) -> void:
 	_state_timer = coffin_windup
 	_coffin_timer = coffin_interval
 	_coffin_spots.clear()
-	var base := player.global_position
+	# Clamped like the ring slots: a player standing past the arena edge
+	# (clamped climbers, knockback) would otherwise get a disc off-field.
+	var base := _clamp_to_arena(player.global_position)
 	_coffin_spots.append(base)  # the on-player disc forces a move
 	var base_angle := randf() * TAU
 	var gap_slot := randi_range(0, coffin_ring_slots - 1)
@@ -255,11 +270,8 @@ func _start_coffins(player: Node3D) -> void:
 		if i == gap_slot:
 			continue
 		var slot_angle := base_angle + TAU * float(i) / float(coffin_ring_slots)
-		var spot := base \
-				+ Vector3(cos(slot_angle), 0.0, sin(slot_angle)) * coffin_ring_radius
-		spot.x = clampf(spot.x, -arena_half_extent, arena_half_extent)
-		spot.z = clampf(spot.z, -arena_half_extent, arena_half_extent)
-		_coffin_spots.append(spot)
+		_coffin_spots.append(_clamp_to_arena(base
+				+ Vector3(cos(slot_angle), 0.0, sin(slot_angle)) * coffin_ring_radius))
 	for spot: Vector3 in _coffin_spots:
 		Telegraph.spawn_disc(self, spot, coffin_radius, coffin_windup, SAND_COLOR)
 
@@ -269,20 +281,10 @@ func _resolve_coffins() -> void:
 	Juice.shake(0.2, 0.4)
 	for spot: Vector3 in _coffin_spots:
 		_spawn_sand_spikes(spot)
-	var player := get_tree().get_first_node_in_group("player") as Node3D
-	if player == null:
-		return
-	var player_health := Health.find_in(player)
-	if player_health == null or player_health.is_dead:
-		return
-	for spot: Vector3 in _coffin_spots:
-		var to_player := player.global_position - spot
-		var height := absf(to_player.y)
-		to_player.y = 0.0
-		if to_player.length() <= coffin_radius and height <= coffin_height_window:
-			# One hit max even where the center and ring discs overlap.
-			player_health.take_damage(coffin_damage, false, self)
-			return
+	# Against the marked SPOTS and the whole party: the raider the ring was
+	# drawn around may no longer be the nearest one by now.
+	damage_players_in_discs(_coffin_spots, coffin_radius, coffin_height_window,
+			coffin_damage, self)
 
 
 # --- Entomb -----------------------------------------------------------------
@@ -292,7 +294,7 @@ func _start_entomb(player: Node3D) -> void:
 	_state_timer = entomb_windup
 	_pending_entombs -= 1
 	# Marked on the player's feet: keep moving and it whiffs entirely.
-	_entomb_spot = player.global_position
+	_entomb_spot = _clamp_to_arena(player.global_position)
 	Telegraph.spawn_disc(self, _entomb_spot, entomb_radius, entomb_windup, TELEGRAPH_COLOR)
 
 
@@ -301,20 +303,13 @@ func _resolve_entomb() -> void:
 	Telegraph.spawn_disc(self, _entomb_spot, entomb_radius, 0.2, SAND_IMPACT_COLOR)
 	_spawn_sand_spikes(_entomb_spot)
 	Juice.shake(0.15, 0.35)
-	var player := get_tree().get_first_node_in_group("player") as Node3D
-	if player == null:
-		return
-	var to_player := player.global_position - _entomb_spot
-	var height := absf(to_player.y)
-	to_player.y = 0.0
-	if to_player.length() > entomb_radius or height > entomb_height_window:
-		return
-	var body := player as Player
-	if body != null:
-		body.apply_root(entomb_root_duration)
-	var player_health := Health.find_in(player)
-	if player_health != null and not player_health.is_dead:
-		player_health.take_damage(entomb_damage, false, self)
+	# Anyone caught on the marked disc is rooted, not just the nearest
+	# raider: the mark is the promise, the same one everybody could see.
+	for caught: Node3D in damage_players_in_disc(_entomb_spot, entomb_radius,
+			entomb_height_window, entomb_damage, self):
+		var body := caught as Player
+		if body != null:
+			body.apply_root(entomb_root_duration)
 
 
 # --- shared bits ------------------------------------------------------------
@@ -353,37 +348,8 @@ func _release_hum() -> void:
 	Sfx.release_loop(&"laser_hum")
 
 
-## Sandstone spike cluster popping out of the ground and sinking back;
-## self-frees via its tween. Same silhouette trick as the Rotking's bark
-## spikes, recolored to cut sandstone.
+## Sandstone spike cluster popping out of the ground and sinking back: the
+## Rotking's silhouette recolored to cut sandstone (BossBase owns the cue).
 func _spawn_sand_spikes(center: Vector3) -> void:
-	var scene_root := get_tree().current_scene
-	if scene_root == null:
-		return
-	var cluster := Node3D.new()
-	scene_root.add_child(cluster)
-	var spike_mesh := CylinderMesh.new()
-	spike_mesh.top_radius = 0.0
-	spike_mesh.bottom_radius = 0.2
-	spike_mesh.height = 1.2
-	var material := StandardMaterial3D.new()
-	material.albedo_color = Color(0.74, 0.6, 0.38)
-	material.roughness = 0.9
-	spike_mesh.material = material
-	for i in 5:
-		var spike := MeshInstance3D.new()
-		spike.mesh = spike_mesh
-		var spike_angle := TAU * float(i) / 5.0
-		spike.position = Vector3(cos(spike_angle), 0.0, sin(spike_angle)) \
-				* coffin_radius * 0.5
-		spike.rotation = Vector3(randf_range(-0.2, 0.2), 0.0, randf_range(-0.2, 0.2))
-		cluster.add_child(spike)
-	# Starts buried inside the floor slab, pops up, sinks back.
-	cluster.global_position = center - Vector3.UP * 1.3
-	var tween := cluster.create_tween()
-	tween.tween_property(cluster, "global_position:y", center.y + 0.05, 0.12) \
-			.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-	tween.tween_interval(0.35)
-	tween.tween_property(cluster, "global_position:y", center.y - 1.4, 0.25) \
-			.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
-	tween.tween_callback(cluster.queue_free)
+	_spawn_spike_cluster(center, coffin_radius * 0.5, SPIKE_COLOR,
+			SPIKE_ROUGHNESS, SPIKE_BOTTOM_RADIUS, SPIKE_LENGTH, SPIKE_SINK_DEPTH)

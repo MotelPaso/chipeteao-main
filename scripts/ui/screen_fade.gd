@@ -6,8 +6,16 @@ extends CanvasLayer
 ## any cleanup), then fades back out. Draws above everything (layer 100),
 ## processes always and ignores time scale, so it works from paused
 ## run-end screens and mid hit-stop. Headless-safe: it is only a ColorRect
-## tween. While busy, repeat requests are dropped — the first change wins
-## and the fade never strands the game mid-black.
+## tween.
+##
+## While busy, repeat requests are DROPPED and transition() returns false
+## — the first change wins and the fade never strands the game mid-black.
+## Callers must therefore put their irreversible cleanup INSIDE the
+## callable (or check the return), never before the call: the busy window
+## outlives the scene swap by FADE_OUT_TIME.
+##
+## leave_run() is the one ritual for ending a run: it owns the cleanup,
+## the reset and the swap, and keeps the tree paused across the cut.
 
 const FADE_IN_TIME := 0.22
 const FADE_OUT_TIME := 0.26
@@ -28,9 +36,11 @@ func _ready() -> void:
 	add_child(_rect)
 
 
-func transition(action: Callable) -> void:
+## Returns false when a fade is already running and this request was
+## dropped without doing anything.
+func transition(action: Callable) -> bool:
 	if _busy:
-		return
+		return false
 	_busy = true
 	_rect.mouse_filter = Control.MOUSE_FILTER_STOP  # swallow clicks mid-cut
 	if _tween != null and _tween.is_valid():
@@ -40,11 +50,53 @@ func transition(action: Callable) -> void:
 	_tween.tween_property(_rect, "modulate:a", 1.0, FADE_IN_TIME) \
 			.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
 	_tween.tween_callback(action)
+	# Give the mouse back with the cut, not with the flag: the rect keeps
+	# fading for another FADE_OUT_TIME over the scene the player can
+	# already see, and swallowing those clicks reads as a frozen UI.
+	_tween.tween_callback(_release_mouse)
 	_tween.tween_property(_rect, "modulate:a", 0.0, FADE_OUT_TIME) \
 			.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
 	_tween.tween_callback(_clear_busy)
+	return true
+
+
+## The one way to leave a live run (retry, back to the select, abandon
+## from the pause menu). Owns the whole ritual so no caller can forget a
+## step: flush the settings save, stop the audio loops, drop the run state
+## and swap scenes. An empty scene_path reloads the current arena.
+##
+## The tree stays PAUSED across the swap on purpose. change_scene_to_file
+## and reload_current_scene are deferred, so unpausing here would hand the
+## outgoing arena one more live frame of a run that is already over:
+## enemies dying in it credit kills to the NEXT run and the world director
+## keeps firing events into a scene about to be freed.
+func leave_run(scene_path: String = "") -> bool:
+	return transition(func() -> void:
+		Settings.flush_save()
+		Sfx.stop_all_loops()
+		get_tree().paused = true
+		RunState.reset()
+		if scene_path.is_empty():
+			get_tree().reload_current_scene()
+		else:
+			get_tree().change_scene_to_file(scene_path)
+		_unpause_after_swap())
+
+
+## Hands the pause back once the deferred swap has landed — two frames,
+## because the first one still belongs to the outgoing tree. Safe to await
+## here and nowhere else: this autoload is the only node that survives the
+## scene change.
+func _unpause_after_swap() -> void:
+	await get_tree().process_frame
+	await get_tree().process_frame
+	get_tree().paused = false
+
+
+func _release_mouse() -> void:
+	_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
 
 
 func _clear_busy() -> void:
 	_busy = false
-	_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_release_mouse()

@@ -13,6 +13,12 @@ enum State { ENTRANCE, PURSUE, HOP_WINDUP, HOP_LEAP, HOP_RECOVER, SPIT }
 const TELEGRAPH_COLOR := Color(0.72, 0.85, 0.3)
 const IMPACT_COLOR := Color(0.9, 0.95, 0.55)
 const GLOB_COLOR := Color(0.62, 0.78, 0.3)
+const ENTRANCE_RING_RADIUS: float = 2.4
+## Peak lift of the cosmetic spit arc, and the sphere's size.
+const GLOB_ARC_HEIGHT: float = 2.2
+const GLOB_VISUAL_RADIUS: float = 0.24
+## Flat distance to the landing spot that ends a leap early.
+const HOP_ARRIVAL_EPSILON: float = 0.35
 
 @export var entrance_duration: float = 0.8
 
@@ -51,7 +57,6 @@ var _hop_target: Vector3 = Vector3.ZERO
 var _base_move_speed: float = 0.0
 var _spit_timer: float = 0.0
 var _glob_spots: Array[Vector3] = []
-var _cue_tween: Tween
 
 
 func _ready() -> void:
@@ -80,7 +85,7 @@ func _behavior_tick(delta: float) -> void:
 		# Arriving early still resolves on the telegraphed disc.
 		var to_target := _hop_target - global_position
 		to_target.y = 0.0
-		if to_target.length() <= 0.35:
+		if to_target.length() <= HOP_ARRIVAL_EPSILON:
 			_resolve_hop()
 			return
 	_state_timer -= delta
@@ -130,11 +135,7 @@ func _combat_tick(player: Node3D, distance: float) -> void:
 func _play_entrance() -> void:
 	Sfx.play(&"burrow_pop")
 	Sfx.play(&"boss_roar", -3.0)
-	Telegraph.spawn_disc(self, global_position, 2.4, 0.45, IMPACT_COLOR)
-	_visual.scale = Vector3.ONE * 0.15
-	var tween := create_tween()
-	tween.tween_property(_visual, "scale", Vector3.ONE, 0.55) \
-			.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	_play_boss_entrance(ENTRANCE_RING_RADIUS, IMPACT_COLOR)
 
 
 # --- Lunging Hop ------------------------------------------------------------
@@ -142,9 +143,7 @@ func _play_entrance() -> void:
 func _start_hop(player: Node3D) -> void:
 	_state = State.HOP_WINDUP
 	_state_timer = hop_windup
-	_hop_target = player.global_position
-	_hop_target.x = clampf(_hop_target.x, -arena_half_extent, arena_half_extent)
-	_hop_target.z = clampf(_hop_target.z, -arena_half_extent, arena_half_extent)
+	_hop_target = _clamp_to_arena(player.global_position)
 	# One disc covers windup + airtime, so the promise holds until landing.
 	Telegraph.spawn_disc(self, _hop_target, hop_radius,
 			hop_windup + hop_leap_time, TELEGRAPH_COLOR)
@@ -159,13 +158,11 @@ func _begin_leap() -> void:
 	_base_move_speed = move_speed
 	move_speed = minf(flat.length() / maxf(hop_leap_time, 0.05), hop_max_speed)
 	# Visual-only arc: the body rises and falls while the chassis dashes.
-	if _cue_tween != null and _cue_tween.is_valid():
-		_cue_tween.kill()
-	_cue_tween = create_tween()
-	_cue_tween.tween_property(_visual, "scale", Vector3(0.85, 1.25, 0.85), 0.1)
-	_cue_tween.parallel().tween_property(_visual, "position:y", 1.1, hop_leap_time * 0.5) \
+	var cue := _begin_cue()
+	cue.tween_property(_visual, "scale", Vector3(0.85, 1.25, 0.85), 0.1)
+	cue.parallel().tween_property(_visual, "position:y", 1.1, hop_leap_time * 0.5) \
 			.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
-	_cue_tween.tween_property(_visual, "position:y", 0.0, hop_leap_time * 0.5) \
+	cue.tween_property(_visual, "position:y", 0.0, hop_leap_time * 0.5) \
 			.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
 
 
@@ -177,18 +174,13 @@ func _resolve_hop() -> void:
 	Telegraph.spawn_disc(self, _hop_target, hop_radius, 0.2, IMPACT_COLOR)
 	Juice.shake(0.15, 0.35)
 	Sfx.play(&"burrow_pop", -2.0)
+	# The leap arc tween is killed by the squash cue below; a hop that
+	# resolved EARLY (arrived before its airtime ran out) would leave the
+	# rig stuck mid-air, so put it back on the ground explicitly.
+	_visual.position.y = 0.0
 	_play_cue_squash(Vector3.ONE, 0.25)
-	var player := get_tree().get_first_node_in_group("player") as Node3D
-	if player == null:
-		return
-	var to_player := player.global_position - _hop_target
-	var height := absf(to_player.y)
-	to_player.y = 0.0
-	if to_player.length() > hop_radius or height > hop_height_window:
-		return
-	var player_health := Health.find_in(player)
-	if player_health != null and not player_health.is_dead:
-		player_health.take_damage(hop_damage, false, self)
+	damage_players_in_disc(_hop_target, hop_radius, hop_height_window,
+			hop_damage, self)
 
 
 # --- Glob Spit --------------------------------------------------------------
@@ -205,9 +197,7 @@ func _start_spit(player: Node3D) -> void:
 			var angle := randf() * TAU
 			spot += Vector3(cos(angle), 0.0, sin(angle)) \
 					* randf_range(glob_scatter * 0.4, glob_scatter)
-		spot.x = clampf(spot.x, -arena_half_extent, arena_half_extent)
-		spot.z = clampf(spot.z, -arena_half_extent, arena_half_extent)
-		_glob_spots.append(spot)
+		_glob_spots.append(_clamp_to_arena(spot))
 	var mouth := global_position + Vector3.UP * 1.1
 	for spot: Vector3 in _glob_spots:
 		Telegraph.spawn_disc(self, spot, glob_radius, spit_windup, TELEGRAPH_COLOR)
@@ -220,20 +210,11 @@ func _resolve_spit() -> void:
 	_play_cue_squash(Vector3.ONE, 0.25)
 	for spot: Vector3 in _glob_spots:
 		Telegraph.spawn_disc(self, spot, glob_radius, 0.18, IMPACT_COLOR)
-	var player := get_tree().get_first_node_in_group("player") as Node3D
-	if player == null:
-		return
-	var player_health := Health.find_in(player)
-	if player_health == null or player_health.is_dead:
-		return
-	for spot: Vector3 in _glob_spots:
-		var to_player := player.global_position - spot
-		var height := absf(to_player.y)
-		to_player.y = 0.0
-		if to_player.length() <= glob_radius and height <= glob_height_window:
-			# One hit max even where splash discs overlap.
-			player_health.take_damage(glob_damage, false, self)
-			return
+	# One hit max PER RAIDER where splash discs overlap — the old single
+	# `return` stopped the whole resolve at the first hit, so a second
+	# raider standing on another disc was never even looked at.
+	damage_players_in_discs(_glob_spots, glob_radius, glob_height_window,
+			glob_damage, self)
 
 
 ## Cosmetic spit lob: a glob sphere arcs from the mouth to the splash spot
@@ -244,8 +225,8 @@ func _launch_glob_visual(from: Vector3, to: Vector3, duration: float) -> void:
 		return
 	var glob := MeshInstance3D.new()
 	var mesh := SphereMesh.new()
-	mesh.radius = 0.24
-	mesh.height = 0.48
+	mesh.radius = GLOB_VISUAL_RADIUS
+	mesh.height = GLOB_VISUAL_RADIUS * 2.0
 	var material := StandardMaterial3D.new()
 	material.albedo_color = GLOB_COLOR
 	material.emission_enabled = true
@@ -257,10 +238,9 @@ func _launch_glob_visual(from: Vector3, to: Vector3, duration: float) -> void:
 	glob.global_position = from
 	# Quadratic arc: linear lerp plus a 4t(1-t) parabolic lift (peaks at
 	# +arc height mid-flight, zero at both ends).
-	var arc_height := 2.2
 	var slide := func(t: float) -> void:
 		var pos := from.lerp(to, t)
-		pos.y += arc_height * 4.0 * t * (1.0 - t)
+		pos.y += GLOB_ARC_HEIGHT * 4.0 * t * (1.0 - t)
 		glob.global_position = pos
 	var tween := glob.create_tween()
 	tween.tween_method(slide, 0.0, 1.0, duration)
@@ -268,8 +248,4 @@ func _launch_glob_visual(from: Vector3, to: Vector3, duration: float) -> void:
 
 
 func _play_cue_squash(target: Vector3, duration: float) -> void:
-	if _cue_tween != null and _cue_tween.is_valid():
-		_cue_tween.kill()
-	_cue_tween = create_tween()
-	_cue_tween.tween_property(_visual, "scale", target, duration) \
-			.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	_play_cue(_visual, "scale", target, duration)

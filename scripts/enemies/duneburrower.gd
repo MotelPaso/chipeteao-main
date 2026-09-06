@@ -34,9 +34,16 @@ const SAND_BURST_COLOR := Color(0.8, 0.66, 0.4)
 var _state: State = State.SURFACED
 var _state_timer: float = 0.0
 var _strike_point: Vector3 = Vector3.ZERO
+# State captured on burrowing and restored on erupting, so a surfaced worm
+# always comes back exactly as it went down (rather than to hardcoded
+# defaults that drift the moment a scene overrides one of them).
 var _surface_separation: float = 0.0
-# Player body excepted from collision while burrowed (mound passes under).
-var _tunneled_player: PhysicsBody3D = null
+var _surface_speed: float = 0.0
+var _surface_layer: int = 0
+var _surface_mask: int = 0
+# Player bodies excepted from collision while burrowed (the mound has to
+# pass under ALL of them: in co-op every raider is an obstacle otherwise).
+var _tunneled_players: Array[PhysicsBody3D] = []
 
 @onready var _mound: Node3D = $Mound
 
@@ -44,6 +51,12 @@ var _tunneled_player: PhysicsBody3D = null
 func _ready() -> void:
 	super()
 	_state_timer = surface_duration
+	# Seeded from the scene so an eruption can always restore a real
+	# surfaced state, even on a path that never went through _burrow().
+	_surface_speed = move_speed
+	_surface_separation = separation_strength
+	_surface_layer = collision_layer
+	_surface_mask = collision_mask
 
 
 func _behavior_tick(delta: float) -> void:
@@ -72,6 +85,9 @@ func _combat_tick(_player: Node3D, distance: float) -> void:
 func _burrow() -> void:
 	_state = State.BURROWED
 	_state_timer = max_burrow_duration
+	_surface_speed = move_speed
+	_surface_layer = collision_layer
+	_surface_mask = collision_mask
 	move_speed *= burrow_speed_multiplier
 	# Off the enemy layer and out of the group: weapons can't target it,
 	# player projectiles (mask 2) pass over, and the horde neither shoves
@@ -82,10 +98,13 @@ func _burrow() -> void:
 	remove_from_group("enemies")
 	collision_layer = 0
 	collision_mask = 1
-	var player := get_tree().get_first_node_in_group("player") as PhysicsBody3D
-	if player != null:
-		_tunneled_player = player
-		add_collision_exception_with(player)
+	_tunneled_players.clear()
+	for node: Node3D in Coop.alive_players(get_tree()):
+		var body := node as PhysicsBody3D
+		if body == null:
+			continue
+		_tunneled_players.append(body)
+		add_collision_exception_with(body)
 	_surface_separation = separation_strength
 	separation_strength = 0.0
 	_visual.visible = false
@@ -106,17 +125,22 @@ func _begin_eruption() -> void:
 func _erupt() -> void:
 	_state = State.SURFACED
 	_state_timer = surface_duration
-	move_speed /= burrow_speed_multiplier
+	# Restored, not divided back: a scene that sets burrow_speed_multiplier
+	# to 0 would otherwise divide by zero, and any speed change applied
+	# while burrowed (an elite promotion) would survive the round trip
+	# scaled by the multiplier.
+	move_speed = _surface_speed
 	# Any residual slide drift snaps back to the telegraphed spot, so the
 	# hit area is exactly what the disc promised.
 	global_position.x = _strike_point.x
 	global_position.z = _strike_point.z
 	add_to_group("enemies")
-	collision_layer = 2
-	collision_mask = 3
-	if _tunneled_player != null and is_instance_valid(_tunneled_player):
-		remove_collision_exception_with(_tunneled_player)
-	_tunneled_player = null
+	collision_layer = _surface_layer
+	collision_mask = _surface_mask
+	for body: PhysicsBody3D in _tunneled_players:
+		if is_instance_valid(body):
+			remove_collision_exception_with(body)
+	_tunneled_players.clear()
 	separation_strength = _surface_separation
 	_mound.visible = false
 	_visual.visible = true
@@ -125,17 +149,9 @@ func _erupt() -> void:
 	Sfx.play(&"burrow_pop")
 	Juice.shake(0.1, 0.3, 0.4)
 	Juice.burst(_strike_point + Vector3.UP * 0.5, SAND_BURST_COLOR, 7)
-	var player := get_tree().get_first_node_in_group("player") as Node3D
-	if player == null:
-		return
-	var to_player := player.global_position - _strike_point
-	var height := to_player.y
-	to_player.y = 0.0
-	if to_player.length() > erupt_radius or absf(height) > erupt_height_window:
-		return
-	var player_health := Health.find_in(player)
-	if player_health != null and not player_health.is_dead:
-		player_health.take_damage(erupt_damage, false, self)
+	# The disc is an area promise: everyone standing on it eats the strike.
+	damage_players_in_disc(_strike_point, erupt_radius, erupt_height_window,
+			erupt_damage, self)
 
 
 # Was missing pre-tiers, so elite/tier damage factors silently skipped the

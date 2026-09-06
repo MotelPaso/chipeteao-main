@@ -12,7 +12,12 @@ extends SceneTree
 ## Output: assets/audio/sfx/*.wav (one-shots + the shrine channel loop)
 ## and assets/audio/ambient/*.wav (the per-map ambient wind beds).
 ## Loopable sounds carry no wav loop metadata — Sfx/AmbientBed force
-## LOOP_FORWARD on the imported streams at runtime.
+## LOOP_FORWARD on their own COPY of the imported streams at runtime.
+##
+## PENDING: the shipped wavs were rendered before the PCM quantization was
+## changed from truncation to rounding (see _save_wav), so one regeneration
+## pass is owed; the difference is at most 1 LSB per sample, which is why
+## it can wait for a moment when nothing else is building the project.
 
 const RATE := 44100.0
 const SFX_DIR := "res://assets/audio/sfx"
@@ -532,7 +537,11 @@ func _save_wav(dir: String, sound_name: String, samples: PackedFloat32Array) -> 
 	var bytes := PackedByteArray()
 	bytes.resize(samples.size() * 2)
 	for i in samples.size():
-		bytes.encode_s16(i * 2, int(clampf(samples[i], -1.0, 1.0) * 32767.0))
+		# roundi, not int(): truncation pulls every sample toward zero by up
+		# to 1 LSB, which is an asymmetric quantization error and it shows
+		# worst exactly where these files are quietest — the long, low
+		# shrine_channel / laser_hum / wind-bed loops.
+		bytes.encode_s16(i * 2, roundi(clampf(samples[i], -1.0, 1.0) * 32767.0))
 	var wav := AudioStreamWAV.new()
 	wav.format = AudioStreamWAV.FORMAT_16_BITS
 	wav.mix_rate = int(RATE)

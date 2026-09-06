@@ -1,0 +1,9 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/weapons/aura.gd" id="1_aura"]
+
+[node name="Aura" type="Node3D"]
+script = ExtResource("1_aura")
+damage = 5.0
+cooldown = 0.6
+attack_range = 3.2

@@ -1,0 +1,237 @@
+[gd_scene load_steps=31 format=3]
+
+[ext_resource type="PackedScene" uid="uid://crunsy5te2m8a" path="res://scenes/world/RunSystems.tscn" id="1_runsystems"]
+[ext_resource type="Script" path="res://scripts/world/backdrop.gd" id="90_backdrop"]
+[ext_resource type="Script" path="res://scripts/systems/enemy_spawner.gd" id="2_spawner"]
+[ext_resource type="PackedScene" uid="uid://bqgr4nt0h3v2e" path="res://scenes/enemies/Grunt.tscn" id="3_grunt"]
+[ext_resource type="PackedScene" path="res://scenes/enemies/Skirmisher.tscn" id="4_skirmisher"]
+[ext_resource type="PackedScene" path="res://scenes/enemies/Tank.tscn" id="5_tank"]
+[ext_resource type="PackedScene" path="res://scenes/enemies/Duneburrower.tscn" id="6_burrower"]
+[ext_resource type="PackedScene" path="res://scenes/enemies/Fenwraith.tscn" id="7_fenwraith"]
+[ext_resource type="Script" path="res://scripts/world/scatter.gd" id="9_scatter"]
+[ext_resource type="PackedScene" uid="uid://ctree3hw7ka2f" path="res://scenes/world/props/Tree.tscn" id="10_tree"]
+[ext_resource type="PackedScene" uid="uid://brock5hw2mv8d" path="res://scenes/world/props/Rock.tscn" id="11_rock"]
+[ext_resource type="PackedScene" uid="uid://bstum8hw1tj5e" path="res://scenes/world/props/Stump.tscn" id="12_stump"]
+[ext_resource type="PackedScene" uid="uid://dramp7hw4qe1c" path="res://scenes/world/props/Ramp.tscn" id="13_ramp"]
+[ext_resource type="PackedScene" uid="uid://cplat2hw9rn6b" path="res://scenes/world/props/Platform.tscn" id="14_platform"]
+[ext_resource type="PackedScene" uid="uid://cbone4du8rv2d" path="res://scenes/world/props/BonePile.tscn" id="15_bonepile"]
+[ext_resource type="PackedScene" uid="uid://cshrn1chrg4ka" path="res://scenes/world/shrines/ChargeShrine.tscn" id="18_chargeshrine"]
+[ext_resource type="PackedScene" uid="uid://bshrn2grd5me1" path="res://scenes/world/shrines/GreedShrine.tscn" id="19_greedshrine"]
+[ext_resource type="PackedScene" uid="uid://dshrn3crs6pa2" path="res://scenes/world/shrines/CurseShrine.tscn" id="20_curseshrine"]
+[ext_resource type="PackedScene" uid="uid://cchst4lut7qb3" path="res://scenes/world/chests/Chest.tscn" id="21_chest"]
+[ext_resource type="Script" path="res://scripts/systems/ambient_bed.gd" id="22_ambient"]
+[ext_resource type="AudioStream" path="res://assets/audio/ambient/forest_wind.wav" id="23_wind"]
+
+[sub_resource type="Shader" id="Shader_marsh"]
+code = "shader_type spatial;
+
+// Gloomfen floor: the shared two-tone value-noise treatment in drowned
+// greens at a mid cell scale, so patches read as moss islands over murk.
+float cell_hash(vec2 p) {
+	return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
+}
+
+void fragment() {
+	vec3 world_pos = (INV_VIEW_MATRIX * vec4(VERTEX, 1.0)).xyz;
+	vec2 grid = world_pos.xz * 0.28;
+	vec2 cell = floor(grid);
+	vec2 f = fract(grid);
+	vec2 u = f * f * (3.0 - 2.0 * f);
+	float n = mix(
+			mix(cell_hash(cell), cell_hash(cell + vec2(1.0, 0.0)), u.x),
+			mix(cell_hash(cell + vec2(0.0, 1.0)), cell_hash(cell + vec2(1.0, 1.0)), u.x),
+			u.y);
+	ALBEDO = mix(vec3(0.08, 0.15, 0.13), vec3(0.16, 0.28, 0.19), n);
+	ROUGHNESS = 1.0;
+}"
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_marsh"]
+shader = SubResource("Shader_marsh")
+
+[sub_resource type="BoxMesh" id="BoxMesh_floor"]
+material = SubResource("ShaderMaterial_marsh")
+size = Vector3(160, 1, 160)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_floor"]
+size = Vector3(160, 1, 160)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_wall_x"]
+size = Vector3(1, 12, 162)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_wall_z"]
+size = Vector3(162, 12, 1)
+
+[sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_1"]
+sky_top_color = Color(0.16, 0.22, 0.24, 1)
+sky_horizon_color = Color(0.42, 0.55, 0.46, 1)
+ground_bottom_color = Color(0.1, 0.16, 0.13, 1)
+ground_horizon_color = Color(0.38, 0.5, 0.42, 1)
+
+[sub_resource type="Sky" id="Sky_1"]
+sky_material = SubResource("ProceduralSkyMaterial_1")
+
+[sub_resource type="Environment" id="Environment_1"]
+background_mode = 2
+sky = SubResource("Sky_1")
+ambient_light_source = 2
+ambient_light_color = Color(0.45, 0.58, 0.52, 1)
+ambient_light_energy = 0.8
+tonemap_mode = 2
+fog_enabled = true
+fog_light_color = Color(0.45, 0.6, 0.52, 1)
+fog_density = 0.011
+fog_sky_affect = 0.35
+
+[node name="Gloomfen" type="Node3D"]
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+environment = SubResource("Environment_1")
+
+[node name="Backdrop" type="Node3D" parent="."]
+script = ExtResource("90_backdrop")
+ground_color = Color(0.1, 0.17, 0.14, 1)
+hill_color = Color(0.09, 0.15, 0.13, 1)
+far_hill_color = Color(0.07, 0.12, 0.11, 1)
+hill_height_max = 20.0
+
+[node name="Sun" type="DirectionalLight3D" parent="."]
+transform = Transform3D(0.866025, 0.383022, -0.321394, 0, 0.642788, 0.766044, 0.5, -0.663414, 0.55667, 0, 12, 0)
+light_color = Color(0.78, 0.92, 0.8, 1)
+light_energy = 0.9
+shadow_enabled = true
+
+[node name="Floor" type="StaticBody3D" parent="."]
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Floor"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.5, 0)
+mesh = SubResource("BoxMesh_floor")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Floor"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.5, 0)
+shape = SubResource("BoxShape3D_floor")
+
+[node name="Perimeter" type="StaticBody3D" parent="."]
+
+[node name="WallEast" type="CollisionShape3D" parent="Perimeter"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 80.5, 6, 0)
+shape = SubResource("BoxShape3D_wall_x")
+
+[node name="WallWest" type="CollisionShape3D" parent="Perimeter"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -80.5, 6, 0)
+shape = SubResource("BoxShape3D_wall_x")
+
+[node name="WallNorth" type="CollisionShape3D" parent="Perimeter"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 6, -80.5)
+shape = SubResource("BoxShape3D_wall_z")
+
+[node name="WallSouth" type="CollisionShape3D" parent="Perimeter"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 6, 80.5)
+shape = SubResource("BoxShape3D_wall_z")
+
+[node name="Verticality" type="Node3D" parent="."]
+
+[node name="HummockEast" type="Node3D" parent="Verticality" groups=["scatter_keepout"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 36, 0, -30)
+
+[node name="Platform" parent="Verticality/HummockEast" instance=ExtResource("14_platform")]
+
+[node name="Ramp" parent="Verticality/HummockEast" instance=ExtResource("13_ramp")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -5, 0, 0)
+
+[node name="RockStep" parent="Verticality/HummockEast" instance=ExtResource("11_rock")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.1, 0, 3.4)
+
+[node name="HummockWest" type="Node3D" parent="Verticality" groups=["scatter_keepout"]]
+transform = Transform3D(0, 0, -1, 0, 1, 0, 1, 0, 0, -42, 0, 22)
+
+[node name="Platform" parent="Verticality/HummockWest" instance=ExtResource("14_platform")]
+transform = Transform3D(1.25, 0, 0, 0, 1.25, 0, 0, 0, 1.25, 0, 0, 0)
+
+[node name="Ramp" parent="Verticality/HummockWest" instance=ExtResource("13_ramp")]
+transform = Transform3D(1.25, 0, 0, 0, 1.25, 0, 0, 0, 1.25, -6.25, 0, 0)
+
+[node name="Stump" parent="Verticality/HummockWest" instance=ExtResource("12_stump")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.8, 0, -3.6)
+
+[node name="IsletSouth" type="Node3D" parent="Verticality" groups=["scatter_keepout"]]
+transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, 2, 0, 44)
+
+[node name="Platform" parent="Verticality/IsletSouth" instance=ExtResource("14_platform")]
+
+[node name="RockStepLow" parent="Verticality/IsletSouth" instance=ExtResource("11_rock")]
+transform = Transform3D(0.75, 0, 0, 0, 0.75, 0, 0, 0, 0.75, -6, 0, 1.2)
+
+[node name="RockStepHigh" parent="Verticality/IsletSouth" instance=ExtResource("11_rock")]
+transform = Transform3D(1.05, 0, 0, 0, 1.05, 0, 0, 0, 1.05, -4.2, 0, -0.8)
+
+[node name="IsletNorth" type="Node3D" parent="Verticality" groups=["scatter_keepout"]]
+transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, -18, 0, -48)
+
+[node name="Platform" parent="Verticality/IsletNorth" instance=ExtResource("14_platform")]
+
+[node name="Ramp" parent="Verticality/IsletNorth" instance=ExtResource("13_ramp")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -5, 0, 0)
+
+[node name="RockStep" parent="Verticality/IsletNorth" instance=ExtResource("11_rock")]
+transform = Transform3D(0.9, 0, 0, 0, 0.9, 0, 0, 0, 0.9, 4.1, 0, -3.2)
+
+[node name="Interactables" type="Node3D" parent="."]
+
+[node name="ChargeShrine" parent="Interactables" groups=["scatter_keepout"] instance=ExtResource("18_chargeshrine")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -46, 0, -40)
+
+[node name="GreedShrine" parent="Interactables" groups=["scatter_keepout"] instance=ExtResource("19_greedshrine")]
+transform = Transform3D(-0.5, 0, -0.866025, 0, 1, 0, 0.866025, 0, -0.5, 50, 0, 34)
+
+[node name="GreedShrineFar" parent="Interactables" groups=["scatter_keepout"] instance=ExtResource("19_greedshrine")]
+transform = Transform3D(0.707107, 0, 0.707107, 0, 1, 0, -0.707107, 0, 0.707107, -16, 0, 60)
+
+[node name="CurseShrine" parent="Interactables" groups=["scatter_keepout"] instance=ExtResource("20_curseshrine")]
+transform = Transform3D(0.866025, 0, 0.5, 0, 1, 0, -0.5, 0, 0.866025, -6, 0, -60)
+
+[node name="ChestGround" parent="Interactables" groups=["scatter_keepout"] instance=ExtResource("21_chest")]
+transform = Transform3D(0.707107, 0, 0.707107, 0, 1, 0, -0.707107, 0, 0.707107, -28, 0, 30)
+
+[node name="ChestHummockEast" parent="Interactables" instance=ExtResource("21_chest")]
+transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, 36, 2, -30)
+
+[node name="ChestHummockWest" parent="Interactables" instance=ExtResource("21_chest")]
+transform = Transform3D(0, 0, -1, 0, 1, 0, 1, 0, 0, -42, 2.5, 22)
+
+[node name="ChestIsletNorth" parent="Interactables" instance=ExtResource("21_chest")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -18, 2, -48)
+
+[node name="MarshScatter" type="Node3D" parent="."]
+script = ExtResource("9_scatter")
+scatter_seed = 47113
+tree_scene = ExtResource("10_tree")
+rock_scene = ExtResource("11_rock")
+stump_scene = ExtResource("12_stump")
+tree_count = 46
+rock_count = 20
+stump_count = 24
+min_prop_spacing = 5.5
+perimeter_scene = ExtResource("10_tree")
+perimeter_accent_scene = ExtResource("15_bonepile")
+perimeter_step = 8.0
+perimeter_rock_every = 7
+
+[node name="EnemySpawner" type="Node3D" parent="."]
+script = ExtResource("2_spawner")
+phase_preset = 2
+grunt_scene = ExtResource("3_grunt")
+skirmisher_scene = ExtResource("4_skirmisher")
+tank_scene = ExtResource("5_tank")
+burrower_scene = ExtResource("6_burrower")
+boss_scene = ExtResource("7_fenwraith")
+elder_title = "Espectro de la Ciénaga Ancestral"
+boss_warning_text = "La ciénaga contiene el aliento..."
+
+[node name="RunSystems" parent="." instance=ExtResource("1_runsystems")]
+map_id = "gloomfen"
+
+[node name="AmbientBed" type="AudioStreamPlayer" parent="."]
+stream = ExtResource("23_wind")
+volume_db = -28.0
+autoplay = true
+script = ExtResource("22_ambient")

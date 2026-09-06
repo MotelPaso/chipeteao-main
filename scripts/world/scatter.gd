@@ -12,6 +12,12 @@ extends Node3D
 
 @export var scatter_seed: int = 71382
 
+## True (the shipping default) re-seeds the scatter every run, so each
+## hunt reads as a fresh clearing instead of the same memorized forest.
+## Flip off (or in a harness, set a seed and this to false) to get the
+## old deterministic layout back for reproducible tests.
+@export var randomize_per_run: bool = true
+
 ## Single source of truth for the arena's half-size (floor is a square of
 ## side 2x this). Consumers (BossBase clamp, EnemySpawner floor-plate
 ## clamp) read it at ready through the "arena_bounds" group and subtract
@@ -23,6 +29,28 @@ extends Node3D
 @export var tree_scene: PackedScene
 @export var rock_scene: PackedScene
 @export var stump_scene: PackedScene
+
+@export_group("Arena Mask")
+## Iteration 44: the square arena gets an IRREGULAR walkable shape each
+## run — a coarse cell grid where a few random blobs of cells are blocked
+## (filled with oversized rock clusters over a tall collider). A flood
+## fill from the spawn guarantees every open cell is reachable on foot;
+## unreachable pockets are blocked too. Spawner, director and this
+## scatter all ask is_walkable() before placing anything.
+@export var mask_enabled: bool = true
+@export var mask_cell_size: float = 10.0
+@export var mask_blobs_min: int = 6
+@export var mask_blobs_max: int = 10
+## Cells per blob (random walk length).
+@export var mask_blob_cells: int = 12
+## Below this open fraction the mask is rebuilt with fewer blobs.
+@export var mask_min_open_fraction: float = 0.62
+@export var mask_rocks_per_cell: int = 4
+@export var mask_wall_height: float = 7.0
+
+## Blocked cells (grid coords -> true) and the grid size (cells per side).
+var _blocked: Dictionary[Vector2i, bool] = {}
+var _mask_cells_per_side: int = 0
 
 @export_group("Interior Scatter")
 ## Props land in [-half_extent, half_extent] on X/Z; keep this inside the
@@ -64,11 +92,23 @@ func _enter_tree() -> void:
 	# Published before any sibling's _ready (tree order), so the spawner's
 	# bounds lookup always finds it.
 	add_to_group("arena_bounds")
+	if GameConfig.daily_mode and GameConfig.daily_seed != 0:
+		# Daily Hunt: every player walks the same field that day.
+		_rng.seed = GameConfig.daily_seed
+	elif randomize_per_run:
+		_rng.randomize()
+	else:
+		_rng.seed = scatter_seed
+	# The mask must exist before the WorldDirector (later in tree order)
+	# shuffles interactables in ITS _enter_tree.
+	if mask_enabled:
+		_build_mask()
 
 
 func _ready() -> void:
-	_rng.seed = scatter_seed
-	for node in get_tree().get_nodes_in_group("scatter_keepout"):
+	if mask_enabled:
+		_fill_blocked_cells()
+	for node: Node in get_tree().get_nodes_in_group("scatter_keepout"):
 		var spot := node as Node3D
 		if spot != null:
 			_keepouts_xz.append(Vector2(spot.global_position.x, spot.global_position.z))
@@ -103,6 +143,8 @@ func _place_many(scene: PackedScene, count: int, min_scale: float, max_scale: fl
 func _is_clear(pos: Vector3) -> bool:
 	var flat := Vector2(pos.x, pos.z)
 	if flat.length() < spawn_clear_radius:
+		return false
+	if not is_walkable(flat):
 		return false
 	for keepout in _keepouts_xz:
 		if keepout.distance_to(flat) < keepout_radius:
@@ -160,3 +202,199 @@ func _spawn_prop(scene: PackedScene, pos: Vector3, uniform_scale: float) -> void
 	prop.position = pos
 	prop.rotate_y(_rng.randf_range(0.0, TAU))
 	prop.scale = Vector3.ONE * uniform_scale
+
+
+## --- arena mask (iteration 44) ------------------------------------------------
+
+func _cell_of(xz: Vector2) -> Vector2i:
+	return Vector2i(
+			floori((xz.x + arena_half_extent) / mask_cell_size),
+			floori((xz.y + arena_half_extent) / mask_cell_size))
+
+
+func _cell_center(cell: Vector2i) -> Vector2:
+	return Vector2(
+			-arena_half_extent + (float(cell.x) + 0.5) * mask_cell_size,
+			-arena_half_extent + (float(cell.y) + 0.5) * mask_cell_size)
+
+
+func _in_grid(cell: Vector2i) -> bool:
+	return cell.x >= 0 and cell.y >= 0 \
+			and cell.x < _mask_cells_per_side and cell.y < _mask_cells_per_side
+
+
+## True when a flat position is inside the arena and not in a blocked
+## cell. Everything that places bodies or POIs asks this first.
+func is_walkable(xz: Vector2) -> bool:
+	if absf(xz.x) > arena_half_extent or absf(xz.y) > arena_half_extent:
+		return false
+	if not mask_enabled or _mask_cells_per_side == 0:
+		return true
+	# The grid, not just the box: a point clamped to exactly +-half_extent
+	# lands one cell PAST the last row, and an off-grid cell is never in
+	# _blocked, so the whole rim used to answer "walkable" no matter what
+	# the mask says there.
+	var cell := _cell_of(xz)
+	return _in_grid(cell) and not _blocked.has(cell)
+
+
+func blocked_cell_count() -> int:
+	return _blocked.size()
+
+
+func open_cell_count() -> int:
+	return _mask_cells_per_side * _mask_cells_per_side - _blocked.size()
+
+
+func cell_size() -> float:
+	return mask_cell_size
+
+
+## A random walkable flat point (uniform over open cells, jittered).
+func random_walkable_point(margin: float = 4.0) -> Vector2:
+	for attempt in 64:
+		var candidate := Vector2(
+				_rng.randf_range(-arena_half_extent + margin, arena_half_extent - margin),
+				_rng.randf_range(-arena_half_extent + margin, arena_half_extent - margin))
+		if is_walkable(candidate):
+			return candidate
+	return Vector2.ZERO
+
+
+## Cells that must stay open: the spawn and every hand-placed keepout
+## (verticality spots, rock clusters) plus their 4-neighbors.
+func _protected_cells() -> Dictionary[Vector2i, bool]:
+	var protected: Dictionary[Vector2i, bool] = {}
+	var seeds: Array[Vector2] = [Vector2.ZERO]
+	for node: Node in get_tree().get_nodes_in_group("scatter_keepout"):
+		var spot := node as Node3D
+		if spot != null and not (spot is Interactable):
+			seeds.append(Vector2(spot.global_position.x, spot.global_position.z))
+	for seed_xz: Vector2 in seeds:
+		var cell := _cell_of(seed_xz)
+		for dx in range(-1, 2):
+			for dy in range(-1, 2):
+				protected[cell + Vector2i(dx, dy)] = true
+	return protected
+
+
+func _build_mask() -> void:
+	_mask_cells_per_side = maxi(ceili(arena_half_extent * 2.0 / mask_cell_size), 3)
+	var protected := _protected_cells()
+	var blobs := _rng.randi_range(mask_blobs_min, mask_blobs_max)
+	for attempt in 4:
+		_blocked.clear()
+		for blob in blobs:
+			var cell := Vector2i(_rng.randi_range(0, _mask_cells_per_side - 1),
+					_rng.randi_range(0, _mask_cells_per_side - 1))
+			var steps: Array[Vector2i] = [Vector2i.LEFT, Vector2i.RIGHT, Vector2i.UP, Vector2i.DOWN]
+			for step in mask_blob_cells:
+				# Block the cell and one side neighbor, so blobs come out
+				# two cells thick instead of thin scribbles.
+				var thick := cell + steps[_rng.randi_range(0, 3)]
+				for c: Vector2i in [cell, thick]:
+					if _in_grid(c) and not protected.has(c):
+						_blocked[c] = true
+				cell += steps[_rng.randi_range(0, 3)]
+		_seal_unreachable(protected)
+		if float(open_cell_count()) / float(_mask_cells_per_side * _mask_cells_per_side) \
+				>= mask_min_open_fraction:
+			break
+		blobs = maxi(blobs - 1, 1)
+	print("Arena mask: %d/%d cells blocked" % [
+			_blocked.size(), _mask_cells_per_side * _mask_cells_per_side])
+
+
+## Flood fill from the spawn cell; open cells it cannot reach are sealed
+## so "walk anywhere" holds for every remaining open cell. PROTECTED cells
+## (the spawn and the hand-placed verticality spots) are never sealed:
+## if a blob ring cut one off, a corridor is carved back to reached ground
+## and the fill re-run, so both invariants survive — everything open is
+## reachable AND no authored spot is ever buried under mask rocks.
+func _seal_unreachable(protected: Dictionary[Vector2i, bool]) -> void:
+	var reached := _reachable_cells()
+	var carved := false
+	for cell: Vector2i in protected:
+		if not _in_grid(cell) or reached.has(cell):
+			continue
+		if _carve_corridor(cell, reached):
+			carved = true
+	if carved:
+		reached = _reachable_cells()
+	for x in _mask_cells_per_side:
+		for y in _mask_cells_per_side:
+			var cell := Vector2i(x, y)
+			if not reached.has(cell):
+				_blocked[cell] = true
+
+
+## 4-neighbor flood fill from the spawn cell over the open cells.
+func _reachable_cells() -> Dictionary[Vector2i, bool]:
+	var start := _cell_of(Vector2.ZERO)
+	var reached: Dictionary[Vector2i, bool] = {start: true}
+	var frontier: Array[Vector2i] = [start]
+	while not frontier.is_empty():
+		var cell: Vector2i = frontier.pop_back()
+		for dir: Vector2i in [Vector2i.LEFT, Vector2i.RIGHT, Vector2i.UP, Vector2i.DOWN]:
+			var next := cell + dir
+			if not _in_grid(next) or reached.has(next) or _blocked.has(next):
+				continue
+			reached[next] = true
+			frontier.append(next)
+	return reached
+
+
+## Unblocks a staircase line of cells from `from` to the nearest reached
+## cell. 4-connected on purpose (one axis per step), so the corridor is
+## walkable by the same neighborhood the flood fill uses. True when it
+## actually opened something.
+func _carve_corridor(from: Vector2i, reached: Dictionary[Vector2i, bool]) -> bool:
+	var target := from
+	var best := INF
+	for cell: Vector2i in reached:
+		var distance := Vector2(cell - from).length_squared()
+		if distance < best:
+			best = distance
+			target = cell
+	if target == from:
+		return false
+	var carved := false
+	var cursor := from
+	_blocked.erase(cursor)
+	while cursor != target:
+		var delta := target - cursor
+		if absi(delta.x) >= absi(delta.y):
+			cursor.x += signi(delta.x)
+		else:
+			cursor.y += signi(delta.y)
+		if _blocked.erase(cursor):
+			carved = true
+	return carved
+
+
+## Every blocked cell becomes a tall invisible collider (players can't
+## cross; climbing enemies can, slowly) dressed with oversized rocks.
+func _fill_blocked_cells() -> void:
+	if _blocked.is_empty():
+		return
+	var body := StaticBody3D.new()
+	body.name = "MaskWalls"
+	body.collision_layer = 1
+	body.collision_mask = 0
+	add_child(body)
+	for cell: Vector2i in _blocked:
+		var center := _cell_center(cell)
+		var shape := CollisionShape3D.new()
+		var box := BoxShape3D.new()
+		box.size = Vector3(mask_cell_size, mask_wall_height, mask_cell_size)
+		shape.shape = box
+		shape.position = Vector3(center.x, mask_wall_height * 0.5, center.y)
+		body.add_child(shape)
+		if rock_scene == null:
+			continue
+		for i in mask_rocks_per_cell:
+			var pos := Vector3(
+					center.x + _rng.randf_range(-mask_cell_size * 0.35, mask_cell_size * 0.35),
+					0.0,
+					center.y + _rng.randf_range(-mask_cell_size * 0.35, mask_cell_size * 0.35))
+			_spawn_prop(rock_scene, pos, _rng.randf_range(2.2, 3.4))

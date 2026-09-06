@@ -12,6 +12,9 @@ extends CharacterBody3D
 @export var separation_radius: float = 1.2
 @export var separation_strength: float = 1.5
 @export var xp_gem_scene: PackedScene
+## Run points paid to the nearest raider on death (iteration 40); elites
+## multiply it like XP, bosses set their own.
+@export var points_value: int = DEFAULT_POINTS_VALUE
 @export_group("Elite")
 @export var elite_hp_multiplier: float = 3.0
 @export var elite_speed_multiplier: float = 1.3
@@ -22,8 +25,38 @@ extends CharacterBody3D
 ## Chance an ELITE death also drops a health orb (regular enemies never
 ## drop one; bosses override _drop_health_orbs with guaranteed counts).
 @export var elite_health_orb_chance: float = 0.4
+## Chance an ELITE death drops a chest (iteration 42; scaled up by the
+## run-wide difficulty, so demonic bargains pay in loot).
+@export var elite_chest_chance: float = 0.3
+@export_group("Climbing")
+## Iteration 42: a body pushing against a wall or prop scrambles UP it at
+## this speed, so verticality never walls the horde off. Perimeter walls
+## are still uncrossable (position is clamped to the arena bounds).
+@export var can_climb: bool = true
+@export var climb_speed: float = 5.5
+## Ceiling on ONE climb, measured from the height the body started
+## scrambling at. Without it a body wedged against geometry keeps pushing
+## up forever and ends up perched on a prop out of everyone's reach.
+## Comfortably above the arena mask walls (7 m, see scatter.gd) so
+## climbers still cross those exactly as before.
+@export var max_climb_height: float = 10.0
+
+const CHEST_SCENE := preload("res://scenes/world/chests/Chest.tscn")
+## EnemyBase's own baseline bounty; BossBase only overrides points_value
+## when the scene left it at this value (a scene-set number always wins).
+const DEFAULT_POINTS_VALUE: int = 1
+## Gap kept between a climber and the arena edge, so a body that scrambled
+## onto the perimeter can never be clamped into the wall itself. Bosses
+## keep their own, wider margin (BossBase.arena_clamp_margin).
+const ARENA_CLAMP_MARGIN: float = 1.5
+## Luck added to an elite's bounty chest per point of run-wide difficulty.
+const ELITE_CHEST_LUCK_PER_DIFFICULTY: float = 15.0
 
 var is_elite: bool = false
+## Sky-event variant applied by the spawner ("" | "berserker" | "shade").
+var variant: String = ""
+## Arena clamp for climbers (from the "arena_bounds" node; INF = none).
+var _arena_limit: float = INF
 
 @onready var _health: Health = $Health
 @onready var _visual: Node3D = $Visual
@@ -45,24 +78,62 @@ var _tier_xp_multiplier: float = 1.0
 # runs; expiry restores full speed. See apply_slow for the refresh rules.
 var _slow_multiplier: float = 1.0
 var _slow_time_left: float = 0.0
+## Poison (iteration 40): damage over time ticking every POISON_TICK
+## seconds; re-application keeps the STRONGER dps and the LONGER timer.
+const POISON_TICK: float = 0.5
+var _poison_dps: float = 0.0
+var _poison_time_left: float = 0.0
+var _poison_tick_timer: float = 0.0
+var _poison_overlay: StandardMaterial3D = null
 ## Last computed separation push, reused on this enemy's off ticks.
 var _separation_cache: Vector3 = Vector3.ZERO
+## Overlay slots in priority order: the elite glow outranks a sky variant,
+## which outranks the poison tint. Every applier writes ITS OWN slot and
+## calls _refresh_overlay(), so a temporary effect can never erase a
+## permanent one (an elite berserker keeps reading as both, and poison
+## wearing off restores the variant instead of clearing to bare skin).
+var _overlay_elite: Material = null
+var _overlay_variant: Material = null
+var _overlay_status: Material = null
+## Meshes of the visual rig, resolved once at ready: the four overlay
+## appliers used to walk find_children on every application.
+var _meshes: Array[MeshInstance3D] = []
+## Height the current climb started at, and whether one is in progress —
+## together they cap a single scramble at max_climb_height.
+var _climb_start_y: float = 0.0
+var _climbing: bool = false
 
 
 func _ready() -> void:
 	_health.died.connect(_on_died)
 	_health.damaged.connect(_on_damaged_flash)
+	_cache_meshes()
+	var bounds := get_tree().get_first_node_in_group("arena_bounds") as Node3D
+	if bounds != null:
+		# Guarded: a bounds node without the property yields null, and
+		# float(null) is a hard script error.
+		var extent: Variant = bounds.get("arena_half_extent")
+		if extent is float or extent is int:
+			_arena_limit = float(extent) - ARENA_CLAMP_MARGIN
 
 
 func _physics_process(delta: float) -> void:
 	if not is_on_floor():
 		velocity.y -= _gravity * delta
 	_slow_time_left = maxf(_slow_time_left - delta, 0.0)
+	if _poison_time_left > 0.0:
+		_tick_poison(delta)
+	# A poison tick can KILL from inside this frame. set_physics_process(false)
+	# only takes effect next tick, so without this guard the corpse would
+	# still run its behaviour: a dead burrower erupting, a dead grunt
+	# landing a contact hit, a dead skirmisher firing one last bolt.
+	if _health.is_dead:
+		return
 	_behavior_tick(delta)
 
 	var steer := Vector3.ZERO
 	var seek := Vector3.ZERO
-	var player := get_tree().get_first_node_in_group("player") as Node3D
+	var player := Coop.nearest_player(get_tree(), global_position)
 	if player != null:
 		var to_player := player.global_position - global_position
 		to_player.y = 0.0
@@ -91,7 +162,46 @@ func _physics_process(delta: float) -> void:
 		var target_yaw := atan2(-face.x, -face.z)
 		rotation.y = lerp_angle(rotation.y, target_yaw, minf(turn_speed * delta, 1.0))
 
+	_tick_climb(steer)
 	move_and_slide()
+	if _arena_limit != INF:
+		global_position.x = clampf(global_position.x, -_arena_limit, _arena_limit)
+		global_position.z = clampf(global_position.z, -_arena_limit, _arena_limit)
+
+
+## Wall climbing: blocked by geometry while trying to move -> go up, but
+## only up to max_climb_height above where this scramble began. Landing on
+## anything walkable re-arms the next climb from the new footing.
+func _tick_climb(steer: Vector3) -> void:
+	if not (can_climb and steer.length_squared() > 0.01 and _blocked_by_geometry()):
+		if _climbing and is_on_floor():
+			_climbing = false
+		return
+	if not _climbing:
+		_climbing = true
+		_climb_start_y = global_position.y
+	if global_position.y - _climb_start_y < max_climb_height:
+		velocity.y = climb_speed
+
+
+## True when a wall contact this frame came from LEVEL GEOMETRY. is_on_wall()
+## alone is not enough: enemies collide with the player and with each other
+## (collision_mask 3), and any near-vertical contact sets it — so a packed
+## horde would read its own neighbours, or the raider it is chewing on, as a
+## wall and scramble up on top of them, out of melee reach. Climbing is about
+## walls and ledges, so only non-character colliders count.
+func _blocked_by_geometry() -> bool:
+	if not is_on_wall():
+		return false
+	for i in get_slide_collision_count():
+		var collision := get_slide_collision(i)
+		# Floors and shallow ramps are walked, not climbed.
+		if collision.get_normal().y > 0.5:
+			continue
+		if collision.get_collider() is CharacterBody3D:
+			continue
+		return true
+	return false
 
 
 ## Virtual: per-frame housekeeping (attack cooldowns etc.) before steering.
@@ -121,20 +231,146 @@ func _apply_elite_damage(_multiplier: float) -> void:
 	pass
 
 
+# --- telegraphed area damage (the party-aware front door) -------------------
+
+## Resolves ONE telegraphed ground disc against the whole party. A disc is
+## drawn for everybody, so it has to hurt everybody standing on it: this is
+## the single resolver every AoE moveset calls, instead of each one asking
+## for the nearest raider and quietly missing the rest of the party.
+## Returns the bodies actually hit, so callers can layer extra effects
+## (the Sarcognath's root) on exactly those players.
+func damage_players_in_disc(center: Vector3, radius: float, height_window: float,
+		amount: float, attacker: Node3D = null) -> Array[Node3D]:
+	var spots: Array[Vector3] = [center]
+	return damage_players_in_discs(spots, radius, height_window, amount, attacker)
+
+
+## Multi-disc version (root bursts, coffin rings, glob volleys): each player
+## takes AT MOST one hit however many discs cover them — the old
+## "one hit max even where discs overlap" rule, now per player instead of
+## per attack.
+## Only players the hit actually LANDED on come back: take_damage reports
+## the HP it removed, so a raider who evaded the disc is left out of the
+## list and the follow-up effect callers layer on it (the Sarcognath's root)
+## misses them too — which is what dodging the attack should mean.
+func damage_players_in_discs(spots: Array[Vector3], radius: float,
+		height_window: float, amount: float, attacker: Node3D = null) -> Array[Node3D]:
+	var hit: Array[Node3D] = []
+	if spots.is_empty():
+		return hit
+	for player: Node3D in Coop.alive_players(get_tree()):
+		if not _covered_by_any(player, spots, radius, height_window):
+			continue
+		var player_health := Health.find_in(player)
+		if player_health == null or player_health.is_dead:
+			continue
+		if player_health.take_damage(amount, false, attacker) > 0.0:
+			hit.append(player)
+	return hit
+
+
+## Flat distance inside `radius` of any spot, and no higher above it than
+## `height_window` — a well-timed jump or a ledge still clears the attack.
+func _covered_by_any(player: Node3D, spots: Array[Vector3], radius: float,
+		height_window: float) -> bool:
+	for spot: Vector3 in spots:
+		var to_player := player.global_position - spot
+		if absf(to_player.y) > height_window:
+			continue
+		to_player.y = 0.0
+		if to_player.length() <= radius:
+			return true
+	return false
+
+
 ## Applies a timed slow: this enemy moves at speed_multiplier of its normal
-## speed for `duration` seconds. Re-application REFRESHES (overwrites both
-## strength and timer) rather than stacking, so repeated whip lashes can
-## never compound a slow toward zero.
+## speed for `duration` seconds. Re-application REFRESHES rather than
+## stacking, so repeated whip lashes can never compound a slow toward zero —
+## but, like apply_poison, the STRONGER slow and the LONGER timer win, so a
+## weak source can neither undo nor cut short a strong one.
 func apply_slow(speed_multiplier: float, duration: float) -> void:
 	if duration <= 0.0:
 		return
-	_slow_multiplier = clampf(speed_multiplier, 0.05, 1.0)
-	_slow_time_left = duration
+	var incoming := clampf(speed_multiplier, 0.05, 1.0)
+	_slow_multiplier = minf(active_slow_multiplier(), incoming)
+	_slow_time_left = maxf(_slow_time_left, duration)
 
 
 ## Current external speed multiplier: 1.0 whenever no slow is active.
 func active_slow_multiplier() -> float:
 	return _slow_multiplier if _slow_time_left > 0.0 else 1.0
+
+
+## Applies a poison of `dps` for `duration` seconds (Fart Bag, spiders,
+## Stench). Refresh rule: the stronger dps wins, the longer timer wins —
+## so spamming weak poison never overwrites a strong one.
+func apply_poison(dps: float, duration: float) -> void:
+	if dps <= 0.0 or duration <= 0.0 or _health.is_dead:
+		return
+	if _poison_time_left <= 0.0:
+		_poison_tick_timer = POISON_TICK
+		_apply_poison_tint(true)
+	_poison_dps = maxf(_poison_dps, dps)
+	_poison_time_left = maxf(_poison_time_left, duration)
+
+
+func is_poisoned() -> bool:
+	return _poison_time_left > 0.0
+
+
+func _tick_poison(delta: float) -> void:
+	_poison_time_left = maxf(_poison_time_left - delta, 0.0)
+	_poison_tick_timer -= delta
+	if _poison_tick_timer <= 0.0:
+		_poison_tick_timer += POISON_TICK
+		# Through take_damage so armor, popups and the death flow all apply.
+		_health.take_damage(_poison_dps * POISON_TICK)
+	if _poison_time_left <= 0.0:
+		_poison_dps = 0.0
+		_apply_poison_tint(false)
+
+
+## Sickly green overlay while poisoned. It is the LOWEST-priority slot, so
+## elites and sky variants keep their own tint and only show poison through
+## the damage popups — exactly as before, but now the poison wearing off
+## restores their overlay instead of wiping it.
+func _apply_poison_tint(on: bool) -> void:
+	if on and _poison_overlay == null:
+		_poison_overlay = StandardMaterial3D.new()
+		_poison_overlay.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		_poison_overlay.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		_poison_overlay.albedo_color = Color(0.35, 0.9, 0.3, 0.35)
+	_overlay_status = _poison_overlay if on else null
+	_refresh_overlay()
+
+
+## The overlay this body should be wearing right now, or null for none.
+## Public so effects that borrow material_overlay for a moment (Juice.flash)
+## can restore the COMPOSED state instead of whatever happened to be in the
+## slot when they started.
+func current_overlay() -> Material:
+	if _overlay_elite != null:
+		return _overlay_elite
+	if _overlay_variant != null:
+		return _overlay_variant
+	return _overlay_status
+
+
+func _refresh_overlay() -> void:
+	var overlay := current_overlay()
+	for mesh: MeshInstance3D in _meshes:
+		if is_instance_valid(mesh):
+			mesh.material_overlay = overlay
+
+
+func _cache_meshes() -> void:
+	_meshes.clear()
+	if _visual == null:
+		return
+	for node: Node in _visual.find_children("*", "MeshInstance3D", true, false):
+		var mesh_instance := node as MeshInstance3D
+		if mesh_instance != null:
+			_meshes.append(mesh_instance)
 
 
 ## Map-tier difficulty hook (GDD 6/7), applied by the spawner right after
@@ -144,12 +380,14 @@ func active_slow_multiplier() -> float:
 ## Every factor at 1.0 (tier 1) is an exact no-op. Call after the enemy is
 ## inside the tree (relies on the onready Health child).
 func apply_tier_scaling(hp_mult: float, dmg_mult: float, xp_value_mult: float = 1.0) -> void:
-	if hp_mult != 1.0:
+	if not is_equal_approx(hp_mult, 1.0):
 		_health.max_hp *= hp_mult
 		_health.heal_full()
-	if dmg_mult != 1.0:
+	if not is_equal_approx(dmg_mult, 1.0):
 		_apply_elite_damage(dmg_mult)
-	_tier_xp_multiplier = xp_value_mult
+	# Composes like every other spawn modifier (a second pass multiplies
+	# instead of replacing), so the XP channel cannot be silently reset.
+	_tier_xp_multiplier *= xp_value_mult
 
 
 ## Promotes this enemy to an elite: more HP (healed to the new max), speed,
@@ -163,25 +401,64 @@ func make_elite() -> void:
 	_health.heal_full()
 	move_speed *= elite_speed_multiplier
 	_apply_elite_damage(elite_damage_multiplier)
-	_xp_multiplier = elite_xp_multiplier
+	# Multiplies (like points_value right below) instead of assigning: the
+	# spawner applies the sky variant FIRST, and an elite berserker must
+	# still pay the variant's doubled XP on top of the elite factor.
+	_xp_multiplier *= elite_xp_multiplier
+	points_value *= elite_xp_multiplier
 	scale *= elite_body_scale
 	_apply_elite_glow()
+
+
+## Sky-event variants (iteration 42), applied by the spawner on fresh
+## spawns while an event runs. Idempotent per body.
+##   "berserker" (blood moon): faster, harder-hitting, ignores the crowd
+##                             (no separation), red-lit; pays double.
+##   "shade"     (eclipse):    much tougher, near-black; pays double.
+func apply_variant(kind: String) -> void:
+	if not variant.is_empty() or kind.is_empty():
+		return
+	variant = kind
+	match kind:
+		"berserker":
+			move_speed *= 1.4
+			_apply_elite_damage(1.3)
+			separation_strength *= 0.2
+			_apply_overlay(Color(1.0, 0.15, 0.1, 0.45), Color(1.0, 0.2, 0.1), 2.0)
+		"shade":
+			_health.max_hp *= 1.6
+			_health.heal_full()
+			_apply_overlay(Color(0.05, 0.02, 0.1, 0.8), Color(0.3, 0.1, 0.5), 0.6)
+		_:
+			push_warning("EnemyBase: unknown variant '%s'" % kind)
+			variant = ""
+			return
+	_xp_multiplier *= 2
+	points_value *= 2
+
+
+func _apply_overlay(albedo: Color, emission: Color, energy: float) -> void:
+	_overlay_variant = _build_overlay(albedo, emission, energy)
+	_refresh_overlay()
 
 
 ## Self-illuminated tint over every mesh in the visual rig so elites read
 ## at a glance even inside a horde.
 func _apply_elite_glow() -> void:
-	var glow := StandardMaterial3D.new()
-	glow.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	glow.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	glow.albedo_color = Color(1.0, 0.62, 0.12, 0.3)
-	glow.emission_enabled = true
-	glow.emission = Color(1.0, 0.55, 0.1)
-	glow.emission_energy_multiplier = 1.8
-	for node: Node in _visual.find_children("*", "MeshInstance3D", true, false):
-		var mesh_instance := node as MeshInstance3D
-		if mesh_instance != null:
-			mesh_instance.material_overlay = glow
+	_overlay_elite = _build_overlay(
+			Color(1.0, 0.62, 0.12, 0.3), Color(1.0, 0.55, 0.1), 1.8)
+	_refresh_overlay()
+
+
+func _build_overlay(albedo: Color, emission: Color, energy: float) -> StandardMaterial3D:
+	var overlay := StandardMaterial3D.new()
+	overlay.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	overlay.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	overlay.albedo_color = albedo
+	overlay.emission_enabled = true
+	overlay.emission = emission
+	overlay.emission_energy_multiplier = energy
+	return overlay
 
 
 func _on_damaged_flash(_amount: float, _current: float) -> void:
@@ -198,9 +475,8 @@ func _death_feedback() -> void:
 ## the shards read as pieces of the body. Elites keep their base skin color
 ## (the glow is an overlay, which get_active_material ignores).
 func death_burst_color() -> Color:
-	for node: Node in _visual.find_children("*", "MeshInstance3D", true, false):
-		var mesh_instance := node as MeshInstance3D
-		if mesh_instance == null or mesh_instance.mesh == null \
+	for mesh_instance: MeshInstance3D in _meshes:
+		if not is_instance_valid(mesh_instance) or mesh_instance.mesh == null \
 				or mesh_instance.mesh.get_surface_count() == 0:
 			continue
 		var material := mesh_instance.get_active_material(0) as StandardMaterial3D
@@ -224,6 +500,11 @@ func _separation_push() -> Vector3:
 		var dist := away.length()
 		if dist >= separation_radius:
 			continue
+		# Checked only for actual neighbours (the snapshot is taken once per
+		# tick, so a body that died EARLIER this tick is still in it and
+		# would keep shoving the horde around as a corpse).
+		if not other.is_in_group(&"enemies"):
+			continue
 		if dist < 0.01:
 			# Perfectly stacked bodies: nudge apart in a stable per-instance direction.
 			away = Vector3.RIGHT.rotated(Vector3.UP, float(get_instance_id() % 64) * TAU / 64.0)
@@ -246,8 +527,14 @@ func _on_died() -> void:
 	set_physics_process(false)
 	_collision.set_deferred("disabled", true)
 	RunState.add_kill()
+	# Bestiary counter (Collection screen): keyed by the script's file name
+	# ("kills_grunt", "kills_rotking", ...), so no per-enemy code or export.
+	var script_path := (get_script() as Script).resource_path
+	if not script_path.is_empty():
+		SaveData.bump("kills_" + script_path.get_file().get_basename())
 	_drop_xp_gem()
 	_drop_health_orbs()
+	_award_points()
 	_death_feedback()
 	var tween := create_tween()
 	tween.set_parallel(true)
@@ -256,6 +543,16 @@ func _on_died() -> void:
 	tween.tween_property(_visual, "scale", Vector3.ONE * 0.05, 0.3) \
 			.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_IN)
 	tween.chain().tween_callback(queue_free)
+
+
+## Run points go to the NEAREST standing raider (co-op: whoever was in
+## the thick of it), never shared — the economy is per player by design.
+func _award_points() -> void:
+	if points_value <= 0:
+		return
+	var player := Coop.nearest_player(get_tree(), global_position)
+	if player != null and player.has_method("add_points"):
+		player.call("add_points", points_value)
 
 
 func _drop_xp_gem() -> void:
@@ -279,6 +576,40 @@ func _drop_xp_gem() -> void:
 func _drop_health_orbs() -> void:
 	if is_elite and randf() < elite_health_orb_chance:
 		_spawn_health_orb(global_position + Vector3.UP * 0.6)
+	if is_elite and randf() < elite_chest_chance * (1.0 + RunState.difficulty_bonus):
+		_drop_chest()
+
+
+## Elite bounty chest (iteration 42): rarity rolled with a luck tilt that
+## grows with the run-wide difficulty.
+func _drop_chest() -> void:
+	var chest := spawn_chest(
+			global_position + Vector3(randf_range(-1.0, 1.0), 0.0, randf_range(-1.0, 1.0)),
+			ELITE_CHEST_LUCK_PER_DIFFICULTY * RunState.difficulty_bonus)
+	if chest != null:
+		print("Elite chest dropped: %s" % chest.rarity)
+
+
+## Drops one chest at `at`, parented to the scene ROOT so it outlives the
+## corpse, or null when there is no scene to drop into (run teardown) or the
+## scene root is not a Chest. The single place both the elite bounty and the
+## boss ring go through, so the guards can only be written once.
+func spawn_chest(at: Vector3, luck_bonus: float, min_rarity: String = "") -> Chest:
+	var parent := get_tree().current_scene if get_tree().current_scene != null else get_parent()
+	if parent == null:
+		return null
+	var chest := CHEST_SCENE.instantiate() as Chest
+	if chest == null:
+		push_warning("EnemyBase: Chest scene root is not a Chest.")
+		return null
+	# Empty keeps whatever floor the scene set (the elite chest's roll is
+	# unbounded; boss chests force Rare+).
+	if not min_rarity.is_empty():
+		chest.min_rarity = min_rarity
+	chest.luck_bonus = luck_bonus
+	parent.add_child(chest)
+	chest.global_position = at
+	return chest
 
 
 ## One pooled health orb at `at`, skipped at the global live-orb soft cap.

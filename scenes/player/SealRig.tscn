@@ -1,4 +1,4 @@
-[gd_scene load_steps=3 format=3 uid="uid://dsealrig8chars"]
+[gd_scene format=3 uid="uid://kmmhqyfs65a3"]
 
 [ext_resource type="Script" path="res://scripts/player/seal_rig.gd" id="1_rig"]
 [ext_resource type="PackedScene" path="res://assets/models/foca.glb" id="2_foca"]

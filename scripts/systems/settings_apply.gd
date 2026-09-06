@@ -29,6 +29,14 @@ func _ready() -> void:
 	apply_all()
 
 
+## Closing the window is the one exit that does not pass through the panel
+## or the pause menu: without this, a slider moved in the last 0.8 s died
+## with the app because only the debounce timer knew about it.
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_WM_CLOSE_REQUEST:
+		flush_save()
+
+
 ## Startup (and harness re-load) application of everything persisted.
 func apply_all() -> void:
 	_apply_bus_volume(Sfx.BUS_NAME, SaveData.sfx_volume)
@@ -95,6 +103,10 @@ static func _apply_fullscreen(on: bool) -> void:
 
 
 func _request_save() -> void:
+	# Timer.start(0) is an error in Godot; a zero debounce means "write now".
+	if save_debounce <= 0.0:
+		SaveData.save()
+		return
 	_save_timer.start(save_debounce)
 
 

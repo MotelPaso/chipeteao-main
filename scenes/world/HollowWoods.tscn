@@ -1,7 +1,7 @@
 [gd_scene load_steps=30 format=3 uid="uid://dqv5m2x8rk1fj"]
 
 [ext_resource type="PackedScene" uid="uid://crunsy5te2m8a" path="res://scenes/world/RunSystems.tscn" id="1_runsystems"]
-[ext_resource type="PackedScene" uid="uid://dn4r8t2ycv5qb" path="res://scenes/enemies/TargetDummy.tscn" id="2_dummy"]
+[ext_resource type="Script" path="res://scripts/world/backdrop.gd" id="90_backdrop"]
 [ext_resource type="Script" path="res://scripts/systems/enemy_spawner.gd" id="3_spawner"]
 [ext_resource type="PackedScene" uid="uid://bqgr4nt0h3v2e" path="res://scenes/enemies/Grunt.tscn" id="4_grunt"]
 [ext_resource type="PackedScene" path="res://scenes/enemies/Skirmisher.tscn" id="15_skirmisher"]
@@ -85,6 +85,12 @@ fog_sky_affect = 0.2
 
 [node name="WorldEnvironment" type="WorldEnvironment" parent="."]
 environment = SubResource("Environment_1")
+
+[node name="Backdrop" type="Node3D" parent="."]
+script = ExtResource("90_backdrop")
+ground_color = Color(0.2, 0.31, 0.19, 1)
+hill_color = Color(0.16, 0.26, 0.17, 1)
+far_hill_color = Color(0.13, 0.21, 0.15, 1)
 
 [node name="Sun" type="DirectionalLight3D" parent="."]
 transform = Transform3D(0.866025, 0.383022, -0.321394, 0, 0.642788, 0.766044, 0.5, -0.663414, 0.55667, 0, 12, 0)
@@ -201,11 +207,6 @@ script = ExtResource("9_scatter")
 tree_scene = ExtResource("10_tree")
 rock_scene = ExtResource("11_rock")
 stump_scene = ExtResource("12_stump")
-
-[node name="Dummies" type="Node3D" parent="."]
-
-[node name="TargetDummy" parent="Dummies" instance=ExtResource("2_dummy")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.2, 0, -2.2)
 
 [node name="EnemySpawner" type="Node3D" parent="."]
 script = ExtResource("3_spawner")

@@ -1,0 +1,78 @@
+[gd_scene load_steps=12 format=3]
+
+[ext_resource type="Script" path="res://scripts/enemies/fenwraith.gd" id="1_fenwraith"]
+[ext_resource type="Script" path="res://scripts/systems/health.gd" id="2_health"]
+[ext_resource type="PackedScene" path="res://scenes/systems/XpGem.tscn" id="3_gem"]
+[ext_resource type="PackedScene" path="res://scenes/enemies/EnemyBolt.tscn" id="4_bolt"]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_shroud"]
+transparency = 1
+albedo_color = Color(0.16, 0.36, 0.3, 0.85)
+roughness = 0.9
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_hood"]
+albedo_color = Color(0.1, 0.24, 0.2, 1)
+roughness = 0.8
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_eye"]
+shading_mode = 0
+albedo_color = Color(0.5, 1, 0.75, 1)
+emission_enabled = true
+emission = Color(0.4, 1, 0.7, 1)
+emission_energy_multiplier = 2.4
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_shroud"]
+material = SubResource("StandardMaterial3D_shroud")
+top_radius = 0.35
+bottom_radius = 1.5
+height = 2.6
+
+[sub_resource type="SphereMesh" id="SphereMesh_hood"]
+material = SubResource("StandardMaterial3D_hood")
+radius = 0.75
+height = 1.5
+
+[sub_resource type="BoxMesh" id="BoxMesh_eye"]
+material = SubResource("StandardMaterial3D_eye")
+size = Vector3(0.22, 0.1, 0.08)
+
+[sub_resource type="CapsuleShape3D" id="CapsuleShape3D_fenwraith"]
+radius = 1.1
+height = 3.4
+
+[node name="Fenwraith" type="CharacterBody3D" groups=["boss", "enemies"]]
+collision_layer = 2
+collision_mask = 3
+script = ExtResource("1_fenwraith")
+boss_title = "Espectro de la Ciénaga"
+move_speed = 3.0
+turn_speed = 5.0
+separation_strength = 0.0
+xp_gem_scene = ExtResource("3_gem")
+bolt_scene = ExtResource("4_bolt")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.7, 0)
+shape = SubResource("CapsuleShape3D_fenwraith")
+
+[node name="Visual" type="Node3D" parent="."]
+
+[node name="Shroud" type="MeshInstance3D" parent="Visual"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.3, 0)
+mesh = SubResource("CylinderMesh_shroud")
+
+[node name="Hood" type="MeshInstance3D" parent="Visual"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.75, 0)
+mesh = SubResource("SphereMesh_hood")
+
+[node name="EyeL" type="MeshInstance3D" parent="Visual"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.26, 2.8, -0.62)
+mesh = SubResource("BoxMesh_eye")
+
+[node name="EyeR" type="MeshInstance3D" parent="Visual"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.26, 2.8, -0.62)
+mesh = SubResource("BoxMesh_eye")
+
+[node name="Health" type="Node" parent="."]
+script = ExtResource("2_health")
+max_hp = 850.0

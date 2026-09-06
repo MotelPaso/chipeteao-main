@@ -9,8 +9,21 @@ extends Node
 ## nodes are children of the current scene and simply die with it; the
 ## deferred release path guards that race. Owned and configured by the
 ## Pools autoload; not meant to be scattered through gameplay scenes.
+##
+## release()/acquire() are strictly symmetric: whatever release() switches
+## off it first RECORDS on the node, and acquire() puts that exact value
+## back. The pool never invents state (it used to force processing on
+## every node, waking up FX scenes that define neither callback) and it
+## never leaves a parked Area3D listening (a spent projectile kept
+## reporting overlaps until its deferred reparent landed).
 
 const META_OWNER: StringName = &"_node_pool_owner"
+## Per-node snapshot of what release() switched off; presence of the first
+## one is what tells acquire() this node has been parked before.
+const META_PROCESS: StringName = &"_node_pool_process"
+const META_PHYSICS_PROCESS: StringName = &"_node_pool_physics_process"
+const META_MONITORING: StringName = &"_node_pool_monitoring"
+const META_MONITORABLE: StringName = &"_node_pool_monitorable"
 
 ## Scene this pool instantiates; its root must be a Node3D.
 @export var scene: PackedScene
@@ -63,10 +76,19 @@ func acquire(parent: Node) -> Node3D:
 	else:
 		node = _parked.pop_back()
 	parent.add_child(node)
-	# Mirror exactly what release() disabled; script state is pool_reset's job.
+	# Put back exactly what release() recorded; script state is pool_reset's
+	# job. A never-parked node keeps whatever entering the tree derived for
+	# it, so FX scenes with no _process stay out of the process lists.
 	node.visible = true
-	node.set_physics_process(true)
-	node.set_process(true)
+	if node.has_meta(META_PROCESS):
+		node.set_process(node.get_meta(META_PROCESS))
+		node.set_physics_process(node.get_meta(META_PHYSICS_PROCESS))
+	var area := node as Area3D
+	if area != null and node.has_meta(META_MONITORING):
+		# Deferred to mirror release(): both sides land in call order, so a
+		# same-frame release/acquire round trip ends up monitoring again.
+		area.set_deferred(&"monitoring", node.get_meta(META_MONITORING))
+		area.set_deferred(&"monitorable", node.get_meta(META_MONITORABLE))
 	if node.has_method(&"pool_reset"):
 		node.call(&"pool_reset")
 	return node
@@ -85,8 +107,19 @@ func release(node: Node3D) -> void:
 		return
 	_pending_release[id] = true
 	node.visible = false
+	node.set_meta(META_PROCESS, node.is_processing())
+	node.set_meta(META_PHYSICS_PROCESS, node.is_physics_processing())
 	node.set_physics_process(false)
 	node.set_process(false)
+	var area := node as Area3D
+	if area != null:
+		# A released Area3D used to keep its shapes live until the deferred
+		# reparent, so it still collected overlaps for the rest of the frame.
+		# Deferred because monitoring cannot be touched during a signal flush.
+		node.set_meta(META_MONITORING, area.monitoring)
+		node.set_meta(META_MONITORABLE, area.monitorable)
+		area.set_deferred(&"monitoring", false)
+		area.set_deferred(&"monitorable", false)
 	_finish_release.call_deferred(node, id)
 
 
@@ -114,13 +147,19 @@ func _finish_release(node: Node3D, id: int) -> void:
 	if parent != null:
 		parent.remove_child(node)
 	if _parked.size() >= max_free:
-		node.free()
+		# queue_free, not free: Pools.release hands over ownership, but a
+		# caller that still holds the reference this frame must not be left
+		# with a dangling pointer mid deferred-call flush.
+		node.queue_free()
 		return
 	_parked.append(node)
 	peak_parked = maxi(peak_parked, _parked.size())
 
 
 func _create_instance() -> Node3D:
+	if scene == null:
+		push_error("NodePool '%s': no scene assigned." % name)
+		return null
 	var node := scene.instantiate() as Node3D
 	if node == null:
 		push_warning("NodePool '%s': scene root is not a Node3D." % name)

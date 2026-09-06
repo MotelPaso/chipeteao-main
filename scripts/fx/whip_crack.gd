@@ -55,10 +55,13 @@ func play(from: Vector3, direction: Vector3, length: float, color: Color) -> voi
 	_tween = create_tween()
 	_tween.tween_property(_strip, "scale:z", length, EXTEND_TIME) \
 			.set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
-	_tween.set_parallel(true)
-	_tween.tween_property(_strip, "scale:z", length * 0.2, SNAP_TIME) \
+	# chain() + parallel(), NOT set_parallel(true): set_parallel makes the
+	# tweeners that follow run WITH the previous one, so the snap-back used
+	# to race the extension from the same start value and the lash never
+	# reached past 20% of the damage lane it actually covers.
+	_tween.chain().tween_property(_strip, "scale:z", length * 0.2, SNAP_TIME) \
 			.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
-	_tween.tween_property(_strip, "transparency", 1.0, SNAP_TIME) \
+	_tween.parallel().tween_property(_strip, "transparency", 1.0, SNAP_TIME) \
 			.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
 	# Linger long enough for the thorn particles to finish before parking.
 	_tween.chain().tween_interval(0.4)
@@ -75,7 +78,6 @@ func _build_strip() -> ArrayMesh:
 	const SEGMENTS: int = 6
 	var vertices := PackedVector3Array()
 	var colors := PackedColorArray()
-	var indices := PackedInt32Array()
 	for i: int in SEGMENTS + 1:
 		var t := float(i) / float(SEGMENTS)
 		var half_width := lerpf(BASE_WIDTH, TIP_WIDTH, t) * 0.5
@@ -84,17 +86,4 @@ func _build_strip() -> ArrayMesh:
 		var alpha := lerpf(0.8, 0.3, t)
 		colors.append(Color(1, 1, 1, alpha))
 		colors.append(Color(1, 1, 1, alpha))
-	for i: int in SEGMENTS:
-		var base := i * 2
-		indices.append_array(PackedInt32Array([
-			base, base + 1, base + 2,
-			base + 1, base + 3, base + 2,
-		]))
-	var arrays: Array = []
-	arrays.resize(Mesh.ARRAY_MAX)
-	arrays[Mesh.ARRAY_VERTEX] = vertices
-	arrays[Mesh.ARRAY_COLOR] = colors
-	arrays[Mesh.ARRAY_INDEX] = indices
-	var built := ArrayMesh.new()
-	built.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
-	return built
+	return FxMesh.strip(vertices, colors)

@@ -43,9 +43,9 @@ func span(from: Vector3, to: Vector3, thickness: float = -1.0) -> void:
 	visible = true
 	var girth := default_thickness if thickness < 0.0 else thickness
 	var direction := (to - from) / length
-	# Beams here are near-horizontal, but guard look_at's colinear-up case.
-	var up := Vector3.UP if absf(direction.dot(Vector3.UP)) < 0.99 else Vector3.RIGHT
-	var look := Basis.looking_at(direction, up)
+	# Beams here are near-horizontal, but guard Basis.looking_at's
+	# colinear-up case — one threshold for every aim in the game.
+	var look := Basis.looking_at(direction, WeaponBase.safe_up(direction))
 	global_transform = Transform3D(
 			look * Basis.from_scale(Vector3(girth, girth, length)),
 			(from + to) * 0.5)

@@ -1,12 +1,17 @@
 extends Node
-## Autoload "Pools": one NodePool per high-churn scene (XP gems, player
-## projectiles, enemy bolts, death bursts, damage popups, telegraph discs)
-## so late-run hordes stop paying per-spawn allocation/free costs.
+## Autoload "Pools": one NodePool per high-churn scene (XP gems, health
+## orbs, player projectiles, enemy bolts, FX bursts, damage popups,
+## telegraph discs) so late-run hordes stop paying per-spawn
+## allocation/free costs.
 ## Call sites swap instantiate/add_child for acquire_scene() and
 ## queue_free() for release(); everything else about the spawned node
 ## (transform, launch params) is still the caller's business.
 ## acquire_scene() parents to the current scene, so in-flight nodes die
 ## with a scene change while parked ones (out of tree) carry over clean.
+##
+## Adding a pooled scene is ONE row in POOLS below — the const preload, the
+## registration and the sizes used to be three parallel lists that drifted
+## apart in silence (a name typo just fell back to a default size).
 
 const XP_GEM_SCENE: PackedScene = preload("res://scenes/systems/XpGem.tscn")
 const HEALTH_ORB_SCENE: PackedScene = preload("res://scenes/systems/HealthOrb.tscn")
@@ -23,43 +28,37 @@ const WHIP_CRACK_SCENE: PackedScene = preload("res://scenes/fx/WhipCrack.tscn")
 const EMBER_BURST_SCENE: PackedScene = preload("res://scenes/fx/EmberBurst.tscn")
 const BLOOD_POOL_SCENE: PackedScene = preload("res://scenes/fx/BloodPool.tscn")
 
-## Per-pool (warm preload count, max parked kept) tunables. Preloads cover
-## a normal early game; caps absorb the worst late-T3 multi-weapon spikes.
-@export var pool_sizes: Dictionary[String, Vector2i] = {
-	"gem": Vector2i(48, 256),
-	"health_orb": Vector2i(4, 16),
-	"dart": Vector2i(16, 96),
-	"arrow": Vector2i(16, 96),
-	"boomerang": Vector2i(4, 24),
-	"enemy_bolt": Vector2i(16, 96),
-	"death_burst": Vector2i(12, 64),
-	"damage_popup": Vector2i(48, 256),
-	"telegraph_disc": Vector2i(6, 32),
-	"slash_arc": Vector2i(8, 32),
-	"muzzle_flash": Vector2i(6, 24),
-	"whip_crack": Vector2i(4, 16),
-	"ember_burst": Vector2i(4, 16),
-	"blood_pool": Vector2i(4, 16),
-}
+## The pooled roster: name, scene, `warm` (instances built at boot so early
+## spawns never hitch) and `cap` (max parked kept, bounding memory after a
+## late-T3 multi-weapon spike). One row per pooled scene.
+const POOLS: Array[Dictionary] = [
+	{"name": "gem", "scene": XP_GEM_SCENE, "warm": 48, "cap": 256},
+	{"name": "health_orb", "scene": HEALTH_ORB_SCENE, "warm": 4, "cap": 16},
+	{"name": "dart", "scene": DART_SCENE, "warm": 16, "cap": 96},
+	{"name": "arrow", "scene": ARROW_SCENE, "warm": 16, "cap": 96},
+	{"name": "boomerang", "scene": BOOMERANG_SCENE, "warm": 4, "cap": 24},
+	{"name": "enemy_bolt", "scene": ENEMY_BOLT_SCENE, "warm": 16, "cap": 96},
+	{"name": "death_burst", "scene": DEATH_BURST_SCENE, "warm": 12, "cap": 64},
+	{"name": "damage_popup", "scene": DAMAGE_POPUP_SCENE, "warm": 48, "cap": 256},
+	{"name": "telegraph_disc", "scene": TELEGRAPH_DISC_SCENE, "warm": 6, "cap": 32},
+	{"name": "slash_arc", "scene": SLASH_ARC_SCENE, "warm": 8, "cap": 32},
+	{"name": "muzzle_flash", "scene": MUZZLE_FLASH_SCENE, "warm": 6, "cap": 24},
+	{"name": "whip_crack", "scene": WHIP_CRACK_SCENE, "warm": 4, "cap": 16},
+	{"name": "ember_burst", "scene": EMBER_BURST_SCENE, "warm": 4, "cap": 16},
+	{"name": "blood_pool", "scene": BLOOD_POOL_SCENE, "warm": 4, "cap": 16},
+]
+
+## Optional per-name (warm, cap) override for tuning experiments; rows not
+## listed keep the POOLS values.
+@export var pool_size_overrides: Dictionary[String, Vector2i] = {}
 
 var _pools_by_path: Dictionary[String, NodePool] = {}
 
 
 func _ready() -> void:
-	_register("gem", XP_GEM_SCENE)
-	_register("health_orb", HEALTH_ORB_SCENE)
-	_register("dart", DART_SCENE)
-	_register("arrow", ARROW_SCENE)
-	_register("boomerang", BOOMERANG_SCENE)
-	_register("enemy_bolt", ENEMY_BOLT_SCENE)
-	_register("death_burst", DEATH_BURST_SCENE)
-	_register("damage_popup", DAMAGE_POPUP_SCENE)
-	_register("telegraph_disc", TELEGRAPH_DISC_SCENE)
-	_register("slash_arc", SLASH_ARC_SCENE)
-	_register("muzzle_flash", MUZZLE_FLASH_SCENE)
-	_register("whip_crack", WHIP_CRACK_SCENE)
-	_register("ember_burst", EMBER_BURST_SCENE)
-	_register("blood_pool", BLOOD_POOL_SCENE)
+	for row: Dictionary in POOLS:
+		_register(String(row["name"]), row["scene"] as PackedScene,
+				Vector2i(int(row["warm"]), int(row["cap"])))
 
 
 ## Pooled replacement for scene.instantiate() + add_child(current scene):
@@ -78,6 +77,12 @@ func acquire_scene(packed: PackedScene) -> Node3D:
 	var node := packed.instantiate() as Node3D
 	if node != null:
 		parent.add_child(node)
+		# The fallback must honour the same contract as a pooled acquire:
+		# XpGem/HealthOrb join their live group inside pool_reset(), so an
+		# unregistered gem variant used to be invisible to the magnet and to
+		# the health-orb soft cap.
+		if node.has_method(&"pool_reset"):
+			node.call(&"pool_reset")
 	return node
 
 
@@ -111,8 +116,12 @@ func stats_line() -> String:
 	return " | ".join(parts)
 
 
-func _register(pool_name: String, packed: PackedScene) -> void:
-	var size: Vector2i = pool_sizes.get(pool_name, Vector2i(0, 64))
+func _register(pool_name: String, packed: PackedScene, size: Vector2i) -> void:
+	if packed == null:
+		push_error("Pools: pool '%s' has no scene; skipped." % pool_name)
+		return
+	if pool_size_overrides.has(pool_name):
+		size = pool_size_overrides[pool_name]
 	var pool := NodePool.new()
 	pool.name = pool_name
 	pool.scene = packed

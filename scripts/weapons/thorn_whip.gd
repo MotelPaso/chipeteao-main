@@ -17,13 +17,10 @@ extends WeaponBase
 
 
 func fire(target: Node3D) -> void:
-	var to_target := target.global_position - global_position
-	to_target.y = 0.0
-	# Degenerate case (target directly above/below): lash where we face.
-	var lash_dir := to_target.normalized() if to_target.length_squared() > 0.0001 \
-			else -global_transform.basis.z
-	lash_dir.y = 0.0
-	lash_dir = lash_dir.normalized() if lash_dir.length_squared() > 0.0001 else Vector3.FORWARD
+	# Degenerate case (target directly above/below): lash where we face, and
+	# FORWARD when our own facing is vertical too.
+	var lash_dir := flat_dir_or(target.global_position - global_position,
+			flat_dir_or(-global_transform.basis.z, Vector3.FORWARD))
 	var length := attack_range * area_scale()
 	_lash_strip(lash_dir, length)
 	_spawn_crack_visual(lash_dir, length)
@@ -34,23 +31,15 @@ func fire(target: Node3D) -> void:
 func _lash_strip(lash_dir: Vector3, length: float) -> void:
 	var half_width := strip_width * 0.5 * area_scale()
 	var slow_mult := 1.0 - clampf(slow_percent, 0.0, 95.0) / 100.0
-	for node: Node in get_tree().get_nodes_in_group("enemies"):
-		var body := node as Node3D
-		if body == null or not body.is_inside_tree():
-			continue
-		var to_enemy := body.global_position - global_position
-		to_enemy.y = 0.0
-		var along := to_enemy.dot(lash_dir)
-		if along < 0.0 or along > length:
-			continue
-		if (to_enemy - lash_dir * along).length() > half_width:
-			continue
+	for body: Node3D in enemies_in_lane(global_position, lash_dir, length, half_width):
 		var health := Health.find_in(body)
 		if health != null:
 			deal_damage(health)
 		var enemy := body as EnemyBase
-		if enemy != null:
-			enemy.apply_slow(slow_mult, slow_duration)
+		# No slowing corpses: the lash that killed this body must not leave
+		# a slow behind on it (see the same guard in stench.gd).
+		if enemy != null and (health == null or not health.is_dead):
+			enemy.apply_slow(slow_mult, slow_duration * duration_scale())
 
 
 func _spawn_crack_visual(lash_dir: Vector3, length: float) -> void:

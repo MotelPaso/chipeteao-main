@@ -8,6 +8,11 @@ extends Node3D
 const SHELL_TIME: float = 0.35
 const SCORCH_TIME: float = 1.1
 
+## Burst radius the authored ember spray is sized for; the spray scales
+## against it so an area build's 6 m detonation is not a hollow bubble
+## with one 0.8 m puff of sparks at its center.
+@export var embers_reference_radius: float = 2.5
+
 @onready var _shell: MeshInstance3D = $Shell
 @onready var _scorch: MeshInstance3D = $Scorch
 @onready var _embers: GPUParticles3D = $Embers
@@ -21,6 +26,7 @@ func pool_reset() -> void:
 		_tween.kill()
 	_shell.transparency = 0.0
 	_scorch.transparency = 0.0
+	_embers.scale = Vector3.ONE
 	_embers.emitting = false
 
 
@@ -32,6 +38,7 @@ func play(center: Vector3, radius: float) -> void:
 	_shell.scale = Vector3.ONE * 0.2
 	_scorch.transparency = 0.35
 	_scorch.scale = Vector3(radius * 0.8, 1.0, radius * 0.8)
+	_embers.scale = Vector3.ONE * maxf(radius / maxf(embers_reference_radius, 0.01), 0.2)
 	_embers.restart()
 	_tween = create_tween()
 	_tween.set_parallel(true)

@@ -1,11 +1,13 @@
-[gd_scene load_steps=7 format=3 uid="uid://c8k2h1n3m5p0a"]
+[gd_scene load_steps=8 format=3 uid="uid://c8k2h1n3m5p0a"]
 
 [ext_resource type="Script" path="res://scripts/player/player.gd" id="1_player"]
 [ext_resource type="PackedScene" path="res://scenes/player/SealRig.tscn" id="2_rig"]
 [ext_resource type="Script" path="res://scripts/systems/health.gd" id="3_health"]
 [ext_resource type="Script" path="res://scripts/systems/player_stats.gd" id="4_stats"]
+[ext_resource type="Script" path="res://scripts/systems/item_bag.gd" id="5_bag"]
 
 [sub_resource type="CapsuleShape3D" id="CapsuleShape3D_1"]
+resource_local_to_scene = true
 radius = 0.4
 height = 1.8
 
@@ -40,3 +42,6 @@ max_hp = 100.0
 
 [node name="Stats" type="Node" parent="."]
 script = ExtResource("4_stats")
+
+[node name="ItemBag" type="Node" parent="."]
+script = ExtResource("5_bag")

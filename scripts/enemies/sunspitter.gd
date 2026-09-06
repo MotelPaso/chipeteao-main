@@ -7,7 +7,9 @@ extends EnemyBase
 ## beam short, so cover is the counterplay. Afterwards it skitters
 ## sideways while the beam recharges. The sight ray masks world layer 1
 ## only (enemies live on layer 2, so they never block or burn) and damage
-## goes to the tracked "player" body — the beam can hurt nothing else.
+## goes to whichever raider the ray actually reached — the target it locked
+## onto when aiming, or a companion who stepped into the line to shield
+## them. Nothing else can be hurt by the beam.
 
 enum State { SKITTER, AIM, FIRE }
 
@@ -36,6 +38,10 @@ var _cooldown_timer: float = 1.2
 var _tick_timer: float = 0.0
 # Sideways-skitter direction; flips after every beam for variety.
 var _strafe_sign: float = 1.0
+## Raider locked in when AIM starts. The warning line promises ONE victim,
+## so the beam has to keep burning that one instead of re-picking the
+## nearest body every tick (in co-op the nearest changes constantly).
+var _target: Node3D = null
 var _aim_line: BeamVisual
 var _beam: BeamVisual
 var _hum_held: bool = false
@@ -53,15 +59,21 @@ func _behavior_tick(delta: float) -> void:
 	_cooldown_timer = maxf(_cooldown_timer - delta, 0.0)
 	if _state == State.SKITTER:
 		return
-	var player := get_tree().get_first_node_in_group("player") as Node3D
-	if player == null:
+	# The locked target leaving (death, teardown) aborts the shot rather
+	# than silently transferring it to whoever is closest now.
+	if not _target_is_valid():
 		_abort_attack()
 		return
 	_state_timer -= delta
 	if _state == State.AIM:
-		_tick_aim(player)
+		_tick_aim(_target)
 	elif _state == State.FIRE:
-		_tick_fire(player, delta)
+		_tick_fire(_target, delta)
+
+
+func _target_is_valid() -> bool:
+	return _target != null and is_instance_valid(_target) \
+			and _target.is_inside_tree() and _target.is_in_group("player")
 
 
 func _movement_intent(seek: Vector3, distance: float) -> Vector3:
@@ -85,10 +97,11 @@ func _combat_tick(player: Node3D, distance: float) -> void:
 	# The lower bound keeps the beam math away from the on-our-head case.
 	if distance > fire_range or distance < 1.0:
 		return
-	if not _beam_sight(player, null):
+	if _beam_sight(player, null) == null:
 		return  # never aims into a wall
 	_state = State.AIM
 	_state_timer = aim_windup
+	_target = player
 
 
 func _tick_aim(player: Node3D) -> void:
@@ -103,14 +116,17 @@ func _tick_fire(player: Node3D, delta: float) -> void:
 	if _state_timer <= 0.0:
 		_end_fire()
 		return
-	var sight_clear := _beam_sight(player, _beam)
+	var burned := _beam_sight(player, _beam)
 	_tick_timer -= delta
 	if _tick_timer > 0.0:
 		return
 	_tick_timer += beam_tick_interval
-	if not sight_clear:
+	if burned == null:
 		return  # blocked tick is consumed, not banked
-	var player_health := Health.find_in(player)
+	# Whoever the ray actually reached takes it: a raider stepping into the
+	# line body-blocks for the target, which is what the cover mechanic
+	# promises. Before, the beam burned the tracked player THROUGH them.
+	var player_health := Health.find_in(burned)
 	if player_health != null and not player_health.is_dead:
 		player_health.take_damage(beam_tick_damage, false, self)
 
@@ -127,28 +143,32 @@ func _end_fire() -> void:
 	_state = State.SKITTER
 	_cooldown_timer = beam_cooldown
 	_strafe_sign = -_strafe_sign
+	_target = null
 	_beam.clear()
 	_release_hum()
 
 
 ## Raycasts muzzle -> player chest against layer 1 (world + player;
 ## enemies are layer 2, invisible to it). Paints `line` — when given — up
-## to whatever the ray struck, and returns true only when the player body
-## itself is the first hit: a clear line of sight.
-func _beam_sight(player: Node3D, line: BeamVisual, thickness: float = -1.0) -> bool:
+## to whatever the ray struck, and returns THE RAIDER THE RAY REACHED, or
+## null when geometry cut it short. Returning the body rather than a bare
+## "clear?" flag is what makes cover honest in co-op: a second raider
+## stepping into the line is who gets burned.
+func _beam_sight(player: Node3D, line: BeamVisual, thickness: float = -1.0) -> Node3D:
 	var from := global_position + Vector3.UP * muzzle_height
 	var to := player.global_position + Vector3.UP * target_height
 	var ray := PhysicsRayQueryParameters3D.create(from, to, 1)
 	var hit := get_world_3d().direct_space_state.intersect_ray(ray)
-	var sight_clear := false
+	var burned: Node3D = null
 	var end := to
 	if not hit.is_empty():
 		var collider := hit["collider"] as Node3D
 		end = hit["position"]
-		sight_clear = collider != null and collider.is_in_group("player")
+		if collider != null and collider.is_in_group("player"):
+			burned = collider
 	if line != null:
 		line.span(from, end, thickness)
-	return sight_clear
+	return burned
 
 
 func _apply_elite_damage(multiplier: float) -> void:
@@ -156,9 +176,13 @@ func _apply_elite_damage(multiplier: float) -> void:
 
 
 func _abort_attack() -> void:
-	if _state == State.FIRE:
+	# Re-armed for ANY interrupted attack, not just a fired one: an aim
+	# aborted because its target left used to fall back to SKITTER with a
+	# spent cooldown, so the next raider in range was lased instantly.
+	if _state != State.SKITTER:
 		_cooldown_timer = maxf(_cooldown_timer, beam_cooldown)
 	_state = State.SKITTER
+	_target = null
 	_aim_line.clear()
 	_beam.clear()
 	_release_hum()

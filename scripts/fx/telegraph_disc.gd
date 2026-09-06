@@ -20,6 +20,10 @@ func pool_reset() -> void:
 func show_disc(center: Vector3, radius: float, duration: float, color: Color) -> void:
 	var material := material_override as StandardMaterial3D
 	if material == null:
+		# The node came out of the pool, so bailing without releasing would
+		# strand it in the scene forever — the only exit here that used to
+		# skip the pool contract.
+		Pools.release(self)
 		return
 	material.albedo_color = Color(color.r, color.g, color.b, 0.45)
 	material.emission = color

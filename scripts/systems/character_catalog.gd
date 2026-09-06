@@ -34,50 +34,55 @@ extends RefCounted
 ##             rendered on the locked card beside the Shard price.
 ##   tint:     placeholder capsule body color (also the card swatch).
 
+##
+## Player-facing text: display_name, blurb, weapon_display_name,
+## passive_description and unlock_hint. Everything else (id, weapon_scene,
+## weapon_node_name, passive_stat, passive_kind) is an identifier.
+
 ## Fallback character when no selection was made (Main booted directly).
 const DEFAULT_ID: String = "rook"
 
 const CHARACTER_LIBRARY: Array[Dictionary] = [
 	{
 		"id": "rook", "display_name": "Rook",
-		"blurb": "A patient wall of a raider whose swings only get meaner.",
+		"blurb": "Un muro con patas: sus golpes solo se ponen más feos.",
 		"weapon_scene": "res://scenes/weapons/Shortsword.tscn",
 		"weapon_node_name": "Shortsword",
-		"weapon_display_name": "Shortsword",
-		"passive_description": "+0.8% damage per level",
+		"weapon_display_name": "Espada corta",
+		"passive_description": "+0.8% de daño por nivel",
 		"passive_stat": "damage", "passive_amount": 0.8,
 		"unlock_cost": 0,
 		"tint": Color(0.35, 0.51, 0.74),
 	},
 	{
 		"id": "vex", "display_name": "Vex",
-		"blurb": "A twitchy sharpshooter who always finds the soft spots.",
+		"blurb": "Un tirador nervioso que siempre encuentra el punto blando.",
 		"weapon_scene": "res://scenes/weapons/DartPistol.tscn",
 		"weapon_node_name": "DartPistol",
-		"weapon_display_name": "Dart Pistol",
-		"passive_description": "+0.5% crit chance per level",
+		"weapon_display_name": "Pistola de dardos",
+		"passive_description": "+0.5% de prob. de crítico por nivel",
 		"passive_stat": "crit_chance", "passive_amount": 0.5,
 		"unlock_cost": 0,
 		"tint": Color(0.58, 0.38, 0.82),
 	},
 	{
 		"id": "ash", "display_name": "Ash",
-		"blurb": "A soot-caked hermit whose fire blooms wider every level.",
+		"blurb": "Un ermitaño cubierto de hollín cuyo fuego se abre más en cada nivel.",
 		"weapon_scene": "res://scenes/weapons/EmberWand.tscn",
 		"weapon_node_name": "EmberWand",
-		"weapon_display_name": "Ember Wand",
-		"passive_description": "+0.7% area per level",
+		"weapon_display_name": "Vara de brasas",
+		"passive_description": "+0.7% de área por nivel",
 		"passive_stat": "area", "passive_amount": 0.7,
 		"unlock_cost": 50,
 		"tint": Color(0.89, 0.45, 0.18),
 	},
 	{
 		"id": "juno", "display_name": "Juno",
-		"blurb": "A fleet-footed stalker who turns raw speed into killing force.",
+		"blurb": "Una acechadora de pies ligeros que convierte la velocidad en fuerza mortal.",
 		"weapon_scene": "res://scenes/weapons/HuntingBow.tscn",
 		"weapon_node_name": "HuntingBow",
-		"weapon_display_name": "Hunting Bow",
-		"passive_description": "+0.6% damage per 1% bonus move speed",
+		"weapon_display_name": "Arco de caza",
+		"passive_description": "+0.6% de daño por cada 1% de velocidad extra",
 		"passive_stat": "damage", "passive_amount": 0.6,
 		"passive_kind": "speed_to_damage",
 		"unlock_cost": 80,
@@ -85,65 +90,126 @@ const CHARACTER_LIBRARY: Array[Dictionary] = [
 	},
 	{
 		"id": "bramble", "display_name": "Bramble",
-		"blurb": "A bristling warden whose hide punishes every careless bite.",
+		"blurb": "Un guardián erizado cuyo cuero castiga cada mordida descuidada.",
 		"weapon_scene": "res://scenes/weapons/ThornWhip.tscn",
 		"weapon_node_name": "ThornWhip",
-		"weapon_display_name": "Thorn Whip",
-		"passive_description": "+1 thorns per level",
+		"weapon_display_name": "Látigo de espinas",
+		"passive_description": "+1 de espinas por nivel",
 		"passive_stat": "thorns", "passive_amount": 1.0,
 		"unlock_cost": 80,
 		"unlock_boss": "grubthing",
-		"unlock_hint": "find something odd in the Hollow Woods",
+		"unlock_hint": "busca algo raro en el Bosque Hueco",
 		"tint": Color(0.5, 0.58, 0.28),
 	},
 	{
 		# GDD 5 also gives Otto wall-climb; that traversal mechanic is
 		# deferred until a climbing system exists — HP growth ships now.
 		"id": "otto", "display_name": "Otto",
-		"blurb": "A stout wanderer who only gets harder to put down.",
+		"blurb": "Un errante recio al que cada vez cuesta más tumbar.",
 		"weapon_scene": "res://scenes/weapons/Boomerang.tscn",
 		"weapon_node_name": "Boomerang",
-		"weapon_display_name": "Boomerang",
-		"passive_description": "+2 max HP per level",
+		"weapon_display_name": "Bumerán",
+		"passive_description": "+2 de HP máx. por nivel",
 		"passive_stat": "max_hp", "passive_amount": 2.0,
 		"unlock_cost": 100,
 		"tint": Color(0.62, 0.44, 0.26),
 	},
 	{
 		"id": "nyx", "display_name": "Nyx",
-		"blurb": "A dusk-veiled blur who answers every whiffed swing with steel.",
+		"blurb": "Un borrón crepuscular que responde con acero a cada golpe fallado.",
 		"weapon_scene": "res://scenes/weapons/TwinDaggers.tscn",
 		"weapon_node_name": "TwinDaggers",
-		"weapon_display_name": "Twin Daggers",
-		"passive_description": "+0.5% evasion per level; dodges execute weakened non-boss enemies",
+		"weapon_display_name": "Dagas gemelas",
+		"passive_description": "+0.5% de evasión por nivel; al esquivar rematas a enemigos debilitados que no sean jefes",
 		"passive_stat": "evasion", "passive_amount": 0.5,
 		"passive_kind": "evasion_execute",
 		"unlock_cost": 150,
 		"unlock_boss": "coffer_mimic",
-		"unlock_hint": "follow a strange hum in the Ash Dunes",
+		"unlock_hint": "sigue un zumbido extraño en las Dunas de Ceniza",
 		"tint": Color(0.42, 0.3, 0.58),
 	},
 	{
+		"id": "wisp", "display_name": "Wisp",
+		"blurb": "Un espíritu a medias, rodeado de luces que solo le obedecen a él.",
+		"weapon_scene": "res://scenes/weapons/SpiritOrbs.tscn",
+		"weapon_node_name": "SpiritOrbs",
+		"weapon_display_name": "Orbes espirituales",
+		"passive_description": "-0.5% de enfriamiento de armas por nivel",
+		"passive_stat": "cooldown", "passive_amount": 0.5,
+		"unlock_cost": 120,
+		"tint": Color(0.55, 0.85, 0.95),
+	},
+	{
+		"id": "torren", "display_name": "Torren",
+		"blurb": "Un cazatormentas cuya suerte se lee como un parte del clima.",
+		"weapon_scene": "res://scenes/weapons/StormRod.tscn",
+		"weapon_node_name": "StormRod",
+		"weapon_display_name": "Pararrayos",
+		"passive_description": "+1 de suerte por nivel (cartas más raras)",
+		"passive_stat": "luck", "passive_amount": 1.0,
+		"unlock_cost": 130,
+		"tint": Color(0.35, 0.45, 0.85),
+	},
+	{
 		"id": "doc", "display_name": "Doc",
-		"blurb": "A cheery field surgeon who bills every patient in blood.",
+		"blurb": "Un cirujano de campaña muy alegre que le cobra a cada paciente en sangre.",
 		"weapon_scene": "res://scenes/weapons/BloodVial.tscn",
 		"weapon_node_name": "BloodVial",
-		"weapon_display_name": "Blood Vial",
-		"passive_description": "+1% lifesteal per level (base +5%)",
+		"weapon_display_name": "Vial de sangre",
+		"passive_description": "+1% de robo de vida por nivel (base +5%)",
 		"passive_stat": "lifesteal", "passive_amount": 1.0,
 		"passive_base": 5.0,
 		"unlock_cost": 150,
 		"tint": Color(0.72, 0.16, 0.2),
 	},
+	# Iteration 43 roster: the slime, stench and beam starters.
+	{
+		"id": "miro", "display_name": "Miro",
+		"blurb": "Una babosa babeante de raider que nunca está donde quedó el desastre.",
+		"weapon_scene": "res://scenes/weapons/SlimeTrail.tscn",
+		"weapon_node_name": "SlimeTrail",
+		"weapon_display_name": "Rastro de baba",
+		"passive_description": "+2% de duración de efectos por nivel",
+		"passive_stat": "duration", "passive_amount": 2.0,
+		"unlock_cost": 120,
+		"tint": Color(0.45, 0.85, 0.35),
+	},
+	{
+		"id": "bogg", "display_name": "Bogg",
+		"blurb": "Nadie se sienta al lado de Bogg. Tampoco nadie sobrevive cerca de Bogg.",
+		"weapon_scene": "res://scenes/weapons/Stench.tscn",
+		"weapon_node_name": "Stench",
+		"weapon_display_name": "Hedor",
+		"passive_description": "+1% de área de ataque por nivel",
+		"passive_stat": "area", "passive_amount": 1.0,
+		"unlock_cost": 120,
+		"tint": Color(0.6, 0.7, 0.3),
+	},
+	{
+		"id": "kael", "display_name": "Kael",
+		"blurb": "Carga seis segundos y después reescribe el mapa.",
+		"weapon_scene": "res://scenes/weapons/Kamehameha.tscn",
+		"weapon_node_name": "Kamehameha",
+		"weapon_display_name": "Kamehameha",
+		"passive_description": "+1% de daño por nivel",
+		"passive_stat": "damage", "passive_amount": 1.0,
+		"unlock_cost": 180,
+		"tint": Color(0.4, 0.7, 1.0),
+	},
 ]
+
+
+## Lazily built lookups (see CatalogIndex): the select screen resolves a
+## row per card per redraw, and the player spawn one per raider.
+static var _by_id: Dictionary[String, Dictionary] = {}
+static var _by_unlock_boss: Dictionary[String, Dictionary] = {}
 
 
 ## Row for the given id, or an empty Dictionary if unknown.
 static func by_id(character_id: String) -> Dictionary:
-	for row: Dictionary in CHARACTER_LIBRARY:
-		if String(row.id) == character_id:
-			return row
-	return {}
+	if _by_id.is_empty():
+		_by_id = CatalogIndex.build(CHARACTER_LIBRARY)
+	return _by_id.get(character_id, {})
 
 
 ## Row for the given id, falling back to the default character so spawn
@@ -158,10 +224,9 @@ static func by_id_or_default(character_id: String) -> Dictionary:
 static func by_unlock_boss(boss_id: String) -> Dictionary:
 	if boss_id.is_empty():
 		return {}
-	for row: Dictionary in CHARACTER_LIBRARY:
-		if String(row.get("unlock_boss", "")) == boss_id:
-			return row
-	return {}
+	if _by_unlock_boss.is_empty():
+		_by_unlock_boss = CatalogIndex.build(CHARACTER_LIBRARY, "unlock_boss")
+	return _by_unlock_boss.get(boss_id, {})
 
 
 ## Ids playable from the start (unlock_cost 0) — GDD 5: Rook and Vex.

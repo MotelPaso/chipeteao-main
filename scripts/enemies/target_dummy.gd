@@ -19,6 +19,10 @@ func _on_died() -> void:
 	_mesh.visible = false
 	_collision.set_deferred("disabled", true)
 	await get_tree().create_timer(respawn_delay).timeout
+	# A SceneTreeTimer outlives its awaiter: a map change during the delay
+	# would resume this coroutine on a freed dummy.
+	if not is_instance_valid(self) or not is_inside_tree():
+		return
 	_respawn()
 
 

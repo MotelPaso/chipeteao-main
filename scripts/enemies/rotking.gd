@@ -13,6 +13,12 @@ enum State { ENTRANCE, PURSUE, SMASH, ROOT_BURST, SUMMON }
 
 const TELEGRAPH_COLOR := Color(1.0, 0.55, 0.12)
 const IMPACT_COLOR := Color(1.0, 0.8, 0.35)
+## Bark-root skin for the shared spike-cluster cue.
+const SPIKE_COLOR := Color(0.36, 0.26, 0.16)
+const SPIKE_ROUGHNESS: float = 0.95
+const SPIKE_BOTTOM_RADIUS: float = 0.16
+const SPIKE_LENGTH: float = 1.1
+const SPIKE_SINK_DEPTH: float = 1.2
 
 @export var entrance_duration: float = 0.9
 
@@ -58,7 +64,6 @@ var _root_burst_timer: float = 0.0
 var _root_spots: Array[Vector3] = []
 var _thresholds_remaining: Array[float] = []
 var _pending_summons: int = 0
-var _cue_tween: Tween
 
 
 func _ready() -> void:
@@ -129,11 +134,7 @@ func _combat_tick(player: Node3D, distance: float) -> void:
 ## Ground-slam arrival: the silhouette pops out of a flash ring.
 func _play_entrance() -> void:
 	Sfx.play(&"boss_roar")
-	Telegraph.spawn_disc(self, global_position, smash_radius * 0.75, 0.45, IMPACT_COLOR)
-	_visual.scale = Vector3.ONE * 0.15
-	var tween := create_tween()
-	tween.tween_property(_visual, "scale", Vector3.ONE, 0.55) \
-			.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	_play_boss_entrance(smash_radius * 0.75, IMPACT_COLOR)
 
 
 func _start_smash() -> void:
@@ -151,17 +152,10 @@ func _resolve_smash() -> void:
 	Telegraph.spawn_disc(self, global_position, smash_radius, 0.2, IMPACT_COLOR)
 	Juice.shake(0.2, 0.4)
 	_play_cue_lean(0.0, 0.25)
-	var player := get_tree().get_first_node_in_group("player") as Node3D
-	if player == null:
-		return
-	var to_player := player.global_position - global_position
-	var height := to_player.y
-	to_player.y = 0.0
-	if to_player.length() > smash_radius or absf(height) > smash_height_window:
-		return
-	var player_health := Health.find_in(player)
-	if player_health != null and not player_health.is_dead:
-		player_health.take_damage(smash_damage)
+	# The shockwave is drawn for the whole party, so it hits the whole
+	# party; naming ourselves as the attacker lets thorns answer back.
+	damage_players_in_disc(global_position, smash_radius, smash_height_window,
+			smash_damage, self)
 
 
 func _start_root_burst(player: Node3D) -> void:
@@ -169,16 +163,13 @@ func _start_root_burst(player: Node3D) -> void:
 	_state_timer = root_burst_windup
 	_root_burst_timer = root_burst_interval
 	_root_spots.clear()
-	var base := player.global_position
+	var base := _clamp_to_arena(player.global_position)
 	_root_spots.append(base)
 	var line_angle := randf() * TAU
 	for i in 2:
 		var spot_angle := line_angle + PI * float(i)
-		var spot := base \
-				+ Vector3(cos(spot_angle), 0.0, sin(spot_angle)) * root_burst_spread
-		spot.x = clampf(spot.x, -arena_half_extent, arena_half_extent)
-		spot.z = clampf(spot.z, -arena_half_extent, arena_half_extent)
-		_root_spots.append(spot)
+		_root_spots.append(_clamp_to_arena(base
+				+ Vector3(cos(spot_angle), 0.0, sin(spot_angle)) * root_burst_spread))
 	for spot: Vector3 in _root_spots:
 		Telegraph.spawn_disc(self, spot, root_burst_radius, root_burst_windup, TELEGRAPH_COLOR)
 
@@ -188,39 +179,31 @@ func _resolve_root_burst() -> void:
 	Juice.shake(0.2, 0.4)
 	for spot: Vector3 in _root_spots:
 		_spawn_spikes(spot)
-	var player := get_tree().get_first_node_in_group("player") as Node3D
-	if player == null:
-		return
-	var player_health := Health.find_in(player)
-	if player_health == null or player_health.is_dead:
-		return
-	for spot: Vector3 in _root_spots:
-		var to_player := player.global_position - spot
-		var height := absf(to_player.y)
-		to_player.y = 0.0
-		if to_player.length() <= root_burst_radius and height <= spike_height_window:
-			# One hit max even where spot discs overlap.
-			player_health.take_damage(root_burst_damage)
-			return
+	# Resolved against the SPOTS, not against whoever is nearest now: the
+	# discs were the promise, and one hit max per raider however many of
+	# them overlap.
+	damage_players_in_discs(_root_spots, root_burst_radius, spike_height_window,
+			root_burst_damage, self)
 
 
 func _start_summon() -> void:
 	_state = State.SUMMON
 	_state_timer = summon_duration
+	# Consumed here, not at resolve: whatever happens to the wave, the
+	# threshold must not be able to re-trigger forever.
 	_pending_summons -= 1
 	# Roar cue: the whole silhouette flares up, then settles.
-	if _cue_tween != null and _cue_tween.is_valid():
-		_cue_tween.kill()
-	_cue_tween = create_tween()
-	_cue_tween.tween_property(_visual, "scale", Vector3.ONE * 1.14, summon_duration * 0.4) \
+	var cue := _begin_cue()
+	cue.tween_property(_visual, "scale", Vector3.ONE * 1.14, summon_duration * 0.4) \
 			.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
-	_cue_tween.tween_property(_visual, "scale", Vector3.ONE, summon_duration * 0.5) \
+	cue.tween_property(_visual, "scale", Vector3.ONE, summon_duration * 0.5) \
 			.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
 
 
 func _resolve_summon() -> void:
 	_state = State.PURSUE
 	if summon_scene == null:
+		push_warning("Rotking: summon_scene is unset; the wave is lost.")
 		return
 	var parent := get_parent()
 	if parent == null:
@@ -230,16 +213,17 @@ func _resolve_summon() -> void:
 		var node := summon_scene.instantiate()
 		var minion := node as EnemyBase
 		if minion == null:
+			# One bad instance must not eat the rest of the wave silently.
 			node.free()
-			return
+			push_warning("Rotking: summon scene root does not extend EnemyBase.")
+			continue
 		parent.add_child(minion)
 		var ring_angle := TAU * float(i) / float(count)
-		var pos := global_position \
-				+ Vector3(cos(ring_angle), 0.0, sin(ring_angle)) * summon_ring_radius \
-				+ Vector3.UP * 0.1
-		pos.x = clampf(pos.x, -arena_half_extent, arena_half_extent)
-		pos.z = clampf(pos.z, -arena_half_extent, arena_half_extent)
-		minion.global_position = pos
+		# Walkable-aware: a minion dropped inside a mask-wall cell would
+		# spend the fight climbing back out of the rock.
+		minion.global_position = _safe_arena_point(global_position
+				+ Vector3(cos(ring_angle), 0.0, sin(ring_angle)) * summon_ring_radius
+				+ Vector3.UP * 0.1)
 
 
 func _on_damaged(_amount: float, current: float) -> void:
@@ -252,43 +236,11 @@ func _on_damaged(_amount: float, current: float) -> void:
 
 
 func _play_cue_lean(target_x: float, duration: float) -> void:
-	if _cue_tween != null and _cue_tween.is_valid():
-		_cue_tween.kill()
-	_cue_tween = create_tween()
-	_cue_tween.tween_property(_visual, "rotation:x", target_x, duration) \
-			.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	_play_cue(_visual, "rotation:x", target_x, duration)
 
 
 ## Quick eruption visual: a clutch of bark cones pops out of the ground and
-## sinks back; self-frees via its tween.
+## sinks back (BossBase owns the cue; these consts are the bark skin).
 func _spawn_spikes(center: Vector3) -> void:
-	var scene_root := get_tree().current_scene
-	if scene_root == null:
-		return
-	var cluster := Node3D.new()
-	scene_root.add_child(cluster)
-	var spike_mesh := CylinderMesh.new()
-	spike_mesh.top_radius = 0.0
-	spike_mesh.bottom_radius = 0.16
-	spike_mesh.height = 1.1
-	var material := StandardMaterial3D.new()
-	material.albedo_color = Color(0.36, 0.26, 0.16)
-	material.roughness = 0.95
-	spike_mesh.material = material
-	for i in 5:
-		var spike := MeshInstance3D.new()
-		spike.mesh = spike_mesh
-		var spike_angle := TAU * float(i) / 5.0
-		spike.position = Vector3(cos(spike_angle), 0.0, sin(spike_angle)) \
-				* root_burst_radius * 0.5
-		spike.rotation = Vector3(randf_range(-0.2, 0.2), 0.0, randf_range(-0.2, 0.2))
-		cluster.add_child(spike)
-	# Starts buried inside the floor slab, pops up, sinks back.
-	cluster.global_position = center - Vector3.UP * 1.2
-	var tween := cluster.create_tween()
-	tween.tween_property(cluster, "global_position:y", center.y + 0.05, 0.12) \
-			.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-	tween.tween_interval(0.35)
-	tween.tween_property(cluster, "global_position:y", center.y - 1.3, 0.25) \
-			.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
-	tween.tween_callback(cluster.queue_free)
+	_spawn_spike_cluster(center, root_burst_radius * 0.5, SPIKE_COLOR,
+			SPIKE_ROUGHNESS, SPIKE_BOTTOM_RADIUS, SPIKE_LENGTH, SPIKE_SINK_DEPTH)

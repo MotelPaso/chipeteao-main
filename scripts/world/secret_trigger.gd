@@ -13,7 +13,7 @@ extends Interactable
 ## it toward open ground/arena center.
 @export var spawn_offset: Vector3 = Vector3(4.0, 0.1, -4.0)
 ## Boss-warning banner line shown through the "boss_ui" group on awaken.
-@export var awaken_text: String = "Something hidden stirs..."
+@export var awaken_text: String = "Algo oculto se remueve..."
 
 ## The awakened miniboss instance (null until spawned; test hook).
 var spawned_boss: BossBase = null

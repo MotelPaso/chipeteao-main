@@ -23,6 +23,11 @@ var _returning: bool = false
 var _life_left: float = 0.0
 ## Instance ids damaged on the CURRENT leg (cleared at the turn point).
 var _hit_ids_this_leg: Dictionary[int, bool] = {}
+## True once the blade has been released back to the pool. Pools.release()
+## only defers the reparent, so the Area3D keeps reporting bodies for the
+## rest of the physics flush — a blade caught while an enemy is hugging the
+## player used to land one extra "already caught" hit.
+var _spent: bool = false
 
 @onready var _spinner: Node3D = $Spinner
 @onready var _trail: GPUParticles3D = $Trail
@@ -39,8 +44,14 @@ func pool_reset() -> void:
 	_source = null
 	_out_point = Vector3.ZERO
 	_returning = false
+	_spent = false
 	_life_left = max_lifetime
 	_hit_ids_this_leg.clear()
+	# Orientation as well: launch() only writes the position, and the
+	# Spinner accumulates yaw for the whole flight, so a reused blade came
+	# back out mid-spin in whatever pose it was caught in.
+	rotation = Vector3.ZERO
+	_spinner.rotation = Vector3.ZERO
 	_trail.restart()
 
 
@@ -56,7 +67,7 @@ func _physics_process(delta: float) -> void:
 	_spinner.rotate_y(spin_speed * delta)
 	_life_left -= delta
 	if _life_left <= 0.0:
-		Pools.release(self)
+		_release()
 		return
 	var step := speed * delta
 	if not _returning:
@@ -68,18 +79,33 @@ func _physics_process(delta: float) -> void:
 		else:
 			global_position += to_out.normalized() * step
 		return
-	var player := get_tree().get_first_node_in_group("player") as Node3D
+	# Return to the THROWER (each co-op raider catches their own blade);
+	# with the thrower gone, fall back to whoever is nearest.
+	var player: Node3D = null
+	if _source != null and is_instance_valid(_source):
+		player = _source.carrier_player()
 	if player == null:
-		Pools.release(self)
+		player = Coop.nearest_player(get_tree(), global_position)
+	if player == null:
+		_release()
 		return
 	var to_catch := player.global_position + Vector3.UP * catch_height - global_position
 	if to_catch.length() <= maxf(step, catch_radius):
-		Pools.release(self)
+		_release()
 	else:
 		global_position += to_catch.normalized() * step
 
 
+## Single exit door: marks the blade spent before handing it back, so the
+## still-live Area3D cannot land another cut this flush.
+func _release() -> void:
+	_spent = true
+	Pools.release(self)
+
+
 func _on_body_entered(body: Node3D) -> void:
+	if _spent:
+		return
 	if not body.is_in_group("enemies"):
 		return
 	var body_id := body.get_instance_id()

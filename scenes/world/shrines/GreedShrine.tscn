@@ -75,7 +75,6 @@ collision_layer = 0
 collision_mask = 1
 script = ExtResource("1_greed")
 xp_gem_scene = ExtResource("2_gem")
-prompt_text = "[E] Offer blood"
 prompt_height = 2.6
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="."]

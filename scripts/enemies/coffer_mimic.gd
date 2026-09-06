@@ -12,6 +12,11 @@ enum State { ENTRANCE, PURSUE, SNAP_WINDUP, SNAP_RECOVER, BURIED }
 
 const TELEGRAPH_COLOR := Color(0.98, 0.75, 0.25)
 const IMPACT_COLOR := Color(1.0, 0.88, 0.5)
+const ENTRANCE_RING_RADIUS: float = 2.4
+## Lid angle while dug in: fully shut, so only sand shows.
+const LID_CLOSED_ANGLE: float = 0.0
+## How wide the maw gapes during a bite windup.
+const LID_GAPE_ANGLE: float = 1.15
 
 @export var entrance_duration: float = 0.8
 
@@ -35,7 +40,11 @@ const IMPACT_COLOR := Color(1.0, 0.88, 0.5)
 @export var bury_interval: float = 8.0
 ## Seconds dug in (also the pop-out shockwave's telegraph time).
 @export var bury_duration: float = 2.0
-## Flat armor added to the Health component while buried.
+## Flat armor added to the Health component while buried. Deliberately
+## flat, and worth knowing what that means: Health.take_damage floors every
+## hit at 1 HP, so while dug in (scene armor 2 + this = 8) any weapon tick
+## under 8 lands for exactly 1. That IS the "wait it out" window, but it is
+## also why raising this further would read as immunity, not as armor.
 @export var bury_armor_bonus: float = 6.0
 ## How far the body sinks: tuned so only the lid clears the sand.
 @export var bury_sink_depth: float = 0.85
@@ -52,7 +61,9 @@ var _snap_cooldown_timer: float = 0.0
 var _snap_point: Vector3 = Vector3.ZERO
 var _bury_timer: float = 0.0
 var _buried_armor_applied: bool = false
-var _cue_tween: Tween
+## The lid animates on its own slot: it runs alongside the body cues
+## (sinking, popping), so it must not share BossBase's single _cue_tween.
+var _lid_tween: Tween
 
 @onready var _lid_pivot: Node3D = $Visual/LidPivot
 @onready var _lid_rest_angle: float = _lid_pivot.rotation.x
@@ -124,11 +135,7 @@ func _combat_tick(player: Node3D, distance: float) -> void:
 func _play_entrance() -> void:
 	Sfx.play(&"burrow_pop")
 	Sfx.play(&"boss_roar_2", -3.0)
-	Telegraph.spawn_disc(self, global_position, 2.4, 0.45, IMPACT_COLOR)
-	_visual.scale = Vector3.ONE * 0.15
-	var tween := create_tween()
-	tween.tween_property(_visual, "scale", Vector3.ONE, 0.55) \
-			.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	_play_boss_entrance(ENTRANCE_RING_RADIUS, IMPACT_COLOR)
 
 
 # --- Snap -------------------------------------------------------------------
@@ -136,11 +143,9 @@ func _play_entrance() -> void:
 func _start_snap(player: Node3D) -> void:
 	_state = State.SNAP_WINDUP
 	_state_timer = snap_windup
-	_snap_point = player.global_position
-	_snap_point.x = clampf(_snap_point.x, -arena_half_extent, arena_half_extent)
-	_snap_point.z = clampf(_snap_point.z, -arena_half_extent, arena_half_extent)
+	_snap_point = _clamp_to_arena(player.global_position)
 	Telegraph.spawn_disc(self, _snap_point, snap_radius, snap_windup, TELEGRAPH_COLOR)
-	_play_lid(1.15, snap_windup)
+	_play_lid(LID_GAPE_ANGLE, snap_windup)
 
 
 func _resolve_snap() -> void:
@@ -150,17 +155,10 @@ func _resolve_snap() -> void:
 	Telegraph.spawn_disc(self, _snap_point, snap_radius, 0.15, IMPACT_COLOR)
 	Sfx.play(&"hit_crit", -3.0)
 	_play_lid(_lid_rest_angle, 0.12)
-	var player := get_tree().get_first_node_in_group("player") as Node3D
-	if player == null:
-		return
-	var to_player := player.global_position - _snap_point
-	var height := absf(to_player.y)
-	to_player.y = 0.0
-	if to_player.length() > snap_radius or height > snap_height_window:
-		return
-	var player_health := Health.find_in(player)
-	if player_health != null and not player_health.is_dead:
-		player_health.take_damage(snap_damage, false, self)
+	# Resolved against the telegraphed bite spot for the whole party: the
+	# raider it locked onto may not be the nearest one any more.
+	damage_players_in_disc(_snap_point, snap_radius, snap_height_window,
+			snap_damage, self)
 
 
 # --- Bury -------------------------------------------------------------------
@@ -176,12 +174,9 @@ func _start_bury() -> void:
 	# The whole bury reads as the shockwave countdown.
 	Telegraph.spawn_disc(self, global_position, shockwave_radius,
 			bury_duration, TELEGRAPH_COLOR)
-	_play_lid(0.0, 0.15)
-	if _cue_tween != null and _cue_tween.is_valid():
-		_cue_tween.kill()
-	_cue_tween = create_tween()
-	_cue_tween.tween_property(_visual, "position:y", -bury_sink_depth, 0.25) \
-			.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	_play_lid(LID_CLOSED_ANGLE, 0.15)
+	_play_cue(_visual, "position:y", -bury_sink_depth, 0.25,
+			Tween.TRANS_QUAD, Tween.EASE_IN)
 
 
 func _resolve_bury() -> void:
@@ -194,25 +189,21 @@ func _resolve_bury() -> void:
 	Telegraph.spawn_disc(self, global_position, shockwave_radius, 0.2, IMPACT_COLOR)
 	Sfx.play(&"burrow_pop")
 	Juice.shake(0.15, 0.35)
-	if _cue_tween != null and _cue_tween.is_valid():
-		_cue_tween.kill()
-	_cue_tween = create_tween()
-	_cue_tween.tween_property(_visual, "position:y", 0.0, 0.2) \
-			.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-	var player := get_tree().get_first_node_in_group("player") as Node3D
-	if player == null:
-		return
-	var to_player := player.global_position - global_position
-	var height := absf(to_player.y)
-	to_player.y = 0.0
-	if to_player.length() > shockwave_radius or height > shockwave_height_window:
-		return
-	var player_health := Health.find_in(player)
-	if player_health != null and not player_health.is_dead:
-		player_health.take_damage(shockwave_damage, false, self)
+	_play_cue(_visual, "position:y", 0.0, 0.2, Tween.TRANS_BACK, Tween.EASE_OUT)
+	# The bury shut the lid; popping out has to open it back to its rest
+	# angle or the coffer keeps fighting sealed for the rest of the run.
+	_play_lid(_lid_rest_angle, 0.2)
+	# The shockwave ring is telegraphed for everyone, so everyone standing
+	# in it takes it.
+	damage_players_in_disc(global_position, shockwave_radius,
+			shockwave_height_window, shockwave_damage, self)
 
 
+## One slot for the lid, so a snap that lands during a bury (or vice versa)
+## replaces the running lid animation instead of fighting it.
 func _play_lid(target_x: float, duration: float) -> void:
-	var tween := create_tween()
-	tween.tween_property(_lid_pivot, "rotation:x", target_x, duration) \
+	if _lid_tween != null and _lid_tween.is_valid():
+		_lid_tween.kill()
+	_lid_tween = create_tween()
+	_lid_tween.tween_property(_lid_pivot, "rotation:x", target_x, duration) \
 			.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)

@@ -1,6 +1,7 @@
-[gd_scene load_steps=32 format=3 uid="uid://bashdu2ne7q4c"]
+[gd_scene load_steps=33 format=3 uid="uid://bashdu2ne7q4c"]
 
 [ext_resource type="PackedScene" uid="uid://crunsy5te2m8a" path="res://scenes/world/RunSystems.tscn" id="1_runsystems"]
+[ext_resource type="Script" path="res://scripts/world/backdrop.gd" id="90_backdrop"]
 [ext_resource type="Script" path="res://scripts/systems/enemy_spawner.gd" id="2_spawner"]
 [ext_resource type="PackedScene" uid="uid://bqgr4nt0h3v2e" path="res://scenes/enemies/Grunt.tscn" id="3_grunt"]
 [ext_resource type="PackedScene" path="res://scenes/enemies/Skirmisher.tscn" id="4_skirmisher"]
@@ -87,6 +88,13 @@ fog_sky_affect = 0.25
 
 [node name="WorldEnvironment" type="WorldEnvironment" parent="."]
 environment = SubResource("Environment_1")
+
+[node name="Backdrop" type="Node3D" parent="."]
+script = ExtResource("90_backdrop")
+ground_color = Color(0.7, 0.53, 0.34, 1)
+hill_color = Color(0.6, 0.41, 0.27, 1)
+far_hill_color = Color(0.49, 0.33, 0.24, 1)
+hill_height_max = 26.0
 
 [node name="Sun" type="DirectionalLight3D" parent="."]
 transform = Transform3D(0.766044, 0, -0.642788, -0.271654, 0.906308, -0.323744, 0.582563, 0.422618, 0.694272, 0, 12, 0)
@@ -273,8 +281,8 @@ tank_scene = ExtResource("5_tank")
 sunspitter_scene = ExtResource("19_sunspitter")
 burrower_scene = ExtResource("20_burrower")
 boss_scene = ExtResource("21_sarcognath")
-elder_title = "Sarcognath Elder"
-boss_warning_text = "The sand shivers over something entombed..."
+elder_title = "Sarcognato Ancestral"
+boss_warning_text = "La arena tiembla sobre algo sepultado..."
 
 [node name="RunSystems" parent="." instance=ExtResource("1_runsystems")]
 map_id = "ash_dunes"

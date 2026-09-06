@@ -39,7 +39,7 @@ unique_name_in_owner = true
 theme_override_colors/font_color = Color(0.96, 0.93, 0.82, 1)
 theme_override_font_sizes/font_size = 34
 horizontal_alignment = 1
-text = "Level up!"
+text = "¡Subiste de nivel!"
 
 [node name="Cards" type="HBoxContainer" parent="Center/VBox"]
 theme_override_constants/separation = 22
@@ -61,12 +61,13 @@ theme_override_constants/separation = 10
 [node name="RarityLabel" type="Label" parent="Center/VBox/Cards/Card1/CardBox"]
 theme_override_font_sizes/font_size = 14
 horizontal_alignment = 1
-text = "COMMON"
+text = "COMÚN"
 
 [node name="TitleLabel" type="Label" parent="Center/VBox/Cards/Card1/CardBox"]
 theme_override_font_sizes/font_size = 24
 horizontal_alignment = 1
-text = "Title"
+autowrap_mode = 3
+text = "Título"
 
 [node name="DescLabel" type="Label" parent="Center/VBox/Cards/Card1/CardBox"]
 size_flags_vertical = 3
@@ -74,7 +75,7 @@ theme_override_font_sizes/font_size = 16
 horizontal_alignment = 1
 vertical_alignment = 1
 autowrap_mode = 3
-text = "Description"
+text = "Descripción"
 
 [node name="Card2" type="Button" parent="Center/VBox/Cards"]
 unique_name_in_owner = true
@@ -93,12 +94,13 @@ theme_override_constants/separation = 10
 [node name="RarityLabel" type="Label" parent="Center/VBox/Cards/Card2/CardBox"]
 theme_override_font_sizes/font_size = 14
 horizontal_alignment = 1
-text = "COMMON"
+text = "COMÚN"
 
 [node name="TitleLabel" type="Label" parent="Center/VBox/Cards/Card2/CardBox"]
 theme_override_font_sizes/font_size = 24
 horizontal_alignment = 1
-text = "Title"
+autowrap_mode = 3
+text = "Título"
 
 [node name="DescLabel" type="Label" parent="Center/VBox/Cards/Card2/CardBox"]
 size_flags_vertical = 3
@@ -106,7 +108,7 @@ theme_override_font_sizes/font_size = 16
 horizontal_alignment = 1
 vertical_alignment = 1
 autowrap_mode = 3
-text = "Description"
+text = "Descripción"
 
 [node name="Card3" type="Button" parent="Center/VBox/Cards"]
 unique_name_in_owner = true
@@ -125,12 +127,13 @@ theme_override_constants/separation = 10
 [node name="RarityLabel" type="Label" parent="Center/VBox/Cards/Card3/CardBox"]
 theme_override_font_sizes/font_size = 14
 horizontal_alignment = 1
-text = "COMMON"
+text = "COMÚN"
 
 [node name="TitleLabel" type="Label" parent="Center/VBox/Cards/Card3/CardBox"]
 theme_override_font_sizes/font_size = 24
 horizontal_alignment = 1
-text = "Title"
+autowrap_mode = 3
+text = "Título"
 
 [node name="DescLabel" type="Label" parent="Center/VBox/Cards/Card3/CardBox"]
 size_flags_vertical = 3
@@ -138,4 +141,4 @@ theme_override_font_sizes/font_size = 16
 horizontal_alignment = 1
 vertical_alignment = 1
 autowrap_mode = 3
-text = "Description"
+text = "Descripción"

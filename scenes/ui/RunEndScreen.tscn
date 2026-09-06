@@ -28,14 +28,14 @@ theme_override_constants/separation = 20
 unique_name_in_owner = true
 theme_override_font_sizes/font_size = 72
 horizontal_alignment = 1
-text = "YOU DIED"
+text = "MORISTE"
 
 [node name="SubtitleLabel" type="Label" parent="Root/Center/VBox"]
 unique_name_in_owner = true
 theme_override_colors/font_color = Color(0.72, 0.74, 0.78, 1)
 theme_override_font_sizes/font_size = 20
 horizontal_alignment = 1
-text = "The horde got you."
+text = "La horda te alcanzó."
 
 [node name="StatsPanel" type="PanelContainer" parent="Root/Center/VBox"]
 unique_name_in_owner = true
@@ -50,7 +50,7 @@ custom_minimum_size = Vector2(360, 0)
 size_flags_horizontal = 3
 theme_override_colors/font_color = Color(0.62, 0.65, 0.7, 1)
 theme_override_font_sizes/font_size = 18
-text = "Time survived"
+text = "Tiempo con vida"
 
 [node name="TimeValue" type="Label" parent="Root/Center/VBox/StatsPanel/StatsBox/TimeRow"]
 unique_name_in_owner = true
@@ -66,7 +66,7 @@ custom_minimum_size = Vector2(360, 0)
 size_flags_horizontal = 3
 theme_override_colors/font_color = Color(0.62, 0.65, 0.7, 1)
 theme_override_font_sizes/font_size = 18
-text = "Level reached"
+text = "Nivel alcanzado"
 
 [node name="LevelValue" type="Label" parent="Root/Center/VBox/StatsPanel/StatsBox/LevelRow"]
 unique_name_in_owner = true
@@ -82,7 +82,7 @@ custom_minimum_size = Vector2(360, 0)
 size_flags_horizontal = 3
 theme_override_colors/font_color = Color(0.62, 0.65, 0.7, 1)
 theme_override_font_sizes/font_size = 18
-text = "Total kills"
+text = "Bajas totales"
 
 [node name="KillsValue" type="Label" parent="Root/Center/VBox/StatsPanel/StatsBox/KillsRow"]
 unique_name_in_owner = true
@@ -97,9 +97,10 @@ visible = false
 theme_override_colors/font_color = Color(0.55, 0.8, 0.92, 1)
 theme_override_font_sizes/font_size = 18
 horizontal_alignment = 1
-text = "+0 shards"
+text = "+0 esquirlas"
 
 [node name="Buttons" type="HBoxContainer" parent="Root/Center/VBox"]
+unique_name_in_owner = true
 theme_override_constants/separation = 20
 alignment = 1
 
@@ -107,16 +108,16 @@ alignment = 1
 unique_name_in_owner = true
 custom_minimum_size = Vector2(160, 46)
 theme_override_font_sizes/font_size = 20
-text = "Retry"
+text = "Reintentar"
 
 [node name="ChangeCharacterButton" type="Button" parent="Root/Center/VBox/Buttons"]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(220, 46)
 theme_override_font_sizes/font_size = 20
-text = "Change Character"
+text = "Cambiar raider"
 
 [node name="QuitButton" type="Button" parent="Root/Center/VBox/Buttons"]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(160, 46)
 theme_override_font_sizes/font_size = 20
-text = "Quit"
+text = "Salir"

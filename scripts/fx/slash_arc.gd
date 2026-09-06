@@ -20,7 +20,8 @@ var _tween: Tween = null
 
 
 func _ready() -> void:
-	cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	# cast_shadow lives in SlashArc.tscn with the rest of the FX geometry
+	# rules (emissive FX never casts), not here.
 	_material = StandardMaterial3D.new()
 	_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
@@ -70,7 +71,6 @@ func _release() -> void:
 func _build_crescent() -> ArrayMesh:
 	var vertices := PackedVector3Array()
 	var colors := PackedColorArray()
-	var indices := PackedInt32Array()
 	var half := deg_to_rad(ARC_DEG) * 0.5
 	for i: int in SEGMENTS + 1:
 		var t := float(i) / float(SEGMENTS)
@@ -84,17 +84,4 @@ func _build_crescent() -> ArrayMesh:
 		var alpha := PEAK_ALPHA * taper
 		colors.append(Color(1, 1, 1, alpha * 0.35))  # inner edge, softer
 		colors.append(Color(1, 1, 1, alpha))
-	for i: int in SEGMENTS:
-		var base := i * 2
-		indices.append_array(PackedInt32Array([
-			base, base + 1, base + 2,
-			base + 1, base + 3, base + 2,
-		]))
-	var arrays: Array = []
-	arrays.resize(Mesh.ARRAY_MAX)
-	arrays[Mesh.ARRAY_VERTEX] = vertices
-	arrays[Mesh.ARRAY_COLOR] = colors
-	arrays[Mesh.ARRAY_INDEX] = indices
-	var built := ArrayMesh.new()
-	built.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
-	return built
+	return FxMesh.strip(vertices, colors)

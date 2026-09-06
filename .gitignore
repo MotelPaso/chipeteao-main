@@ -3,3 +3,6 @@ builds/
 *.translation
 .claude/scheduled_tasks.lock
 .DS_Store
+.agents/
+.claude/skills/
+skills-lock.json

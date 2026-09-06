@@ -1,0 +1,9 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/weapons/storm_rod.gd" id="1_stormrod"]
+
+[node name="StormRod" type="Node3D"]
+script = ExtResource("1_stormrod")
+damage = 12.0
+cooldown = 1.6
+attack_range = 12.0

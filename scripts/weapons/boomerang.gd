@@ -15,14 +15,10 @@ func fire(target: Node3D) -> void:
 	if projectile_scene == null:
 		push_warning("%s: projectile_scene not set" % name)
 		return
-	var to_target := target.global_position - global_position
-	to_target.y = 0.0
-	# Degenerate case (target directly above/below): throw where we face.
-	var throw_dir := to_target.normalized() if to_target.length_squared() > 0.0001 \
-			else -global_transform.basis.z
-	throw_dir.y = 0.0
-	throw_dir = throw_dir.normalized() if throw_dir.length_squared() > 0.0001 \
-			else Vector3.FORWARD
+	# Degenerate case (target directly above/below): throw where we face, and
+	# FORWARD when our own facing is vertical too.
+	var throw_dir := flat_dir_or(target.global_position - global_position,
+			flat_dir_or(-global_transform.basis.z, Vector3.FORWARD))
 	# Pooled, parented to the scene root so the blade keeps flying while
 	# the player moves on.
 	var blade := Pools.acquire_scene(projectile_scene) as BoomerangProjectile

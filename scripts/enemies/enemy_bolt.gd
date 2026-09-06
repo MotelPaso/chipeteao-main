@@ -14,6 +14,11 @@ var _travelled: float = 0.0
 ## Scene-default damage, restored on reuse (casters override it per shot
 ## AFTER the pool's reset, so an elite's hot bolt never leaks to the next).
 var _default_damage: float = 8.0
+## Set the moment this bolt spends itself. Pools.release only DEFERS the
+## reparent, so the Area3D keeps monitoring for the rest of the signal
+## flush: without this flag two raiders entering on the same physics step
+## would each eat a full hit from one bolt.
+var _spent: bool = false
 
 
 func _ready() -> void:
@@ -25,19 +30,29 @@ func _ready() -> void:
 func pool_reset() -> void:
 	damage = _default_damage
 	_travelled = 0.0
+	_spent = false
 
 
 func _physics_process(delta: float) -> void:
+	if _spent:
+		return
 	var step := speed * delta
 	global_position += -global_transform.basis.z * step
 	_travelled += step
 	if _travelled >= max_distance:
-		Pools.release(self)
+		_spend()
 
 
 func _on_body_entered(body: Node3D) -> void:
+	if _spent:
+		return
 	if body.is_in_group("player"):
 		var health := Health.find_in(body)
 		if health != null:
 			health.take_damage(damage)
+	_spend()
+
+
+func _spend() -> void:
+	_spent = true
 	Pools.release(self)

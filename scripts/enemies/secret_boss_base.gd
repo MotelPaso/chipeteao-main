@@ -30,10 +30,20 @@ func _on_secret_boss_died() -> void:
 	var row := CharacterCatalog.by_unlock_boss(secret_boss_id)
 	if row.is_empty():
 		return
+	# Read defensively, the way CharacterCatalog reads its own rows: a
+	# property access on a Dictionary throws if a future row omits the key,
+	# and this runs inside a death handler.
+	var character_id := String(row.get("id", ""))
+	if character_id.is_empty():
+		push_warning("SecretBossBase: unlock row for '%s' has no id." % secret_boss_id)
+		return
 	# Idempotent: with the character already unlocked (purchase or an
 	# earlier kill) this no-ops and the fight stays a gem/quest payday.
-	if SaveData.unlock_character(String(row.id), "boss"):
-		get_tree().call_group("boss_ui", "announce",
-				"CHARACTER UNLOCKED: %s!" % String(row.display_name))
+	if SaveData.unlock_character(character_id, "boss"):
+		# announce_major, not announce: a free raider is the biggest banner
+		# of the run and a plain announce is overwritten within 0.3 s by the
+		# next kill streak line.
+		get_tree().call_group("boss_ui", "announce_major",
+				"¡RAIDER DESBLOQUEADO: %s!" % String(row.get("display_name", character_id)))
 	# One-line log (RunManager convention) so headless runs can confirm it.
 	print("Secret boss slain: %s" % secret_boss_id)

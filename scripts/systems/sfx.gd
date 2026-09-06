@@ -3,8 +3,10 @@ extends Node
 ## assets/audio/sfx (rendered by scripts/tools/generate_sfx.gd — every
 ## sound is original, generated audio). One-shots go through play() onto a
 ## round-robin pool of AudioStreamPlayers so overlapping hits never cut
-## each other; loops (the shrine channel hum) get a dedicated voice via
-## play_loop()/stop_loop(). Repetitive ids take a small random pitch
+## each other; loops (the shrine channel hum, the laser hum) get ONE
+## shared, reference-counted voice per id via acquire_loop()/release_loop()
+## — play_loop/stop_loop are the same thing under an older name.
+## Repetitive ids take a small random pitch
 ## jitter against machine-gun sameness, spammy ids are rate limited so
 ## hordes can't clip, and everything routes through an "Sfx" bus created
 ## in code (headless-safe: players simply mix into the dummy driver).
@@ -39,14 +41,12 @@ const STREAMS: Dictionary[StringName, AudioStream] = {
 	&"secret_fanfare": preload("res://assets/audio/sfx/secret_fanfare.wav"),
 }
 
-## Ids meant for play_loop(): forced to LOOP_FORWARD at ready, because the
-## generated wav files carry no loop metadata.
+## Ids meant for play_loop(): a LOOP_FORWARD copy of each is made at ready,
+## because the generated wav files carry no loop metadata.
 const LOOP_IDS: Array[StringName] = [&"shrine_channel", &"laser_hum"]
 
 ## One-shot voices; overlapping sounds round-robin across these.
 @export var pool_size: int = 12
-## Master SFX level, applied to the "Sfx" audio bus.
-@export var bus_volume_db: float = 0.0
 ## Default random pitch spread (fraction, so 0.08 = ±8%) for jittered_ids.
 @export var default_pitch_jitter: float = 0.08
 ## Repetitive ids that get default_pitch_jitter when play() is called
@@ -58,9 +58,11 @@ const LOOP_IDS: Array[StringName] = [&"shrine_channel", &"laser_hum"]
 @export var rate_limits: Dictionary[StringName, int] = {
 	&"hit_soft": 10,
 	&"hit_crit": 10,
+	&"enemy_die": 12,
 	&"gem_pickup": 10,
 	&"burrow_pop": 8,
 	&"heal": 4,
+	&"player_hurt": 6,
 }
 ## Per-id base volume (dB) so the constant hit_soft sits well under the
 ## rare stingers; play()'s volume_db_offset stacks on top.
@@ -100,12 +102,17 @@ var _started_at: Array[float] = []
 var _next_voice: int = 0
 var _rate_state: Dictionary[StringName, RateWindow] = {}
 var _loop_players: Dictionary[StringName, AudioStreamPlayer] = {}
-## Live acquire_loop() holders per id (several lasers share one hum voice).
+## Live loop holders per id (several lasers share one hum voice).
 var _loop_refcounts: Dictionary[StringName, int] = {}
+## Looping COPIES of the LOOP_IDS streams; see _ready.
+var _loop_streams: Dictionary[StringName, AudioStream] = {}
 
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
+	# pool_size is a tunable: 0 used to leave play() indexing an empty array
+	# and _alloc_voice doing a modulo by zero on the very first sound.
+	pool_size = maxi(pool_size, 1)
 	_setup_bus()
 	for i in pool_size:
 		var voice := AudioStreamPlayer.new()
@@ -115,10 +122,17 @@ func _ready() -> void:
 		_started_at.append(-1000.0)
 	for id: StringName in LOOP_IDS:
 		var wav := STREAMS.get(id) as AudioStreamWAV
-		if wav != null:
-			wav.loop_mode = AudioStreamWAV.LOOP_FORWARD
-			wav.loop_begin = 0
-			wav.loop_end = int(round(wav.get_length() * float(wav.mix_rate)))
+		if wav == null:
+			continue
+		# Loop a COPY: the preloaded stream is the process-wide
+		# ResourceLoader entry, so forcing LOOP_FORWARD on it in place would
+		# make every one-shot play() of the same file loop forever and eat a
+		# voice from the pool for good.
+		var looped := wav.duplicate() as AudioStreamWAV
+		looped.loop_mode = AudioStreamWAV.LOOP_FORWARD
+		looped.loop_begin = 0
+		looped.loop_end = int(round(looped.get_length() * float(looped.mix_rate)))
+		_loop_streams[id] = looped
 
 
 ## Autoloads only leave the tree at app shutdown. Anything still mid-
@@ -141,6 +155,8 @@ func play(id: StringName, volume_db_offset: float = 0.0, pitch_jitter: float = -
 	if stream == null:
 		push_warning("Sfx: unknown sound id '%s'" % id)
 		return
+	if _pool.is_empty():
+		return
 	var now := _now()
 	if not _rate_check(id, now):
 		return
@@ -153,11 +169,48 @@ func play(id: StringName, volume_db_offset: float = 0.0, pitch_jitter: float = -
 	_started_at[idx] = now
 
 
-## Starts a dedicated looping voice for `id` (no-op while already
-## playing). Loop voices live outside the one-shot pool and are never
-## stolen.
+## Claims the shared looping voice for `id`, starting it on the first
+## holder. Reference counted, because one id can have several live holders
+## at once (a Charge Altar, a Humming Skull and a placed altar all hum on
+## "shrine_channel"): the voice stops only when the LAST holder releases,
+## so one of them walking out no longer cuts everyone else's hum.
+## Every caller MUST pair one acquire with exactly one release (guard with
+## a held flag; release from _exit_tree for mid-loop frees).
+func acquire_loop(id: StringName) -> void:
+	var count := int(_loop_refcounts.get(id, 0))
+	_loop_refcounts[id] = count + 1
+	if count == 0:
+		_start_loop_voice(id)
+
+
+func release_loop(id: StringName) -> void:
+	var count := int(_loop_refcounts.get(id, 0))
+	if count <= 0:
+		return
+	count -= 1
+	_loop_refcounts[id] = count
+	if count == 0:
+		_stop_loop_voice(id)
+
+
+## Older name for acquire_loop/release_loop, kept because the shrines call
+## it; identical (and reference counted) behaviour.
 func play_loop(id: StringName) -> void:
-	var stream := STREAMS.get(id) as AudioStream
+	acquire_loop(id)
+
+
+func stop_loop(id: StringName) -> void:
+	release_loop(id)
+
+
+## How many holders `id` currently has (test hook).
+func loop_refcount(id: StringName) -> int:
+	return int(_loop_refcounts.get(id, 0))
+
+
+## Loop voices live outside the one-shot pool and are never stolen.
+func _start_loop_voice(id: StringName) -> void:
+	var stream := _loop_streams.get(id, STREAMS.get(id)) as AudioStream
 	if stream == null:
 		push_warning("Sfx: unknown loop id '%s'" % id)
 		return
@@ -173,36 +226,10 @@ func play_loop(id: StringName) -> void:
 		player.play()
 
 
-func stop_loop(id: StringName) -> void:
+func _stop_loop_voice(id: StringName) -> void:
 	var player := _loop_players.get(id) as AudioStreamPlayer
 	if player != null and player.playing:
 		player.stop()
-
-
-## Reference-counted loop for sounds many emitters share (laser beams):
-## the loop starts on the first acquire and stops only when every acquirer
-## has released. Emitters MUST pair each acquire with exactly one release
-## (guard with a held flag; release from _exit_tree for mid-loop frees).
-func acquire_loop(id: StringName) -> void:
-	var count := int(_loop_refcounts.get(id, 0))
-	_loop_refcounts[id] = count + 1
-	if count == 0:
-		play_loop(id)
-
-
-func release_loop(id: StringName) -> void:
-	var count := int(_loop_refcounts.get(id, 0))
-	if count <= 0:
-		return
-	count -= 1
-	_loop_refcounts[id] = count
-	if count == 0:
-		stop_loop(id)
-
-
-## How many acquire_loop() holders `id` currently has (test hook).
-func loop_refcount(id: StringName) -> int:
-	return int(_loop_refcounts.get(id, 0))
 
 
 ## Run-end safety: the manager processes through pause, so a channel hum
@@ -272,10 +299,13 @@ func _now() -> float:
 	return float(Time.get_ticks_msec()) / 1000.0
 
 
+## Creates the code-owned buses and nothing else: the Settings autoload is
+## the single owner of their volume (it readies right after this one and
+## applies the persisted levels), so a master trim here was dead config —
+## silently overwritten one autoload later and on every slider move.
 func _setup_bus() -> void:
 	_ensure_bus(BUS_NAME)
 	_ensure_bus(AMBIENT_BUS_NAME)
-	AudioServer.set_bus_volume_db(AudioServer.get_bus_index(BUS_NAME), bus_volume_db)
 
 
 static func _ensure_bus(bus_name: StringName) -> void:

@@ -1,6 +1,8 @@
 # Bonkraiders
 
-Roguelite de supervivencia "bullet-heaven" en 3D hecho en Godot 4.7 (GDScript): partidas cronometradas de 15 minutos donde las armas disparan solas, los enemigos llegan en hordas crecientes y cada subida de nivel ofrece 3 cartas de mejora. Incluye dos biomas (Hollow Woods y Ash Dunes) con jefes propios y minijefes secretos, 8 personajes con arma inicial y pasiva propia, 8 armas, 9 tomos, 3 tiers de dificultad por mapa y meta-progresión entre partidas (Shards, 30 misiones, desbloqueo de personajes). El diseño completo está en `GDD.md` y la historia de desarrollo en `CHANGELOG.md`.
+Roguelite de supervivencia "bullet-heaven" en 3D hecho en Godot 4.7 (GDScript): incursiones sin límite de tiempo (15 minutos de supervivencia = victoria, y el jugador se extrae cuando quiere) donde las armas disparan solas, los enemigos llegan en hordas crecientes y cada subida de nivel ofrece 3 cartas de mejora. Incluye tres biomas (Bosque Hueco, Dunas de Ceniza y Ciénaga Lóbrega) con jefes propios y minijefes secretos, 13 raiders con arma inicial y pasiva propia, 14 armas **que evolucionan por nivel**, 15 tomos, 16 objetos con rareza fija y 4 mascotas, 3 grados de dificultad por mapa y meta-progresión entre incursiones (esquirlas, 40 misiones, desbloqueo de raiders, 6 reliquias permanentes de la Armería, pantalla de Colección, Cacería diaria con semilla por fecha). El diseño completo está en `GDD.md` y la historia de desarrollo en `CHANGELOG.md`.
+
+**Idioma:** el juego está íntegramente en **español latinoamericano**. La terminología canónica vive en `docs/GLOSARIO.md` y es obligatoria para cualquier cadena nueva; los identificadores (ids de catálogo, `node_name`, grupos, `StringName`, claves de guardado y los `print()` de depuración) se quedan en inglés a propósito.
 
 ## Requisitos y ejecución
 
@@ -8,24 +10,80 @@ Roguelite de supervivencia "bullet-heaven" en 3D hecho en Godot 4.7 (GDScript): 
 - Ejecutar desde la raíz del proyecto:
 
 ```sh
-godot --path .          # lanza el juego (escena principal: selector de personaje)
+godot --path .          # lanza el juego (escena principal: selector de raider)
 godot -e --path .       # abre el editor
 ```
 
-- Escena principal: `scenes/ui/CharacterSelect.tscn` (selector de personaje, mapa y tier; botón Quests abre el registro de misiones). También se puede ejecutar una arena directamente (F6 sobre `scenes/world/HollowWoods.tscn`): usa el personaje/mapa por defecto.
+- Escena principal: `scenes/ui/CharacterSelect.tscn` (selector de raider, mapa y grado; los botones son **Iniciar incursión**, **Misiones**, **Ajustes**, **Colección**, **Armería** y **Cacería diaria**). También se puede ejecutar una arena directamente (F6 sobre `scenes/world/HollowWoods.tscn`): usa el raider/mapa por defecto y reinicia la partida igual que una real.
 
 ### Controles
 
-| Entrada | Acción |
-|---|---|
-| WASD | Movimiento (relativo a la cámara) |
-| Ratón | Cámara en tercera persona (clic recaptura el cursor si se libera) |
-| Espacio | Salto |
-| Shift (moviéndose) | Derrape (burst de velocidad, colisión baja) |
-| E | Interactuar (santuarios, cofres, secretos) |
-| Esc | Menú de pausa (Resume / Settings / Quit to Menu) |
+| Entrada | Acción | Acción de `project.godot` |
+|---|---|---|
+| WASD | Movimiento (relativo a la cámara) | `move_forward` / `move_back` / `move_left` / `move_right` |
+| Mouse | Cámara en tercera persona (clic recaptura el cursor si se libera) | — (movimiento de mouse) |
+| Espacio | Salto | `jump` |
+| Shift (moviéndose) | Derrape (impulso de velocidad, colisión baja) | `sprint` |
+| E | Interactuar (altares, cofres, portales, secretos) | `interact` |
+| C | Cambiar cámara: tercera persona → primera persona → órbita libre | `camera_mode` |
+| Rueda del mouse | Zoom (solo en cámara de órbita libre) | `camera_zoom_in` / `camera_zoom_out` |
+| Esc | Menú de pausa: **Continuar** / **Ajustes** / **Extraerse (terminar incursión)** — cierra la incursión y guarda / **Salir al menú** — abandona sin guardar nada | — (`ui_cancel`) |
 
-Las armas disparan automáticamente al enemigo más cercano: no hay botón de ataque. Los mapeos viven en `project.godot` (`[input]`: `move_*`, `jump`, `sprint`, `interact`).
+**Modos de cámara** (por jugador, también en co-op; en control: click del stick derecho alterna, D-pad arriba/abajo hace zoom):
+- **Tercera persona** — el modo clásico: mirar gira al raider.
+- **Primera persona** — la cámara baja a los ojos y tu propia foca se oculta (solo en tu vista; tus compañeros te siguen viendo), con rango de pitch completo.
+- **Órbita libre** — la cámara orbita alrededor del jugador con mouse/stick y zoom con rueda/D-pad; el raider camina hacia donde te mueves, independiente de hacia dónde mire la cámara (las armas apuntan solas, así que la orientación es cosmética).
+
+Las armas disparan automáticamente al enemigo más cercano: no hay botón de ataque. Los mapeos viven en `project.godot`, sección `[input]`: `move_forward`, `move_back`, `move_left`, `move_right`, `jump`, `sprint`, `interact`, `camera_mode`, `camera_zoom_in`, `camera_zoom_out`. El menú de pausa usa `ui_cancel`, que es el mapeo por defecto de Godot (Esc). En co-op, el autoload `Coop` clona cada una de esas acciones por slot (`p1_*`, `p2_*`…) ligada solo al dispositivo de ese jugador.
+
+**Control (también en solitario):** stick izquierdo = movimiento, stick derecho = cámara, A = salto, X o LB = derrape, Y = interactuar, click del stick derecho = cambiar cámara, D-pad arriba/abajo = zoom, B/Start = navegación de menús (acciones `ui_*` por defecto de Godot). Cualquier control conectado sirve en solitario; el mouse y el control conviven.
+
+## Co-op local (2-4 jugadores, pantalla dividida)
+
+En la pantalla de selección hay una fila **Jugadores 1-4**: el jugador 1 usa teclado+mouse y cada jugador extra necesita su propio control conectado (la fila muestra cuántos hay y rechaza tamaños de grupo sin controles suficientes). Con 2+ jugadores aparece una fila de slots **J1..J4**: pulsar una carta de raider la asigna al slot resaltado y avanza al siguiente (se permiten raiders repetidos; las cartas muestran qué slots las eligieron). El botón de inicio pasa a decir **Iniciar incursión — N jugadores**.
+
+En partida:
+
+- **Pantalla dividida**: 2 jugadores = mitades arriba/abajo; 3-4 = rejilla 2x2 (`scripts/systems/split_screen.gd`, un `SubViewport` con cámara-espejo por jugador). Cada jugador conserva su cámara en tercera persona (mouse o stick derecho).
+- **Entrada aislada por jugador**: el autoload `Coop` (`scripts/systems/coop.gd`) clona las acciones base como `p<slot>_*` ligadas solo al dispositivo de ese slot, así que dos controles nunca se pisan.
+- **XP, nivel y muertes compartidos** (RunState no cambia); las gemas vuelan al jugador vivo más cercano. Las cartas de mejora se reparten **por turnos rotatorios** entre los jugadores en pie (el título indica a quién le toca) y se aplican a las armas/stats de ese jugador.
+- **Caídos y reanimación**: al llegar a 0 HP un jugador queda **derribado** (no muerto): sus armas se apagan y los enemigos lo ignoran. Un compañero puede reanimarlo al 50% manteniendo su botón de interactuar a su lado ~3 s. La derrota solo llega cuando **todo** el equipo está derribado a la vez.
+- **Enemigos y jefes** persiguen/aparecen alrededor de jugadores vivos aleatorios, repartiendo la presión; los interactuables responden al botón del jugador que realmente los pulsa.
+- El HUD añade barras de vida compactas J2-J4 (con estado K.O.) junto a la barra principal del J1.
+
+El modo solitario no cambia en nada: todo el sistema co-op se activa únicamente cuando `Coop.player_count > 1`.
+
+## Mapa vivo y dificultad (iteración 33)
+
+Cada partida es distinta y el mapa sigue dando cosas que hacer hasta el final:
+
+- **Layout aleatorio por partida**: el scatter de props se re-siembra en cada run (`randomize_per_run` en `scripts/world/scatter.gd`) y el `WorldDirector` (`scripts/world/world_director.gd`, instanciado en `RunSystems.tscn`) recoloca los interactuables de suelo (altares, cofre de suelo, secretos enterrados) en posiciones aleatorias antes de que el scatter marque sus keepouts. Los cofres sobre plataformas no se mueven: escalar hasta ellos es el premio.
+- **Eventos del mundo**: desde ~1:15 y cada 50-75 s el director lanza un evento anunciado en el banner del HUD: un **cofre de suministros** raro o mejor bajo un faro dorado (desaparece si nadie llega en 40 s), una **jauría de élites** que caza a un jugador aleatorio, una **fisura de esencia** (gemas de XP + orbe de vida bajo un faro verde), un **altar de carga** o **altar demoníaco** que se va si nadie lo carga, o un **manantial**. Además, con cierta probabilidad (mayor tras usar altares demoníacos) llega un **evento de cielo**: Luna de Sangre (berserkers) o Eclipse (sombras), siempre seguido de una Luna Llena que da XP y suerte.
+
+## Economía, objetos y altares (iteraciones 38-44)
+
+- **Sin reloj**: la incursión sigue hasta morir o **extraerse** desde el menú de pausa; 15 minutos sobrevividos = victoria. Tras el Elder (min 11) vuelve un jefe cada 4 min, cada vez más fuerte; hay **hordas** en los minutos 3/7/10/13 y luego cada 3.
+- **Puntos de partida** (por jugador, se reinician cada run): cada muerte paga puntos al raider más cercano (élites x5, jefes 25). Sirven para abrir **cofres** (precio por rareza: 20/40/80/160, y cada cofre abierto encarece todos los demás x1.25), girar la **ruleta** (60) y beber del **manantial** (40).
+- **Cofres** solo dan **objetos** (`scripts/systems/item_catalog.gd`): rareza fija por objeto, copias ilimitadas, independientes de armas y tomos. La suerte inclina la rareza del cofre. Ejemplos: Imán (aspira toda la XP periódicamente), Bolsa de pedos (veneno al golpear), Sangre de titán (creces y tus ataques cubren más área), Sangre de demonio, Llave maestra, Gusano cósmico, Máscara de superhéroe (arañas venenosas al matar) y huevos de **mascota** (Alienígena, Dinosaurio, Pájaro furioso, Capibara: te siguen, llevan un arma propia fuera del tope de 5 armas y dan un stat por nivel).
+- **Altares**: el de **carga** se carga solo al estar dentro del anillo (si te vas, desaparece; si nadie lo carga, se va) y da a toda la party un stat plano independiente de las cartas; el **demoníaco** hace lo mismo pero sube la **dificultad** de la partida para siempre (enemigos más duros, más élites, más XP, un cofre extra por jefe); el de **codicia** sigue apostando vida; la **ruleta** abre un menú con 11 resultados (objetos, +stats, +armas, jackpot, curación, maldiciones…); los **portales** aparecen emparejados al inicio y teletransportan con recarga; el **manantial** cura y da un power-up de 30 s.
+- **Cartas**: tope de 5 armas y 5 tomos distintos por jugador; cartas que suben dos stats de un arma; las armas **evolucionan al nivel 6**; «Corazón recio» cura solo lo ganado; subir de nivel ya no aspira las gemas. Tomos nuevos: Tomo de Fortuna (suerte), de Multitud (+proyectiles), de Persistencia (duración de efectos), de Sabiduría (XP), del Azar (stats aleatorios según rareza) y del Peligro (dificultad).
+- **Mapa irregular**: cada run bloquea manchas de celdas con rocas (todo lo abierto es alcanzable a pie), y los cofres/altares iniciales varían. Los enemigos **trepan** muros y props.
+- **HUD**: puntos, dificultad acumulada y una tira inferior con armas (nivel), tomos (stacks) y objetos (copias). Los iconos son placeholders con siglas; cada fila de catálogo acepta `icon` con una textura 2D para sustituirlos.
+- **Dificultad**: rampa de spawns más agresiva (`interval_shrink_per_minute` 0.25, `extra_count_per_minute` 0.35), más élites (6% → 16%), y un **escalado tardío abierto** desde el minuto 6 (+6% HP y +4% daño por minuto en spawns nuevos) para que el late game no se pueda ignorar quieto. En co-op los enemigos escalan por jugador extra (+50% HP, +30% ritmo de spawn, jefes +50% HP por jugador).
+
+Los números viven como exports en `enemy_spawner.gd` y `world_director.gd` para ajustarlos sin tocar código.
+
+## Fondo del mundo (iteración 34)
+
+Las arenas ya no flotan en el vacío: cada mapa instancia un nodo **Backdrop** (`scripts/world/backdrop.gd`) que construye en código un disco de suelo gigante bajo el borde del mapa (tinte del bioma) y dos anillos de colinas-silueta low-poly fuera del perímetro (a ~105-140 m y ~160-220 m), que la niebla del `WorldEnvironment` ya existente funde con el horizonte. Los colores son exports por bioma en la escena de cada mapa; las colinas se re-generan aleatorias cada partida.
+
+## Enganche y rejugabilidad (iteraciones 35-37)
+
+- **Evoluciones de armas** (`scripts/systems/evolution_catalog.gd`): cada carta invertida en un arma es un nivel de arma; al llegar al nivel 6 el arma evoluciona en el acto (iteración 38), con fanfarria, banner dorado y sparkle; cambia de nombre y multiplica sus stats (fila `mults`/`adds` aplicada genéricamente por `WeaponBase.evolve()`). Descubrimientos persistidos en contadores `evo_<arma>`.
+- **Colección** (`scenes/ui/Collection.tscn`, botón en el selector): raiders, arsenal, evoluciones descubiertas (las no descubiertas muestran una pista vaga) y bestiario con kills por especie (`kills_<script>`, bump automático en `EnemyBase`), más un % de completitud global.
+- **Armería** (`scenes/ui/RelicShop.tscn` + `relic_catalog.gd`): 6 reliquias de stats permanentes compradas con esquirlas en escalera de rangos/precios (persisten en `SaveData.relic_ranks`, se aplican en cada `PlayerStats.recompute()`). Amplía la regla del GDD "las esquirlas solo compran raiders": los montos son pequeños para que la maestría siga siendo la curva real.
+- **Cacería diaria** (botón dorado del selector): reto diario con semilla derivada de la fecha — raider, mapa, layout del scatter, máscara de arena y tiradas de cartas deterministas para todos ese día; reintentos permitidos, se guarda el mejor puntaje por fecha (`daily_best_<fecha>`, fórmula en `GameConfig.daily_score`).
+- **Sin reloj (iteración 38)**: la partida no termina al minuto 15. Sobrevivir 15 minutos es el hito que la califica como victoria (banner «15 minutos sobrevividos — extráete cuando quieras desde el menú de pausa», plantilla en `RunManager.survival_text`); desde el menú de pausa se puede **Extraerse** en cualquier momento, lo que cierra la incursión con fold de meta (victoria si se alcanzó el hito, derrota si no). Morir tras el hito también cuenta como victoria. La pantalla final titula MORISTE / INCURSIÓN COMPLETA / EXTRACCIÓN LOGRADA / INCURSIÓN ABANDONADA y ofrece **Reintentar**, **Cambiar raider** y **Salir**. `best_endless_minutes` guarda los minutos de la partida ganada más larga.
 
 ## Compilar (export)
 
@@ -44,34 +102,50 @@ Para Windows/Linux se usan los mismos comandos con `"Windows Desktop"` / `"Linux
 project.godot            # autoloads, input map, escena principal
 export_presets.cfg       # presets macOS / Windows / Linux
 GDD.md                   # documento de diseño
-CHANGELOG.md             # una línea por iteración (28 hasta ahora)
+CHANGELOG.md             # una línea por iteración (45 hasta ahora)
 docs/ARQUITECTURA.md     # mapa de sistemas: dónde tocar para extender cada cosa
+docs/GLOSARIO.md         # terminología canónica es-419 (obligatoria)
+tools/verificar.sh       # import + soak de las 3 arenas + cobertura mínima
 assets/
   audio/sfx/             # 20 wav sintetizados (regenerables, ver ARQUITECTURA)
   audio/ambient/         # camas de viento por bioma (forest_wind, desert_wind)
   materials/             # StandardMaterial3D .tres de los props low-poly
 scenes/
   ui/                    # CharacterSelect (main), HUD, UpgradeCardUI, PauseMenu,
-                         #   RunEndScreen, QuestLog, SettingsPanel
-  player/Player.tscn     # CharacterBody3D + SpringArm3D + Weapons + Health + Stats
-  weapons/               # 8 armas + proyectiles (Projectile, Arrow, BoomerangProjectile)
+                         #   RunEndScreen, QuestLog, SettingsPanel,
+                         #   Collection, RelicShop
+  player/Player.tscn     # CharacterBody3D + SpringArm3D + Weapons + Health +
+                         #   Stats + ItemBag + SealRig
+  weapons/               # 14 armas + proyectiles (Projectile, Arrow,
+                         #   BoomerangProjectile)
   enemies/               # Grunt/Skirmisher/Tank/Sunspitter/Duneburrower, jefes
-                         #   (Rotking, Sarcognath), minijefes (Grubthing, CofferMimic)
-  world/                 # HollowWoods.tscn y AshDunes.tscn (arenas),
+                         #   (Rotking, Sarcognath, Fenwraith), minijefes
+                         #   (Grubthing, CofferMimic)
+  world/                 # HollowWoods.tscn, AshDunes.tscn y Gloomfen.tscn (arenas),
                          #   RunSystems.tscn (bloque común de partida),
                          #   props/, shrines/, chests/, secrets/
   systems/               # XpGem, HealthOrb
-  fx/                    # DamagePopup, DeathBurst, TelegraphDisc
+  fx/                    # DamagePopup, DeathBurst, TelegraphDisc, SlashArc...
+  tests/ArenaProbe.tscn  # harness headless de soak (ver Verificación)
 scripts/                 # espejo de scenes/: systems/ (autoloads y catálogos),
                          #   player/, weapons/, enemies/, world/, ui/, fx/,
                          #   tools/generate_sfx.gd (generador de audio)
 ```
 
-Los archivos clave para tocar contenido son los **catálogos** en `scripts/systems/`: `upgrade_pool.gd` (armas y cartas), `character_catalog.gd`, `tome.gd`, `map_catalog.gd`, `quest_catalog.gd`. Ver `docs/ARQUITECTURA.md`.
+Los archivos clave para tocar contenido son los **catálogos** en `scripts/systems/`: `upgrade_pool.gd` (armas y cartas), `character_catalog.gd`, `tome.gd`, `map_catalog.gd`, `quest_catalog.gd`, `evolution_catalog.gd` (recetas de evolución) y `relic_catalog.gd` (reliquias de la Armería). Ver `docs/ARQUITECTURA.md`, y `docs/GLOSARIO.md` para los nombres visibles.
 
-## Verificación (usada en todo el desarrollo)
+## Verificación
 
-Tras cualquier cambio, desde la raíz:
+**El comando por defecto tras cualquier cambio** es el script de verificación: hace el import y un soak de las **tres** arenas, y falla si alguna ensucia el log, se cuelga o no ejercita nada.
+
+```sh
+tools/verificar.sh            # 120 s de partida por arena (~rápido)
+tools/verificar.sh 300        # corrida larga: además exige que se resuelva algún interactuable
+```
+
+Falla (exit 1) si el import o un soak imprimen errores/warnings de Godot, si una arena no llega al final de su soak, o si no alcanza la cobertura mínima (el raider tiene que pasar de nivel 3; en corridas de ≥240 s tiene que abrir un cofre, cargar un altar o usar un portal). Los logs quedan en `$TMPDIR/bonkraiders-verify/` y cada arena imprime su resumen `nivel=… cofres=… altares=… portales=…`.
+
+Por debajo, los comandos sueltos siguen sirviendo:
 
 ```sh
 # 1. Reimporta assets y compila todos los scripts; debe salir con exit 0
@@ -80,17 +154,32 @@ godot --headless --import
 # 2. Boot de humo: la arena arranca sin errores (5 s simulados)
 godot --headless --fixed-fps 60 --quit-after 300 res://scenes/world/HollowWoods.tscn
 
-# 3. Soak largo: simula minutos de partida más rápido que tiempo real
-#    (36000 frames = 10 min de juego). Revisar el log: los sistemas imprimen
-#    una línea por evento ("Boss spawned: ...", "Run ended: ...", "Meta saved: ...")
-godot --headless --fixed-fps 60 --quit-after 36000 res://scenes/world/HollowWoods.tscn
+# 3. Soak con el harness (36000 frames = 10 min de juego). Los sistemas
+#    imprimen una línea por evento ("Boss spawned: ...", "Chest opened: ...",
+#    "Run ended: ...", "Meta saved: ..."): esa es la interfaz de verificación.
+BONK_ARENA=res://scenes/world/Gloomfen.tscn BONK_GODMODE=1 \
+  godot --headless --fixed-fps 60 --quit-after 36000 res://scenes/tests/ArenaProbe.tscn
 ```
 
-También arrancan así `AshDunes.tscn` y las escenas de UI. Para lógica aislada, el patrón usado fue un harness desechable `extends SceneTree` ejecutado con `godot --headless --path . -s <script>` (igual que `scripts/tools/generate_sfx.gd`). El overlay de rendimiento (FPS, conteos, pools) se activa con la variable de entorno `BONK_PERF=1`.
+`scenes/tests/ArenaProbe.tscn` arranca la arena como hijo de un nodo siempre activo, imprime estado cada 2 s, elige sola la primera carta en cada subida de nivel y —desde la iteración 45— **camina e interactúa**: recorre los interactuables disponibles manejando las acciones de input reales, se queda quieto al llegar para que los altares de carga completen su canal, salta cuando se atasca y avisa por `push_warning` si una UI bloqueante deja la partida encallada. Un raider aparcado se salta en silencio todo sistema condicionado al movimiento, y un soak así reporta "sin errores" sobre código que nunca corrió. Nunca toca el guardado real: re-apunta `SaveData.save_path` a `user://soak_save.json`.
+
+Variables de entorno del harness:
+
+| Variable | Efecto |
+|---|---|
+| `BONK_ARENA=res://scenes/world/AshDunes.tscn` | arena a arrancar (defecto: Bosque Hueco) |
+| `BONK_CHARACTER=<id>` | raider concreto del catálogo |
+| `BONK_GODMODE=1` | raider prácticamente inmortal, para llegar a los sistemas tardíos |
+| `BONK_WALK=0` | deja el raider quieto (defecto: camina) |
+| `BONK_SEED=<int>` | recorrido determinista, para reproducir un soak |
+| `BONK_PROBE_DEBUG=1` | narra el recorrido (waypoints, llegadas, pulsaciones) |
+| `BONK_PERF=1` | overlay de rendimiento del HUD (FPS, conteos, pools) |
+
+Para lógica aislada sigue sirviendo un harness desechable `extends SceneTree` con `godot --headless --path . -s <script>` (igual que `scripts/tools/generate_sfx.gd`). Ojo: en un script `-s` **no hay autoloads**, así que no vale para nada que toque `RunState`, `SaveData` o `Coop`.
 
 ## Guardado
 
-Un único JSON en `user://save.json` (Shards, personajes desbloqueados, contadores de misiones, tiers, ajustes). En macOS:
+Un único JSON en `user://save.json` (esquirlas, raiders desbloqueados, contadores de misiones, grados, rangos de reliquia, ajustes). En macOS:
 
 ```
 ~/Library/Application Support/Godot/app_userdata/Bonkraiders/save.json
@@ -98,4 +187,4 @@ Un único JSON en `user://save.json` (Shards, personajes desbloqueados, contador
 
 (Windows: `%APPDATA%\Godot\app_userdata\Bonkraiders\`; Linux: `~/.local/share/godot/app_userdata/Bonkraiders/`.)
 
-**Resetear el progreso** = borrar ese archivo con el juego cerrado; se regenera limpio al arrancar (Rook y Vex desbloqueados, 0 Shards). Un archivo corrupto no crashea: `SaveData.load_from_disk()` cae a valores por defecto. Los harness de prueba pueden apuntar `SaveData.save_path` a un archivo temporal antes de `load_from_disk()`.
+**Resetear el progreso** = borrar ese archivo con el juego cerrado; se regenera limpio al arrancar (Rook y Vex desbloqueados, 0 esquirlas). Un archivo corrupto no crashea: la escritura es atómica (`.tmp` + rename) y deja un `.bak`, así que `SaveData.load_from_disk()` recupera el respaldo y, si tampoco sirve, cae a valores por defecto. Los harness de prueba pueden apuntar `SaveData.save_path` a un archivo temporal antes de `load_from_disk()`.

@@ -1,0 +1,9 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/weapons/kamehameha.gd" id="1_kamehameha"]
+
+[node name="Kamehameha" type="Node3D"]
+script = ExtResource("1_kamehameha")
+damage = 60.0
+cooldown = 6.0
+attack_range = 14.0

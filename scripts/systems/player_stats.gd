@@ -20,6 +20,14 @@ extends Node
 ## strictly below this when the dodge lands.
 @export var execute_threshold: float = 0.25
 
+## Floors for the multipliers a debuff could otherwise drive to zero (or
+## below): a cursed raider still hits, moves, gains XP and keeps its
+## effects running, however many negative boons pile up.
+const MIN_DAMAGE_MULTIPLIER: float = 0.1
+const MIN_MOVE_MULTIPLIER: float = 0.2
+const MIN_DURATION_MULTIPLIER: float = 0.1
+const MIN_XP_MULTIPLIER: float = 0.1
+
 # Derived values — change them via add_tome()/recompute(), never directly.
 var damage_multiplier: float = 1.0
 var cooldown_multiplier: float = 1.0
@@ -38,10 +46,32 @@ var thorns: float = 0.0
 ## Max-HP granted on top of the Health node's own max_hp (which generic
 ## Stout Heart cards also raise); pushed into Health as a DELTA.
 var bonus_max_hp: float = 0.0
+## Iteration 39 stat layer:
+## Flat extra projectiles on every volley weapon (WeaponBase.effective_projectile_count).
+var projectile_bonus: int = 0
+## Multiplier on timed weapon effects — slows, pools, poison (WeaponBase.duration_scale).
+var duration_multiplier: float = 1.0
+## Multiplier on XP this raider collects (XpGem applies it at pickup).
+var xp_multiplier: float = 1.0
+## This raider's contribution to the RUN-WIDE difficulty (fraction);
+## published to RunState under a per-player source key on every recompute.
+var difficulty_share: float = 0.0
+## Gambling stacks taken (Tome of Chance); the rolled boons live in
+## _gamble_boons and replay on every recompute.
+var gambling_stacks: int = 0
 
 ## tome id -> one rarity potency per collected stack. recompute() derives
 ## every stat from this, so it is the single source of truth.
 var _tome_stacks: Dictionary[String, PackedFloat32Array] = {}
+## Tome of Chance outcomes, rolled ONCE at pickup and replayed by
+## recompute(): [{stat, amount}] already potency-scaled.
+var _gamble_boons: Array[Dictionary] = []
+## Altar boons (iteration 41): permanent flat effects granted by charge /
+## demonic altars and the roulette — independent of cards and tomes.
+var _altar_boons: Array[Dictionary] = []
+## Timed boons (springs, roulette curses): {stat, amount, expires_at}
+## in RunState.run_time seconds; dropped (with a recompute) on expiry.
+var _timed_boons: Array[Dictionary] = []
 
 ## Character passive (CharacterCatalog row data). Kinds:
 ##   "per_level":       _passive_stat gains _passive_base plus
@@ -51,6 +81,9 @@ var _tome_stacks: Dictionary[String, PackedFloat32Array] = {}
 ##   "evasion_execute": per_level scaling, plus every successful dodge
 ##                      executes a weakened non-boss attacker (_on_dodged).
 ## Empty stat id with a per-level kind = no passive.
+## Every kind _apply_character_passive knows how to run; a catalog row
+## outside this list is rejected at set time, not once per recompute.
+const PASSIVE_KINDS: Array[String] = ["per_level", "evasion_execute", "speed_to_damage"]
 var _passive_kind: String = "per_level"
 var _passive_stat: String = ""
 var _passive_amount: float = 0.0
@@ -90,6 +123,24 @@ func stack_count(tome_id: String) -> int:
 	return _tome_stacks[tome_id].size()
 
 
+## Number of DIFFERENT tomes carried (the 5-tome loadout cap counts these).
+func distinct_tome_count() -> int:
+	var count := 0
+	for tome_id: String in _tome_stacks:
+		if _tome_stacks[tome_id].size() > 0:
+			count += 1
+	return count
+
+
+## Ids of every carried tome, in pickup order (HUD loadout strip).
+func carried_tome_ids() -> Array[String]:
+	var ids: Array[String] = []
+	for tome_id: String in _tome_stacks:
+		if _tome_stacks[tome_id].size() > 0:
+			ids.append(tome_id)
+	return ids
+
+
 ## Grants one stack of a tome at the given rarity potency. Stacks past
 ## Tome.MAX_STACKS are ignored (the pool stops offering capped tomes; this
 ## guards a stale queued offer).
@@ -101,7 +152,71 @@ func add_tome(tome_id: String, potency: float) -> void:
 	var stacks: PackedFloat32Array = _tome_stacks.get(tome_id, PackedFloat32Array())
 	stacks.append(potency)
 	_tome_stacks[tome_id] = stacks
+	# Gambling tomes roll their boons right here, once, so the outcome is
+	# fixed for the run and recompute() only replays it.
+	var tome := Tome.by_id(tome_id)
+	if bool(tome.get("gamble", false)):
+		_gamble_boons.append_array(roll_gamble_boons(potency))
 	recompute()
+
+
+## Tome of Chance roll: potency 1 (Common) gives one boon at base size;
+## each higher rarity adds a boon and scales every boon by the potency
+## (Rare 1.5x/2 boons, Epic 2x/3, Legendary 3x/4). Distinct stats per roll.
+## Static and pure so a harness can verify the distribution.
+static func roll_gamble_boons(potency: float) -> Array[Dictionary]:
+	var count := 1 + clampi(UpgradePool.potency_rank(potency), 0, 3)
+	var pool := Tome.GAMBLE_BOONS.duplicate()
+	pool.shuffle()
+	var boons: Array[Dictionary] = []
+	for i in mini(count, pool.size()):
+		var boon: Dictionary = pool[i]
+		boons.append({
+			"stat": String(boon.stat),
+			"amount": roundf(float(boon.amount) * potency),
+		})
+	return boons
+
+
+## The boons rolled so far (HUD/tests), in pickup order.
+func gamble_boons() -> Array[Dictionary]:
+	return _gamble_boons
+
+
+## Permanent flat boon outside the card/tome economy (altars, roulette).
+func add_altar_boon(stat: String, amount: float) -> void:
+	_altar_boons.append({"stat": stat, "amount": amount})
+	recompute()
+
+
+func altar_boons() -> Array[Dictionary]:
+	return _altar_boons
+
+
+## Temporary boon for `duration` seconds of run time (negative amounts
+## are debuffs). Expiry is polled in _physics_process.
+func add_timed_boon(stat: String, amount: float, duration: float) -> void:
+	if duration <= 0.0:
+		return
+	_timed_boons.append({
+		"stat": stat, "amount": amount, "expires_at": RunState.run_time + duration})
+	recompute()
+
+
+func timed_boon_count() -> int:
+	return _timed_boons.size()
+
+
+func _physics_process(_delta: float) -> void:
+	if _timed_boons.is_empty():
+		return
+	var expired := false
+	for i in range(_timed_boons.size() - 1, -1, -1):
+		if RunState.run_time >= float(_timed_boons[i].expires_at):
+			_timed_boons.remove_at(i)
+			expired = true
+	if expired:
+		recompute()
 
 
 ## Registers the selected character's passive (stat ids match _apply_effect;
@@ -110,6 +225,11 @@ func add_tome(tome_id: String, potency: float) -> void:
 ## catalog row data.
 func set_character_passive(stat: String, amount: float, kind: String = "per_level",
 		base_amount: float = 0.0) -> void:
+	if not PASSIVE_KINDS.has(kind):
+		# Validated ONCE, here. The old check lived in the recompute path,
+		# so a typo'd catalog row warned several times a second all run.
+		push_warning("PlayerStats: unknown passive kind '%s'" % kind)
+		kind = "per_level"
 	_passive_kind = kind
 	_passive_stat = stat
 	_passive_amount = amount
@@ -119,7 +239,17 @@ func set_character_passive(stat: String, amount: float, kind: String = "per_leve
 
 ## Rebuilds every derived stat from the stored tome stacks and the
 ## character passive (recompute, not accumulate). Call after any change.
+## Four phases, in this order and no other: everything back to baseline,
+## every source applied, the caps, then the push to outside consumers.
 func recompute() -> void:
+	_reset_derived()
+	_apply_sources()
+	_clamp_derived()
+	_publish_derived()
+
+
+## Every derived field back to its baseline (the value with zero sources).
+func _reset_derived() -> void:
 	damage_multiplier = 1.0
 	cooldown_multiplier = 1.0
 	area_multiplier = 1.0
@@ -132,24 +262,125 @@ func recompute() -> void:
 	evasion = 0.0
 	thorns = 0.0
 	bonus_max_hp = 0.0
+	projectile_bonus = 0
+	duration_multiplier = 1.0
+	xp_multiplier = 1.0
+	difficulty_share = 0.0
+	gambling_stacks = 0
+
+
+## Every source, in the ONE order that matters: the character passive runs
+## last because conversion kinds (speed_to_damage) read the totals the
+## other sources built.
+func _apply_sources() -> void:
+	_apply_tomes()
+	# Gambling boons replay in pickup order (already potency-scaled).
+	_apply_boons(_gamble_boons)
+	# Items (iteration 40): every copy of a stat item contributes its row
+	# effects through the same channel.
+	_apply_items()
+	# Altar boons and live timed boons (iteration 41).
+	_apply_boons(_altar_boons)
+	_apply_boons(_timed_boons)
+	# Armory relics (iteration 36): permanent meta ranks, applied through
+	# the same effect channel as tomes so stacking rules stay identical.
+	_apply_relics()
+	_apply_character_passive()
+
+
+func _apply_tomes() -> void:
 	for tome_id: String in _tome_stacks:
 		var tome := Tome.by_id(tome_id)
 		if tome.is_empty():
 			push_warning("PlayerStats: unknown tome '%s'" % tome_id)
 			continue
+		# Counted from the stacks themselves, not from the effect amount:
+		# the effect is potency-scaled, the stack count must not be.
+		if bool(tome.get("gamble", false)):
+			gambling_stacks += _tome_stacks[tome_id].size()
 		var effects: Array = tome.effects
 		for potency: float in _tome_stacks[tome_id]:
 			for effect: Dictionary in effects:
 				# roundf matches the card text, so displayed == applied.
 				_apply_effect(String(effect.stat), roundf(float(effect.amount) * potency))
-	# Passives run AFTER tomes so conversion kinds see the tome totals.
-	_apply_character_passive()
+
+
+## One list of {stat, amount} boons through the effect channel. Gamble,
+## altar and timed boons all share this shape, so they share the loop.
+func _apply_boons(boons: Array[Dictionary]) -> void:
+	for boon: Dictionary in boons:
+		_apply_effect(String(boon.stat), float(boon.amount))
+
+
+## The caps, after every source: stacking is additive, so without these a
+## deep enough build reaches zero cooldowns or 100% dodge.
+func _clamp_derived() -> void:
 	cooldown_multiplier = maxf(cooldown_multiplier, min_cooldown_multiplier)
+	damage_multiplier = maxf(damage_multiplier, MIN_DAMAGE_MULTIPLIER)
+	move_speed_multiplier = maxf(move_speed_multiplier, MIN_MOVE_MULTIPLIER)
 	crit_chance = clampf(crit_chance, 0.0, 1.0)
 	evasion = clampf(evasion, 0.0, max_evasion)
 	luck = maxf(luck, 0.0)
+	duration_multiplier = maxf(duration_multiplier, MIN_DURATION_MULTIPLIER)
+	xp_multiplier = maxf(xp_multiplier, MIN_XP_MULTIPLIER)
+	projectile_bonus = maxi(projectile_bonus, 0)
+
+
+## Pushes the finished totals to the consumers that cannot read them
+## themselves: the sibling Health (armor, bonus max HP) and the run-wide
+## difficulty pool.
+func _publish_derived() -> void:
 	_push_armor_to_health()
 	_push_bonus_max_hp_to_health()
+	_publish_difficulty()
+
+
+## Run-wide difficulty is shared, so each raider publishes its own total
+## under a per-slot key; RunState sums the sources (recompute-safe).
+func _publish_difficulty() -> void:
+	var parent := get_parent()
+	var slot := int(parent.get("player_index")) if parent != null and parent.get("player_index") != null else 0
+	RunState.set_difficulty_source("tomes_p%d" % slot, difficulty_share)
+
+
+## Sibling ItemBag counts x catalog effects (no bag = no items). One pass
+## over the bag: a row's own effects scale with the copies carried, and a
+## pet row also grants its per-level stat (iteration 43).
+func _apply_items() -> void:
+	var bag := ItemBag.find_in(get_parent())
+	if bag == null:
+		return
+	for item_id: String in bag.carried_ids():
+		var row := ItemCatalog.by_id(item_id)
+		var copies := bag.count(item_id)
+		for effect: Dictionary in row.get("effects", [] as Array):
+			_apply_effect(String(effect.stat), float(effect.amount) * float(copies))
+		if String(row.get("kind", "")) == "pet":
+			_apply_pet_stat(String(row.get("pet_id", "")), copies)
+
+
+## A pet's stat, scaling with the run level like a character passive.
+## Extra copies of a pet item normally feed the pet's WEAPON (Pet.set_copies),
+## so they must NOT also multiply the stat — except for a pet that has no
+## weapon of its own, where that channel does not exist and a second copy
+## would otherwise buy the player literally nothing.
+func _apply_pet_stat(pet_id: String, copies: int) -> void:
+	var pet := PetCatalog.by_id(pet_id)
+	var stat := String(pet.get("stat", ""))
+	if stat.is_empty():
+		return
+	var copy_scale := float(copies) if String(pet.get("weapon_scene", "")).is_empty() else 1.0
+	_apply_effect(stat,
+			float(pet.get("amount_per_level", 0.0)) * float(RunState.level) * copy_scale)
+
+
+## Every owned Armory rank contributes its catalog effect (SaveData holds
+## the ranks; a fresh save contributes nothing).
+func _apply_relics() -> void:
+	for relic: Dictionary in RelicCatalog.RELIC_LIBRARY:
+		var rank := SaveData.relic_rank(String(relic.id))
+		if rank > 0:
+			_apply_effect(String(relic.stat), float(relic.amount) * float(rank))
 
 
 ## Applies the character passive by kind (data-driven from the catalog row;
@@ -168,8 +399,6 @@ func _apply_character_passive() -> void:
 			# Bonus move speed (multiplier above 1) converts into a direct
 			# damage-multiplier bonus at the configured ratio.
 			damage_multiplier += maxf(move_speed_multiplier - 1.0, 0.0) * _passive_amount
-		_:
-			push_warning("PlayerStats: unknown passive kind '%s'" % _passive_kind)
 
 
 ## One potency-scaled effect on top of the running totals. Percent-like
@@ -200,6 +429,20 @@ func _apply_effect(stat: String, amount: float) -> void:
 			thorns += amount
 		"max_hp":
 			bonus_max_hp += amount
+		"projectiles":
+			projectile_bonus += roundi(amount)
+		"duration":
+			duration_multiplier += amount / 100.0
+		"xp_gain":
+			xp_multiplier += amount / 100.0
+		"difficulty":
+			difficulty_share += amount / 100.0
+		"gambling":
+			# No-op by design: the boons were rolled at pickup and replay
+			# from _gamble_boons, and gambling_stacks counts STACKS, which
+			# _apply_tomes reads from the stack list (this amount is
+			# potency-scaled, so it would count 3 for one Legendary stack).
+			pass
 		_:
 			push_warning("PlayerStats: unknown effect stat '%s'" % stat)
 
@@ -218,7 +461,10 @@ func _push_armor_to_health() -> void:
 
 ## Health.max_hp is shared state (Stout Heart cards add to it directly), so
 ## the passive's bonus is applied as a delta from what was already pushed.
-## A raise also heals by the delta — clamped by heal(), never an overheal.
+## A raise also heals by the delta — clamped by heal(), never an overheal;
+## a drop needs nothing here, because Health.max_hp's setter clamps
+## current_hp itself and signals the change (a downed body is left at 0 and
+## revives at a fraction of the max it now has).
 func _push_bonus_max_hp_to_health() -> void:
 	var health := _sibling_health()
 	if health == null:
@@ -230,8 +476,6 @@ func _push_bonus_max_hp_to_health() -> void:
 	health.max_hp += delta
 	if delta > 0.0:
 		health.heal(delta)
-	else:
-		health.current_hp = minf(health.current_hp, health.max_hp)
 
 
 ## Dodge-execute ("evasion_execute" kind): a successful dodge instantly

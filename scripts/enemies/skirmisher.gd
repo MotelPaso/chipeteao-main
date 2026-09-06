@@ -47,24 +47,27 @@ func _combat_tick(player: Node3D, distance: float) -> void:
 		return
 	if bolt_scene == null:
 		return
-	_fire_timer = fire_cooldown
-	_fire_bolt(player)
+	# Only a shot that actually left the muzzle spends the cooldown; a
+	# failed acquire used to cost a full cadence of silence.
+	if _fire_bolt(player):
+		_fire_timer = fire_cooldown
 
 
-func _fire_bolt(player: Node3D) -> void:
+func _fire_bolt(player: Node3D) -> bool:
 	# Pooled, parented to the scene root so the bolt outlives its caster.
 	var bolt := Pools.acquire_scene(bolt_scene) as EnemyBolt
 	if bolt == null:
-		return
+		return false
 	bolt.damage = bolt_damage
 	bolt.global_position = global_position + Vector3.UP * muzzle_height
 	# The bolt flies at the true 3D aim; when that runs near-colinear with UP
 	# (player jumping right overhead) look_at cannot build a basis, so swap
-	# in a sideways up vector — same guard as BeamVisual.span().
+	# in a sideways up vector — WeaponBase.safe_up is the one guard, and the
+	# one threshold, every aim in the game goes through.
 	var aim := (player.global_position + Vector3.UP * target_height
 			- bolt.global_position).normalized()
-	var up := Vector3.UP if absf(aim.dot(Vector3.UP)) < 0.99 else Vector3.RIGHT
-	bolt.look_at(bolt.global_position + aim, up)
+	bolt.look_at(bolt.global_position + aim, WeaponBase.safe_up(aim))
+	return true
 
 
 func _apply_elite_damage(multiplier: float) -> void:

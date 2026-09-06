@@ -61,6 +61,7 @@ mesh = SubResource("BoxMesh_wing")
 shape = SubResource("SphereShape3D_hit")
 
 [node name="Trail" type="GPUParticles3D" parent="."]
+cast_shadow = 0
 emitting = true
 amount = 24
 lifetime = 0.4
