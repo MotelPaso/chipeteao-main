@@ -35,6 +35,10 @@ const RECIPIENT_TITLE_TEMPLATE := "%s  ·  Jugador %d"
 ## Level-pick title: level number, then the side this pick offers.
 const LEVEL_TITLE_TEMPLATE := "Nivel %d — elige: %s"
 
+## Queued request kinds (see _open_request).
+const KIND_BONUS := "bonus"
+const KIND_CHOICE := "choice"
+
 @onready var _dim: ColorRect = %Dim
 @onready var _level_label: Label = %LevelLabel
 @onready var _cards: Array[Button] = [%Card1 as Button, %Card2 as Button, %Card3 as Button]
@@ -44,8 +48,11 @@ var _offer: Array[Dictionary] = []
 ## window must queue exactly as if the picker were already visible.
 var _opening: bool = false
 var _pending_levels: int = 0
-## Queued open_bonus_pick requests ({title, luck_bonus, min_rarity}).
+## Queued earned picks, in arrival order: bonus rolls and caller-supplied
+## choices share one queue so neither can jump the other.
 var _pending_bonus: Array[Dictionary] = []
+## The choice on screen ({options, on_pick, tag}); empty for a rolled offer.
+var _choice: Dictionary = {}
 ## Roll context for the pick currently on screen (zeroed for level picks).
 var _luck_bonus: float = 0.0
 var _min_rarity: String = ""
@@ -96,12 +103,34 @@ func open_bonus_pick(title: String, luck_bonus: float = 0.0, min_rarity: String 
 		recipient: Node = null) -> void:
 	if not RunState.run_active:
 		return
-	var request := {"title": title, "luck_bonus": luck_bonus,
+	var request := {"kind": KIND_BONUS, "title": title, "luck_bonus": luck_bonus,
 			"min_rarity": min_rarity, "recipient": recipient}
+	_serve_or_queue(request)
+
+
+## Public (altars via the "upgrade_ui" group): a pick between options the
+## CALLER built. `options` are display-ready rows — {title, description,
+## color} plus whatever payload the caller needs back — and `on_pick`
+## receives the chosen row. Nothing here rolls a rarity or touches
+## UpgradePool: the caller owns the meaning, this layer owns the moment.
+## `recipient` names the raider the choice belongs to (the one who held the
+## altar ring), which is also whose name the co-op title carries.
+func open_choice(title: String, options: Array[Dictionary], recipient: Node = null,
+		on_pick: Callable = Callable(), tag: String = "") -> void:
+	if not RunState.run_active or options.is_empty():
+		return
+	_serve_or_queue({"kind": KIND_CHOICE, "title": title, "options": options,
+			"recipient": recipient, "on_pick": on_pick, "tag": tag})
+
+
+## Opens an earned pick now, or queues it behind whatever is already up.
+## A request that cannot open (nobody standing) goes back in the queue
+## instead of being lost.
+func _serve_or_queue(request: Dictionary) -> void:
 	if visible or _opening:
 		_pending_bonus.append(request)
 		return
-	if not _open_bonus_pick(request):
+	if not _open_request(request):
 		_pending_bonus.append(request)
 
 
@@ -122,6 +151,7 @@ func _on_leveled_up(new_level: int) -> void:
 func _open_level_pick(new_level: int) -> bool:
 	_luck_bonus = 0.0
 	_min_rarity = ""
+	_choice = {}
 	# The side is rolled against THIS raider's loadout and named in the
 	# title, so the recipient has to be resolved before the title exists.
 	# _pick_recipient() advances the round-robin exactly once, and _open
@@ -134,10 +164,21 @@ func _open_level_pick(new_level: int) -> bool:
 			recipient)
 
 
-func _open_bonus_pick(request: Dictionary) -> bool:
+## Serves one queued request of either kind. Both end in _open(), so the
+## pause, the reveal beat and the co-op title are shared.
+func _open_request(request: Dictionary) -> bool:
+	_side = ""
+	if String(request.get("kind", KIND_BONUS)) == KIND_CHOICE:
+		_luck_bonus = 0.0
+		_min_rarity = ""
+		_choice = request
+		if _open(String(request.title), request.get("recipient", null) as Node):
+			return true
+		_choice = {}
+		return false
+	_choice = {}
 	_luck_bonus = float(request.luck_bonus)
 	_min_rarity = String(request.min_rarity)
-	_side = ""
 	return _open(String(request.title), request.get("recipient", null) as Node)
 
 
@@ -242,6 +283,17 @@ func _focus_first_card() -> void:
 
 func _roll() -> void:
 	_kill_shines()
+	if not _choice.is_empty():
+		# Caller-supplied options: nothing to roll, and _offer stays empty
+		# so no card here can ever be applied through UpgradePool.
+		_offer = []
+		var options: Array[Dictionary] = _choice.options
+		var tag := String(_choice.get("tag", ""))
+		for i in _cards.size():
+			_cards[i].visible = i < options.size()
+			if i < options.size():
+				_populate_choice_card(_cards[i], options[i], tag)
+		return
 	# The pool needs the recipient to offer only THEIR owned-weapon
 	# upgrades and new-weapon cards (re-derived on every reroll).
 	var player := _resolve_recipient()
@@ -252,10 +304,34 @@ func _roll() -> void:
 			_populate_card(_cards[i], _offer[i])
 
 
+## One caller-supplied option, drawn with the same card carpentry a rolled
+## card gets: the ribbon carries the caller's tag instead of a rarity, and
+## the option's own color drives the border and glow.
+func _populate_choice_card(card: Button, option: Dictionary, tag: String) -> void:
+	var color: Color = option.get("color", UiTheme.ACCENT_AMBER)
+	var rarity_label: Label = card.get_node("CardBox/RarityLabel")
+	rarity_label.text = tag.to_upper()
+	rarity_label.visible = not tag.is_empty()
+	rarity_label.add_theme_font_override("font", UiTheme.spaced_font(3))
+	UiTheme.style_badge(rarity_label, Color(0.07, 0.075, 0.1), color, color.lightened(0.2))
+	rarity_label.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	var title_label := card.get_node("CardBox/TitleLabel") as Label
+	title_label.text = String(option.get("title", ""))
+	title_label.add_theme_color_override("font_color", UiTheme.TEXT_BRIGHT)
+	var desc_label := card.get_node("CardBox/DescLabel") as Label
+	desc_label.text = String(option.get("description", ""))
+	desc_label.add_theme_color_override("font_color", UiTheme.TEXT_DIM)
+	UiTheme.style_card(card, color)
+	card.self_modulate = Color.WHITE
+
+
 func _populate_card(card: Button, item: Dictionary) -> void:
 	var rarity: Dictionary = item.rarity
 	var rarity_color := rarity.color as Color
 	var rarity_label: Label = card.get_node("CardBox/RarityLabel")
+	# A choice card may have hidden the ribbon (an untagged option); a
+	# rolled card always shows its rarity there.
+	rarity_label.visible = true
 	# rarity.name is an ID (chest prices, item rows, min_rarity floors all
 	# key off it): translated only here, on the way to the screen.
 	rarity_label.text = UpgradePool.rarity_display(String(rarity.name)).to_upper()
@@ -286,7 +362,12 @@ func _populate_card(card: Button, item: Dictionary) -> void:
 
 
 func _on_card_pressed(index: int) -> void:
-	if index >= _offer.size() or _picking:
+	if _picking:
+		return
+	if not _choice.is_empty():
+		_pick_choice(index)
+		return
+	if index >= _offer.size():
 		return
 	_picking = true
 	Sfx.play(&"card_pick")
@@ -296,8 +377,36 @@ func _on_card_pressed(index: int) -> void:
 	# so the roll and the click can never resolve to different raiders.
 	var player := _resolve_recipient()
 	if player != null:
-		UpgradePool.apply(_offer[index], player)
+		var rolled := UpgradePool.apply(_offer[index], player)
+		if not rolled.is_empty():
+			# Tomo del Azar: the bet is invisible without this — the stats
+			# moved, but nothing on screen ever said which ones.
+			_toast_gamble(rolled, player)
 	_animate_pick(index)
+
+
+## Hands the chosen option back to whoever asked for the choice. The
+## callback is checked for validity first: the altar that opened this menu
+## can sink and free itself while the pick is on screen.
+func _pick_choice(index: int) -> void:
+	var options: Array[Dictionary] = _choice.options
+	if index >= options.size():
+		return
+	_picking = true
+	Sfx.play(&"card_pick")
+	var callback: Callable = _choice.get("on_pick", Callable())
+	var chosen: Dictionary = options[index]
+	_choice = {}
+	if callback.is_valid():
+		callback.call(chosen)
+	_animate_pick(index)
+
+
+## Reads a Tomo del Azar roll onto the HUD loot toast.
+func _toast_gamble(boons: Array[Dictionary], player: Node) -> void:
+	var index: Variant = player.get("player_index")
+	get_tree().call_group("hud", "show_loot", "Azar", Tome.boon_text(boons),
+			UiTheme.ACCENT_AMBER, int(index) if index != null else 0)
 
 
 ## Chosen card punches up, the losers drop and fade; after the short beat
@@ -337,7 +446,7 @@ func _after_pick() -> void:
 		_pending_levels += 1
 	if not _pending_bonus.is_empty():
 		var request: Dictionary = _pending_bonus.pop_front()
-		if _open_bonus_pick(request):
+		if _open_request(request):
 			return
 		_pending_bonus.push_front(request)
 	_close()
@@ -403,6 +512,7 @@ func _cancel_pick() -> void:
 	_picking = false
 	_pending_levels = 0
 	_pending_bonus.clear()
+	_choice = {}
 	_kill_shines()
 	visible = false
 

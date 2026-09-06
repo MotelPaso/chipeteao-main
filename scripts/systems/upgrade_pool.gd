@@ -423,19 +423,21 @@ static func side_label(side: String) -> String:
 
 
 ## Applies one rolled offer to the live nodes reachable from `player`.
-static func apply(offer: Dictionary, player: Node) -> void:
+## Returns the boons a gambling tome (Tomo del Azar) just rolled, so the
+## caller can show the player what the bet paid; empty for every other card.
+static func apply(offer: Dictionary, player: Node) -> Array[Dictionary]:
 	var entry: Dictionary = offer.entry
+	var rolled: Array[Dictionary] = []
 	match String(entry.get("kind", "stat")):
 		"new_weapon":
 			_grant_weapon(entry, player)
-			return
+			return rolled
 		"tome":
-			_grant_tome(entry, offer, player)
-			return
+			return _grant_tome(entry, offer, player)
 	var target := _resolve_target(entry.target, player)
 	if target == null:
 		push_warning("UpgradePool: target '%s' not found for '%s'" % [entry.target, entry.id])
-		return
+		return rolled
 	if entry.has("effects"):
 		var amounts: Array[float] = offer.get("amounts", [] as Array[float])
 		var effects: Array = entry.effects
@@ -453,6 +455,7 @@ static func apply(offer: Dictionary, player: Node) -> void:
 		var weapon := target as WeaponBase
 		weapon.upgrade_level += 1
 		EvolutionCatalog.try_advance_by_level(weapon, player)
+	return rolled
 
 
 ## One property change on a live target. A max_hp raise on a Health also
@@ -641,13 +644,15 @@ static func weapon_display_name(node_name: String) -> String:
 
 ## Adds one stack at the rolled rarity's potency; PlayerStats recomputes
 ## every derived stat from scratch, so displayed amounts match applied.
-static func _grant_tome(entry: Dictionary, offer: Dictionary, player: Node) -> void:
+## Returns the boons a gambling tome rolled (empty for every other tome).
+static func _grant_tome(entry: Dictionary, offer: Dictionary,
+		player: Node) -> Array[Dictionary]:
 	var stats := PlayerStats.find_in(player)
 	if stats == null:
 		push_warning("UpgradePool: no PlayerStats on player for '%s'" % entry.id)
-		return
+		return [] as Array[Dictionary]
 	var rarity: Dictionary = offer.rarity
-	stats.add_tome(String(entry.tome_id), float(rarity.potency))
+	return stats.add_tome(String(entry.tome_id), float(rarity.potency))
 
 
 static func _max_weapons(player: Node) -> int:

@@ -98,6 +98,16 @@ func add_item(item_id: String) -> void:
 	if stats != null:
 		stats.recompute()
 	items_changed.emit(item_id, count(item_id))
+	# Loot toast (iteration 47): ONE call for every source — chests, the
+	# roulette, anything later — because this is the single door every
+	# item comes through. A source-side announce would have to be written
+	# again for each new source, and the roulette's never was.
+	var owner_index: Variant = get_parent().get("player_index") \
+			if get_parent() != null else null
+	get_tree().call_group("hud", "show_loot", String(row.display_name),
+			String(row.get("description", "")),
+			ItemCatalog.rarity_color(String(row.get("rarity", "Common"))),
+			int(owner_index) if owner_index != null else 0)
 	# Bestiary-style discovery counter for future Collection pages.
 	SaveData.bump("item_" + item_id)
 

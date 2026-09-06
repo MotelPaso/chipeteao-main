@@ -15,6 +15,18 @@ extends CharacterBody3D
 ## Run points paid to the nearest raider on death (iteration 40); elites
 ## multiply it like XP, bosses set their own.
 @export var points_value: int = DEFAULT_POINTS_VALUE
+## Shiny shimmer (iteration 47). Turns of the hue wheel per second, how
+## many brightness beats fit in one full turn, and the energy/alpha bounds.
+## Slow enough to read as a sheen rather than a strobe.
+const SHINY_HUE_SPEED: float = 0.28
+const SHINY_PULSE_CYCLES: float = 4.0
+const SHINY_ENERGY_MIN: float = 1.3
+const SHINY_ENERGY_MAX: float = 2.8
+const SHINY_SATURATION: float = 0.85
+const SHINY_ALPHA: float = 0.3
+## Distinct starting phases handed out by instance id.
+const SHINY_PHASE_BUCKETS: int = 997
+
 @export_group("Elite")
 @export var elite_hp_multiplier: float = 3.0
 @export var elite_speed_multiplier: float = 1.3
@@ -92,7 +104,10 @@ var _separation_cache: Vector3 = Vector3.ZERO
 ## calls _refresh_overlay(), so a temporary effect can never erase a
 ## permanent one (an elite berserker keeps reading as both, and poison
 ## wearing off restores the variant instead of clearing to bare skin).
-var _overlay_elite: Material = null
+## Typed narrower than its siblings on purpose: the shiny shimmer writes
+## albedo/emission on it every frame (_tick_shiny), which Material alone
+## does not expose.
+var _overlay_elite: StandardMaterial3D = null
 var _overlay_variant: Material = null
 var _overlay_status: Material = null
 ## Meshes of the visual rig, resolved once at ready: the four overlay
@@ -118,6 +133,8 @@ func _ready() -> void:
 
 
 func _physics_process(delta: float) -> void:
+	if _overlay_elite != null:
+		_tick_shiny(delta)
 	if not is_on_floor():
 		velocity.y -= _gravity * delta
 	_slow_time_left = maxf(_slow_time_left - delta, 0.0)
@@ -437,17 +454,44 @@ func apply_variant(kind: String) -> void:
 	points_value *= 2
 
 
+## Where this body sits in the shiny hue cycle (0-1); unused until
+## _apply_elite_glow seeds it.
+var _shiny_phase: float = 0.0
+
+
 func _apply_overlay(albedo: Color, emission: Color, energy: float) -> void:
 	_overlay_variant = _build_overlay(albedo, emission, energy)
 	_refresh_overlay()
 
 
-## Self-illuminated tint over every mesh in the visual rig so elites read
-## at a glance even inside a horde.
+## The SHINY look (iteration 47, replacing the flat amber tint): a
+## self-illuminated overlay whose hue cycles and whose brightness breathes,
+## so a shiny reads at a glance even inside a horde and even when the horde
+## is entirely shiny. Material only, on purpose — no particles and no
+## pooled FX: the elite-boost soak makes every body shiny at once, and one
+## emitter per body would drain the pools and drown the log in warnings.
+## The overlay is built per body (_build_overlay news one every call), so
+## animating it here can never bleed into another enemy.
 func _apply_elite_glow() -> void:
 	_overlay_elite = _build_overlay(
-			Color(1.0, 0.62, 0.12, 0.3), Color(1.0, 0.55, 0.1), 1.8)
+			Color(1.0, 0.62, 0.12, SHINY_ALPHA), Color(1.0, 0.55, 0.1), SHINY_ENERGY_MIN)
+	# Each body starts somewhere else in the cycle: a horde pulsing in
+	# lockstep reads as one flashing object, not as many shiny ones.
+	_shiny_phase = float(get_instance_id() % SHINY_PHASE_BUCKETS) \
+			/ float(SHINY_PHASE_BUCKETS)
 	_refresh_overlay()
+
+
+## One frame of the shimmer. Cheap on purpose: two writes on one material
+## this body owns, no allocation, no group walk.
+func _tick_shiny(delta: float) -> void:
+	_shiny_phase = fmod(_shiny_phase + delta * SHINY_HUE_SPEED, 1.0)
+	var tint := Color.from_hsv(_shiny_phase, SHINY_SATURATION, 1.0)
+	_overlay_elite.albedo_color = Color(tint.r, tint.g, tint.b, SHINY_ALPHA)
+	_overlay_elite.emission = tint
+	var beat := 0.5 + 0.5 * sin(_shiny_phase * TAU * SHINY_PULSE_CYCLES)
+	_overlay_elite.emission_energy_multiplier = lerpf(
+			SHINY_ENERGY_MIN, SHINY_ENERGY_MAX, beat)
 
 
 func _build_overlay(albedo: Color, emission: Color, energy: float) -> StandardMaterial3D:
@@ -587,13 +631,18 @@ func _drop_chest() -> void:
 			global_position + Vector3(randf_range(-1.0, 1.0), 0.0, randf_range(-1.0, 1.0)),
 			ELITE_CHEST_LUCK_PER_DIFFICULTY * RunState.difficulty_bonus)
 	if chest != null:
-		print("Elite chest dropped: %s" % chest.rarity)
+		# A free chest has no rarity yet (it rolls when opened), so the log
+		# reports what it IS instead of an empty string.
+		print("Elite chest dropped: free")
 
 
 ## Drops one chest at `at`, parented to the scene ROOT so it outlives the
 ## corpse, or null when there is no scene to drop into (run teardown) or the
-## scene root is not a Chest. The single place both the elite bounty and the
+## scene root is not a Chest. The single place both the shiny bounty and the
 ## boss ring go through, so the guards can only be written once.
+## Every chest dropped by a BODY is free (iteration 47): you already paid
+## for it by killing the thing, and charging points for a boss reward on
+## top of the run economy is what made the rings go unopened.
 func spawn_chest(at: Vector3, luck_bonus: float, min_rarity: String = "") -> Chest:
 	var parent := get_tree().current_scene if get_tree().current_scene != null else get_parent()
 	if parent == null:
@@ -607,6 +656,7 @@ func spawn_chest(at: Vector3, luck_bonus: float, min_rarity: String = "") -> Che
 	if not min_rarity.is_empty():
 		chest.min_rarity = min_rarity
 	chest.luck_bonus = luck_bonus
+	chest.free_open = true
 	parent.add_child(chest)
 	chest.global_position = at
 	return chest

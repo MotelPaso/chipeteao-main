@@ -34,8 +34,10 @@ const EVENT_LIBRARY: Array[Dictionary] = [
 	{"id": "supply_chest", "weight": 1.0, "method": &"_event_supply_chest"},
 	{"id": "elite_pack", "weight": 1.0, "method": &"_event_elite_pack"},
 	{"id": "essence_rift", "weight": 1.0, "method": &"_event_essence_rift"},
-	{"id": "charge_altar", "weight": 1.6, "method": &"_event_charge_altar"},
-	{"id": "demonic_altar", "weight": 0.5, "method": &"_event_demonic_altar"},
+	# `altar` marks the rows the altar cadence rules apply to (weight rising
+	# with the minute, capped by how many unspent altars already stand).
+	{"id": "charge_altar", "weight": 1.6, "method": &"_event_charge_altar", "altar": true},
+	{"id": "demonic_altar", "weight": 0.5, "method": &"_event_demonic_altar", "altar": true},
 	{"id": "spring", "weight": 0.7, "method": &"_event_spring"},
 ]
 
@@ -99,6 +101,12 @@ class TimedBeacon:
 @export var first_event_at: float = 75.0
 @export var event_gap_min: float = 50.0
 @export var event_gap_max: float = 75.0
+## The gap shrinks as the run goes on (iteration 47) — a map that stops
+## producing anything new is the whole complaint the events answer — but
+## never below the floor, which is the shortest window a raider can
+## actually cross the arena in.
+@export var event_gap_floor: float = 20.0
+@export var event_gap_decay_per_minute: float = 0.18
 ## Event points land this far from a random alive player.
 @export var event_min_distance: float = 25.0
 @export var event_max_distance: float = 45.0
@@ -115,10 +123,23 @@ class TimedBeacon:
 ## left out keeps the library weight; a weight of 0 drops that event from
 ## the rotation for this map.
 @export var event_weight_overrides: Dictionary[String, float] = {}
-@export_group("Altars (iteration 41)")
-## Recurring altars: seconds an untouched spawned altar/spring waits before leaving.
-@export var altar_idle_lifetime: float = 45.0
+@export_group("Altars (iteration 47)")
+## Altars get commoner as the run goes on: their EVENT_LIBRARY weight is
+## multiplied by (1 + this x minutes), capped by altar_weight_max_scale.
+@export var altar_weight_per_minute: float = 0.25
+@export var altar_weight_max_scale: float = 3.0
+## Cap on UNSPENT altars standing at once (scene-placed ones included),
+## itself growing with the minute: altar_cap_base + minutes / cap_minutes.
+## Altars no longer time out (iteration 47), so without a cap they would
+## accumulate for the whole run.
+@export var altar_cap_base: int = 3
+@export var altar_cap_minutes: float = 3.0
+## Springs still leave on their own; they are a consumable, not a fixture.
 @export var spring_idle_lifetime: float = 60.0
+## Share of the run-start chests (scene-placed and the extras below) that
+## costs nothing. Free chests roll their rarity when opened, so an early
+## one is a real chance at a Legendary before any points exist.
+@export var free_start_chest_chance: float = 0.15
 ## Portals dropped at run start (paired: keep it even) and roulette wheels.
 @export var portal_count: int = 4
 @export var roulette_count: int = 1
@@ -217,23 +238,42 @@ func _exit_tree() -> void:
 func _randomize_starting_pois() -> void:
 	var removed := 0
 	var chests_kept := 0
+	var freebies := 0
 	for node: Node in get_tree().get_nodes_in_group("scatter_keepout"):
 		if node is Chest or node is ChargeShrine or node is GreedShrine:
 			if node is Chest and chests_kept == 0:
 				chests_kept += 1  # always keep the first ground chest
+				if _make_start_chest_free(node as Chest):
+					freebies += 1
 				continue
 			if randf() < poi_skip_chance:
 				node.queue_free()
 				removed += 1
 			elif node is Chest:
 				chests_kept += 1
+				if _make_start_chest_free(node as Chest):
+					freebies += 1
 	_refresh_placed_points()
 	var extra := randi_range(extra_start_chests_min, extra_start_chests_max)
 	for i in extra:
 		var chest := CHEST_SCENE.instantiate() as Chest
+		# Set BEFORE add_child: a chest decides its tint and its prompt in
+		# _ready, and one flipped afterwards has to repaint itself.
+		if randf() < free_start_chest_chance:
+			chest.free_open = true
+			freebies += 1
 		add_child(chest)
 		chest.global_position = _claim_clear_point()
-	print("Start layout: %d POI(s) skipped, %d extra chest(s)" % [removed, extra])
+	print("Start layout: %d POI(s) skipped, %d extra chest(s), %d free" % [
+			removed, extra, freebies])
+
+
+## Rolls one already-ready scene chest free. Returns true when it flipped.
+func _make_start_chest_free(chest: Chest) -> bool:
+	if chest == null or randf() >= free_start_chest_chance:
+		return false
+	chest.make_free()
+	return true
 
 
 func _physics_process(delta: float) -> void:
@@ -246,9 +286,37 @@ func _physics_process(delta: float) -> void:
 	_event_timer -= delta
 	if _event_timer > 0.0:
 		return
-	_event_timer = randf_range(event_gap_min, event_gap_max)
+	_event_timer = _next_event_gap()
 	_fire_random_event()
 	_maybe_sky_event()
+
+
+## Run minutes elapsed; the altar cadence and the event gap both ride it.
+func _minutes() -> float:
+	return RunState.run_time / 60.0
+
+
+## Seconds until the next event: the authored window, compressed by the
+## minute, never below event_gap_floor.
+func _next_event_gap() -> float:
+	var raw := randf_range(event_gap_min, event_gap_max)
+	return maxf(raw / (1.0 + event_gap_decay_per_minute * _minutes()), event_gap_floor)
+
+
+## Unspent altars standing right now, wherever they came from — the arena's
+## own fixtures and the ones this director raised are the same thing since
+## iteration 47, so the cap has to see both. Group, not node paths.
+func _unspent_altars() -> int:
+	var count := 0
+	for node: Node in get_tree().get_nodes_in_group("altars"):
+		var available: Variant = node.get("available")
+		if (available is bool and bool(available)) and not node.is_queued_for_deletion():
+			count += 1
+	return count
+
+
+func _altar_cap() -> int:
+	return altar_cap_base + floori(_minutes() / maxf(altar_cap_minutes, 0.001))
 
 
 ## --- arena mask -------------------------------------------------------------
@@ -407,9 +475,18 @@ func _find_clear_point(limit: float, placed: Array[Vector2],
 
 ## --- events -----------------------------------------------------------------
 
-## This map's weight for an EVENT_LIBRARY row.
+## This map's weight for an EVENT_LIBRARY row. Altar rows carry the
+## iteration-47 cadence: heavier by the minute, and zero (i.e. rerolled
+## into another event) while the field already holds its cap of unspent
+## altars — which is what keeps "more altars" from becoming "an arena
+## paved with altars nobody walks to".
 func _event_weight(row: Dictionary) -> float:
-	return float(event_weight_overrides.get(row["id"], row["weight"]))
+	var weight := float(event_weight_overrides.get(row["id"], row["weight"]))
+	if not bool(row.get("altar", false)) or weight <= 0.0:
+		return weight
+	if _unspent_altars() >= _altar_cap():
+		return 0.0
+	return weight * minf(1.0 + altar_weight_per_minute * _minutes(), altar_weight_max_scale)
 
 
 func _fire_random_event() -> void:
@@ -443,18 +520,21 @@ func _event_demonic_altar() -> void:
 	_event_altar(CURSE_SHRINE_SCENE, "Un obelisco demoníaco sale del suelo a zarpazos...")
 
 
-## Recurring altar (charge or demonic): far from a player, leaves on its
-## own after altar_idle_lifetime if nobody comes.
+## Recurring altar (charge or demonic): far from a player, and it STAYS.
+## Since iteration 47 an altar never times out, so its beacon has no
+## deadline either — it burns until the altar is spent, which the
+## TimedBeacon's own poi_worth_showing() check reports.
 func _event_altar(scene: PackedScene, message: String) -> void:
 	var altar := scene.instantiate() as Node3D
-	altar.set("idle_lifetime", altar_idle_lifetime)
 	add_child(altar)
 	altar.global_position = _event_point()
 	var color := Color(1.0, 0.35, 0.3) if scene == CURSE_SHRINE_SCENE \
 			else Color(0.45, 0.85, 1.0)
 	_beacons.append(TimedBeacon.new(
-			_spawn_beacon(altar.global_position, color), altar, altar_idle_lifetime))
+			_spawn_beacon(altar.global_position, color), altar, INF))
 	_announce(message)
+	# One-line log (RunManager convention) for headless soaks.
+	print("Altar placed: %s" % ("demonic" if scene == CURSE_SHRINE_SCENE else "charge"))
 
 
 func _event_spring() -> void:
@@ -522,7 +602,7 @@ func _event_elite_pack() -> void:
 			"spawn_pressure_burst", anchor.global_position, elite_pack_size, true)
 	if spawned <= 0:
 		return
-	_announce("¡Una jauría élite te huele el rastro!")
+	_announce("¡Una jauría shiny te huele el rastro!")
 
 
 func _event_essence_rift() -> void:
@@ -566,8 +646,12 @@ func _tick_beacons(delta: float) -> void:
 		_beacons.remove_at(i)
 
 
-## Unclaimed supply chest sinks away.
+## Unclaimed supply chest sinks away. Guarded: a chest that was opened
+## sinks and frees itself (iteration 47), so by the time a stale beacon
+## entry gets here the box may already be gone.
 func _despawn_chest(chest: Chest) -> void:
+	if chest == null or not is_instance_valid(chest) or chest.is_queued_for_deletion():
+		return
 	# A missed chest must not credit the chests_opened quest counter.
 	chest.meta_stat_id = ""
 	chest.consume()
@@ -619,7 +703,10 @@ func _spawn_beacon(at: Vector3, color: Color) -> Node3D:
 func _maybe_sky_event() -> void:
 	if not _sky_kind.is_empty() or _sky_gap_left > 0.0:
 		return
-	var chance := sky_event_chance + sky_event_chance_per_demonic * float(RunState.demonic_uses)
+	# Demonic pacts can sell sky-event odds outright (iteration 47), on top
+	# of the per-use tilt every demonic completion already adds.
+	var chance := sky_event_chance + RunState.event_chance_bonus \
+			+ sky_event_chance_per_demonic * float(RunState.demonic_uses)
 	if randf() >= chance:
 		return
 	start_sky_event("blood_moon" if randf() < 0.5 else "eclipse")
@@ -631,22 +718,28 @@ func start_sky_event(kind: String) -> void:
 	_sky_kind = kind
 	match kind:
 		"blood_moon":
-			_sky_left = sky_event_duration
-			get_tree().call_group("enemy_spawner", "set_sky_event", kind, sky_event_duration)
+			var dark_duration := sky_event_duration * RunState.sky_duration_multiplier
+			_sky_left = dark_duration
+			get_tree().call_group("enemy_spawner", "set_sky_event", kind, dark_duration)
 			_tint_sky(Color(1.0, 0.25, 0.2), 0.9, Color(0.5, 0.1, 0.1))
 			_announce("LUNA DE SANGRE — ¡la horda enloquece!")
 		"eclipse":
-			_sky_left = sky_event_duration
-			get_tree().call_group("enemy_spawner", "set_sky_event", kind, sky_event_duration)
+			var dark_duration := sky_event_duration * RunState.sky_duration_multiplier
+			_sky_left = dark_duration
+			get_tree().call_group("enemy_spawner", "set_sky_event", kind, dark_duration)
 			_tint_sky(Color(0.35, 0.3, 0.5), 0.35, Color(0.12, 0.1, 0.2))
 			_announce("ECLIPSE — las sombras entran por todos lados")
 		"full_moon":
-			_sky_left = full_moon_duration
+			# The pact sells "the moons last longer", so the good one grows
+			# too — a cost that only stretched the bad half would read as a
+			# straight penalty rather than a bargain.
+			var full_duration := full_moon_duration * RunState.sky_duration_multiplier
+			_sky_left = full_duration
 			for node: Node in get_tree().get_nodes_in_group("player"):
 				var stats := PlayerStats.find_in(node)
 				if stats != null:
-					stats.add_timed_boon("xp_gain", full_moon_xp_bonus, full_moon_duration)
-					stats.add_timed_boon("luck", full_moon_luck_bonus, full_moon_duration)
+					stats.add_timed_boon("xp_gain", full_moon_xp_bonus, full_duration)
+					stats.add_timed_boon("luck", full_moon_luck_bonus, full_duration)
 			_tint_sky(Color(0.85, 0.9, 1.0), 1.3, Color(0.6, 0.65, 0.9))
 			_announce("LUNA LLENA — la fortuna y la sabiduría te sonríen")
 		_:

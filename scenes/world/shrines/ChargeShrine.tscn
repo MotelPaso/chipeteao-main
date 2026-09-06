@@ -45,17 +45,17 @@ rings = 2
 
 [sub_resource type="TorusMesh" id="TorusMesh_ring"]
 material = SubResource("StandardMaterial3D_ring")
-inner_radius = 2.95
-outer_radius = 3.15
+inner_radius = 8.85
+outer_radius = 9.45
 
 [sub_resource type="CylinderMesh" id="CylinderMesh_progress"]
 material = SubResource("StandardMaterial3D_progress")
-top_radius = 3.0
-bottom_radius = 3.0
+top_radius = 9.0
+bottom_radius = 9.0
 height = 0.04
 
 [sub_resource type="CylinderShape3D" id="CylinderShape3D_zone"]
-radius = 3.1
+radius = 9.3
 height = 3.0
 
 [sub_resource type="CylinderShape3D" id="CylinderShape3D_body"]

@@ -177,6 +177,8 @@ static func roll_gamble_boons(potency: float) -> Array[Dictionary]:
 		boons.append({
 			"stat": String(boon.stat),
 			"amount": roundf(float(boon.amount) * potency),
+			# Carried along so the HUD toast can read the roll (iteration 47).
+			"label": String(boon.get("label", "")),
 		})
 	return boons
 

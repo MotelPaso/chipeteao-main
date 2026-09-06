@@ -110,6 +110,29 @@ var _loadout_player: Node = null
 var _loadout_signature: String = ""
 var _loadout_refresh_left: float = 0.0
 
+## Loot toast (iteration 47): a card that slides in bottom-center whenever
+## something lands in a bag — a chest item, a roulette prize, a Tomo del
+## Azar roll. Reached through the "hud" group as show_loot(); ItemBag calls
+## it for every source, so a new loot source needs no HUD change at all.
+## Toasts QUEUE instead of overwriting: a boss ring dropping four chests
+## used to be four items and one readable line.
+const LOOT_TOAST_TIME: float = 3.0
+const LOOT_TOAST_FADE: float = 0.25
+const LOOT_TOAST_SLIDE: float = 26.0
+const LOOT_TOAST_WIDTH: float = 340.0
+const LOOT_TOAST_BOTTOM: float = -108.0
+const LOOT_TITLE_FONT_SIZE: int = 17
+const LOOT_DESC_FONT_SIZE: int = 13
+## Co-op tag on the toast, so four raiders sharing one screen can tell
+## whose pickup it was.
+const LOOT_PLAYER_TAG := "J%d"
+var _loot_box: PanelContainer = null
+var _loot_title: Label = null
+var _loot_desc: Label = null
+var _loot_queue: Array[Dictionary] = []
+var _loot_tween: Tween = null
+var _loot_showing: bool = false
+
 
 func _ready() -> void:
 	# Bosses and the spawner reach this layer through "boss_ui"; shrines
@@ -642,6 +665,94 @@ func announce(message: String) -> void:
 	_announce_tween.tween_interval(2.4)
 	_announce_tween.tween_property(_announce_label, "modulate:a", 0.0, 0.6)
 	_announce_tween.tween_callback(_announce_label.hide)
+
+
+## Called through the "hud" group whenever loot reaches a raider (chests,
+## roulette, Tomo del Azar). Queues one card per prize; `player_index` only
+## shows as a tag while the party is bigger than one.
+func show_loot(title: String, description: String, color: Color,
+		player_index: int = 0) -> void:
+	_loot_queue.append({"title": title, "description": description,
+			"color": color, "player_index": player_index})
+	if not _loot_showing:
+		_show_next_loot()
+
+
+func _show_next_loot() -> void:
+	if _loot_queue.is_empty():
+		_loot_showing = false
+		if _loot_box != null:
+			_loot_box.visible = false
+		return
+	_loot_showing = true
+	var entry: Dictionary = _loot_queue.pop_front()
+	_build_loot_toast()
+	var color: Color = entry.color
+	var title := String(entry.title)
+	if Coop.player_count > 1:
+		title = "%s  %s" % [LOOT_PLAYER_TAG % (int(entry.player_index) + 1), title]
+	_loot_title.text = title
+	_loot_title.add_theme_color_override("font_color", color.lightened(0.25))
+	_loot_desc.text = String(entry.description)
+	var style := UiTheme.flat(Color(0.07, 0.075, 0.11, 0.92), UiTheme.RADIUS_SMALL)
+	style.border_color = color
+	style.set_border_width_all(2)
+	UiTheme.add_glow(style, color, 10, 0.3)
+	_loot_box.add_theme_stylebox_override("panel", style)
+	_loot_box.visible = true
+	_loot_box.modulate.a = 0.0
+	_loot_box.offset_bottom = LOOT_TOAST_BOTTOM + LOOT_TOAST_SLIDE
+	_loot_box.offset_top = _loot_box.offset_bottom - 64.0
+	if _loot_tween != null and _loot_tween.is_valid():
+		_loot_tween.kill()
+	_loot_tween = create_tween()
+	_loot_tween.set_parallel(true)
+	_loot_tween.tween_property(_loot_box, "modulate:a", 1.0, LOOT_TOAST_FADE)
+	_loot_tween.tween_property(_loot_box, "offset_bottom", LOOT_TOAST_BOTTOM,
+			LOOT_TOAST_FADE).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	_loot_tween.tween_property(_loot_box, "offset_top", LOOT_TOAST_BOTTOM - 64.0,
+			LOOT_TOAST_FADE).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	_loot_tween.chain().tween_interval(LOOT_TOAST_TIME)
+	_loot_tween.chain().tween_property(_loot_box, "modulate:a", 0.0, LOOT_TOAST_FADE)
+	_loot_tween.chain().tween_callback(_show_next_loot)
+
+
+## Built once, on the first prize of the run: most runs show one, and a
+## HUD that allocates its whole furniture up front pays for every panel a
+## run never opens.
+func _build_loot_toast() -> void:
+	if _loot_box != null:
+		return
+	_loot_box = PanelContainer.new()
+	_loot_box.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
+	_loot_box.grow_vertical = Control.GROW_DIRECTION_BEGIN
+	_loot_box.custom_minimum_size = Vector2(LOOT_TOAST_WIDTH, 0.0)
+	_loot_box.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	_loot_box.offset_left = -LOOT_TOAST_WIDTH * 0.5
+	_loot_box.offset_right = LOOT_TOAST_WIDTH * 0.5
+	_loot_box.anchor_left = 0.5
+	_loot_box.anchor_right = 0.5
+	# IGNORE, not PASS: this card sits over the play area for three
+	# seconds and must never eat a click meant for the world.
+	_loot_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_loot_box.visible = false
+	add_child(_loot_box)
+	var column := VBoxContainer.new()
+	column.add_theme_constant_override("separation", 2)
+	column.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_loot_box.add_child(column)
+	_loot_title = Label.new()
+	_loot_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_loot_title.add_theme_font_size_override("font_size", LOOT_TITLE_FONT_SIZE)
+	_loot_title.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	column.add_child(_loot_title)
+	_loot_desc = Label.new()
+	_loot_desc.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_loot_desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_loot_desc.add_theme_font_size_override("font_size", LOOT_DESC_FONT_SIZE)
+	_loot_desc.add_theme_color_override("font_color", UiTheme.TEXT_DIM)
+	_loot_desc.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	column.add_child(_loot_desc)
 
 
 ## Bigger sibling of announce() for payoff moments (weapon evolutions):

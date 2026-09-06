@@ -175,7 +175,8 @@ const ELITE_CHANCE_CAP: float = 0.6
 @export var boss_warning_text: String = "Una presencia monstruosa se acerca..."
 @export_group("Pressure Surge")
 ## Ring band around a requesting shrine where surge enemies land
-## (spawn_pressure_burst, called by the Charge Shrine via group).
+## (spawn_pressure_burst: hordes, the WorldDirector's shiny pack, the
+## roulette frenzy — charge altars stopped calling surges in iteration 47).
 @export var surge_min_radius: float = 7.0
 @export var surge_max_radius: float = 10.0
 ## Headroom over max_active for shrine surges and elite packs. Without it
@@ -456,8 +457,11 @@ func elite_chance() -> float:
 	# as "elites never roll again" rather than as a configuration error.
 	var span := maxf(elite_full_minute - elite_start_minute, 0.001)
 	var ramp := clampf((minutes - elite_start_minute) / span, 0.0, 1.0)
+	# Demonic pacts sell elite odds directly (iteration 47), on top of the
+	# difficulty tilt every source already feeds.
 	return minf(lerpf(elite_start_chance, elite_full_chance, ramp)
-			* (1.0 + RunState.difficulty_bonus), ELITE_CHANCE_CAP)
+			* (1.0 + RunState.difficulty_bonus) + RunState.elite_chance_bonus,
+			ELITE_CHANCE_CAP)
 
 
 ## Temporary enemy buff (roulette "frenzy"): fresh spawns scale HP/damage

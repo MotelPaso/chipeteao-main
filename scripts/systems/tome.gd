@@ -114,22 +114,25 @@ const TOME_LIBRARY: Array[Dictionary] = [
 	},
 ]
 
-## Stats a Tomo del Azar boon can land on: {stat, amount} at Common
+## Stats a Tomo del Azar boon can land on: {stat, amount, label} at Common
 ## potency (the rolled rarity's potency scales it and adds more boons).
+## `label` carries exactly one "%d", filled with the rolled amount: the
+## bet is invisible without it, so the HUD toast (iteration 47) reads what
+## the roll actually paid instead of just "subiste algo".
 const GAMBLE_BOONS: Array[Dictionary] = [
-	{"stat": "damage", "amount": 12.0},
-	{"stat": "cooldown", "amount": 6.0},
-	{"stat": "area", "amount": 10.0},
-	{"stat": "move_speed", "amount": 6.0},
-	{"stat": "crit_chance", "amount": 5.0},
-	{"stat": "crit_damage", "amount": 25.0},
-	{"stat": "lifesteal", "amount": 2.0},
-	{"stat": "armor", "amount": 2.0},
-	{"stat": "evasion", "amount": 3.0},
-	{"stat": "luck", "amount": 8.0},
-	{"stat": "max_hp", "amount": 15.0},
-	{"stat": "xp_gain", "amount": 8.0},
-	{"stat": "duration", "amount": 15.0},
+	{"stat": "damage", "amount": 12.0, "label": "daño +%d%%"},
+	{"stat": "cooldown", "amount": 6.0, "label": "velocidad de ataque +%d%%"},
+	{"stat": "area", "amount": 10.0, "label": "área +%d%%"},
+	{"stat": "move_speed", "amount": 6.0, "label": "velocidad +%d%%"},
+	{"stat": "crit_chance", "amount": 5.0, "label": "prob. de crítico +%d%%"},
+	{"stat": "crit_damage", "amount": 25.0, "label": "daño crítico +%d%%"},
+	{"stat": "lifesteal", "amount": 2.0, "label": "robo de vida +%d%%"},
+	{"stat": "armor", "amount": 2.0, "label": "armadura +%d"},
+	{"stat": "evasion", "amount": 3.0, "label": "evasión +%d%%"},
+	{"stat": "luck", "amount": 8.0, "label": "suerte +%d"},
+	{"stat": "max_hp", "amount": 15.0, "label": "HP máx. +%d"},
+	{"stat": "xp_gain", "amount": 8.0, "label": "ganancia de XP +%d%%"},
+	{"stat": "duration", "amount": 15.0, "label": "duración de efectos +%d%%"},
 ]
 
 ## Lazily built id -> row index (see CatalogIndex): PlayerStats.recompute()
@@ -172,3 +175,16 @@ static func stack_label(stack: int) -> String:
 			value -= ROMAN_VALUES[i]
 			label += ROMAN_SYMBOLS[i]
 	return label
+
+
+## Reads a list of rolled boons ({stat, amount, label}) as one line, for
+## the HUD toast: "daño +18%, suerte +12". Rows without a label fall back
+## to their stat id so a new GAMBLE_BOONS row can never print nothing.
+static func boon_text(boons: Array[Dictionary]) -> String:
+	var parts: PackedStringArray = PackedStringArray()
+	for boon: Dictionary in boons:
+		var label := String(boon.get("label", ""))
+		var amount := roundi(float(boon.get("amount", 0.0)))
+		parts.append(label % amount if not label.is_empty()
+				else "%s +%d" % [String(boon.get("stat", "?")), amount])
+	return ", ".join(parts)

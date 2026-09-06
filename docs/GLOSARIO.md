@@ -209,6 +209,44 @@ Lo que NO se traduce nunca: los `id` de catálogo, los `node_name`, los nombres 
 | Chest | Cofre |
 | supply chest | cofre de suministros |
 | shrine | altar |
+| free chest | cofre gratis |
+| free (precio) | gratis (nunca «libre») |
+| blessing | bendición (etiqueta de la carta de altar de carga) |
+| pact | pacto (etiqueta de la carta de altar demoníaco) |
+
+### Menú del altar de carga (iteración 47)
+
+| Inglés | Español |
+|---|---|
+| `The altar offers you a gift` | El altar te ofrece un don |
+| `Blessing` | Bendición |
+| `Fury` / `Rhythm` / `Breadth` | Furia / Ritmo / Amplitud |
+| `Swiftness` / `Vigor` / `Carapace` | Ligereza / Vigor / Coraza |
+| `Fortune` / `Precision` / `Wisdom` / `Multitude` | Fortuna / Precisión / Sabiduría / Multitud |
+| `%s for the whole party` | %s para toda la party |
+
+### Menú de pactos del altar demoníaco (iteración 47)
+
+| Inglés | Español |
+|---|---|
+| `The obelisk offers a deal` | El obelisco ofrece un trato |
+| `Pact` | Pacto |
+| `You gain: %s\nYou pay: %s` | Ganas: %s\nPagas: %s |
+| `Pact of fury` | Pacto de furia |
+| `Pact of the pulse` | Pacto del pulso |
+| `Pact of the carapace` | Pacto de la coraza |
+| `Pact of flesh` | Pacto de carne |
+| `Pact of the swarm` | Pacto del enjambre |
+| `Pact of greed` | Pacto de codicia |
+| `Pact of the hoard` | Pacto del arcón |
+| `Pact of the omen` | Pacto del augurio |
+| `+%d pts` | +%d pts |
+| `a free chest right here` | un cofre gratis aquí mismo |
+| `difficulty +%d%%` | dificultad +%d%% |
+| `shiny chance +%d%%` | prob. de shiny +%d%% |
+| `moons last %d%% longer` | las lunas duran %d%% más |
+| `moon chance +%d%%` | prob. de luna +%d%% |
+| `disaster chance +%d%%` | prob. de desastre +%d%% |
 
 ## Misiones
 
@@ -301,7 +339,8 @@ Lo que NO se traduce nunca: los `id` de catálogo, los `node_name`, los nombres 
 | Eclipse | Eclipse |
 | Full Moon | Luna llena |
 | Essence rift | grieta de esencia |
-| Elite pack | jauría élite |
+| elite (enemigo) | shiny (minúscula dentro de la frase, regla 3; nunca «élite») |
+| Elite pack | jauría shiny |
 | Extract / Extraction | extraerse / extracción |
 | gamepad | control (NUNCA «mando») |
 | mouse | mouse (NUNCA «ratón») |
@@ -507,6 +546,7 @@ Lo que NO se traduce nunca: los `id` de catálogo, los `node_name`, los nombres 
 | `Enemies stronger 30 s` | Enemigos más fuertes 30 s |
 | `[E] Interact` | [E] Interactuar |
 | `[E] Open the chest` | [E] Abrir el cofre |
+| `[E] Open chest — free` | [E] Abrir cofre — gratis |
 | `[E] Open %s chest — %d pts` | [E] Abrir cofre %s — %d pts |
 | `%s chest — %d pts (you have %d)` | Cofre %s — %d pts (tienes %d) |
 | `%s chest: %s — %s` | Cofre %s: %s — %s |
@@ -540,7 +580,7 @@ Lo que NO se traduce nunca: los `id` de catálogo, los `node_name`, los nombres 
 | `A demonic obelisk claws out of the ground...` | Un obelisco demoníaco sale del suelo a zarpazos... |
 | `A spring bubbles up somewhere in the field...` | Un manantial brota en algún lugar del campo... |
 | `A supply chest hums somewhere in the field...` | Un cofre de suministros zumba en algún lugar del campo... |
-| `An elite pack picks up your scent!` | ¡Una jauría élite te huele el rastro! |
+| `An elite pack picks up your scent!` | ¡Una jauría shiny te huele el rastro! |
 | `An essence rift tears open...` | Se abre una grieta de esencia... |
 | `BLOOD MOON — the horde goes berserk!` | LUNA DE SANGRE — ¡la horda enloquece! |
 | `ECLIPSE — shadows pour in from everywhere` | ECLIPSE — las sombras entran por todos lados |

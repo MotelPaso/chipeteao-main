@@ -36,6 +36,20 @@ var difficulty_bonus: float = 0.0
 var _difficulty_sources: Dictionary[String, float] = {}
 ## Fraction of the difficulty bonus that becomes extra XP on every gem.
 const DIFFICULTY_XP_SHARE: float = 0.75
+## Demonic pacts (iteration 47): the run-wide knobs a pact's COST writes.
+## Each is a fraction (0.1 = +10%) and each has exactly one consumer, named
+## here so a knob can never quietly become dead data:
+##   elite_chance_bonus     -> EnemySpawner.elite_chance()
+##   sky_duration_multiplier-> WorldDirector sky event length
+##   event_chance_bonus     -> WorldDirector sky event probability
+##   disaster_chance_bonus  -> NOTHING YET. Deliberate forward hook for the
+##     disasters of part C, like RunState.demonic_uses was for iteration 42.
+##     A pact can already sell it, and the cost is real the moment part C
+##     reads it; until then it is stored and reset like the others.
+var elite_chance_bonus: float = 0.0
+var sky_duration_multiplier: float = 1.0
+var event_chance_bonus: float = 0.0
+var disaster_chance_bonus: float = 0.0
 ## Chest economy (iteration 40): base price in run points per rarity, and
 ## the GLOBAL multiplier every opened chest applies to all the others.
 const CHEST_BASE_PRICES: Dictionary[String, int] = {
@@ -88,6 +102,10 @@ func reset() -> void:
 	run_active = true
 	pickup_radius_multiplier = 1.0
 	demonic_uses = 0
+	elite_chance_bonus = 0.0
+	sky_duration_multiplier = 1.0
+	event_chance_bonus = 0.0
+	disaster_chance_bonus = 0.0
 	difficulty_bonus = 0.0
 	_difficulty_sources.clear()
 	chest_price_multiplier = 1.0
