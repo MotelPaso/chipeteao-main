@@ -141,12 +141,12 @@ func carried_tome_ids() -> Array[String]:
 	return ids
 
 
-## Grants one stack of a tome at the given rarity potency. Stacks past
-## Tome.MAX_STACKS are ignored (the pool stops offering capped tomes; this
-## guards a stale queued offer).
-func add_tome(tome_id: String, potency: float) -> void:
-	if stack_count(tome_id) >= Tome.MAX_STACKS:
-		return
+## Grants one stack of a tome at the given rarity potency. Stacks are
+## UNCAPPED since iteration 46 — only the number of DISTINCT tomes is
+## limited (Player.max_tomes, enforced by the offer pool).
+## Returns the boons a gambling tome (Tomo del Azar) just rolled, so the
+## card UI can toast what the bet paid; empty for every other tome.
+func add_tome(tome_id: String, potency: float) -> Array[Dictionary]:
 	# Packed arrays inside dictionaries are copy-on-write: mutate a copy,
 	# then write it back.
 	var stacks: PackedFloat32Array = _tome_stacks.get(tome_id, PackedFloat32Array())
@@ -155,9 +155,12 @@ func add_tome(tome_id: String, potency: float) -> void:
 	# Gambling tomes roll their boons right here, once, so the outcome is
 	# fixed for the run and recompute() only replays it.
 	var tome := Tome.by_id(tome_id)
+	var rolled: Array[Dictionary] = []
 	if bool(tome.get("gamble", false)):
-		_gamble_boons.append_array(roll_gamble_boons(potency))
+		rolled = roll_gamble_boons(potency)
+		_gamble_boons.append_array(rolled)
 	recompute()
+	return rolled
 
 
 ## Tome of Chance roll: potency 1 (Common) gives one boon at base size;

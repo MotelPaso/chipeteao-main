@@ -1,6 +1,8 @@
 extends CanvasLayer
 ## Card picker: on RunState.leveled_up it pauses the tree, frees the
-## mouse, and offers 3 rolled upgrades from UpgradePool. Runs with
+## mouse, and offers 3 rolled upgrades from UpgradePool — since iteration
+## 46 all from ONE side of the pool (weapons or tomes/stats), named in the
+## title; bonus picks keep mixing both sides. Runs with
 ## process_mode ALWAYS so its buttons work while everything else is
 ## paused. Shrines and chests reach it through the "upgrade_ui" group via
 ## open_bonus_pick() for free picks (optionally luck-boosted or
@@ -30,6 +32,9 @@ const PICK_ANIM_TIME := 0.16
 ## the separator or putting the raider first is a one-line change.
 const RECIPIENT_TITLE_TEMPLATE := "%s  ·  Jugador %d"
 
+## Level-pick title: level number, then the side this pick offers.
+const LEVEL_TITLE_TEMPLATE := "Nivel %d — elige: %s"
+
 @onready var _dim: ColorRect = %Dim
 @onready var _level_label: Label = %LevelLabel
 @onready var _cards: Array[Button] = [%Card1 as Button, %Card2 as Button, %Card3 as Button]
@@ -44,6 +49,9 @@ var _pending_bonus: Array[Dictionary] = []
 ## Roll context for the pick currently on screen (zeroed for level picks).
 var _luck_bonus: float = 0.0
 var _min_rarity: String = ""
+## Which side of the pool the pick on screen rolls from (UpgradePool
+## SIDE_*); "" for bonus picks, which mix both sides as they always did.
+var _side: String = ""
 ## True during the 0.16s pick animation: swallows further card clicks so
 ## a double-click can never apply two upgrades from one offer.
 var _picking: bool = false
@@ -114,12 +122,22 @@ func _on_leveled_up(new_level: int) -> void:
 func _open_level_pick(new_level: int) -> bool:
 	_luck_bonus = 0.0
 	_min_rarity = ""
-	return _open("Nivel %d — elige una mejora" % new_level)
+	# The side is rolled against THIS raider's loadout and named in the
+	# title, so the recipient has to be resolved before the title exists.
+	# _pick_recipient() advances the round-robin exactly once, and _open
+	# below can no longer fail (its only failure is a null recipient).
+	var recipient := _pick_recipient()
+	if recipient == null:
+		return false
+	_side = UpgradePool.roll_side(recipient)
+	return _open(LEVEL_TITLE_TEMPLATE % [new_level, UpgradePool.side_label(_side)],
+			recipient)
 
 
 func _open_bonus_pick(request: Dictionary) -> bool:
 	_luck_bonus = float(request.luck_bonus)
 	_min_rarity = String(request.min_rarity)
+	_side = ""
 	return _open(String(request.title), request.get("recipient", null) as Node)
 
 
@@ -227,7 +245,7 @@ func _roll() -> void:
 	# The pool needs the recipient to offer only THEIR owned-weapon
 	# upgrades and new-weapon cards (re-derived on every reroll).
 	var player := _resolve_recipient()
-	_offer = UpgradePool.roll_offer(player, _cards.size(), _luck_bonus, _min_rarity)
+	_offer = UpgradePool.roll_offer(player, _cards.size(), _luck_bonus, _min_rarity, _side)
 	for i in _cards.size():
 		_cards[i].visible = i < _offer.size()
 		if i < _offer.size():

@@ -38,8 +38,8 @@ const RELIC_LIBRARY: Array[Dictionary] = [
 	},
 	{
 		"id": "relic_haste", "display_name": "Colmillo silbante",
-		"description": "Enfriamiento de armas %s por rango.",
-		"stat": "cooldown", "amount": 1.5, "amount_text": "-1.5%",
+		"description": "Velocidad de ataque %s por rango.",
+		"stat": "cooldown", "amount": 1.5, "amount_text": "+1.5%",
 		"max_ranks": 5, "base_cost": 50, "cost_growth": 1.6,
 	},
 	{

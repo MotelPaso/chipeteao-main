@@ -15,6 +15,19 @@ extends WeaponBase
 ## reads the same at any physics tick rate.
 const DISC_FOLLOW_RATE: float = 8.0
 
+## Extra ring radius per point of Tome of Multitude, as a fraction of the
+## base radius. The tome cannot add RINGS here: a second aura is centered
+## on the same carrier, so it is the same circle drawn twice — invisible,
+## and it would silently double every pulse. The extra count widens the one
+## ring instead, which is the same "more of this weapon" the tome promises.
+const AURA_RADIUS_PER_EXTRA: float = 0.12
+## Fraction of the pulse interval each extra point shaves off, so a stacked
+## tome also makes the ring beat faster and not just reach farther.
+const AURA_PULSE_PER_EXTRA: float = 0.08
+## Floor on the accumulated pulse scale: the aura must stay a pulse, not
+## become a per-frame damage field.
+const AURA_MIN_PULSE_SCALE: float = 0.6
+
 var _disc: MeshInstance3D = null
 var _pulse_tween: Tween = null
 
@@ -51,9 +64,25 @@ func _physics_process(delta: float) -> void:
 
 
 ## Ring radius: the damage area, the drawn disc and the pulse trigger all
-## read this one number.
+## read this one number — and so does fire(), which is where the Tome of
+## Multitude bonus below reaches the attack.
 func reach() -> float:
-	return attack_range * area_scale()
+	return attack_range * area_scale() \
+			* (1.0 + AURA_RADIUS_PER_EXTRA * float(_multitude_extra()))
+
+
+## Pulses per second rise with the tome too (see AURA_PULSE_PER_EXTRA); the
+## floor keeps a heavy stack from collapsing the interval into a tick.
+func effective_cooldown() -> float:
+	var pulse_scale := maxf(1.0 - AURA_PULSE_PER_EXTRA * float(_multitude_extra()),
+			AURA_MIN_PULSE_SCALE)
+	return maxf(super() * pulse_scale, MIN_COOLDOWN)
+
+
+## Projectiles past the first this weapon would have fired, i.e. what the
+## Tome of Multitude granted (weapon ascensions raise projectile_count too).
+func _multitude_extra() -> int:
+	return maxi(effective_projectile_count() - 1, 0)
 
 
 ## The ring IS the hit area, so the pulse has to trigger on anything inside

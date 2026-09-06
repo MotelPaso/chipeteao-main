@@ -14,6 +14,19 @@ extends WeaponBase
 @export var gas_color: Color = Color(0.55, 0.8, 0.25)
 @export var height_window: float = 2.2
 
+## Extra cloud radius per point of Tome of Multitude, as a fraction of the
+## base radius. The tome cannot add CLOUDS here: a second burst is centered
+## on the same carrier, so it is the same sphere drawn twice — invisible,
+## and it would silently double every pulse's damage, poison and slow. The
+## extra count grows the one cloud instead.
+const STENCH_RADIUS_PER_EXTRA: float = 0.12
+## Fraction of the pulse interval each extra point shaves off, so a stacked
+## tome also makes the gas go off more often.
+const STENCH_PULSE_PER_EXTRA: float = 0.08
+## Floor on the accumulated pulse scale: the poison and slow it applies are
+## refreshes, so an interval that collapsed would just be a permanent field.
+const STENCH_MIN_PULSE_SCALE: float = 0.6
+
 var _shell_mesh: SphereMesh = null
 
 
@@ -33,9 +46,25 @@ func _ready() -> void:
 
 
 ## Cloud radius: the damage area, the drawn shell and the pulse trigger all
-## read this one number.
+## read this one number — and so does fire(), which is where the Tome of
+## Multitude bonus below reaches the attack.
 func reach() -> float:
-	return attack_range * area_scale()
+	return attack_range * area_scale() \
+			* (1.0 + STENCH_RADIUS_PER_EXTRA * float(_multitude_extra()))
+
+
+## Pulses per second rise with the tome too (see STENCH_PULSE_PER_EXTRA);
+## the floor keeps a heavy stack from collapsing the interval into a tick.
+func effective_cooldown() -> float:
+	var pulse_scale := maxf(1.0 - STENCH_PULSE_PER_EXTRA * float(_multitude_extra()),
+			STENCH_MIN_PULSE_SCALE)
+	return maxf(super() * pulse_scale, MIN_COOLDOWN)
+
+
+## Projectiles past the first this weapon would have fired, i.e. what the
+## Tome of Multitude granted (weapon ascensions raise projectile_count too).
+func _multitude_extra() -> int:
+	return maxi(effective_projectile_count() - 1, 0)
 
 
 ## The cloud IS the hit area, so the pulse has to trigger on anything inside

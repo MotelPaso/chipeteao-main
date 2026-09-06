@@ -19,6 +19,18 @@ extends WeaponBase
 ## and this weapon fires it every few seconds.
 const BEAM_VOLUME_DB: float = -12.0
 
+## Seconds between the beams a Tome of Multitude adds. Wider than the melee
+## staggers on purpose: each blast is a heavy, readable event, and two of
+## them overlapping in the same lane would just be one thicker beam.
+const EXTRA_BEAM_STAGGER: float = 0.12
+## Yaw between neighboring beams. The lane is long, so a narrow fan already
+## separates the far ends by several meters.
+const EXTRA_BEAM_FAN_DEG: float = 14.0
+## The whole staggered chain has to end inside this fraction of one
+## cooldown; with this weapon's long charge the clamp rarely bites, but a
+## haste-stacked build would otherwise still be firing when it recharges.
+const BEAM_CHAIN_WINDOW: float = 0.6
+
 var _beam_mesh: CylinderMesh = null
 
 
@@ -40,8 +52,36 @@ func _ready() -> void:
 
 func fire(target: Node3D) -> void:
 	var origin := global_position + Vector3.UP * muzzle_height
-	var direction := flat_dir_or(target.global_position + Vector3.UP * 0.8 - origin,
+	var center_dir := flat_dir_or(target.global_position + Vector3.UP * 0.8 - origin,
 			-global_transform.basis.z)
+	var count := maxi(effective_projectile_count(), 1)
+	var step := minf(EXTRA_BEAM_STAGGER,
+			effective_cooldown() * BEAM_CHAIN_WINDOW / float(maxi(count - 1, 1)))
+	for i: int in count:
+		var yaw := deg_to_rad(EXTRA_BEAM_FAN_DEG) * (float(i) - float(count - 1) * 0.5)
+		var beam_dir := center_dir.rotated(Vector3.UP, yaw)
+		if i == 0:
+			_blast(beam_dir)
+		else:
+			# Pausable and stepped in physics: an extra beam must not fire
+			# while the upgrade UI holds the tree, and damage belongs on the
+			# same tick the rest of the combat runs on.
+			get_tree().create_timer(step * float(i), false, true).timeout \
+					.connect(_blast.bind(beam_dir))
+	# Feedback belongs to the shot, not to the visual helper: a beam that
+	# stopped calling _play_beam would otherwise go silent unnoticed. One
+	# roar and one shake per volley, however many beams fan out — this
+	# stinger is already trimmed hard for a once-every-few-seconds cast.
+	Sfx.play(&"boss_roar_2", BEAM_VOLUME_DB)
+	Juice.shake(0.2, 0.35)
+
+
+## One beam down `direction`. The staggered extras land here a beat later,
+## when this weapon may already have left the tree with a removed raider.
+func _blast(direction: Vector3) -> void:
+	if not is_inside_tree():
+		return
+	var origin := global_position + Vector3.UP * muzzle_height
 	var length := beam_length * area_scale()
 	var half_width := beam_width * 0.5 * area_scale()
 	var hits := 0
@@ -53,10 +93,6 @@ func fire(target: Node3D) -> void:
 			deal_damage(health)
 			hits += 1
 	_play_beam(origin, direction, length, half_width)
-	# Feedback belongs to the shot, not to the visual helper: a beam that
-	# stopped calling _play_beam would otherwise go silent unnoticed.
-	Sfx.play(&"boss_roar_2", BEAM_VOLUME_DB)
-	Juice.shake(0.2, 0.35)
 	if hits > 0:
 		Juice.hit_stop(0.1, 0.05)
 

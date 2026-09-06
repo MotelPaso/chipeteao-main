@@ -27,6 +27,14 @@ const BEAM_COLOR := Color(0.55, 0.75, 1.0)
 ## second, so six is plenty.
 const BEAM_SEGMENTS: int = 6
 
+## Seconds between the bolts a Tome of Multitude adds. Staggered rather
+## than simultaneous: two casts in the same frame would fork through the
+## same nearest bodies and draw both chains on top of each other.
+const EXTRA_BOLT_STAGGER: float = 0.1
+## The whole staggered chain has to end inside this fraction of one
+## cooldown, or the last bolt of a volley would land after the next cast.
+const BOLT_CHAIN_WINDOW: float = 0.6
+
 ## One mesh and one material for every bolt ever drawn. Building a
 ## CylinderMesh plus a StandardMaterial3D per link (six links a cast, several
 ## casts a second once Tempest Crown lands) was the per-spawn resource churn
@@ -53,6 +61,33 @@ func _ready() -> void:
 
 
 func fire(target: Node3D) -> void:
+	var count := maxi(effective_projectile_count(), 1)
+	var step := minf(EXTRA_BOLT_STAGGER,
+			effective_cooldown() * BOLT_CHAIN_WINDOW / float(maxi(count - 1, 1)))
+	_zap(target)
+	for i: int in range(1, count):
+		# Pausable and stepped in physics: an extra bolt must not fire while
+		# the upgrade UI holds the tree, and damage belongs on the same tick
+		# the rest of the combat runs on.
+		get_tree().create_timer(step * float(i), false, true).timeout \
+				.connect(_refork)
+
+
+## A follow-up bolt from a Tome of Multitude. It picks its OWN first target
+## instead of reusing the one the volley started on: by now the opening
+## chain may have killed it, and re-acquiring is what makes the extra bolt
+## fork through a different part of the horde. Lands a beat after fire(),
+## when this weapon may already have left the tree with a removed raider.
+func _refork() -> void:
+	if not is_inside_tree():
+		return
+	var target := acquire_target()
+	if target != null:
+		_zap(target)
+
+
+## One bolt: the first strike plus its chain_count forks.
+func _zap(target: Node3D) -> void:
 	var previous_point := global_position + Vector3.UP * 1.1
 	var current := target
 	var hit_ids: Dictionary[int, bool] = {}

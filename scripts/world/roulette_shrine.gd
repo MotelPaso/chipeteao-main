@@ -1,9 +1,11 @@
 class_name RouletteShrine
 extends Interactable
-## Roulette altar (iteration 41): a wheel of fortune that costs a FIXED
-## number of run points per spin and opens a menu (RouletteUi) where the
-## raider spins for one of the outcomes below — from a Legendary item to a
-## temporary curse. Reusable: the wheel stays, the price stays.
+## Roulette altar (iteration 41): a wheel of fortune that costs run points
+## per spin and opens a menu (RouletteUi) where the raider spins for one of
+## the outcomes below — from a Legendary item to a temporary curse. The
+## wheel is reusable, but since iteration 46 every spin DOUBLES the price
+## for the rest of the run (RunState.roulette_price_multiplier, run-wide
+## like chest prices), so `price` is the base, never what you pay.
 
 @export var price: int = 60
 
@@ -46,8 +48,14 @@ func _ready() -> void:
 	_refresh_prompt_text()
 
 
+## The price grows with every spin this run, so the prompt is re-read
+## rather than baked once at ready.
+func current_price() -> int:
+	return RunState.roulette_price(price)
+
+
 func _refresh_prompt_text() -> void:
-	set_prompt("[E] Girar la ruleta — %d pts" % price)
+	set_prompt("[E] Girar la ruleta — %d pts" % current_price())
 
 
 func _physics_process(delta: float) -> void:
@@ -57,9 +65,10 @@ func _physics_process(delta: float) -> void:
 
 
 func _interact(player: Node) -> void:
-	if int(player.get("points")) < price:
+	var cost := current_price()
+	if int(player.get("points")) < cost:
 		Sfx.play(&"dodge")
-		set_prompt("Girar cuesta %d pts (tienes %d)" % [price, int(player.get("points"))])
+		set_prompt("Girar cuesta %d pts (tienes %d)" % [cost, int(player.get("points"))])
 		return
 	if _ui != null and is_instance_valid(_ui):
 		return
@@ -90,8 +99,12 @@ static func outcome_for(roll: float) -> Dictionary:
 
 ## Charges the price and rolls; returns the outcome (empty if unaffordable).
 func spin(player: Node) -> Dictionary:
-	if not player.has_method("spend_points") or not bool(player.call("spend_points", price)):
+	if not player.has_method("spend_points") or not bool(player.call("spend_points", current_price())):
 		return {}
+	# Charge first, THEN raise the price: the next spin (this altar or any
+	# other) costs double, and the prompt re-reads it on the next refresh.
+	RunState.register_roulette_spin()
+	_refresh_prompt_text()
 	SaveData.bump("shrines_used")
 	SaveData.bump("roulette_spins")
 	var outcome := outcome_for(randf())
@@ -128,7 +141,7 @@ func apply_outcome(outcome_id: String, player: Node) -> void:
 					if weapon != null:
 						weapon.damage *= 1.15
 						weapon.upgrade_level += 1
-						EvolutionCatalog.try_evolve_by_level(weapon, player)
+						EvolutionCatalog.try_advance_by_level(weapon, player)
 		"jackpot":
 			player.call("add_points", 120)
 		"heal":

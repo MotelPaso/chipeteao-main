@@ -54,7 +54,7 @@ const RESUME_TEXT: String = "Vuelve a entrar para reanudar (%d%%)"
 ## Flat boons a charge can land on: {stat, amount} (PlayerStats ids).
 const ALTAR_BOONS: Array[Dictionary] = [
 	{"stat": "damage", "amount": 10.0, "label": "daño +%d%%"},
-	{"stat": "cooldown", "amount": 6.0, "label": "enfriamientos -%d%%"},
+	{"stat": "cooldown", "amount": 6.0, "label": "velocidad de ataque +%d%%"},
 	{"stat": "area", "amount": 10.0, "label": "área +%d%%"},
 	{"stat": "move_speed", "amount": 6.0, "label": "velocidad +%d%%"},
 	{"stat": "max_hp", "amount": 20.0, "label": "HP máx. +%d"},

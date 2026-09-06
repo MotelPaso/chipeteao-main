@@ -66,11 +66,34 @@ Helpers compartidos que ya existían pero **crecieron** en esta iteración (ver 
 - Contrato `WeaponBase`: exporta `damage/cooldown/attack_range/projectile_count/cooldown_scale`; la subclase sobreescribe `fire(target)` y canaliza **todo** golpe por `deal_damage(target_health)` (aplica multiplicador global, crit, lifesteal y los hooks de objetos del portador). Helpers de stats: `effective_damage()`, `effective_cooldown()`, `area_scale()` (radios/arcos, no `attack_range`), `effective_projectile_count()`, `duration_scale()`, `targeting_range()`.
 - **Barridos de área compartidos (iteración 45)**: `enemies_in_disc(centro, radio, ventana_y)`, `enemies_in_sphere(centro, radio)`, `enemies_in_lane(origen, dir, largo, ancho)`, `enemies_in_arc(centro, dir, alcance, ángulo)` y `damage_all(bodies)`. Cuatro armas repetían el mismo bucle con los mismos dos números mágicos; si tu arma golpea una forma, **úsala desde aquí** en vez de escribir un `get_nodes_in_group("enemies")` nuevo. Los helpers de aim (`aim_dir_or`, `flat_dir_or`, `safe_up`) son estáticos y cubren los casos degenerados (vector nulo, dirección colineal con Y).
 - Visual efímero: `spawn_fx_mesh(mesh)` construye el `MeshInstance3D` en la raíz de escena con la configuración correcta (lo que antes copiaban cuatro armas).
-- Pasos: (1) script `extends WeaponBase` + escena en `scenes/weapons/` (mira `shortsword.gd` melee, `dart_pistol.gd` proyectil, `ember_wand.gd` área); (2) una fila en `UpgradePool.WEAPON_LIBRARY` con `id`, `display_name` (**en español**, glosario «Armas»), `node_name` (== nombre de nodo al instanciarse, **en inglés**), `scene`, `flavor` y opcionalmente `extra_entries`. Con eso ya aparece como carta de arma nueva y genera sus cartas de daño/enfriamiento/alcance automáticamente.
+- Pasos: (1) script `extends WeaponBase` + escena en `scenes/weapons/` (mira `shortsword.gd` melee, `dart_pistol.gd` proyectil, `ember_wand.gd` área); (2) una fila en `UpgradePool.WEAPON_LIBRARY` con `id`, `display_name` (**en español**, glosario «Armas»), `node_name` (== nombre de nodo al instanciarse, **en inglés**), `scene`, `flavor` y opcionalmente `extra_entries`. Con eso ya aparece como carta de arma nueva y genera sus cartas de daño/velocidad de ataque/alcance automáticamente.
 - `WEAPON_LIBRARY` está indexada por `node_name` (`CatalogIndex`) para el HUD y el banner de evolución: no hagas un bucle lineal nuevo, usa el accesor del catálogo.
 - Si dispara proyectiles: el proyectil es su propia escena con `pool_reset()`, se lanza con `Pools.acquire_scene(...)` y se registra con **una fila** en `Pools.POOLS` (ver Pools abajo). Ejemplo completo: `dart_pistol.gd` + `projectile.gd`.
 - Armas sin objetivo: un arma que actúa sola (Rastro de baba) sobreescribe `_physics_process` y devuelve `null` en `acquire_target()`; las de área alrededor del portador (Aura, Hedor) usan `attack_range * area_scale()` como radio y `fire()` ignora el objetivo.
 - Al caer un raider (co-op), el Player avisa a sus armas **antes** de congelar el mount: un arma que deja objetos en el mundo (charcos) tiene que limpiarlos ahí, o quedan huérfanos.
+
+### Multitud por arma (iteración 46)
+
+`Tomo de Multitud` (stat `projectiles`) llega a **todas** las armas: cada script lee `effective_projectile_count()` en su ruta de ataque (`fire()`, o `_physics_process` en las que atacan desde ahí). Qué hace el conteo extra depende de la forma del arma — un arma de ataque único no puede sacar dos golpes en el mismo sitio y el mismo frame, y un campo persistente no puede duplicar su anillo sin duplicar el daño en silencio:
+
+| Arma | Forma | Qué hace el conteo extra |
+|---|---|---|
+| Pistola de dardos | proyectil | más dardos por andanada (abanico), como siempre |
+| Arco de caza | proyectil | más flechas por andanada (abanico), como siempre |
+| Orbes espirituales | órbita | más orbes en el anillo, como siempre |
+| Espada corta | ataque único (arco) | un arco completo más por extra, escalonado y abanicado |
+| Dagas gemelas | ataque único (estocada) | estocadas extra escalonadas; cada una re-adquiere objetivo |
+| Látigo de espinas | ataque único (carril) | latigazos extra escalonados y abanicados, cada uno su carril |
+| Kamehameha | ataque único (rayo) | rayos extra escalonados y abanicados; un rugido por andanada |
+| Pararrayos | ataque único (cadena) | descargas extra escalonadas, cada una con su propia bifurcación |
+| Bumerán | proyectil (ataque único) | hojas extra lanzadas una tras otra y abanicadas |
+| Vial de sangre | ataque único (frasco) | frascos extra escalonados, impacto rotado **alrededor del lanzador** |
+| Vara de brasas | ataque único (estallido) | detonaciones extra escalonadas, cada una re-adquiere su centro |
+| Aura | campo persistente | **no** añade anillos: +12% de radio y −8% de intervalo por extra (suelo 60%) |
+| Hedor | campo persistente | igual que Aura: +12% de radio y −8% de intervalo por extra (suelo 60%) |
+| Rastro de baba | charco | un charco más por gota, en anillo a 1.2 radios del punto de caída |
+
+Reglas que comparten las de ataque único: el escalonado es un `const` por archivo y se recorta para que **toda la cadena quepa en el 60% del `effective_cooldown()`**; los callbacks diferidos usan `get_tree().create_timer(delay, false, true)` (pausable y en paso de física) y abren con `if not is_inside_tree(): return`, porque un arma se libera con su raider. Todo golpe sigue pasando por `deal_damage()`.
 
 ## Mascotas
 
@@ -96,7 +119,7 @@ Helpers compartidos que ya existían pero **crecieron** en esta iteración (ver 
 - Fila: `id`, `display_name` («Tomo de X» / «Tomo del X», glosario), `description` (el `%d` se rellena con la cantidad del **primer** efecto), `effects: [{stat, amount}]`. Una fila nueva basta: el pool ofrece el siguiente stack automáticamente.
 - Ojo con el nombre: `hud.gd` recorta el prefijo para la sigla de la tira de equipamiento usando `TOME_NAME_PREFIXES`, **ordenado del más largo al más corto** (`"Tomo del "` antes que `"Tomo de "`). Al revés, «Tomo del Azar» quedaría como «l Azar». Un prefijo nuevo se añade ahí respetando ese orden.
 - Escalado: `amount` es el valor a potencia Común; la rareza de la carta lo multiplica (`UpgradePool.RARITIES`: Common 1.0 / Rare 1.5 / Epic 2.0 / Legendary 3.0). La `luck` del jugador inclina los pesos al tirar.
-- Ids de stat de `_apply_effect`: `damage, cooldown, area, move_speed, crit_chance, crit_damage, lifesteal, evasion, armor, luck, thorns, max_hp, projectiles, duration, xp_gain, difficulty, gambling`. `difficulty` es **run-wide**: cada jugador publica su total con `RunState.set_difficulty_source("tomes_p<slot>")`.
+- Ids de stat de `_apply_effect`: `damage, cooldown, area, move_speed, crit_chance, crit_damage, lifesteal, evasion, armor, luck, thorns, max_hp, projectiles, duration, xp_gain, difficulty, gambling`. Ojo: el id `cooldown` sigue siendo enfriamiento por dentro, pero **se muestra como «velocidad de ataque» en positivo** (GLOSARIO regla 7, iteración 46) — no cambies la matemática al tocar una etiqueta. `difficulty` es **run-wide**: cada jugador publica su total con `RunState.set_difficulty_source("tomes_p<slot>")`.
 
 ## Añadir un enemigo
 
@@ -153,8 +176,10 @@ Helpers compartidos que ya existían pero **crecieron** en esta iteración (ver 
 
 ## Evoluciones de armas
 
-- Qué es: cada carta invertida en un arma es un nivel de arma (`WeaponBase.upgrade_level`); al llegar a `EvolutionCatalog.EVOLVE_AT_LEVEL` (6) el arma evoluciona en el acto con ceremonia. No intervienen cofres ni tomos.
-- Archivos: `scripts/systems/evolution_catalog.gd` (`EVOLUTION_LIBRARY`, 14 filas, indexada por `weapon_id`), `scripts/weapons/weapon_base.gd` (`upgrade_level`, `evolve()`), `scripts/systems/upgrade_pool.gd` (`apply` llama a `try_evolve_by_level` tras cada carta de arma), `scripts/ui/hud.gd` (`announce_major`).
+- Qué es: cada carta invertida en un arma es un nivel de arma (`WeaponBase.upgrade_level`); cada múltiplo de `EvolutionCatalog.EVOLVE_AT_LEVEL` (**10**) es un **hito**. El primero evoluciona el arma si tiene receta; los siguientes —y también el primero para un arma sin receta— son **ascensos**: un escalón plano sin fila de catálogo (`WeaponBase.ASCEND_MULTS`: daño ×1.15, `cooldown_scale` ×0.9, alcance ×1.1, y +1 proyectil en los tiers pares). Así ningún arma deja de mejorar nunca. No intervienen cofres ni tomos.
+- `WeaponBase.ascension_tier` cuenta los hitos pasados (la evolución del nivel 10 es el tier 1). El HUD pinta `N%d` (nivel) por debajo del primer hito y `★%d` (tier) desde ahí.
+- Archivos: `scripts/systems/evolution_catalog.gd` (`EVOLUTION_LIBRARY`, 14 filas, indexada por `weapon_id`; `try_advance_by_level`), `scripts/weapons/weapon_base.gd` (`upgrade_level`, `ascension_tier`, `evolve()`, `ascend()`, y el aplicador genérico `_apply_stat_tables` que comparten), `scripts/systems/upgrade_pool.gd` (`apply` llama a `try_advance_by_level` tras cada carta de arma), `scripts/ui/hud.gd` (`announce_major`).
+- Ceremonia compartida por ambos hitos (fanfarria, sparkle, shake) + banner propio: «¡%s evolucionó a %s!» y «¡%s asciende!». Logs `Weapon evolved:` y `Weapon ascended: <arma> tier <n>`.
 - Evolución nueva: una fila con `weapon_id`/`weapon_node`, `evolved_name`, `mults`/`adds` (aplicados genéricamente sobre cualquier propiedad del arma vía get/set) y `flavor` para la Colección. El banner busca el `display_name` traducido en `WEAPON_LIBRARY`, no capitaliza el id. La ceremonia bumpea `evo_<weapon_id>` + `evolutions_total` e imprime `Weapon evolved:`.
 - `evolution_catalog.gd` tiene funciones `static`; para alcanzar autoloads desde ahí hay **un** helper estático en el archivo, no `Engine.get_main_loop()` repetido.
 
@@ -162,7 +187,9 @@ Helpers compartidos que ya existían pero **crecieron** en esta iteración (ver 
 
 - Una entrada del pool puede llevar `effects: [{property, op, amount}, ...]` en vez del trío `property/op/amount`: todos los efectos caen sobre el mismo `target` en una sola carta y la descripción lleva un `%d` por efecto. `_entries_for_weapon` genera dos por arma («Temple», «Ritmo de batalla»), con sus escalones en `TEMPERED_STEPS` / `RHYTHM_STEPS`.
 - Las descripciones de cartas por arma **concatenan** el sustantivo delante (`"Daño de " + display + " +%d%%"`) en vez de usar `%s`: así el número de marcadores no cambia con el idioma.
-- Topes por jugador: `Player.max_weapons` (5) y `Player.max_tomes` (5 tomos **distintos**; al llegar, el pool solo ofrece stacks de los ya poseídos — `PlayerStats.distinct_tome_count()`).
+- Topes por jugador: `Player.max_weapons` (5) y `Player.max_tomes` (5 tomos **distintos**; al llegar, el pool solo ofrece stacks de los ya poseídos — `PlayerStats.distinct_tome_count()`). **No hay tope de stacks ni de nivel de arma** (iteración 46): un tomo se apila indefinidamente y `Tome.stack_label(n)` construye el numeral romano para cualquier `n`, tanto en el título de la carta como en la esquina del HUD.
+- **Un lado por subida de nivel** (iteración 46): cada carta de nivel ofrece *o* armas (cartas de arma poseída + `new_weapon`) *o* tomos/stats (entradas de tomo + `GENERIC_POOL`), nunca mezclado. `UpgradePool.roll_side(player)` elige el lado al azar ponderado por cuántas entradas tiene cada uno y jamás devuelve un lado vacío; `build_pool(player, side)` lo materializa y el título de la UI lo nombra («Nivel 7 — elige: Armas»). Los picks de bonificación (`open_bonus_pick`: cofres, santuarios) pasan `side = ""` y siguen mezclando.
+- **Curva de XP** (`RunState._xp_required`): lineal más un término cuadrático (`XP_PER_LEVEL_SQUARED`). Los primeros niveles no cambian; el 10 cuesta 50 (antes 35) y el 20 cuesta 125 (antes 65).
 - Los nombres de los escalones de carta de arma están en constantes con nombre, no en literales repartidos.
 - Rareza: `UpgradePool.RARITIES[].name` es un **identificador** (`Common`/`Rare`/`Epic`/`Legendary`) que llavea precios de cofre, el campo `rarity` de `ITEM_LIBRARY` y los pisos `min_rarity`. Para pintarla, `UpgradePool.rarity_display(id)` — ver Convenciones.
 - Balance a vigilar: la curva de suerte de `_rarity_weights` se arregló en la iteración 45 (todo punto por encima de 50 era un no-op); los pesos se mueven de verdad en la banda 10-50.
@@ -193,7 +220,7 @@ Helpers compartidos que ya existían pero **crecieron** en esta iteración (ver 
 - **Quién está en el anillo (iteración 45)**: `_players_in_range` es la lista real; `player_in_range` es solo «alguno». Un raider **derribado sigue en la lista** (su cuerpo nunca sale del árbol, así que `body_exited` no dispara): para saber quién puede sostener un ritual, usar **`live_players_in_range()`** y `nearest_live_player()`. `best_item_count_in_range(item_id)` da el mejor conteo de un objeto entre los presentes.
 - **Prompts**: el texto por defecto de cada interactuable vive en un solo sitio, y el botón se escribe como el literal `[E]` (`Interactable.INTERACT_TOKEN`), que la etiqueta sustituye por el glifo del control (`[Y]`) según el slot que esté en el anillo. Un prompt nuevo **tiene que** escribir `[E]` literal para que el token funcione.
 - **Audio en loop**: `_hold_loop(id)` / `_drop_loop()` sobre `Sfx.acquire_loop`/`release_loop`, con refcount y una liberación extra desde `_exit_tree`, así un abandono a mitad de canalización no deja la voz sonando.
-- **Altares**: *Carga* se carga solo mientras un jugador está en el anillo (salir = `_leave()` y el altar se hunde; `idle_lifetime` > 0 lo hace irse sin uso), lanza `spawn_pressure_burst` mientras carga y al completar reparte a **toda la party** — `player` **y** `downed_players` — un boon plano de `ALTAR_BOONS` vía `PlayerStats.add_altar_boon`. *Demoníaco* hereda ese ritual mediante el hook virtual **`_effective_boon_scale()`** (no mutando el `@export` del padre) y además hace `RunState.add_difficulty(0.15 × (1 + 0.25 × demon_blood))` y `RunState.demonic_uses += 1`. *Codicia*: apuesta de HP (log `Greed shrine:`). *Manantial*: precio fijo en puntos, `heal_full` + `PlayerStats.add_timed_boon` (30 s). *Ruleta*: precio fijo por giro, `RouletteShrine.OUTCOMES` (clasificador puro `outcome_for(roll)`), `apply_outcome(id, player)`; la UI (`roulette_ui.gd`, `CanvasLayer` construido en código, grupos `ui_blocking` + `blocking_ui_closable`) se instancia **bajo la escena actual, no bajo root**, pausa el árbol y se resuelve sola en headless. *Portal*: `WorldDirector._spawn_portals` crea `portal_count` portales emparejados; E teletransporta al gemelo y ambos recargan `cooldown / (1 + 0.25 × cosmic_worm)`.
+- **Altares**: *Carga* se carga solo mientras un jugador está en el anillo (salir = `_leave()` y el altar se hunde; `idle_lifetime` > 0 lo hace irse sin uso), lanza `spawn_pressure_burst` mientras carga y al completar reparte a **toda la party** — `player` **y** `downed_players` — un boon plano de `ALTAR_BOONS` vía `PlayerStats.add_altar_boon`. *Demoníaco* hereda ese ritual mediante el hook virtual **`_effective_boon_scale()`** (no mutando el `@export` del padre) y además hace `RunState.add_difficulty(0.15 × (1 + 0.25 × demon_blood))` y `RunState.demonic_uses += 1`. *Codicia*: apuesta de HP (log `Greed shrine:`). *Manantial*: precio fijo en puntos, `heal_full` + `PlayerStats.add_timed_boon` (30 s). *Ruleta*: `RouletteShrine.price` es la **base**; cada giro **duplica** el precio para el resto de la partida y para toda la party (`RunState.roulette_price_multiplier` / `roulette_price()` / `register_roulette_spin()`, reiniciado en `reset()` junto a los precios de cofre). El prompt y el botón releen `current_price()`. `RouletteShrine.OUTCOMES` (clasificador puro `outcome_for(roll)`), `apply_outcome(id, player)`; la UI (`roulette_ui.gd`, `CanvasLayer` construido en código, grupos `ui_blocking` + `blocking_ui_closable`) se instancia **bajo la escena actual, no bajo root**, pausa el árbol y se resuelve sola en headless. *Portal*: `WorldDirector._spawn_portals` crea `portal_count` portales emparejados; E teletransporta al gemelo y ambos recargan `cooldown / (1 + 0.25 × cosmic_worm)`.
 - WorldDirector: los eventos temporizados salen de un **catálogo de filas** (`EVENT_LIBRARY`: cofre / élites / grieta / altar de carga / altar demoníaco / manantial), con `event_weight_overrides` por instancia. Las balizas viven en una lista tipada con clase interna. Logs: `Altar charged:`, `Altar left:`, `Demonic altar used:`, `Roulette spun:`, `Portal used:`, `Portals placed:`, `Spring used:`, `Boss chests dropped:`.
 - Presión vía `call_group("enemy_spawner", "spawn_pressure_burst", centro, n)`; buff temporal de enemigos vía `apply_temp_enemy_buff(mult, s)`.
 - Secreto nuevo: `extends SecretTrigger`, define la condición (Tocón raro: 3 interacciones; Cráneo zumbante: canal quieto de 4 s) y llama `_awaken()` — gasta, anuncia por `boss_ui` y spawnea `miniboss_scene` (raíz `extends SecretBossBase` con `secret_boss_id` exportado: su muerte bumpea `slain_<id>` y desbloquea el personaje cuya fila tenga ese `unlock_boss`). Logs `Secret miniboss awakened:` / `Secret boss slain:`.
@@ -229,9 +256,16 @@ Helpers compartidos que ya existían pero **crecieron** en esta iteración (ver 
 La comprobación estándar del proyecto. Desde la raíz:
 
 ```sh
-tools/verificar.sh            # 120 s de partida por arena (rápido)
-tools/verificar.sh 300        # corrida larga: también exige interactuables
+tools/verificar.sh            # 240 s de partida por arena (el modo estándar)
+tools/verificar.sh 600        # corrida larga, para cambios de ritmo tardío
 ```
+
+**Nunca la corras con menos de 240 s.** Por debajo de ese umbral la puerta
+de cobertura de interactuables se salta en silencio y el script imprime OK
+sin haber exigido nada: un soak de 120 s «pasa» aunque ningún cofre, altar
+ni portal se haya resuelto en las tres arenas. La corrida completa tarda
+~13 minutos, más que el timeout de una llamada de shell: lánzala en
+segundo plano y lee los logs al terminar.
 
 Hace `godot --headless --import` y luego un soak de **las tres arenas** (`HollowWoods`, `AshDunes`, `Gloomfen`) con `BONK_GODMODE=1 BONK_SEED=4242`. Falla (exit 1) si:
 
@@ -287,5 +321,5 @@ Para lógica aislada sigue sirviendo un harness desechable `extends SceneTree` (
 - **Español latinoamericano para todo lo visible, inglés para todo lo estructural.** La tabla es `docs/GLOSARIO.md`. En inglés y sin tocar: ids, `node_name`, grupos, `StringName`, rutas `res://`, claves de `SaveData` y los `print()`/`push_warning()`. Los marcadores de formato (`%d %s %.1f %02d %%`) conservan número y orden exactos.
 - **Tunables como `@export`** con defaults en el script; los overrides por instancia viven en la escena (el horario de jefes por arena, las escenas del spawner). Antes de mover un `@export` de sitio, comprueba qué `.tscn` lo overridea: las tres arenas overridean el `EnemySpawner`.
 - **Números mágicos a `const` con nombre y comentario del porqué.** Un `0.5` suelto en dos archivos es la forma en que dos copias del mismo cálculo se separan.
-- **Logs de una línea** en eventos clave — son la interfaz de verificación de los soaks headless, van **en inglés** y se conservan. Inventario actual: `Run ended:`, `Meta saved:`, `Save recovered from backup:`, `Boss spawned:`, `Boss chests dropped:`, `Elite chest dropped:`, `Horde:`, `Sky event:`, `Chest opened:`, `Altar charged:`, `Altar left:`, `Demonic altar used:`, `Greed shrine:`, `Roulette spun:`, `Spring used:`, `Portal used:`, `Portals placed:`, `Weapon evolved:`, `Pet joined:`, `Secret miniboss awakened:`, `Secret boss slain:`, `Arena mask:`, `Start layout:`, `Daily run scored:`, `Void rescue:`. Al crear un evento mayor, añade el tuyo con el mismo formato.
+- **Logs de una línea** en eventos clave — son la interfaz de verificación de los soaks headless, van **en inglés** y se conservan. Inventario actual: `Run ended:`, `Meta saved:`, `Save recovered from backup:`, `Boss spawned:`, `Boss chests dropped:`, `Elite chest dropped:`, `Horde:`, `Sky event:`, `Chest opened:`, `Altar charged:`, `Altar left:`, `Demonic altar used:`, `Greed shrine:`, `Roulette spun:`, `Spring used:`, `Portal used:`, `Portals placed:`, `Weapon evolved:`, `Weapon ascended:`, `Pet joined:`, `Secret miniboss awakened:`, `Secret boss slain:`, `Arena mask:`, `Start layout:`, `Daily run scored:`, `Void rescue:`. Al crear un evento mayor, añade el tuyo con el mismo formato.
 - **Verificar antes de dar por hecho un cambio**: `tools/verificar.sh`. Un cambio que no pasa el import o ensucia el log de un soak no está terminado.

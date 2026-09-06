@@ -29,12 +29,27 @@ const UP_COLINEAR_DOT: float = 0.99
 @export var cooldown_scale: float = 1.0
 
 ## Upgrade cards this weapon has received this run (bumped by
-## UpgradePool.apply); one of the two evolution gates (EvolutionCatalog).
+## UpgradePool.apply); the evolution/ascension gate (EvolutionCatalog).
 var upgrade_level: int = 0
 ## True once evolve() ran; an evolved weapon never evolves again.
 var evolved: bool = false
 ## The evolved form's display name ("" until evolved).
 var evolved_name: String = ""
+## Milestones of EvolutionCatalog.EVOLVE_AT_LEVEL this weapon has passed
+## (iteration 46): tier 1 is level 10 — the evolution for weapons with a
+## recipe, a plain ascension for the rest — then one per further multiple.
+var ascension_tier: int = 0
+
+## Flat ascension step, applied ON TOP of whatever the weapon already is,
+## at every EvolutionCatalog.EVOLVE_AT_LEVEL milestone past the first.
+## It lives here, not in the catalog, because it needs no recipe row: a
+## weapon nobody wrote an evolution for still improves every ten levels.
+const ASCEND_MULTS: Dictionary[String, float] = {
+	"damage": 1.15, "cooldown_scale": 0.9, "attack_range": 1.1}
+## Extra projectile granted on EVEN tiers only (20, 40, ...): one per tier
+## would double a volley weapon's output far faster than the flat mults.
+const ASCEND_PROJECTILE_TIER_STEP: int = 2
+const ASCEND_PROJECTILE_ADD: int = 1
 
 var _cooldown_left: float = 0.0
 
@@ -355,19 +370,38 @@ func spawn_fx_mesh(mesh: Mesh) -> MeshInstance3D:
 # --- evolution -------------------------------------------------------------
 
 ## Applies an EvolutionCatalog row to this live weapon: every "mults" entry
-## multiplies the named property, every "adds" entry adds to it, generically
-## through get()/set() so subclass-only knobs (burst_radius, pierce_count)
-## need no per-weapon code. Idempotent: a second call is a no-op.
+## multiplies the named property, every "adds" entry adds to it.
+## Idempotent: a second call is a no-op.
 func evolve(row: Dictionary) -> void:
 	if evolved:
 		return
 	evolved = true
 	evolved_name = String(row.get("evolved_name", name))
-	var mults: Dictionary = row.get("mults", {})
+	_apply_stat_tables(row.get("mults", {}), row.get("adds", {}), "evolve")
+
+
+## Ascension step (iteration 46): the flat, recipe-free upgrade a weapon
+## takes at every EvolutionCatalog.EVOLVE_AT_LEVEL milestone past the
+## first, so weapons without an evolution row keep improving too.
+## `tier` is the milestone number (1 = level 10, 2 = level 20, ...).
+func ascend(tier: int) -> void:
+	ascension_tier = tier
+	var adds: Dictionary[String, int] = {}
+	if tier % ASCEND_PROJECTILE_TIER_STEP == 0:
+		adds["projectile_count"] = ASCEND_PROJECTILE_ADD
+	_apply_stat_tables(ASCEND_MULTS, adds, "ascend")
+
+
+## Applies a {property: factor} multiply table and a {property: amount}
+## add table onto this weapon's own properties, generically through
+## get()/set() so subclass-only knobs (burst_radius, pierce_count) need no
+## per-weapon code. Shared by evolve() and ascend(); `what` only names the
+## caller in the warning a mistyped table would raise.
+func _apply_stat_tables(mults: Dictionary, adds: Dictionary, what: String) -> void:
 	for property: Variant in mults:
 		var current: Variant = get(String(property))
 		if current == null:
-			push_warning("%s: evolve mult on unknown property '%s'" % [name, property])
+			push_warning("%s: %s mult on unknown property '%s'" % [name, what, property])
 			continue
 		# Int knobs (projectile_count, pierce_count, chain_count) round to the
 		# nearest whole step instead of taking GDScript's truncation, so a
@@ -376,11 +410,10 @@ func evolve(row: Dictionary) -> void:
 			set(String(property), roundi(float(current) * float(mults[property])))
 		else:
 			set(String(property), float(current) * float(mults[property]))
-	var adds: Dictionary = row.get("adds", {})
 	for property: Variant in adds:
 		var current: Variant = get(String(property))
 		if current == null:
-			push_warning("%s: evolve add on unknown property '%s'" % [name, property])
+			push_warning("%s: %s add on unknown property '%s'" % [name, what, property])
 			continue
 		if current is int:
 			set(String(property), int(current) + int(adds[property]))

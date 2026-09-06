@@ -271,10 +271,12 @@ func _refresh_loadout() -> void:
 			entries.append({
 				"glyph": _catalog_glyph(row, title),
 				"color": UiTheme.ACCENT_AMBER if weapon.evolved else LOADOUT_WEAPON_COLOR,
-				# Same scale EvolutionCatalog.EVOLVE_AT_LEVEL and the
-				# Collection screen quote, so "sube el arma al nivel 6"
-				# means the number on this corner reaching 6.
-				"corner": ("★%d" if weapon.evolved else UiTheme.WEAPON_LEVEL_ABBREV) % weapon.upgrade_level,
+				# Two readings of the same scale (iteration 46): the weapon
+				# LEVEL while it is climbing to its first milestone, then
+				# the milestone TIER — so "sube el arma al nivel 10" means
+				# this corner reaching N10, and ★2 means level 20.
+				"corner": ("★%d" % weapon.ascension_tier) if weapon.ascension_tier > 0 \
+						else (UiTheme.WEAPON_LEVEL_ABBREV % weapon.upgrade_level),
 				"tip": title, "icon": "",
 			})
 	var stats := PlayerStats.find_in(_loadout_player)
@@ -285,7 +287,7 @@ func _refresh_loadout() -> void:
 			entries.append({
 				"glyph": _catalog_glyph(tome, _tome_short_name(title)),
 				"color": LOADOUT_TOME_COLOR,
-				"corner": Tome.STACK_NUMERALS[clampi(stats.stack_count(tome_id), 1, Tome.MAX_STACKS) - 1],
+				"corner": Tome.stack_label(stats.stack_count(tome_id)),
 				"tip": title, "icon": "",
 			})
 	var bag := ItemBag.find_in(_loadout_player)

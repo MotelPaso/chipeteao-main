@@ -134,7 +134,7 @@ const CHARACTER_LIBRARY: Array[Dictionary] = [
 		"weapon_scene": "res://scenes/weapons/SpiritOrbs.tscn",
 		"weapon_node_name": "SpiritOrbs",
 		"weapon_display_name": "Orbes espirituales",
-		"passive_description": "-0.5% de enfriamiento de armas por nivel",
+		"passive_description": "+0.5% de velocidad de ataque por nivel",
 		"passive_stat": "cooldown", "passive_amount": 0.5,
 		"unlock_cost": 120,
 		"tint": Color(0.55, 0.85, 0.95),

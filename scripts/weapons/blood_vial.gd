@@ -37,6 +37,18 @@ extends WeaponBase
 ## one frame, sweeping the horde once per pending tick.
 const MIN_TICK_INTERVAL: float = 0.01
 
+## Seconds between the flasks a Tome of Multitude adds. Thrown one after
+## the other: flasks lobbed together share one arc and shatter into pools
+## sitting on the exact same ground, which is a single pool that ticks
+## twice rather than a wider wet floor.
+const EXTRA_FLASK_STAGGER: float = 0.12
+## Yaw between neighboring flasks, swung around the THROWER, so the extra
+## pools land beside the cluster instead of inside the first one.
+const EXTRA_FLASK_FAN_DEG: float = 22.0
+## The whole staggered chain has to end inside this fraction of one
+## cooldown, or a volley would still be leaving the hand at the next throw.
+const FLASK_CHAIN_WINDOW: float = 0.6
+
 
 ## One live blood pool. A record instead of a loose Dictionary because its
 ## `visual` is a POOLED node crossing frames: with fields the compiler
@@ -120,7 +132,32 @@ func acquire_target() -> Node3D:
 
 
 func fire(target: Node3D) -> void:
-	_lob_flask(target.global_position)
+	var impact := target.global_position
+	var count := maxi(effective_projectile_count(), 1)
+	var step := minf(EXTRA_FLASK_STAGGER,
+			effective_cooldown() * FLASK_CHAIN_WINDOW / float(maxi(count - 1, 1)))
+	for i: int in count:
+		var yaw := deg_to_rad(EXTRA_FLASK_FAN_DEG) * (float(i) - float(count - 1) * 0.5)
+		# Fanned around the thrower, so the lateral spread grows with the
+		# throw distance and the pools stay a lane rather than a stack.
+		var spot := global_position + (impact - global_position).rotated(Vector3.UP, yaw)
+		if i == 0:
+			_throw_at(spot)
+		else:
+			# Pausable and stepped in physics: an extra flask must not leave
+			# while the upgrade UI holds the tree, and the throw belongs on
+			# the same tick the rest of the combat runs on.
+			get_tree().create_timer(step * float(i), false, true).timeout \
+					.connect(_throw_at.bind(spot))
+
+
+## Throws one flask at `impact`. The staggered extras land here a beat
+## later, when this weapon may already have left the tree with a removed
+## raider — and a flask thrown from outside the tree has no hand to leave.
+func _throw_at(impact: Vector3) -> void:
+	if not is_inside_tree():
+		return
+	_lob_flask(impact)
 
 
 ## Throws the flask visual along a parabolic arc; the pool spawns where it

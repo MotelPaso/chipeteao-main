@@ -47,11 +47,23 @@ const CHEST_PRICE_GROWTH: float = 1.25
 ## is bumped by Interactable.consume, so there is no second copy here to
 ## drift out of sync with it.
 var chest_price_multiplier: float = 1.0
+## Roulette economy (iteration 46): each spin DOUBLES the price of every
+## later spin this run. Steeper than the chest curve on purpose — a
+## roulette outcome can be a Legendary item, so a flat price turned the
+## altar into the whole run's build once the points started flowing.
+const ROULETTE_PRICE_GROWTH: float = 2.0
+var roulette_price_multiplier: float = 1.0
 ## XP curve: cost of the level being climbed to, in gems (level 1 -> 2
 ## costs XP_BASE + XP_PER_LEVEL). The whole pacing of a run rides on these
-## two numbers, so they are named instead of buried in _xp_required.
+## three numbers, so they are named instead of buried in _xp_required.
 const XP_BASE: int = 5
 const XP_PER_LEVEL: int = 3
+## Convex term (iteration 46): the old straight line let a late run take a
+## level every few seconds, which is what made weapons cap out and cards
+## stop meaning anything. Quadratic, so the first levels are untouched
+## (level 1 still costs 8) and the late ones bite: level 10 costs 50
+## instead of 35 (+43%), level 20 costs 125 instead of 65 (+92%).
+const XP_PER_LEVEL_SQUARED: float = 0.15
 
 
 func _ready() -> void:
@@ -79,6 +91,7 @@ func reset() -> void:
 	difficulty_bonus = 0.0
 	_difficulty_sources.clear()
 	chest_price_multiplier = 1.0
+	roulette_price_multiplier = 1.0
 	# Counters credited during a run live in a SaveData buffer that only a
 	# run END merges into the persisted ledger; starting (or abandoning) a
 	# run drops whatever is still pending, which is what makes save_data's
@@ -160,10 +173,23 @@ func register_chest_opened() -> void:
 	chest_price_multiplier *= CHEST_PRICE_GROWTH
 
 
+## Current price of a roulette spin, in run points: the shrine's own base
+## price times the run-wide growth below.
+func roulette_price(base_price: int) -> int:
+	return ceili(float(base_price) * roulette_price_multiplier)
+
+
+## Every spin makes the next one cost ROULETTE_PRICE_GROWTH times more,
+## for the whole party and the rest of the run.
+func register_roulette_spin() -> void:
+	roulette_price_multiplier *= ROULETTE_PRICE_GROWTH
+
+
 ## XP multiplier the run-wide difficulty grants on every gem.
 func difficulty_xp_multiplier() -> float:
 	return 1.0 + difficulty_bonus * DIFFICULTY_XP_SHARE
 
 
 func _xp_required(for_level: int) -> int:
-	return XP_BASE + for_level * XP_PER_LEVEL
+	return XP_BASE + for_level * XP_PER_LEVEL \
+			+ roundi(XP_PER_LEVEL_SQUARED * float(for_level * for_level))

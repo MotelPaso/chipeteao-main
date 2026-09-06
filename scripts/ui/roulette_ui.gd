@@ -160,7 +160,7 @@ func _build_buttons(box: VBoxContainer) -> void:
 	buttons.add_theme_constant_override("separation", 14)
 	box.add_child(buttons)
 	_spin_button = Button.new()
-	_spin_button.text = "GIRAR — %d pts" % _shrine.price
+	_spin_button.text = "GIRAR — %d pts" % _shrine.current_price()
 	_spin_button.custom_minimum_size = SPIN_BUTTON_SIZE
 	UiTheme.style_button(_spin_button, UiTheme.ACCENT_AMBER, true)
 	_spin_button.pressed.connect(_on_spin)
@@ -185,7 +185,11 @@ func _unhandled_input(event: InputEvent) -> void:
 func _refresh_points() -> void:
 	_points_label.text = "Tienes %d pts" % int(_player.get("points"))
 	if _spin_button != null:
-		_spin_button.disabled = _spinning or int(_player.get("points")) < _shrine.price
+		# The price doubles with every spin (iteration 46), so the label is
+		# re-read here and not baked once when the panel is built.
+		var cost := _shrine.current_price()
+		_spin_button.text = "GIRAR — %d pts" % cost
+		_spin_button.disabled = _spinning or int(_player.get("points")) < cost
 
 
 func _on_spin() -> void:

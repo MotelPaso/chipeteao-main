@@ -29,6 +29,12 @@ const FADE_TIME: float = 0.3
 const GROW_TIME: float = 0.2
 ## Radius fraction a puddle starts at before swelling.
 const GROW_FROM: float = 0.3
+## Distance from the drop point to each puddle a Tome of Multitude adds, in
+## puddle radii. Just over 1.0: the extras ring the main puddle and touch
+## it, widening the trail into a smear the horde has to wade through,
+## instead of stacking discs on one spot where they would be invisible and
+## just tick the same enemies several times.
+const EXTRA_PUDDLE_SPACING: float = 1.2
 
 
 ## One live slime puddle. A record instead of a loose Dictionary: the
@@ -73,7 +79,9 @@ func _physics_process(delta: float) -> void:
 		if _last_drop == Vector3.INF or feet.distance_to(_last_drop) >= min_drop_distance:
 			_drop_timer = effective_cooldown()
 			_last_drop = feet
-			_spawn_puddle(feet)
+			# This weapon never calls fire(), so the Tome of Multitude has to
+			# be read here: it is the drop that is the attack.
+			_drop_cluster(feet, maxi(effective_projectile_count(), 1))
 	_tick_puddles(delta)
 
 
@@ -87,6 +95,20 @@ func _exit_tree() -> void:
 			puddle.visual.queue_free()
 		puddle.visual = null
 	_puddles.clear()
+
+
+## One drop: the puddle under the carrier's feet plus, once a Tome of
+## Multitude is in play, `count - 1` more evenly ringed around it at
+## EXTRA_PUDDLE_SPACING radii, so the trail gets wider instead of thicker.
+func _drop_cluster(center: Vector3, count: int) -> void:
+	_spawn_puddle(center)
+	var extras := count - 1
+	if extras <= 0:
+		return
+	var offset := puddle_radius * area_scale() * EXTRA_PUDDLE_SPACING
+	for i: int in extras:
+		var angle := TAU * float(i) / float(extras)
+		_spawn_puddle(center + Vector3(cos(angle), 0.0, sin(angle)) * offset)
 
 
 func _spawn_puddle(center: Vector3) -> void:

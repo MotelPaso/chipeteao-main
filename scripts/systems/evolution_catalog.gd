@@ -4,11 +4,14 @@ extends RefCounted
 ## weapon into a named, far stronger form. Data-driven like the other
 ## catalogs — a new evolution is one row here.
 ##
-## The rule (iteration 38, replacing the chest + paired-tome ceremony):
-## every upgrade card invested in a weapon is one weapon level; the moment
-## a weapon reaches EVOLVE_AT_LEVEL it evolves on the spot, with the full
-## ceremony (fanfare, banner, sparkle) run by try_evolve_by_level from
-## UpgradePool.apply. Chests and tomes play no part any more.
+## The rule (iteration 46, deepening iteration 38's card-only ceremony):
+## every upgrade card invested in a weapon is one weapon level, and every
+## EVOLVE_AT_LEVEL-th level is a MILESTONE run by try_advance_by_level from
+## UpgradePool.apply. The first milestone evolves the weapon when it has a
+## recipe here; every milestone after that — and the first one for a weapon
+## with no recipe at all — is an ascension (WeaponBase.ascend), so no weapon
+## ever stops improving. Both share one ceremony (fanfare, banner, sparkle).
+## Chests and tomes play no part any more.
 ##
 ## Row fields:
 ##   weapon_id/weapon_node: WEAPON_LIBRARY identity of the base weapon —
@@ -28,8 +31,11 @@ extends RefCounted
 ## (SaveData counters), which the Collection screen and quests read.
 
 ## Upgrade cards a weapon must have received (WeaponBase.upgrade_level)
-## to evolve. Weapons WITHOUT a catalog row simply keep leveling.
-const EVOLVE_AT_LEVEL: int = 6
+## per milestone: the first EVOLVE_AT_LEVEL levels buy the evolution, and
+## every further multiple buys an ascension. ONE number on purpose — an
+## evolution threshold that drifted from the ascension period would leave
+## a dead stretch of levels where a weapon gains nothing.
+const EVOLVE_AT_LEVEL: int = 10
 
 const EVOLUTION_LIBRARY: Array[Dictionary] = [
 	{
@@ -154,33 +160,53 @@ static func by_weapon_node(node_name: String) -> Dictionary:
 	return _by_weapon_node.get(node_name, {})
 
 
-## Evolves `weapon` if it just reached EVOLVE_AT_LEVEL and has a recipe:
-## applies the row, runs the ceremony (fanfare, banner, sparkle on the
-## carrier, shake), bumps the Collection/quest counters and prints the
-## soak log line. Returns true when an evolution happened.
-static func try_evolve_by_level(weapon: WeaponBase, player: Node) -> bool:
-	if weapon == null or weapon.evolved or weapon.upgrade_level < EVOLVE_AT_LEVEL:
+## Runs the milestone `weapon` just reached, if any: the evolution at the
+## first one (when a recipe exists), an ascension at every later one and at
+## the first one for a recipe-less weapon. Applies the change, runs the
+## ceremony (fanfare, banner, sparkle on the carrier, shake), bumps the
+## Collection/quest counters and prints the soak log line.
+## Returns true when a milestone fired.
+static func try_advance_by_level(weapon: WeaponBase, player: Node) -> bool:
+	if weapon == null:
 		return false
-	var row := by_weapon_node(weapon.name)
-	if row.is_empty():
+	# Integer division: level 10-19 is tier 1, 20-29 tier 2, and so on.
+	var tier := weapon.upgrade_level / EVOLVE_AT_LEVEL
+	if tier <= weapon.ascension_tier:
 		return false
-	weapon.evolve(row)
-	var weapon_id := String(row.weapon_id)
-	_celebrate(row, weapon.evolved_name, player)
-	# One-line log (RunManager convention) for headless soaks.
-	print("Weapon evolved: %s -> %s" % [weapon_id, weapon.evolved_name])
+	weapon.ascension_tier = tier
+	if tier == 1 and not weapon.evolved:
+		var row := by_weapon_node(weapon.name)
+		if not row.is_empty():
+			weapon.evolve(row)
+			_celebrate(player)
+			_announce("¡%s evolucionó a %s!" % [
+					weapon_display(weapon), weapon.evolved_name])
+			_record_evolution(String(row.weapon_id))
+			# One-line log (RunManager convention) for headless soaks.
+			print("Weapon evolved: %s -> %s" % [String(row.weapon_id), weapon.evolved_name])
+			return true
+	weapon.ascend(tier)
+	_celebrate(player)
+	_announce("¡%s asciende!" % weapon_display(weapon))
+	print("Weapon ascended: %s tier %d"
+			% [UpgradePool.weapon_id_for_node(weapon.name), tier])
 	return true
 
 
-## The payoff moment: fanfare, sparkle on the carrier, banner, and the
-## Collection/quest counters. Split out of try_evolve_by_level so the
-## catalog side stays testable, and every autoload is reached through the
-## same guarded helper — a `-s` harness has no autoloads instanced, and the
-## old direct Sfx/Juice calls aborted it before a single assert ran.
-static func _celebrate(row: Dictionary, evolved_name: String, player: Node) -> void:
-	var loop := Engine.get_main_loop() as SceneTree
-	if loop == null:
-		return
+## The name a milestone banner uses: the evolved form once the weapon has
+## one, otherwise its WEAPON_LIBRARY display name. Never the internal id.
+static func weapon_display(weapon: WeaponBase) -> String:
+	if weapon.evolved and not weapon.evolved_name.is_empty():
+		return weapon.evolved_name
+	return UpgradePool.weapon_display_name(weapon.name)
+
+
+## The payoff moment shared by evolutions and ascensions: fanfare, sparkle
+## on the carrier, shake. Split out of try_advance_by_level so the catalog
+## side stays testable, and every autoload is reached through the same
+## guarded helper — a `-s` harness has no autoloads instanced, and the old
+## direct Sfx/Juice calls aborted it before a single assert ran.
+static func _celebrate(player: Node) -> void:
 	var sfx := UpgradePool.autoload_node(&"Sfx")
 	if sfx != null:
 		sfx.play(&"secret_fanfare")
@@ -189,13 +215,22 @@ static func _celebrate(row: Dictionary, evolved_name: String, player: Node) -> v
 		if player is Node3D:
 			juice.sparkle((player as Node3D).global_position + Vector3.UP * 1.2)
 		juice.shake(0.25, 0.5)
-	# The banner names the weapon the way every other screen does — from
-	# WEAPON_LIBRARY. It used to prettify the internal id instead
-	# (weapon_id.capitalize()), which only ever matched the English names
-	# by accident and could never be translated.
-	loop.call_group("boss_ui", "announce_major", "¡%s evolucionó a %s!"
-			% [UpgradePool.weapon_display_name(String(row.weapon_node)), evolved_name])
+
+
+## The banner. Names the weapon the way every other screen does — from
+## WEAPON_LIBRARY (it used to prettify the internal id, which only ever
+## matched the English names by accident and could never be translated).
+static func _announce(message: String) -> void:
+	var loop := Engine.get_main_loop() as SceneTree
+	if loop == null:
+		return
+	loop.call_group("boss_ui", "announce_major", message)
+
+
+## Collection/quest bookkeeping for an evolution (ascensions have no
+## counters of their own: the weapon level already carries them).
+static func _record_evolution(weapon_id: String) -> void:
 	var save_data := UpgradePool.autoload_node(&"SaveData")
 	if save_data != null:
-		save_data.bump("evo_" + String(row.weapon_id))
+		save_data.bump("evo_" + weapon_id)
 		save_data.bump("evolutions_total")

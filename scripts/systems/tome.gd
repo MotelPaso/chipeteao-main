@@ -5,7 +5,9 @@ extends RefCounted
 ## UpgradePool.WEAPON_LIBRARY — adding a tome is one new row here.
 ## Row fields:
 ##   id/display_name: identity; the card title appends a stack numeral
-##             ("Tomo de Furia II") when offering the next stack. `id` is an
+##             ("Tomo de Furia II") when offering the next stack. Stacks
+##             are UNCAPPED since iteration 46 (the 5-DISTINCT-tome cap
+##             stays); see stack_label(). `id` is an
 ##             identifier and stays in English; display_name is player text.
 ##   glyph:    2-letter tile the HUD loadout strip draws while there is no
 ##             sprite. DECLARED, never derived from display_name: every row
@@ -19,8 +21,13 @@ extends RefCounted
 ##             potency; the rolled rarity's potency scales it on pickup.
 ##             stat names map onto PlayerStats (see _apply_effect there).
 
-const MAX_STACKS: int = 5
-const STACK_NUMERALS: Array[String] = ["I", "II", "III", "IV", "V"]
+## Roman-numeral table for stack_label(). Tomes stack WITHOUT a ceiling
+## since iteration 46, so the numeral is built from these pairs instead of
+## being indexed out of a fixed five-entry list; it stays a numeral rather
+## than borrowing "Nv %d", which GLOSARIO rule 6 reserves for the run level.
+const ROMAN_VALUES: Array[int] = [1000, 900, 500, 400, 100, 90, 50, 40, 10, 9, 5, 4, 1]
+const ROMAN_SYMBOLS: Array[String] = [
+	"M", "CM", "D", "CD", "C", "XC", "L", "XL", "X", "IX", "V", "IV", "I"]
 
 const TOME_LIBRARY: Array[Dictionary] = [
 	{
@@ -30,7 +37,7 @@ const TOME_LIBRARY: Array[Dictionary] = [
 	},
 	{
 		"id": "tome_haste", "display_name": "Tomo de Celeridad", "glyph": "CE",
-		"description": "Enfriamiento de todas las armas -%d%%",
+		"description": "Velocidad de ataque de todas las armas +%d%%",
 		"effects": [{"stat": "cooldown", "amount": 8.0}],
 	},
 	{
@@ -146,9 +153,22 @@ static func gamble_boon_count(potency: float) -> int:
 
 
 ## Card title for offering the given stack (1-based): plain name for the
-## first copy, "Nombre II".."Nombre V" for later stacks.
+## first copy, "Nombre II", "Nombre VII", "Nombre XIV"... for later ones.
 static func display_title(tome: Dictionary, stack: int) -> String:
 	var title := String(tome.display_name)
 	if stack <= 1:
 		return title
-	return title + " " + STACK_NUMERALS[clampi(stack, 1, MAX_STACKS) - 1]
+	return title + " " + stack_label(stack)
+
+
+## THE stack numeral, for the card title and the HUD loadout corner alike
+## (iteration 46 removed the five-stack ceiling, so both had to stop
+## indexing a fixed table). Any stack count from 1 up reads as a numeral.
+static func stack_label(stack: int) -> String:
+	var value := maxi(stack, 1)
+	var label := ""
+	for i: int in ROMAN_VALUES.size():
+		while value >= ROMAN_VALUES[i]:
+			value -= ROMAN_VALUES[i]
+			label += ROMAN_SYMBOLS[i]
+	return label

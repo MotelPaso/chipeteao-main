@@ -11,11 +11,45 @@ extends WeaponBase
 ## Spark tint for per-enemy hit bursts.
 @export var spark_color: Color = Color(0.7, 0.8, 1.0)
 
+## Seconds between the swings a Tome of Multitude adds. Extra swings are
+## staggered instead of simultaneous: two arcs cast from the same shoulder
+## in the same frame are one arc that happens to hit twice.
+const EXTRA_SWING_STAGGER: float = 0.09
+## Yaw between neighboring swings, so the extras carve their own ground
+## instead of retracing the first one.
+const EXTRA_SWING_FAN_DEG: float = 25.0
+## The whole staggered chain has to end inside this fraction of one
+## cooldown, or a long volley would still be swinging when the next one
+## starts and the combo would read as a single smear.
+const SWING_CHAIN_WINDOW: float = 0.6
+
 
 func fire(target: Node3D) -> void:
 	# Degenerate case (target directly above/below): swing where we face.
 	var center_dir := flat_dir_or(target.global_position - global_position,
 			-global_transform.basis.z)
+	var count := maxi(effective_projectile_count(), 1)
+	var step := minf(EXTRA_SWING_STAGGER,
+			effective_cooldown() * SWING_CHAIN_WINDOW / float(maxi(count - 1, 1)))
+	for i: int in count:
+		var yaw := deg_to_rad(EXTRA_SWING_FAN_DEG) * (float(i) - float(count - 1) * 0.5)
+		var swing_dir := center_dir.rotated(Vector3.UP, yaw)
+		if i == 0:
+			_swing(swing_dir)
+		else:
+			# Pausable and stepped in physics: an extra swing must not land
+			# while the upgrade UI holds the tree, and damage belongs on the
+			# same tick the rest of the combat runs on.
+			get_tree().create_timer(step * float(i), false, true).timeout \
+					.connect(_swing.bind(swing_dir))
+
+
+## One full swing: the hit pass plus its crescent. The staggered extras land
+## here a beat later, when this weapon may already have left the tree with
+## a removed raider.
+func _swing(center_dir: Vector3) -> void:
+	if not is_inside_tree():
+		return
 	_hit_enemies_in_arc(center_dir)
 	_play_swing(center_dir)
 

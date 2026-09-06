@@ -1,6 +1,12 @@
 class_name UpgradePool
 extends RefCounted
 ## Data-driven pool of level-up upgrades with rarity weighting (GDD 3/4).
+## Since iteration 46 a LEVEL pick rolls one SIDE of the pool, never a
+## mix: either weapons (owned-weapon stat cards + new_weapon cards) or
+## tomes/stats (tome cards + GENERIC_POOL). roll_side() picks the side,
+## weighted by how many entries each currently has, and never returns an
+## empty one; the card UI names it in the title. Bonus picks (chests,
+## shrines) pass no side and keep mixing everything.
 ## The offer pool is rebuilt per roll from:
 ##   - GENERIC_POOL: player/health/run_state tweaks, always available.
 ##   - Tome cards (Tome.TOME_LIBRARY): the next stack of every tome the
@@ -112,7 +118,7 @@ const WEAPON_LIBRARY: Array[Dictionary] = [
 				# Attack-speed flavor on its own knob (cooldown_scale), so it
 				# stacks with "Mano rápida" without touching the base cooldown.
 				"id": "twin_daggers_flurry", "title": "Ráfaga",
-				"description": "Enfriamiento de las Dagas gemelas -%d%%",
+				"description": "Velocidad de ataque de las Dagas gemelas +%d%%",
 				"target": "weapon/TwinDaggers", "property": "cooldown_scale",
 				"op": "mul_percent", "amount": -15.0,
 			},
@@ -205,6 +211,13 @@ const WEAPON_LIBRARY: Array[Dictionary] = [
 	},
 ]
 
+## The two sides of the pool (iteration 46). Identifiers, not display
+## text — SIDE_LABELS translates them for the card title.
+const SIDE_WEAPONS: String = "weapons"
+const SIDE_TOMES: String = "tomes"
+const SIDE_LABELS: Dictionary[String, String] = {
+	SIDE_WEAPONS: "Armas", SIDE_TOMES: "Tomos"}
+
 ## Fallback weapon cap when the player script doesn't export max_weapons.
 const DEFAULT_MAX_WEAPONS: int = 5
 ## Fallback cap on DISTINCT tomes when the player doesn't export max_tomes
@@ -290,14 +303,15 @@ static func rarity_display(rarity_name: String) -> String:
 ## display-ready dicts: entry, rarity, amount, title, description.
 ## Shrine/chest picks pass luck_bonus (temporary rarity-tilt luck on top
 ## of PlayerStats) and/or min_rarity (a tier name every rarity is floored
-## to, fixed ones included).
+## to, fixed ones included). `side` restricts the pool to SIDE_WEAPONS or
+## SIDE_TOMES; "" (the default, and what every bonus pick passes) mixes.
 static func roll_offer(player: Node, count: int = 3, luck_bonus: float = 0.0,
-		min_rarity: String = "") -> Array[Dictionary]:
+		min_rarity: String = "", side: String = "") -> Array[Dictionary]:
 	var offer: Array[Dictionary] = []
 	var stats := PlayerStats.find_in(player)
 	var luck := (stats.luck if stats != null else 0.0) + luck_bonus
 	var floor_index := rarity_index(min_rarity)
-	for entry: Dictionary in _weighted_pick(build_pool(player), count):
+	for entry: Dictionary in _weighted_pick(build_pool(player, side), count):
 		var rarity := _rarity_for(entry, luck, floor_index)
 		if String(entry.get("kind", "stat")) == "new_weapon":
 			offer.append({
@@ -342,14 +356,34 @@ static func roll_offer(player: Node, count: int = 3, luck_bonus: float = 0.0,
 	return offer
 
 
-## The full pool the player can currently roll from: generic entries, tome
-## cards below their stack cap, stat entries for each owned weapon, and
-## new_weapon cards for unowned ones (none once the weapon cap is reached).
-static func build_pool(player: Node) -> Array[Dictionary]:
-	var pool := GENERIC_POOL.duplicate()
+## The pool the player can currently roll from. `side` restricts it to one
+## half (SIDE_WEAPONS / SIDE_TOMES); "" returns both, which is what bonus
+## picks want.
+static func build_pool(player: Node, side: String = "") -> Array[Dictionary]:
+	var pool: Array[Dictionary] = []
+	if side != SIDE_WEAPONS:
+		pool.append_array(_tome_side(player))
+	if side != SIDE_TOMES:
+		pool.append_array(_weapon_side(player))
+	return pool
+
+
+## Tomes/stats half: the generic stat cards, always available, plus the
+## next stack of every tome the player may still take.
+static func _tome_side(player: Node) -> Array[Dictionary]:
+	var pool: Array[Dictionary] = GENERIC_POOL.duplicate()
 	if player == null:
 		return pool
 	pool.append_array(_tome_entries(player))
+	return pool
+
+
+## Weapons half: stat entries for each owned weapon plus new_weapon cards
+## for the unowned ones (none once the weapon cap is reached).
+static func _weapon_side(player: Node) -> Array[Dictionary]:
+	var pool: Array[Dictionary] = []
+	if player == null:
+		return pool
 	var mount := player.get_node_or_null("Weapons")
 	if mount == null:
 		return pool
@@ -363,6 +397,29 @@ static func build_pool(player: Node) -> Array[Dictionary]:
 			if not mount.has_node(String(weapon.node_name)):
 				pool.append(_new_weapon_entry(weapon))
 	return pool
+
+
+## Which side a level pick offers: random, weighted by how many entries
+## each side actually has right now, so a raider with five maxed weapons
+## and nine open tomes mostly sees tomes. Never returns an empty side —
+## a pick with nothing to show is a wedge over a paused tree.
+## Both halves are built to count them: this runs once per level-up, not
+## per frame, and counting them any other way would duplicate the rules
+## about caps that _tome_side / _weapon_side already own.
+static func roll_side(player: Node) -> String:
+	var weapons := _weapon_side(player).size()
+	var tomes := _tome_side(player).size()
+	if weapons <= 0:
+		return SIDE_TOMES
+	if tomes <= 0:
+		return SIDE_WEAPONS
+	return SIDE_WEAPONS if randf() * float(weapons + tomes) < float(weapons) \
+			else SIDE_TOMES
+
+
+## Player-facing name of a side, for the card-picker title.
+static func side_label(side: String) -> String:
+	return SIDE_LABELS.get(side, "")
 
 
 ## Applies one rolled offer to the live nodes reachable from `player`.
@@ -395,7 +452,7 @@ static func apply(offer: Dictionary, player: Node) -> void:
 	if target is WeaponBase:
 		var weapon := target as WeaponBase
 		weapon.upgrade_level += 1
-		EvolutionCatalog.try_evolve_by_level(weapon, player)
+		EvolutionCatalog.try_advance_by_level(weapon, player)
 
 
 ## One property change on a live target. A max_hp raise on a Health also
@@ -440,7 +497,7 @@ static func _entries_for_weapon(weapon: Dictionary) -> Array[Dictionary]:
 		},
 		{
 			"id": String(weapon.id) + "_cooldown", "title": "Mano rápida",
-			"description": "Enfriamiento de " + display + " -%d%%",
+			"description": "Velocidad de ataque de " + display + " +%d%%",
 			"target": target, "property": "cooldown",
 			"op": "mul_percent", "amount": WEAPON_COOLDOWN_STEP,
 		},
@@ -463,7 +520,7 @@ static func _entries_for_weapon(weapon: Dictionary) -> Array[Dictionary]:
 		},
 		{
 			"id": String(weapon.id) + "_rhythm", "title": "Ritmo de batalla",
-			"description": "Enfriamiento de " + display + " -%d%%, daño +%d%%",
+			"description": "Velocidad de ataque de " + display + " +%d%%, daño +%d%%",
 			"target": target,
 			"effects": [
 				{"property": "cooldown", "op": "mul_percent", "amount": RHYTHM_STEPS.x},
@@ -477,9 +534,10 @@ static func _entries_for_weapon(weapon: Dictionary) -> Array[Dictionary]:
 	return entries
 
 
-## One card per tome below its stack cap, offering the NEXT stack (the
-## title carries the stack numeral, e.g. "Tomo de Furia II"). The rolled
-## rarity's potency scales the granted amounts exactly like stat cards.
+## One card per available tome, offering the NEXT stack (the title carries
+## the stack numeral, e.g. "Tomo de Furia II" — Tome.stack_label builds it
+## for any count). The rolled rarity's potency scales the granted amounts
+## exactly like stat cards.
 static func _tome_entries(player: Node) -> Array[Dictionary]:
 	var stats := PlayerStats.find_in(player)
 	var entries: Array[Dictionary] = []
@@ -492,9 +550,9 @@ static func _tome_entries(player: Node) -> Array[Dictionary]:
 		var owned_stacks := stats.stack_count(tome_id) if stats != null else 0
 		if at_cap and owned_stacks == 0:
 			continue
+		# No stack ceiling since iteration 46: only the number of DISTINCT
+		# tomes is capped, so a favourite tome keeps deepening all run.
 		var next_stack := owned_stacks + 1
-		if next_stack > Tome.MAX_STACKS:
-			continue
 		var effects: Array = tome.effects
 		var primary: Dictionary = effects[0]
 		entries.append({

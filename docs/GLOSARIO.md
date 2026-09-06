@@ -9,15 +9,15 @@ Lo que NO se traduce nunca: los `id` de catálogo, los `node_name`, los nombres 
 4. Llevan mayúscula inicial en las dos partes solo: topónimos (Bosque Hueco, Dunas de Ceniza, Ciénaga Lóbrega), nombres de tomo («Tomo de Furia»), nombres propios de jefe (Rey Pútrido, Cofre Mímico, Espectro de la Ciénaga) y de evolución con genitivo (Mandoble del Caudillo, Resplandor Final).
 5. Nombres de personaje intactos por regla 4 del brief: Juno, Nyx, Doc, Otto, Vex, Rook, Ash, Miro, Bogg, Kael, Torren, Wisp y **Bramble**. Bramble NO se traduce.
 6. Tres escalas distintas, tres palabras: level = Nivel / «Nv %d»; tier de mapa = Grado / insignia «G%d»; rank de reliquia = Rango. Cambiar «T%d» a «G%d» en hud.gd:511, HUD.tscn:53 y character_select.gd:91 (las tres, o quedan desincronizadas).
-7. cooldown = «enfriamiento». «Recarga» queda reservada a los portales («Recharging... %d s» → «Recargando... %d s», «Portals recharge» → «los portales se recargan»); usar «recarga» para cooldown crearía una sola palabra para dos sistemas.
+7. cooldown = «velocidad de ataque», y **siempre como bonificación positiva** (iteración 46): un enfriamiento que baja se escribe como una velocidad que sube («Enfriamiento de X -15%» → «Velocidad de ataque de X +15%»), incluido el texto de reliquias («-1.5%» → «+1.5%») y de pasivas. La matemática interna sigue siendo un multiplicador de enfriamiento (`cooldown_multiplier`, `cooldown_scale`): solo cambia lo que lee el jugador, porque «enfriamiento» obligaba a leer un número que baja como algo bueno. La palabra «enfriamiento» ya no aparece en ninguna cadena visible. «Recarga» sigue reservada a los portales («Recharging... %d s» → «Recargando... %d s», «Portals recharge» → «los portales se recargan»); usarla para cooldown crearía una sola palabra para dos sistemas.
 8. Marcadores %d %s %.1f %.2f %02d %% \n: mismo número y mismo orden que el original, sin excepción. Ninguna cadena pierde o gana marcadores.
 9. Mayúsculas con tilde (MORISTE, EN PAUSA, ARMERÍA, COLECCIÓN, MÁX, COMÚN, ÉPICO, RECLAMADA) y apertura obligatoria de ¿ y ¡.
 10. RAREZAS: nunca traducir RARITIES[].name ni el campo "rarity" de item_catalog. Es id en 9 archivos. Traducir solo en pantalla con rarity_display() (ver bloque «rarezas»).
 11. IDs, node_name, grupos, StringName &"...", rutas res://, claves de SaveData y todo print()/push_warning() quedan en inglés y sin tocar.
 12. hud.gd:231 hace trim_prefix("Tome of "). Con tomos en español debe ser, EN ESTE ORDEN: .trim_prefix("Tomo del ").trim_prefix("Tomo de ") — al revés «Tomo del Azar» quedaría como «l Azar».
-13. Cartas por arma (upgrade_pool.gd:365-408): en español el sustantivo va delante. Mantener concatenación, no % : "Daño de " + display + " +%d%%", "Enfriamiento de " + display + " -%d%%", "Alcance de " + display + " +%d%%", y las dos de dos stats. Así el conteo de marcadores no cambia.
+13. Cartas por arma (`upgrade_pool.gd`, `_entries_for_weapon`): en español el sustantivo va delante. Mantener concatenación, no % : "Daño de " + display + " +%d%%", "Velocidad de ataque de " + display + " +%d%%", "Alcance de " + display + " +%d%%", y las dos de dos stats. Así el conteo de marcadores no cambia.
 14. run_end_screen.gd:82 pasa 3 argumentos. Traducir a "+%d esquirlas · %d %s — reclámalas en el registro" y cambiar el tercer argumento por la frase completa: "misión completada" si quest_count == 1, si no "misiones completadas". Prohibido «misión%s» (da «misiónes») y prohibido dejar «(s)» suelto.
-15. evolution_catalog.gd:163 usa weapon_id.capitalize(); en español debe buscar el display_name traducido en UpgradePool.WEAPON_LIBRARY: "¡%s evolucionó a %s!".
+15. `evolution_catalog.gd` busca el `display_name` traducido en `UpgradePool.WEAPON_LIBRARY`, nunca capitaliza el id: «¡%s evolucionó a %s!» y, desde la iteración 46, «¡%s asciende!» para los hitos posteriores (ascender = subir un escalón de arma cada 10 niveles; no es «evolucionar», que sigue siendo el cambio de nombre y de forma).
 16. Co-op: character_select.gd:190/234/237/238 ya está en español peninsular. Corregir a control / mouse / J1 según la tabla ui_chrome. player.gd:508/511 ya está correcto: no tocar.
 17. La ruleta es RULETA (RULETA DE LA FORTUNA + «[E] Girar la ruleta» + «Altar de la ruleta»); nunca «rueda», que en México es la vuelta al mundo.
 18. Compuestos: verbo + sustantivo en plural (Perforacorazones, Matarreyes, Cazacoronas, Levantatapas); mata- no elide nunca. Escupesol va en singular (quitasol, girasol).
@@ -312,8 +312,10 @@ Lo que NO se traduce nunca: los `id` de catálogo, los `node_name`, los nombres 
 | Inglés | Español |
 |---|---|
 | damage | daño |
-| cooldown | enfriamiento |
-| cooldowns | enfriamientos |
+| cooldown | velocidad de ataque (siempre en positivo; ver regla 7) |
+| cooldowns | velocidad de ataque |
+| attack speed | velocidad de ataque |
+| ascend / ascension | ascender / ascenso (hito de arma cada 10 niveles) |
 | area | área |
 | attack area | área de ataque |
 | move speed | velocidad de movimiento (corto: velocidad) |
@@ -475,7 +477,9 @@ Lo que NO se traduce nunca: los `id` de catálogo, los `node_name`, los nombres 
 | `"" if quest_count == 1 else "s"  (arg 3 de run_end_screen.gd:82)` | "misión completada" if quest_count == 1 else "misiones completadas" |
 | `Daily score: %d — today's best: %d` | Puntaje diario: %d — mejor de hoy: %d |
 | `Level up!` | ¡Subiste de nivel! |
-| `Level %d — choose an upgrade` | Nivel %d — elige una mejora |
+| `Level %d — choose: %s` | Nivel %d — elige: %s (el %s es el lado del pool: «Armas» o «Tomos», iteración 46) |
+| `Weapons` (lado del pool) | Armas |
+| `Tomes` (lado del pool) | Tomos |
 | `Title` | Título |
 | `Description` | Descripción |
 | `Jugador %d` | Jugador %d |
@@ -552,6 +556,7 @@ Lo que NO se traduce nunca: los `id` de catálogo, los `node_name`, los nombres 
 | `The marsh holds its breath...` | La ciénaga contiene el aliento... |
 | `15 minutes survived — extract any time from the pause menu` | 15 minutos sobrevividos — extráete cuando quieras desde el menú de pausa |
 | `%s evolved into %s!` | ¡%s evolucionó a %s! |
+| `%s ascends!` | ¡%s asciende! (hito de arma cada 10 niveles, iteración 46) |
 | `Reviviendo... %d%%` | Reviviendo... %d%% |
 | `CAÍDO — mantén [Interactuar] cerca` | CAÍDO — mantén [Interactuar] cerca |
 | `A patient wall of a raider whose swings only get meaner.` | Un muro con patas: sus golpes solo se ponen más feos. |
@@ -574,7 +579,7 @@ Lo que NO se traduce nunca: los `id` de catálogo, los `node_name`, los nombres 
 | `+1 thorns per level` | +1 de espinas por nivel |
 | `+2 max HP per level` | +2 de HP máx. por nivel |
 | `+0.5% evasion per level; dodges execute weakened non-boss enemies` | +0.5% de evasión por nivel; al esquivar rematas a enemigos debilitados que no sean jefes |
-| `-0.5% weapon cooldowns per level` | -0.5% de enfriamiento de armas por nivel |
+| `-0.5% weapon cooldowns per level` | +0.5% de velocidad de ataque por nivel |
 | `+1 luck per level (rarer upgrade cards)` | +1 de suerte por nivel (cartas más raras) |
 | `+1% lifesteal per level (base +5%)` | +1% de robo de vida por nivel (base +5%) |
 | `+2% effect duration per level` | +2% de duración de efectos por nivel |
@@ -609,7 +614,7 @@ Lo que NO se traduce nunca: los `id` de catálogo, los `node_name`, los nombres 
 | `a rot cloud that lingers on everything it touches` | una nube de podredumbre que se queda en todo lo que toca |
 | `a beam wide enough to end a horde in one breath` | un rayo tan ancho que acaba una horda de un solo aliento |
 | `All weapon damage +%d%%` | Daño de todas las armas +%d%% |
-| `All weapon cooldowns -%d%%` | Enfriamiento de todas las armas -%d%% |
+| `All weapon cooldowns -%d%%` | Velocidad de ataque de todas las armas +%d%% |
 | `Attack area +%d%%` | Área de ataque +%d%% |
 | `Move speed +%d%%` | Velocidad de movimiento +%d%% |
 | `Crit chance +%d%%` | Prob. de crítico +%d%% |
@@ -641,7 +646,7 @@ Lo que NO se traduce nunca: los `id` de catálogo, los `node_name`, los nombres 
 | `A serene capybara that adds XP gain per level` | Un capibara sereno que suma ganancia de XP por nivel |
 | `All damage %s per rank.` | Todo el daño %s por rango. |
 | `Max HP %s per rank.` | HP máx. %s por rango. |
-| `Weapon cooldowns %s per rank.` | Enfriamiento de armas %s por rango. |
+| `Weapon cooldowns %s per rank.` | Velocidad de ataque %s por rango. (texto del rango: «+1.5%») |
 | `Luck %s per rank (rarer upgrade cards).` | Suerte %s por rango (cartas de mejora más raras). |
 | `Move speed %s per rank.` | Velocidad de movimiento %s por rango. |
 | `Armor %s per rank (flat damage reduction).` | Armadura %s por rango (reducción fija de daño). |
@@ -650,7 +655,7 @@ Lo que NO se traduce nunca: los `id` de catálogo, los `node_name`, los nombres 
 | `crit +0.3% per level` | crítico +0.3% por nivel |
 | `XP gain +0.6% per level` | ganancia de XP +0.6% por nivel |
 | `damage +%d%%` | daño +%d%% |
-| `cooldowns -%d%%` | enfriamientos -%d%% |
+| `cooldowns -%d%%` | velocidad de ataque +%d%% |
 | `area +%d%%` | área +%d%% |
 | `move speed +%d%%` | velocidad +%d%% |
 | `max HP +%d` | HP máx. +%d |
@@ -662,15 +667,15 @@ Lo que NO se traduce nunca: los `id` de catálogo, los `node_name`, los nombres 
 | `Max HP +%d (heals the gained HP)` | HP máx. +%d (te cura lo que ganas) |
 | `Pickup radius +%d%%` | Radio de recolección +%d%% |
 | `display + " damage +%d%%"` | "Daño de " + display + " +%d%%" |
-| `display + " cooldown -%d%%"` | "Enfriamiento de " + display + " -%d%%" |
+| `display + " cooldown -%d%%"` | "Velocidad de ataque de " + display + " +%d%%" |
 | `display + " range +%d%%"` | "Alcance de " + display + " +%d%%" |
 | `display + " damage +%d%%, range +%d%%"` | "Daño de " + display + " +%d%%, alcance +%d%%" |
-| `display + " cooldown -%d%%, damage +%d%%"` | "Enfriamiento de " + display + " -%d%%, daño +%d%%" |
+| `display + " cooldown -%d%%, damage +%d%%"` | "Velocidad de ataque de " + display + " +%d%%, daño +%d%%" |
 | `Dart Pistol fires %d extra dart(s)` | La Pistola de dardos dispara %d dardo(s) más |
 | `Hunting Bow arrows pierce %d more enemies` | Las flechas del Arco de caza perforan %d enemigos más |
 | `Thorn Whip slow %d%% stronger` | La ralentización del Látigo de espinas es %d%% más fuerte |
 | `Boomerang travel distance +%d%%` | Distancia de vuelo del Bumerán +%d%% |
-| `Twin Daggers cooldown -%d%%` | Enfriamiento de las Dagas gemelas -%d%% |
+| `Twin Daggers cooldown -%d%%` | Velocidad de ataque de las Dagas gemelas +%d%% |
 | `Spirit Orbs gains %d more orb(s)` | Los Orbes espirituales suman %d orbe(s) más |
 | `Storm Rod chains to %d more enemies` | El Pararrayos encadena a %d enemigos más |
 | `Blood Vial pools pulse %d more time(s)` | Los charcos del Vial de sangre pulsan %d vez(ces) más |
