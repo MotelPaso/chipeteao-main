@@ -1,6 +1,6 @@
 # Bonkraiders
 
-Roguelite de supervivencia "bullet-heaven" en 3D hecho en Godot 4.7 (GDScript): incursiones sin límite de tiempo que recorren **un mapa tras otro**: superas una etapa sobreviviendo 15 minutos y matando a su jefe, se abre un portal de salida, te quedas cuanto quieras en modo **pseudo-infinito** (la dificultad sube rápido) y cruzas al mapa siguiente con todo lo que llevas donde las armas disparan solas, los enemigos llegan en hordas crecientes y cada subida de nivel ofrece 3 cartas de mejora. Arenas de **240×240 con relieve** (colinas, hondonadas y mesetas). Incluye tres biomas (Bosque Hueco, Dunas de Ceniza y Ciénaga Lóbrega) con jefes propios y minijefes secretos, 13 raiders con arma inicial y pasiva propia, 14 armas **que evolucionan por nivel**, 15 tomos, 16 objetos con rareza fija y 4 mascotas, dificultad por **vueltas** al circuito de mapas y meta-progresión entre incursiones (esquirlas, 40 misiones, desbloqueo de raiders, 6 reliquias permanentes de la Armería, pantalla de Colección, Cacería diaria con semilla por fecha). El diseño completo está en `GDD.md` y la historia de desarrollo en `CHANGELOG.md`.
+Roguelite de supervivencia "bullet-heaven" en 3D hecho en Godot 4.7 (GDScript): incursiones sin límite de tiempo que recorren **un mapa tras otro**: superas una etapa sobreviviendo 15 minutos y matando a su jefe, se abre un portal de salida, te quedas cuanto quieras en modo **pseudo-infinito** (la dificultad sube rápido) y cruzas al mapa siguiente con todo lo que llevas donde las armas disparan solas, los enemigos llegan en hordas crecientes y cada subida de nivel ofrece 3 cartas de mejora. Arenas de **240×240 con relieve** (colinas, hondonadas y mesetas), con **minimapa** en la esquina de cada vista y **mapa completo con Tab** sobre una niebla de guerra que el equipo destapa caminando. Incluye tres biomas (Bosque Hueco, Dunas de Ceniza y Ciénaga Lóbrega) con jefes propios y minijefes secretos, 13 raiders con arma inicial y pasiva propia, 14 armas **que evolucionan por nivel**, 15 tomos, 16 objetos con rareza fija y 4 mascotas, dificultad por **vueltas** al circuito de mapas y meta-progresión entre incursiones (esquirlas, 40 misiones, desbloqueo de raiders, 6 reliquias permanentes de la Armería, pantalla de Colección, Cacería diaria con semilla por fecha). El diseño completo está en `GDD.md` y la historia de desarrollo en `CHANGELOG.md`.
 
 **Idioma:** el juego está íntegramente en **español latinoamericano**. La terminología canónica vive en `docs/GLOSARIO.md` y es obligatoria para cualquier cadena nueva; los identificadores (ids de catálogo, `node_name`, grupos, `StringName`, claves de guardado y los `print()` de depuración) se quedan en inglés a propósito.
 
@@ -28,6 +28,7 @@ godot -e --path .       # abre el editor
 | E | Interactuar (altares, cofres, portales, secretos) | `interact` |
 | C | Cambiar cámara: tercera persona → primera persona → órbita libre | `camera_mode` |
 | Rueda del mouse | Zoom (solo en cámara de órbita libre) | `camera_zoom_in` / `camera_zoom_out` |
+| Tab | Abre el **mapa** de tu vista a pantalla completa (etapa, reloj, leyenda, estadísticas, party y objetos). No pausa la partida | `map_overlay` |
 | Esc | Menú de pausa: **Continuar** / **Ajustes** / **Extraerse (terminar incursión)** — cierra la incursión y guarda / **Salir al menú** — abandona sin guardar nada | — (`ui_cancel`) |
 
 **Modos de cámara** (por jugador, también en co-op; en control: click del stick derecho alterna, D-pad arriba/abajo hace zoom):
@@ -35,9 +36,9 @@ godot -e --path .       # abre el editor
 - **Primera persona** — la cámara baja a los ojos y tu propia foca se oculta (solo en tu vista; tus compañeros te siguen viendo), con rango de pitch completo.
 - **Órbita libre** — la cámara orbita alrededor del jugador con mouse/stick y zoom con rueda/D-pad; el raider camina hacia donde te mueves, independiente de hacia dónde mire la cámara (las armas apuntan solas, así que la orientación es cosmética).
 
-Las armas disparan automáticamente al enemigo más cercano: no hay botón de ataque. Los mapeos viven en `project.godot`, sección `[input]`: `move_forward`, `move_back`, `move_left`, `move_right`, `jump`, `sprint`, `interact`, `camera_mode`, `camera_zoom_in`, `camera_zoom_out`. El menú de pausa usa `ui_cancel`, que es el mapeo por defecto de Godot (Esc). En co-op, el autoload `Coop` clona cada una de esas acciones por slot (`p1_*`, `p2_*`…) ligada solo al dispositivo de ese jugador.
+Las armas disparan automáticamente al enemigo más cercano: no hay botón de ataque. Los mapeos viven en `project.godot`, sección `[input]`: `move_forward`, `move_back`, `move_left`, `move_right`, `jump`, `sprint`, `interact`, `camera_mode`, `camera_zoom_in`, `camera_zoom_out`, `map_overlay`. El menú de pausa usa `ui_cancel`, que es el mapeo por defecto de Godot (Esc). En co-op, el autoload `Coop` clona cada una de esas acciones por slot (`p1_*`, `p2_*`…) ligada solo al dispositivo de ese jugador.
 
-**Control (también en solitario):** stick izquierdo = movimiento, stick derecho = cámara, A = salto, X o LB = derrape, Y = interactuar, click del stick derecho = cambiar cámara, D-pad arriba/abajo = zoom, B/Start = navegación de menús (acciones `ui_*` por defecto de Godot). Cualquier control conectado sirve en solitario; el mouse y el control conviven.
+**Control (también en solitario):** stick izquierdo = movimiento, stick derecho = cámara, A = salto, X o LB = derrape, Y = interactuar, click del stick derecho = cambiar cámara, D-pad arriba/abajo = zoom, BACK/Select = abrir el mapa, B/Start = navegación de menús (acciones `ui_*` por defecto de Godot). Cualquier control conectado sirve en solitario; el mouse y el control conviven.
 
 ## Co-op local (2-4 jugadores, pantalla dividida)
 
@@ -145,7 +146,7 @@ tools/verificar.sh            # 360 s de partida por arena (el modo estándar)
 tools/verificar.sh 720        # corrida larga, para cambios de ritmo tardío
 ```
 
-**Nunca con menos de 360 s**: por debajo, la puerta de cobertura de interactuables se salta en silencio y el script imprime OK sin haber exigido nada. La corrida completa tarda ~13 minutos.
+**Nunca con menos de 360 s**: por debajo, la puerta de cobertura de interactuables se salta en silencio y el script imprime OK sin haber exigido nada. La corrida completa tarda ~32 minutos (3 × 360 s + 1 × 720 s + import).
 
 Falla (exit 1) si el import o un soak imprimen errores/warnings de Godot, si una arena no llega al final de su soak, si no alcanza la cobertura mínima (el raider tiene que pasar de nivel 3; en corridas de ≥240 s tiene que abrir un cofre, cargar un altar o usar un portal), o si el soak de etapa no abre su portal, no cruza a las Dunas de Ceniza, deja algo vivo al cruzar, pierde progreso o no vuelve a producir un evento de cielo en el mapa nuevo. Los logs quedan en `$TMPDIR/bonkraiders-verify/` y cada arena imprime su resumen `nivel=… cofres=… altares=… portales=…`.
 

@@ -88,6 +88,7 @@ const PACT_TEXT: String = "Ganas: %s\nPagas: %s"
 
 func _init() -> void:
 	super()
+	marker_kind = &"altar_demonic"
 	boon_scale = 1.6
 	completed_text = "El obelisco bebe hondo: %s — la horda se pone más hambrienta"
 	choice_title = "El obelisco ofrece un trato"

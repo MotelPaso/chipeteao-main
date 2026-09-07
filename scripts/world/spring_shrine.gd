@@ -32,6 +32,7 @@ var _drying: bool = false
 
 func _init() -> void:
 	meta_stat_id = "shrines_used"
+	marker_kind = &"spring"
 	complete_sound = &"heal"
 
 

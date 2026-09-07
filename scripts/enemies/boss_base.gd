@@ -69,6 +69,8 @@ var _tier_stacks: int = 0
 
 
 func _ready() -> void:
+	# Map marker (iteration 52): a boss is the one enemy the map shows.
+	add_to_group(&"map_markers")
 	super()
 	# A scene-set bounty wins; boss_points_value only fills in the default.
 	if points_value == DEFAULT_POINTS_VALUE:
@@ -335,3 +337,10 @@ func _drop_health_orbs() -> void:
 		var orb_angle := TAU * (float(i) + 0.5) / float(maxi(health_orb_count, 1))
 		_spawn_health_orb(global_position + Vector3.UP * 0.6
 				+ Vector3(cos(orb_angle), 0.0, sin(orb_angle)) * ORB_RING_RADIUS)
+
+
+## Map marker contract (group "map_markers"). Regular enemies are
+## deliberately absent: a minimap dotted with forty grunts is noise, and
+## the horde is what the player is already looking at.
+func map_marker_kind() -> StringName:
+	return &"boss"

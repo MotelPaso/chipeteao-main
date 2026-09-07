@@ -120,6 +120,7 @@ var _disc_material: StandardMaterial3D = null
 
 func _init() -> void:
 	meta_stat_id = "shrines_used"
+	marker_kind = &"altar"
 	# Proximity charges the altar; there is no button, so the prompt must
 	# not offer one. Scenes MUST NOT override this (a scene value wins over
 	# _init and used to put a dead "[E] ..." line back on the label).

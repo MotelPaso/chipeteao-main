@@ -37,7 +37,10 @@ El acoplamiento cruzado va siempre por aquí. Lista actual:
 | `run_root` | la raíz de la partida (`Run.tscn`) | `arena_root()`, `current_arena()`, `advance_stage()` |
 | `arena_root` | la arena de la etapa viva | la busca `RunRoot`; el scatter la usa para filtrar sus keepouts |
 | `arena_bounds` | el nodo de scatter de la arena | `is_walkable`, `random_walkable_point`, extensión de arena |
-| `hud` | el HUD | `announce(msg)`, `announce_major(msg)`, `show_loot(...)`, `show_stage_tag(stage, lap)` |
+| `hud` | el HUD | `announce(msg)`, `announce_major(msg)`, `show_loot(...)`, `show_stage_tag(stage, lap)`, `on_stage_started(arena)` (reenvía a minimapa y mapa) |
+| `fog` | la niebla de guerra de la partida | `reset_for_stage(arena)`, `reveal_at(xz)`, `is_explored(xz)`, `explored_fraction()` |
+| `map_markers` | todo lo que sale en el mapa (raiders, jefes, interactuables con `marker_kind`) | `map_marker_kind()`, opcional `map_marker_color()` |
+| `map_overlay` | los mapas de Tab vivos | `marker_count()` (lo lee el harness) |
 | `boss_ui` | HUD + flecha de jefe | `track_boss(boss, title)`, `track_objective(node)`, `announce` |
 | `upgrade_ui` | `UpgradeCardUI` | `open_bonus_pick(...)`, `open_choice(...)` |
 | `altars` | todo `ChargeShrine` vivo (de escena o del director) | el cupo de altares sin gastar del `WorldDirector` |
@@ -235,6 +238,16 @@ persecución en vez de enriquecerla. Lo que compra el relieve es legibilidad
   `_enter_tree`, leída por el grupo `arena_bounds`), así que `BONK_SEED`,
   `BONK_GAME_SEED` y la Cacería diaria reproducen el mismo relieve **y** los
   mismos props encima.
+  - **De dónde sale esa semilla** (corregido en la iteración 52): de
+    `randi()`, es decir del **stream de la partida**, el que
+    `RunState.reset()` acaba de sembrar. Antes era `_rng.randomize()`, que
+    resiembra desde la entropía del sistema y **es sorda** a ese `seed()`:
+    `BONK_GAME_SEED` no reproducía nada: dos soaks con la misma semilla
+    salían con máscara, props y relieve distintos (medido: `168/576` vs
+    `167/576` celdas bloqueadas, `min=-1.8 max=1.8` vs `min=-2.1 max=2.0`).
+    Lo encontró la puerta de niebla de esta misma iteración, comparando dos
+    corridas que debían ser idénticas. Una partida normal no cambia: ahí
+    `reset()` hace `randomize()` sobre el mismo stream.
 - **Orden de construcción**: se arma en `_ready`, que corre **antes** de
   `Arena._ready` (los hijos primero) y **después** del `_enter_tree` del
   scatter, así que la máscara y los sitios de meseta ya existen. Quien pueda
@@ -299,6 +312,122 @@ y muros siguen contando); el vigilante de celda bloqueada compara
   - `Rock.tscn` y `DuneRock.tscn` llevan **un `ConvexPolygonShape3D` por blob visible** (2 y 3), con los puntos ya horneados en la transformación del blob para que el `CollisionShape3D` quede en identidad y `_spawn_prop` pueda seguir escalando **uniformemente** (Godot no soporta escalar una forma de colisión de forma no uniforme). Antes el blob lateral no tenía collider.
 - API: `is_walkable(Vector2)`, `random_walkable_point()`, `blocked_cell_count()`, `open_cell_count()`, `blocked_cells()`, `cell_center(Vector2i)`, `cell_of(Vector2)` (las tres últimas las usa el barrido de máscara del harness). Consumidores: `EnemySpawner._ring_position` / `_band_position` / `spawn_pressure_burst` (reintentan hasta hallar celda abierta, no clampean), `WorldDirector` (un **único** helper respeta la máscara para portales, ruleta, altares y cofres de evento), `scatter._is_clear`, y el harness de pruebas. La máscara se construye en `_enter_tree` (antes del barajado del director) con el mismo RNG. Log `Arena mask:`, que **imprime la fracción abierta** (la puerta que persigue el bucle de reconstrucción).
 - Inicio irregular: `WorldDirector._randomize_starting_pois` elimina cofres/altares colocados con `poi_skip_chance` (conserva al menos el primer cofre) y añade `extra_start_chests_min..max` cofres en puntos libres. Log `Start layout:`.
+
+## Minimapa y mapa (Tab)
+
+Desde la iteración 52 cada vista de jugador tiene **su propio** minimapa en la
+esquina y **su propio** mapa a pantalla completa con Tab. En 240×240 con
+relieve, «¿dónde estoy y dónde está lo que no he abierto?» dejó de ser
+respondible mirando alrededor.
+
+### Las tres piezas
+
+| Pieza | Qué es | Dónde vive |
+|---|---|---|
+| `FogOfWar` | lo que el equipo **ha visto** de la etapa | `scripts/systems/fog_of_war.gd`, nodo de `RunSystems.tscn`, grupo `fog`, `static find(tree)` |
+| `MapDraw` | **el** dibujante: fondo, composición con niebla, marcadores, proyección | `scripts/ui/map_draw.gd` (`RefCounted`, `MapDraw.new(get_tree())`) |
+| `Minimap` / `MapOverlay` | los dos consumidores | `scripts/ui/minimap.gd`, `scripts/ui/map_overlay.gd`, ambos creados por el HUD |
+
+**`MapDraw` es uno solo a propósito.** Un widget de 150 px y un overlay de
+media pantalla comparten el 100% de la lógica (la imagen del terreno, el
+oscurecido de celdas bloqueadas, la composición con la niebla, el filtrado de
+marcadores y la proyección mundo→pantalla). Escrita dos veces, la única
+pregunta interesante —«¿por qué el marcador cae en un sitio distinto en el
+minimapa?»— habría tenido respuesta.
+
+Reparto de trabajo, y **cuándo** corre cada cosa:
+
+- `build_background(arena)` — **una vez por etapa**, desde el hook de etapa del
+  consumidor. Pide `Terrain.map_image(PIXELS_PER_METER)` (tinte del bioma
+  sombreado por altura; 0.5 px/m = 240 px para una arena de 240 m) y oscurece
+  las celdas que la máscara bloquea, para que el mapa tenga la **forma
+  irregular** de la etapa y no un cuadrado limpio.
+- `composite()` — en el tick de refresco (10 Hz). Fondo × niebla en una única
+  `ImageTexture` que el consumidor solo blitea. Lo inexplorado se atenúa a
+  `FOG_ALPHA` 0.85, **no** se pinta opaco: la silueta del mapa es una pista, lo
+  que hay **encima** es la recompensa.
+- `collect_markers()` — 10 Hz. Quién está dónde, filtrado por la niebla.
+- `draw_into(canvas, rect, marker_scale)` — desde el `_draw` de cada consumidor.
+
+Las tres primeras son **métodos planos sin Control**: un soak headless las
+ejercita aunque `_draw()` no se despache jamás bajo el renderer dummy. Esa es
+la razón de que el minimapa y el overlay refresquen llamándolas en vez de
+dejarlo todo dentro de `_draw`.
+
+### Niebla de guerra
+
+- Estado autoritativo: **una `Image` L8** (255 explorado, 0 desconocido),
+  `meters_per_pixel` 2.0 → 121×121 para 240 m. Nada fuera de `FogOfWar`
+  escribe en ella.
+- Se pinta un disco de `reveal_radius` 18 m por raider **vivo y caído** cada
+  `paint_interval` 0.2 s. Los caídos revelan porque su cuerpo sigue ahí.
+- **Compartida por todo el equipo**: en co-op, cuatro raiders explorando cuatro
+  esquinas están explorando **un** mapa.
+- Ámbito de partida: se reconstruye por etapa desde
+  `WorldDirector.on_stage_started` (no desde la señal `stage_changed`: por ese
+  hook pasa también la etapa 0, así que no hay caso especial de primera etapa)
+  y no persiste nada entre incursiones.
+- `explored_fraction()` no barre la imagen: `reveal_at` lleva la cuenta de
+  píxeles nuevos. El harness la lee.
+- API pública: `reveal_at(xz)` (existe para un futuro power-up de «leer el
+  mapa»), `is_explored(xz)`, `explored_fraction()`, `pixels()`,
+  `half_extent()`.
+
+### Marcadores de mapa
+
+Un nodo aparece en el mapa **poniendo `marker_kind`** y nada más: `Interactable`
+se une solo al grupo `map_markers` cuando ese export no está vacío, y expone
+`map_marker_kind()`. `Player` y `BossBase` hacen lo mismo por su cuenta.
+
+- La tabla es `MapDraw.MARKER_STYLES`: color, forma (`dot` / `square` /
+  `triangle` / `diamond`), tamaño y `always_visible`. **Un kind que no está en
+  la tabla no se dibuja.**
+- Solo los raiders y la **salida** son `always_visible`; todo lo demás hay que
+  **encontrarlo** (la niebla filtra en `collect_markers`).
+- **Los enemigos normales no se dibujan nunca.** Un minimapa con cuarenta
+  grunts es ruido, y la horda es justo lo que el jugador ya está mirando. Solo
+  los jefes.
+- Un altar gastado o un cofre abierto **desaparecen** por el `available` que
+  esos nodos ya tenían: no se añadió estado nuevo.
+- `secret_trigger.gd` deja `marker_kind` **vacío a propósito** y lo dice en un
+  comentario: los secretos siguen siendo secretos.
+- Las **cinco últimas filas** de la tabla (`powerup`, `vendor`, `lucky_block`,
+  `pet_box`, `event_altar`) están **reservadas para la parte C**. Esa parte solo
+  tiene que poner el `marker_kind` en su nodo; aquí no se toca nada.
+- Un nodo puede además implementar `map_marker_color()` para pintarse con su
+  propio color (rareza de cofre, por ejemplo) sin tocar la tabla.
+
+### Los dos consumidores
+
+- **`Minimap`** (150 px): norte arriba, marcadores a 0.75 de escala, refresco
+  0.1 s. En solitario va arriba a la derecha, **bajo la insignia de FPS**; en
+  co-op, uno por celda de pantalla dividida.
+- **`MapOverlay`**: capa **8** (bajo `UpgradeCardUI` 10 — una carta abierta
+  tiene que verse por encima), `PROCESS_MODE_ALWAYS`, grupo `map_overlay`.
+  Cabecera «Etapa N · Vuelta M — MM:SS», leyenda abajo a la izquierda y tres
+  paneles a la derecha: **Estadísticas** (toda la capa derivada, con
+  `cooldown_multiplier` mostrado como **velocidad de ataque en positivo**,
+  regla 7 del glosario), **Jugadores** (HP, nivel y puntos de los cuatro slots,
+  caídos incluidos) y **Objetos** (objetos con copias, armas con nivel, tomos
+  con su numeral).
+- **No pausa la partida.** Es un mapa, no un menú: el mundo sigue vivo detrás,
+  y por eso el overlay tampoco entra en `ui_blocking`. Se oculta solo si la
+  partida no está activa, si el árbol está pausado o si el slot no tiene raider.
+- **Todo Control de ambos widgets es `FOCUS_NONE` y `MOUSE_FILTER_IGNORE`**
+  (`_own()`): **Tab es `ui_focus_next` de Godot**, así que un solo Control
+  enfocable dentro del overlay se come la tecla y el mapa deja de cerrarse.
+  Es la trampa de esta iteración; si añades un Control aquí, pásalo por `_own`.
+- El HUD los construye: `_build_map_widgets(count)` crea un par por jugador y
+  `_anchor_to_cell` los ancla usando **`SplitScreenView.cell_rect(i, n)`**, que
+  era `_cell_rect` privado y se hizo público exactamente para esto (con un caso
+  `1:` explícito que devuelve el rect entero).
+
+### Entrada
+
+`map_overlay` es una acción nueva de `project.godot` (Tab por keycode físico,
+botón **BACK** en control) y está en `Coop.BASE_ACTIONS`, así que cada slot
+tiene su `p1_map_overlay`, `p2_map_overlay`… ligado solo a su dispositivo: en
+co-op cada jugador abre **su** mapa.
 
 ## Misiones y meta-progresión
 
@@ -370,7 +499,7 @@ y muros siguen contando); el vigilante de celda bloqueada compara
 
 ## UI
 
-- Capas (CanvasLayer): SplitScreen (capa por defecto) → HUD 5 → UpgradeCardUI 10 → RunEndScreen 20 → PauseMenu 30 → ScreenFade 100. Archivos en `scripts/ui/` + `scenes/ui/`.
+- Capas (CanvasLayer): SplitScreen (capa por defecto) → HUD 5 → MapOverlay 8 → UpgradeCardUI 10 → RunEndScreen 20 → PauseMenu 30 → ScreenFade 100. Archivos en `scripts/ui/` + `scenes/ui/`.
 - **`UiTheme`** (`scripts/ui/ui_theme.gd`, todo `static`) es el sistema de diseño: paleta, radios, `style_card()` (un único constructor de tarjeta de 4 estados), `style_button`, `style_title`, `style_badge`, `style_bar`, `attach_motion`, `pop`, `spaced_font(spacing)` (con caché por spacing) y las abreviaturas compartidas `LEVEL_ABBREV` («Nv %d») / `WEAPON_LEVEL_ABBREV` («N%d»). **No inventes styleboxes nuevas en una pantalla**: si falta un estilo, se añade aquí.
 - **`CardFactory`** arma las tarjetas del selector; **`MetaScreen`** es el chasis de Registro / Colección / Armería.
 - **`ScreenFade`** (autoload): `transition(callable)` funde a negro, ejecuta el callable (el `change_scene`/`reload` y su limpieza) y funde de vuelta; mientras está ocupado **descarta** peticiones repetidas y devuelve `false`, así que la limpieza irreversible va **dentro** del callable, nunca antes. `leave_run(ruta)` es el **único dueño del ritual de fin de partida**: guarda ajustes, para los loops de audio, deja el árbol **pausado durante el swap** (dos frames), llama `RunState.reset()` y cambia de escena. Cualquier botón que saque de una partida debe usarlo.
@@ -384,7 +513,7 @@ Cada casilla de la tira de equipamiento resuelve su arte en este orden:
 
 La existencia se comprueba con `ResourceLoader.exists(path, "Texture2D")`, **no** con `FileAccess.file_exists`: en una build exportada el PNG viaja empaquetado como `.ctex` y el chequeo de archivo daría falso. El único PNG del repo es el placeholder, generado por `scripts/tools/generate_placeholder_icon.gd` (`godot --headless -s ...`, sin autoloads, hermano de `generate_sfx.gd`) y commiteado junto a su `.import`.
 
-- HUD (`hud.gd`): grupos `hud` y `boss_ui`; API por grupo: `announce(msg)`, `announce_major(msg)` (ceremonias), `track_boss(boss, title)`, `show_tier_tag(tier)`. Barras HP/XP, cronómetro (se repinta solo cuando cambia el segundo), bajas, rachas, insignia de puntos, `Dificultad +N%`, filas compactas J2-J4 en co-op, **toast de botín** (`show_loot`) y **badge de FPS** opcional arriba a la derecha (`SaveData.show_fps`, Ajustes → «Mostrar FPS»; se sondea, no se escucha, porque la opción se cambia con el HUD vivo o antes de que exista). Desde la iteración 48 la tira de equipamiento son **dos**: armas y tomos abajo a la izquierda, objetos abajo a la derecha. Overlay de perf oculto: export `show_perf_probe` o `BONK_PERF=1`. El daño a un compañero **no** dispara viñeta/shake globales, solo el pop de su fila.
+- HUD (`hud.gd`): grupos `hud` y `boss_ui`; API por grupo: `announce(msg)`, `announce_major(msg)` (ceremonias), `track_boss(boss, title)`, `show_tier_tag(tier)`. Barras HP/XP, cronómetro (se repinta solo cuando cambia el segundo), bajas, rachas, insignia de puntos, `Dificultad +N%`, filas compactas J2-J4 en co-op, **toast de botín** (`show_loot`) y **badge de FPS** opcional arriba a la derecha (`SaveData.show_fps`, Ajustes → «Mostrar FPS»; se sondea, no se escucha, porque la opción se cambia con el HUD vivo o antes de que exista). Desde la iteración 48 la tira de equipamiento son **dos**: armas y tomos abajo a la izquierda, objetos abajo a la derecha. Overlay de perf oculto: export `show_perf_probe` o `BONK_PERF=1`. El daño a un compañero **no** dispara viñeta/shake globales, solo el pop de su fila. Desde la iteración 52 el HUD también **construye y ancla** el minimapa y el mapa de Tab de cada jugador (`_build_map_widgets`, `_anchor_to_cell`) y les reenvía `on_stage_started(arena)` — ver «Minimapa y mapa (Tab)».
 - Flecha de jefe (`boss_arrow.gd`): `bind_view(camera, carrier)` inyecta la cámara y el raider de esa vista. Sin inyección cae al viewport raíz (solo) — ver la convención de cámaras.
 - Cartas (`upgrade_card_ui.gd`): en `RunState.leveled_up` pausa el árbol y ofrece 3 tiradas de `UpgradePool.roll_offer()` **de un solo lado del pool** (ver «Cartas de mejora»); los picks extra se encolan.
 - **`open_choice(title, options, recipient, on_pick, tag)`** (iteración 47) es la **única** ampliación del contrato: dibuja opciones que el llamador construyó (`{title, description, color, ...payload}`) y le devuelve la elegida por `on_pick`. No tira rareza, no aplica nada, no es un framework de menús. Existe así a propósito: la pausa, la cola, el título con destinatario de co-op, el look de `UiTheme.style_card` y —sobre todo— el harness de soaks (que responde llamando `_on_card_pressed(0)` sobre cualquier nodo visible del grupo `upgrade_ui`) siguen funcionando **porque una elección ES un pick**. Una UI bloqueante nueva sería una forma nueva de encallar una partida.
@@ -436,7 +565,7 @@ Logs en `$TMPDIR/bonkraiders-verify/`. Cada arena imprime su resumen `nivel=… 
 
 ### El harness: `scenes/tests/ArenaProbe.tscn` + `arena_probe.gd`
 
-Arranca una arena como **hijo de un nodo siempre activo**, imprime estado cada 2 s (`frame N paused=… run_time=… enemies=… level=…`) y elige sola la primera carta en cada subida de nivel (si no, el soak se queda pausado en la primera carta).
+Arranca una arena como **hijo de un nodo siempre activo**, imprime estado cada 2 s (`frame N paused=… run_time=… enemies=… level=… airborne=… explored=…`) y elige sola la primera carta en cada subida de nivel (si no, el soak se queda pausado en la primera carta).
 
 Desde la iteración 45 **el raider camina e interactúa por defecto**. Un raider aparcado se salta en silencio todo sistema condicionado al movimiento — el Rastro de baba solo suelta charcos moviéndose, los altares de carga solo cargan con alguien en el anillo, cofres y portales necesitan que alguien llegue **y** pulse interactuar — así que un soak quieto reporta «sin errores» sobre código que nunca ejecutó. Cómo funciona, y por qué importa si tocas el Player:
 
@@ -449,6 +578,32 @@ Desde la iteración 45 **el raider camina e interactúa por defecto**. Un raider
 - **Barrido de máscara** (iteración 48, una sola vez en el frame de física 10, cuando los transforms de los props ya llegaron al servidor de física): por cada celda bloqueada recorre en pasos de 0.2 m cada arista que comparte con una celda caminable y prueba ahí una cápsula del tamaño del jugador (radio 0.4, altura 1.8, centrada a 0.9 m) a caballo de la arista contra la capa 1, excluyendo a los raiders. Una muestra que no golpea nada es una **apertura**. Imprime `Mask sweep: blocked=%d samples=%d openings=%d` y hace `push_warning` por cada apertura. Es la prueba de que las rocas sellan de verdad; **jamás se afloja la tolerancia ni la densidad de muestreo** para hacerlo pasar — se mueven las rocas.
 - **Raider dentro de celda bloqueada** (iteración 48): si el raider líder está **a nivel de suelo** (y ≤ 0.6, no sobre una roca ni una meseta) dentro de una celda no caminable más de 2 s seguidos, `push_warning`. Se reporta una vez por entrada a la celda, no por frame.
 - **Detector de enemigos voladores** (iteración 48): un cuerpo cuenta como *airborne* cuando lleva `velocity.y > 0.5` **en subida y sin piso** durante 0.5 s seguidos. Exactamente dos excepciones, y son las dos que suben a propósito: un enemigo en estado de trepada (`_climbing`) y un Duneburrower en erupción. Cada ocurrencia nueva imprime **un** `push_warning` (una vez por cuerpo) y la línea de estado del harness termina en `airborne=%d` acumulado. Las reglas son fijas: ensancharlas para callar un warning es exactamente lo que este detector existe para impedir.
+- **Cobertura de niebla** (iteración 52): la línea de estado termina en
+  `explored=` (`FogOfWar.explored_fraction()`) y al terminar el soak imprime
+  `Probe fog: explored=%.2f`, avisando si quedó por debajo de
+  `FOG_MIN_EXPLORED` **0.09**. Ese número se calibró **una sola vez**, con las
+  tres arenas a 360 s y las semillas de `verificar.sh`: Bosque Hueco 0.15,
+  Dunas de Ceniza 0.32, Ciénaga Lóbrega 0.16 → el **60% de la peor**. Ese 40%
+  de margen no es holgura para un recorrido flojo, es **varianza medida**: el
+  mundo sí es reproducible (misma máscara, mismo relieve, líneas de frame
+  idénticas los primeros ~38 s) pero la partida **no** —el orden de contactos
+  de la física diverge y la misma semilla cae entre 0.13 y 0.24 en el mismo
+  mapa—, así que una puerta clavada en el mínimo observado sería intermitente.
+  Aun así atrapa lo que existe para atrapar: la corrida en la que el raider se
+  quedó atascado midió **0.08**. Es un piso: se sube si el recorrido mejora, no
+  se baja porque una corrida se quedó corta. La fracción se **cachea mientras la partida vive**: en
+  `_exit_tree` el nodo de niebla ya no está y leerla ahí reportaba 0.00. El
+  soak de etapa (`BONK_STAGE_FAST`) no pasa por esta puerta: dura 60 s por
+  etapa a propósito y no le da tiempo a explorar nada.
+- **Mapa de Tab** (iteración 52): cada `MAP_OVERLAY_INTERVAL` 60 s pulsa
+  `map_overlay`, lo mantiene `MAP_OVERLAY_HOLD` 2 s y suelta. Imprime
+  `Map overlay: open markers=%d` y `Map overlay: closed`. El conteo se lee
+  `MAP_OVERLAY_REPORT_DELAY` 0.5 s **después** de la pulsación, no en el mismo
+  frame: el overlay refresca en su propio `_process`, que cae en un frame de
+  idle **posterior** al de física que sintetizó la tecla, y leerlo antes
+  reportaba el mapa de antes de abrirse (`markers=0`).
+- `_send_action(base, pressed)` es el sintetizador de teclas genérico (antes
+  era solo `_send_interact`): misma regla de soltar en un frame posterior.
 - Nunca toca el guardado real: re-apunta `SaveData.save_path` a `user://soak_save.json` antes de instanciar la arena.
 
 Variables de entorno:

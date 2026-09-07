@@ -14,6 +14,8 @@ extends Node
 ##   BONK_ELITE_BOOST=1     every spawn rolls shiny (crowding stress test)
 ##   BONK_STAGE_FAST=1      stages clear at 60 s with no boss, so one soak
 ##                          crosses a stage change (RunManager reads it)
+##   BONK_GAME_SEED=<int>   seeds the GAME's RNG (RunState.reset), which is
+##                          what makes a whole soak reproducible
 ##
 ## The raider WALKS AND INTERACTS by default (iteration 45). A parked raider
 ## silently skips every movement-gated system — Slime Trail only drops
@@ -180,6 +182,40 @@ var _dwell_left: float = 0.0
 var _stage_cleared_seen: bool = false
 ## True while BONK_STAGE_FAST is set (read once, at ready).
 var _stage_fast: bool = false
+## Fog gate. A soak that explores almost nothing is a soak whose raider
+## never went anywhere, and that is exactly the failure the walk exists to
+## catch — the fog is the only signal that reports it directly.
+##
+## Calibrated ONCE (iteration 52) against three 360 s biome soaks with
+## BONK_SEED=4242 BONK_GAME_SEED=4242: Hollow Woods 0.15, Ash Dunes 0.32,
+## Gloomfen 0.16. The gate is 60% of the WORST of those.
+##
+## The 60% is not slack for a lazy tour, it is measured variance: the world
+## is reproducible (same mask, same relief, frame-identical for the first
+## ~38 s) but the run is not — physics contact order diverges and the same
+## seed lands anywhere in 0.13-0.24 on the same map. A gate pinned to the
+## observed minimum would be flaky; this one still catches the failure it
+## exists for, a raider that stops walking, which measured 0.08.
+##
+## It is a floor on coverage: raise it if the tour gets better, never lower
+## it because a run came up short.
+const FOG_MIN_EXPLORED: float = 0.09
+## Last fog reading taken while the run was alive. _exit_tree runs during
+## teardown, when the RunSystems that owns the fog is already gone, so the
+## summary has to report what was measured, not what is left.
+var _explored_seen: float = 0.0
+## Seconds between Tab presses, and how long the overlay stays open.
+const MAP_OVERLAY_INTERVAL: float = 60.0
+const MAP_OVERLAY_HOLD: float = 2.0
+var _map_overlay_left: float = MAP_OVERLAY_INTERVAL
+var _map_overlay_close_left: float = 0.0
+## The overlay refreshes on its own _process, which lands in an idle frame
+## AFTER this physics one; reading the count immediately reported the map
+## as it was before it opened.
+const MAP_OVERLAY_REPORT_DELAY: float = 0.5
+var _map_overlay_report_left: float = 0.0
+var _map_overlay_open: bool = false
+
 ## True once the tour has been told to drop everything and head for the
 ## exit portal (see _tick_stage_flow); re-armed on every stage change.
 var _exit_rush: bool = false
@@ -304,6 +340,66 @@ func _apply_godmode() -> void:
 func _exit_tree() -> void:
 	# One-line log (RunManager convention) for headless soaks.
 	print("Probe legs: reached=%d timed_out=%d" % [_legs_reached, _legs_timed_out])
+	var explored := _explored_seen
+	print("Probe fog: explored=%.2f" % explored)
+	# Skipped under BONK_STAGE_FAST: that soak resets the fog every minute
+	# when it crosses a stage, so its coverage says nothing about the walk.
+	if not _stage_fast and explored < FOG_MIN_EXPLORED:
+		push_warning("ArenaProbe: fog barely explored — %.2f < %.2f"
+				% [explored, FOG_MIN_EXPLORED])
+
+
+
+func _explored_fraction() -> float:
+	var fog := FogOfWar.find(get_tree())
+	if fog != null:
+		_explored_seen = fog.explored_fraction()
+	return _explored_seen
+
+
+## Opens the Tab map every MAP_OVERLAY_INTERVAL seconds and closes it
+## MAP_OVERLAY_HOLD later. Not decoration: the overlay is a Control that
+## composites an image and walks the marker group, and this is the only
+## thing that ever exercises that path in a soak.
+func _tick_map_overlay(delta: float) -> void:
+	if _map_overlay_open:
+		if _map_overlay_report_left > 0.0:
+			_map_overlay_report_left -= delta
+			if _map_overlay_report_left <= 0.0:
+				_report_map_markers()
+		_map_overlay_close_left -= delta
+		if _map_overlay_close_left <= 0.0:
+			_map_overlay_open = false
+			_send_action(&"map_overlay", true)
+			_release_map_overlay.call_deferred()
+			print("Map overlay: closed")
+		return
+	_map_overlay_left -= delta
+	if _map_overlay_left > 0.0:
+		return
+	_map_overlay_left = MAP_OVERLAY_INTERVAL
+	_map_overlay_open = true
+	_map_overlay_close_left = MAP_OVERLAY_HOLD
+	_map_overlay_report_left = MAP_OVERLAY_REPORT_DELAY
+	_send_action(&"map_overlay", true)
+	_release_map_overlay.call_deferred()
+
+
+func _release_map_overlay() -> void:
+	_send_action(&"map_overlay", false)
+
+
+## Marker count of slot 0's overlay, MAP_OVERLAY_REPORT_DELAY after the
+## press: the overlay refreshes in its own idle _process, which lands
+## after this physics frame, so reading it sooner reported the map as it
+## was before it opened (markers=0).
+func _report_map_markers() -> void:
+	var markers := 0
+	for node: Node in get_tree().get_nodes_in_group(&"map_overlay"):
+		if int(node.get("slot")) == 0 and node.has_method(&"marker_count"):
+			markers = int(node.call(&"marker_count"))
+			break
+	print("Map overlay: open markers=%d" % markers)
 
 
 func _physics_process(delta: float) -> void:
@@ -312,13 +408,14 @@ func _physics_process(delta: float) -> void:
 		_swept = true
 		_run_mask_sweep()
 	_tick_stage_flow(delta)
+	_tick_map_overlay(delta)
 	_watch_airborne(delta)
 	_watch_blocked_cell(delta)
 	if _frames % 120 == 0:
-		print("frame %d paused=%s run_time=%.1f active=%s enemies=%d level=%d airborne=%d" % [
+		print("frame %d paused=%s run_time=%.1f active=%s enemies=%d level=%d airborne=%d explored=%.2f" % [
 				_frames, get_tree().paused, RunState.run_time, RunState.run_active,
 				get_tree().get_node_count_in_group("enemies"), RunState.level,
-				_airborne_total])
+				_airborne_total, _explored_fraction()])
 	var card_ui_open := false
 	for node: Node in get_tree().get_nodes_in_group("upgrade_ui"):
 		var ui := node as CanvasLayer
@@ -686,8 +783,15 @@ func _release_interact() -> void:
 
 
 func _send_interact(pressed: bool) -> void:
+	_send_action(&"interact", pressed)
+
+
+## One synthesized action press for slot 0. A PARSED InputEventAction, not
+## Input.action_press: an _unhandled_input handler only ever sees the
+## parsed kind, and Input.is_action_just_pressed sees both.
+func _send_action(base: StringName, pressed: bool) -> void:
 	var event := InputEventAction.new()
-	event.action = Coop.action(0, &"interact")
+	event.action = Coop.action(0, base)
 	event.pressed = pressed
 	Input.parse_input_event(event)
 

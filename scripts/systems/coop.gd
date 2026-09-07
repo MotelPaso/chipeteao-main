@@ -27,6 +27,7 @@ const BASE_ACTIONS: Array[StringName] = [
 	&"move_forward", &"move_back", &"move_left", &"move_right",
 	&"jump", &"sprint", &"interact",
 	&"camera_mode", &"camera_zoom_in", &"camera_zoom_out",
+	&"map_overlay",
 ]
 
 ## Right-stick look tuning shared by every pad-driven camera.
@@ -38,6 +39,8 @@ const LOOK_SPEED: float = 2.6
 const PAD_JUMP_BUTTON := JOY_BUTTON_A
 const PAD_SPRINT_BUTTON := JOY_BUTTON_X
 const PAD_INTERACT_BUTTON := JOY_BUTTON_Y
+## Tab's pad equivalent: Back/Select, the button every game puts the map on.
+const PAD_MAP_BUTTON := JOY_BUTTON_BACK
 
 var player_count: int = 1
 ## Input device per slot: KEYBOARD_DEVICE or a joypad device id.
@@ -244,6 +247,8 @@ func _pad_events_for(base: StringName, device: int) -> Array[InputEvent]:
 			events.append(_button_event(device, JOY_BUTTON_LEFT_SHOULDER))
 		&"interact":
 			events.append(_button_event(device, PAD_INTERACT_BUTTON))
+		&"map_overlay":
+			events.append(_button_event(device, PAD_MAP_BUTTON))
 		&"camera_mode":
 			events.append(_button_event(device, JOY_BUTTON_RIGHT_STICK))
 		&"camera_zoom_in":

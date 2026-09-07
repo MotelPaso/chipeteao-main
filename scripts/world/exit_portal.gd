@@ -39,6 +39,7 @@ var _taken: bool = false
 
 func _init() -> void:
 	prompt_text = "[E] Cruzar al siguiente mapa"
+	marker_kind = &"exit"
 	prompt_height = 4.2
 	# No meta counter of its own: the stage counters live in RunState and
 	# are folded once at the end of the run.

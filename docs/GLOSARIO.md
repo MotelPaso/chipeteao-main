@@ -23,6 +23,7 @@ Lo que NO se traduce nunca: los `id` de catálogo, los `node_name`, los nombres 
 18. Compuestos: verbo + sustantivo en plural (Perforacorazones, Matarreyes, Cazacoronas, Levantatapas); mata- no elide nunca. Escupesol va en singular (quitasol, girasol).
 19. Los glifos de dos letras de item_catalog.gd se re-siglan al nombre español (tabla en «terminos»); un glifo «WS» sobre «Piedra de afilar» se lee como bug.
 20. Brevedad: la etiqueta española no debe crecer más de ~10% sobre la inglesa en HUD, insignias y botones. Si crece, se recorta el adjetivo, nunca el sentido.
+21. El mapa de Tab **no** es un menú y su título no lleva verbo: la cabecera es «Etapa N · Vuelta M — MM:SS» y los tres paneles son sustantivos sueltos («Estadísticas», «Jugadores», «Objetos»). La leyenda nombra **familias** en plural («Cofres», «Altares», «Portales») y en singular solo lo que es único en la etapa («Jefe», «Salida», «Manantial», «Ruleta»).
 
 ## Personajes (no se traducen)
 
@@ -395,6 +396,40 @@ Lo que NO se traduce nunca: los `id` de catálogo, los `node_name`, los nombres 
 | beam length | largo del rayo |
 | chain | encadenamiento |
 | recharge (portales) | recarga — reservado para portales, NO para cooldown |
+
+## Mapa, minimapa y niebla (iteración 52)
+
+| Inglés | Español |
+|---|---|
+| minimap | minimapa (el widget de esquina, uno por vista) |
+| map | mapa (el de Tab, a pantalla completa) |
+| map overlay | mapa (nunca «superposición»; en código, `map_overlay`) |
+| fog of war | niebla de guerra (corto: niebla) |
+| explored | explorado |
+| unexplored | sin explorar |
+| reveal | destapar (la niebla), revelar (un secreto) |
+| legend | leyenda |
+| marker | marcador |
+| Stats | Estadísticas |
+| Players | Jugadores |
+| Items | Objetos |
+| Stage %d | Etapa %d |
+| Stage %d · Lap %d | Etapa %d · Vuelta %d |
+| `%s — %02d:%02d` | `%s — %02d:%02d` |
+| Boss | Jefe |
+| Chests | Cofres |
+| Altars | Altares |
+| Spring | Manantial |
+| Roulette | Ruleta |
+| Portals | Portales |
+| Exit | Salida |
+| `J%d  %s  %s  %s  %d pts` | `J%d  %s  %s  %s  %d pts` |
+
+Las filas del panel **Estadísticas** reusan tal cual los términos de la tabla
+«Estadísticas» de más abajo, incluida la **regla 7**: `cooldown_multiplier` se
+imprime como «Velocidad de ataque» y **en positivo**. Los nombres de arma,
+tomo y objeto del panel **Objetos** salen de los catálogos ya traducidos: el
+overlay no tiene tabla propia de nombres.
 
 ## Rarezas
 

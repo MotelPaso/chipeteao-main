@@ -37,6 +37,7 @@ var _time: float = 0.0
 
 func _init() -> void:
 	prompt_text = "[E] Atravesar"
+	marker_kind = &"portal"
 	prompt_height = 3.0
 	meta_stat_id = ""
 	collision_layer = 0

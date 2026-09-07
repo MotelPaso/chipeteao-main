@@ -6,6 +6,10 @@ extends Interactable
 ## awaken flow both secrets share. One use per run (consume pattern);
 ## scene reload resets it naturally. No meta stat: the quest counters ride
 ## on the miniboss KILL (SecretBossBase), not on the trigger.
+##
+## NEVER a map marker (iteration 52): `marker_kind` stays empty on purpose.
+## A secret you can read off the Tab map is not a secret — finding these is
+## the whole mechanic.
 
 ## Hidden miniboss scene (root must extend BossBase) this trigger awakens.
 @export var miniboss_scene: PackedScene

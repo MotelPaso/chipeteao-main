@@ -60,7 +60,7 @@ static func build(players: Array) -> SplitScreen:
 		if source == null:
 			push_error("SplitScreen: player %d has no view camera." % i)
 			continue
-		var rect := _cell_rect(i, count)
+		var rect := cell_rect(i, count)
 		var container := SubViewportContainer.new()
 		container.name = "View%d" % (i + 1)
 		container.stretch = true
@@ -102,11 +102,16 @@ func _process(_delta: float) -> void:
 		pair.sync()
 
 
-## Anchor rect (in 0-1 space) for player cell `index` of `count`.
-static func _cell_rect(index: int, count: int) -> Rect2:
+## Anchor rect (in 0-1 space) for player cell `index` of `count`. Public
+## since iteration 52: the HUD anchors one minimap and one map overlay per
+## player, and both have to land in exactly the cell that player's camera
+## renders into. Solo (count <= 1) is the whole window.
+static func cell_rect(index: int, count: int) -> Rect2:
 	match count:
 		2:
 			return Rect2(0.0, 0.5 * index, 1.0, 0.5)
+		1:
+			return Rect2(0.0, 0.0, 1.0, 1.0)
 		_:
 			return Rect2(0.5 * (index % 2), 0.5 * (index >> 1), 0.5, 0.5)
 

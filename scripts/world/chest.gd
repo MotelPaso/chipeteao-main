@@ -64,6 +64,7 @@ func _init() -> void:
 	meta_stat_id = "chests_opened"
 	complete_sound = &"chest_open"
 	prompt_text = "[E] Abrir el cofre"
+	marker_kind = &"chest"
 
 
 func _ready() -> void:
@@ -254,3 +255,9 @@ func _tint_by_rarity() -> void:
 			_glow_light.position = Vector3.UP * 1.2
 			add_child(_glow_light)
 		_glow_light.light_color = color
+
+
+## A free chest reads as its own marker: on a 240 m map, "worth the walk
+## even with no points" is the single most useful thing the icon can say.
+func map_marker_kind() -> StringName:
+	return &"chest_free" if free_open else marker_kind

@@ -185,6 +185,9 @@ var _spawn_position: Vector3 = Vector3.ZERO
 
 
 func _ready() -> void:
+	# Map marker (iteration 52): raiders are always visible on the map,
+	# fog or no fog — the minimap's first job is "where am I".
+	add_to_group(&"map_markers")
 	_spawn_position = global_position
 	_cache_slot_actions()
 	_apply_character(CharacterCatalog.by_id_or_default(Coop.character_for_slot(player_index)))
@@ -782,3 +785,9 @@ func _set_body_height(height: float) -> void:
 	collision_shape.position.y = height * 0.5
 	# The seal squashes flat and dips its nose to match the low collider.
 	seal_rig.set_slide_ratio(height / _default_collision_height)
+
+
+## Map marker contract (group "map_markers"). The arrow's heading comes
+## from this body's own rotation, which is where the raider is facing.
+func map_marker_kind() -> StringName:
+	return &"player"

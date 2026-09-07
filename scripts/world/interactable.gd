@@ -56,7 +56,17 @@ var _held_loop: StringName = &""
 var _prompt: Label3D
 
 
+## Map marker (iteration 52): which dot this thing draws as on the
+## minimap and the Tab map. Empty means IT NEVER APPEARS — which is what
+## secret_trigger.gd keeps, on purpose: a secret you can read off the map
+## is not a secret. Subclasses set their default in _init; the style table
+## lives in MapDraw.MARKER_STYLES.
+@export var marker_kind: StringName = &""
+
+
 func _ready() -> void:
+	if not marker_kind.is_empty():
+		add_to_group(&"map_markers")
 	body_entered.connect(_on_body_entered)
 	body_exited.connect(_on_body_exited)
 	_prompt = Label3D.new()
@@ -261,3 +271,8 @@ func _interact_glyph() -> String:
 	if slot == null or Coop.device_for_slot(int(slot)) == Coop.KEYBOARD_DEVICE:
 		return INTERACT_TOKEN
 	return PAD_INTERACT_GLYPH
+
+
+## Map marker contract (group "map_markers").
+func map_marker_kind() -> StringName:
+	return marker_kind

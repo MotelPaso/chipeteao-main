@@ -57,6 +57,23 @@ const FPS_BADGE_TEXT := "%d FPS"
 ## One full pulse cycle (fade down + back) takes twice this many seconds.
 @export var low_hp_pulse_half_period: float = 0.45
 
+## Preloaded, not the bare class_name: headless runs that never built the
+## editor's class cache still resolve it (same reason RunSystems does).
+const SplitScreenView := preload("res://scripts/systems/split_screen.gd")
+
+## Inset of a minimap from the top-right corner of its own cell.
+const MINIMAP_MARGIN := Vector2(14.0, 14.0)
+## Extra top inset for player 1 in SOLO, so the map clears the run timer
+## and the stage badge that live in the top-centre/right cluster.
+const MINIMAP_SOLO_TOP: float = 46.0
+## The overlay draws above the HUD and below the card picker (layer 10).
+const MAP_OVERLAY_LAYER: int = 8
+
+## Minimap and Tab overlay per player slot, built once in _bind_party;
+## on_stage_started refreshes their content, never rebuilds them.
+var _minimaps: Array[Minimap] = []
+var _overlays: Array[MapOverlay] = []
+
 @onready var _hp_bar: ProgressBar = %HpBar
 @onready var _hp_label: Label = %HpLabel
 @onready var _xp_bar: ProgressBar = %XpBar
@@ -208,6 +225,70 @@ func _bind_party() -> void:
 			_refresh_loadout()
 		elif Coop.is_coop():
 			_build_mate_bar(int(node.get("player_index")), health, node)
+	# One minimap and one Tab overlay PER VIEW (iteration 52), player 1
+	# included: in split-screen each raider looks at their own cell, and a
+	# single map in a window corner belongs to nobody.
+	_build_map_widgets(players.size())
+
+
+
+## Builds the per-view map widgets. Anchored to the same cell rect the
+## player's camera renders into (SplitScreen.cell_rect), so a co-op map
+## sits in ITS raider's corner and not over somebody else's view.
+func _build_map_widgets(player_count: int) -> void:
+	if not _minimaps.is_empty():
+		return
+	var count := maxi(player_count, 1)
+	for slot in count:
+		var cell := SplitScreenView.cell_rect(slot, count)
+		var minimap := Minimap.new()
+		# Not _anchor_to_cell: the minimap does not FILL its cell, it hangs
+		# off the cell's own top-right corner.
+		minimap.anchor_left = cell.position.x + cell.size.x
+		minimap.anchor_right = cell.position.x + cell.size.x
+		minimap.anchor_top = cell.position.y
+		minimap.anchor_bottom = cell.position.y
+		minimap.offset_left = -Minimap.SIZE - MINIMAP_MARGIN.x
+		minimap.offset_right = -MINIMAP_MARGIN.x
+		var top := MINIMAP_MARGIN.y + (MINIMAP_SOLO_TOP if count == 1 else 0.0)
+		minimap.offset_top = top
+		minimap.offset_bottom = top + Minimap.SIZE
+		add_child(minimap)
+		_minimaps.append(minimap)
+		# Its own CanvasLayer: the overlay has to draw ABOVE this HUD and
+		# below the card picker, and a Control cannot cross layers.
+		var layer := CanvasLayer.new()
+		layer.layer = MAP_OVERLAY_LAYER
+		add_child(layer)
+		var overlay := MapOverlay.new()
+		overlay.slot = slot
+		_anchor_to_cell(overlay, cell)
+		layer.add_child(overlay)
+		_overlays.append(overlay)
+
+
+func _anchor_to_cell(control: Control, cell: Rect2) -> void:
+	control.anchor_left = cell.position.x
+	control.anchor_top = cell.position.y
+	control.anchor_right = cell.position.x + cell.size.x
+	control.anchor_bottom = cell.position.y + cell.size.y
+	control.offset_left = 0.0
+	control.offset_top = 0.0
+	control.offset_right = 0.0
+	control.offset_bottom = 0.0
+
+
+## Stage hook, relayed by WorldDirector.on_stage_started through the "hud"
+## group. NOT the stage_changed signal: this call is what stage 0 goes
+## through too, so the first map needs no special case — and the widgets
+## are built before RunRoot has instantiated any arena.
+func on_stage_started(arena: Node3D = null) -> void:
+	for minimap: Minimap in _minimaps:
+		if is_instance_valid(minimap):
+			minimap.on_stage_started(arena)
+	for overlay: MapOverlay in _overlays:
+		if is_instance_valid(overlay):
+			overlay.on_stage_started(arena)
 
 
 ## Teammate readout column (built only in co-op): "J2" tag + slim HP bar

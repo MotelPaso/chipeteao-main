@@ -40,6 +40,7 @@ const WHEEL_SPIN: float = 0.6
 func _init() -> void:
 	meta_stat_id = ""
 	prompt_text = "[E] Girar la ruleta"
+	marker_kind = &"roulette"
 
 
 func _ready() -> void:

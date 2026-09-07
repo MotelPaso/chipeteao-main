@@ -253,6 +253,13 @@ func on_stage_started(arena: Node3D) -> void:
 	_placed_pois.clear()
 	_beacons.clear()
 	_event_timer = first_event_at
+	# Fog and map are per STAGE. Reset from HERE and not from the
+	# stage_changed signal: this call is what stage 0 goes through too, so
+	# there is no first-stage special case to forget.
+	var fog := FogOfWar.find(get_tree())
+	if fog != null:
+		fog.reset_for_stage(arena)
+	get_tree().call_group("hud", "on_stage_started", arena)
 	_exit_portal_spawned = false
 	if shuffle_layout:
 		_shuffle_ground_interactables()

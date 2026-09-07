@@ -147,7 +147,13 @@ func _enter_tree() -> void:
 		# Daily Hunt: every player walks the same field that day.
 		_rng.seed = GameConfig.daily_seed
 	elif randomize_per_run:
-		_rng.randomize()
+		# Drawn from the RUN's stream, not from _rng.randomize(): that call
+		# reseeds from system entropy and is deaf to RunState.reset(), so
+		# BONK_GAME_SEED (and any two-sided comparison built on it) never
+		# actually reproduced the mask, the props or the relief standing on
+		# them — two "identical" soaks came out with different arenas. A
+		# normal run is unaffected: reset() randomize()s the same stream.
+		_rng.seed = randi()
 	else:
 		_rng.seed = scatter_seed
 	# Frozen here, before anything draws from the stream: the Terrain node
