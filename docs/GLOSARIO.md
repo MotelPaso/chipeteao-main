@@ -8,7 +8,7 @@ Lo que NO se traduce nunca: los `id` de catálogo, los `node_name`, los nombres 
 3. Caja baja tipo oración en TODO nombre de arma, tomo (salvo la palabra del tomo), objeto, carta, misión, evolución, reliquia y enemigo: «Espada corta», «Ritmo de batalla», «Cien caídos». Nada de Title Case inglés.
 4. Llevan mayúscula inicial en las dos partes solo: topónimos (Bosque Hueco, Dunas de Ceniza, Ciénaga Lóbrega), nombres de tomo («Tomo de Furia»), nombres propios de jefe (Rey Pútrido, Cofre Mímico, Espectro de la Ciénaga) y de evolución con genitivo (Mandoble del Caudillo, Resplandor Final).
 5. Nombres de personaje intactos por regla 4 del brief: Juno, Nyx, Doc, Otto, Vex, Rook, Ash, Miro, Bogg, Kael, Torren, Wisp y **Bramble**. Bramble NO se traduce.
-6. Tres escalas distintas, tres palabras: level = Nivel / «Nv %d»; tier de mapa = Grado / insignia «G%d»; rank de reliquia = Rango. Cambiar «T%d» a «G%d» en hud.gd:511, HUD.tscn:53 y character_select.gd:91 (las tres, o quedan desincronizadas).
+6. Cuatro escalas distintas, cuatro palabras: level = Nivel / «Nv %d» (el raider); **etapa = Etapa / insignia «E%d»** (el mapa dentro de la partida); **vuelta = Vuelta / «V%d»** (loops completos al circuito de mapas); rank de reliquia = Rango. **«Grado» / «G%d» quedó retirado en la iteración 50**: los grados de mapa desaparecieron junto con el selector, y la dificultad ahora sale de cuán lejos llegó la partida, no de un menú. Si ves «Grado» en notas viejas, está muerto.
 7. cooldown = «velocidad de ataque», y **siempre como bonificación positiva** (iteración 46): un enfriamiento que baja se escribe como una velocidad que sube («Enfriamiento de X -15%» → «Velocidad de ataque de X +15%»), incluido el texto de reliquias («-1.5%» → «+1.5%») y de pasivas. La matemática interna sigue siendo un multiplicador de enfriamiento (`cooldown_multiplier`, `cooldown_scale`): solo cambia lo que lee el jugador, porque «enfriamiento» obligaba a leer un número que baja como algo bueno. La palabra «enfriamiento» ya no aparece en ninguna cadena visible. «Recarga» sigue reservada a los portales («Recharging... %d s» → «Recargando... %d s», «Portals recharge» → «los portales se recargan»); usarla para cooldown crearía una sola palabra para dos sistemas.
 8. Marcadores %d %s %.1f %.2f %02d %% \n: mismo número y mismo orden que el original, sin excepción. Ninguna cadena pierde o gana marcadores.
 9. Mayúsculas con tilde (MORISTE, EN PAUSA, ARMERÍA, COLECCIÓN, MÁX, COMÚN, ÉPICO, RECLAMADA) y apertura obligatoria de ¿ y ¡.
@@ -326,7 +326,6 @@ Lo que NO se traduce nunca: los `id` de catálogo, los `node_name`, los nombres 
 | raiders | raiders |
 | Run | incursión |
 | Shards | esquirlas |
-| Tier | Grado (insignia G%d) |
 | Rank (relic) | Rango |
 | Level | Nivel (abreviado Nv) |
 | Armory | Armería |
@@ -344,6 +343,11 @@ Lo que NO se traduce nunca: los `id` de catálogo, los `node_name`, los nombres 
 | elite (enemigo) | shiny (minúscula dentro de la frase, regla 3; nunca «élite») |
 | Elite pack | jauría shiny |
 | Extract / Extraction | extraerse / extracción |
+| stage | etapa (un mapa dentro de la partida; insignia «E%d») |
+| lap | vuelta (un circuito completo de mapas; insignia «V%d») |
+| exit portal | portal de salida |
+| cleared (stage) | superada (etapa superada) |
+| pseudo-infinite | pseudo-infinito |
 | gamepad | control (NUNCA «mando») |
 | mouse | mouse (NUNCA «ratón») |
 | Player 1 / P1 | Jugador 1 / J1 (NUNCA «P1») |
@@ -415,7 +419,6 @@ Lo que NO se traduce nunca: los `id` de catálogo, los `node_name`, los nombres 
 | `Shards: 0` | Esquirlas: 0 |
 | `BONKRAIDERS` | BONKRAIDERS |
 | `Choose your hunting ground and raider` | Elige tu coto de caza y tu raider |
-| `Tier 1 — the standard hunt` | Grado 1 — la cacería estándar |
 | `Start Run` | Iniciar incursión |
 | `Quests` | Misiones |
 | `Settings` | Ajustes |
@@ -431,9 +434,6 @@ Lo que NO se traduce nunca: los `id` de catálogo, los `node_name`, los nombres 
 | `Start Run — %d jugadores` | Iniciar incursión — %d jugadores |
 | `Start Run — %s` | Iniciar incursión — %s |
 | `Shards: %d` | Esquirlas: %d |
-| `Tier %d locked — win Tier %d on %s` | Grado %d bloqueado — gana el Grado %d en %s |
-| `Win Tier %d here to unlock` | Gana aquí el Grado %d para desbloquearlo |
-| `Tier %d — enemies +%d%% HP, +%d%% dmg · +%d bonus shards` | Grado %d — enemigos +%d%% HP, +%d%% daño · +%d esquirlas extra |
 | `Collection` | Colección |
 | `Armory` | Armería |
 | `Daily Hunt` | Cacería diaria |
@@ -518,11 +518,18 @@ Lo que NO se traduce nunca: los `id` de catálogo, los `node_name`, los nombres 
 | `Retry` | Reintentar |
 | `Change Character` | Cambiar raider |
 | `Quit` | Salir |
-| `+%d shards — Tier %d victory bonus` | +%d esquirlas — bono por victoria en Grado %d |
 | `+%d shards · %d quest%s completed — claim in the quest log` | +%d esquirlas · %d %s — reclámalas en el registro |
 | `"" if quest_count == 1 else "s"  (arg 3 de run_end_screen.gd:82)` | "misión completada" if quest_count == 1 else "misiones completadas" |
 | `Daily score: %d — today's best: %d` | Puntaje diario: %d — mejor de hoy: %d |
 | `Level up!` | ¡Subiste de nivel! |
+| `Stage %d — %s` | Etapa %d — %s |
+| `Stage cleared! The portal is open — stay as long as you like` | ¡Etapa superada! Se abrió el portal — quédate cuanto quieras |
+| `The exit portal opened — cross it whenever you like` | Se abrió el portal de salida — crúzalo cuando quieras |
+| `[E] Cross to the next map` | [E] Cruzar al siguiente mapa |
+| `Stages cleared: %d` | Etapas superadas: %d |
+| `Laps: %d` | Vueltas: %d |
+| `You left before clearing a stage.` | Saliste antes de superar una etapa. |
+| `E%d` / `E%d · V%d` | E%d / E%d · V%d (insignia de etapa del HUD) |
 | `Level %d — choose: %s` | Nivel %d — elige: %s (el %s es el lado del pool: «Armas» o «Tomos», iteración 46) |
 | `Weapons` (lado del pool) | Armas |
 | `Tomes` (lado del pool) | Tomos |
@@ -775,8 +782,8 @@ Lo que NO se traduce nunca: los `id` de catálogo, los `node_name`, los nombres 
 | `Finish a run in the Gloomfen.` | Termina una incursión en la Ciénaga Lóbrega. |
 | `Win a run in the Gloomfen.` | Gana una incursión en la Ciénaga Lóbrega. |
 | `Bring down the Fenwraith 5 times.` | Abate al Espectro de la Ciénaga 5 veces. |
-| `Win a Tier 2 run on any map.` | Gana una incursión de Grado 2 en cualquier mapa. |
-| `Win a Tier 3 run on any map.` | Gana una incursión de Grado 3 en cualquier mapa. |
+| `Complete a full lap of the map circuit.` | Completa una vuelta entera al circuito de mapas. |
+| `Complete two full laps of the map circuit.` | Completa dos vueltas enteras al circuito de mapas. |
 | `Evolve a weapon by leveling it up enough.` | Evoluciona un arma subiéndola lo suficiente de nivel. |
 | `Evolve 4 weapons across your runs.` | Evoluciona 4 armas a lo largo de tus incursiones. |
 | `Buy a relic rank in the Armory.` | Compra un rango de reliquia en la Armería. |

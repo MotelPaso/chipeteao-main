@@ -68,7 +68,7 @@ const FPS_BADGE_TEXT := "%d FPS"
 @onready var _boss_name_label: Label = %BossNameLabel
 @onready var _announce_label: Label = %AnnounceLabel
 @onready var _curse_label: Label = %CurseLabel
-@onready var _tier_label: Label = %TierLabel
+@onready var _stage_label: Label = %StageLabel
 @onready var _streak_label: Label = %StreakLabel
 
 var _hp_fill: StyleBoxFlat
@@ -736,8 +736,8 @@ func _probe_text() -> String:
 ## GLOSARIO rule 6: Nivel/Nv is the raider, Etapa/E is the map, Vuelta/V
 ## is the lap, Rango is a relic — four scales, four words.
 func show_stage_tag(stage_index: int, lap: int) -> void:
-	_tier_label.visible = true
-	_tier_label.text = "E%d" % (stage_index + 1) if lap <= 0 \
+	_stage_label.visible = true
+	_stage_label.text = "E%d" % (stage_index + 1) if lap <= 0 \
 			else "E%d · V%d" % [stage_index + 1, lap + 1]
 
 

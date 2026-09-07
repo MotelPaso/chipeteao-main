@@ -9,9 +9,13 @@ Dos documentos que este mapa da por leídos:
 
 ## Vista general de una partida
 
-`scenes/ui/CharacterSelect.tscn` (escena principal) escribe la elección en el autoload `GameConfig` (`selected_character_id`, `selected_map_id`, `selected_tier`, más el modo diario) y carga la arena (`HollowWoods.tscn`, `AshDunes.tscn` o `Gloomfen.tscn`). Cada arena instancia `scenes/world/RunSystems.tscn` — el bloque común: `Player`, `RunManager` (fin de partida), `WorldDirector` (layout y eventos), `UpgradeCardUI`, `HUD`, `RunEndScreen`, `PauseMenu` — y mantiene como propios su `EnemySpawner` y `AmbientBed`.
+`scenes/ui/CharacterSelect.tscn` (escena principal) escribe la elección en el autoload `GameConfig` (`selected_character_id`, más el modo diario) y carga **una sola escena**: `scenes/world/Run.tscn`. Ya no hay selector de mapa ni de grado — toda partida empieza en el Bosque Hueco y recorre la lista de mapas.
 
-`RunSystems._enter_tree()` llama `RunState.reset()`: el bloque de partida es el dueño del reinicio, entra al árbol **antes** del `WorldDirector` que baraja el layout, y por eso una arena arrancada directamente (F6, soak headless) empieza igual que una partida real.
+`Run.tscn` (raíz `run_root.gd`, `class_name RunRoot`, grupo `run_root`) tiene dos hijos: la instancia **única** de `scenes/world/RunSystems.tscn` — el bloque común: `Player`, `RunManager` (fin de partida y puerta de etapa), `WorldDirector` (layout y eventos), `UpgradeCardUI`, `HUD`, `RunEndScreen`, `PauseMenu` — y `ArenaHost`, bajo el cual se instancia la arena de la etapa actual. Cada arena (`HollowWoods.tscn`, `AshDunes.tscn`, `Gloomfen.tscn`) es solo el mundo: entorno, luz, suelo, perímetro, verticalidad, interactuables de escena, scatter, `EnemySpawner` y `AmbientBed`. **Una arena ya no se puede arrancar sola** (F6 o `--quit-after` directo sobre el `.tscn`): sin raíz de partida no hay jugador, ni HUD, ni director.
+
+`RunSystems._enter_tree()` llama `RunState.reset()`: el bloque de partida es el dueño del reinicio y entra al árbol **antes** de que `RunRoot._ready` construya la primera arena, así que el scatter y el director de cada etapa siempre ven un `RunState` limpio.
+
+Ver «Partida por etapas» más abajo para el ciclo de vida completo y el contrato del cambio de mapa.
 
 Autoloads (`project.godot`, en orden de carga): `RunState` (XP/nivel/kills/reloj/dificultad), `GameConfig`, `Coop` (entrada por slot), `SaveData` (meta persistente), `Juice` (game feel), `Sfx` (audio), `Settings` (aplica ajustes), `Pools` (object pooling), `ScreenFade` (fundidos y el ritual de salir de partida).
 
@@ -27,12 +31,14 @@ El acoplamiento cruzado va siempre por aquí. Lista actual:
 | `enemy_bolts`, `player_shots` | proyectiles en vuelo | limpieza y filtros de colisión |
 | `gems` / `health_orbs` | pickups vivos (`XpGem.LIVE_GROUP`, `HealthOrb.LIVE_GROUP`) | `vacuum()`, tope blando de orbes |
 | `enemy_spawner` | el spawner de la arena | `spawn_pressure_burst`, `spawn_minions`, `apply_tier_spec`, `set_sky_event`, `apply_temp_enemy_buff` |
-| `world_director` | el director de `RunSystems` | `start_sky_event(kind)` |
+| `world_director` | el director de `RunSystems` | `start_sky_event(kind)`, `on_stage_started(arena)`, `on_stage_ended()`, `beacon_count()` |
 | `run_manager` | el `RunManager` | `extract_run()` |
-| `run_systems` | la raíz del bloque | `vacuum_pickups()` |
+| `run_systems` | la raíz del bloque | `vacuum_pickups()`, `place_party(origin)` |
+| `run_root` | la raíz de la partida (`Run.tscn`) | `arena_root()`, `current_arena()`, `advance_stage()` |
+| `arena_root` | la arena de la etapa viva | la busca `RunRoot`; el scatter la usa para filtrar sus keepouts |
 | `arena_bounds` | el nodo de scatter de la arena | `is_walkable`, `random_walkable_point`, extensión de arena |
-| `hud` | el HUD | `announce(msg)`, `announce_major(msg)`, `show_loot(...)` |
-| `boss_ui` | HUD + flecha de jefe | `track_boss(boss, title)`, `announce` |
+| `hud` | el HUD | `announce(msg)`, `announce_major(msg)`, `show_loot(...)`, `show_stage_tag(stage, lap)` |
+| `boss_ui` | HUD + flecha de jefe | `track_boss(boss, title)`, `track_objective(node)`, `announce` |
 | `upgrade_ui` | `UpgradeCardUI` | `open_bonus_pick(...)`, `open_choice(...)` |
 | `altars` | todo `ChargeShrine` vivo (de escena o del director) | el cupo de altares sin gastar del `WorldDirector` |
 | `ui_blocking` | toda UI que se adueña de la pausa | `is_blocking() -> bool` |
@@ -154,11 +160,63 @@ Reglas que comparten las de ataque único: el escalonado es un `const` por archi
 
 ## Añadir un mapa
 
-- Qué es: una fila de catálogo + una escena de arena; el select construye la carta y `SaveData.is_map_unlocked()` evalúa la regla.
-- Archivos: `scripts/systems/map_catalog.gd` (`MAP_LIBRARY`, `DEFAULT_TIERS`), `scripts/world/run_systems.gd`, `scripts/world/scatter.gd`, arenas existentes como plantilla.
-- Fila: `id`, `display_name` (topónimo, mayúscula en las dos partes), `blurb`, `scene_path`, `unlock_stat` + `unlock_target` (contador de `SaveData`; `""` = siempre abierto), `locked_hint`, `palette`, `tiers` (normalmente `DEFAULT_TIERS`: G1 baseline exacto, G2/G3 con `enemy_hp_mult`, `enemy_damage_mult`, `spawn_rate_mult`, `boss_mult`, `xp_value_mult`, `shard_bonus`; G(N+1) se desbloquea ganando G(N) en ese mapa). `boss_mult` **puede ser menor que 1.0** (un grado más suave): el spawner lo compara con `is_equal_approx`, no con `> 1.0`.
-- Escena de arena (copiar `AshDunes.tscn`): `WorldEnvironment` + luz, `Floor` y `Perimeter` (muros, capa 1), `Backdrop` (`scripts/world/backdrop.gd`, sus anillos de colinas se derivan de `arena_half_extent`), spots de verticalidad y props a mano (en grupo `scatter_keepout`), nodo de scatter con `scatter.gd` (seed determinista; su `arena_half_extent` es la **fuente única del tamaño de arena** — 80.0 = 160x160 — publicada por el grupo `arena_bounds`, la leen `BossBase` y `EnemySpawner` restando su margen), `Interactables`, `EnemySpawner` (con `phase_preset` y sus escenas/horario), `AmbientBed` y **una instancia de `RunSystems.tscn` con `map_id` overrideado**. `RunSystems._ready` republica el mapa en `GameConfig`, valida el tier y lo reparte por grupos (`apply_tier_spec` al spawner, `show_tier_tag` al HUD).
+- Qué es: una fila de catálogo + una escena de arena. **El orden de `MAP_LIBRARY` es el orden de la partida** (iteración 50): una fila nueva insertada en medio cambia la progresión de todos inmediatamente. No hay desbloqueos de mapa ni grados; a un bioma se llega jugando.
+- Archivos: `scripts/systems/map_catalog.gd` (`MAP_LIBRARY`), `scripts/world/run_root.gd`, `scripts/world/arena.gd`, `scripts/world/scatter.gd`, arenas existentes como plantilla.
+- Fila: `id`, `display_name` (topónimo, mayúscula en las dos partes), `blurb`, `scene_path`, `palette`. Nada más: `unlock_stat`, `locked_hint` y `tiers` desaparecieron con los grados.
+- Escena de arena (copiar `AshDunes.tscn`): raíz `Node3D` **con `scripts/world/arena.gd` y su `map_id`**, `WorldEnvironment` + luz, `Floor` y `Perimeter` (muros, capa 1), `Backdrop` (`scripts/world/backdrop.gd`, sus anillos de colinas se derivan de `arena_half_extent`), spots de verticalidad y props a mano (en grupo `scatter_keepout`), nodo de scatter con `scatter.gd` (seed determinista; su `arena_half_extent` es la **fuente única del tamaño de arena** — 80.0 = 160x160 — publicada por el grupo `arena_bounds`, la leen `BossBase` y `EnemySpawner` restando su margen), `Interactables`, `EnemySpawner` (con `phase_preset` y sus escenas/horario), `AmbientBed` y un `Marker3D` llamado `SpawnPoint` (dónde aterriza el equipo). **NO** instancia `RunSystems.tscn`: eso vive una sola vez en `Run.tscn`.
 - Los `@export` del `EnemySpawner` los overridean las tres arenas en su `.tscn`: mover esos exports a un colaborador rompe los tres mapas. Si hace falta partir el spawner, hay que migrar las escenas a la vez.
+
+## Partida por etapas
+
+Una partida es una **secuencia de etapas**, una por mapa, en el orden de `MAP_LIBRARY`, volviendo al primero con **vuelta + 1**. Lo que cruza de etapa es todo lo del equipo — nivel, armas, tomos, objetos, mascotas, puntos, boons de altar, boons temporales, la dificultad de partida y la inflación de precios de cofre y ruleta —; **no se copia nada, porque no se recrea nada**: los raiders son los mismos nodos. Lo que se reinicia es el mapa y lo que cuelga de él (cofres, altares, portales, balizas, enemigos, props), el reloj de etapa y el horario de jefes.
+
+### Piezas
+
+| Archivo | Qué hace |
+|---|---|
+| `scenes/world/Run.tscn` + `scripts/world/run_root.gd` (`RunRoot`, grupo `run_root`) | La raíz persistente. Hijos: `RunSystems` y `ArenaHost`. API: `arena_root()` / `current_arena()`, `advance_stage()`, y el estático `RunRoot.stage_parent(tree)`. |
+| `scripts/world/arena.gd` (`Arena`, grupo `arena_root`) | Raíz de cada bioma. `map_id`, `SpawnPoint`, y el **orden** del ciclo de vida. |
+| `scripts/world/exit_portal.gd` (`ExitPortal`) | El portal de salida de la etapa. |
+| `RunState` | `stage_index`, `lap`, `stage_time`, `stage_boss_dead`, `stage_cleared`, `pseudo_infinite_time`, `stages_cleared_total`, `endless_seconds_total`, `laps_completed`, `visited_map_ids`, `cleared_map_ids`, señal `stage_changed(stage_index, map_id)`, y `begin_stage()` / `mark_stage_cleared(map_id)`. Los índices son **0-based**; todo lo que ve el jugador (o un log) imprime `+ 1`. |
+
+### El orden del ciclo de vida de una etapa (es load-bearing)
+
+1. `RunRoot._load_stage()` instancia la arena y la cachea **antes** del `add_child` (el scatter y el `_ready` de la arena ya preguntan por `arena_root()`).
+2. Al entrar al árbol, `scatter._enter_tree` siembra su RNG y **construye la máscara** de la etapa.
+3. Corren los `_ready` de los hijos (spawner, ambiente, interactuables de escena).
+4. `Arena._ready()` llama `world_director.on_stage_started(arena)` por grupo: cachea los bounds, **re-cachea el Sol y el `Environment`** (ver abajo), baraja los POI de suelo, aplica el inicio irregular y coloca portales y ruletas.
+5. `Arena._ready()` llama `scatter.place_props()`, así que la lista de keepouts ve las posiciones **ya barajadas** — exactamente el orden que producía el viejo reparto `_enter_tree`/`_ready` cuando cada arena tenía su propio director.
+6. `RunRoot` coloca al equipo (`run_systems.place_party(origin)`, que reusa la geometría del anillo de co-op y **re-ancla el rescate del vacío** de cada cuerpo) y emite `stage_changed`.
+
+**Por qué el re-cacheo de luces es obligatorio**: `_cache_lights()` sale temprano si `_sun` ya está puesto, y `_exit_tree` (que restauraba la luz) ya no se dispara nunca, porque el director sobrevive a la arena. Sin ponerlas a `null` en `on_stage_started`, la segunda etapa tintaría el Sol liberado de la primera y **ningún evento de cielo se vería** a partir de ahí. El soak lo comprueba: el harness dispara una luna de sangre 5 s después de cada cambio de etapa.
+
+### El cambio de etapa (`advance_stage`)
+
+Corre dentro de `ScreenFade.transition_async(action)` — el hermano que **espera** a la acción entre el fundido de entrada y el de salida, cosa que `transition()` no puede hacer (su acción va en un `tween_callback`, y una corrutina vuelve al tween en su primer `await`). Pasos:
+
+1. Pausa el árbol **y para explícitamente el spawner y el director**. La pausa sola no basta: los `process_mode` se **heredan**, y el harness de soaks enraiza toda la partida bajo un nodo `ALWAYS`, así que un árbol «pausado» ahí sigue generando enemigos. Un spawner trabajando mientras se desmonta su arena metió seis enemigos en el primer `Stage sweep:`.
+2. `Stage carry:` con lo que lleva el equipo, leído de los nodos vivos.
+3. Desmontaje: liberar todo enemigo con `free()` (no `queue_free()`: el barrido cuenta en el mismo frame), `Pools.release_all_live()` (cada `NodePool` mantiene un conjunto de vivos y los reclama de inmediato), `world_director.on_stage_ended()` y liberar los restos de etapa (cofres, altares, portales, ruletas, manantiales, balizas, gemas, orbes). **Un prompt posterior añade sus propias clases a esas listas.**
+4. `await get_tree().process_frame` y `Stage sweep: enemies=%d gems=%d orbs=%d chests=%d altars=%d beacons=%d` — **todos en cero**, o hay una fuga que seguiría al equipo al mapa siguiente.
+5. Liberar la arena.
+6. Avanzar los contadores (`lap += 1` al envolver) y construir la etapa siguiente por el ciclo de arriba.
+7. Banner «Etapa %d — %s», `show_stage_tag`, log `Stage advanced:` y `Stage carry:` otra vez. **Las dos líneas de acarreo tienen que coincidir**: es la prueba de que cruzar no cuesta nada.
+
+### Dónde se parentan las cosas
+
+`RunRoot.stage_parent(tree)` es **el** padre de todo lo que se spawnea al mundo: pooled FX, proyectiles, cofres soltados, púas de jefe, la UI de la ruleta, los minijefes secretos. Antes todos usaban `get_tree().current_scene`, que **era** la arena; ahora `current_scene` es la raíz persistente, así que spawnear ahí arrastraría los dardos y los charcos de la etapa 1 a la etapa 2. `Pools._spawn_parent()` hace lo mismo. Los únicos `current_scene` que quedan son los de esos dos helpers (su fallback fuera de partida) y los del harness.
+
+### La puerta de etapa y el modo pseudo-infinito
+
+- **Puerta** (`RunManager`): la etapa se supera cuando `RunState.stage_time >= stage_goal` (900 s) **y** el jefe de etapa (el Elder) está muerto. Una arena sin `boss_scene` cuenta como «jefe muerto». Log `Stage gate: time=%.1f boss=%s`, y `Stage boss slain:` cuando cae el Elder (`EnemySpawner._watch_stage_boss`, conectado a **esa** instancia: los jefes recurrentes posteriores no reabren nada).
+- Superarla abre el **portal de salida** (`WorldDirector._tick_exit_portal`, a `exit_portal_min_distance` 40 m o más de todo raider, con baliza hasta usarse) y la flecha de jefe lo apunta mientras no viva ningún jefe (`track_objective`). Logs `Exit portal opened at %.1fs` y `Portal used: exit`.
+- **Pseudo-infinito**: mientras la etapa está superada, cada minuto de `RunState.pseudo_infinite_time` suma HP +15%, daño +10% y velocidad +4% (con tope `endless_speed_cap` 1.8), comprime el intervalo de spawn ×0.85 y agranda las hordas ×1.5. Exports en el spawner (`endless_*`), aplicados en spawns frescos; la velocidad es su canal propio porque `apply_tier_scaling` cubre HP/daño/pago solamente. Log `Pseudo-infinite: minute %d hp x%.2f dmg x%.2f speed x%.2f`, uno por minuto.
+- **Vueltas**: los grados de mapa desaparecieron; su lugar lo ocupa `lap_hp_mult` 1.5 / `lap_damage_mult` 1.3 / `lap_xp_mult` 1.3 por vuelta completa, aplicados por el mismo canal `apply_tier_scaling` / `apply_tier`.
+- El horario de jefes y las hordas leen **`RunState.stage_time`**, no `run_time`: cada mapa tiene su jefe en el minuto 5 y su Elder en el 11. Las rampas globales (intervalo, conteo, rampa tardía) siguen leyendo `run_time`.
+
+### Interruptores del harness
+
+`BONK_STAGE_FAST=1` supera la etapa a los 60 s y sin jefe; el harness se queda entonces `PSEUDO_INFINITE_DWELL` (70 s) antes de ir al portal, para que la rampa registre al menos un minuto, y después abandona su ruta y va directo. `BONK_ARENA` ya no nombra la escena a instanciar sino el **bioma inicial** (`GameConfig.start_map_id`); el harness siempre arranca `Run.tscn`. `BONK_SAVE_PATH` re-apunta el guardado antes de la primera lectura, para cualquier arranque headless que no sea el probe.
 
 ## Arena irregular
 
@@ -176,7 +234,8 @@ Reglas que comparten las de ataque único: el escalonado es un `const` por archi
 - Fila de misión: `id`, `display_name`, `description` (imperativo, tuteo), `stat` (id de contador — **lista canónica en la cabecera de `save_data.gd`**), `target`, `reward`. Un contador nuevo no necesita registro: `bump` crea la clave.
 - **Contrato transaccional (iteración 45)**: los sistemas en partida acreditan con `SaveData.bump(id)` / `raise_to(id, valor)`, que caen en un **buffer de partida** (`_run_counters` / `_run_highs`). Solo el fin de partida lo funde en el ledger persistido (`fold_run_results`); `RunState.reset()` lo descarta. Consecuencia observable y deliberada: **abandonar una partida con «Salir al menú» ya no deja rastro de nada** — ni `bosses_killed`, ni `chests_opened`, ni `used_weapon_<id>` para la Colección. Antes esos contadores se filtraban al siguiente guardado y se podían farmear sin terminar partidas.
   - `stat(id)` lee ledger + buffer (para mostrar progreso); la **evaluación de misiones lee solo el ledger**, así que una misión nunca se marca completa con contadores que un abandono va a revertir.
-  - Firma actual: `fold_run_results(victory: bool, character_ids: Array[String], map_id: String, tier: int, ...)`. El `Array[String]` tiene que ir **tipado**: un literal sin tipo lanza `Invalid type in function`.
+  - Firma actual (iteración 50): `fold_run_results(victory, character_ids, visited_map_ids, cleared_map_ids, stages_cleared, laps, level, kills, run_seconds)`. Una partida recorre **varios** mapas, así que `runs_on_<map>` se acredita por cada mapa **visitado** y `victories_<map>` por cada mapa **superado** — así `dunes_run_1`, `fen_win_1` y compañía siguen funcionando sin tocarlas. `victory` significa «superó al menos una etapa». Los `Array[String]` tienen que ir **tipados**: un literal sin tipo lanza `Invalid type in function`.
+  - Las misiones de grado conservan sus ids (`tier2_win`, `tier3_win`) pero ahora son de **vueltas** (`laps_completed`), y las de `best_endless_minutes` cuentan el tiempo en **pseudo-infinito**. Las claves que este build ya no conoce (`tier_choice`, `victories_<map>_t<n>`) simplemente no se leen: un guardado viejo carga limpio y en silencio.
 - Escritura en disco: `save()` escribe en `<save>.tmp` y solo renombra al terminar, dejando el anterior como `.bak`. Una escritura interrumpida no puede truncar el archivo real; `load_from_disk()` cae al respaldo e imprime `Save recovered from backup:`.
 - El cobro de misiones es manual en el Registro (`claim_quest`). Los harness pueden re-apuntar `SaveData.save_path` a un archivo temporal **antes** de `load_from_disk()`.
 
@@ -231,7 +290,7 @@ Reglas que comparten las de ataque único: el escalonado es un `const` por archi
 - **Altares (reglas de la iteración 47)**: *Carga* se carga solo mientras un jugador está en el anillo. **Ya no hay sobresaltos de spawn, ni caducidad, ni renuncia**: salir del anillo solo **pausa** la carga y volver a entrar la reanuda; un altar que nadie toca espera para siempre. Desapareció `idle_lifetime` — era el único discriminador entre un altar de escena y uno del director, y gobernaba tres comportamientos distintos —; **todos** los altares se hunden tras pagar (`spent_lifetime`). El anillo es **tres veces más grande** (zona 9.3 en `ChargeShrine.tscn`, 7.8 en `CurseShrine.tscn`) y se **marca al acercarse**: dentro de `APPROACH_BAND_SCALE` (2×) radios el anillo y el disco brillan y laten, con materiales **por instancia** (`_own_material`, porque un `[sub_resource]` es un objeto compartido). El radio del disco de progreso **se deriva de la forma de la zona** (`_measure_zone_radius()` × `PROGRESS_DISC_SHARE`), nunca de una constante propia. Todo `ChargeShrine` se une al grupo `altars`.
   - Al completar, el altar **no reparte un boon al azar**: abre un menú de 3 opciones distintas de `ALTAR_BOONS` en el propio `UpgradeCardUI` (`open_choice`, ver UI) con el raider que sostuvo el anillo como destinatario explícito. Lo elegido llega a **toda la party** — `player` **y** `downed_players` — vía `PlayerStats.add_altar_boon`, escalado por `_effective_boon_scale()` y las Llaves maestras. Log `Altar charged:` (lo cuenta `verificar.sh`).
   - *Demoníaco* hereda el ritual y sustituye las opciones por **pactos** (`CurseShrine.PACT_LIBRARY`): cada carta es un **beneficio** (boon grande ~2× el de altar, puntos de partida, o un cofre gratis ahí mismo) más un **costo** que escribe knobs de `RunState` (`add_difficulty`, `elite_chance_bonus`, `sky_duration_multiplier`, `event_chance_bonus`, `disaster_chance_bonus`). Beneficio y costo son filas `{kind, ...}` con **una rama por kind**, nunca un caso especial por id. Mantiene `demonic_uses += 1`, el escalado por Sangre de demonio (`_blood_scale()`, vía el hook virtual `_effective_boon_scale()`, no mutando el `@export` del padre) y los logs `Demonic altar used:` y `Demonic pact:`.
-  - `WorldDirector` ya no da vida a los altares: los siembra por el tick de eventos con **cadencia creciente** (el hueco entre eventos se comprime con el minuto hacia `event_gap_floor` ≈ 20 s, y el peso de las filas marcadas `altar` sube con `altar_weight_per_minute`) y un **cupo de altares sin gastar** que crece con el minuto (`altar_cap_base + minuto / altar_cap_minutes`); al tope, el peso del altar cae a 0 y la tirada elige otro evento. La baliza de un altar vive hasta que el altar se gasta (`TimedBeacon` con `INF` + `poi_worth_showing()`). Log `Altar placed: <kind>`. *Codicia*: apuesta de HP (log `Greed shrine:`). *Manantial*: precio fijo en puntos, `heal_full` + `PlayerStats.add_timed_boon` (30 s). *Ruleta*: `RouletteShrine.price` es la **base**; cada giro **duplica** el precio para el resto de la partida y para toda la party (`RunState.roulette_price_multiplier` / `roulette_price()` / `register_roulette_spin()`, reiniciado en `reset()` junto a los precios de cofre). El prompt y el botón releen `current_price()`. `RouletteShrine.OUTCOMES` (clasificador puro `outcome_for(roll)`), `apply_outcome(id, player)`; la UI (`roulette_ui.gd`, `CanvasLayer` construido en código, grupos `ui_blocking` + `blocking_ui_closable`) se instancia **bajo la escena actual, no bajo root**, pausa el árbol y se resuelve sola en headless. *Portal*: `WorldDirector._spawn_portals` crea `portal_count` portales emparejados; E teletransporta al gemelo y ambos recargan `cooldown / (1 + 0.25 × cosmic_worm)`.
+  - `WorldDirector` ya no da vida a los altares: los siembra por el tick de eventos con **cadencia creciente** (el hueco entre eventos se comprime con el minuto hacia `event_gap_floor` ≈ 20 s, y el peso de las filas marcadas `altar` sube con `altar_weight_per_minute`) y un **cupo de altares sin gastar** que crece con el minuto (`altar_cap_base + minuto / altar_cap_minutes`); al tope, el peso del altar cae a 0 y la tirada elige otro evento. La baliza de un altar vive hasta que el altar se gasta (`TimedBeacon` con `INF` + `poi_worth_showing()`). Log `Altar placed: <kind>`. *Codicia*: apuesta de HP (log `Greed shrine:`). *Manantial*: precio fijo en puntos, `heal_full` + `PlayerStats.add_timed_boon` (30 s). *Ruleta*: `RouletteShrine.price` es la **base**; cada giro **duplica** el precio para el resto de la partida y para toda la party (`RunState.roulette_price_multiplier` / `roulette_price()` / `register_roulette_spin()`, reiniciado en `reset()` junto a los precios de cofre). El prompt y el botón releen `current_price()`. `RouletteShrine.OUTCOMES` (clasificador puro `outcome_for(roll)`), `apply_outcome(id, player)`; la UI (`roulette_ui.gd`, `CanvasLayer` construido en código, grupos `ui_blocking` + `blocking_ui_closable`) se instancia **bajo la raíz de la arena** (`RunRoot.stage_parent`, iteración 49), nunca bajo root ni bajo `current_scene`, pausa el árbol y se resuelve sola en headless. *Portal*: `WorldDirector._spawn_portals` crea `portal_count` portales emparejados; E teletransporta al gemelo y ambos recargan `cooldown / (1 + 0.25 × cosmic_worm)`.
 - WorldDirector: los eventos temporizados salen de un **catálogo de filas** (`EVENT_LIBRARY`: cofre / shiny / grieta / altar de carga / altar demoníaco / manantial), con `event_weight_overrides` por instancia. Las balizas viven en una lista tipada con clase interna. Logs: `Altar charged:`, `Altar left:`, `Altar placed:`, `Demonic altar used:`, `Demonic pact:`, `Roulette spun:`, `Portal used:`, `Portals placed:`, `Spring used:`, `Boss chests dropped:`.
 - Presión vía `call_group("enemy_spawner", "spawn_pressure_burst", centro, n)`; buff temporal de enemigos vía `apply_temp_enemy_buff(mult, s)`.
 - Secreto nuevo: `extends SecretTrigger`, define la condición (Tocón raro: 3 interacciones; Cráneo zumbante: canal quieto de 4 s) y llama `_awaken()` — gasta, anuncia por `boss_ui` y spawnea `miniboss_scene` (raíz `extends SecretBossBase` con `secret_boss_id` exportado: su muerte bumpea `slain_<id>` y desbloquea el personaje cuya fila tenga ese `unlock_boss`). Logs `Secret miniboss awakened:` / `Secret boss slain:`.
@@ -288,15 +347,16 @@ tools/verificar.sh 600        # corrida larga, para cambios de ritmo tardío
 **Nunca la corras con menos de 240 s.** Por debajo de ese umbral la puerta
 de cobertura de interactuables se salta en silencio y el script imprime OK
 sin haber exigido nada: un soak de 120 s «pasa» aunque ningún cofre, altar
-ni portal se haya resuelto en las tres arenas. La corrida completa tarda
-~13 minutos, más que el timeout de una llamada de shell: lánzala en
-segundo plano y lee los logs al terminar.
+ni portal se haya resuelto en las tres arenas.
 
-Hace `godot --headless --import` y luego un soak de **las tres arenas** (`HollowWoods`, `AshDunes`, `Gloomfen`) con `BONK_GODMODE=1 BONK_SEED=4242`. Falla (exit 1) si:
+Hace `godot --headless --import`, un soak de **las tres arenas** (`HollowWoods`, `AshDunes`, `Gloomfen`) con `BONK_GODMODE=1 BONK_SEED=4242`, y un **cuarto soak de etapa** (iteración 49): Bosque Hueco con `BONK_STAGE_FAST=1` y **el doble de reloj** (60 s hasta la puerta + 70 s de espera deliberada + cruzar el mapa hasta un portal que sale a 40 m o más no cabe en 240 s, y el RNG del juego se `randomize()`a por corrida, así que la semilla solo fija el paseo del harness). Ese cuarto soak queda **fuera** de la cuenta de interactuables, y `Portal used: exit` no cuenta como portal usado. Falla (exit 1) si:
 
 - el import o algún soak imprime errores/warnings de Godot (patrón amplio: `SCRIPT ERROR`, `ERROR:`, `WARNING:`, `null instance`, `previously freed`, `Resource file not found`…),
 - una arena no llega al final del soak (se colgó o murió antes) — lo mide contando las líneas `frame N ...` que el harness imprime cada 120 frames,
 - **cobertura**: el raider no pasó del nivel 3 (señal de que el arma no hace daño), o —solo en corridas de ≥240 s— ningún interactuable se resolvió. Un soak que no sube de nivel ni toca nada puede pasar «limpio» sin haber ejercitado nada.
+- **etapa**: el soak de etapa no abrió su portal, no cruzó de `hollow_woods` a `ash_dunes`, dejó algo vivo en un `Stage sweep:`, perdió progreso entre el par de `Stage carry:` de un cruce, o no produjo ningún `Sky event:` después del cruce (lo que probaría que el director no volvió a cachear las luces del mapa nuevo).
+
+La corrida completa tarda **~21 minutos** (import + 3×240 s + 1×480 s), más que el timeout de una llamada de shell: lánzala en segundo plano.
 
 Logs en `$TMPDIR/bonkraiders-verify/`. Cada arena imprime su resumen `nivel=… cofres=… altares=… portales=…`.
 
@@ -321,13 +381,15 @@ Variables de entorno:
 
 | Variable | Efecto |
 |---|---|
-| `BONK_ARENA=res://scenes/world/AshDunes.tscn` | arena a arrancar (defecto: Hollow Woods) |
+| `BONK_ARENA=res://scenes/world/AshDunes.tscn` | **bioma inicial** de la etapa 1 (defecto: Hollow Woods). El probe siempre arranca `Run.tscn` |
 | `BONK_CHARACTER=<id>` | raider de `CharacterCatalog` |
 | `BONK_GODMODE=1` | raider con 10M de HP, para que los sistemas tardíos se ejerciten |
 | `BONK_WALK=0` | deja el raider quieto (defecto: camina) |
 | `BONK_SEED=<int>` | recorrido determinista, para reproducir un soak |
 | `BONK_PROBE_DEBUG=1` | narra el recorrido (waypoints, llegadas, pulsaciones) |
 | `BONK_ELITE_BOOST=1` | todo spawn sale shiny (`force_elite_spawns` por grupo) |
+| `BONK_STAGE_FAST=1` | la etapa se supera a los 60 s sin jefe; el harness espera 70 s y cruza |
+| `BONK_SAVE_PATH=<ruta>` | re-apunta el guardado (cualquier arranque headless que no sea el probe) |
 | `BONK_PERF=1` | enciende el overlay de rendimiento del HUD |
 
 Uso directo:
@@ -336,6 +398,11 @@ Uso directo:
 BONK_ARENA=res://scenes/world/Gloomfen.tscn BONK_GODMODE=1 \
   godot --headless --fixed-fps 60 --quit-after 36000 res://scenes/tests/ArenaProbe.tscn
 ```
+
+Arrancar una arena directamente (`res://scenes/world/Gloomfen.tscn` como
+escena principal, o F6 en el editor) **ya no funciona** desde la iteración
+49: una arena es solo el mundo. Arranca `res://scenes/world/Run.tscn` y
+elige el bioma con `BONK_ARENA` / `GameConfig.start_map_id`.
 
 Para lógica aislada sigue sirviendo un harness desechable `extends SceneTree` (patrón de `generate_sfx.gd`) con `godot --headless --path . -s res://...`. Ojo: en un script `-s` **no hay autoloads**, así que no sirve para nada que toque `RunState`, `SaveData` o `Coop`.
 
@@ -350,5 +417,5 @@ Para lógica aislada sigue sirviendo un harness desechable `extends SceneTree` (
 - **Español latinoamericano para todo lo visible, inglés para todo lo estructural.** La tabla es `docs/GLOSARIO.md`. En inglés y sin tocar: ids, `node_name`, grupos, `StringName`, rutas `res://`, claves de `SaveData` y los `print()`/`push_warning()`. Los marcadores de formato (`%d %s %.1f %02d %%`) conservan número y orden exactos.
 - **Tunables como `@export`** con defaults en el script; los overrides por instancia viven en la escena (el horario de jefes por arena, las escenas del spawner). Antes de mover un `@export` de sitio, comprueba qué `.tscn` lo overridea: las tres arenas overridean el `EnemySpawner`.
 - **Números mágicos a `const` con nombre y comentario del porqué.** Un `0.5` suelto en dos archivos es la forma en que dos copias del mismo cálculo se separan.
-- **Logs de una línea** en eventos clave — son la interfaz de verificación de los soaks headless, van **en inglés** y se conservan. Inventario actual: `Run ended:`, `Meta saved:`, `Save recovered from backup:`, `Boss spawned:`, `Boss chests dropped:`, `Elite chest dropped:`, `Horde:`, `Sky event:`, `Chest opened:`, `Altar charged:`, `Altar left:`, `Altar placed:`, `Demonic altar used:`, `Demonic pact:`, `Spawn skipped:`, `Greed shrine:`, `Roulette spun:`, `Spring used:`, `Portal used:`, `Portals placed:`, `Weapon evolved:`, `Weapon ascended:`, `Pet joined:`, `Secret miniboss awakened:`, `Secret boss slain:`, `Arena mask:`, `Start layout:`, `Daily run scored:`, `Void rescue:`. Al crear un evento mayor, añade el tuyo con el mismo formato.
+- **Logs de una línea** en eventos clave — son la interfaz de verificación de los soaks headless, van **en inglés** y se conservan. Inventario actual: `Run ended:`, `Meta saved:`, `Save recovered from backup:`, `Boss spawned:`, `Boss chests dropped:`, `Elite chest dropped:`, `Horde:`, `Sky event:`, `Chest opened:`, `Altar charged:`, `Altar left:`, `Altar placed:`, `Demonic altar used:`, `Demonic pact:`, `Spawn skipped:`, `Stage advanced:`, `Stage sweep:`, `Stage carry:`, `Stage gate:`, `Stage boss slain:`, `Exit portal opened`, `Portal used: exit`, `Pseudo-infinite:`, `Run stages:`, `Greed shrine:`, `Roulette spun:`, `Spring used:`, `Portal used:`, `Portals placed:`, `Weapon evolved:`, `Weapon ascended:`, `Pet joined:`, `Secret miniboss awakened:`, `Secret boss slain:`, `Arena mask:`, `Start layout:`, `Daily run scored:`, `Void rescue:`. Al crear un evento mayor, añade el tuyo con el mismo formato.
 - **Verificar antes de dar por hecho un cambio**: `tools/verificar.sh`. Un cambio que no pasa el import o ensucia el log de un soak no está terminado.

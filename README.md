@@ -1,6 +1,6 @@
 # Bonkraiders
 
-Roguelite de supervivencia "bullet-heaven" en 3D hecho en Godot 4.7 (GDScript): incursiones sin límite de tiempo (15 minutos de supervivencia = victoria, y el jugador se extrae cuando quiere) donde las armas disparan solas, los enemigos llegan en hordas crecientes y cada subida de nivel ofrece 3 cartas de mejora. Incluye tres biomas (Bosque Hueco, Dunas de Ceniza y Ciénaga Lóbrega) con jefes propios y minijefes secretos, 13 raiders con arma inicial y pasiva propia, 14 armas **que evolucionan por nivel**, 15 tomos, 16 objetos con rareza fija y 4 mascotas, 3 grados de dificultad por mapa y meta-progresión entre incursiones (esquirlas, 40 misiones, desbloqueo de raiders, 6 reliquias permanentes de la Armería, pantalla de Colección, Cacería diaria con semilla por fecha). El diseño completo está en `GDD.md` y la historia de desarrollo en `CHANGELOG.md`.
+Roguelite de supervivencia "bullet-heaven" en 3D hecho en Godot 4.7 (GDScript): incursiones sin límite de tiempo que recorren **un mapa tras otro**: superas una etapa sobreviviendo 15 minutos y matando a su jefe, se abre un portal de salida, te quedas cuanto quieras en modo **pseudo-infinito** (la dificultad sube rápido) y cruzas al mapa siguiente con todo lo que llevas donde las armas disparan solas, los enemigos llegan en hordas crecientes y cada subida de nivel ofrece 3 cartas de mejora. Incluye tres biomas (Bosque Hueco, Dunas de Ceniza y Ciénaga Lóbrega) con jefes propios y minijefes secretos, 13 raiders con arma inicial y pasiva propia, 14 armas **que evolucionan por nivel**, 15 tomos, 16 objetos con rareza fija y 4 mascotas, dificultad por **vueltas** al circuito de mapas y meta-progresión entre incursiones (esquirlas, 40 misiones, desbloqueo de raiders, 6 reliquias permanentes de la Armería, pantalla de Colección, Cacería diaria con semilla por fecha). El diseño completo está en `GDD.md` y la historia de desarrollo en `CHANGELOG.md`.
 
 **Idioma:** el juego está íntegramente en **español latinoamericano**. La terminología canónica vive en `docs/GLOSARIO.md` y es obligatoria para cualquier cadena nueva; los identificadores (ids de catálogo, `node_name`, grupos, `StringName`, claves de guardado y los `print()` de depuración) se quedan en inglés a propósito.
 
@@ -14,7 +14,8 @@ godot --path .          # lanza el juego (escena principal: selector de raider)
 godot -e --path .       # abre el editor
 ```
 
-- Escena principal: `scenes/ui/CharacterSelect.tscn` (selector de raider, mapa y grado; los botones son **Iniciar incursión**, **Misiones**, **Ajustes**, **Colección**, **Armería** y **Cacería diaria**). También se puede ejecutar una arena directamente (F6 sobre `scenes/world/HollowWoods.tscn`): usa el raider/mapa por defecto y reinicia la partida igual que una real.
+- Escena principal: `scenes/ui/CharacterSelect.tscn` (selector de raider y de party; los botones son **Iniciar incursión**, **Misiones**, **Ajustes**, **Colección**, **Armería** y **Cacería diaria**). Ya no hay selector de mapa ni de grado: toda partida empieza en el Bosque Hueco.
+- La partida entera vive en **una** escena, `scenes/world/Run.tscn`, que instancia la arena de la etapa actual bajo `ArenaHost`. **Arrancar una arena directamente (F6 sobre `HollowWoods.tscn`) ya no funciona**: una arena es solo el mundo, sin jugador ni HUD.
 
 ### Controles
 
@@ -106,7 +107,7 @@ GDD.md                   # documento de diseño
 CHANGELOG.md             # una línea por iteración (45 hasta ahora)
 docs/ARQUITECTURA.md     # mapa de sistemas: dónde tocar para extender cada cosa
 docs/GLOSARIO.md         # terminología canónica es-419 (obligatoria)
-tools/verificar.sh       # import + soak de las 3 arenas + cobertura mínima
+tools/verificar.sh       # import + soak de las 3 arenas + soak de etapa + cobertura
 assets/
   audio/sfx/             # 20 wav sintetizados (regenerables, ver ARQUITECTURA)
   audio/ambient/         # camas de viento por bioma (forest_wind, desert_wind)
@@ -137,7 +138,7 @@ Los archivos clave para tocar contenido son los **catálogos** en `scripts/syste
 
 ## Verificación
 
-**El comando por defecto tras cualquier cambio** es el script de verificación: hace el import y un soak de las **tres** arenas, y falla si alguna ensucia el log, se cuelga o no ejercita nada.
+**El comando por defecto tras cualquier cambio** es el script de verificación: hace el import, un soak de las **tres** arenas y un **cuarto soak de etapa** que cruza de mapa, y falla si alguno ensucia el log, se cuelga, no ejercita nada o pierde progreso al cruzar. Tarda ~21 minutos.
 
 ```sh
 tools/verificar.sh            # 240 s de partida por arena (el modo estándar)
@@ -146,7 +147,7 @@ tools/verificar.sh 600        # corrida larga, para cambios de ritmo tardío
 
 **Nunca con menos de 240 s**: por debajo, la puerta de cobertura de interactuables se salta en silencio y el script imprime OK sin haber exigido nada. La corrida completa tarda ~13 minutos.
 
-Falla (exit 1) si el import o un soak imprimen errores/warnings de Godot, si una arena no llega al final de su soak, o si no alcanza la cobertura mínima (el raider tiene que pasar de nivel 3; en corridas de ≥240 s tiene que abrir un cofre, cargar un altar o usar un portal). Los logs quedan en `$TMPDIR/bonkraiders-verify/` y cada arena imprime su resumen `nivel=… cofres=… altares=… portales=…`.
+Falla (exit 1) si el import o un soak imprimen errores/warnings de Godot, si una arena no llega al final de su soak, si no alcanza la cobertura mínima (el raider tiene que pasar de nivel 3; en corridas de ≥240 s tiene que abrir un cofre, cargar un altar o usar un portal), o si el soak de etapa no abre su portal, no cruza a las Dunas de Ceniza, deja algo vivo al cruzar, pierde progreso o no vuelve a producir un evento de cielo en el mapa nuevo. Los logs quedan en `$TMPDIR/bonkraiders-verify/` y cada arena imprime su resumen `nivel=… cofres=… altares=… portales=…`.
 
 Por debajo, los comandos sueltos siguen sirviendo:
 
@@ -154,8 +155,10 @@ Por debajo, los comandos sueltos siguen sirviendo:
 # 1. Reimporta assets y compila todos los scripts; debe salir con exit 0
 godot --headless --import
 
-# 2. Boot de humo: la arena arranca sin errores (5 s simulados)
-godot --headless --fixed-fps 60 --quit-after 300 res://scenes/world/HollowWoods.tscn
+# 2. Boot de humo: la partida arranca sin errores (5 s simulados).
+#    Es Run.tscn, no una arena suelta: una arena ya no arranca sola.
+BONK_SAVE_PATH="$TMPDIR/smoke_save.json" \
+  godot --headless --fixed-fps 60 --quit-after 300 res://scenes/world/Run.tscn
 
 # 3. Soak con el harness (36000 frames = 10 min de juego). Los sistemas
 #    imprimen una línea por evento ("Boss spawned: ...", "Chest opened: ...",
@@ -164,18 +167,20 @@ BONK_ARENA=res://scenes/world/Gloomfen.tscn BONK_GODMODE=1 \
   godot --headless --fixed-fps 60 --quit-after 36000 res://scenes/tests/ArenaProbe.tscn
 ```
 
-`scenes/tests/ArenaProbe.tscn` arranca la arena como hijo de un nodo siempre activo, imprime estado cada 2 s, elige sola la primera carta en cada subida de nivel y —desde la iteración 45— **camina e interactúa**: recorre los interactuables disponibles manejando las acciones de input reales, se queda quieto al llegar para que los altares de carga completen su canal, salta cuando se atasca y avisa por `push_warning` si una UI bloqueante deja la partida encallada. Un raider aparcado se salta en silencio todo sistema condicionado al movimiento, y un soak así reporta "sin errores" sobre código que nunca corrió. Nunca toca el guardado real: re-apunta `SaveData.save_path` a `user://soak_save.json`.
+`scenes/tests/ArenaProbe.tscn` arranca `Run.tscn` como hijo de un nodo siempre activo, imprime estado cada 2 s, elige sola la primera carta en cada subida de nivel y —desde la iteración 45— **camina e interactúa**: recorre los interactuables disponibles manejando las acciones de input reales, se queda quieto al llegar para que los altares de carga completen su canal, salta cuando se atasca y avisa por `push_warning` si una UI bloqueante deja la partida encallada. Un raider aparcado se salta en silencio todo sistema condicionado al movimiento, y un soak así reporta "sin errores" sobre código que nunca corrió. Nunca toca el guardado real: re-apunta `SaveData.save_path` a `user://soak_save.json`.
 
 Variables de entorno del harness:
 
 | Variable | Efecto |
 |---|---|
-| `BONK_ARENA=res://scenes/world/AshDunes.tscn` | arena a arrancar (defecto: Bosque Hueco) |
+| `BONK_ARENA=res://scenes/world/AshDunes.tscn` | **bioma de la etapa 1** (defecto: Bosque Hueco); el harness siempre arranca `Run.tscn` |
 | `BONK_CHARACTER=<id>` | raider concreto del catálogo |
 | `BONK_GODMODE=1` | raider prácticamente inmortal, para llegar a los sistemas tardíos |
 | `BONK_WALK=0` | deja el raider quieto (defecto: camina) |
 | `BONK_SEED=<int>` | recorrido determinista, para reproducir un soak |
 | `BONK_PROBE_DEBUG=1` | narra el recorrido (waypoints, llegadas, pulsaciones) |
+| `BONK_STAGE_FAST=1` | la etapa se supera a los 60 s y sin jefe; el harness espera 70 s y cruza el portal |
+| `BONK_SAVE_PATH=<ruta>` | re-apunta el guardado (cualquier arranque headless que no sea el probe) |
 | `BONK_PERF=1` | overlay de rendimiento del HUD (FPS, conteos, pools) |
 
 Para lógica aislada sigue sirviendo un harness desechable `extends SceneTree` con `godot --headless --path . -s <script>` (igual que `scripts/tools/generate_sfx.gd`). Ojo: en un script `-s` **no hay autoloads**, así que no vale para nada que toque `RunState`, `SaveData` o `Coop`.

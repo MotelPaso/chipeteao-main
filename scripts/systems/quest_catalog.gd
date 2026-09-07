@@ -173,13 +173,16 @@ const QUEST_LIBRARY: Array[Dictionary] = [
 	},
 	# Map tiers (win-gated ladders; any map counts).
 	{
-		"id": "tier2_win", "display_name": "Ascendente",
-		"description": "Gana una incursión de Grado 2 en cualquier mapa.",
+		# Iteration 50: the tier ladder became LAPS of the map list. The ids
+		# and the stat keys are kept so a save that already earned them
+		# stays earned; only what they mean changed.
+		"id": "tier2_win", "display_name": "Segunda vuelta",
+		"description": "Completa una vuelta entera al circuito de mapas.",
 		"stat": "any_t2_win", "target": 1, "reward": 70,
 	},
 	{
-		"id": "tier3_win", "display_name": "Raider supremo",
-		"description": "Gana una incursión de Grado 3 en cualquier mapa.",
+		"id": "tier3_win", "display_name": "Tercera vuelta",
+		"description": "Completa dos vueltas enteras al circuito de mapas.",
 		"stat": "any_t3_win", "target": 1, "reward": 120,
 	},
 	# Weapon evolutions (iteration 38): reach the evolve level on a weapon.
@@ -210,13 +213,15 @@ const QUEST_LIBRARY: Array[Dictionary] = [
 		"stat": "daily_runs", "target": 7, "reward": 80,
 	},
 	{
+		# Iteration 50: "endless" is now the pseudo-infinite time a run
+		# spent past its stage gates, which is what the mode is for.
 		"id": "endless_20", "display_name": "Más allá del amanecer",
-		"description": "Sobrevive 20 minutos en una incursión.",
+		"description": "Quédate 20 minutos en modo pseudo-infinito tras superar una etapa.",
 		"stat": "best_endless_minutes", "target": 20, "reward": 80,
 	},
 	{
 		"id": "endless_25", "display_name": "La noche larga",
-		"description": "Sobrevive 25 minutos en una incursión.",
+		"description": "Quédate 25 minutos en modo pseudo-infinito tras superar una etapa.",
 		"stat": "best_endless_minutes", "target": 25, "reward": 150,
 	},
 	# Hidden minibosses (GDD 6 secrets). Descriptions stay vague on purpose:

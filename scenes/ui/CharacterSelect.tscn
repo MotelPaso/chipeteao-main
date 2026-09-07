@@ -67,23 +67,6 @@ unique_name_in_owner = true
 size_flags_horizontal = 3
 theme_override_constants/separation = 12
 
-[node name="MapRow" type="HBoxContainer" parent="Layout/VBox/ContentScroll/Content"]
-unique_name_in_owner = true
-size_flags_horizontal = 4
-theme_override_constants/separation = 18
-
-[node name="TierRow" type="HBoxContainer" parent="Layout/VBox/ContentScroll/Content"]
-unique_name_in_owner = true
-size_flags_horizontal = 4
-theme_override_constants/separation = 10
-
-[node name="TierSummaryLabel" type="Label" parent="Layout/VBox/ContentScroll/Content"]
-unique_name_in_owner = true
-theme_override_colors/font_color = Color(0.72, 0.74, 0.78, 1)
-theme_override_font_sizes/font_size = 13
-horizontal_alignment = 1
-text = "Grado 1 — la cacería estándar"
-
 [node name="CardsGrid" type="GridContainer" parent="Layout/VBox/ContentScroll/Content"]
 unique_name_in_owner = true
 size_flags_horizontal = 4

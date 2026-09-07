@@ -10,18 +10,16 @@ extends Control
 ## Locked characters show grayed with a lock glyph and their Shard price;
 ## clicking one with enough Shards flips the card into an inline "Unlock
 ## for N? [Yes]" confirm (second click cancels), while a short balance
-## earns a red-flash shake instead. Locked maps show grayed with the
-## catalog's unlock hint and reject clicks the same way (map unlocks are
-## earned, never bought). Under the map row, a G1/G2/G3 tier picker for
-## the selected map: tiers are win-gated per map (SaveData
-## .is_tier_unlocked), locked picks gray out and explain the gate, and the
-## last pick per map persists (SaveData.tier_choice). The Shard balance
-## sits top-right and the Quests button opens the quest log.
+## earns a red-flash shake instead. There is no map or difficulty picker
+## any more (iteration 50): every run opens in Bosque Hueco and walks the
+## whole map list, so the choices left here are the raider, the party and
+## the Daily Hunt. The Shard balance sits top-right and the Quests button
+## opens the quest log.
 ##
 ## Look (iteration 29): everything styles through UiTheme — animated fog
 ## backdrop shader, letter-spaced pulsing title, cards with tinted glow
-## selection states (selected lifts, others dim), segmented map/tier
-## controls, hero Start CTA, staggered entrance, and ScreenFade around
+## selection states (selected lifts, others dim), hero Start CTA,
+## staggered entrance, and ScreenFade around
 ## every scene change. Card contents are built by CardFactory; the cards'
 ## state styleboxes are UiTheme.style_card — the same look the upgrade
 ## cards wear, so the two screens can never drift apart.
@@ -49,9 +47,10 @@ const PASSIVE_MAX_LINES := 3
 const LOCKED_PASSIVE_MAX_LINES := 2
 const UNLOCK_HINT_MAX_LINES := 2
 const BLURB_MAX_LINES := 2
-const MAP_CARD_SIZE := Vector2(252, 54)
 const REJECT_FLASH_COLOR := Color(1.0, 0.42, 0.42)
-const TIER_BUTTON_SIZE := Vector2(64, 36)
+## Segmented button size, shared by the co-op player-count row (it was
+## the tier picker's size before iteration 50 removed that row).
+const SEGMENT_BUTTON_SIZE := Vector2(64, 36)
 ## Non-selected cards sit slightly dimmed so the pick reads at a glance.
 const UNSELECTED_DIM := Color(0.8, 0.82, 0.86)
 ## Side margin of the scene's Layout MarginContainer, so the column math
@@ -65,9 +64,6 @@ const GRID_TARGET_ROWS := 3
 @onready var _title_label: Label = %TitleLabel
 @onready var _subtitle_label: Label = %SubtitleLabel
 @onready var _cards_grid: GridContainer = %CardsGrid
-@onready var _map_row: HBoxContainer = %MapRow
-@onready var _tier_row: HBoxContainer = %TierRow
-@onready var _tier_summary_label: Label = %TierSummaryLabel
 ## HFlowContainer: the meta buttons wrap to a second line rather than
 ## running off a narrow window (Spanish labels are wider than the English).
 @onready var _button_row: HFlowContainer = %ButtonRow
@@ -80,10 +76,6 @@ const GRID_TARGET_ROWS := 3
 
 ## Card button per playable character id, for selection restyling.
 var _cards_by_id: Dictionary[String, Button] = {}
-## Card button per catalog map id, for selection restyling.
-var _map_cards_by_id: Dictionary[String, Button] = {}
-## Tier picker buttons, index 0 = tier 1; restyled per selected map.
-var _tier_buttons: Array[Button] = []
 ## Character id whose card currently shows the inline unlock confirm.
 var _pending_unlock_id: String = ""
 var _title_tween: Tween = null
@@ -109,25 +101,6 @@ var _coop_hint: Label = null
 
 func _ready() -> void:
 	Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
-	for map_row: Dictionary in MapCatalog.MAP_LIBRARY:
-		var map_card := Button.new()
-		map_card.custom_minimum_size = MAP_CARD_SIZE
-		map_card.pressed.connect(_on_map_card_pressed.bind(String(map_row.id)))
-		UiTheme.attach_motion(map_card, 1.03)
-		map_card.mouse_exited.connect(_resettle_map_card.bind(String(map_row.id)))
-		_keep_pivot_centered(map_card)
-		_map_row.add_child(map_card)
-		_map_cards_by_id[String(map_row.id)] = map_card
-	for tier in range(1, MapCatalog.TIER_COUNT + 1):
-		var tier_button := Button.new()
-		tier_button.custom_minimum_size = TIER_BUTTON_SIZE
-		# "Grado" badge (glossary rule 6): tier = G, never T (level is Nv).
-		tier_button.text = "G%d" % tier
-		tier_button.add_theme_font_size_override("font_size", 15)
-		tier_button.pressed.connect(_on_tier_pressed.bind(tier))
-		UiTheme.attach_motion(tier_button, 1.06)
-		_tier_row.add_child(tier_button)
-		_tier_buttons.append(tier_button)
 	_build_coop_rows()
 	for character: Dictionary in CharacterCatalog.CHARACTER_LIBRARY:
 		var card := Button.new()
@@ -168,10 +141,6 @@ func _ready() -> void:
 	if not SaveData.is_unlocked(remembered):
 		remembered = CharacterCatalog.DEFAULT_ID
 	_select(remembered)
-	var remembered_map := String(MapCatalog.by_id_or_default(GameConfig.selected_map_id).id)
-	if not SaveData.is_map_unlocked(remembered_map):
-		remembered_map = MapCatalog.DEFAULT_ID
-	_select_map(remembered_map)
 	# Remember the last party (Retry / back from a run replays it); pads
 	# may have (dis)connected since, so the count re-validates itself.
 	_restore_coop_session()
@@ -227,7 +196,7 @@ func _build_coop_rows() -> void:
 	_coop_row.add_child(tag)
 	for count in range(1, Coop.MAX_PLAYERS + 1):
 		var count_button := Button.new()
-		count_button.custom_minimum_size = TIER_BUTTON_SIZE
+		count_button.custom_minimum_size = SEGMENT_BUTTON_SIZE
 		count_button.text = str(count)
 		count_button.add_theme_font_size_override("font_size", 15)
 		count_button.pressed.connect(_on_coop_count_pressed.bind(count))
@@ -382,7 +351,6 @@ func _apply_chrome() -> void:
 	_subtitle_label.add_theme_color_override("font_color", UiTheme.TEXT_DIM)
 	UiTheme.style_badge(_shards_label, UiTheme.SHARD_BLUE,
 			UiTheme.PANEL_BG, UiTheme.SHARD_BLUE.darkened(0.45))
-	_tier_summary_label.add_theme_font_override("font", UiTheme.spaced_font(1))
 	if _title_tween != null and _title_tween.is_valid():
 		_title_tween.kill()
 	_title_tween = create_tween().set_loops()
@@ -398,8 +366,8 @@ func _apply_chrome() -> void:
 func _play_entrance() -> void:
 	if _entrance_tween != null and _entrance_tween.is_valid():
 		_entrance_tween.kill()
-	var sections: Array[Control] = [_title_label, _subtitle_label, _map_row,
-			_tier_row, _coop_row, _slot_row, _cards_grid, _button_row]
+	var sections: Array[Control] = [_title_label, _subtitle_label,
+			_coop_row, _slot_row, _cards_grid, _button_row]
 	# Hide instantly, but wait a frame for the first layout pass so pivots
 	# center on real sizes before the scale-in.
 	for section: Control in sections:
@@ -569,11 +537,7 @@ func _on_daily_pressed() -> void:
 	for character: Dictionary in CharacterCatalog.CHARACTER_LIBRARY:
 		if SaveData.is_unlocked(String(character.id)):
 			characters.append(String(character.id))
-	var maps: Array[String] = []
-	for map_row: Dictionary in MapCatalog.MAP_LIBRARY:
-		if SaveData.is_map_unlocked(String(map_row.id)):
-			maps.append(String(map_row.id))
-	if characters.is_empty() or maps.is_empty():
+	if characters.is_empty():
 		return
 	GameConfig.daily_mode = true
 	GameConfig.daily_seed = int(hash(date_id))
@@ -589,92 +553,6 @@ func _on_daily_pressed() -> void:
 	ScreenFade.transition(func() -> void:
 		RunState.reset()
 		get_tree().change_scene_to_file(RUN_SCENE_PATH))
-
-
-## --- Map row (GDD 7: pick the biome; victory-gated unlocks) -------------
-
-func _select_map(map_id: String) -> void:
-	GameConfig.selected_map_id = map_id
-	# Restore this map's remembered tier pick; a tier the map hasn't
-	# earned yet (or a legacy save with none) drops to the baseline.
-	var remembered_tier := SaveData.tier_choice(map_id)
-	if not SaveData.is_tier_unlocked(map_id, remembered_tier):
-		remembered_tier = 1
-	GameConfig.selected_tier = remembered_tier
-	_refresh_map_cards()
-	_refresh_tier_row()
-
-
-func _on_map_card_pressed(map_id: String) -> void:
-	if SaveData.is_map_unlocked(map_id):
-		_select_map(map_id)
-	else:
-		_reject_card(_map_cards_by_id[map_id], _rest_modulate(_map_selected(map_id)))
-
-
-## --- Tier picker (win tier N on a map to open its tier N+1) -------------
-
-func _on_tier_pressed(tier: int) -> void:
-	var map_id := GameConfig.selected_map_id
-	if SaveData.is_tier_unlocked(map_id, tier):
-		GameConfig.selected_tier = tier
-		SaveData.set_tier_choice(map_id, tier)
-		_refresh_tier_row()
-		return
-	_reject_card(_tier_buttons[tier - 1])
-	# Locked feedback: the summary line explains the gate until the next
-	# refresh repaints it with the selected tier's summary.
-	_tier_summary_label.text = "Grado %d bloqueado — gana el Grado %d en %s" % [
-			tier, tier - 1, String(MapCatalog.by_id_or_default(map_id).display_name)]
-	_tier_summary_label.add_theme_color_override("font_color", UiTheme.TEXT_FAINT)
-
-
-## Segmented-control look: the selected tier is an amber-filled segment,
-## unlocked ones are quiet outlines, locked ones sink into the ground.
-func _refresh_tier_row() -> void:
-	var map_id := GameConfig.selected_map_id
-	for i in _tier_buttons.size():
-		var tier := i + 1
-		var tier_button := _tier_buttons[i]
-		if not SaveData.is_tier_unlocked(map_id, tier):
-			tier_button.tooltip_text = "Gana aquí el Grado %d para desbloquearlo" % (tier - 1)
-			tier_button.add_theme_color_override("font_color", UiTheme.TEXT_FAINT)
-			UiTheme.style_card(tier_button, UiTheme.BORDER_LOCKED, 2, false)
-			continue
-		tier_button.tooltip_text = ""
-		var selected := tier == GameConfig.selected_tier
-		tier_button.add_theme_color_override("font_color",
-				UiTheme.ACCENT_AMBER if selected else Color(0.85, 0.87, 0.9))
-		UiTheme.style_card(tier_button,
-				UiTheme.ACCENT_AMBER if selected else UiTheme.BORDER_DIM,
-				3 if selected else 2, selected)
-	_tier_summary_label.text = MapCatalog.tier_summary(map_id, GameConfig.selected_tier)
-	_tier_summary_label.add_theme_color_override("font_color", UiTheme.TEXT_DIM)
-
-
-func _refresh_map_cards() -> void:
-	for id: String in _map_cards_by_id:
-		_populate_map_card(_map_cards_by_id[id], MapCatalog.by_id(id))
-
-
-func _populate_map_card(card: Button, map_row: Dictionary) -> void:
-	_clear_card(card)
-	var map_id := String(map_row.id)
-	var box := CardFactory.map_card_box(card)
-	if not SaveData.is_map_unlocked(map_id):
-		box.add_child(CardFactory.label(String(map_row.display_name), 16, UiTheme.TEXT_FAINT))
-		box.add_child(CardFactory.label(String(map_row.locked_hint), 10,
-				UiTheme.SHARD_BLUE.darkened(0.2)))
-		UiTheme.style_card(card, UiTheme.BORDER_LOCKED, 2, false)
-		_settle_card(card, false)
-		return
-	box.add_child(CardFactory.label(String(map_row.display_name), 16, UiTheme.TEXT_BRIGHT))
-	box.add_child(CardFactory.palette_strip(map_row.palette as Array))
-	var selected := map_id == GameConfig.selected_map_id
-	var accent := (map_row.palette as Array)[0] as Color
-	UiTheme.style_card(card, accent if selected else UiTheme.BORDER_DIM,
-			3 if selected else 2, selected)
-	_settle_card(card, selected)
 
 
 ## --- Card content (rebuilt whenever lock/selection state changes) ------
@@ -751,10 +629,6 @@ func _card_selected(character_id: String) -> bool:
 	return character_id == GameConfig.selected_character_id
 
 
-func _map_selected(map_id: String) -> bool:
-	return SaveData.is_map_unlocked(map_id) and map_id == GameConfig.selected_map_id
-
-
 func _rest_modulate(selected: bool) -> Color:
 	return Color.WHITE if selected else UNSELECTED_DIM
 
@@ -787,14 +661,6 @@ func _resettle_card(character_id: String) -> void:
 		return
 	UiTheme.kill_meta_tween(card, &"ui_motion_tween")
 	_settle_card(card, _card_selected(character_id))
-
-
-func _resettle_map_card(map_id: String) -> void:
-	var card: Button = _map_cards_by_id.get(map_id)
-	if card == null:
-		return
-	UiTheme.kill_meta_tween(card, &"ui_motion_tween")
-	_settle_card(card, _map_selected(map_id))
 
 
 ## Grayed roster slot: lock glyph in place of the portrait, dimmed

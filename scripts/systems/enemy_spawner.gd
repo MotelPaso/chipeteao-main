@@ -160,6 +160,27 @@ const ELITE_CHANCE_CAP: float = 0.6
 ## more orb income to stay fair, and elite packs give focus targets.
 @export var elite_start_chance: float = 0.08
 @export var elite_full_chance: float = 0.21
+@export_group("Laps and pseudo-infinite (iteration 50)")
+## Multiplier per completed lap of the map list, applied to fresh spawns
+## and to bosses. Replaces the map-tier ladder the select screen used to
+## offer: the difficulty now comes from how far a run got, not from a
+## menu pick made before it started.
+@export var lap_hp_mult: float = 1.5
+@export var lap_damage_mult: float = 1.3
+@export var lap_xp_mult: float = 1.3
+## Pseudo-infinite ramp, per minute past the stage gate.
+@export var endless_hp_per_minute: float = 0.15
+@export var endless_damage_per_minute: float = 0.10
+@export var endless_speed_per_minute: float = 0.04
+## Hard ceiling on the speed factor: past this the horde simply outruns
+## the raider and the mode stops being playable.
+@export var endless_speed_cap: float = 1.8
+## Spawn interval multiplier per minute (compounding, floored by
+## min_interval like every other interval factor).
+@export var endless_interval_per_minute: float = 0.85
+## Horde size multiplier while the ramp is running.
+@export var endless_horde_mult: float = 1.5
+
 @export_group("Boss")
 @export var boss_scene: PackedScene
 ## Run minute the biome boss arrives, and the minute its stronger Elder
@@ -223,20 +244,64 @@ var _relief_timer: float = 0.0
 ## Map-tier factors (MapCatalog tier spec), pushed by the arena's
 ## RunSystems root at ready through the "enemy_spawner" group. All 1.0
 ## until then and at tier 1, so the baseline game is untouched.
-var _tier_hp_multiplier: float = 1.0
-var _tier_damage_multiplier: float = 1.0
-var _tier_spawn_rate_multiplier: float = 1.0
-var _tier_boss_multiplier: float = 1.0
-var _tier_xp_multiplier: float = 1.0
+## Highest pseudo-infinite minute already announced, so the log below
+## prints once a minute instead of once a frame.
+var _endless_minute_logged: int = -1
 
 
-## Group hook (RunSystems): adopt the selected map tier's spec.
-func apply_tier_spec(spec: Dictionary) -> void:
-	_tier_hp_multiplier = float(spec.get("enemy_hp_mult", 1.0))
-	_tier_damage_multiplier = float(spec.get("enemy_damage_mult", 1.0))
-	_tier_spawn_rate_multiplier = maxf(float(spec.get("spawn_rate_mult", 1.0)), 0.1)
-	_tier_boss_multiplier = float(spec.get("boss_mult", 1.0))
-	_tier_xp_multiplier = float(spec.get("xp_value_mult", 1.0))
+## Per-LAP scaling (iteration 50), replacing the map tiers: every complete
+## loop of the map list multiplies fresh spawns. One lap is a whole run's
+## worth of maps, so these are much larger steps than the per-minute ramp.
+func lap_hp_factor() -> float:
+	return pow(lap_hp_mult, float(RunState.lap))
+
+
+func lap_damage_factor() -> float:
+	return pow(lap_damage_mult, float(RunState.lap))
+
+
+func lap_xp_factor() -> float:
+	return pow(lap_xp_mult, float(RunState.lap))
+
+
+## --- Pseudo-infinite ramp (iteration 50) --------------------------------
+## Once a stage is cleared the party may stay as long as it likes, and the
+## map answers: per minute of RunState.pseudo_infinite_time, fresh spawns
+## get more HP, more damage and more speed, the spawn interval shrinks and
+## hordes come bigger. Speed is capped because a body faster than the
+## raider cannot be kited at all, which is not difficulty, it is a wall.
+func endless_minutes() -> float:
+	return RunState.pseudo_infinite_time / 60.0 if RunState.stage_cleared else 0.0
+
+
+func endless_hp_factor() -> float:
+	return 1.0 + endless_hp_per_minute * endless_minutes()
+
+
+func endless_damage_factor() -> float:
+	return 1.0 + endless_damage_per_minute * endless_minutes()
+
+
+func endless_speed_factor() -> float:
+	return minf(1.0 + endless_speed_per_minute * endless_minutes(), endless_speed_cap)
+
+
+func endless_interval_factor() -> float:
+	return pow(endless_interval_per_minute, endless_minutes())
+
+
+## One line per minute while the ramp runs, so a soak can prove it moved.
+func _tick_endless_log() -> void:
+	if not RunState.stage_cleared:
+		_endless_minute_logged = -1
+		return
+	var minute := floori(endless_minutes())
+	if minute <= _endless_minute_logged:
+		return
+	_endless_minute_logged = minute
+	print("Pseudo-infinite: minute %d hp x%.2f dmg x%.2f speed x%.2f" % [
+			minute, endless_hp_factor(), endless_damage_factor(),
+			endless_speed_factor()])
 
 
 ## The arena-bounds node (scatter): also answers is_walkable() for the
@@ -332,13 +397,14 @@ func _physics_process(delta: float) -> void:
 	_sky_left = maxf(_sky_left - delta, 0.0)
 	if _sky_left <= 0.0 and not _sky_kind.is_empty():
 		_sky_kind = ""
+	_tick_endless_log()
 	_tick_boss_schedule()
 	_tick_hordes(delta)
 	_spawn_timer -= delta
 	if _spawn_timer > 0.0:
 		return
-	# Carry the overshoot instead of resetting: divided by the tier and
-	# party multipliers the interval approaches one physics frame, and
+	# Carry the overshoot instead of resetting: divided by the party
+	# multiplier the interval approaches one physics frame, and
 	# throwing away the remainder made the real cadence measurably slower
 	# than the tabulated one. Floored at zero so a frame hitch buys at
 	# most one catch-up tick instead of a queued burst.
@@ -356,10 +422,10 @@ func current_interval() -> float:
 		interval *= boss_relief_interval_multiplier
 	if _sky_kind == "eclipse":
 		interval /= eclipse_rate_multiplier
-	# Tier and party pressure divide last, after the min_interval floor, so
-	# higher tiers and bigger co-op parties stay proportionally faster.
-	return interval / (_tier_spawn_rate_multiplier
-			* (1.0 + coop_rate_per_extra_player * _coop_extra_alive()))
+	# The pseudo-infinite squeeze compounds on top, then the party pressure
+	# divides last so a bigger co-op party stays proportionally faster.
+	interval = maxf(interval * endless_interval_factor(), min_interval)
+	return interval / (1.0 + coop_rate_per_extra_player * _coop_extra_alive())
 
 
 ## The party as configured in the lobby: what a whole run is sized for
@@ -439,11 +505,12 @@ func _tick_hordes(delta: float) -> void:
 			_horde_waves_left -= 1
 			spawn_pressure_burst(anchor.global_position, _horde_wave_size, false, true)
 		return
-	if RunState.run_time < _next_horde_time():
+	if RunState.stage_time < _next_horde_time():
 		return
 	_hordes_fired += 1
 	var size := int((float(horde_base_size) + horde_size_per_minute * _minutes())
-			* (1.0 + RunState.difficulty_bonus) * (1.0 + 0.3 * _coop_extra_alive()))
+			* (1.0 + RunState.difficulty_bonus) * (1.0 + 0.3 * _coop_extra_alive())
+			* (endless_horde_mult if RunState.stage_cleared else 1.0))
 	_horde_wave_size = maxi(ceili(float(size) / float(maxi(horde_waves, 1))), 1)
 	_horde_waves_left = horde_waves
 	_horde_wave_timer = 0.0
@@ -452,7 +519,7 @@ func _tick_hordes(delta: float) -> void:
 	# means the total can exceed the raw `size` by up to horde_waves - 1,
 	# and the log is the soaks' only view of the horde.
 	print("Horde: %d enemies in %d waves at %.1fs" % [
-			_horde_wave_size * horde_waves, horde_waves, RunState.run_time])
+			_horde_wave_size * horde_waves, horde_waves, RunState.stage_time])
 
 
 func current_count_per_tick() -> int:
@@ -601,10 +668,16 @@ func _make_enemy_at(pos: Vector3, force_elite: bool = false,
 func _scale_fresh_spawn(enemy: EnemyBase) -> void:
 	var difficulty := (1.0 + RunState.difficulty_bonus) * temp_enemy_buff()
 	enemy.apply_tier_scaling(
-			_tier_hp_multiplier * late_hp_factor() * difficulty * _sky_hp_factor()
+			lap_hp_factor() * endless_hp_factor() * late_hp_factor() * difficulty
+					* _sky_hp_factor()
 					* (1.0 + coop_hp_per_extra_player * _coop_extra_alive()),
-			_tier_damage_multiplier * late_damage_factor() * difficulty * _sky_damage_factor(),
-			_tier_xp_multiplier * late_xp_factor())
+			lap_damage_factor() * endless_damage_factor() * late_damage_factor()
+					* difficulty * _sky_damage_factor(),
+			lap_xp_factor() * late_xp_factor())
+	# Speed is the pseudo-infinite ramp's own channel: apply_tier_scaling
+	# deliberately covers HP, damage and payout only, and a body that also
+	# gets faster is what makes "stayed too long" read as a mistake.
+	enemy.move_speed *= endless_speed_factor()
 	_apply_sky_variant(enemy)
 
 
@@ -658,49 +731,75 @@ func spawn_pressure_burst(center: Vector3, count: int, force_elites: bool = fals
 	return spawned
 
 
-## Boss timetable, read off RunState.run_time — the canonical run clock the
-## HUD timer and victory check already use — so the schedule can never
-## drift from what the player sees. Each entry fires once per run.
+## Boss timetable, read off RunState.stage_time (iteration 50): a fresh
+## spawner arrives with every arena, so its _boss_spawned / _elder_spawned
+## / _repeat_bosses_spawned flags start clean per stage, and the clock they
+## compare against has to be the stage's, not the run's. Each entry fires once per run.
 func _tick_boss_schedule() -> void:
 	if boss_scene == null:
 		return
 	# Flag only on a boss that actually arrived: _spawn_boss aborts when
 	# the whole party is downed (no ring anchor), and a slot marked as
 	# spent would silently drop that boss for the rest of the run.
-	if not _boss_spawned and RunState.run_time >= boss_spawn_minute * 60.0:
-		_boss_spawned = _spawn_boss(1.0)
-	if not _elder_spawned and RunState.run_time >= elder_spawn_minute * 60.0:
-		_elder_spawned = _spawn_boss(elder_stat_multiplier, elder_title)
+	# Keyed to the STAGE clock (iteration 50), not the run clock: every map
+	# of a run gets its own boss at minute 5 and its own Elder at 11. On
+	# the run clock, stage 2 would have been born with both slots expired.
+	if not _boss_spawned and RunState.stage_time >= boss_spawn_minute * 60.0:
+		_boss_spawned = _spawn_boss(1.0) != null
+	if not _elder_spawned and RunState.stage_time >= elder_spawn_minute * 60.0:
+		var elder := _spawn_boss(elder_stat_multiplier, elder_title)
+		_elder_spawned = elder != null
+		if elder != null:
+			_watch_stage_boss(elder)
 	# Endless clock (iteration 42): bosses keep returning, each stronger.
 	if _elder_spawned and boss_repeat_minutes > 0.0:
 		var due := (elder_spawn_minute
 				+ boss_repeat_minutes * float(_repeat_bosses_spawned + 1)) * 60.0
-		if RunState.run_time >= due:
+		if RunState.stage_time >= due:
 			var rank := _repeat_bosses_spawned + 1
 			if _spawn_boss(elder_stat_multiplier * pow(boss_repeat_growth, float(rank)),
-					boss_repeat_title_template % [elder_title, rank]):
+					boss_repeat_title_template % [elder_title, rank]) != null:
 				_repeat_bosses_spawned = rank
 
 
-## True when a boss actually entered the arena; false on every abort, so
-## the caller can retry the slot on a later tick.
-func _spawn_boss(stat_multiplier: float, title_override: String = "") -> bool:
+## The Elder is THE stage boss: its death is half of the stage gate.
+## Bound to that one instance rather than to the "boss died" counter,
+## because the recurring bosses after it must not re-open a gate.
+func _watch_stage_boss(boss: BossBase) -> void:
+	var health := Health.find_in(boss)
+	if health == null:
+		RunState.stage_boss_dead = true
+		return
+	health.died.connect(_on_stage_boss_died, CONNECT_ONE_SHOT)
+
+
+func _on_stage_boss_died() -> void:
+	RunState.stage_boss_dead = true
+	# One-line log (RunManager convention) for headless soaks.
+	print("Stage boss slain: %s at %.1fs" % [elder_title, RunState.stage_time])
+
+
+## The boss that entered the arena, or null on every abort, so the caller
+## can retry the slot on a later tick. Returns the instance (iteration 50)
+## because the Elder's death is what opens the stage gate, and the caller
+## has to be able to hook that one body's Health.
+func _spawn_boss(stat_multiplier: float, title_override: String = "") -> BossBase:
 	var player := Coop.random_player(get_tree())
 	if player == null:
-		return false
+		return null
 	# Placed BEFORE the boss exists: the schedule only marks a slot spent on
 	# a boss that actually arrived, so a ring with no clear point retries on
 	# the next tick instead of announcing a boss that never came.
 	var at := _ring_position(player)
 	if not _has_player_clearance(at):
 		_register_clearance_skip()
-		return false
+		return null
 	var node := boss_scene.instantiate()
 	var boss := node as BossBase
 	if boss == null:
 		node.free()
 		push_warning("EnemySpawner: boss scene root does not extend BossBase.")
-		return false
+		return null
 	if not title_override.is_empty():
 		# Before add_child: the boss announces its title to the HUD in _ready.
 		boss.boss_title = title_override
@@ -720,12 +819,14 @@ func _spawn_boss(stat_multiplier: float, title_override: String = "") -> bool:
 	#            more hits, so scaling the hits as well double-charges them.
 	#   payout — rematch x tier only: RunState.difficulty_xp_multiplier()
 	#            already pays the difficulty share when the gems are collected.
-	var payout_multiplier := stat_multiplier * _tier_boss_multiplier
-	var damage_multiplier := payout_multiplier * (1.0 + RunState.difficulty_bonus)
-	var hp_multiplier := damage_multiplier \
+	var payout_multiplier := stat_multiplier * lap_xp_factor()
+	var damage_multiplier := stat_multiplier * lap_damage_factor() \
+			* (1.0 + RunState.difficulty_bonus)
+	var hp_multiplier := stat_multiplier * lap_hp_factor() \
+			* (1.0 + RunState.difficulty_bonus) \
 			* (1.0 + coop_boss_hp_per_extra_player * _coop_extra())
-	# is_equal_approx, not "> 1.0": MapCatalog allows a boss_mult BELOW 1.0
-	# (a gentler tier), and a plain greater-than dropped that silently.
+	# is_equal_approx, not "> 1.0": a factor can legitimately land below 1.0
+	# and a plain greater-than dropped that silently.
 	if not (is_equal_approx(hp_multiplier, 1.0) and is_equal_approx(damage_multiplier, 1.0)
 			and is_equal_approx(payout_multiplier, 1.0)):
 		boss.apply_tier(hp_multiplier, damage_multiplier, payout_multiplier)
@@ -736,8 +837,8 @@ func _spawn_boss(stat_multiplier: float, title_override: String = "") -> bool:
 	get_tree().call_group("boss_ui", "announce", boss_warning_text)
 	# One-line log (RunManager convention) so headless soaks can confirm
 	# the boss timetable fired.
-	print("Boss spawned: %s at %.1fs" % [boss.boss_title, RunState.run_time])
-	return true
+	print("Boss spawned: %s at %.1fs" % [boss.boss_title, RunState.stage_time])
+	return boss
 
 
 func _on_boss_died() -> void:

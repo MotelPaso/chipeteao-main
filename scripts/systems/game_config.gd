@@ -20,12 +20,6 @@ var selected_map_id: String = MapCatalog.DEFAULT_ID
 ## and a start past the first stage simply wraps to lap 1 sooner.
 var start_map_id: String = MapCatalog.DEFAULT_ID
 
-## Map tier (1..MapCatalog.TIER_COUNT) the next run plays at. The select
-## screen resets it to 1 when switching to a map where the pick is still
-## locked, and RunSystems clamps it again at ready (direct boots, stale
-## cross-map picks), so an unearned tier can never reach a spawner.
-var selected_tier: int = 1
-
 ## --- Daily Hunt (iteration 36) ------------------------------------------
 ## True while the next/current run is the seeded daily challenge: fixed
 ## character/map for everyone that day, deterministic RNG (RunState seeds

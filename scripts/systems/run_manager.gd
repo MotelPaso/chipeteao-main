@@ -1,22 +1,19 @@
 extends Node
-## Owns the run-end flow. Since iteration 38 the run has NO clock limit:
+## Owns the run-end flow and the STAGE GATE. The run has no clock limit:
 ## it keeps going until the party is wiped or the player extracts from the
-## pause menu (extract_run). Reaching survival_goal seconds is announced as
-## the "survived" milestone and decides how the run is graded — any end
-## (death or extraction) at or past the goal folds as a victory, before it
-## folds as a defeat. Ends the run exactly once — flags RunState inactive,
+## pause menu (extract_run). What grades it is stages: a stage is CLEARED
+## when its own clock passes stage_goal AND its boss is dead, which opens
+## the exit portal and starts the pseudo-infinite ramp. Any end (death or
+## extraction) with at least one stage cleared folds as a victory, before
+## it folds as a defeat. Ends the run exactly once — flags RunState inactive,
 ## stops the spawner, pauses the tree — then emits run_ended, which
 ## RunSystems.tscn wires to the RunEndScreen.
 
 signal run_ended(victory: bool)
 
-## Seconds of survival that grade the run as a victory (default 15 min).
-## The run does not stop here; the milestone is only announced.
-@export var survival_goal: float = 900.0
-## Seconds a STAGE has to last before its gate can open (iteration 49).
-## Same 15 minutes, but measured on RunState.stage_time, so every map of a
-## run gets its own full stretch instead of the second one inheriting a
-## clock that already ran out.
+## Seconds a STAGE has to last before its gate can open. Measured on
+## RunState.stage_time, so every map of a run gets its own full stretch
+## instead of the second one inheriting a clock that already ran out.
 @export var stage_goal: float = 900.0
 
 ## Harness switch: BONK_STAGE_FAST=1 clears a stage after STAGE_FAST_GOAL
@@ -24,10 +21,12 @@ signal run_ended(victory: bool)
 ## stages and exercise the swap. Test-only — nothing in the game sets it.
 const STAGE_FAST_ENV: String = "BONK_STAGE_FAST"
 const STAGE_FAST_GOAL: float = 60.0
-## Milestone banner. Template with EXACTLY ONE %d, filled with the goal in
-## whole minutes, so retuning survival_goal can never leave the banner
-## announcing a number the run no longer uses.
-@export var survival_text: String = "%d minutos sobrevividos — extráete cuando quieras desde el menú de pausa"
+## Banner for the moment a stage is cleared. NO format markers: the number
+## it used to carry was the survival goal in minutes, and the gate is no
+## longer about a number the player is counting down — it is about the
+## door that just opened (GLOSARIO rule 8 allows dropping markers when the
+## call site stops formatting the string, which it does).
+@export var survival_text: String = "¡Etapa superada! Se abrió el portal — quédate cuanto quieras"
 
 var _run_over: bool = false
 ## True while BONK_STAGE_FAST is set (read once, at ready).
@@ -82,8 +81,7 @@ func _physics_process(_delta: float) -> void:
 	# this check freezes along with RunState.stage_time.
 	if not RunState.stage_cleared and _stage_gate_open():
 		RunState.mark_stage_cleared(GameConfig.selected_map_id)
-		get_tree().call_group("boss_ui", "announce_major",
-				survival_text % roundi(_stage_goal() / 60.0))
+		get_tree().call_group("boss_ui", "announce_major", survival_text)
 		# One-line log (RunManager convention): the moment the exit portal
 		# is allowed to appear, with the two halves of the gate spelled out.
 		print("Stage gate: time=%.1f boss=%s" % [
@@ -96,15 +94,27 @@ func _stage_goal() -> float:
 	return STAGE_FAST_GOAL if _stage_fast else stage_goal
 
 
-## The stage gate. Iteration 49 checks the clock only; iteration 50 adds
-## "and the stage boss is dead".
+## The stage gate: the clock AND the stage boss. The harness switch drops
+## the boss half, because a soak cannot be asked to kill an Elder inside
+## its budget. An arena with no boss scene counts as "boss dead", so a
+## future biome without one is still finishable.
 func _stage_gate_open() -> bool:
-	return RunState.stage_time >= _stage_goal()
+	if RunState.stage_time < _stage_goal():
+		return false
+	return _stage_fast or RunState.stage_boss_dead or not _stage_has_boss()
 
 
-## True once the run clock passed the survival goal (victory grading).
+## True when this stage's spawner ships a boss at all.
+func _stage_has_boss() -> bool:
+	var spawner := get_tree().get_first_node_in_group("enemy_spawner")
+	return spawner != null and spawner.get("boss_scene") != null
+
+
+## Victory grading: a run counts as won once it cleared at least ONE
+## stage. Reaching a map's exit is the achievement now, not surviving a
+## fixed number of minutes in whichever map you happened to pick.
 func goal_reached() -> bool:
-	return RunState.run_time >= survival_goal
+	return RunState.stages_cleared_total > 0
 
 
 ## Pause-menu "Extract": ends the run voluntarily. Graded like a death —
@@ -140,6 +150,9 @@ func _end_run(victory: bool) -> bool:
 	print("Run ended: %s at %.1fs (level %d, %d kills)" % [
 			"victory" if victory else "defeat",
 			RunState.run_time, RunState.level, RunState.kills])
+	print("Run stages: %d cleared, %d lap(s), %d map(s) visited" % [
+			RunState.stages_cleared_total, RunState.laps_completed,
+			RunState.visited_map_ids.size()])
 	# Daily Hunt score (iteration 36): recorded win or lose, best-per-date.
 	# Credited BEFORE the fold on purpose — the fold is what judges the
 	# quests, so daily_1/daily_7 would otherwise always be evaluated with
@@ -155,15 +168,13 @@ func _end_run(victory: bool) -> bool:
 	# the save write all happen here, exactly once per run. The screen reads
 	# the outcome from SaveData.last_* so the signal shape stays unchanged.
 	SaveData.fold_run_results(victory, _party_character_ids(),
-			GameConfig.selected_map_id, GameConfig.selected_tier,
+			RunState.visited_map_ids, RunState.cleared_map_ids,
+			RunState.stages_cleared_total, RunState.laps_completed,
 			RunState.level, RunState.kills, RunState.run_time)
 	if GameConfig.daily_mode:
 		print("Daily run scored: %d" % GameConfig.last_daily_score)
 	print("Meta saved: %d quest(s) newly completed, %d shard(s) to claim" % [
 			SaveData.last_new_quest_ids.size(), SaveData.last_reward_shards])
-	if SaveData.last_tier_bonus_shards > 0:
-		print("Tier %d victory bonus: +%d shards" % [
-				GameConfig.selected_tier, SaveData.last_tier_bonus_shards])
 	run_ended.emit(victory)
 	return true
 

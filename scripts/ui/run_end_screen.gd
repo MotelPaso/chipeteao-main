@@ -38,7 +38,7 @@ const ENDINGS: Dictionary[String, Dictionary] = {
 		"color": VICTORY_TITLE_COLOR, "shake": false, "shimmer": true,
 	},
 	"exit_loss": {
-		"title": "INCURSIÓN ABANDONADA", "subtitle": "Saliste antes de la meta.",
+		"title": "INCURSIÓN ABANDONADA", "subtitle": "Saliste antes de superar una etapa.",
 		"color": DEFEAT_TITLE_COLOR, "shake": false, "shimmer": false,
 	},
 }
@@ -115,9 +115,11 @@ func _ending_key(victory: bool, extracted: bool) -> String:
 ## quest log.
 func _earning_lines() -> Array[String]:
 	var lines: Array[String] = []
-	if SaveData.last_tier_bonus_shards > 0:
-		lines.append("+%d esquirlas — bono por victoria en Grado %d" % [
-				SaveData.last_tier_bonus_shards, GameConfig.selected_tier])
+	# Stage progression (iteration 50) reads first: it is what the run was
+	# actually about now that there is no tier to have picked.
+	lines.append("Etapas superadas: %d" % RunState.stages_cleared_total)
+	if RunState.laps_completed > 0:
+		lines.append("Vueltas: %d" % RunState.laps_completed)
 	var quest_count := SaveData.last_new_quest_ids.size()
 	if quest_count > 0:
 		# The whole noun phrase agrees, not just a plural letter: Spanish

@@ -22,11 +22,10 @@ extends Node
 ##   total_kills, bosses_killed, runs_finished, victories, shrines_used,
 ##   chests_opened, max_level (high-water), best_run_minutes (high-water),
 ##   runs_as_<character_id>, wins_as_<character_id>,
-##   runs_on_<map_id>, victories_<map_id>,
-##   victories_<map_id>_t<tier> (per-map-tier wins; tier N wins gate tier
-##   N+1 — see is_tier_unlocked; victories_<map_id> keeps counting
-##   any-tier wins so pre-tier quests and unlocks never regress),
-##   any_t2_win / any_t3_win (tier-victory quests),
+##   runs_on_<map_id> (every map a run VISITED), victories_<map_id>
+##   (every map a run CLEARED — a run walks several maps since
+##   iteration 50), stages_cleared, laps_completed (high-water),
+##   any_t2_win / any_t3_win (kept ids, now the LAP quests),
 ##   slain_<miniboss_id> (hidden-boss kills, bumped by SecretBossBase),
 ##   used_weapon_<weapon_id> (Collection: ever carried; Player/UpgradePool),
 ##   evo_<weapon_id> / evolutions_total (chest evolution ceremonies),
@@ -79,14 +78,6 @@ var claimed_quest_ids: Array[String] = []
 ## (the run_ended signal shape stays untouched; loose coupling via here).
 var last_new_quest_ids: Array[String] = []
 var last_reward_shards: int = 0
-## Shards credited outright by the last fold's tier victory bonus (0 for a
-## defeat or a tier-1 win).
-var last_tier_bonus_shards: int = 0
-
-## Last tier picked per map id on the select screen (a remembered-choice
-## nicety, not a gate — the screen still clamps to unlocked tiers).
-var tier_choices: Dictionary[String, int] = {}
-
 ## Owned Armory ranks per relic id (iteration 36; see RelicCatalog).
 var relic_ranks: Dictionary[String, int] = {}
 
@@ -183,45 +174,53 @@ func discard_run_counters() -> void:
 ## --- Run-end fold (RunManager) ----------------------------------------
 
 ## Folds one finished run into the lifetime counters, marks any quest that
-## just hit its target (claiming stays manual, in the quest log), credits
-## any tier victory bonus outright and saves. The outcome is published in
-## last_new_quest_ids / last_reward_shards / last_tier_bonus_shards, which
-## RunManager and the run-end screen read (the tier bonus is separate
-## because it needs no claim).
+## just hit its target (claiming stays manual, in the quest log) and
+## saves. The outcome is published in last_new_quest_ids /
+## last_reward_shards, which RunManager and the run-end screen read.
 ##
 ## `character_ids` is the WHOLE party (one entry per co-op slot, solo is a
 ## single id): every distinct raider in it earns the runs_as_/wins_as_
 ## credit, so slots 1..3 stop playing for free.
-func fold_run_results(victory: bool, character_ids: Array[String], map_id: String, tier: int,
+## Folds a finished run (iteration 50 signature). A run now walks SEVERAL
+## maps, so the per-map counters are credited per map instead of once:
+## runs_on_<map> for every map visited and victories_<map> for every map
+## cleared, which is what keeps dunes_run_1 / fen_win_1 and friends
+## working unchanged across a multi-map run. `victory` means "cleared at
+## least one stage".
+func fold_run_results(victory: bool, character_ids: Array[String],
+		visited_map_ids: Array[String], cleared_map_ids: Array[String],
+		stages_cleared: int, laps: int,
 		level: int, kills: int, run_seconds: float) -> void:
-	tier = clampi(tier, 1, MapCatalog.TIER_COUNT)
 	var party := _distinct(character_ids)
 	bump("total_kills", kills)
 	bump("runs_finished")
-	bump("runs_on_" + map_id)
+	for map_id: String in _distinct(visited_map_ids):
+		bump("runs_on_" + map_id)
 	for character_id: String in party:
 		bump("runs_as_" + character_id)
-	last_tier_bonus_shards = 0
 	if victory:
 		bump("victories")
-		bump("victories_" + map_id)
-		bump("victories_%s_t%d" % [map_id, tier])
+		for map_id: String in _distinct(cleared_map_ids):
+			bump("victories_" + map_id)
 		for character_id: String in party:
 			bump("wins_as_" + character_id)
-		if tier >= 2:
-			bump("any_t%d_win" % tier)
-			last_tier_bonus_shards = MapCatalog.tier_shard_bonus(map_id, tier)
-			shards += last_tier_bonus_shards
+	bump("stages_cleared", stages_cleared)
+	# Lap quests (iteration 50) reuse the ids the tier quests had, so a
+	# save that already completed them keeps them completed.
+	raise_to("laps_completed", laps)
+	if laps >= 1:
+		bump("any_t2_win")
+	if laps >= 2:
+		bump("any_t3_win")
 	raise_to("max_level", level)
 	raise_to("best_run_minutes", int(run_seconds / 60.0))
-	# Iteration 38: runs have no clock, so "endless" minutes are simply a
-	# victorious run's total (the counter name is kept for old saves/quests).
-	if victory:
-		raise_to("best_endless_minutes", int(run_seconds / 60.0))
+	# The "endless" counter (kept for its quest ids) is now the
+	# pseudo-infinite time this run accumulated past its stage gates.
+	raise_to("best_endless_minutes", int(RunState.endless_seconds_total / 60.0))
 	# The run reached its end, so everything it credited becomes permanent
 	# BEFORE the quests are judged — this is the only merge point.
 	_merge_run_counters()
-	last_new_quest_ids = _commit(last_tier_bonus_shards > 0)
+	last_new_quest_ids = _commit()
 	last_reward_shards = 0
 	for quest_id: String in last_new_quest_ids:
 		last_reward_shards += int(QuestCatalog.by_id(quest_id).reward)
@@ -288,51 +287,6 @@ func claim_quest(quest_id: String) -> int:
 	shards += reward
 	_commit(true)
 	return reward
-
-
-## --- Map unlocks --------------------------------------------------------
-
-## A map is playable when its catalog unlock rule is met: rows with an
-## empty unlock_stat are always open; otherwise the named lifetime
-## counter must reach unlock_target (Ash Dunes: victories >= 1). Unknown
-## ids read as locked.
-func is_map_unlocked(map_id: String) -> bool:
-	var row := MapCatalog.by_id(map_id)
-	if row.is_empty():
-		return false
-	var stat_id := String(row.unlock_stat)
-	if stat_id.is_empty():
-		return true
-	return stat(stat_id) >= int(row.unlock_target)
-
-
-## --- Map tiers ----------------------------------------------------------
-
-## Tier 1 is always playable on any known map; tier N+1 unlocks by WINNING
-## tier N on that same map (per-map, so a Hollow Woods T2 win says nothing
-## about Ash Dunes). Legacy saves have no per-tier counters, so they read
-## as "only T1 unlocked" — exactly right.
-func is_tier_unlocked(map_id: String, tier: int) -> bool:
-	if MapCatalog.by_id(map_id).is_empty():
-		return false
-	if tier == 1:
-		return true
-	if tier < 1 or tier > MapCatalog.TIER_COUNT:
-		return false
-	return stat("victories_%s_t%d" % [map_id, tier - 1]) >= 1
-
-
-## Remembered select-screen tier pick for a map (1 when never picked).
-func tier_choice(map_id: String) -> int:
-	return clampi(int(tier_choices.get(map_id, 1)), 1, MapCatalog.TIER_COUNT)
-
-
-func set_tier_choice(map_id: String, tier: int) -> void:
-	tier = clampi(tier, 1, MapCatalog.TIER_COUNT)
-	if tier_choice(map_id) == tier:
-		return
-	tier_choices[map_id] = tier
-	save()
 
 
 ## --- Relics (Armory; iteration 36) --------------------------------------
@@ -434,9 +388,9 @@ func load_from_disk() -> void:
 	counters = _as_int_dict(data.get("counters"))
 	completed_quest_ids = _as_string_array(data.get("completed_quests"))
 	claimed_quest_ids = _as_string_array(data.get("claimed_quests"))
-	# Missing on legacy (pre-tier) saves: every map just remembers tier 1.
-	tier_choices = _as_int_dict(data.get("tier_choice"))
-	# Missing on pre-iteration-36 saves: no relics owned.
+	# Missing on pre-iteration-36 saves: no relics owned. Keys this build
+	# no longer knows (tier_choice, from before iteration 50) are simply
+	# not read — an old save loads clean and silent.
 	relic_ranks = _as_int_dict(data.get("relics"))
 	_load_settings(data.get("settings"))
 	# Starters are always playable, even if an edited file dropped them.
@@ -494,7 +448,6 @@ func _apply_defaults() -> void:
 	counters = {}
 	completed_quest_ids = []
 	claimed_quest_ids = []
-	tier_choices = {}
 	relic_ranks = {}
 	sfx_volume = DEFAULT_SFX_VOLUME
 	ambient_volume = DEFAULT_AMBIENT_VOLUME
@@ -530,7 +483,6 @@ func _to_save_dict() -> Dictionary[String, Variant]:
 		"counters": counters,
 		"completed_quests": completed_quest_ids,
 		"claimed_quests": claimed_quest_ids,
-		"tier_choice": tier_choices,
 		"relics": relic_ranks,
 		"settings": {
 			"sfx_volume": sfx_volume,
