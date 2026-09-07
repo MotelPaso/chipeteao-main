@@ -58,4 +58,12 @@ func _dress_arena() -> void:
 ## which is where every raider used to appear before this marker existed.
 func spawn_origin() -> Vector3:
 	var marker := get_node_or_null(SPAWN_POINT_NAME) as Node3D
-	return marker.global_position if marker != null else global_position
+	var at := marker.global_position if marker != null else global_position
+	# Dropped onto the relief (iteration 51): the marker is authored at
+	# y = 0 and the terrain under it is a flat pad, but "flat" is the
+	# terrain's own height there, which is only 0 by coincidence.
+	var terrain := Terrain.find(get_tree())
+	if terrain != null:
+		terrain.ensure_built()
+		at.y = terrain.height_at(at.x, at.z)
+	return at

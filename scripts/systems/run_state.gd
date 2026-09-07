@@ -102,6 +102,10 @@ var roulette_price_multiplier: float = 1.0
 ## XP curve: cost of the level being climbed to, in gems (level 1 -> 2
 ## costs XP_BASE + XP_PER_LEVEL). The whole pacing of a run rides on these
 ## three numbers, so they are named instead of buried in _xp_required.
+## Env override that makes a whole run reproducible (see reset()).
+## Test-only; nothing in the game sets it.
+const GAME_SEED_ENV: String = "BONK_GAME_SEED"
+
 const XP_BASE: int = 5
 const XP_PER_LEVEL: int = 3
 ## Convex term (iteration 46): the old straight line let a late run take a
@@ -168,8 +172,15 @@ func reset() -> void:
 	# Fetched by path: this autoload loads BEFORE GameConfig, so the very
 	# first reset (app startup, never a daily) must not touch it by name.
 	var config := get_node_or_null("/root/GameConfig")
+	var game_seed := OS.get_environment(GAME_SEED_ENV)
 	if config != null and bool(config.daily_mode) and int(config.daily_seed) != 0:
 		seed(int(config.daily_seed))
+	elif game_seed.is_valid_int():
+		# Test-only (BONK_GAME_SEED): the run's own stream — cards, spawns,
+		# the scatter and therefore the terrain — becomes reproducible.
+		# Without it a soak is a fresh world every time, which makes any
+		# two-sided comparison (balance, fog coverage) measure noise.
+		seed(int(game_seed))
 	else:
 		randomize()
 	xp_to_next = _xp_required(level)

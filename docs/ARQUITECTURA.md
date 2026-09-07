@@ -163,7 +163,7 @@ Reglas que comparten las de ataque único: el escalonado es un `const` por archi
 - Qué es: una fila de catálogo + una escena de arena. **El orden de `MAP_LIBRARY` es el orden de la partida** (iteración 50): una fila nueva insertada en medio cambia la progresión de todos inmediatamente. No hay desbloqueos de mapa ni grados; a un bioma se llega jugando.
 - Archivos: `scripts/systems/map_catalog.gd` (`MAP_LIBRARY`), `scripts/world/run_root.gd`, `scripts/world/arena.gd`, `scripts/world/scatter.gd`, arenas existentes como plantilla.
 - Fila: `id`, `display_name` (topónimo, mayúscula en las dos partes), `blurb`, `scene_path`, `palette`. Nada más: `unlock_stat`, `locked_hint` y `tiers` desaparecieron con los grados.
-- Escena de arena (copiar `AshDunes.tscn`): raíz `Node3D` **con `scripts/world/arena.gd` y su `map_id`**, `WorldEnvironment` + luz, `Floor` y `Perimeter` (muros, capa 1), `Backdrop` (`scripts/world/backdrop.gd`, sus anillos de colinas se derivan de `arena_half_extent`), spots de verticalidad y props a mano (en grupo `scatter_keepout`), nodo de scatter con `scatter.gd` (seed determinista; su `arena_half_extent` es la **fuente única del tamaño de arena** — 80.0 = 160x160 — publicada por el grupo `arena_bounds`, la leen `BossBase` y `EnemySpawner` restando su margen), `Interactables`, `EnemySpawner` (con `phase_preset` y sus escenas/horario), `AmbientBed` y un `Marker3D` llamado `SpawnPoint` (dónde aterriza el equipo). **NO** instancia `RunSystems.tscn`: eso vive una sola vez en `Run.tscn`.
+- Escena de arena (copiar `AshDunes.tscn`): raíz `Node3D` **con `scripts/world/arena.gd` y su `map_id`**, `WorldEnvironment` + luz, `Floor` y `Perimeter` (muros, capa 1), `Backdrop` (`scripts/world/backdrop.gd`, sus anillos de colinas se derivan de `arena_half_extent`), spots de verticalidad y props a mano (en grupo `scatter_keepout`), nodo de scatter con `scatter.gd` (seed determinista; su `arena_half_extent` es la **fuente única del tamaño de arena** — 120.0 = 240x240 — publicada por el grupo `arena_bounds`, la leen `BossBase` y `EnemySpawner` restando su margen), `Interactables`, `EnemySpawner` (con `phase_preset` y sus escenas/horario), `AmbientBed`, un nodo **`Terrain`** con `scripts/world/terrain.gd`, su `amplitude` del bioma y el `ShaderMaterial` del suelo en `surface_material` (colocado **después** del scatter en orden de árbol), y un `Marker3D` llamado `SpawnPoint` (dónde aterriza el equipo). Los muros del `Perimeter` se escriben **estáticos** en la escena: formas `(1, 17, 242)` / `(242, 17, 1)` centradas en ±120.5 y y = 3.5. Unos **13 POI barajables** bajo `Interactables`. **NO** instancia `RunSystems.tscn`: eso vive una sola vez en `Run.tscn`.
 - Los `@export` del `EnemySpawner` los overridean las tres arenas en su `.tscn`: mover esos exports a un colaborador rompe los tres mapas. Si hace falta partir el spawner, hay que migrar las escenas a la vez.
 
 ## Partida por etapas
@@ -218,13 +218,86 @@ Corre dentro de `ScreenFade.transition_async(action)` — el hermano que **esper
 
 `BONK_STAGE_FAST=1` supera la etapa a los 60 s y sin jefe; el harness se queda entonces `PSEUDO_INFINITE_DWELL` (70 s) antes de ir al portal, para que la rampa registre al menos un minuto, y después abandona su ruta y va directo. `BONK_ARENA` ya no nombra la escena a instanciar sino el **bioma inicial** (`GameConfig.start_map_id`); el harness siempre arranca `Run.tscn`. `BONK_SAVE_PATH` re-apunta el guardado antes de la primera lectura, para cualquier arranque headless que no sea el probe.
 
+## Terreno
+
+Desde la iteración 51 el suelo de una arena **no es una placa plana**: es
+`scripts/world/terrain.gd` (`class_name Terrain extends StaticBody3D`, grupo
+`terrain`, `static func find(tree)`), un heightmap suave de amplitud baja
+(bosque 2.5, dunas 3.0, ciénaga 1.5) con mesetas encima.
+
+**El relieve es deliberadamente bajo.** Esto es un bullet-heaven: la horda no
+tiene navmesh, persigue en línea recta y trepa lo que la bloquea, así que un
+terreno capaz de esconder a un raider o cortar una persecución rompería la
+persecución en vez de enriquecerla. Lo que compra el relieve es legibilidad
+(saber dónde estás en 240×240) y silueta.
+
+- **Semilla**: la del scatter (`scatter.run_seed()`, válida desde su
+  `_enter_tree`, leída por el grupo `arena_bounds`), así que `BONK_SEED`,
+  `BONK_GAME_SEED` y la Cacería diaria reproducen el mismo relieve **y** los
+  mismos props encima.
+- **Orden de construcción**: se arma en `_ready`, que corre **antes** de
+  `Arena._ready` (los hijos primero) y **después** del `_enter_tree` del
+  scatter, así que la máscara y los sitios de meseta ya existen. Quien pueda
+  correr antes (el `Backdrop` es el hijo #2 y lee `min_height` en su propio
+  `_ready`) llama `ensure_built()`, que es idempotente.
+- **API**: `height_at(x, z)` (bilineal sobre la misma rejilla que tiene el
+  cuerpo físico), `height_at_xz`, `snap(pos)`, `min_height`, `max_height`,
+  `map_image(px_per_meter)` (tinte del bioma sombreado por altura, para el
+  minimapa y el mapa de Tab), `add_pad(centro, radio)`.
+- **Técnica**: el ruido se muestrea en una retícula de `noise_step` 2 m y se
+  interpola a la rejilla de 1 m del `HeightMapShape3D` (que es **fija** en una
+  unidad por muestra: 241×241 y el nodo sin escalar). La malla se arma con
+  `add_surface_from_arrays` sobre arrays empaquetados, no con `SurfaceTool`:
+  un vértice por llamada sobre 241×241 son cientos de miles de llamadas de
+  GDScript y tarda segundos. Presupuesto: **400 ms**; medido 92-115 ms.
+- **Pads planos**: bajo el spawn (`spawn_flat_radius`), bajo cada grupo
+  autorizado de `Verticality` y bajo cada sitio de meseta, con una banda de
+  mezcla de 6 m. **Nunca bajo los POI barajables**, cuyo XZ cambia después: a
+  esos se los apoya en el relieve. Una banda de `rim_flat_band` 10 m aplana el
+  borde para que los muros estáticos y el disco del backdrop encuentren suelo
+  llano.
+- **Regla de nulos**: quien corre desde `on_stage_started` en adelante trata un
+  `find()` nulo como un `push_error` una vez; quien corre en construcción
+  (Backdrop, HUD, overlay) lo tolera en silencio y se reconstruye al empezar la
+  etapa.
+
+### La regla de apoyado
+
+**Nada se coloca a y = 0.** Todo pasa por `Terrain.height_at`:
+
+| Dónde | Cómo |
+|---|---|
+| Props del scatter | `_spawn_prop` **ignora** el `pos.y` que le pasan y usa `ground_height()` |
+| Rocas de máscara, línea de perímetro, mesetas | por el mismo `_spawn_prop` |
+| Puntos del director | `_claim_clear_point()` → `_terrain_height()` |
+| Eventos, portales, ruletas, altares, manantiales, cofres de evento | `_event_point()` / `_claim_clear_point()` |
+| Portal de salida | candidatos a y = 0, apoyados por `_ground_height` |
+| POI barajados | `_shuffle_ground_interactables` apoya los autorizados por debajo de `POI_PLATFORM_Y` 0.5; los de plataforma conservan su y |
+| Spawn del equipo | `Arena.spawn_origin()` y `RunSystems.place_party` (cada offset del anillo lee su propia altura) |
+| Anillo de cofres del jefe | uno por uno en `BossBase._drop_chests` |
+| Spawns de enemigos | `_ring_position` → `_ground_height` |
+
+**Las dos sondas de suelo** (`WorldDirector._ground_height`,
+`EnemySpawner._ground_height`) ahora barren **todo** el relieve —de
+`max_height + 30` a `min_height − 2`— y su fallback ya **no es 0** sino
+`height_at`: cero es una altura real en un heightmap, así que el viejo
+fallback enterraba o levitaba lo que colocara. Una meseta sobre una colina
+quedaba por encima del inicio del rayo y una hondonada por debajo del final.
+
+**Las dos puertas del harness se reescribieron con el terreno, no se
+aflojaron**: el barrido de máscara centra su cápsula en
+`height_at(muestra) + SWEEP_CAPSULE_CENTER_Y` y **excluye el RID del terreno**
+de la consulta (una cápsula que toca el suelo no es una apertura; rocas, props
+y muros siguen contando); el vigilante de celda bloqueada compara
+`y − height_at(xz)` contra `FLOOR_STAND_MAX_Y`.
+
 ## Arena irregular
 
-- Qué es: cada partida el cuadrado de 160x160 recibe una **máscara de celdas** (`scatter.gd`, grupo `arena_bounds`): `mask_cell_size` (10 m), entre `mask_blobs_min` y `mask_blobs_max` manchas por paseo aleatorio se bloquean (nunca las celdas del spawn ni las de los spots de verticalidad), y un flood fill 4-vecinos desde el spawn **sella** cualquier bolsa no alcanzable. Si queda menos de `mask_min_open_fraction` abierto se reintenta con menos manchas. Las celdas bloqueadas se llenan con **rocas de verdad** (iteración 48): una retícula de `mask_rocks_per_side`² props con jitter (`mask_rock_jitter`) y escala en `[mask_rock_scale_min, mask_rock_scale_max]`, **cubriendo la celda entera, frontera incluida**. Los enemigos trepadores pueden cruzarlas, el jugador no.
+- Qué es: cada partida el cuadrado de **240x240** recibe una **máscara de celdas** (`scatter.gd`, grupo `arena_bounds`): `mask_cell_size` (10 m, o sea 24x24 celdas), entre `mask_blobs_min` y `mask_blobs_max` (13-22) manchas por paseo aleatorio se bloquean (nunca las celdas del spawn ni las de los spots de verticalidad), y un flood fill 4-vecinos desde el spawn **sella** cualquier bolsa no alcanzable. Si queda menos de `mask_min_open_fraction` abierto se reintenta con menos manchas. Las celdas bloqueadas se llenan con **rocas de verdad** (iteración 48): una retícula de `mask_rocks_per_side`² props con jitter (`mask_rock_jitter`) y escala en `[mask_rock_scale_min, mask_rock_scale_max]`, **cubriendo la celda entera, frontera incluida**. Los enemigos trepadores pueden cruzarlas, el jugador no.
   - **Se acabaron los muros invisibles.** Antes cada celda bloqueada llevaba un `StaticBody3D` de 10×7×10 m (`MaskWalls`) con rocas encima de adorno: chocabas contra nada, y —peor— los trepadores subían los 7 m y **caminaban por arriba**, que es exactamente el reporte de «enemigos volando» (medido: y ≈ 7.0-7.5 con `velocity.y` = 5.5 = `climb_speed`). Sin esos cajones, la altura máxima que alcanza la horda es la cima de la roca más grande (≈ 4.0-4.3 m), que además se ve.
   - La cobertura no es opinión: `_fill_budget_gap()` recalcula en runtime el alcance de una roca (inradio en planta del casco × escala mínima + radio de la cápsula del jugador) contra el paso de la retícula en diagonal, y **avisa** si alguien afloja los exports por debajo del margen. La primera versión selló solo la frontera y el harness la rechazó: el raider saltaba, aterrizaba sobre las rocas del borde y bajaba al interior hueco.
   - `Rock.tscn` y `DuneRock.tscn` llevan **un `ConvexPolygonShape3D` por blob visible** (2 y 3), con los puntos ya horneados en la transformación del blob para que el `CollisionShape3D` quede en identidad y `_spawn_prop` pueda seguir escalando **uniformemente** (Godot no soporta escalar una forma de colisión de forma no uniforme). Antes el blob lateral no tenía collider.
-- API: `is_walkable(Vector2)`, `random_walkable_point()`, `blocked_cell_count()`, `open_cell_count()`, `blocked_cells()`, `cell_center(Vector2i)`, `cell_of(Vector2)` (las tres últimas las usa el barrido de máscara del harness). Consumidores: `EnemySpawner._ring_position` / `_band_position` / `spawn_pressure_burst` (reintentan hasta hallar celda abierta, no clampean), `WorldDirector` (un **único** helper respeta la máscara para portales, ruleta, altares y cofres de evento), `scatter._is_clear`, y el harness de pruebas. La máscara se construye en `_enter_tree` (antes del barajado del director) con el mismo RNG. Log `Arena mask:`.
+- API: `is_walkable(Vector2)`, `random_walkable_point()`, `blocked_cell_count()`, `open_cell_count()`, `blocked_cells()`, `cell_center(Vector2i)`, `cell_of(Vector2)` (las tres últimas las usa el barrido de máscara del harness). Consumidores: `EnemySpawner._ring_position` / `_band_position` / `spawn_pressure_burst` (reintentan hasta hallar celda abierta, no clampean), `WorldDirector` (un **único** helper respeta la máscara para portales, ruleta, altares y cofres de evento), `scatter._is_clear`, y el harness de pruebas. La máscara se construye en `_enter_tree` (antes del barajado del director) con el mismo RNG. Log `Arena mask:`, que **imprime la fracción abierta** (la puerta que persigue el bucle de reconstrucción).
 - Inicio irregular: `WorldDirector._randomize_starting_pois` elimina cofres/altares colocados con `poi_skip_chance` (conserva al menos el primer cofre) y añade `extra_start_chests_min..max` cofres en puntos libres. Log `Start layout:`.
 
 ## Misiones y meta-progresión
@@ -340,23 +413,24 @@ La existencia se comprueba con `ResourceLoader.exists(path, "Texture2D")`, **no*
 La comprobación estándar del proyecto. Desde la raíz:
 
 ```sh
-tools/verificar.sh            # 240 s de partida por arena (el modo estándar)
-tools/verificar.sh 600        # corrida larga, para cambios de ritmo tardío
+tools/verificar.sh            # 360 s de partida por arena (el modo estándar)
+tools/verificar.sh 720        # corrida larga, para cambios de ritmo tardío
 ```
 
-**Nunca la corras con menos de 240 s.** Por debajo de ese umbral la puerta
+**Nunca la corras con menos de 360 s.** Por debajo de ese umbral la puerta
 de cobertura de interactuables se salta en silencio y el script imprime OK
-sin haber exigido nada: un soak de 120 s «pasa» aunque ningún cofre, altar
-ni portal se haya resuelto en las tres arenas.
+sin haber exigido nada: un soak corto «pasa» aunque ningún cofre, altar
+ni portal se haya resuelto en las tres arenas. 360 s es lo que tarda el
+recorrido en cruzar una arena de 240x240.
 
-Hace `godot --headless --import`, un soak de **las tres arenas** (`HollowWoods`, `AshDunes`, `Gloomfen`) con `BONK_GODMODE=1 BONK_SEED=4242`, y un **cuarto soak de etapa** (iteración 49): Bosque Hueco con `BONK_STAGE_FAST=1` y **el doble de reloj** (60 s hasta la puerta + 70 s de espera deliberada + cruzar el mapa hasta un portal que sale a 40 m o más no cabe en 240 s, y el RNG del juego se `randomize()`a por corrida, así que la semilla solo fija el paseo del harness). Ese cuarto soak queda **fuera** de la cuenta de interactuables, y `Portal used: exit` no cuenta como portal usado. Falla (exit 1) si:
+Hace `godot --headless --import`, un soak de **las tres arenas** (`HollowWoods`, `AshDunes`, `Gloomfen`) con `BONK_GODMODE=1 BONK_SEED=4242 BONK_GAME_SEED=4242`, y un **cuarto soak de etapa** (iteración 49): Bosque Hueco con `BONK_STAGE_FAST=1` y **el doble de reloj** (60 s hasta la puerta + 70 s de espera deliberada + cruzar el mapa hasta un portal que sale a 40 m o más no cabe en 240 s, y el RNG del juego se `randomize()`a por corrida, así que la semilla solo fija el paseo del harness). Ese cuarto soak queda **fuera** de la cuenta de interactuables, y `Portal used: exit` no cuenta como portal usado. Falla (exit 1) si:
 
 - el import o algún soak imprime errores/warnings de Godot (patrón amplio: `SCRIPT ERROR`, `ERROR:`, `WARNING:`, `null instance`, `previously freed`, `Resource file not found`…),
 - una arena no llega al final del soak (se colgó o murió antes) — lo mide contando las líneas `frame N ...` que el harness imprime cada 120 frames,
 - **cobertura**: el raider no pasó del nivel 3 (señal de que el arma no hace daño), o —solo en corridas de ≥240 s— ningún interactuable se resolvió. Un soak que no sube de nivel ni toca nada puede pasar «limpio» sin haber ejercitado nada.
 - **etapa**: el soak de etapa no abrió su portal, no cruzó de `hollow_woods` a `ash_dunes`, dejó algo vivo en un `Stage sweep:`, perdió progreso entre el par de `Stage carry:` de un cruce, o no produjo ningún `Sky event:` después del cruce (lo que probaría que el director no volvió a cachear las luces del mapa nuevo).
 
-La corrida completa tarda **~21 minutos** (import + 3×240 s + 1×480 s), más que el timeout de una llamada de shell: lánzala en segundo plano.
+La corrida completa tarda **~32 minutos** (import + 3×360 s + 1×720 s), más que el timeout de una llamada de shell: lánzala en segundo plano.
 
 Logs en `$TMPDIR/bonkraiders-verify/`. Cada arena imprime su resumen `nivel=… cofres=… altares=… portales=…`.
 
@@ -390,6 +464,7 @@ Variables de entorno:
 | `BONK_ELITE_BOOST=1` | todo spawn sale shiny (`force_elite_spawns` por grupo) |
 | `BONK_STAGE_FAST=1` | la etapa se supera a los 60 s sin jefe; el harness espera 70 s y cruza |
 | `BONK_SAVE_PATH=<ruta>` | re-apunta el guardado (cualquier arranque headless que no sea el probe) |
+| `BONK_GAME_SEED=<int>` | siembra el RNG **del juego** (cartas, spawns, scatter y relieve): lo que hace reproducible un soak entero |
 | `BONK_PERF=1` | enciende el overlay de rendimiento del HUD |
 
 Uso directo:
@@ -417,5 +492,5 @@ Para lógica aislada sigue sirviendo un harness desechable `extends SceneTree` (
 - **Español latinoamericano para todo lo visible, inglés para todo lo estructural.** La tabla es `docs/GLOSARIO.md`. En inglés y sin tocar: ids, `node_name`, grupos, `StringName`, rutas `res://`, claves de `SaveData` y los `print()`/`push_warning()`. Los marcadores de formato (`%d %s %.1f %02d %%`) conservan número y orden exactos.
 - **Tunables como `@export`** con defaults en el script; los overrides por instancia viven en la escena (el horario de jefes por arena, las escenas del spawner). Antes de mover un `@export` de sitio, comprueba qué `.tscn` lo overridea: las tres arenas overridean el `EnemySpawner`.
 - **Números mágicos a `const` con nombre y comentario del porqué.** Un `0.5` suelto en dos archivos es la forma en que dos copias del mismo cálculo se separan.
-- **Logs de una línea** en eventos clave — son la interfaz de verificación de los soaks headless, van **en inglés** y se conservan. Inventario actual: `Run ended:`, `Meta saved:`, `Save recovered from backup:`, `Boss spawned:`, `Boss chests dropped:`, `Elite chest dropped:`, `Horde:`, `Sky event:`, `Chest opened:`, `Altar charged:`, `Altar left:`, `Altar placed:`, `Demonic altar used:`, `Demonic pact:`, `Spawn skipped:`, `Stage advanced:`, `Stage sweep:`, `Stage carry:`, `Stage gate:`, `Stage boss slain:`, `Exit portal opened`, `Portal used: exit`, `Pseudo-infinite:`, `Run stages:`, `Greed shrine:`, `Roulette spun:`, `Spring used:`, `Portal used:`, `Portals placed:`, `Weapon evolved:`, `Weapon ascended:`, `Pet joined:`, `Secret miniboss awakened:`, `Secret boss slain:`, `Arena mask:`, `Start layout:`, `Daily run scored:`, `Void rescue:`. Al crear un evento mayor, añade el tuyo con el mismo formato.
+- **Logs de una línea** en eventos clave — son la interfaz de verificación de los soaks headless, van **en inglés** y se conservan. Inventario actual: `Run ended:`, `Meta saved:`, `Save recovered from backup:`, `Boss spawned:`, `Boss chests dropped:`, `Elite chest dropped:`, `Horde:`, `Sky event:`, `Chest opened:`, `Altar charged:`, `Altar left:`, `Altar placed:`, `Demonic altar used:`, `Demonic pact:`, `Spawn skipped:`, `Stage advanced:`, `Stage sweep:`, `Stage carry:`, `Stage gate:`, `Stage boss slain:`, `Exit portal opened`, `Portal used: exit`, `Pseudo-infinite:`, `Run stages:`, `Terrain built:`, `Probe legs:`, `Greed shrine:`, `Roulette spun:`, `Spring used:`, `Portal used:`, `Portals placed:`, `Weapon evolved:`, `Weapon ascended:`, `Pet joined:`, `Secret miniboss awakened:`, `Secret boss slain:`, `Arena mask:`, `Start layout:`, `Daily run scored:`, `Void rescue:`. Al crear un evento mayor, añade el tuyo con el mismo formato.
 - **Verificar antes de dar por hecho un cambio**: `tools/verificar.sh`. Un cambio que no pasa el import o ensucia el log de un soak no está terminado.

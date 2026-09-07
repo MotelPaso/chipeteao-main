@@ -1,9 +1,14 @@
 #!/usr/bin/env bash
 # Verificación headless del proyecto: import limpio + soak por arena.
-# Uso: tools/verificar.sh [segundos_por_arena]   (por defecto 240)
+# Uso: tools/verificar.sh [segundos_por_arena]   (por defecto 360)
 #
-# 240 s no es arbitrario: por debajo, el recorrido del harness no da tiempo a
-# cruzar una arena de 160x160 y la puerta de cobertura no puede exigir nada.
+# 360 s no es arbitrario: por debajo, el recorrido del harness no da tiempo a
+# cruzar una arena de 240x240 y la puerta de cobertura no puede exigir nada.
+# La corrida completa tarda ~32 min (3 x 360 s + 1 x 720 s + import).
+#
+# BONK_GAME_SEED fija el RNG del juego (cartas, spawns, scatter y por tanto
+# el relieve). Sin él cada soak es un mundo distinto y cualquier comparación
+# entre dos corridas mide ruido, no el cambio.
 #
 # Falla (exit 1) si:
 #   - el import o algún soak reporta errores/warnings de Godot
@@ -15,7 +20,7 @@
 set -uo pipefail
 cd "$(dirname "$0")/.."
 
-SECS="${1:-240}"
+SECS="${1:-360}"
 FRAMES=$(( SECS * 60 ))
 LOGDIR="${TMPDIR:-/tmp}/bonkraiders-verify"
 mkdir -p "$LOGDIR"
@@ -39,6 +44,7 @@ for ARENA in HollowWoods AshDunes Gloomfen; do
 	echo "== soak $ARENA (${SECS}s de partida) =="
 	LOG="$LOGDIR/soak_$ARENA.log"
 	BONK_ARENA="res://scenes/world/$ARENA.tscn" BONK_GODMODE=1 BONK_SEED=4242 \
+		BONK_GAME_SEED=4242 \
 		godot --headless --fixed-fps 60 --quit-after "$FRAMES" \
 		res://scenes/tests/ArenaProbe.tscn >"$LOG" 2>&1
 
@@ -98,7 +104,7 @@ STAGE_FRAMES=$(( STAGE_SECS * 60 ))
 echo "== soak etapa (HollowWoods, BONK_STAGE_FAST, ${STAGE_SECS}s de partida) =="
 STAGE_LOG="$LOGDIR/soak_stage.log"
 BONK_ARENA="res://scenes/world/HollowWoods.tscn" BONK_GODMODE=1 BONK_SEED=4242 \
-	BONK_STAGE_FAST=1 \
+	BONK_GAME_SEED=4242 BONK_STAGE_FAST=1 \
 	godot --headless --fixed-fps 60 --quit-after "$STAGE_FRAMES" \
 	res://scenes/tests/ArenaProbe.tscn >"$STAGE_LOG" 2>&1
 

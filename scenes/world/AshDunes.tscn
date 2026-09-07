@@ -23,6 +23,7 @@
 [ext_resource type="Script" path="res://scripts/systems/ambient_bed.gd" id="17_ambient"]
 [ext_resource type="AudioStream" path="res://assets/audio/ambient/desert_wind.wav" id="18_wind"]
 [ext_resource type="PackedScene" path="res://scenes/world/secrets/HummingSkull.tscn" id="24_skull"]
+[ext_resource type="Script" path="res://scripts/world/terrain.gd" id="90_terrain"]
 
 [sub_resource type="Shader" id="Shader_sand"]
 code = "shader_type spatial;
@@ -50,18 +51,11 @@ void fragment() {
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_sand"]
 shader = SubResource("Shader_sand")
 
-[sub_resource type="BoxMesh" id="BoxMesh_floor"]
-material = SubResource("ShaderMaterial_sand")
-size = Vector3(160, 1, 160)
-
-[sub_resource type="BoxShape3D" id="BoxShape3D_floor"]
-size = Vector3(160, 1, 160)
-
 [sub_resource type="BoxShape3D" id="BoxShape3D_wall_x"]
-size = Vector3(1, 12, 162)
+size = Vector3(1, 17, 242)
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_wall_z"]
-size = Vector3(162, 12, 1)
+size = Vector3(242, 17, 1)
 
 [sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_1"]
 sky_top_color = Color(0.48, 0.32, 0.36, 1)
@@ -104,32 +98,22 @@ light_color = Color(1, 0.76, 0.52, 1)
 light_energy = 1.15
 shadow_enabled = true
 
-[node name="Floor" type="StaticBody3D" parent="."]
-
-[node name="MeshInstance3D" type="MeshInstance3D" parent="Floor"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.5, 0)
-mesh = SubResource("BoxMesh_floor")
-
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Floor"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.5, 0)
-shape = SubResource("BoxShape3D_floor")
-
 [node name="Perimeter" type="StaticBody3D" parent="."]
 
 [node name="WallEast" type="CollisionShape3D" parent="Perimeter"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 80.5, 6, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 120.5, 3.5, 0)
 shape = SubResource("BoxShape3D_wall_x")
 
 [node name="WallWest" type="CollisionShape3D" parent="Perimeter"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -80.5, 6, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -120.5, 3.5, 0)
 shape = SubResource("BoxShape3D_wall_x")
 
 [node name="WallNorth" type="CollisionShape3D" parent="Perimeter"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 6, -80.5)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 3.5, -120.5)
 shape = SubResource("BoxShape3D_wall_z")
 
 [node name="WallSouth" type="CollisionShape3D" parent="Perimeter"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 6, 80.5)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 3.5, 120.5)
 shape = SubResource("BoxShape3D_wall_z")
 
 [node name="Verticality" type="Node3D" parent="."]
@@ -259,20 +243,48 @@ transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, 48, 2.4, 22)
 [node name="HummingSkull" parent="Interactables" groups=["scatter_keepout"] instance=ExtResource("24_skull")]
 transform = Transform3D(0.453596, 0, 0.891207, 0, 1, 0, -0.891207, 0, 0.453596, -64, 0, -8)
 
+[node name="ExtraChest1" parent="Interactables" groups=["scatter_keepout"] instance=ExtResource("16_chest")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 48.0, 0, 0.0)
+
+[node name="ExtraCharge2" parent="Interactables" groups=["scatter_keepout"] instance=ExtResource("13_chargeshrine")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 35.5, 0, 44.6)
+
+[node name="ExtraChest3" parent="Interactables" groups=["scatter_keepout"] instance=ExtResource("16_chest")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -14.7, 0, 64.3)
+
+[node name="ExtraGreed4" parent="Interactables" groups=["scatter_keepout"] instance=ExtResource("14_greedshrine")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -43.2, 0, 20.8)
+
+[node name="ExtraCharge5" parent="Interactables" groups=["scatter_keepout"] instance=ExtResource("13_chargeshrine")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -51.4, 0, -24.7)
+
+[node name="ExtraChest6" parent="Interactables" groups=["scatter_keepout"] instance=ExtResource("16_chest")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -14.7, 0, -64.3)
+
+[node name="ExtraCurse7" parent="Interactables" groups=["scatter_keepout"] instance=ExtResource("15_curseshrine")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 29.9, 0, -37.5)
+
 [node name="DuneScatter" type="Node3D" parent="."]
 script = ExtResource("6_scatter")
 scatter_seed = 90417
 tree_scene = ExtResource("7_cactus")
 rock_scene = ExtResource("9_dunerock")
 stump_scene = ExtResource("10_bonepile")
-tree_count = 24
-rock_count = 16
-stump_count = 14
+tree_count = 54
+rock_count = 36
+stump_count = 32
 min_prop_spacing = 7.0
 perimeter_scene = ExtResource("9_dunerock")
 perimeter_accent_scene = ExtResource("8_obelisk")
 perimeter_step = 10.0
 perimeter_rock_every = 6
+mesa_platform_scene = ExtResource("12_mesaplatform")
+mesa_ramp_scene = ExtResource("11_mesaramp")
+
+[node name="Terrain" type="StaticBody3D" parent="."]
+script = ExtResource("90_terrain")
+amplitude = 3.0
+surface_material = SubResource("ShaderMaterial_sand")
 
 [node name="EnemySpawner" type="Node3D" parent="."]
 script = ExtResource("2_spawner")

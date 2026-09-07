@@ -48,10 +48,15 @@ const STAGE_SKY_DELAY: float = 5.0
 ## publish its own bounds through the "arena_bounds" group.
 const FALLBACK_HALF_EXTENT: float = 60.0
 ## A leg ends when the raider gets this close to its waypoint...
+## Arrival radius, measured on XZ ONLY (iteration 51): with terrain, a
+## waypoint on a hollow floor and a raider on its rim are metres apart in
+## Y while standing on the same spot, and a 3D check never converged.
 const WAYPOINT_REACHED: float = 2.5
 ## ...or after this long, so geometry it cannot walk around never wedges it.
 ## Generous: a 160x160 arena with mask walls needs detours.
-const LEG_TIMEOUT: float = 16.0
+## A 240x240 arena is 1.5x the old crossing and the relief adds detours:
+## 16 s timed out most legs, which turned the tour into a random walk.
+const LEG_TIMEOUT: float = 40.0
 ## Seconds before the tour will head back to an interactable it already
 ## tried. Keeps a spent-but-still-available altar from pinning the walk.
 const REVISIT_COOLDOWN: float = 45.0
@@ -88,6 +93,12 @@ var _debug: bool = false
 var _visited: Dictionary[int, float] = {}
 ## The interactable this leg is walking to (null when just roaming).
 var _target: Interactable = null
+## Leg accounting, summarised at the end of every soak (Probe legs:): a
+## tour whose legs all time out looks identical to a healthy one in the
+## frame counter, and that is exactly what a too-small arrival radius or
+## an unreachable waypoint produces.
+var _legs_reached: int = 0
+var _legs_timed_out: int = 0
 var _stall_check: float = 0.0
 var _last_position: Vector3 = Vector3.ZERO
 var _rng := RandomNumberGenerator.new()
@@ -133,6 +144,8 @@ const SWEEP_STEP: float = 0.2
 ## arena floor plate).
 const SWEEP_CAPSULE_RADIUS: float = 0.4
 const SWEEP_CAPSULE_HEIGHT: float = 1.8
+## Capsule centre ABOVE THE GROUND at each sample (iteration 51: it used
+## to be an absolute height, which only worked on a flat floor).
 const SWEEP_CAPSULE_CENTER_Y: float = 0.9
 ## World geometry (floor, perimeter, props) is layer 1; enemies are layer 2
 ## and never count as "this boundary is sealed".
@@ -145,6 +158,9 @@ const SWEEP_FRAME: int = 10
 const SWEEP_REPORT_LIMIT: int = 6
 ## A raider higher than this above the floor plate (y = 0) is standing on a
 ## rock, a platform or a mesa — above a blocked cell, not inside it.
+## How far ABOVE THE TERRAIN a raider can be and still count as standing
+## on the ground rather than on a rock or a platform (iteration 51: this
+## used to be an absolute Y, which read every hill as "on a prop").
 const FLOOR_STAND_MAX_Y: float = 0.6
 ## Continuous seconds inside a blocked cell before it counts as "got in".
 ## Long enough that a jump arc or a knockback cannot trip it.
@@ -284,6 +300,12 @@ func _apply_godmode() -> void:
 	print("ArenaProbe: godmode on")
 
 
+## Printed once, on the way out: a summary the soak script can read.
+func _exit_tree() -> void:
+	# One-line log (RunManager convention) for headless soaks.
+	print("Probe legs: reached=%d timed_out=%d" % [_legs_reached, _legs_timed_out])
+
+
 func _physics_process(delta: float) -> void:
 	_frames += 1
 	if not _swept and _frames >= _sweep_at_frame:
@@ -355,6 +377,12 @@ func _is_rising(body: CharacterBody3D) -> bool:
 	return true
 
 
+## Metres between a body and the ground under it.
+func _height_above_ground(at: Vector3) -> float:
+	var terrain := Terrain.find(get_tree())
+	return at.y - (terrain.height_at(at.x, at.z) if terrain != null else 0.0)
+
+
 ## (a) Walks every boundary a blocked cell shares with a WALKABLE one in
 ## SWEEP_STEP increments, straddling the boundary line with the player
 ## capsule. A sample that touches no world geometry is an opening: a hole
@@ -376,7 +404,15 @@ func _run_mask_sweep() -> void:
 	query.collision_mask = WORLD_COLLISION_LAYER
 	# Raiders share layer 1 with the world; a body standing on a boundary
 	# would otherwise answer for the rock that is missing there.
-	query.exclude = _raider_rids()
+	# Raiders AND the terrain: the ground is layer-1 geometry, so with a
+	# heightmap under it every sample would touch something and the sweep
+	# would report a perfect map it never actually tested. Rocks, props and
+	# walls still count, which is what the sweep is for.
+	var excluded := _raider_rids()
+	var terrain := Terrain.find(get_tree())
+	if terrain != null:
+		excluded.append(terrain.get_rid())
+	query.exclude = excluded
 	var space := bounds.get_world_3d().direct_space_state
 	var samples := 0
 	var openings := 0
@@ -392,8 +428,12 @@ func _run_mask_sweep() -> void:
 			for i in steps + 1:
 				var spot := edge + along * ((float(i) / float(steps) - 0.5) * cell_size)
 				samples += 1
+				# Centred over the GROUND at that spot, not at an absolute
+				# height: on a hill the old fixed 0.9 m sat inside the
+				# terrain, on a hollow floor it floated over the rocks.
+				var ground := terrain.height_at(spot.x, spot.y) if terrain != null else 0.0
 				query.transform = Transform3D(Basis(),
-						Vector3(spot.x, SWEEP_CAPSULE_CENTER_Y, spot.y))
+						Vector3(spot.x, ground + SWEEP_CAPSULE_CENTER_Y, spot.y))
 				if not space.intersect_shape(query, 1).is_empty():
 					continue
 				openings += 1
@@ -431,7 +471,7 @@ func _watch_blocked_cell(delta: float) -> void:
 		_blocked_cell = cell
 		_blocked_stay = 0.0
 		_blocked_reported = false
-	if lead.global_position.y > FLOOR_STAND_MAX_Y:
+	if _height_above_ground(lead.global_position) > FLOOR_STAND_MAX_Y:
 		_blocked_stay = 0.0
 		return
 	_blocked_stay += delta
@@ -521,6 +561,12 @@ func _watch_for_wedge(delta: float, card_ui_open: bool) -> void:
 				% [_paused_for, blockers])
 
 
+## XZ of a world position. Every distance this tour measures is flat:
+## with relief, height differences are not travel.
+func _flat(at: Vector3) -> Vector2:
+	return Vector2(at.x, at.z)
+
+
 ## Steers the lead raider toward the current waypoint by HOLDING THE REAL
 ## MOVE ACTIONS. Writing velocity directly does not work: Player rebuilds it
 ## from Input.get_vector() every physics frame and then calls
@@ -549,11 +595,12 @@ func _drive_walk(delta: float) -> void:
 	# which is what gates the prompt and the interact — not a fixed radius.
 	# A chest on a rise sits 4-5 m away horizontally and would never satisfy
 	# a distance test while being perfectly interactable.
-	var reached := lead.global_position.distance_to(_waypoint) <= WAYPOINT_REACHED
+	var reached := _flat(lead.global_position).distance_to(_flat(_waypoint)) <= WAYPOINT_REACHED
 	if is_instance_valid(_target) and _target.player_in_range:
 		reached = true
 	if _waypoint == Vector3.ZERO or _leg_time_left <= 0.0 or reached:
 		if reached:
+			_legs_reached += 1
 			# Stand still on arrival: Charge altars need an uninterrupted
 			# channel and chests need the interact press to land.
 			_linger_left = LINGER_TIME
@@ -561,9 +608,10 @@ func _drive_walk(delta: float) -> void:
 			_release_move()
 			_pick_waypoint(lead.global_position)
 			return
+		_legs_timed_out += 1
 		if _debug:
 			print("ArenaProbe: leg timed out %.1fm short of %v"
-					% [lead.global_position.distance_to(_waypoint), _waypoint])
+					% [_flat(lead.global_position).distance_to(_flat(_waypoint)), _waypoint])
 		_pick_waypoint(lead.global_position)
 	_hold_move_toward(lead, _waypoint)
 	_unstick(lead, delta)
@@ -657,7 +705,7 @@ func _pick_waypoint(from: Vector3) -> void:
 		_waypoint = target.global_position
 		if _debug:
 			print("ArenaProbe: heading to %s at %.1fm (available=%s)"
-					% [target.name, from.distance_to(_waypoint), target.available])
+					% [target.name, _flat(from).distance_to(_flat(_waypoint)), target.available])
 		return
 	# Prefer the arena's own walkable mask so waypoints never sit inside the
 	# blocked cells the irregular-arena mask carves out (iteration 44).

@@ -1,6 +1,6 @@
 # Bonkraiders
 
-Roguelite de supervivencia "bullet-heaven" en 3D hecho en Godot 4.7 (GDScript): incursiones sin límite de tiempo que recorren **un mapa tras otro**: superas una etapa sobreviviendo 15 minutos y matando a su jefe, se abre un portal de salida, te quedas cuanto quieras en modo **pseudo-infinito** (la dificultad sube rápido) y cruzas al mapa siguiente con todo lo que llevas donde las armas disparan solas, los enemigos llegan en hordas crecientes y cada subida de nivel ofrece 3 cartas de mejora. Incluye tres biomas (Bosque Hueco, Dunas de Ceniza y Ciénaga Lóbrega) con jefes propios y minijefes secretos, 13 raiders con arma inicial y pasiva propia, 14 armas **que evolucionan por nivel**, 15 tomos, 16 objetos con rareza fija y 4 mascotas, dificultad por **vueltas** al circuito de mapas y meta-progresión entre incursiones (esquirlas, 40 misiones, desbloqueo de raiders, 6 reliquias permanentes de la Armería, pantalla de Colección, Cacería diaria con semilla por fecha). El diseño completo está en `GDD.md` y la historia de desarrollo en `CHANGELOG.md`.
+Roguelite de supervivencia "bullet-heaven" en 3D hecho en Godot 4.7 (GDScript): incursiones sin límite de tiempo que recorren **un mapa tras otro**: superas una etapa sobreviviendo 15 minutos y matando a su jefe, se abre un portal de salida, te quedas cuanto quieras en modo **pseudo-infinito** (la dificultad sube rápido) y cruzas al mapa siguiente con todo lo que llevas donde las armas disparan solas, los enemigos llegan en hordas crecientes y cada subida de nivel ofrece 3 cartas de mejora. Arenas de **240×240 con relieve** (colinas, hondonadas y mesetas). Incluye tres biomas (Bosque Hueco, Dunas de Ceniza y Ciénaga Lóbrega) con jefes propios y minijefes secretos, 13 raiders con arma inicial y pasiva propia, 14 armas **que evolucionan por nivel**, 15 tomos, 16 objetos con rareza fija y 4 mascotas, dificultad por **vueltas** al circuito de mapas y meta-progresión entre incursiones (esquirlas, 40 misiones, desbloqueo de raiders, 6 reliquias permanentes de la Armería, pantalla de Colección, Cacería diaria con semilla por fecha). El diseño completo está en `GDD.md` y la historia de desarrollo en `CHANGELOG.md`.
 
 **Idioma:** el juego está íntegramente en **español latinoamericano**. La terminología canónica vive en `docs/GLOSARIO.md` y es obligatoria para cualquier cadena nueva; los identificadores (ids de catálogo, `node_name`, grupos, `StringName`, claves de guardado y los `print()` de depuración) se quedan en inglés a propósito.
 
@@ -77,7 +77,7 @@ Los números viven como exports en `enemy_spawner.gd` y `world_director.gd` para
 
 ## Fondo del mundo (iteración 34)
 
-Las arenas ya no flotan en el vacío: cada mapa instancia un nodo **Backdrop** (`scripts/world/backdrop.gd`) que construye en código un disco de suelo gigante bajo el borde del mapa (tinte del bioma) y dos anillos de colinas-silueta low-poly fuera del perímetro (a ~105-140 m y ~160-220 m), que la niebla del `WorldEnvironment` ya existente funde con el horizonte. Los colores son exports por bioma en la escena de cada mapa; las colinas se re-generan aleatorias cada partida.
+Las arenas ya no flotan en el vacío: cada mapa instancia un nodo **Backdrop** (`scripts/world/backdrop.gd`) que construye en código un disco de suelo gigante bajo el borde del mapa (tinte del bioma) y dos anillos de colinas-silueta low-poly fuera del perímetro (a ~190-250 m y ~310-410 m, derivadas del medio-extent de 120), que la niebla del `WorldEnvironment` ya existente funde con el horizonte. Los colores son exports por bioma en la escena de cada mapa; las colinas se re-generan aleatorias cada partida.
 
 ## Enganche y rejugabilidad (iteraciones 35-37)
 
@@ -138,14 +138,14 @@ Los archivos clave para tocar contenido son los **catálogos** en `scripts/syste
 
 ## Verificación
 
-**El comando por defecto tras cualquier cambio** es el script de verificación: hace el import, un soak de las **tres** arenas y un **cuarto soak de etapa** que cruza de mapa, y falla si alguno ensucia el log, se cuelga, no ejercita nada o pierde progreso al cruzar. Tarda ~21 minutos.
+**El comando por defecto tras cualquier cambio** es el script de verificación: hace el import, un soak de las **tres** arenas y un **cuarto soak de etapa** que cruza de mapa, y falla si alguno ensucia el log, se cuelga, no ejercita nada o pierde progreso al cruzar. Tarda ~32 minutos.
 
 ```sh
-tools/verificar.sh            # 240 s de partida por arena (el modo estándar)
-tools/verificar.sh 600        # corrida larga, para cambios de ritmo tardío
+tools/verificar.sh            # 360 s de partida por arena (el modo estándar)
+tools/verificar.sh 720        # corrida larga, para cambios de ritmo tardío
 ```
 
-**Nunca con menos de 240 s**: por debajo, la puerta de cobertura de interactuables se salta en silencio y el script imprime OK sin haber exigido nada. La corrida completa tarda ~13 minutos.
+**Nunca con menos de 360 s**: por debajo, la puerta de cobertura de interactuables se salta en silencio y el script imprime OK sin haber exigido nada. La corrida completa tarda ~13 minutos.
 
 Falla (exit 1) si el import o un soak imprimen errores/warnings de Godot, si una arena no llega al final de su soak, si no alcanza la cobertura mínima (el raider tiene que pasar de nivel 3; en corridas de ≥240 s tiene que abrir un cofre, cargar un altar o usar un portal), o si el soak de etapa no abre su portal, no cruza a las Dunas de Ceniza, deja algo vivo al cruzar, pierde progreso o no vuelve a producir un evento de cielo en el mapa nuevo. Los logs quedan en `$TMPDIR/bonkraiders-verify/` y cada arena imprime su resumen `nivel=… cofres=… altares=… portales=…`.
 
@@ -181,6 +181,7 @@ Variables de entorno del harness:
 | `BONK_PROBE_DEBUG=1` | narra el recorrido (waypoints, llegadas, pulsaciones) |
 | `BONK_STAGE_FAST=1` | la etapa se supera a los 60 s y sin jefe; el harness espera 70 s y cruza el portal |
 | `BONK_SAVE_PATH=<ruta>` | re-apunta el guardado (cualquier arranque headless que no sea el probe) |
+| `BONK_GAME_SEED=<int>` | siembra el RNG del juego (cartas, spawns, scatter y relieve): hace reproducible un soak entero |
 | `BONK_PERF=1` | overlay de rendimiento del HUD (FPS, conteos, pools) |
 
 Para lógica aislada sigue sirviendo un harness desechable `extends SceneTree` con `godot --headless --path . -s <script>` (igual que `scripts/tools/generate_sfx.gd`). Ojo: en un script `-s` **no hay autoloads**, así que no vale para nada que toque `RunState`, `SaveData` o `Coop`.

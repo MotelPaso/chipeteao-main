@@ -50,6 +50,7 @@ var _half_extent: float = 80.0
 
 func _ready() -> void:
 	_half_extent = _arena_half_extent()
+	_settle_ground_drop()
 	_build_ground()
 	_build_hill_ring(hill_count, near_ring_min_factor, near_ring_max_factor,
 			_hill_material(hill_color))
@@ -67,6 +68,18 @@ func _arena_half_extent() -> float:
 		return _half_extent
 	var value: Variant = bounds.get("arena_half_extent")
 	return float(value) if value != null else _half_extent
+
+
+## The distant disc has to clear the DEEPEST hollow, not the old flat
+## floor (iteration 51). Terrain.ensure_built() is called explicitly:
+## this node is child #2 of the arena and its _ready runs long before the
+## terrain's, so min_height would otherwise still be 0.
+func _settle_ground_drop() -> void:
+	var terrain := Terrain.find(get_tree())
+	if terrain == null:
+		return
+	terrain.ensure_built()
+	ground_drop = -terrain.min_height + ground_drop
 
 
 func _build_ground() -> void:

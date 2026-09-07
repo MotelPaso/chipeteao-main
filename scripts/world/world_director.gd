@@ -45,9 +45,12 @@ const EVENT_LIBRARY: Array[Dictionary] = [
 ## an event point gets before it falls back to the run-start sampler.
 const CLEAR_POINT_ATTEMPTS: int = 60
 const EVENT_POINT_ATTEMPTS: int = 24
-## The event ground probe starts this high — above every arena platform
-## and mesa — and ends just below the floor plate.
+## Fallback probe span used when there is no terrain to measure against.
 const GROUND_PROBE_HEIGHT: float = 20.0
+## With a terrain, the probe starts this far above its highest point (room
+## for a mesa standing on a hill) and ends this far below its lowest.
+const PROBE_HEADROOM: float = 30.0
+const PROBE_UNDERSHOOT: float = 2.0
 ## Used only if portal_pair_colors is emptied in the inspector.
 const DEFAULT_PORTAL_COLORS: Array[Color] = [Color(0.5, 0.9, 1.0)]
 
@@ -84,6 +87,11 @@ class TimedBeacon:
 		var available: Variant = poi.get("available")
 		return not (available is bool) or bool(available)
 
+
+## A shuffled POI authored above this height is standing on a verticality
+## platform and keeps its y; anything at or below it is ground furniture
+## and gets dropped onto the relief.
+const POI_PLATFORM_Y: float = 0.5
 
 @export_group("Layout Shuffle")
 @export var shuffle_layout: bool = true
@@ -500,8 +508,17 @@ func _random_walkable_point() -> Vector2:
 ## sees the player who climbed up following the beacon.
 func _ground_height(pos: Vector3) -> float:
 	var space := get_tree().root.world_3d.direct_space_state
+	# The ray has to span the WHOLE relief (iteration 51): a mesa standing
+	# on a hill is above the old 20 m start, and a hollow is below the old
+	# -1 end, so either one used to escape the cast and fall back to 0.
+	var terrain := Terrain.find(get_tree())
+	var top := GROUND_PROBE_HEIGHT
+	var bottom := -1.0
+	if terrain != null:
+		top = terrain.max_height + PROBE_HEADROOM
+		bottom = terrain.min_height - PROBE_UNDERSHOOT
 	var ray := PhysicsRayQueryParameters3D.create(
-			Vector3(pos.x, GROUND_PROBE_HEIGHT, pos.z), Vector3(pos.x, -1.0, pos.z), 1)
+			Vector3(pos.x, top, pos.z), Vector3(pos.x, bottom, pos.z), 1)
 	# Raiders share layer 1 with the world; never mistake a head for ground.
 	var excluded: Array[RID] = []
 	for node: Node in Coop.alive_players(get_tree()):
@@ -511,7 +528,10 @@ func _ground_height(pos: Vector3) -> float:
 	ray.exclude = excluded
 	var hit := space.intersect_ray(ray)
 	if hit.is_empty():
-		return 0.0
+		# Nothing under the point: the TERRAIN height, not 0. Zero is a
+		# real height somewhere on a heightmap, so falling back to it used
+		# to bury or float a POI by whatever the relief happened to be.
+		return terrain.height_at(pos.x, pos.z) if terrain != null else 0.0
 	var hit_position: Vector3 = hit["position"]
 	return hit_position.y
 
@@ -535,8 +555,13 @@ func _shuffle_ground_interactables() -> void:
 	for poi: Node3D in movable:
 		var spot_xz := _find_clear_point(limit, placed, anchors)
 		placed.append(spot_xz)
-		# Only X/Z move; the scene's Y (ground offset) is kept as authored.
-		poi.global_position = Vector3(spot_xz.x, poi.global_position.y, spot_xz.y)
+		# Ground-level POIs land ON the relief at their new spot; ones
+		# authored on a platform (y above POI_PLATFORM_Y) keep their height,
+		# because the platform they stand on is not moving with them and the
+		# terrain under it is flat anyway (the Terrain pads it).
+		var authored_y := poi.global_position.y
+		var new_y := authored_y if authored_y > POI_PLATFORM_Y else _terrain_height(spot_xz)
+		poi.global_position = Vector3(spot_xz.x, new_y, spot_xz.y)
 	_placed_points = placed
 	_placed_pois = movable
 	_anchor_points = anchors
@@ -557,7 +582,15 @@ func _refresh_placed_points() -> void:
 func _claim_clear_point() -> Vector3:
 	var spot := _find_clear_point(_arena_half_extent - bounds_margin, _placed_points, _anchor_points)
 	_placed_points.append(spot)
-	return Vector3(spot.x, 0.0, spot.y)
+	return Vector3(spot.x, _terrain_height(spot), spot.y)
+
+
+## Terrain height at a flat point, or 0 without a terrain. Placement code
+## in this file goes through here rather than through the raycast when it
+## only needs the ground and not whatever prop is standing on it.
+func _terrain_height(xz: Vector2) -> float:
+	var terrain := Terrain.find(get_tree())
+	return terrain.height_at(xz.x, xz.y) if terrain != null else 0.0
 
 
 ## --- run-start fixtures -----------------------------------------------------

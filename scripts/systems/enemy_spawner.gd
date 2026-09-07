@@ -58,6 +58,10 @@ const SPAWN_GROUND_OFFSET: float = 0.05
 ## The ground probe starts this high: above every arena platform and mesa,
 ## below the mask walls' ceiling.
 const GROUND_PROBE_HEIGHT: float = 12.0
+## With a terrain, the probe starts this far above its highest point and
+## ends this far below its lowest (see _ground_height).
+const PROBE_HEADROOM: float = 30.0
+const PROBE_UNDERSHOOT: float = 2.0
 ## Radians a burst slot may wander off its even ring position, so a
 ## surround reads as organic instead of geometric.
 const BURST_ANGLE_JITTER: float = 0.35
@@ -885,8 +889,16 @@ func _band_position(center: Vector3, min_r: float, max_r: float, angle: float) -
 ## collision, so under-canopy spawns still hit the floor. Falls back to the
 ## flat-floor height if the ray somehow misses everything.
 func _ground_height(pos: Vector3) -> float:
+	# Spans the whole relief (iteration 51): the old 12 m start sat under
+	# a mesa on a hill, and the -1 end above a hollow's floor.
+	var terrain := Terrain.find(get_tree())
+	var top := GROUND_PROBE_HEIGHT
+	var bottom := -1.0
+	if terrain != null:
+		top = terrain.max_height + PROBE_HEADROOM
+		bottom = terrain.min_height - PROBE_UNDERSHOOT
 	var ray := PhysicsRayQueryParameters3D.create(
-			Vector3(pos.x, GROUND_PROBE_HEIGHT, pos.z), Vector3(pos.x, -1.0, pos.z), 1)
+			Vector3(pos.x, top, pos.z), Vector3(pos.x, bottom, pos.z), 1)
 	# Raiders share layer 1 with the world, so the WHOLE party is excluded:
 	# with only the ring anchor excluded, a spawn drawn over a co-op
 	# partner used their head as "ground" and dropped onto them.
@@ -898,6 +910,8 @@ func _ground_height(pos: Vector3) -> float:
 	ray.exclude = excluded
 	var hit := get_world_3d().direct_space_state.intersect_ray(ray)
 	if hit.is_empty():
-		return 0.0
+		# The TERRAIN height, not 0: zero is a real height on a heightmap,
+		# so the old fallback spawned bodies inside a hill or under one.
+		return terrain.height_at(pos.x, pos.z) if terrain != null else 0.0
 	var hit_position: Vector3 = hit["position"]
 	return hit_position.y

@@ -61,7 +61,14 @@ func place_party(origin: Vector3) -> void:
 		var body := bodies[i] as Node3D
 		if body == null:
 			continue
-		body.global_position = origin + _coop_spawn_offset(i)
+		# The ring offset moves the body sideways, so its ground height has
+		# to be re-read there: slot 0 is on the spawn pad, slot 3 may be a
+		# metre and a half off it.
+		var at := origin + _coop_spawn_offset(i)
+		var terrain := Terrain.find(get_tree())
+		if terrain != null:
+			at.y = terrain.height_at(at.x, at.z)
+		body.global_position = at
 		if body.has_method("anchor_here"):
 			body.call("anchor_here")
 

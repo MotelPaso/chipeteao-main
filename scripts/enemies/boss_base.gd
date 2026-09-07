@@ -294,6 +294,11 @@ func _drop_chests() -> void:
 		var angle := TAU * float(i) / float(count)
 		var at := global_position \
 				+ Vector3(cos(angle), 0.0, sin(angle)) * CHEST_RING_RADIUS
+		# Each chest of the ring lands on the relief under ITS own spot: a
+		# boss dying on a slope used to bury half its payout (iteration 51).
+		var terrain := Terrain.find(get_tree())
+		if terrain != null:
+			at.y = terrain.height_at(at.x, at.z)
 		if spawn_chest(at, CHEST_LUCK_PER_DEMONIC * float(RunState.demonic_uses),
 				chest_min_rarity) != null:
 			dropped += 1

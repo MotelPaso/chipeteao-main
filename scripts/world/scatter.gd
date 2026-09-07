@@ -40,7 +40,7 @@ const DIAGONAL: float = 1.4142136
 ## clamp) read it at ready through the "arena_bounds" group and subtract
 ## their own margin, so resizing a map is this one number plus the floor/
 ## wall geometry in the scene.
-@export var arena_half_extent: float = 80.0
+@export var arena_half_extent: float = 120.0
 
 @export_group("Prop Scenes")
 @export var tree_scene: PackedScene
@@ -57,8 +57,8 @@ const DIAGONAL: float = 1.4142136
 ## is_walkable() before placing anything.
 @export var mask_enabled: bool = true
 @export var mask_cell_size: float = 10.0
-@export var mask_blobs_min: int = 6
-@export var mask_blobs_max: int = 10
+@export var mask_blobs_min: int = 13
+@export var mask_blobs_max: int = 22
 ## Cells per blob (random walk length).
 @export var mask_blob_cells: int = 12
 ## Below this open fraction the mask is rebuilt with fewer blobs.
@@ -78,14 +78,38 @@ const DIAGONAL: float = 1.4142136
 ## Blocked cells (grid coords -> true) and the grid size (cells per side).
 var _blocked: Dictionary[Vector2i, bool] = {}
 var _mask_cells_per_side: int = 0
+## Frozen at _enter_tree (see run_seed).
+var _run_seed: int = 0
+## Flat centres of this stage's mesas (see mesa_sites).
+var _mesa_sites: PackedVector2Array = PackedVector2Array()
+
+@export_group("Mesas (iteration 51)")
+## Raised platform+ramp clusters the terrain flattens a pad under. They
+## are what makes a 240x240 arena readable: relief alone is too soft to
+## navigate by, and a mesa is a landmark you can name.
+@export var mesa_count: int = 5
+## Minimum distance between two mesa centres, and from spawn/keepouts.
+@export var mesa_min_spacing: float = 42.0
+## Half-extent mesas are sampled in (inside the interior square).
+@export var mesa_half_extent: float = 92.0
+## Platform and ramp scenes for this biome's mesas. Left null the biome
+## falls back to nothing (no mesas), which is a configuration error worth
+## seeing rather than a silent flat map.
+@export var mesa_platform_scene: PackedScene
+@export var mesa_ramp_scene: PackedScene
+## Uniform scale range of a mesa platform, and how far the ramp sits from
+## the platform centre.
+@export var mesa_scale_min: float = 1.0
+@export var mesa_scale_max: float = 1.6
+@export var mesa_ramp_offset: float = 5.5
 
 @export_group("Interior Scatter")
 ## Props land in [-half_extent, half_extent] on X/Z; keep this inside the
 ## perimeter band so the tree line stays visually distinct.
-@export var interior_half_extent: float = 68.0
-@export var tree_count: int = 57
-@export var rock_count: int = 24
-@export var stump_count: int = 15
+@export var interior_half_extent: float = 108.0
+@export var tree_count: int = 128
+@export var rock_count: int = 54
+@export var stump_count: int = 34
 ## No props inside this radius around the origin: spawn/tutorial-dummy space.
 @export var spawn_clear_radius: float = 9.0
 ## No props inside this radius around any "scatter_keepout" node (covers a
@@ -100,8 +124,8 @@ var _mask_cells_per_side: int = 0
 ## the rim falls back to tree_scene with rock_scene accents (forest).
 @export var perimeter_scene: PackedScene
 @export var perimeter_accent_scene: PackedScene
-@export var perimeter_inner: float = 72.0
-@export var perimeter_outer: float = 78.0
+@export var perimeter_inner: float = 112.0
+@export var perimeter_outer: float = 118.0
 ## Distance between slots along each edge; every Nth slot is an accent.
 @export var perimeter_step: float = 9.0
 @export var perimeter_rock_every: int = 5
@@ -126,10 +150,31 @@ func _enter_tree() -> void:
 		_rng.randomize()
 	else:
 		_rng.seed = scatter_seed
+	# Frozen here, before anything draws from the stream: the Terrain node
+	# seeds its noise from this in ITS _ready, and a terrain that did not
+	# match the props standing on it would be a different arena every time
+	# the two were built in a different order.
+	_run_seed = int(_rng.seed)
 	# The mask must exist before the WorldDirector (later in tree order)
 	# shuffles interactables in ITS _enter_tree.
 	if mask_enabled:
 		_build_mask()
+	# Mesa sites right after the mask (iteration 51): the Terrain reads
+	# them as flat pads in its _ready, and place_props() builds the
+	# platform + ramp on each one later.
+	_pick_mesa_sites()
+
+
+## This run's seed, valid from _enter_tree onward. Read through the
+## "arena_bounds" group by the Terrain, so relief and props always agree.
+func run_seed() -> int:
+	return _run_seed
+
+
+## Flat XZ centres of this stage's mesas, for the Terrain's pads and for
+## place_props(). Empty before _enter_tree.
+func mesa_sites() -> PackedVector2Array:
+	return _mesa_sites
 
 
 ## Dressing the arena is NOT done in _ready any more (iteration 49): the
@@ -143,6 +188,7 @@ func _enter_tree() -> void:
 func place_props() -> void:
 	if mask_enabled:
 		_fill_blocked_cells()
+	_build_mesas()
 	for node: Node in get_tree().get_nodes_in_group("scatter_keepout"):
 		var spot := node as Node3D
 		if spot == null or not is_inside_tree() or not spot.is_inside_tree():
@@ -160,9 +206,11 @@ func place_props() -> void:
 
 ## True when `node` belongs to the same arena scene as this scatter. The
 ## arena root is this node's nearest ancestor in group "arena_root".
+## Found by TYPE, not by the "arena_root" group: Arena claims that group
+## in its _ready, and this is also called from _enter_tree (mesa sites).
 func owner_arena_contains(node: Node) -> bool:
 	var arena: Node = self
-	while arena != null and not arena.is_in_group("arena_root"):
+	while arena != null and not (arena is Arena):
 		arena = arena.get_parent()
 	return arena == null or arena.is_ancestor_of(node)
 
@@ -243,14 +291,86 @@ func _perimeter_accent() -> PackedScene:
 
 ## Uniform scale only: non-uniform scaling of collision shapes is not
 ## supported by Godot physics.
+## `pos.y` is IGNORED and replaced by the terrain height at that XZ
+## (iteration 51): nothing in this project is placed at y = 0 any more, and
+## a prop left there would float over a hill or sink into a hollow.
 func _spawn_prop(scene: PackedScene, pos: Vector3, uniform_scale: float) -> void:
 	var prop := scene.instantiate() as Node3D
 	if prop == null:
 		return
 	add_child(prop)
-	prop.position = pos
+	prop.position = Vector3(pos.x, ground_height(pos.x, pos.z), pos.z)
 	prop.rotate_y(_rng.randf_range(0.0, TAU))
 	prop.scale = Vector3.ONE * uniform_scale
+
+
+## Terrain height at a flat position, or 0 where there is no terrain yet
+## (a scene without one, or a consumer running before it built). Every
+## placement in this file goes through here.
+func ground_height(x: float, z: float) -> float:
+	var terrain := Terrain.find(get_tree())
+	if terrain == null:
+		return 0.0
+	terrain.ensure_built()
+	return terrain.height_at(x, z)
+
+
+## --- mesas (iteration 51) -------------------------------------------------
+
+## Picks the stage's mesa centres: inside the sampling square, on walkable
+## ground, clear of the spawn, of the authored keepouts and of each other.
+## Runs in _enter_tree so the Terrain can flatten a pad under each one
+## before anything is placed.
+func _pick_mesa_sites() -> void:
+	_mesa_sites = PackedVector2Array()
+	if mesa_count <= 0 or mesa_platform_scene == null:
+		return
+	var authored: Array[Vector2] = []
+	for node: Node in get_tree().get_nodes_in_group("scatter_keepout"):
+		var spot := node as Node3D
+		if spot != null and not (spot is Interactable) and owner_arena_contains(spot):
+			authored.append(Vector2(spot.position.x, spot.position.z))
+	for attempt in mesa_count * 40:
+		if _mesa_sites.size() >= mesa_count:
+			break
+		var candidate := Vector2(
+				_rng.randf_range(-mesa_half_extent, mesa_half_extent),
+				_rng.randf_range(-mesa_half_extent, mesa_half_extent))
+		if candidate.length() < mesa_min_spacing:
+			continue
+		if mask_enabled and not is_walkable(candidate):
+			continue
+		var clear := true
+		for other: Vector2 in authored:
+			if other.distance_to(candidate) < mesa_min_spacing:
+				clear = false
+				break
+		if clear:
+			for other: Vector2 in _mesa_sites:
+				if other.distance_to(candidate) < mesa_min_spacing:
+					clear = false
+					break
+		if clear:
+			_mesa_sites.append(candidate)
+
+
+## Builds a platform + ramp on each site. The pad under it is already flat
+## (the Terrain read mesa_sites()), so the ramp meets level ground at both
+## ends instead of floating at one.
+func _build_mesas() -> void:
+	if mesa_platform_scene == null:
+		return
+	for site: Vector2 in _mesa_sites:
+		var scale := _rng.randf_range(mesa_scale_min, mesa_scale_max)
+		_spawn_prop(mesa_platform_scene, Vector3(site.x, 0.0, site.y), scale)
+		if mesa_ramp_scene == null:
+			continue
+		var angle := _rng.randf_range(0.0, TAU)
+		var ramp_at := site + Vector2(cos(angle), sin(angle)) * mesa_ramp_offset * scale
+		_spawn_prop(mesa_ramp_scene, Vector3(ramp_at.x, 0.0, ramp_at.y), scale)
+		# The mesa counts as a keepout for the interior scatter, so trees
+		# do not grow through the platform it stands on.
+		_keepouts_xz.append(site)
 
 
 ## --- arena mask (iteration 44) ------------------------------------------------
@@ -373,8 +493,12 @@ func _build_mask() -> void:
 				>= mask_min_open_fraction:
 			break
 		blobs = maxi(blobs - 1, 1)
-	print("Arena mask: %d/%d cells blocked" % [
-			_blocked.size(), _mask_cells_per_side * _mask_cells_per_side])
+	var cells := _mask_cells_per_side * _mask_cells_per_side
+	# The OPEN FRACTION is the number that matters (mask_min_open_fraction
+	# is the gate the rebuild loop above is chasing), so the log states it
+	# instead of leaving a reader to divide two counts.
+	print("Arena mask: %d/%d cells blocked, open=%.2f" % [
+			_blocked.size(), cells, float(open_cell_count()) / float(maxi(cells, 1))])
 
 
 ## Flood fill from the spawn cell; open cells it cannot reach are sealed
