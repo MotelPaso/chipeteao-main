@@ -6,8 +6,10 @@ extends Node
 ## Call sites swap instantiate/add_child for acquire_scene() and
 ## queue_free() for release(); everything else about the spawned node
 ## (transform, launch params) is still the caller's business.
-## acquire_scene() parents to the current scene, so in-flight nodes die
-## with a scene change while parked ones (out of tree) carry over clean.
+## acquire_scene() parents to the ARENA of the current stage, so in-flight
+## nodes die with the map while parked ones (out of tree) carry over
+## clean; release_all_live() reclaims the in-flight ones before a stage
+## swap frees that arena.
 ##
 ## Adding a pooled scene is ONE row in POOLS below — the const preload, the
 ## registration and the sizes used to be three parallel lists that drifted
@@ -53,6 +55,13 @@ const POOLS: Array[Dictionary] = [
 @export var pool_size_overrides: Dictionary[String, Vector2i] = {}
 
 var _pools_by_path: Dictionary[String, NodePool] = {}
+
+
+## Stage-swap hook (RunRoot): every pool reclaims what it has out in the
+## world, so the arena about to be freed takes nothing pooled with it.
+func release_all_live() -> void:
+	for path: String in _pools_by_path:
+		_pools_by_path[path].release_all_live()
 
 
 func _ready() -> void:
@@ -131,8 +140,18 @@ func _register(pool_name: String, packed: PackedScene, size: Vector2i) -> void:
 	_pools_by_path[packed.resource_path] = pool
 
 
+## Where pooled nodes are parented: the ARENA of the current stage
+## (iteration 49), so an in-flight dart dies with the map it was fired in
+## instead of following the party to the next one. Falls back to
+## current_scene where there is no run root — the menus, and any future
+## scene that pools something outside a run.
 func _spawn_parent() -> Node:
 	var tree := get_tree()
 	if tree == null:
 		return null
+	var root := tree.get_first_node_in_group("run_root")
+	if root != null and root.has_method("arena_root"):
+		var arena: Variant = root.call("arena_root")
+		if arena is Node3D and is_instance_valid(arena):
+			return arena
 	return tree.current_scene if tree.current_scene != null else tree.root

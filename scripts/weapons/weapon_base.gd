@@ -360,7 +360,7 @@ func spawn_fx_mesh(mesh: Mesh) -> MeshInstance3D:
 	var node := MeshInstance3D.new()
 	node.mesh = mesh
 	node.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	var parent_node: Node = get_tree().current_scene
+	var parent_node: Node = RunRoot.stage_parent(get_tree())
 	if parent_node == null:
 		parent_node = get_tree().root
 	parent_node.add_child(node)

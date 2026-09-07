@@ -1,6 +1,6 @@
 [gd_scene load_steps=30 format=3 uid="uid://dqv5m2x8rk1fj"]
 
-[ext_resource type="PackedScene" uid="uid://crunsy5te2m8a" path="res://scenes/world/RunSystems.tscn" id="1_runsystems"]
+[ext_resource type="Script" path="res://scripts/world/arena.gd" id="1_arena"]
 [ext_resource type="Script" path="res://scripts/world/backdrop.gd" id="90_backdrop"]
 [ext_resource type="Script" path="res://scripts/systems/enemy_spawner.gd" id="3_spawner"]
 [ext_resource type="PackedScene" uid="uid://bqgr4nt0h3v2e" path="res://scenes/enemies/Grunt.tscn" id="4_grunt"]
@@ -82,6 +82,8 @@ fog_density = 0.007
 fog_sky_affect = 0.2
 
 [node name="HollowWoods" type="Node3D"]
+script = ExtResource("1_arena")
+map_id = "hollow_woods"
 
 [node name="WorldEnvironment" type="WorldEnvironment" parent="."]
 environment = SubResource("Environment_1")
@@ -215,11 +217,10 @@ skirmisher_scene = ExtResource("15_skirmisher")
 tank_scene = ExtResource("16_tank")
 boss_scene = ExtResource("17_boss")
 
-[node name="RunSystems" parent="." instance=ExtResource("1_runsystems")]
-map_id = "hollow_woods"
-
 [node name="AmbientBed" type="AudioStreamPlayer" parent="."]
 stream = ExtResource("23_wind")
 volume_db = -26.0
 autoplay = true
 script = ExtResource("22_ambient")
+
+[node name="SpawnPoint" type="Marker3D" parent="."]

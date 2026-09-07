@@ -223,7 +223,7 @@ func _pay_cost(cost: Dictionary) -> float:
 ## scene root, not to this altar — the obelisk sinks and frees itself a few
 ## seconds after paying, and it would take the prize down with it.
 func _drop_free_chest() -> void:
-	var parent := get_tree().current_scene
+	var parent := RunRoot.stage_parent(get_tree())
 	if parent == null:
 		parent = get_parent()
 	if parent == null:

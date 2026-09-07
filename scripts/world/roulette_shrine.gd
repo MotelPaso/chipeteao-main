@@ -78,7 +78,7 @@ func _interact(player: Node) -> void:
 	# whole tree paused, and a CanvasLayer parented to root survives
 	# change_scene_to_file — leaving the next arena frozen behind an
 	# orphan panel with nothing left to close it.
-	var host := get_tree().current_scene
+	var host := RunRoot.stage_parent(get_tree())
 	if host == null:
 		host = get_tree().root
 	host.add_child(_ui)

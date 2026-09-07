@@ -238,7 +238,7 @@ const SPIKE_EXTRA_SINK: float = 0.1
 func _spawn_spike_cluster(center: Vector3, spread_radius: float, color: Color,
 		roughness: float, bottom_radius: float, spike_length: float,
 		sink_depth: float) -> void:
-	var scene_root := get_tree().current_scene
+	var scene_root := RunRoot.stage_parent(get_tree())
 	if scene_root == null:
 		return
 	var cluster := Node3D.new()
@@ -281,7 +281,9 @@ func _is_walkable(point: Vector3) -> bool:
 ## outlive the corpse.
 func _drop_chests() -> void:
 	var count := base_chest_drops + RunState.demonic_uses
-	var parent := get_tree().current_scene if get_tree().current_scene != null else get_parent()
+	var parent := RunRoot.stage_parent(get_tree())
+	if parent == null:
+		parent = get_parent()
 	# Same guards EnemyBase._drop_chest already had: a boss dying during
 	# teardown has no scene to parent to, and a bad cast must not crash the
 	# death flow (the gems and the kill credit already went out).

@@ -9,10 +9,16 @@ extends Node
 ## default.
 var selected_character_id: String = CharacterCatalog.DEFAULT_ID
 
-## MapCatalog id of the arena the next run loads (and, mid-run, the arena
-## being played). Set by the select screen; the arena's RunSystems root
-## republishes it at ready so direct boots stay consistent.
+## MapCatalog id of the map CURRENTLY being played. Written by RunRoot on
+## every stage change, read by the meta fold and the end screen. It is no
+## longer a choice — a run walks the whole map list.
 var selected_map_id: String = MapCatalog.DEFAULT_ID
+
+## MapCatalog id of the biome stage 1 starts on. Always the default in
+## normal play and in the daily (every run opens in the forest); the soak
+## harness points it at a biome so BONK_ARENA still means "soak this map",
+## and a start past the first stage simply wraps to lap 1 sooner.
+var start_map_id: String = MapCatalog.DEFAULT_ID
 
 ## Map tier (1..MapCatalog.TIER_COUNT) the next run plays at. The select
 ## screen resets it to 1 when switching to a map where the pick is still

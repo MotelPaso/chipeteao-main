@@ -132,17 +132,39 @@ func _enter_tree() -> void:
 		_build_mask()
 
 
-func _ready() -> void:
+## Dressing the arena is NOT done in _ready any more (iteration 49): the
+## Arena root calls this AFTER the WorldDirector has shuffled the ground
+## POIs, so the keepout list below reads the SHUFFLED positions. That
+## ordering used to come from the director living in the arena and doing
+## its shuffle in _enter_tree; with one persistent director for the whole
+## run, the arena has to sequence it explicitly.
+## Idempotent by construction: an arena is dressed exactly once, when it
+## is built for its stage.
+func place_props() -> void:
 	if mask_enabled:
 		_fill_blocked_cells()
 	for node: Node in get_tree().get_nodes_in_group("scatter_keepout"):
 		var spot := node as Node3D
-		if spot != null:
-			_keepouts_xz.append(Vector2(spot.global_position.x, spot.global_position.z))
+		if spot == null or not is_inside_tree() or not spot.is_inside_tree():
+			continue
+		# Only THIS arena's keepouts: during a stage swap the outgoing
+		# arena can still be in the tree, and its POIs are not ours.
+		if not owner_arena_contains(spot):
+			continue
+		_keepouts_xz.append(Vector2(spot.global_position.x, spot.global_position.z))
 	_place_many(tree_scene, tree_count, 0.85, 1.25)
 	_place_many(rock_scene, rock_count, 0.7, 1.1)
 	_place_many(stump_scene, stump_count, 0.8, 1.2)
 	_ring_perimeter()
+
+
+## True when `node` belongs to the same arena scene as this scatter. The
+## arena root is this node's nearest ancestor in group "arena_root".
+func owner_arena_contains(node: Node) -> bool:
+	var arena: Node = self
+	while arena != null and not arena.is_in_group("arena_root"):
+		arena = arena.get_parent()
+	return arena == null or arena.is_ancestor_of(node)
 
 
 ## Rejection-samples `count` positions inside the interior square, skipping

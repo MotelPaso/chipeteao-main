@@ -500,13 +500,19 @@ func _on_start_pressed() -> void:
 	else:
 		slot_characters.append(GameConfig.selected_character_id)
 	Coop.configure(_coop_count, slot_devices, slot_characters)
-	var map_row := MapCatalog.by_id_or_default(GameConfig.selected_map_id)
-	var scene_path := String(map_row.scene_path)
+	# One scene for every run (iteration 49): Run.tscn owns the persistent
+	# run block and swaps the arena per stage. Every run opens in the
+	# forest and walks the map list from there, so there is no map to pick.
+	GameConfig.start_map_id = MapCatalog.DEFAULT_ID
 	ScreenFade.transition(func() -> void:
 		# RunState keeps ticking while this unpaused screen is up, so a
 		# fresh run starts from a clean slate (mirrors the run-end Retry).
 		RunState.reset()
-		get_tree().change_scene_to_file(scene_path))
+		get_tree().change_scene_to_file(RUN_SCENE_PATH))
+
+
+## The one scene a run boots into (iteration 49).
+const RUN_SCENE_PATH: String = "res://scenes/world/Run.tscn"
 
 
 func _on_quests_pressed() -> void:
@@ -573,15 +579,16 @@ func _on_daily_pressed() -> void:
 	GameConfig.daily_seed = int(hash(date_id))
 	GameConfig.daily_date = date_id
 	GameConfig.selected_character_id = characters[rng.randi() % characters.size()]
-	GameConfig.selected_map_id = maps[rng.randi() % maps.size()]
-	GameConfig.selected_tier = 1
+	# The daily starts in the forest like every other run (iteration 49);
+	# its seed is what makes the layout, cards and spawns identical for
+	# everyone that day, not the map.
+	GameConfig.selected_map_id = MapCatalog.DEFAULT_ID
+	GameConfig.start_map_id = MapCatalog.DEFAULT_ID
 	Coop.configure(1, [Coop.KEYBOARD_DEVICE] as Array[int],
 			[GameConfig.selected_character_id] as Array[String])
-	var scene_path := String(MapCatalog.by_id_or_default(
-			GameConfig.selected_map_id).scene_path)
 	ScreenFade.transition(func() -> void:
 		RunState.reset()
-		get_tree().change_scene_to_file(scene_path))
+		get_tree().change_scene_to_file(RUN_SCENE_PATH))
 
 
 ## --- Map row (GDD 7: pick the biome; victory-gated unlocks) -------------

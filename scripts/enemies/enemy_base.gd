@@ -704,7 +704,9 @@ func _drop_chest() -> void:
 ## for it by killing the thing, and charging points for a boss reward on
 ## top of the run economy is what made the rings go unopened.
 func spawn_chest(at: Vector3, luck_bonus: float, min_rarity: String = "") -> Chest:
-	var parent := get_tree().current_scene if get_tree().current_scene != null else get_parent()
+	var parent := RunRoot.stage_parent(get_tree())
+	if parent == null:
+		parent = get_parent()
 	if parent == null:
 		return null
 	var chest := CHEST_SCENE.instantiate() as Chest

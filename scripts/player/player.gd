@@ -372,6 +372,15 @@ func _tick_timers(delta: float) -> void:
 ## transient state (slide, root) cleared. A DOWNED body goes to the nearest
 ## standing teammate rather than its own spawn: the run's start point can
 ## be 100 m away and nobody would ever find the corpse to revive it.
+## Re-records the void-rescue anchor at the body's current position.
+## Called by RunSystems.place_party on every stage change (iteration 49):
+## the anchor taken at _ready belongs to a map that has been freed, and
+## falling through the floor of stage 3 must not teleport a raider to
+## where stage 1's spawn used to be.
+func anchor_here() -> void:
+	_spawn_position = global_position
+
+
 func _rescue_from_void() -> void:
 	if global_position.y >= void_rescue_y:
 		return

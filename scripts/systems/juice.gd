@@ -484,7 +484,7 @@ func _on_leveled_up(_new_level: int) -> void:
 ## Expanding emissive ring at the player's feet. Its tween ignores pause so
 ## the pulse plays under the card UI's freeze-frame.
 func _spawn_level_ring(at: Vector3) -> void:
-	var scene_root := get_tree().current_scene
+	var scene_root := RunRoot.stage_parent(get_tree())
 	if scene_root == null:
 		return
 	var ring := MeshInstance3D.new()

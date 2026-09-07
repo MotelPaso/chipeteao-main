@@ -93,6 +93,16 @@ static func by_id(map_id: String) -> Dictionary:
 	return _by_id.get(map_id, {})
 
 
+## Position of a map in the progression order, or 0 (the first stage) for
+## an unknown id. THE stage-order accessor: RunRoot advances by index and
+## wraps on MAP_LIBRARY.size(), so the library's order IS the run's order.
+static func index_of(map_id: String) -> int:
+	for i: int in MAP_LIBRARY.size():
+		if String(MAP_LIBRARY[i].id) == map_id:
+			return i
+	return 0
+
+
 ## Row for the given id, or the default map's row when the id is unknown.
 static func by_id_or_default(map_id: String) -> Dictionary:
 	var row := by_id(map_id)

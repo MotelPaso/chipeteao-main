@@ -12,6 +12,8 @@ extends Node
 ##   BONK_WALK=0            hold the raider still (default: it walks, see below)
 ##   BONK_SEED=<int>        deterministic walk, for reproducing a soak
 ##   BONK_ELITE_BOOST=1     every spawn rolls shiny (crowding stress test)
+##   BONK_STAGE_FAST=1      stages clear at 60 s with no boss, so one soak
+##                          crosses a stage change (RunManager reads it)
 ##
 ## The raider WALKS AND INTERACTS by default (iteration 45). A parked raider
 ## silently skips every movement-gated system — Slime Trail only drops
@@ -29,6 +31,18 @@ extends Node
 ## fail. See the two blocks of constants below.
 
 const DEFAULT_ARENA := "res://scenes/world/HollowWoods.tscn"
+## The one scene a run boots into since iteration 49. BONK_ARENA no longer
+## names the scene to instance — it names the BIOME to soak, which becomes
+## GameConfig.start_map_id and therefore stage 1.
+const RUN_SCENE := "res://scenes/world/Run.tscn"
+## Seconds the tour lingers after the exit portal opens before taking it,
+## under BONK_STAGE_FAST. Long enough for at least one full minute of the
+## pseudo-infinite ramp to be logged, which is what proves it runs at all.
+const PSEUDO_INFINITE_DWELL: float = 70.0
+## Delay after a stage change before the probe fires a sky event at the
+## new arena. The lights are re-cached during the swap; a blood moon that
+## tints nothing is how a stale Sun reference shows up in a log.
+const STAGE_SKY_DELAY: float = 5.0
 
 ## Radius of the square the walk picks waypoints in, when the arena does not
 ## publish its own bounds through the "arena_bounds" group.
@@ -137,6 +151,22 @@ const FLOOR_STAND_MAX_Y: float = 0.6
 const BLOCKED_CELL_GRACE: float = 2.0
 
 var _swept: bool = false
+## Physics frame the (next) mask sweep is due on. Re-armed on every stage
+## change, since each stage builds its own mask.
+var _sweep_at_frame: int = SWEEP_FRAME
+## Stage the tour believes it is in (only for the debug narration).
+var _seen_stage_index: int = 0
+## Countdown to the post-swap sky event (see STAGE_SKY_DELAY); <= 0 idle.
+var _sky_probe_left: float = 0.0
+## Seconds left of the deliberate dwell before taking the exit portal.
+var _dwell_left: float = 0.0
+## True while RunState.stage_cleared has already been acted on.
+var _stage_cleared_seen: bool = false
+## True while BONK_STAGE_FAST is set (read once, at ready).
+var _stage_fast: bool = false
+## True once the tour has been told to drop everything and head for the
+## exit portal (see _tick_stage_flow); re-armed on every stage change.
+var _exit_rush: bool = false
 var _bounds: Node3D = null
 var _in_blocked_cell: bool = false
 var _blocked_cell: Vector2i = Vector2i.ZERO
@@ -153,14 +183,19 @@ func _ready() -> void:
 	var character := OS.get_environment("BONK_CHARACTER")
 	if not character.is_empty() and not CharacterCatalog.by_id(character).is_empty():
 		GameConfig.selected_character_id = character
+	# BONK_ARENA is a SCENE PATH for backwards compatibility, but what it
+	# selects now is the starting biome: the probe always boots Run.tscn,
+	# which owns the run and swaps arenas per stage.
 	var path := OS.get_environment("BONK_ARENA")
 	if path.is_empty():
 		path = DEFAULT_ARENA
-	var scene := load(path) as PackedScene
+	GameConfig.start_map_id = _map_id_for_scene(path)
+	var scene := load(RUN_SCENE) as PackedScene
 	if scene == null:
-		push_error("ArenaProbe: cannot load '%s'" % path)
+		push_error("ArenaProbe: cannot load '%s'" % RUN_SCENE)
 		get_tree().quit(1)
 		return
+	RunState.stage_changed.connect(_on_stage_changed)
 	add_child(scene.instantiate())
 	_walking = OS.get_environment("BONK_WALK") != "0"
 	_debug = OS.get_environment("BONK_PROBE_DEBUG") == "1"
@@ -176,7 +211,61 @@ func _ready() -> void:
 		_apply_godmode.call_deferred()
 	if OS.get_environment("BONK_ELITE_BOOST") == "1":
 		_apply_elite_boost.call_deferred()
+	_stage_fast = OS.get_environment("BONK_STAGE_FAST") == "1"
 	print("ArenaProbe: arena=%s walk=%s" % [path.get_file(), _walking])
+
+
+## Stage bookkeeping the tour needs: the dwell that lets the
+## pseudo-infinite ramp log a minute before the party leaves, and the sky
+## event fired a beat after every stage change. That sky event is a TEST,
+## not scenery: the WorldDirector survives the swap and re-caches the new
+## arena's Sun in on_stage_started, and a blood moon that tints nothing is
+## how a stale light reference would show up in a soak log.
+func _tick_stage_flow(delta: float) -> void:
+	if RunState.stage_cleared and not _stage_cleared_seen:
+		_stage_cleared_seen = true
+		_dwell_left = PSEUDO_INFINITE_DWELL if _stage_fast else 0.0
+	elif not RunState.stage_cleared:
+		_stage_cleared_seen = false
+	_dwell_left = maxf(_dwell_left - delta, 0.0)
+	if RunState.stage_cleared and _dwell_left <= 0.0 and not _exit_rush:
+		_exit_rush = true
+		# Abandon whatever the tour was doing. The exit portal lands at
+		# least 40 m away and the soak has a fixed clock; finishing the
+		# current linger and leg first can burn 25 s of it on a chest.
+		_linger_left = 0.0
+		_leg_time_left = 0.0
+	if _sky_probe_left > 0.0:
+		_sky_probe_left = maxf(_sky_probe_left - delta, 0.0)
+		if _sky_probe_left <= 0.0:
+			get_tree().call_group("world_director", "start_sky_event", "blood_moon")
+
+
+## MapCatalog id whose arena scene is `scene_path`; the default map when
+## the path is unknown, so a typo soaks the forest instead of crashing.
+func _map_id_for_scene(scene_path: String) -> String:
+	for row: Dictionary in MapCatalog.MAP_LIBRARY:
+		if String(row.scene_path) == scene_path:
+			return String(row.id)
+	return MapCatalog.DEFAULT_ID
+
+
+## A stage change replaces the whole arena: every id-keyed piece of state
+## in this harness now points at freed nodes, and the new map has its own
+## mask, so the sweep has to run again against it.
+func _on_stage_changed(stage_index: int, map_id: String) -> void:
+	_target = null
+	_visited.clear()
+	_seen_stage_index = stage_index
+	_swept = false
+	_sweep_at_frame = _frames + SWEEP_FRAME
+	_blocked_stay = 0.0
+	_blocked_reported = false
+	_rising_for.clear()
+	_sky_probe_left = STAGE_SKY_DELAY
+	_dwell_left = 0.0
+	_exit_rush = false
+	print("ArenaProbe: stage %d is %s" % [stage_index + 1, map_id])
 
 
 ## BONK_ELITE_BOOST=1: every spawn rolls shiny. Through the group, like
@@ -197,9 +286,10 @@ func _apply_godmode() -> void:
 
 func _physics_process(delta: float) -> void:
 	_frames += 1
-	if not _swept and _frames >= SWEEP_FRAME:
+	if not _swept and _frames >= _sweep_at_frame:
 		_swept = true
 		_run_mask_sweep()
+	_tick_stage_flow(delta)
 	_watch_airborne(delta)
 	_watch_blocked_cell(delta)
 	if _frames % 120 == 0:
@@ -587,6 +677,15 @@ func _pick_waypoint(from: Vector3) -> void:
 ## that cooldown the tour ping-pongs between the two closest points forever
 ## (a spent-but-still-`available` altar stays the nearest thing on the map).
 func _nearest_interactable(from: Vector3) -> Interactable:
+	# Once the stage is cleared (and the dwell is over) the exit portal
+	# outranks everything: a tour that keeps shopping for chests never
+	# crosses a stage, and crossing is what this harness has to prove.
+	# Distance and the revisit cooldown are deliberately ignored.
+	if RunState.stage_cleared and _dwell_left <= 0.0:
+		for node: Node in _all_interactables(get_tree().current_scene):
+			var way_out := node as ExitPortal
+			if way_out != null and way_out.available and way_out.is_inside_tree():
+				return way_out
 	var nearest: Interactable = null
 	var nearest_dist := INF
 	for node: Node in _all_interactables(get_tree().current_scene):

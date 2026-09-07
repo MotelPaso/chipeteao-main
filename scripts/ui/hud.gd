@@ -730,9 +730,23 @@ func _probe_text() -> String:
 ## Map-tier tag on the timer's other flank, pushed through the "hud" group
 ## by RunSystems once it settles the run's tier; hidden on the baseline.
 ## "G" for Grado — the same badge the select screen shows on a map card.
-func show_tier_tag(tier: int) -> void:
-	_tier_label.visible = tier > 1
-	_tier_label.text = "G%d" % tier
+## Stage badge (iteration 49, replacing the map-tier badge): "E%d" for the
+## stage of the run, plus "·V%d" once the party has looped the map list.
+## Both 1-based on screen; RunState keeps them 0-based.
+## GLOSARIO rule 6: Nivel/Nv is the raider, Etapa/E is the map, Vuelta/V
+## is the lap, Rango is a relic — four scales, four words.
+func show_stage_tag(stage_index: int, lap: int) -> void:
+	_tier_label.visible = true
+	_tier_label.text = "E%d" % (stage_index + 1) if lap <= 0 \
+			else "E%d · V%d" % [stage_index + 1, lap + 1]
+
+
+## Objective arrow relay ("boss_ui" group): the WorldDirector points the
+## arrow at the exit portal when the stage opens one.
+func track_objective(node: Node3D) -> void:
+	var arrow := get_node_or_null("BossArrow")
+	if arrow != null and arrow.has_method("track_objective"):
+		arrow.call("track_objective", node)
 
 
 ## Called through the "boss_ui" group by a boss entering the arena. If one

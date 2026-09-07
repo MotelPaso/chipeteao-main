@@ -220,7 +220,7 @@ func _resolve_spit() -> void:
 ## Cosmetic spit lob: a glob sphere arcs from the mouth to the splash spot
 ## over the windup and frees itself. Damage stays on the disc resolve.
 func _launch_glob_visual(from: Vector3, to: Vector3, duration: float) -> void:
-	var scene_root := get_tree().current_scene
+	var scene_root := RunRoot.stage_parent(get_tree())
 	if scene_root == null:
 		return
 	var glob := MeshInstance3D.new()

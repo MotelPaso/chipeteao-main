@@ -8,7 +8,9 @@ extends CanvasLayer
 ## run-end screens and mid hit-stop. Headless-safe: it is only a ColorRect
 ## tween.
 ##
-## While busy, repeat requests are DROPPED and transition() returns false
+## transition_async() is the awaiting variant, for work that spans frames
+## (the stage swap). While busy, repeat requests are DROPPED and both
+## return false
 ## — the first change wins and the fade never strands the game mid-black.
 ## Callers must therefore put their irreversible cleanup INSIDE the
 ## callable (or check the return), never before the call: the busy window
@@ -57,6 +59,40 @@ func transition(action: Callable) -> bool:
 	_tween.tween_property(_rect, "modulate:a", 0.0, FADE_OUT_TIME) \
 			.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
 	_tween.tween_callback(_clear_busy)
+	return true
+
+
+## Async sibling of transition(): AWAITS the action between the fade-in
+## and the fade-out. transition() cannot — its action runs inside a
+## tween_callback, and a callback that is a coroutine returns to the tween
+## the moment it hits its first await, so the screen would come back in
+## the middle of the work. The stage swap needs several frames (frees
+## settle, the next arena builds), which is what this exists for.
+##
+## Same busy contract as transition(): a request landing while another
+## fade runs is DROPPED and returns false, so the caller can decide
+## whether to retry.
+func transition_async(action: Callable) -> bool:
+	if _busy:
+		return false
+	_busy = true
+	_rect.mouse_filter = Control.MOUSE_FILTER_STOP  # swallow clicks mid-cut
+	if _tween != null and _tween.is_valid():
+		_tween.kill()
+	_tween = create_tween()
+	_tween.set_ignore_time_scale(true)
+	_tween.tween_property(_rect, "modulate:a", 1.0, FADE_IN_TIME) \
+			.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
+	await _tween.finished
+	await action.call()
+	# Give the mouse back with the cut, not with the flag (see transition).
+	_release_mouse()
+	_tween = create_tween()
+	_tween.set_ignore_time_scale(true)
+	_tween.tween_property(_rect, "modulate:a", 0.0, FADE_OUT_TIME) \
+			.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	await _tween.finished
+	_clear_busy()
 	return true
 
 

@@ -1,6 +1,6 @@
 [gd_scene load_steps=33 format=3 uid="uid://bashdu2ne7q4c"]
 
-[ext_resource type="PackedScene" uid="uid://crunsy5te2m8a" path="res://scenes/world/RunSystems.tscn" id="1_runsystems"]
+[ext_resource type="Script" path="res://scripts/world/arena.gd" id="1_arena"]
 [ext_resource type="Script" path="res://scripts/world/backdrop.gd" id="90_backdrop"]
 [ext_resource type="Script" path="res://scripts/systems/enemy_spawner.gd" id="2_spawner"]
 [ext_resource type="PackedScene" uid="uid://bqgr4nt0h3v2e" path="res://scenes/enemies/Grunt.tscn" id="3_grunt"]
@@ -85,6 +85,8 @@ fog_density = 0.006
 fog_sky_affect = 0.25
 
 [node name="AshDunes" type="Node3D"]
+script = ExtResource("1_arena")
+map_id = "ash_dunes"
 
 [node name="WorldEnvironment" type="WorldEnvironment" parent="."]
 environment = SubResource("Environment_1")
@@ -284,11 +286,10 @@ boss_scene = ExtResource("21_sarcognath")
 elder_title = "Sarcognato Ancestral"
 boss_warning_text = "La arena tiembla sobre algo sepultado..."
 
-[node name="RunSystems" parent="." instance=ExtResource("1_runsystems")]
-map_id = "ash_dunes"
-
 [node name="AmbientBed" type="AudioStreamPlayer" parent="."]
 stream = ExtResource("18_wind")
 volume_db = -26.0
 autoplay = true
 script = ExtResource("17_ambient")
+
+[node name="SpawnPoint" type="Marker3D" parent="."]

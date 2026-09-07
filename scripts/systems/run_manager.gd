@@ -13,13 +13,25 @@ signal run_ended(victory: bool)
 ## Seconds of survival that grade the run as a victory (default 15 min).
 ## The run does not stop here; the milestone is only announced.
 @export var survival_goal: float = 900.0
+## Seconds a STAGE has to last before its gate can open (iteration 49).
+## Same 15 minutes, but measured on RunState.stage_time, so every map of a
+## run gets its own full stretch instead of the second one inheriting a
+## clock that already ran out.
+@export var stage_goal: float = 900.0
+
+## Harness switch: BONK_STAGE_FAST=1 clears a stage after STAGE_FAST_GOAL
+## seconds and with no boss requirement, so one 240 s soak can cross two
+## stages and exercise the swap. Test-only — nothing in the game sets it.
+const STAGE_FAST_ENV: String = "BONK_STAGE_FAST"
+const STAGE_FAST_GOAL: float = 60.0
 ## Milestone banner. Template with EXACTLY ONE %d, filled with the goal in
 ## whole minutes, so retuning survival_goal can never leave the banner
 ## announcing a number the run no longer uses.
 @export var survival_text: String = "%d minutos sobrevividos — extráete cuando quieras desde el menú de pausa"
 
 var _run_over: bool = false
-var _goal_announced: bool = false
+## True while BONK_STAGE_FAST is set (read once, at ready).
+var _stage_fast: bool = false
 
 ## Every party member's Health, bound one frame after ready (co-op spawns
 ## the extra bodies in RunSystems._ready, which runs after this child's).
@@ -29,6 +41,9 @@ var _party_health: Array[Health] = []
 func _ready() -> void:
 	# The pause menu reaches back through this group to extract.
 	add_to_group("run_manager")
+	_stage_fast = OS.get_environment(STAGE_FAST_ENV) == "1"
+	if _stage_fast:
+		print("RunManager: fast stage gate (%.0fs, no boss)" % STAGE_FAST_GOAL)
 	_bind_party.call_deferred()
 
 
@@ -64,12 +79,27 @@ func _on_player_died() -> void:
 
 func _physics_process(_delta: float) -> void:
 	# Pausable process mode: while the upgrade-card UI has the tree paused
-	# this check freezes along with RunState.run_time.
-	if not _goal_announced and goal_reached():
-		_goal_announced = true
+	# this check freezes along with RunState.stage_time.
+	if not RunState.stage_cleared and _stage_gate_open():
+		RunState.mark_stage_cleared(GameConfig.selected_map_id)
 		get_tree().call_group("boss_ui", "announce_major",
-				survival_text % roundi(survival_goal / 60.0))
-		print("Survival goal reached at %.1fs" % RunState.run_time)
+				survival_text % roundi(_stage_goal() / 60.0))
+		# One-line log (RunManager convention): the moment the exit portal
+		# is allowed to appear, with the two halves of the gate spelled out.
+		print("Stage gate: time=%.1f boss=%s" % [
+				RunState.stage_time, RunState.stage_boss_dead])
+
+
+## Seconds this stage has to last. The harness switch shortens it so a
+## soak can reach a stage change.
+func _stage_goal() -> float:
+	return STAGE_FAST_GOAL if _stage_fast else stage_goal
+
+
+## The stage gate. Iteration 49 checks the clock only; iteration 50 adds
+## "and the stage boss is dead".
+func _stage_gate_open() -> bool:
+	return RunState.stage_time >= _stage_goal()
 
 
 ## True once the run clock passed the survival goal (victory grading).

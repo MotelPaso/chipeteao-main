@@ -34,7 +34,9 @@ func _awaken() -> void:
 func _spawn_miniboss() -> void:
 	if miniboss_scene == null:
 		return
-	var scene_root := get_tree().current_scene
+	# The ARENA, not current_scene (iteration 49): a miniboss belongs to
+	# the stage that woke it, and follows the map when the party leaves.
+	var scene_root := RunRoot.stage_parent(get_tree())
 	if scene_root == null:
 		return
 	var node := miniboss_scene.instantiate()
@@ -53,7 +55,7 @@ func _spawn_miniboss() -> void:
 ## Short floating flavor line above the trigger (the damage-popup styling,
 ## warmer color); parented to the scene root so it outlives state changes.
 func show_flavor(line: String) -> void:
-	var scene_root := get_tree().current_scene
+	var scene_root := RunRoot.stage_parent(get_tree())
 	if scene_root == null:
 		return
 	var label := Label3D.new()

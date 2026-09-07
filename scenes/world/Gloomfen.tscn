@@ -1,6 +1,6 @@
 [gd_scene load_steps=31 format=3]
 
-[ext_resource type="PackedScene" uid="uid://crunsy5te2m8a" path="res://scenes/world/RunSystems.tscn" id="1_runsystems"]
+[ext_resource type="Script" path="res://scripts/world/arena.gd" id="1_arena"]
 [ext_resource type="Script" path="res://scripts/world/backdrop.gd" id="90_backdrop"]
 [ext_resource type="Script" path="res://scripts/systems/enemy_spawner.gd" id="2_spawner"]
 [ext_resource type="PackedScene" uid="uid://bqgr4nt0h3v2e" path="res://scenes/enemies/Grunt.tscn" id="3_grunt"]
@@ -83,6 +83,8 @@ fog_density = 0.011
 fog_sky_affect = 0.35
 
 [node name="Gloomfen" type="Node3D"]
+script = ExtResource("1_arena")
+map_id = "gloomfen"
 
 [node name="WorldEnvironment" type="WorldEnvironment" parent="."]
 environment = SubResource("Environment_1")
@@ -227,11 +229,10 @@ boss_scene = ExtResource("7_fenwraith")
 elder_title = "Espectro de la Ciénaga Ancestral"
 boss_warning_text = "La ciénaga contiene el aliento..."
 
-[node name="RunSystems" parent="." instance=ExtResource("1_runsystems")]
-map_id = "gloomfen"
-
 [node name="AmbientBed" type="AudioStreamPlayer" parent="."]
 stream = ExtResource("23_wind")
 volume_db = -28.0
 autoplay = true
 script = ExtResource("22_ambient")
+
+[node name="SpawnPoint" type="Marker3D" parent="."]

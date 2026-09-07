@@ -10,6 +10,10 @@ signal leveled_up(new_level: int)
 signal kills_changed(total_kills: int)
 ## Run-wide difficulty changed (Tome of Peril, demonic altars).
 signal difficulty_changed(bonus: float)
+## A new stage is live (iteration 49): the arena is in the tree and the
+## party has been placed. `stage_index` is 0-based; everything the player
+## or a soak log reads prints it as stage_index + 1.
+signal stage_changed(stage_index: int, map_id: String)
 
 var xp: int = 0
 var level: int = 1
@@ -17,6 +21,34 @@ var level: int = 1
 var xp_to_next: int = XP_BASE + XP_PER_LEVEL
 var kills: int = 0
 var run_time: float = 0.0
+## --- Stage progression (iteration 49) -----------------------------------
+## A run is a sequence of STAGES, one map each, in MapCatalog order,
+## wrapping back to the first map with lap + 1. Everything about the party
+## carries across; only the map and its clock reset.
+## 0-based index into MapCatalog.MAP_LIBRARY.
+var stage_index: int = 0
+## Completed loops of the map list. 0 on the first pass.
+var lap: int = 0
+## Seconds spent in the CURRENT stage. run_time keeps counting the whole
+## run; this one is what the stage gate, the boss schedule and the hordes
+## read, so a stage always plays out the same however late it comes.
+var stage_time: float = 0.0
+## True once this stage's Elder is dead (RunManager sets it).
+var stage_boss_dead: bool = false
+## True once this stage's gate opened (time AND boss): the exit portal is
+## out and the pseudo-infinite ramp is running.
+var stage_cleared: bool = false
+## Seconds since this stage was cleared — the pseudo-infinite clock.
+var pseudo_infinite_time: float = 0.0
+## Run totals, folded into the meta ledger at the end.
+var stages_cleared_total: int = 0
+var endless_seconds_total: float = 0.0
+var laps_completed: int = 0
+## Maps entered / cleared this run, in order. The meta fold credits
+## runs_on_<map> for every visited one and victories_<map> for every
+## cleared one, so per-map quests keep working across a multi-map run.
+var visited_map_ids: Array[String] = []
+var cleared_map_ids: Array[String] = []
 ## True while the run is in progress; RunManager clears it when the run
 ## ends (death or victory) so late same-frame events like a level-up
 ## card stand down.
@@ -91,6 +123,10 @@ func _physics_process(delta: float) -> void:
 	# frames where something unpauses the tree.
 	if run_active:
 		run_time += delta
+		stage_time += delta
+		if stage_cleared:
+			pseudo_infinite_time += delta
+			endless_seconds_total += delta
 
 
 ## Call at the start of a new run.
@@ -100,6 +136,14 @@ func reset() -> void:
 	kills = 0
 	run_time = 0.0
 	run_active = true
+	stage_index = 0
+	lap = 0
+	stages_cleared_total = 0
+	endless_seconds_total = 0.0
+	laps_completed = 0
+	visited_map_ids = []
+	cleared_map_ids = []
+	begin_stage()
 	pickup_radius_multiplier = 1.0
 	demonic_uses = 0
 	elite_chance_bonus = 0.0
@@ -132,6 +176,26 @@ func reset() -> void:
 	xp_changed.emit(xp, xp_to_next)
 	kills_changed.emit(kills)
 	difficulty_changed.emit(difficulty_bonus)
+
+
+## Clears the per-stage fields. Called by reset() and by RunRoot on every
+## stage change — the run-level counters above are deliberately NOT here.
+func begin_stage() -> void:
+	stage_time = 0.0
+	stage_boss_dead = false
+	stage_cleared = false
+	pseudo_infinite_time = 0.0
+
+
+## Records that the current stage was cleared. Idempotent: the gate is
+## polled, so it would otherwise credit a stage once per frame.
+func mark_stage_cleared(map_id: String) -> void:
+	if stage_cleared:
+		return
+	stage_cleared = true
+	stages_cleared_total += 1
+	if not cleared_map_ids.has(map_id):
+		cleared_map_ids.append(map_id)
 
 
 func add_xp(amount: int) -> void:

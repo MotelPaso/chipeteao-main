@@ -42,6 +42,12 @@ var peak_parked: int = 0
 var _parked: Array[Node3D] = []
 ## Instance ids released this frame but not yet reparented (see release()).
 var _pending_release: Dictionary[int, bool] = {}
+## Instances currently OUT in the world (acquired and not yet parked).
+## Tracked since iteration 49 because a stage swap has to reclaim them:
+## before, an in-flight dart simply died with the scene, which is exactly
+## the leak a persistent pool cannot afford — the node would be freed
+## while the pool still counted it as created and never parked again.
+var _live: Dictionary[int, Node3D] = {}
 
 
 func _ready() -> void:
@@ -91,6 +97,7 @@ func acquire(parent: Node) -> Node3D:
 		area.set_deferred(&"monitorable", node.get_meta(META_MONITORABLE))
 	if node.has_method(&"pool_reset"):
 		node.call(&"pool_reset")
+	_live[node.get_instance_id()] = node
 	return node
 
 
@@ -123,6 +130,43 @@ func release(node: Node3D) -> void:
 	_finish_release.call_deferred(node, id)
 
 
+## Reclaims every instance still out in the world, immediately (no
+## deferred hop): a stage swap frees the arena those nodes are parented
+## to, and anything left there would be freed behind the pool's back.
+## Safe to call at any time — it is a no-op when nothing is out.
+func release_all_live() -> void:
+	for id: int in _live.keys():
+		var node: Node3D = _live[id]
+		_live.erase(id)
+		if not is_instance_valid(node) or node.is_queued_for_deletion():
+			continue
+		# A release is already in flight for this one; its deferred
+		# _finish_release will park it. Touching it here would park it
+		# twice.
+		if _pending_release.has(id):
+			continue
+		var parent := node.get_parent()
+		if parent == null:
+			continue
+		node.visible = false
+		node.set_meta(META_PROCESS, node.is_processing())
+		node.set_meta(META_PHYSICS_PROCESS, node.is_physics_processing())
+		node.set_physics_process(false)
+		node.set_process(false)
+		var area := node as Area3D
+		if area != null:
+			node.set_meta(META_MONITORING, area.monitoring)
+			node.set_meta(META_MONITORABLE, area.monitorable)
+			area.monitoring = false
+			area.monitorable = false
+		parent.remove_child(node)
+		if _parked.size() >= max_free:
+			node.queue_free()
+			continue
+		_parked.append(node)
+		peak_parked = maxi(peak_parked, _parked.size())
+
+
 ## Counters for the perf probe and soak harnesses.
 func stats() -> Dictionary[String, int]:
 	return {
@@ -139,13 +183,18 @@ func parked_count() -> int:
 
 func _finish_release(node: Node3D, id: int) -> void:
 	_pending_release.erase(id)
+	_live.erase(id)
 	# The node's scene may have been torn down between release() and this
 	# deferred call (quit-to-menu with shots in flight); it died with it.
 	if not is_instance_valid(node):
 		return
+	# Already parked (a stage swap reclaimed it synchronously between the
+	# release and this deferred call): parking it twice would put the same
+	# instance in _parked twice and hand it out to two callers at once.
 	var parent := node.get_parent()
-	if parent != null:
-		parent.remove_child(node)
+	if parent == null:
+		return
+	parent.remove_child(node)
 	if _parked.size() >= max_free:
 		# queue_free, not free: Pools.release hands over ownership, but a
 		# caller that still holds the reference this frame must not be left

@@ -107,7 +107,19 @@ var fullscreen: bool = false
 var show_fps: bool = false
 
 
+## Env override (test-only, iteration 49): BONK_SAVE_PATH re-points the
+## ledger before the first read, so ANY headless boot — the select screen,
+## a scene opened by hand, a future harness — can be run without touching
+## the player's real save. The soak probe still redirects on its own,
+## earlier, because it boots the run itself; this covers everything else.
+const SAVE_PATH_ENV: String = "BONK_SAVE_PATH"
+
+
 func _ready() -> void:
+	var override_path := OS.get_environment(SAVE_PATH_ENV)
+	if not override_path.is_empty():
+		save_path = override_path
+		print("Save path overridden: %s" % save_path)
 	load_from_disk()
 
 

@@ -1,16 +1,15 @@
 extends Node3D
-## Root of RunSystems.tscn: the map-independent run block every arena
-## scene instances — Player, RunManager, upgrade-card UI, HUD, and the
-## run-end screen, with run_ended already wired to the end screen inside
-## this scene. Arenas keep their own EnemySpawner and AmbientBed (the
-## boss timetable and the wind differ per biome) and override map_id on
-## the instance.
-
-## MapCatalog id of the arena this instance sits in. Republished to
-## GameConfig at ready so a directly-booted arena (headless soaks, F6)
-## still folds per-map counters correctly and Retry resolves to the same
-## map; via the select screen this is an idempotent re-set.
-@export var map_id: String = MapCatalog.DEFAULT_ID
+## Root of RunSystems.tscn: the map-independent run block — Player,
+## RunManager, WorldDirector, upgrade-card UI, HUD, and the run-end
+## screen, with run_ended already wired to the end screen inside this
+## scene. Arenas keep their own EnemySpawner and AmbientBed (the boss
+## timetable and the wind differ per biome).
+##
+## Since iteration 49 this block is instanced ONCE, by Run.tscn, and
+## survives every stage change: that is what makes level, weapons, tomes,
+## items and points carry from map to map without copying anything. It no
+## longer knows which map is being played (RunRoot publishes that into
+## GameConfig) and it no longer settles a map tier (tiers are gone).
 
 ## Radius of the ring co-op slots 1..N-1 spawn on, around the scene's
 ## slot-0 spawn point. Generated instead of tabulated: a fixed table of
@@ -24,36 +23,47 @@ const SplitScreenView := preload("res://scripts/systems/split_screen.gd")
 const PLAYER_SCENE := preload("res://scenes/player/Player.tscn")
 
 
-## The run block owns the run reset (it is the one node every arena
-## instances, and it enters the tree BEFORE the WorldDirector child that
-## shuffles the layout). That makes a directly booted arena — F6, headless
-## soaks — start from zero like a real run, and re-seeds the Daily Hunt
-## stream at a fixed point instead of however many frames earlier the
-## menu happened to call it. reset() is idempotent, so the select screen's
-## own call stays harmless.
+## The run block owns the run reset. It enters the tree BEFORE the arena
+## RunRoot builds afterwards, so a stage's scatter and director always see
+## a clean RunState, and the Daily Hunt stream is re-seeded at one fixed
+## point instead of however many frames earlier the menu happened to call
+## it. reset() is idempotent, so the select screen's own call stays
+## harmless.
 func _enter_tree() -> void:
 	RunState.reset()
 
 
 func _ready() -> void:
-	# Items and altars reach the run block through this group (vacuum_pickups).
+	# Items, altars and the run root reach this block through the group
+	# (vacuum_pickups, place_party).
 	add_to_group("run_systems")
-	GameConfig.selected_map_id = map_id
 	if Coop.is_coop():
 		_spawn_party()
-	# Settle the run's map tier: a pick this map hasn't earned (stale
-	# cross-map selection, edited config) falls back to the baseline.
-	if not SaveData.is_tier_unlocked(map_id, GameConfig.selected_tier):
-		GameConfig.selected_tier = 1
-	# Push the tier out through groups, never node paths. Works because the
-	# arena's EnemySpawner and this RunSystems' HUD sit earlier in tree
-	# order, so both joined their groups before this _ready runs.
-	var spec := MapCatalog.tier_spec(map_id, GameConfig.selected_tier)
-	get_tree().call_group("enemy_spawner", "apply_tier_spec", spec)
-	get_tree().call_group("hud", "show_tier_tag", GameConfig.selected_tier)
+	get_tree().call_group("hud", "show_stage_tag", RunState.stage_index, RunState.lap)
 	# Iteration 38: leveling no longer vacuums the floor. The gem/orb
 	# vacuum() hooks stay for the Magnet item, which fires them on its own
 	# timer (see vacuum_pickups).
+
+
+## Stage hook (RunRoot, through the "run_systems" group): puts the whole
+## party down at the new arena's spawn point — standing raiders and downed
+## bodies alike, since a downed raider travels with the party. Reuses the
+## same ring geometry the co-op boot uses, so a party never lands stacked
+## on one point, and re-anchors each body's void rescue: the anchor
+## recorded at _ready belongs to a map that no longer exists.
+func place_party(origin: Vector3) -> void:
+	var bodies: Array[Node] = []
+	for group: String in ["player", "downed_players"]:
+		bodies.append_array(get_tree().get_nodes_in_group(group))
+	bodies.sort_custom(func(a: Node, b: Node) -> bool:
+		return int(a.get("player_index")) < int(b.get("player_index")))
+	for i: int in bodies.size():
+		var body := bodies[i] as Node3D
+		if body == null:
+			continue
+		body.global_position = origin + _coop_spawn_offset(i)
+		if body.has_method("anchor_here"):
+			body.call("anchor_here")
 
 
 ## Magnet-item hook (and any future "hoover the floor" effect): every live
@@ -86,6 +96,10 @@ func _spawn_party() -> void:
 
 ## Slot `slot`'s offset on the spawn ring: one even share of the circle
 ## per party member, so no two slots can land on the same point.
+## Slot 0 lands ON the spawn point; the rest ring around it, one even
+## share of the circle each, so no two slots can land on the same spot.
 func _coop_spawn_offset(slot: int) -> Vector3:
+	if slot <= 0:
+		return Vector3.ZERO
 	var angle := TAU * float(slot) / float(maxi(Coop.player_count, 1))
 	return Vector3(cos(angle), 0.0, sin(angle)) * coop_spawn_radius

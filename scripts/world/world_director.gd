@@ -140,6 +140,11 @@ class TimedBeacon:
 ## costs nothing. Free chests roll their rarity when opened, so an early
 ## one is a real chance at a Legendary before any points exist.
 @export var free_start_chest_chance: float = 0.15
+@export_group("Exit portal (iteration 49)")
+## How far the stage's exit portal lands from the nearest raider. Far
+## enough to be a trip across the map, which is the point of a portal that
+## opens when you have already won the stage.
+@export var exit_portal_min_distance: float = 40.0
 ## Portals dropped at run start (paired: keep it even) and roulette wheels.
 @export var portal_count: int = 4
 @export var roulette_count: int = 1
@@ -164,6 +169,11 @@ var _arena_half_extent: float = 80.0
 ## The arena-bounds node: the single source of arena size AND of the
 ## irregular walkable mask (iteration 44).
 var _bounds: Node3D = null
+## The arena of the current stage; everything this director spawns is
+## parented to it (see _stage_parent).
+var _arena: Node3D = null
+## One exit portal per stage (iteration 49).
+var _exit_portal_spawned: bool = false
 var _event_timer: float = 0.0
 ## Every point already occupied by a POI (shuffled or spawned), so later
 ## placements keep their distance.
@@ -191,19 +201,53 @@ var _ambient_energy: float = 1.0
 var _sky_tween: Tween = null
 
 
-func _enter_tree() -> void:
-	# All scene nodes are in-tree here but NO _ready ran yet — the scatter
-	# will therefore build its keepout list from the SHUFFLED positions.
-	_bounds = get_tree().get_first_node_in_group("arena_bounds") as Node3D
-	if _bounds != null:
-		_arena_half_extent = float(_bounds.get("arena_half_extent"))
-	if shuffle_layout:
-		_shuffle_ground_interactables()
-
-
 func _ready() -> void:
 	add_to_group("world_director")
+
+
+## Stage hook (iteration 49), called by Arena._ready through the
+## "world_director" group. This director is now PERSISTENT — one per run,
+## not one per arena — so everything it used to do in _enter_tree/_ready
+## happens here instead, once per stage, and every cached arena reference
+## has to be dropped first.
+## Order inside a stage: the scatter's _enter_tree already built the mask;
+## this claims the arena, shuffles the ground POIs and places the
+## run-start fixtures; the Arena then calls scatter.place_props(), whose
+## keepouts therefore see the shuffled positions — the exact sequence the
+## old per-arena director produced.
+func on_stage_started(arena: Node3D) -> void:
+	set_physics_process(true)
+	_arena = arena
+	# Re-cache the arena's lights from scratch. _cache_lights() returns
+	# early while _sun is set, and _exit_tree (which used to restore them)
+	# never fires now that this node outlives the arena: without these four
+	# lines the second stage would tint stage 1's freed Sun and every sky
+	# event after the first would be invisible.
+	_kill_sky_tween()
+	_sun = null
+	_environment = null
+	_sun_color = Color.WHITE
+	_sun_energy = 1.0
+	_ambient_color = Color.WHITE
+	_ambient_energy = 1.0
+	_sky_kind = ""
+	_sky_left = 0.0
+	_sky_gap_left = 0.0
+	_bounds = null
+	for node: Node in get_tree().get_nodes_in_group("arena_bounds"):
+		var bounds := node as Node3D
+		if bounds != null and arena.is_ancestor_of(bounds):
+			_bounds = bounds
+			_arena_half_extent = float(bounds.get("arena_half_extent"))
+			break
+	_placed_points.clear()
+	_anchor_points.clear()
+	_placed_pois.clear()
+	_beacons.clear()
 	_event_timer = first_event_at
+	_exit_portal_spawned = false
+	if shuffle_layout:
+		_shuffle_ground_interactables()
 	# Irregular start (iteration 44) FIRST: it culls scene-placed POIs, and
 	# the spots they were holding have to be released before the run-start
 	# fixtures pick theirs — otherwise portals and the roulette keep their
@@ -214,10 +258,59 @@ func _ready() -> void:
 	_spawn_roulettes()
 
 
+## Stage teardown (RunRoot, before the arena is freed): restore the sky the
+## event tint borrowed and drop the beacon bookkeeping. The beacon NODES
+## are parented to the arena and die with it; this only clears the list so
+## the sweep can report zero.
+func on_stage_ended() -> void:
+	# Stop ticking for the length of the swap: this node OUTLIVES the
+	# arena, and a director still firing events between the teardown and
+	# the next map drops chests and altars into a scene about to be freed
+	# (see the note in RunRoot._swap_stage about inherited process modes).
+	set_physics_process(false)
+	_snap_sky_back()
+	_sky_kind = ""
+	_sky_left = 0.0
+	_beacons.clear()
+	_placed_points.clear()
+	_anchor_points.clear()
+	_placed_pois.clear()
+	_arena = null
+	_bounds = null
+
+
+## Live beacons, for the stage sweep.
+func beacon_count() -> int:
+	return _beacons.size()
+
+
+## Where every world object this director spawns is parented: the arena of
+## the moment, so a stage change takes them all with it. Falls back to
+## this node only when there is no arena (teardown races), which keeps the
+## spawn from erroring instead of silently leaking into the next stage.
+func _stage_parent() -> Node:
+	if _arena != null and is_instance_valid(_arena):
+		return _arena
+	var root := get_tree().get_first_node_in_group("run_root")
+	if root != null and root.has_method("arena_root"):
+		var arena: Variant = root.call("arena_root")
+		if arena is Node3D and is_instance_valid(arena):
+			return arena
+	return self
+
+
 ## The run can end — or the scene reload — mid sky event, which kills the
 ## tint tween halfway. Snap the cached lighting back on the way out so a
 ## blood moon cannot bleed into the next run through a shared resource.
 func _exit_tree() -> void:
+	_snap_sky_back()
+
+
+## Restores the arena's own lighting IMMEDIATELY (no tween). Used when the
+## arena is about to go — run teardown, or a stage swap: _restore_sky()
+## eases over two seconds, and a tween writing into a freed Sun is an
+## error, not a fade.
+func _snap_sky_back() -> void:
 	_kill_sky_tween()
 	if _sun != null and is_instance_valid(_sun):
 		_sun.light_color = _sun_color
@@ -262,7 +355,7 @@ func _randomize_starting_pois() -> void:
 		if randf() < free_start_chest_chance:
 			chest.free_open = true
 			freebies += 1
-		add_child(chest)
+		_stage_parent().add_child(chest)
 		chest.global_position = _claim_clear_point()
 	print("Start layout: %d POI(s) skipped, %d extra chest(s), %d free" % [
 			removed, extra, freebies])
@@ -279,6 +372,7 @@ func _make_start_chest_free(chest: Chest) -> bool:
 func _physics_process(delta: float) -> void:
 	if not RunState.run_active:
 		return
+	_tick_exit_portal()
 	_tick_beacons(delta)
 	if not events_enabled:
 		return
@@ -289,6 +383,64 @@ func _physics_process(delta: float) -> void:
 	_event_timer = _next_event_gap()
 	_fire_random_event()
 	_maybe_sky_event()
+
+
+## Raises the stage's exit portal the first frame the stage counts as
+## cleared. Polled rather than signalled: the gate is a poll too
+## (RunManager), and one flag read per frame is cheaper than keeping two
+## systems' signal wiring in sync across a stage swap.
+func _tick_exit_portal() -> void:
+	if _exit_portal_spawned or not RunState.stage_cleared:
+		return
+	_exit_portal_spawned = true
+	var portal := ExitPortal.new()
+	portal.name = "ExitPortal"
+	_stage_parent().add_child(portal)
+	portal.global_position = _exit_portal_point()
+	# Burns until the party takes it: an exit with no deadline still needs
+	# to be findable, and poi_worth_showing() puts the light out when the
+	# portal is consumed.
+	_beacons.append(TimedBeacon.new(
+			_spawn_beacon(portal.global_position, portal.portal_color), portal, INF))
+	get_tree().call_group("boss_ui", "track_objective", portal)
+	_announce("Se abrió el portal de salida — crúzalo cuando quieras")
+	# One-line log (RunManager convention) for headless soaks.
+	print("Exit portal opened at %.1fs" % RunState.run_time)
+
+
+## Somewhere clear, walkable and at least exit_portal_min_distance from
+## every raider: the exit is a destination, not a thing you trip over the
+## second the stage ends.
+func _exit_portal_point() -> Vector3:
+	var limit := _arena_half_extent - bounds_margin
+	var best := Vector3.ZERO
+	var best_distance := -1.0
+	for attempt in CLEAR_POINT_ATTEMPTS:
+		var candidate := Vector3(randf_range(-limit, limit), 0.0, randf_range(-limit, limit))
+		if not _walkable(candidate):
+			continue
+		var nearest := _distance_to_nearest_player(candidate)
+		if nearest > best_distance:
+			best_distance = nearest
+			best = candidate
+		if nearest >= exit_portal_min_distance:
+			break
+	if best_distance < 0.0:
+		# Every sample landed in a mask wall: fall back to the sampler that
+		# knows where the open cells actually are.
+		var point := _random_walkable_point()
+		best = Vector3(point.x, 0.0, point.y)
+	best.y = _ground_height(best)
+	return best
+
+
+func _distance_to_nearest_player(at: Vector3) -> float:
+	var nearest := INF
+	for node: Node in Coop.alive_players(get_tree()):
+		var body := node as Node3D
+		if body != null:
+			nearest = minf(nearest, at.distance_to(body.global_position))
+	return 0.0 if nearest == INF else nearest
 
 
 ## Run minutes elapsed; the altar cadence and the event gap both ride it.
@@ -423,7 +575,7 @@ func _spawn_portals() -> void:
 		var portal: Interactable = PortalShrineScript.new()
 		portal.name = "Portal%d" % (i + 1)
 		portal.set("pair_color", colors[(i / 2) % colors.size()])
-		add_child(portal)
+		_stage_parent().add_child(portal)
 		portal.global_position = _claim_clear_point()
 		portals.append(portal)
 	portals.shuffle()
@@ -437,7 +589,7 @@ func _spawn_portals() -> void:
 func _spawn_roulettes() -> void:
 	for i in roulette_count:
 		var wheel := ROULETTE_SHRINE_SCENE.instantiate() as Node3D
-		add_child(wheel)
+		_stage_parent().add_child(wheel)
 		wheel.global_position = _claim_clear_point()
 
 
@@ -526,7 +678,7 @@ func _event_demonic_altar() -> void:
 ## TimedBeacon's own poi_worth_showing() check reports.
 func _event_altar(scene: PackedScene, message: String) -> void:
 	var altar := scene.instantiate() as Node3D
-	add_child(altar)
+	_stage_parent().add_child(altar)
 	altar.global_position = _event_point()
 	var color := Color(1.0, 0.35, 0.3) if scene == CURSE_SHRINE_SCENE \
 			else Color(0.45, 0.85, 1.0)
@@ -540,7 +692,7 @@ func _event_altar(scene: PackedScene, message: String) -> void:
 func _event_spring() -> void:
 	var spring := SPRING_SHRINE_SCENE.instantiate() as Node3D
 	spring.set("idle_lifetime", spring_idle_lifetime)
-	add_child(spring)
+	_stage_parent().add_child(spring)
 	spring.global_position = _event_point()
 	_beacons.append(TimedBeacon.new(
 			_spawn_beacon(spring.global_position, Color(0.4, 0.8, 1.0)),
@@ -580,7 +732,7 @@ func _event_supply_chest() -> void:
 	# Supply chests are never Common: floored to Rare and luck-tilted up.
 	chest.min_rarity = "Rare"
 	chest.luck_bonus = chest_luck_bonus
-	add_child(chest)
+	_stage_parent().add_child(chest)
 	chest.global_position = _event_point()
 	_beacons.append(TimedBeacon.new(
 			_spawn_beacon(chest.global_position, Color(1.0, 0.82, 0.3)),
@@ -665,7 +817,7 @@ func _despawn_chest(chest: Chest) -> void:
 ## so it reads as an invitation rather than a threat.
 func _spawn_beacon(at: Vector3, color: Color) -> Node3D:
 	var beacon := Node3D.new()
-	add_child(beacon)
+	_stage_parent().add_child(beacon)
 	beacon.global_position = at
 	var pillar := MeshInstance3D.new()
 	var mesh := CylinderMesh.new()
@@ -771,8 +923,10 @@ func _tick_sky(delta: float) -> void:
 func _cache_lights() -> void:
 	if _sun != null:
 		return
-	var scene := get_tree().current_scene
-	if scene == null:
+	# The ARENA, not current_scene: current_scene is the persistent run
+	# root now, and its lights are whatever arena happens to be under it.
+	var scene := _stage_parent()
+	if scene == null or scene == self:
 		return
 	for node: Node in scene.find_children("*", "DirectionalLight3D", true, false):
 		_sun = node as DirectionalLight3D

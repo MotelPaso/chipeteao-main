@@ -1,5 +1,5 @@
 extends Node2D
-## Screen-edge boss indicator: while any "boss"-group body is alive but
+## Screen-edge objective indicator: while any "boss"-group body is alive but
 ## off-screen (or behind the camera plane), an amber arrow clamped inside
 ## the screen edges points toward it, so players can re-find a fight they
 ## kited away from. Tracks the nearest live boss — dead bosses leave the
@@ -33,6 +33,8 @@ var _carrier: Node3D = null
 ## Cached co-op fallback camera, re-scanned at most every CAMERA_RESCAN.
 var _fallback_camera: Camera3D = null
 var _rescan_left: float = 0.0
+## Non-boss target shown while no boss is alive (see track_objective).
+var _objective: Node3D = null
 
 
 func _ready() -> void:
@@ -48,17 +50,26 @@ func bind_view(camera: Camera3D, carrier: Node3D) -> void:
 	_carrier = carrier
 
 
+## Points the arrow at something that is not a boss (iteration 49: the
+## stage's exit portal). A live boss always wins — a fight you have to
+## finish outranks a door you can take whenever you like — so this is a
+## fallback target, not an override. Cleared by passing null, and dropped
+## on its own once the node is gone (the portal is consumed when used).
+func track_objective(node: Node3D) -> void:
+	_objective = node
+
+
 func _process(delta: float) -> void:
 	var camera := _resolve_camera(delta)
 	if camera == null:
 		visible = false
 		return
 	var view := camera.get_viewport()
-	var boss := _nearest_live_boss(_resolve_reference())
-	if boss == null or view == null:
+	var marked := _current_target(_resolve_reference())
+	if marked == null or view == null:
 		visible = false
 		return
-	var target := boss.global_position + Vector3.UP * aim_height
+	var target := marked.global_position + Vector3.UP * aim_height
 	var placement := compute_placement(camera.unproject_position(target),
 			camera.is_position_behind(target), view.get_visible_rect().size)
 	visible = bool(placement["visible"])
@@ -171,6 +182,19 @@ func compute_placement(unprojected: Vector2, behind: bool,
 ## when there is one (two bosses alive is rare but possible: miniboss plus
 ## the timetable boss). A null reference keeps every boss at distance 0,
 ## so the first one in the group wins — enough for a camera-less harness.
+## What the arrow points at right now: the nearest live boss, else the
+## tracked objective while it still exists.
+func _current_target(reference: Node3D) -> Node3D:
+	var boss := _nearest_live_boss(reference)
+	if boss != null:
+		return boss
+	if _objective != null and not is_instance_valid(_objective):
+		_objective = null
+	if _objective != null and not _objective.is_inside_tree():
+		return null
+	return _objective
+
+
 func _nearest_live_boss(reference: Node3D) -> Node3D:
 	var tree := get_tree()
 	if tree == null:
