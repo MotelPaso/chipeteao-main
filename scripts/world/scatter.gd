@@ -10,6 +10,23 @@ extends Node3D
 ## always has wide walkable lanes (canopies carry no collision, so only
 ## trunks/rocks actually block).
 
+## Worst-case horizontal half-width of one mask rock, per unit of uniform
+## scale: the smallest distance from the prop's origin to its own convex
+## hull's footprint boundary, over every heading (Rock 0.944, DuneRock
+## 0.992 — the smaller one is the safe assumption, since _spawn_prop
+## rotates each prop at random around Y). Baked off the blob meshes; it
+## moves only if the blob transforms in Rock.tscn/DuneRock.tscn do.
+const MASK_ROCK_HALF_WIDTH: float = 0.94
+## Radius of the player capsule (Player.tscn), which is also the capsule
+## the ArenaProbe mask sweep pushes along every blocked-cell boundary: a
+## rock this close to a sample still blocks it.
+const PLAYER_CAPSULE_RADIUS: float = 0.4
+## sqrt(2), as a compile-time constant: the fill lattice's budget is all
+## about the DIAGONAL of a lattice square (the farthest a point of the cell
+## can sit from the rock that has to cover it) and about the jitter, which
+## can push that rock a diagonal further away.
+const DIAGONAL: float = 1.4142136
+
 @export var scatter_seed: int = 71382
 
 ## True (the shipping default) re-seeds the scatter every run, so each
@@ -33,10 +50,11 @@ extends Node3D
 @export_group("Arena Mask")
 ## Iteration 44: the square arena gets an IRREGULAR walkable shape each
 ## run — a coarse cell grid where a few random blobs of cells are blocked
-## (filled with oversized rock clusters over a tall collider). A flood
-## fill from the spawn guarantees every open cell is reachable on foot;
-## unreachable pockets are blocked too. Spawner, director and this
-## scatter all ask is_walkable() before placing anything.
+## and packed solid with oversized rocks (iteration 48: no invisible
+## collider, the rocks ARE the wall). A flood fill from the spawn
+## guarantees every open cell is reachable on foot; unreachable pockets
+## are blocked too. Spawner, director and this scatter all ask
+## is_walkable() before placing anything.
 @export var mask_enabled: bool = true
 @export var mask_cell_size: float = 10.0
 @export var mask_blobs_min: int = 6
@@ -45,8 +63,17 @@ extends Node3D
 @export var mask_blob_cells: int = 12
 ## Below this open fraction the mask is rebuilt with fewer blobs.
 @export var mask_min_open_fraction: float = 0.62
-@export var mask_rocks_per_cell: int = 4
-@export var mask_wall_height: float = 7.0
+## Mask rocks per axis inside a blocked cell: the fill is a jittered square
+## lattice, so this is 3 x 3 = 9 rocks per blocked cell. Load bearing
+## together with mask_rock_scale_min — see the budget in _fill_budget_gap();
+## coarsening either one opens holes the ArenaProbe mask sweep reports.
+@export var mask_rocks_per_side: int = 3
+## How far a lattice rock may wander off its slot. Pure looks: without it
+## the blocked regions read as a checkerboard of boulders.
+@export var mask_rock_jitter: float = 0.3
+## Uniform scale range of every mask rock.
+@export var mask_rock_scale_min: float = 2.9
+@export var mask_rock_scale_max: float = 3.6
 
 ## Blocked cells (grid coords -> true) and the grid size (cells per side).
 var _blocked: Dictionary[Vector2i, bool] = {}
@@ -250,6 +277,29 @@ func cell_size() -> float:
 	return mask_cell_size
 
 
+## Grid coords of every blocked cell. Public for the soak harness, whose
+## mask sweep walks each blocked cell's boundary hunting for a gap the
+## player capsule fits through.
+func blocked_cells() -> Array[Vector2i]:
+	var cells: Array[Vector2i] = []
+	for cell: Vector2i in _blocked:
+		cells.append(cell)
+	return cells
+
+
+## Flat center of a grid cell. Public alongside blocked_cells() so the
+## harness rebuilds an edge with the scatter's own arithmetic and the two
+## can never disagree about where a boundary is.
+func cell_center(cell: Vector2i) -> Vector2:
+	return _cell_center(cell)
+
+
+## Grid cell a flat position falls in. Public so a warning about someone
+## standing where they should not can name the cell, not just the metres.
+func cell_of(xz: Vector2) -> Vector2i:
+	return _cell_of(xz)
+
+
 ## A random walkable flat point (uniform over open cells, jittered).
 func random_walkable_point(margin: float = 4.0) -> Vector2:
 	for attempt in 64:
@@ -372,29 +422,48 @@ func _carve_corridor(from: Vector2i, reached: Dictionary[Vector2i, bool]) -> boo
 	return carved
 
 
-## Every blocked cell becomes a tall invisible collider (players can't
-## cross; climbing enemies can, slowly) dressed with oversized rocks.
+## Every blocked cell becomes a REAL rock field: a jittered square lattice
+## of oversized rocks whose footprints overlap enough to cover the WHOLE
+## cell, boundary included. Iteration 48 dropped the invisible 7 m box that
+## used to stand here — the player bumped into nothing next to the rocks,
+## and climbing enemies walked along its roof at y~7, which reads as flying.
+## The fill covers the interior and not just the rim on purpose: a raider
+## can jump onto the rocks and walk the ridge (a soak caught exactly that),
+## and over a hollow cell it would drop into ground the mask calls
+## unreachable and get stuck there. With no floor left inside a blocked
+## cell, coming down means landing on rock the player can see.
 func _fill_blocked_cells() -> void:
-	if _blocked.is_empty():
+	if _blocked.is_empty() or rock_scene == null:
 		return
-	var body := StaticBody3D.new()
-	body.name = "MaskWalls"
-	body.collision_layer = 1
-	body.collision_mask = 0
-	add_child(body)
+	var gap := _fill_budget_gap()
+	if gap > 0.0:
+		push_warning("Arena mask fill is %.2f m short per rock: raise mask_rocks_per_side or mask_rock_scale_min"
+				% gap)
+	var span := mask_cell_size / float(maxi(mask_rocks_per_side, 1))
 	for cell: Vector2i in _blocked:
 		var center := _cell_center(cell)
-		var shape := CollisionShape3D.new()
-		var box := BoxShape3D.new()
-		box.size = Vector3(mask_cell_size, mask_wall_height, mask_cell_size)
-		shape.shape = box
-		shape.position = Vector3(center.x, mask_wall_height * 0.5, center.y)
-		body.add_child(shape)
-		if rock_scene == null:
-			continue
-		for i in mask_rocks_per_cell:
-			var pos := Vector3(
-					center.x + _rng.randf_range(-mask_cell_size * 0.35, mask_cell_size * 0.35),
-					0.0,
-					center.y + _rng.randf_range(-mask_cell_size * 0.35, mask_cell_size * 0.35))
-			_spawn_prop(rock_scene, pos, _rng.randf_range(2.2, 3.4))
+		for ix in mask_rocks_per_side:
+			for iz in mask_rocks_per_side:
+				var slot := Vector2(
+						(float(ix) + 0.5) * span - mask_cell_size * 0.5,
+						(float(iz) + 0.5) * span - mask_cell_size * 0.5)
+				var spot := center + slot + Vector2(
+						_rng.randf_range(-mask_rock_jitter, mask_rock_jitter),
+						_rng.randf_range(-mask_rock_jitter, mask_rock_jitter))
+				_spawn_prop(rock_scene, Vector3(spot.x, 0.0, spot.y),
+						_rng.randf_range(mask_rock_scale_min, mask_rock_scale_max))
+
+
+## How many metres of reach the WORST mask rock is missing, or 0 when the
+## lattice covers its cell. The farthest a point of the cell can sit from
+## the rock responsible for it is half the diagonal of one lattice square,
+## and the jitter can push that rock a full diagonal further away; a rock
+## covers everything within its own footprint plus the player capsule's
+## radius. Mask rocks are oversized so that footprint is the widest slice
+## of the hull all along the capsule's height, instead of a sphere that
+## thins out at the ankles.
+func _fill_budget_gap() -> float:
+	var reach := MASK_ROCK_HALF_WIDTH * mask_rock_scale_min + PLAYER_CAPSULE_RADIUS
+	var span := mask_cell_size / float(maxi(mask_rocks_per_side, 1))
+	var needed := span * DIAGONAL * 0.5 + mask_rock_jitter * DIAGONAL
+	return maxf(needed - reach, 0.0)

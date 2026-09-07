@@ -423,7 +423,7 @@ func make_elite() -> void:
 	# still pay the variant's doubled XP on top of the elite factor.
 	_xp_multiplier *= elite_xp_multiplier
 	points_value *= elite_xp_multiplier
-	scale *= elite_body_scale
+	_grow_body(elite_body_scale)
 	_apply_elite_glow()
 
 
@@ -457,6 +457,66 @@ func apply_variant(kind: String) -> void:
 ## Where this body sits in the shiny hue cycle (0-1); unused until
 ## _apply_elite_glow seeds it.
 var _shiny_phase: float = 0.0
+
+
+## Grows this body by `factor`: the VISUAL rig is scaled, and the collision
+## shape is RESIZED on a per-instance duplicate.
+## Never `scale *= factor` on the CharacterBody3D itself, which is what
+## this replaced (iteration 48): Godot does not support scaling a physics
+## body — the scaled shape produces unstable contacts and depenetration
+## pops, worst exactly where bodies press against each other, which is the
+## crowded horde where "enemies fly" was reported.
+## The shape is duplicated because a .tscn [sub_resource] is ONE object
+## shared by every instance of the scene (project convention): resizing the
+## scene's own CapsuleShape3D would grow every grunt in the arena, and the
+## next run too.
+func _grow_body(factor: float) -> void:
+	if is_equal_approx(factor, 1.0) or factor <= 0.0:
+		return
+	if _visual != null:
+		_visual.scale *= factor
+		# Positions scale too, so a rig authored with its parts offset from
+		# the origin keeps its proportions — the old node-wide scale did.
+		_visual.position *= factor
+	for child: Node in get_children():
+		var shape_node := child as CollisionShape3D
+		if shape_node == null or shape_node.shape == null:
+			continue
+		var shape := shape_node.shape.duplicate() as Shape3D
+		if not _resize_shape(shape, factor):
+			continue
+		shape_node.shape = shape
+		# Keeps the feet where they were: the old node-wide scale moved the
+		# shape's offset as well, and a capsule grown in place would sink
+		# half a body into the floor and be shoved back out on the next tick.
+		shape_node.position *= factor
+
+
+## Resizes one shape in place by `factor`. Returns false for a shape kind
+## this does not know how to grow, so the caller leaves the original alone
+## instead of silently shipping a body whose collider stopped matching it.
+func _resize_shape(shape: Shape3D, factor: float) -> bool:
+	var capsule := shape as CapsuleShape3D
+	if capsule != null:
+		capsule.radius *= factor
+		capsule.height *= factor
+		return true
+	var sphere := shape as SphereShape3D
+	if sphere != null:
+		sphere.radius *= factor
+		return true
+	var cylinder := shape as CylinderShape3D
+	if cylinder != null:
+		cylinder.radius *= factor
+		cylinder.height *= factor
+		return true
+	var box := shape as BoxShape3D
+	if box != null:
+		box.size *= factor
+		return true
+	push_warning("%s: cannot grow collision shape of type %s"
+			% [name, shape.get_class()])
+	return false
 
 
 func _apply_overlay(albedo: Color, emission: Color, energy: float) -> void:

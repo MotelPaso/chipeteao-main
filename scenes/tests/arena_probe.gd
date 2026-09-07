@@ -11,6 +11,7 @@ extends Node
 ##   BONK_GODMODE=1         unkillable raider, so late systems get exercised
 ##   BONK_WALK=0            hold the raider still (default: it walks, see below)
 ##   BONK_SEED=<int>        deterministic walk, for reproducing a soak
+##   BONK_ELITE_BOOST=1     every spawn rolls shiny (crowding stress test)
 ##
 ## The raider WALKS AND INTERACTS by default (iteration 45). A parked raider
 ## silently skips every movement-gated system — Slime Trail only drops
@@ -20,6 +21,12 @@ extends Node
 ## tours available Interactables first (lingering on arrival so Charge
 ## altars can finish their channel and the interact action lands) and falls
 ## back to random walkable points when none are left.
+##
+## Three checks run unconditionally in every soak and warn (which fails
+## tools/verificar.sh) when they trip: the airborne detector, the one-shot
+## arena MASK SWEEP and the continuous BLOCKED-CELL WATCH. None of them has
+## an env switch — a guard that can be turned off is a guard nobody sees
+## fail. See the two blocks of constants below.
 
 const DEFAULT_ARENA := "res://scenes/world/HollowWoods.tscn"
 
@@ -38,9 +45,12 @@ const REVISIT_COOLDOWN: float = 45.0
 ## window counts as stuck and earns a jump.
 const STALL_WINDOW: float = 1.0
 const STALL_DISTANCE: float = 1.5
-## On reaching an interactable the raider stands still this long: Charge
-## altars need an uninterrupted channel, and leaving cancels it.
-const LINGER_TIME: float = 6.0
+## On reaching an interactable the raider stands still this long. It has to
+## exceed ChargeShrine.channel_time (8 s): "arrived" is the game's own
+## player_in_range, which since the ring got three times wider triggers at
+## the ring EDGE, so a linger shorter than the channel walks away from
+## every altar at 75% and the soak never exercises a completion.
+const LINGER_TIME: float = 10.0
 ## While lingering, fire the interact action this often (chests answer on
 ## the first press; a spent one just ignores the rest).
 const INTERACT_INTERVAL: float = 0.75
@@ -67,6 +77,71 @@ var _target: Interactable = null
 var _stall_check: float = 0.0
 var _last_position: Vector3 = Vector3.ZERO
 var _rng := RandomNumberGenerator.new()
+
+## --- airborne detector (iteration 48) ---------------------------------------
+## Enemies were reported "flying" when the horde crowds. The rule is fixed
+## and deliberately narrow so it cannot be tuned into silence: a body counts
+## as airborne once it has been RISING (velocity.y above AIRBORNE_RISE_SPEED)
+## while NOT on the floor, continuously, for AIRBORNE_TIME seconds.
+## Exactly two exclusions, both of them bodies that rise on purpose:
+## an enemy whose own climb state is on, and a Duneburrower mid-eruption.
+## Every new occurrence pushes ONE warning (once per body) — and every
+## warning fails tools/verificar.sh, which is the point.
+const AIRBORNE_RISE_SPEED: float = 0.5
+const AIRBORNE_TIME: float = 0.5
+## Duneburrower.State.ERUPTING, by value: the probe cannot name the enum
+## without hard-coupling to that script, and the order is stable
+## (SURFACED, BURROWED, ERUPTING).
+const BURROWER_ERUPTING: int = 2
+## instance id -> seconds it has been rising off the floor.
+var _rising_for: Dictionary[int, float] = {}
+## instance ids already reported, so one body warns once.
+var _airborne_seen: Dictionary[int, bool] = {}
+## Cumulative count of DISTINCT airborne bodies; printed on every frame line.
+var _airborne_total: int = 0
+
+## --- arena mask guards (iteration 48) ---------------------------------------
+## The irregular-arena mask used to be enforced by an invisible 7 m box per
+## blocked cell. Now the only thing standing there is the rocks you can see,
+## so two checks run in EVERY soak — no env switch, because both of them
+## exist precisely to be able to fail:
+##  (a) MASK SWEEP, once: pushes a player-sized capsule along every boundary
+##      a blocked cell shares with a walkable one and reports every sample
+##      that touches nothing. A gap the capsule fits through is a hole in
+##      the arena.
+##  (b) BLOCKED-CELL WATCH, continuous: the lead raider standing on the
+##      arena FLOOR inside a blocked cell means it got through one.
+## Sampling step along a boundary edge. Well under the capsule diameter, so
+## a gap cannot hide between two samples.
+const SWEEP_STEP: float = 0.2
+## The player capsule, verbatim from Player.tscn (radius/height and the
+## 0.9 m the CollisionShape3D sits above the body origin, i.e. above the
+## arena floor plate).
+const SWEEP_CAPSULE_RADIUS: float = 0.4
+const SWEEP_CAPSULE_HEIGHT: float = 1.8
+const SWEEP_CAPSULE_CENTER_Y: float = 0.9
+## World geometry (floor, perimeter, props) is layer 1; enemies are layer 2
+## and never count as "this boundary is sealed".
+const WORLD_COLLISION_LAYER: int = 1
+## The sweep runs on this physics frame: late enough that every prop the
+## scatter added in _ready has had its transform flushed to the physics
+## server, early enough that the tour has not moved anywhere yet.
+const SWEEP_FRAME: int = 10
+## Openings named one by one before the log falls back to the summary line.
+const SWEEP_REPORT_LIMIT: int = 6
+## A raider higher than this above the floor plate (y = 0) is standing on a
+## rock, a platform or a mesa — above a blocked cell, not inside it.
+const FLOOR_STAND_MAX_Y: float = 0.6
+## Continuous seconds inside a blocked cell before it counts as "got in".
+## Long enough that a jump arc or a knockback cannot trip it.
+const BLOCKED_CELL_GRACE: float = 2.0
+
+var _swept: bool = false
+var _bounds: Node3D = null
+var _in_blocked_cell: bool = false
+var _blocked_cell: Vector2i = Vector2i.ZERO
+var _blocked_stay: float = 0.0
+var _blocked_reported: bool = false
 
 
 func _ready() -> void:
@@ -99,7 +174,16 @@ func _ready() -> void:
 	# the full clock. Purely a harness switch — never shipped behavior.
 	if OS.get_environment("BONK_GODMODE") == "1":
 		_apply_godmode.call_deferred()
+	if OS.get_environment("BONK_ELITE_BOOST") == "1":
+		_apply_elite_boost.call_deferred()
 	print("ArenaProbe: arena=%s walk=%s" % [path.get_file(), _walking])
+
+
+## BONK_ELITE_BOOST=1: every spawn rolls shiny. Through the group, like
+## every other cross-scene call in this project.
+func _apply_elite_boost() -> void:
+	get_tree().call_group("enemy_spawner", "force_elite_spawns", true)
+	print("ArenaProbe: elite boost on")
 
 
 func _apply_godmode() -> void:
@@ -113,10 +197,16 @@ func _apply_godmode() -> void:
 
 func _physics_process(delta: float) -> void:
 	_frames += 1
+	if not _swept and _frames >= SWEEP_FRAME:
+		_swept = true
+		_run_mask_sweep()
+	_watch_airborne(delta)
+	_watch_blocked_cell(delta)
 	if _frames % 120 == 0:
-		print("frame %d paused=%s run_time=%.1f active=%s enemies=%d level=%d" % [
+		print("frame %d paused=%s run_time=%.1f active=%s enemies=%d level=%d airborne=%d" % [
 				_frames, get_tree().paused, RunState.run_time, RunState.run_active,
-				get_tree().get_node_count_in_group("enemies"), RunState.level])
+				get_tree().get_node_count_in_group("enemies"), RunState.level,
+				_airborne_total])
 	var card_ui_open := false
 	for node: Node in get_tree().get_nodes_in_group("upgrade_ui"):
 		var ui := node as CanvasLayer
@@ -126,6 +216,197 @@ func _physics_process(delta: float) -> void:
 	_watch_for_wedge(delta, card_ui_open)
 	if _walking and not get_tree().paused:
 		_drive_walk(delta)
+
+
+## One pass over the live horde: bodies that have been rising off the floor
+## long enough are the "flying enemies" bug, and each one warns once.
+## Runs even while the tree is paused (the counters simply stop moving,
+## because nothing moves), and prunes itself against the live group so a
+## freed body cannot keep a stale timer alive.
+func _watch_airborne(delta: float) -> void:
+	if get_tree().paused:
+		return
+	var live: Dictionary[int, bool] = {}
+	for node: Node in get_tree().get_nodes_in_group("enemies"):
+		var body := node as CharacterBody3D
+		if body == null or not body.is_inside_tree():
+			continue
+		var id := body.get_instance_id()
+		live[id] = true
+		if _airborne_seen.has(id):
+			continue
+		if not _is_rising(body):
+			_rising_for.erase(id)
+			continue
+		var elapsed := float(_rising_for.get(id, 0.0)) + delta
+		_rising_for[id] = elapsed
+		if elapsed < AIRBORNE_TIME:
+			continue
+		_airborne_seen[id] = true
+		_airborne_total += 1
+		push_warning("ArenaProbe: enemy airborne — %s rose %.1f m/s for %.1fs off the floor"
+				% [body.name, body.velocity.y, elapsed])
+	for id: int in _rising_for.keys():
+		if not live.has(id):
+			_rising_for.erase(id)
+
+
+## True while this body is climbing the air under its own upward velocity
+## and is NOT one of the two bodies allowed to: an enemy in its climb state
+## (scrambling up a wall or a prop) or a Duneburrower mid-eruption.
+func _is_rising(body: CharacterBody3D) -> bool:
+	if body.is_on_floor() or body.velocity.y <= AIRBORNE_RISE_SPEED:
+		return false
+	if bool(body.get("_climbing")):
+		return false
+	var state: Variant = body.get("_state")
+	if state != null and int(state) == BURROWER_ERUPTING and body.has_method("_erupt"):
+		return false
+	return true
+
+
+## (a) Walks every boundary a blocked cell shares with a WALKABLE one in
+## SWEEP_STEP increments, straddling the boundary line with the player
+## capsule. A sample that touches no world geometry is an opening: a hole
+## the raider can walk through into ground the mask calls unreachable.
+## Never loosen this — the rock placement in scatter.gd is what has to give.
+func _run_mask_sweep() -> void:
+	var bounds := _arena_bounds()
+	if bounds == null:
+		push_warning("ArenaProbe: mask sweep skipped — no arena_bounds node with blocked_cells()")
+		return
+	var cells := _blocked_cells(bounds)
+	var cell_size := float(bounds.call("cell_size"))
+	var steps := maxi(int(round(cell_size / SWEEP_STEP)), 1)
+	var capsule := CapsuleShape3D.new()
+	capsule.radius = SWEEP_CAPSULE_RADIUS
+	capsule.height = SWEEP_CAPSULE_HEIGHT
+	var query := PhysicsShapeQueryParameters3D.new()
+	query.shape = capsule
+	query.collision_mask = WORLD_COLLISION_LAYER
+	# Raiders share layer 1 with the world; a body standing on a boundary
+	# would otherwise answer for the rock that is missing there.
+	query.exclude = _raider_rids()
+	var space := bounds.get_world_3d().direct_space_state
+	var samples := 0
+	var openings := 0
+	var named := 0
+	for cell: Vector2i in cells:
+		var center: Vector2 = bounds.call("cell_center", cell)
+		for dir: Vector2i in [Vector2i.LEFT, Vector2i.RIGHT, Vector2i.UP, Vector2i.DOWN]:
+			if not bool(bounds.call("is_walkable", bounds.call("cell_center", cell + dir))):
+				continue
+			var normal := Vector2(float(dir.x), float(dir.y))
+			var along := Vector2(-normal.y, normal.x)
+			var edge := center + normal * (cell_size * 0.5)
+			for i in steps + 1:
+				var spot := edge + along * ((float(i) / float(steps) - 0.5) * cell_size)
+				samples += 1
+				query.transform = Transform3D(Basis(),
+						Vector3(spot.x, SWEEP_CAPSULE_CENTER_Y, spot.y))
+				if not space.intersect_shape(query, 1).is_empty():
+					continue
+				openings += 1
+				if named < SWEEP_REPORT_LIMIT:
+					named += 1
+					push_warning("ArenaProbe: mask opening at (%.1f, %.1f) — cell (%d, %d), edge (%d, %d)"
+							% [spot.x, spot.y, cell.x, cell.y, dir.x, dir.y])
+	print("Mask sweep: blocked=%d samples=%d openings=%d" % [cells.size(), samples, openings])
+	if openings > 0:
+		push_warning("ArenaProbe: mask sweep found %d opening(s) in %d samples over %d blocked cells"
+				% [openings, samples, cells.size()])
+
+
+## (b) The lead raider standing ON THE FLOOR PLATE inside a blocked cell for
+## BLOCKED_CELL_GRACE seconds straight. Height is what separates "walked in
+## through a gap" from "is on top of a rock, a platform or a mesa that sits
+## in a blocked cell", which is fine — the timer only runs at floor level,
+## while the right to report belongs to the ENTRY, so a stuck raider that
+## keeps hopping still warns once and not once per landing.
+func _watch_blocked_cell(delta: float) -> void:
+	if get_tree().paused:
+		return
+	var bounds := _arena_bounds()
+	var lead := _lead_raider()
+	if bounds == null or lead == null:
+		_leave_blocked_cell()
+		return
+	var flat := Vector2(lead.global_position.x, lead.global_position.z)
+	if bool(bounds.call("is_walkable", flat)):
+		_leave_blocked_cell()
+		return
+	var cell: Vector2i = bounds.call("cell_of", flat)
+	if not _in_blocked_cell or cell != _blocked_cell:
+		_in_blocked_cell = true
+		_blocked_cell = cell
+		_blocked_stay = 0.0
+		_blocked_reported = false
+	if lead.global_position.y > FLOOR_STAND_MAX_Y:
+		_blocked_stay = 0.0
+		return
+	_blocked_stay += delta
+	if _blocked_stay < BLOCKED_CELL_GRACE or _blocked_reported:
+		return
+	_blocked_reported = true
+	push_warning("ArenaProbe: raider inside blocked cell (%d, %d) — stood at (%.1f, %.1f, %.1f) for %.1fs"
+			% [_blocked_cell.x, _blocked_cell.y, lead.global_position.x,
+			lead.global_position.y, lead.global_position.z, _blocked_stay])
+
+
+func _leave_blocked_cell() -> void:
+	_in_blocked_cell = false
+	_blocked_stay = 0.0
+	_blocked_reported = false
+
+
+## The arena's own bounds node (scatter.gd), through the group like every
+## other cross-scene lookup here. Cached: both mask guards ask every frame.
+func _arena_bounds() -> Node3D:
+	if is_instance_valid(_bounds):
+		return _bounds
+	for node: Node in get_tree().get_nodes_in_group("arena_bounds"):
+		var bounds := node as Node3D
+		if bounds != null and bounds.has_method("blocked_cells"):
+			_bounds = bounds
+			return bounds
+	return null
+
+
+## Duck-typed on purpose: scatter.gd has no class_name, so the return
+## crosses as a Variant and every element is re-checked before it lands in
+## a typed array.
+func _blocked_cells(bounds: Node3D) -> Array[Vector2i]:
+	var cells: Array[Vector2i] = []
+	var raw: Variant = bounds.call("blocked_cells")
+	if not (raw is Array):
+		return cells
+	for item: Variant in (raw as Array):
+		if item is Vector2i:
+			cells.append(item)
+	return cells
+
+
+## Physics RIDs of every raider, standing or downed: the sweep asks about
+## world geometry, and a raider is on the same collision layer as it.
+func _raider_rids() -> Array[RID]:
+	var rids: Array[RID] = []
+	var groups: Array[StringName] = [&"player", &"downed_players"]
+	for group: StringName in groups:
+		for node: Node in get_tree().get_nodes_in_group(group):
+			var body := node as CollisionObject3D
+			if body != null and body.is_inside_tree():
+				rids.append(body.get_rid())
+	return rids
+
+
+func _lead_raider() -> CharacterBody3D:
+	var players := get_tree().get_nodes_in_group("player")
+	if players.is_empty():
+		return null
+	var lead := players[0] as CharacterBody3D
+	if lead == null or not lead.is_inside_tree():
+		return null
+	return lead
 
 
 ## A blocking UI that never closes (roulette, run end) freezes run_time while

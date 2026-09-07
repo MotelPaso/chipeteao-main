@@ -128,7 +128,10 @@ func apply_tier(hp_mult: float, damage_mult: float = -1.0, payout_mult: float = 
 	# Points scale with the payout too, the way make_elite scales them for
 	# regular enemies; without this an Elder paid the baseline bounty.
 	points_value = maxi(roundi(float(points_value) * payout_factor), 1)
-	scale *= tier_body_scale
+	# Same rule as make_elite (iteration 48): grow the rig and resize a
+	# per-instance shape, never the CharacterBody3D itself. A boss is the
+	# body most likely to be pressed against by a whole horde.
+	_grow_body(tier_body_scale)
 
 
 func _on_boss_base_died() -> void:

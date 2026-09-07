@@ -1,6 +1,7 @@
 extends Node
 ## Autoload "Settings": the single APPLIER of the persisted settings that
-## SaveData stores (sfx/ambient volume, mouse sensitivity, fullscreen).
+## SaveData stores (sfx/ambient volume, mouse sensitivity, fullscreen,
+## FPS readout).
 ## Registered after Sfx so both code-built buses exist, and before any
 ## scene loads so buses and window mode are right from the first frame.
 ## The settings panel writes through the set_* API here, which mutates
@@ -69,6 +70,13 @@ func set_mouse_sensitivity(value: float) -> void:
 func set_fullscreen(on: bool) -> void:
 	SaveData.fullscreen = on
 	_apply_fullscreen(on)
+	_request_save()
+
+
+## The HUD polls SaveData.show_fps, so flipping it is live everywhere at
+## once — including a HUD that does not exist yet (menu -> run).
+func set_show_fps(on: bool) -> void:
+	SaveData.show_fps = on
 	_request_save()
 
 

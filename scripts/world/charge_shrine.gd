@@ -95,6 +95,11 @@ const ALTAR_BOONS: Array[Dictionary] = [
 	# for both counts ("+1 proyectil(es)" reads as a set, not a typo).
 	{"stat": "projectiles", "amount": 1.0, "name": "Multitud",
 		"label": "+%d proyectil(es)"},
+	# Iteration 48 stats. "Salto" is capped inside PlayerStats
+	# (MAX_EXTRA_JUMPS), so a lucky run cannot stack it into flight.
+	{"stat": "jumps", "amount": 1.0, "name": "Impulso", "label": "+%d salto(s)"},
+	{"stat": "powerup_chance", "amount": 10.0, "name": "Fortuna menor",
+		"label": "prob. de power-up +%d%%"},
 ]
 
 var channeling: bool = false

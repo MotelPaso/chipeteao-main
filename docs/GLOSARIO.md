@@ -110,6 +110,7 @@ Lo que NO se traduce nunca: los `id` de catálogo, los `node_name`, los nombres 
 | Iron Rations | Raciones de hierro |
 | Lucky Coin | Moneda de la suerte |
 | Swift Boots | Botas veloces |
+| Spring Boots | Botas de resorte |
 | Magnet | Imán |
 | Fart Bag | Bolsa de pedos |
 | Keen Eye | Ojo agudo |
@@ -138,6 +139,7 @@ Lo que NO se traduce nunca: los `id` de catálogo, los `node_name`, los nombres 
 | glyph "DN" | glifo "HD" |
 | glyph "AB" | glifo "HF" |
 | glyph "CP" | glifo "AC" |
+| glyph "SP" (Spring Boots) | glifo "RS" (por «reSorte»: «BR» ya es Tomo de Bruma) |
 
 ## Mascotas
 
@@ -345,6 +347,9 @@ Lo que NO se traduce nunca: los `id` de catálogo, los `node_name`, los nombres 
 | gamepad | control (NUNCA «mando») |
 | mouse | mouse (NUNCA «ratón») |
 | Player 1 / P1 | Jugador 1 / J1 (NUNCA «P1») |
+| Show FPS | Mostrar FPS (FPS no se traduce ni se declina) |
+| jump | salto (mid-air jump = salto en el aire) |
+| power-up | power-up (con guion, invariable en plural: «power-up»/«power-ups») |
 
 ## Estadísticas
 
@@ -496,6 +501,8 @@ Lo que NO se traduce nunca: los `id` de catálogo, los `node_name`, los nombres 
 | `1.00x` | 1.00x |
 | `%.2fx` | %.2fx |
 | `Fullscreen` | Pantalla completa |
+| `Show FPS` | Mostrar FPS |
+| `%d FPS` | %d FPS |
 | `YOU DIED` | MORISTE |
 | `RUN COMPLETE` | INCURSIÓN COMPLETA |
 | `EXTRACTED` | EXTRACCIÓN LOGRADA |
@@ -552,7 +559,7 @@ Lo que NO se traduce nunca: los `id` de catálogo, los `node_name`, los nombres 
 | `%s chest: %s — %s` | Cofre %s: %s — %s |
 | `[E] Step through` | [E] Atravesar |
 | `Recharging... %d s` | Recargando... %d s |
-| `[E] Drink — %d pts (heal + power-up)` | [E] Beber — %d pts (cura + potenciador) |
+| `[E] Drink — %d pts (heal + power-up)` | [E] Beber — %d pts (cura + power-up) |
 | `The spring restores you — empowered for %d s` | El manantial te restaura — potenciado por %d s |
 | `Stay inside to charge` | Quédate dentro para cargar |
 | `Charging... %d%%` | Cargando... %d%% |
@@ -704,6 +711,10 @@ Lo que NO se traduce nunca: los `id` de catálogo, los `node_name`, los nombres 
 | `crit chance +%d%%` | prob. de crítico +%d%% |
 | `XP gain +%d%%` | ganancia de XP +%d%% |
 | `+%d projectile` | +%d proyectil(es) |
+| `+%d jump(s)` | +%d salto(s) |
+| `power-up chance +%d%%` | prob. de power-up +%d%% |
+| `Impulse` (boon de altar) | Impulso |
+| `Lesser fortune` (boon de altar) | Fortuna menor |
 | `Max HP +%d (heals the gained HP)` | HP máx. +%d (te cura lo que ganas) |
 | `Pickup radius +%d%%` | Radio de recolección +%d%% |
 | `display + " damage +%d%%"` | "Daño de " + display + " +%d%%" |

@@ -35,6 +35,15 @@ const STREAK_COLORS: Array[Color] = [
 const PERF_PROBE_ENV := "BONK_PERF"
 const PERF_PROBE_REFRESH := 0.25
 
+## User-facing FPS badge (iteration 48), top-right, toggled in Ajustes and
+## persisted as SaveData.show_fps. Completely separate from the debug perf
+## probe above: that one is a developer overlay behind an export/env
+## switch, this one is a shipped option and shows nothing but the rate.
+const FPS_BADGE_REFRESH := 0.25
+const FPS_BADGE_OFFSET := Vector2(16.0, 76.0)
+const FPS_BADGE_FONT_SIZE := 13
+const FPS_BADGE_TEXT := "%d FPS"
+
 ## Debug-only counter overlay (hidden by default, NOT a user-facing
 ## feature): live FPS plus active enemy/gem/projectile counts and per-pool
 ## created/parked sizes, for perf verification. Ships disabled; flip this
@@ -80,6 +89,8 @@ var _streak_tier: int = -1
 var _last_kills: int = 0
 var _probe_label: Label = null
 var _probe_refresh_left: float = 0.0
+var _fps_label: Label = null
+var _fps_refresh_left: float = 0.0
 ## Last whole second painted on the timer: the text only changes once a
 ## second, so re-formatting (and re-shaping the spaced font) every frame
 ## is 100+ wasted relayouts per second.
@@ -96,6 +107,20 @@ const LOADOUT_GLYPH_FONT_SIZE := 16
 const LOADOUT_CORNER_FONT_SIZE := 10
 ## Blank spacer between the weapon / tome / item groups of the strip.
 const LOADOUT_GROUP_GAP := 8.0
+## Icon convention (iteration 48): a slot draws
+## res://assets/icons/<library>/<id>.png when that file exists, and
+## ICON_PLACEHOLDER with the catalog glyph on top when it does not, so real
+## sprites can be dropped in by id later with no code change at all.
+## A catalog row's own `icon` path still wins over both.
+## `library` is weapons / tomes / items today; pets and powerups later.
+const ICON_ROOT := "res://assets/icons/"
+const ICON_PLACEHOLDER := "res://assets/icons/placeholder.png"
+const ICON_LIBRARY_WEAPONS := "weapons"
+const ICON_LIBRARY_TOMES := "tomes"
+const ICON_LIBRARY_ITEMS := "items"
+## Glyph drawn over the placeholder tile: smaller than the bare-tile glyph,
+## so it reads as a label on the art rather than as the art.
+const LOADOUT_PLACEHOLDER_GLYPH_SIZE := 13
 ## Teammate readout column (co-op only): bar size and its top-left corner.
 const MATE_BAR_SIZE := Vector2(150.0, 16.0)
 const MATE_BOX_OFFSET := Vector2(16.0, 96.0)
@@ -106,6 +131,10 @@ const MATE_FONT_SIZE := 13
 ## "l Azar"). The English prefix stays for untranslated rows.
 const TOME_NAME_PREFIXES: Array[String] = ["Tome of ", "Tomo del ", "Tomo de "]
 var _loadout_box: HBoxContainer = null
+## Items live in their OWN bottom-right strip since iteration 48: weapons
+## and tomes are the build (five each, with level and stack corners), items
+## are the bag (copies), and one row of up to fifteen tiles read as noise.
+var _items_box: HBoxContainer = null
 var _loadout_player: Node = null
 var _loadout_signature: String = ""
 var _loadout_refresh_left: float = 0.0
@@ -261,6 +290,34 @@ func _process(delta: float) -> void:
 	if _loadout_refresh_left <= 0.0:
 		_loadout_refresh_left = LOADOUT_REFRESH
 		_refresh_loadout()
+	_fps_refresh_left -= delta
+	if _fps_refresh_left <= 0.0:
+		_fps_refresh_left = FPS_BADGE_REFRESH
+		_refresh_fps_badge()
+
+
+## Polls SaveData.show_fps rather than listening for a change: the option
+## can be flipped from the pause menu while this HUD is alive, and from the
+## title screen before it exists.
+func _refresh_fps_badge() -> void:
+	var wanted := SaveData.show_fps
+	if not wanted:
+		if _fps_label != null:
+			_fps_label.visible = false
+		return
+	if _fps_label == null:
+		_fps_label = Label.new()
+		_fps_label.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+		_fps_label.grow_horizontal = Control.GROW_DIRECTION_BEGIN
+		_fps_label.offset_right = -FPS_BADGE_OFFSET.x
+		_fps_label.offset_top = FPS_BADGE_OFFSET.y
+		_fps_label.add_theme_font_size_override("font_size", FPS_BADGE_FONT_SIZE)
+		_fps_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		UiTheme.style_badge(_fps_label, UiTheme.TEXT_BRIGHT,
+				Color(0.07, 0.075, 0.11, 0.85), Color(0.3, 0.33, 0.4))
+		add_child(_fps_label)
+	_fps_label.visible = true
+	_fps_label.text = FPS_BADGE_TEXT % roundi(Engine.get_frames_per_second())
 
 
 func _on_points_changed(total: int) -> void:
@@ -293,6 +350,8 @@ func _refresh_loadout() -> void:
 					else UpgradePool.weapon_display_name(weapon.name)
 			entries.append({
 				"glyph": _catalog_glyph(row, title),
+				"library": ICON_LIBRARY_WEAPONS,
+				"entry_id": UpgradePool.weapon_id_for_node(weapon.name),
 				"color": UiTheme.ACCENT_AMBER if weapon.evolved else LOADOUT_WEAPON_COLOR,
 				# Two readings of the same scale (iteration 46): the weapon
 				# LEVEL while it is climbing to its first milestone, then
@@ -300,7 +359,7 @@ func _refresh_loadout() -> void:
 				# this corner reaching N10, and ★2 means level 20.
 				"corner": ("★%d" % weapon.ascension_tier) if weapon.ascension_tier > 0 \
 						else (UiTheme.WEAPON_LEVEL_ABBREV % weapon.upgrade_level),
-				"tip": title, "icon": "",
+				"tip": title, "icon": String(row.get("icon", "")),
 			})
 	var stats := PlayerStats.find_in(_loadout_player)
 	if stats != null:
@@ -309,28 +368,34 @@ func _refresh_loadout() -> void:
 			var title := String(tome.get("display_name", tome_id))
 			entries.append({
 				"glyph": _catalog_glyph(tome, _tome_short_name(title)),
+				"library": ICON_LIBRARY_TOMES,
+				"entry_id": tome_id,
 				"color": LOADOUT_TOME_COLOR,
 				"corner": Tome.stack_label(stats.stack_count(tome_id)),
-				"tip": title, "icon": "",
+				"tip": title, "icon": String(tome.get("icon", "")),
 			})
+	var items: Array[Dictionary] = []
 	var bag := ItemBag.find_in(_loadout_player)
 	if bag != null:
 		for item_id: String in bag.carried_ids():
 			var row := ItemCatalog.by_id(item_id)
 			var copies := bag.count(item_id)
-			entries.append({
+			items.append({
 				"glyph": _catalog_glyph(row, item_id),
+				"library": ICON_LIBRARY_ITEMS,
+				"entry_id": item_id,
 				"color": ItemCatalog.rarity_color(String(row.get("rarity", "Common"))),
 				"corner": "x%d" % copies if copies > 1 else "",
 				"tip": String(row.get("display_name", item_id)), "icon": String(row.get("icon", "")),
 			})
 	var signature := ""
-	for entry: Dictionary in entries:
+	for entry: Dictionary in entries + items:
 		signature += "%s|%s|%s;" % [entry.tip, entry.corner, entry.icon]
 	if signature == _loadout_signature:
 		return
 	_loadout_signature = signature
-	_rebuild_loadout(entries)
+	_loadout_box = _rebuild_strip(_loadout_box, entries, true)
+	_items_box = _rebuild_strip(_items_box, items, false)
 
 
 ## Glyph for one slot: the catalog row's own two-letter `glyph` when it
@@ -367,37 +432,48 @@ func _glyph_for(title: String) -> String:
 	return title.substr(0, 2).to_upper()
 
 
-func _rebuild_loadout(entries: Array[Dictionary]) -> void:
-	if _loadout_box == null:
-		_loadout_box = HBoxContainer.new()
-		_loadout_box.set_anchors_preset(Control.PRESET_BOTTOM_LEFT)
-		_loadout_box.grow_vertical = Control.GROW_DIRECTION_BEGIN
-		_loadout_box.offset_left = 16.0
-		_loadout_box.offset_bottom = -20.0
-		_loadout_box.offset_top = -68.0
-		_loadout_box.add_theme_constant_override("separation", 6)
+## Builds (once) and refills one bottom strip. `left` picks the corner:
+## bottom-left for the build (weapons then tomes), bottom-right for the bag.
+## Returns the container so the caller can cache it.
+func _rebuild_strip(box: HBoxContainer, entries: Array[Dictionary],
+		left: bool) -> HBoxContainer:
+	if box == null:
+		box = HBoxContainer.new()
+		box.set_anchors_preset(Control.PRESET_BOTTOM_LEFT if left
+				else Control.PRESET_BOTTOM_RIGHT)
+		box.grow_vertical = Control.GROW_DIRECTION_BEGIN
+		box.grow_horizontal = Control.GROW_DIRECTION_END if left \
+				else Control.GROW_DIRECTION_BEGIN
+		if left:
+			box.offset_left = 16.0
+		else:
+			box.offset_right = -16.0
+		box.offset_bottom = -20.0
+		box.offset_top = -68.0
+		box.add_theme_constant_override("separation", 6)
 		# PASS, not IGNORE: the slots need to be hit-testable for their
 		# tooltips, and PASS still lets the click through to the 3D world.
-		_loadout_box.mouse_filter = Control.MOUSE_FILTER_PASS
-		add_child(_loadout_box)
-	for child: Node in _loadout_box.get_children():
+		box.mouse_filter = Control.MOUSE_FILTER_PASS
+		add_child(box)
+	for child: Node in box.get_children():
 		# Out of the container FIRST: queue_free() only lands at the end of
 		# the frame, so the old slots would lay out beside the new ones for
 		# one frame and make the strip jump every time the loadout changes.
-		_loadout_box.remove_child(child)
+		box.remove_child(child)
 		child.queue_free()
-	var last_color := Color.TRANSPARENT
+	var last_library := ""
 	for entry: Dictionary in entries:
-		# A thin gap between the weapon / tome / item groups.
-		var color: Color = entry.color
-		if last_color != Color.TRANSPARENT and not color.is_equal_approx(last_color) \
-				and (color.is_equal_approx(LOADOUT_TOME_COLOR) or last_color.is_equal_approx(LOADOUT_TOME_COLOR)
-				or last_color.is_equal_approx(LOADOUT_WEAPON_COLOR) or last_color.is_equal_approx(UiTheme.ACCENT_AMBER)):
+		# A thin gap between the weapon and tome groups, read off the
+		# library the entry declares instead of guessing from its color
+		# (an evolved weapon is amber, which broke the old color test).
+		var library := String(entry.get("library", ""))
+		if not last_library.is_empty() and library != last_library:
 			var spacer := Control.new()
 			spacer.custom_minimum_size = Vector2(LOADOUT_GROUP_GAP, 0.0)
-			_loadout_box.add_child(spacer)
-		last_color = color
-		_loadout_box.add_child(_make_loadout_slot(entry))
+			box.add_child(spacer)
+		last_library = library
+		box.add_child(_make_loadout_slot(entry))
+	return box
 
 
 func _make_loadout_slot(entry: Dictionary) -> Control:
@@ -421,8 +497,9 @@ func _make_loadout_slot(entry: Dictionary) -> Control:
 	var inner := Control.new()
 	inner.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	slot.add_child(inner)
-	var icon_path := String(entry.icon)
-	if not icon_path.is_empty() and ResourceLoader.exists(icon_path):
+	var icon_path := _icon_path_for(entry)
+	var on_placeholder := icon_path == ICON_PLACEHOLDER
+	if not icon_path.is_empty():
 		var texture := TextureRect.new()
 		texture.texture = load(icon_path)
 		texture.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
@@ -430,13 +507,18 @@ func _make_loadout_slot(entry: Dictionary) -> Control:
 		texture.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		texture.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 		inner.add_child(texture)
-	else:
+	if icon_path.is_empty() or on_placeholder:
+		# The glyph is the art while there is no sprite: alone on a bare
+		# tile, or laid over the placeholder so the slot is still readable.
 		var glyph := Label.new()
 		glyph.text = String(entry.glyph)
 		glyph.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		glyph.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-		glyph.add_theme_font_size_override("font_size", LOADOUT_GLYPH_FONT_SIZE)
+		glyph.add_theme_font_size_override("font_size",
+				LOADOUT_PLACEHOLDER_GLYPH_SIZE if on_placeholder else LOADOUT_GLYPH_FONT_SIZE)
 		glyph.add_theme_color_override("font_color", color.lightened(0.25))
+		glyph.add_theme_color_override("font_outline_color", UiTheme.OUTLINE_DARK)
+		glyph.add_theme_constant_override("outline_size", 4 if on_placeholder else 0)
 		glyph.add_theme_font_override("font", UiTheme.spaced_font(1))
 		glyph.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		glyph.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -458,6 +540,27 @@ func _make_loadout_slot(entry: Dictionary) -> Control:
 				Control.PRESET_MODE_MINSIZE, 3)
 		inner.add_child(corner)
 	return slot
+
+
+## The texture a slot draws, in order of precedence: the catalog row's own
+## `icon` when it declares one, then the id-based convention
+## (assets/icons/<library>/<id>.png), then the shared placeholder.
+## ResourceLoader.exists with the type hint is the check that also works in
+## an exported build, where a PNG is packed as .ctex and FileAccess on the
+## .png answers false.
+func _icon_path_for(entry: Dictionary) -> String:
+	var declared := String(entry.get("icon", ""))
+	if not declared.is_empty() and ResourceLoader.exists(declared, "Texture2D"):
+		return declared
+	var library := String(entry.get("library", ""))
+	var entry_id := String(entry.get("entry_id", ""))
+	if not library.is_empty() and not entry_id.is_empty():
+		var path := "%s%s/%s.png" % [ICON_ROOT, library, entry_id]
+		if ResourceLoader.exists(path, "Texture2D"):
+			return path
+	if ResourceLoader.exists(ICON_PLACEHOLDER, "Texture2D"):
+		return ICON_PLACEHOLDER
+	return ""
 
 
 func _on_health_damaged(_amount: float, current: float) -> void:

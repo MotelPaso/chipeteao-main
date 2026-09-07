@@ -54,6 +54,14 @@ const ITEM_LIBRARY: Array[Dictionary] = [
 	},
 	# --- Rare -----------------------------------------------------------
 	{
+		# Iteration 48: the multi-jump item. PlayerStats caps the stat
+		# (MAX_EXTRA_JUMPS), so extra copies past the cap are inert by
+		# design rather than by accident.
+		"id": "spring_boots", "display_name": "Botas de resorte", "rarity": "Rare",
+		"glyph": "RS", "description": "+1 salto en el aire por copia",
+		"effects": [{"stat": "jumps", "amount": 1.0}],
+	},
+	{
 		"id": "magnet", "display_name": "Imán", "rarity": "Rare",
 		"glyph": "IM", "kind": "magnet",
 		"description": "Cada tanto atrae todas las gemas de XP del mapa; cada copia lo hace antes y suma +10% de XP",

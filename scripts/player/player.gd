@@ -164,6 +164,10 @@ var _slide_direction: Vector3 = Vector3.ZERO
 
 # Time left on an external root (Entomb): movement/jump/slide locked.
 var _root_timer: float = 0.0
+## Jumps left before touching the floor again (iteration 48): 1 plus
+## PlayerStats.extra_jumps, refilled every frame the body is grounded.
+## Starts at 1 so a raider spawned mid-air can still jump once.
+var _jumps_left: int = 1
 
 var _is_dead: bool = false
 
@@ -326,6 +330,11 @@ func _physics_process(delta: float) -> void:
 
 	if not is_on_floor():
 		velocity.y -= _gravity * delta
+	else:
+		# Landing refills the jump budget (iteration 48). Refilling HERE and
+		# not inside _try_jump is what lets a raider who walked off a ledge
+		# still spend their mid-air jumps.
+		_jumps_left = _max_jumps()
 
 	_apply_stick_look(delta)
 
@@ -452,11 +461,24 @@ func _apply_horizontal_velocity(delta: float, wish_dir: Vector3,
 
 
 func _try_jump() -> void:
-	if not Input.is_action_just_pressed(_act(&"jump")) or not is_on_floor() or is_rooted():
+	if not Input.is_action_just_pressed(_act(&"jump")) or is_rooted():
 		return
+	# Multi-jump (iteration 48): the floor jump plus PlayerStats.extra_jumps
+	# mid-air ones, refilled on landing (see _physics_process). The rooted
+	# and sliding rules are untouched.
+	if _jumps_left <= 0:
+		return
+	_jumps_left -= 1
 	if _is_sliding:
 		_end_slide()
 	velocity.y = jump_velocity
+
+
+## Jumps available from a standing start: the floor one plus whatever the
+## stats layer grants.
+func _max_jumps() -> int:
+	var stats := PlayerStats.find_in(self)
+	return 1 + (stats.extra_jumps if stats != null else 0)
 
 
 ## External snare (Sarcognath's Entomb): locks ground movement, jumping,

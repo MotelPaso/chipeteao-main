@@ -81,6 +81,13 @@ const ELITE_CHANCE_CAP: float = 0.6
 ## arena_half_extent), so map resizes propagate automatically.
 @export var arena_half_extent: float = 78.0
 @export var arena_edge_margin: float = 2.0
+## No spawn may land closer than this to ANY standing raider (iteration
+## 48). Deliberately BELOW the 7-10 m surge band: a horde or a shiny pack
+## centered on a raider is supposed to be uncomfortably close, and raising
+## this above surge_min_radius would quietly gut both. What it stops is a
+## body materializing inside you — in co-op the ring is drawn around ONE
+## raider and used to appear on top of another.
+@export var min_player_clearance: float = 5.0
 @export_group("Difficulty Ramp")
 ## Ramp shape (retuned from instrumented T1 soaks, iteration 26): arrivals
 ## build ~20/min at the open and ~27/min by minute 4, then the count steps
@@ -93,36 +100,40 @@ const ELITE_CHANCE_CAP: float = 0.6
 ## max_active by minute 4-5, so every soak died in minutes 2-3 instead of
 ## facing "real danger by minute 10+".
 @export var start_interval: float = 3.0
-@export var min_interval: float = 0.4
-## 0.25 (was 0.2, iteration-33 balance): the shipped ramp left minutes 6+
-## comfortably idle-able for a leveled build; a faster shrink keeps the
-## early game intact (still ~21/min at the open) while landing "you must
-## keep moving" pressure a couple of minutes sooner.
-@export var interval_shrink_per_minute: float = 0.25
+@export var min_interval: float = 0.35
+## 0.32 (was 0.25, iteration-48 balance): the whole ramp block below moves
+## up ~25-35% because the run was still comfortable through minute 15 once
+## builds got the uncapped levels of iteration 46. The steps are chosen so
+## the FIRST minute barely moves (3.0 -> 2.16 s at minute 1.2 instead of
+## 2.31, one arrival per tick either way): the opening is the part that
+## already worked, and the non-godmode survival guard rail is measured
+## there. The pressure lands from minute 3 on, where hordes, shinies and
+## the late ramp live.
+@export var interval_shrink_per_minute: float = 0.32
 @export var base_count_per_tick: int = 1
-## 0.35 (was 0.2, iteration-33): count steps now land at minutes ~3/6/9/12
-## instead of 5/10/15, so the mid-run stream grows instead of plateauing.
-@export var extra_count_per_minute: float = 0.35
+## 0.45 (was 0.35, iteration-48): count steps land at minutes ~2.2/4.4/6.7
+## instead of 2.9/5.7/8.6.
+@export var extra_count_per_minute: float = 0.45
 @export_group("Late Ramp")
 ## Open-ended time scaling on REGULAR spawns (bosses have their own
 ## ladder): from late_ramp_start_minute, every minute multiplies fresh
-## spawns' HP/damage by another +N%. By minute 15 that is roughly +54% HP
-## and +36% damage — the "you out-leveled the horde, now it catches back
+## spawns' HP/damage by another +N%. By minute 15 that is roughly +72% HP
+## and +45% damage (iteration 48: was +54%/+36%) — the "you out-leveled the horde, now it catches back
 ## up" turn the idle late game was missing. Stacks with map tiers and
 ## elites through the same apply_tier_scaling channel.
 @export var late_ramp_start_minute: float = 6.0
-@export var late_hp_per_minute: float = 0.06
-@export var late_damage_per_minute: float = 0.04
+@export var late_hp_per_minute: float = 0.08
+@export var late_damage_per_minute: float = 0.05
 ## Iteration 42: stronger late spawns also pay more XP per minute past the ramp.
-@export var late_xp_per_minute: float = 0.05
+@export var late_xp_per_minute: float = 0.065
 @export_group("Hordes")
 ## Run minutes a horde arrives; after the last entry they repeat every
 ## horde_repeat_minutes. Size scales with the minute, the run-wide
 ## difficulty and the party; arrives in waves around a random raider.
 @export var horde_minutes: Array[float] = [3.0, 7.0, 10.0, 13.0]
 @export var horde_repeat_minutes: float = 3.0
-@export var horde_base_size: int = 14
-@export var horde_size_per_minute: float = 1.5
+@export var horde_base_size: int = 18
+@export var horde_size_per_minute: float = 2.0
 @export var horde_waves: int = 4
 @export var horde_wave_gap: float = 1.6
 ## Hordes may push the live count this far past max_active.
@@ -144,11 +155,11 @@ const ELITE_CHANCE_CAP: float = 0.6
 ## 20-30s short of the first boss-orb payday at 5:00; 5% yields ~2-3
 ## pre-boss elites (~1 extra orb plus their 5x XP) while also seeding the
 ## midgame with minibosses worth focusing.
-## 0.06/0.16 (was 0.05/0.10, iteration-33): more late elites are the
-## difficulty AND the health economy — the harder late ramp needs a bit
+## 0.08/0.21 (was 0.06/0.16, iteration-48; 0.05/0.10 before iteration 33):
+## more late shinies are the difficulty AND the health economy — the harder late ramp needs a bit
 ## more orb income to stay fair, and elite packs give focus targets.
-@export var elite_start_chance: float = 0.06
-@export var elite_full_chance: float = 0.16
+@export var elite_start_chance: float = 0.08
+@export var elite_full_chance: float = 0.21
 @export_group("Boss")
 @export var boss_scene: PackedScene
 ## Run minute the biome boss arrives, and the minute its stronger Elder
@@ -254,6 +265,43 @@ func _validate_phase_scenes() -> void:
 				missing.append(kind)
 	if not missing.is_empty():
 		push_error("EnemySpawner: no scene assigned for spawn kind(s) %s." % [missing])
+
+
+## Set only by the harness hook above.
+var _force_elite_spawns: bool = false
+## Spawns dropped this minute for want of clearance, and the minute they
+## are being counted for. Printed once a minute while non-zero, so a soak
+## shows whether the harder ramp is being silently eaten by the check
+## instead of reaching the field.
+var _clearance_skips: int = 0
+var _clearance_report_minute: int = -1
+
+
+## True when `pos` is far enough from every standing raider. Downed bodies
+## do not count: they cannot be jumped on, and treating a corpse as a
+## keep-out zone would carve dead holes out of the spawn ring.
+func _has_player_clearance(pos: Vector3) -> bool:
+	var clearance_sq := min_player_clearance * min_player_clearance
+	for node: Node in Coop.alive_players(get_tree()):
+		var body := node as Node3D
+		if body == null:
+			continue
+		var away := pos - body.global_position
+		away.y = 0.0
+		if away.length_squared() < clearance_sq:
+			return false
+	return true
+
+
+## Counts one dropped spawn and reports the total once per game minute.
+func _register_clearance_skip() -> void:
+	_clearance_skips += 1
+	var minute := floori(_minutes())
+	if minute == _clearance_report_minute:
+		return
+	_clearance_report_minute = minute
+	# One-line log (RunManager convention) for headless soaks.
+	print("Spawn skipped: no clearance x%d" % _clearance_skips)
 
 
 func _walkable(pos: Vector3) -> bool:
@@ -448,6 +496,16 @@ func pick_spawn_scene() -> PackedScene:
 ## elite_start_minute, then a linear ramp that caps at elite_full_minute.
 ## Run-wide difficulty (demonic altars, Tome of Peril) multiplies it —
 ## more elites is both the threat and the reward (5x XP, orbs, points).
+## Harness hook, reached through the "enemy_spawner" group: makes EVERY
+## spawn roll shiny. Test-only (ArenaProbe under BONK_ELITE_BOOST=1) — the
+## shiny path and the body crowding it causes would otherwise need twelve
+## minutes of ramp to show up in a soak, and elite_chance() is capped at
+## ELITE_CHANCE_CAP by design so no export can reach 1.0. Nothing in the
+## game calls this.
+func force_elite_spawns(on: bool) -> void:
+	_force_elite_spawns = on
+
+
 func elite_chance() -> float:
 	var minutes := _minutes()
 	if minutes < elite_start_minute:
@@ -513,6 +571,13 @@ func _spawn_one() -> void:
 ## skips that unit instead of losing the rest.
 func _make_enemy_at(pos: Vector3, force_elite: bool = false,
 		scene_override: PackedScene = null) -> EnemyBase:
+	# THE gate for every spawn path: ring spawns, hordes, surges, boss
+	# summons and the WorldDirector's packs all land here, so the clearance
+	# rule cannot be forgotten by a new caller. The position samplers below
+	# already prefer clear points; this is what happens when none exists.
+	if not _has_player_clearance(pos):
+		_register_clearance_skip()
+		return null
 	var scene := scene_override if scene_override != null else pick_spawn_scene()
 	if scene == null:
 		return null
@@ -525,7 +590,7 @@ func _make_enemy_at(pos: Vector3, force_elite: bool = false,
 	add_child(enemy)
 	enemy.global_position = pos
 	_scale_fresh_spawn(enemy)
-	if force_elite or randf() < elite_chance():
+	if force_elite or _force_elite_spawns or randf() < elite_chance():
 		enemy.make_elite()
 	return enemy
 
@@ -623,6 +688,13 @@ func _spawn_boss(stat_multiplier: float, title_override: String = "") -> bool:
 	var player := Coop.random_player(get_tree())
 	if player == null:
 		return false
+	# Placed BEFORE the boss exists: the schedule only marks a slot spent on
+	# a boss that actually arrived, so a ring with no clear point retries on
+	# the next tick instead of announcing a boss that never came.
+	var at := _ring_position(player)
+	if not _has_player_clearance(at):
+		_register_clearance_skip()
+		return false
 	var node := boss_scene.instantiate()
 	var boss := node as BossBase
 	if boss == null:
@@ -633,7 +705,7 @@ func _spawn_boss(stat_multiplier: float, title_override: String = "") -> bool:
 		# Before add_child: the boss announces its title to the HUD in _ready.
 		boss.boss_title = title_override
 	add_child(boss)
-	boss.global_position = _ring_position(player)
+	boss.global_position = at
 	# Elder rematch factor and map-tier factor land in ONE apply_tier call, so
 	# tier_body_scale applies once per boss and a baseline boss (every factor
 	# 1.0) stays exactly baseline. The three channels are deliberately
@@ -696,7 +768,10 @@ func _band_position(center: Vector3, min_r: float, max_r: float, angle: float) -
 		pos = center + Vector3(cos(heading), 0.0, sin(heading)) * randf_range(min_r, max_r)
 		if absf(pos.x) > arena_half_extent or absf(pos.z) > arena_half_extent:
 			continue
-		if _walkable(pos):
+		# Clearance is part of "is this a usable point", not a separate
+		# pass: rotating around the band is exactly how a blocked slot gets
+		# resolved, and a raider standing in the band is a blocked slot.
+		if _walkable(pos) and _has_player_clearance(pos):
 			break
 	pos.x = clampf(pos.x, -arena_half_extent, arena_half_extent)
 	pos.z = clampf(pos.z, -arena_half_extent, arena_half_extent)

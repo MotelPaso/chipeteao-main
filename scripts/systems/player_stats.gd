@@ -59,6 +59,20 @@ var difficulty_share: float = 0.0
 ## Gambling stacks taken (Tome of Chance); the rolled boons live in
 ## _gamble_boons and replay on every recompute.
 var gambling_stacks: int = 0
+## Iteration 48 stat layer:
+## Extra mid-air jumps before touching the floor again (Player._try_jump).
+var extra_jumps: int = 0
+## Chance bonus, in percent, on power-up drops. NO CONSUMER YET: this is
+## the forward hook for the power-ups of part C, the way demonic_uses was
+## the hook for iteration 42. Altars already sell it, so the stat has to
+## exist and survive recompute; deleting it as "dead data" would break the
+## altar pool. Documented in docs/ARQUITECTURA.md.
+var powerup_drop_chance: float = 0.0
+
+## Ceiling on extra jumps. Not taste: the raider has no air control budget
+## beyond air_acceleration, and past this an arena's verticality (mesas,
+## platforms, the perimeter band) stops being a constraint at all.
+const MAX_EXTRA_JUMPS: int = 5
 
 ## tome id -> one rarity potency per collected stack. recompute() derives
 ## every stat from this, so it is the single source of truth.
@@ -272,6 +286,8 @@ func _reset_derived() -> void:
 	xp_multiplier = 1.0
 	difficulty_share = 0.0
 	gambling_stacks = 0
+	extra_jumps = 0
+	powerup_drop_chance = 0.0
 
 
 ## Every source, in the ONE order that matters: the character passive runs
@@ -442,6 +458,10 @@ func _apply_effect(stat: String, amount: float) -> void:
 			xp_multiplier += amount / 100.0
 		"difficulty":
 			difficulty_share += amount / 100.0
+		"jumps":
+			extra_jumps = mini(extra_jumps + roundi(amount), MAX_EXTRA_JUMPS)
+		"powerup_chance":
+			powerup_drop_chance += amount
 		"gambling":
 			# No-op by design: the boons were rolled at pickup and replay
 			# from _gamble_boons, and gambling_stacks counts STACKS, which

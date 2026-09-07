@@ -25,6 +25,7 @@ const VOLUME_MAX := 100.0
 @onready var _sensitivity_slider: HSlider = %SensitivitySlider
 @onready var _sensitivity_value: Label = %SensitivityValue
 @onready var _fullscreen_check: CheckButton = %FullscreenCheck
+@onready var _fps_check: CheckButton = %FpsCheck
 @onready var _back_button: Button = %BackButton
 
 var _open_tween: Tween = null
@@ -37,6 +38,7 @@ func _ready() -> void:
 	_ambient_slider.value_changed.connect(_on_ambient_changed)
 	_sensitivity_slider.value_changed.connect(_on_sensitivity_changed)
 	_fullscreen_check.toggled.connect(_on_fullscreen_toggled)
+	_fps_check.toggled.connect(_on_fps_toggled)
 	_back_button.pressed.connect(close)
 
 
@@ -85,6 +87,7 @@ func _refresh_controls() -> void:
 	_ambient_slider.set_value_no_signal(SaveData.ambient_volume)
 	_sensitivity_slider.set_value_no_signal(SaveData.mouse_sensitivity)
 	_fullscreen_check.set_pressed_no_signal(SaveData.fullscreen)
+	_fps_check.set_pressed_no_signal(SaveData.show_fps)
 	_refresh_sensitivity_label(_sensitivity_slider.value)
 
 
@@ -107,6 +110,10 @@ func _on_sensitivity_changed(value: float) -> void:
 
 func _on_fullscreen_toggled(on: bool) -> void:
 	Settings.set_fullscreen(on)
+
+
+func _on_fps_toggled(on: bool) -> void:
+	Settings.set_show_fps(on)
 
 
 ## Slider bounds come from the code that clamps the stored values, not

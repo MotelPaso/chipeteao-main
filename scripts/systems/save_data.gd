@@ -102,6 +102,9 @@ var ambient_volume: float = DEFAULT_AMBIENT_VOLUME
 ## Look-speed multiplier the player applies on top of its exported base.
 var mouse_sensitivity: float = DEFAULT_MOUSE_SENSITIVITY
 var fullscreen: bool = false
+## User-facing FPS readout in the HUD (iteration 48). Independent from the
+## debug perf probe, which stays hidden behind its own export/env switch.
+var show_fps: bool = false
 
 
 func _ready() -> void:
@@ -485,6 +488,7 @@ func _apply_defaults() -> void:
 	ambient_volume = DEFAULT_AMBIENT_VOLUME
 	mouse_sensitivity = DEFAULT_MOUSE_SENSITIVITY
 	fullscreen = false
+	show_fps = false
 
 
 ## Missing/legacy "settings" (pre-iteration-22 saves) or malformed entries
@@ -500,6 +504,7 @@ func _load_settings(value: Variant) -> void:
 			_as_float(settings.get("mouse_sensitivity"), DEFAULT_MOUSE_SENSITIVITY),
 			MIN_MOUSE_SENSITIVITY, MAX_MOUSE_SENSITIVITY)
 	fullscreen = _as_bool(settings.get("fullscreen"), false)
+	show_fps = _as_bool(settings.get("show_fps"), false)
 
 
 ## The persisted ledger. Note it serializes `counters` only: whatever the
@@ -520,6 +525,7 @@ func _to_save_dict() -> Dictionary[String, Variant]:
 			"ambient_volume": ambient_volume,
 			"mouse_sensitivity": mouse_sensitivity,
 			"fullscreen": fullscreen,
+			"show_fps": show_fps,
 		},
 	}
 

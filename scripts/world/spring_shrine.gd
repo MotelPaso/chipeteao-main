@@ -57,7 +57,7 @@ func _physics_process(delta: float) -> void:
 
 
 func _refresh_price_prompt() -> void:
-	set_prompt("[E] Beber — %d pts (cura + potenciador)" % price)
+	set_prompt("[E] Beber — %d pts (cura + power-up)" % price)
 
 
 func _interact(player: Node) -> void:
