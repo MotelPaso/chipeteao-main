@@ -877,6 +877,30 @@ func spawn_minions(scene: PackedScene, positions: Array[Vector3],
 ## Charge Shrine pressure hook (called via the "enemy_spawner" group): an
 ## immediate burst of current-phase enemies in a ring around `center`, on
 ## top of the normal cadence but still respecting max_active (plus the
+## Spawns one enemy at each of `points`, grounded, through the same
+## clearance gate every other path uses (iteration 55: the enemy rain and
+## the tsunami). Synchronous and budgeted like spawn_pressure_burst —
+## a rain that ignored the cap would be a horde with extra steps — and it
+## returns how many actually landed, so a caller can pace itself.
+##
+## Deliberately NOT spawn_minions: that one is uncapped on purpose (boss
+## summons must always appear), and weather must never be.
+func spawn_at_points(points: Array[Vector3], horde: bool = true) -> int:
+	var cap := max_active + (horde_overflow if horde else pressure_overflow)
+	var budget := cap - _live_enemy_count()
+	if budget <= 0:
+		return 0
+	var made := 0
+	for point: Vector3 in points:
+		if made >= budget:
+			break
+		var pos := point
+		pos.y = _ground_height(pos) + SPAWN_GROUND_OFFSET
+		if _make_enemy_at(pos) != null:
+			made += 1
+	return made
+
+
 ## pressure_overflow headroom, or horde_overflow for hordes). The usual
 ## elite roll applies, so late-run surges stay threatening.
 ## force_elites (WorldDirector's elite-pack event): every burst spawn is

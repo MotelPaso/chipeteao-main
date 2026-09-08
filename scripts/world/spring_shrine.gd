@@ -53,12 +53,20 @@ func _physics_process(delta: float) -> void:
 		_refresh_price_prompt()
 
 
+## The golden rain halves what the party pays, and the prompt is rebuilt
+## every physics frame while a raider stands in the ring, so the number on
+## the label follows the weather without any wiring of its own.
+func current_price() -> int:
+	return ceili(float(price) * RunState.price_discount)
+
+
 func _refresh_price_prompt() -> void:
-	set_prompt("[E] Beber — %d pts (cura + power-up al azar)" % price)
+	set_prompt("[E] Beber — %d pts (cura + power-up al azar)" % current_price())
 
 
 func _interact(player: Node) -> void:
-	if not player.has_method("spend_points") or not bool(player.call("spend_points", price)):
+	if not player.has_method("spend_points") \
+			or not bool(player.call("spend_points", current_price())):
 		Sfx.play(&"dodge")
 		return
 	_emit_started()

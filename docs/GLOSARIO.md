@@ -497,6 +497,40 @@ sin traducir, como el roster de personajes: «Calabaza mágica» llegó ya en
 español y ya en caja baja tipo oración, así que traducir o reestilar
 cualquiera de los cinco inventaría un nombre que nadie del equipo usa.
 
+## Clima (iteración 55)
+
+| Inglés | Español |
+|---|---|
+| weather | clima (en código; lo que ve el jugador es «evento») |
+| Blood Moon | Luna de sangre |
+| Eclipse | Eclipse |
+| Full Moon | Luna llena |
+| Enemy rain | Lluvia de enemigos |
+| Radioactive rain | Lluvia radiactiva |
+| Golden rain | Lluvia dorada |
+| Enemy tsunami | Tsunami |
+| Earthquake | Terremoto |
+| Meteor shower | Lluvia de meteoritos |
+| event altar | altar de eventos |
+| acid pool | charco ácido |
+| `BLOOD MOON — the horde goes mad!` | LUNA DE SANGRE — ¡la horda enloquece! |
+| `ECLIPSE — shadows pour in` | ECLIPSE — las sombras entran por todos lados |
+| `FULL MOON — fortune and wisdom smile on you` | LUNA LLENA — la fortuna y la sabiduría te sonríen |
+| `ENEMY RAIN — they fall from the sky!` | LLUVIA DE ENEMIGOS — ¡caen del cielo! |
+| `RADIOACTIVE RAIN — the ground turns to acid` | LLUVIA RADIACTIVA — el suelo se vuelve ácido |
+| `GOLDEN RAIN — everything shines and costs half` | LLUVIA DORADA — todo brilla y todo vale la mitad |
+| `ENEMY TSUNAMI! %s` | ¡TSUNAMI DE ENEMIGOS! %s |
+| `from the north / south / east / west` | desde el norte / sur / este / oeste |
+| `EARTHQUAKE! The ground will not hold still` | ¡TERREMOTO! El suelo no se queda quieto |
+| `METEOR SHOWER! Get out of the circles` | ¡LLUVIA DE METEORITOS! Sal de los círculos |
+| `[E] Summon an event` | `[E] Invocar un evento` |
+| `An event is already running` | Ya hay un evento activo |
+| `A storm glass rises in the field...` | Un cristal de tormenta se alza en el campo... |
+
+Los nombres del clima van en **caja baja tipo oración** (regla 3) en la
+insignia del HUD («Luna de sangre»), y en **mayúsculas** solo en el anuncio
+grande, igual que ya hacían las lunas desde la iteración 42.
+
 ## Rarezas
 
 > **Cuidado:** `UpgradePool.RARITIES[].name` y el campo `rarity` de `ItemCatalog` son **claves de lógica**, no texto. Se leen como id en los precios de cofre (`RunState.CHEST_BASE_PRICES`), en la tirada de objetos y en varios santuarios. Se traducen **solo al pintarlos**, con `UpgradePool.rarity_display()`.

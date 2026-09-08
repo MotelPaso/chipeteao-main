@@ -151,6 +151,40 @@ const ICON_LIBRARY_TOMES := "tomes"
 const ICON_LIBRARY_ITEMS := "items"
 const ICON_LIBRARY_POWERUPS := "powerups"
 const ICON_LIBRARY_PETS := "pets"
+
+## --- weather badge and quake offset (iteration 55) --------------------------
+## Player-facing name per weather id. The badge is the ONE place the run
+## says what is falling on it, so an id with no row here would show up as
+## an empty chip rather than as nothing.
+const WEATHER_NAMES: Dictionary[String, String] = {
+	"blood_moon": "Luna de sangre",
+	"eclipse": "Eclipse",
+	"full_moon": "Luna llena",
+	"enemy_rain": "Lluvia de enemigos",
+	"radioactive_rain": "Lluvia radiactiva",
+	"golden_rain": "Lluvia dorada",
+	"enemy_tsunami": "Tsunami",
+	"earthquake": "Terremoto",
+	"meteor_shower": "Lluvia de meteoritos",
+}
+## Tint per weather GROUP, not per id: three colours read as three kinds of
+## trouble, nine would read as decoration.
+const WEATHER_GROUP_COLORS: Dictionary[String, Color] = {
+	"moon": Color(0.85, 0.75, 1.0),
+	"rain": Color(0.55, 0.9, 1.0),
+	"disaster": Color(1.0, 0.55, 0.3),
+}
+const WEATHER_BADGE_REFRESH: float = 0.2
+## Where the badge sits relative to the run timer.
+const WEATHER_BADGE_OFFSET := Vector2(0.0, 26.0)
+
+var _weather_badge: Label = null
+var _weather_refresh_left: float = 0.0
+var _weather_signature: String = ""
+## Earthquake displacement, written by the director through the "hud"
+## group. Kept apart from `offset` itself so anything else that ever moves
+## this layer composes with it instead of fighting it.
+var _quake_offset: Vector2 = Vector2.ZERO
 ## Glyph drawn over the placeholder tile: smaller than the bare-tile glyph,
 ## so it reads as a label on the art rather than as the art.
 const LOADOUT_PLACEHOLDER_GLYPH_SIZE := 13
@@ -401,6 +435,10 @@ func _process(delta: float) -> void:
 	if _powerup_refresh_left <= 0.0:
 		_powerup_refresh_left = POWERUP_REFRESH
 		_refresh_powerups()
+	_weather_refresh_left -= delta
+	if _weather_refresh_left <= 0.0:
+		_weather_refresh_left = WEATHER_BADGE_REFRESH
+		_refresh_weather_badge()
 
 
 ## Polls SaveData.show_fps rather than listening for a change: the option
@@ -430,6 +468,58 @@ func _refresh_fps_badge() -> void:
 func _on_points_changed(total: int) -> void:
 	_points_label.text = "%d pts" % total
 	UiTheme.pop(_points_label, 1.15, 0.18)
+
+
+## --- weather badge ----------------------------------------------------------
+
+## Group hook (WorldDirector, earthquake): shifts THIS CanvasLayer, which
+## moves every element it owns — bars, timer, loadout strips and the
+## per-view minimaps — in one write. The Tab map lives on its own layer and
+## deliberately stays still: a map that shook would be unreadable.
+func set_quake_offset(shift: Vector2) -> void:
+	_quake_offset = shift
+	offset = shift
+
+
+## Name and seconds left of the live weather, or nothing at all. Read from
+## the director rather than pushed by it: the badge is a view, and a push
+## would need a signal fired from three different weather groups.
+func _refresh_weather_badge() -> void:
+	var director := get_tree().get_first_node_in_group("world_director")
+	var live: Variant = director.get("active_weather") if director != null else null
+	var weather := live as Dictionary if live is Dictionary else {}
+	if weather.is_empty():
+		if _weather_badge != null:
+			_weather_badge.visible = false
+		_weather_signature = ""
+		return
+	var weather_id := String(weather.get("id", ""))
+	var seconds := ceili(maxf(float(weather.get("time_left", 0.0)), 0.0))
+	var signature := "%s|%d" % [weather_id, seconds]
+	if signature == _weather_signature:
+		return
+	_weather_signature = signature
+	if _weather_badge == null:
+		_weather_badge = _build_weather_badge()
+	_weather_badge.visible = true
+	_weather_badge.text = "%s %ds" % [
+			WEATHER_NAMES.get(weather_id, weather_id), seconds]
+	_weather_badge.add_theme_color_override("font_color",
+			WEATHER_GROUP_COLORS.get(String(weather.get("group", "")), UiTheme.TEXT_BRIGHT))
+
+
+## Built on first use and parented to the timer label, so it rides the same
+## top-centre cluster the clock is in without a second set of anchors.
+func _build_weather_badge() -> Label:
+	var badge := Label.new()
+	badge.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	badge.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	UiTheme.style_badge(badge, UiTheme.TEXT_BRIGHT)
+	badge.set_anchors_preset(Control.PRESET_CENTER_TOP)
+	badge.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	badge.position = WEATHER_BADGE_OFFSET
+	_timer_label.add_child(badge)
+	return badge
 
 
 ## --- active power-ups -------------------------------------------------------

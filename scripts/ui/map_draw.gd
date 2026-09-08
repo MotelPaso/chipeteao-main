@@ -84,6 +84,8 @@ const MARKER_LABELS: Dictionary[StringName, String] = {
 	&"powerup": "Power-ups",
 	&"vendor": "Vendedores",
 	&"pet_box": "Caja de mascotas",
+	&"event_altar": "Altar de eventos",
+	&"lucky_block": "Bloque de la suerte",
 }
 
 ## Alpha the unexplored ground is dimmed to in the composite. Not fully

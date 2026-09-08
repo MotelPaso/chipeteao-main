@@ -30,6 +30,8 @@ extends Node
 ##                          take many minutes to offer all four
 ##   BONK_POINTS=<n>        grants slot 0 that many run points at start, so
 ##                          a vendor soak can actually afford the shelf
+##   BONK_WEATHER_NOW=<id>  forces that weather at 30 s (the director's own
+##                          cadence needs many minutes to offer all nine)
 ##
 ## The raider WALKS AND INTERACTS by default (iteration 45). A parked raider
 ## silently skips every movement-gated system — Slime Trail only drops
@@ -262,6 +264,20 @@ const FLIGHT_HOLD_PERIOD: float = 15.0
 const FLIGHT_HOLD_TIME: float = 5.0
 var _flight_holding: bool = false
 
+## BONK_WEATHER_NOW: forced once, at this run time. Late enough that the
+## arena and its lights are cached, early enough that even a 240 s soak
+## sees the whole row plus its follow-up.
+## Preloaded, not the bare class name: world_director.gd declares no
+## class_name, so its static weather_row() is only reachable through the
+## script resource.
+const WEATHER_DIRECTOR := preload("res://scripts/world/world_director.gd")
+const WEATHER_NOW_AT: float = 30.0
+var _weather_now: String = ""
+var _weather_forced: bool = false
+## Last weather id seen live, so the frame the channel empties can be
+## caught without the director having to signal it.
+var _weather_seen: String = ""
+
 ## BONK_POI_NOW: POIs to drop next to the raider once, at POI_NOW_AT.
 const POI_NOW_AT: float = 20.0
 ## Placed this far from the raider: outside the interact ring so the tour
@@ -341,6 +357,11 @@ func _ready() -> void:
 		push_error("ArenaProbe: unknown BONK_POWERUP_NOW '%s'" % _powerup_now)
 		_powerup_now = ""
 	_star_now = OS.get_environment("BONK_STAR_NOW") == "1"
+	_weather_now = OS.get_environment("BONK_WEATHER_NOW")
+	if not _weather_now.is_empty() \
+			and WEATHER_DIRECTOR.weather_row(_weather_now).is_empty():
+		push_error("ArenaProbe: unknown BONK_WEATHER_NOW '%s'" % _weather_now)
+		_weather_now = ""
 	var poi_list := OS.get_environment("BONK_POI_NOW")
 	if not poi_list.is_empty():
 		for entry: String in poi_list.split(",", false):
@@ -552,6 +573,8 @@ func _tick_powerup_switches() -> void:
 			powerups.apply(_powerup_now)
 	_tick_flight_hold()
 	_tick_poi_now()
+	_tick_weather_now()
+	_watch_weather_end()
 	if _star_now and not _star_dropped and RunState.run_time >= STAR_NOW_AT:
 		_star_dropped = true
 		var spawner := get_tree().get_first_node_in_group("enemy_spawner")
@@ -578,6 +601,44 @@ func _tick_flight_hold() -> void:
 		return
 	_flight_holding = want_hold
 	_send_action(&"jump", want_hold)
+
+
+## BONK_WEATHER_NOW: one forced summon. Through start_sky_event, which is
+## the same forced entry the event altar uses — it stops whatever is
+## running and ignores the cadence gap.
+## Watches the director's one weather slot and reports the HUD offset the
+## moment it empties.
+func _watch_weather_end() -> void:
+	var director := get_tree().get_first_node_in_group("world_director")
+	if director == null:
+		return
+	var live: Variant = director.get("active_weather")
+	var weather := live as Dictionary if live is Dictionary else {}
+	var now := String(weather.get("id", "")) if not weather.is_empty() else ""
+	if now == _weather_seen:
+		return
+	if not _weather_seen.is_empty():
+		_report_hud_offset()
+	_weather_seen = now
+
+
+## The earthquake shifts the HUD CanvasLayer and has to put it back. Read
+## at every "Weather ended:" so a soak can prove it, and printed even when
+## the weather was not the quake: a non-zero offset after ANY weather is a
+## leak, and only checking after the quake would miss it.
+func _report_hud_offset() -> void:
+	for node: Node in get_tree().get_nodes_in_group("hud"):
+		var hud := node as CanvasLayer
+		if hud != null:
+			print("HUD offset: %s" % hud.offset)
+			return
+
+
+func _tick_weather_now() -> void:
+	if _weather_forced or _weather_now.is_empty() or RunState.run_time < WEATHER_NOW_AT:
+		return
+	_weather_forced = true
+	get_tree().call_group("world_director", "start_sky_event", _weather_now)
 
 
 ## BONK_POI_NOW: one ring of requested POIs beside the raider. The
@@ -612,6 +673,8 @@ func _build_poi(poi: String) -> Node3D:
 	match poi:
 		"pet_box":
 			return load("res://scenes/world/PetBox.tscn").instantiate() as Node3D
+		"event_altar":
+			return load("res://scenes/world/shrines/EventAltar.tscn").instantiate() as Node3D
 		"vendor_items", "vendor_powerups", "vendor_animals":
 			var vendor := load("res://scenes/world/Vendor.tscn").instantiate() as Node3D
 			# Set before it enters the tree: Vendor._ready reads it.

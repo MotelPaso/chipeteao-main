@@ -667,6 +667,7 @@ func _on_died() -> void:
 	_drop_xp_gem()
 	_drop_health_orbs()
 	_drop_powerup()
+	_drop_acid_pool()
 	_award_points()
 	_death_feedback()
 	var tween := create_tween()
@@ -711,6 +712,15 @@ func _drop_health_orbs() -> void:
 		_spawn_health_orb(global_position + Vector3.UP * 0.6)
 	if is_elite and randf() < elite_chest_chance * (1.0 + RunState.difficulty_bonus):
 		_drop_chest()
+
+
+## Radioactive rain (iteration 55): every corpse leaves a puddle while it
+## falls. The director owns the cap and the spacing and refuses politely
+## when the weather is not running, so this stays one call with no state.
+func _drop_acid_pool() -> void:
+	var director := get_tree().get_first_node_in_group("world_director")
+	if director != null and director.has_method("spawn_acid_pool"):
+		director.call("spawn_acid_pool", global_position)
 
 
 ## Temporary power-up drop (iteration 53). The base chance is tiny on

@@ -29,6 +29,7 @@ const MUZZLE_FLASH_SCENE: PackedScene = preload("res://scenes/fx/MuzzleFlash.tsc
 const WHIP_CRACK_SCENE: PackedScene = preload("res://scenes/fx/WhipCrack.tscn")
 const EMBER_BURST_SCENE: PackedScene = preload("res://scenes/fx/EmberBurst.tscn")
 const BLOOD_POOL_SCENE: PackedScene = preload("res://scenes/fx/BloodPool.tscn")
+const ACID_POOL_SCENE: PackedScene = preload("res://scenes/fx/AcidPool.tscn")
 
 ## The pooled roster: name, scene, `warm` (instances built at boot so early
 ## spawns never hitch) and `cap` (max parked kept, bounding memory after a
@@ -48,6 +49,7 @@ const POOLS: Array[Dictionary] = [
 	{"name": "whip_crack", "scene": WHIP_CRACK_SCENE, "warm": 4, "cap": 16},
 	{"name": "ember_burst", "scene": EMBER_BURST_SCENE, "warm": 4, "cap": 16},
 	{"name": "blood_pool", "scene": BLOOD_POOL_SCENE, "warm": 4, "cap": 16},
+	{"name": "acid_pool", "scene": ACID_POOL_SCENE, "warm": 8, "cap": 48},
 ]
 
 ## Optional per-name (warm, cap) override for tuning experiments; rows not

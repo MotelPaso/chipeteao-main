@@ -1,0 +1,8 @@
+[gd_scene load_steps=2 format=3 uid="uid://cevntaltr1k2p0"]
+
+[ext_resource type="Script" path="res://scripts/world/event_altar.gd" id="1_evtaltar"]
+
+[node name="EventAltar" type="Area3D"]
+collision_layer = 0
+collision_mask = 1
+script = ExtResource("1_evtaltar")

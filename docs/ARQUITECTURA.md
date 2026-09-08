@@ -44,6 +44,7 @@ El acoplamiento cruzado va siempre por aquí. Lista actual:
 | `powerup_pickups` | power-ups en el suelo (iteración 53) | limpieza de etapa y `Stage sweep: pickups=` |
 | `enemy_projectiles` | bolts enemigos en vuelo | el flag `frozen` de Tiempo detenido |
 | `springs` | el manantial vivo (como máximo uno) | el peso 0 de su fila de evento |
+| `acid_pools` | charcos ácidos vivos (iteración 55) | el tope y la separación de la lluvia radiactiva |
 | `vendors` | los puestos vivos (máximo 2) | el peso 0 de su fila y `Stage sweep: vendors=` |
 | `pet_boxes` | las cajas de mascotas vivas | limpieza de etapa y `Stage sweep: boxes=` |
 | `boss_ui` | HUD + flecha de jefe | `track_boss(boss, title)`, `track_objective(node)`, `announce` |
@@ -659,6 +660,141 @@ En el HUD, una fila de fichas **sobre la barra de HP** con los segundos
 que quedan (jugador 1; en co-op los compañeros llevan un contador `◈N` en
 su fila compacta), y el mapa de Tab lista «Power-ups» con sus segundos.
 
+## Clima y eventos
+
+Desde la iteración 55 las lunas, las lluvias y los desastres son **un solo
+canal** en `WorldDirector`. En código se llama **weather**, nunca «event»:
+`EVENT_LIBRARY` es la tabla de POIs del tick de eventos y los dos sentidos
+chocarían en cada lectura. La palabra que ve el jugador sigue siendo
+«evento» (el altar invoca uno).
+
+**`active_weather` guarda como mucho una fila** (`{id, group, time_left}`),
+así que «solo una luna, lluvia o desastre a la vez» es una propiedad de la
+estructura de datos y no un acuerdo entre tres temporizadores.
+
+### El catálogo
+
+| id | grupo | duración | sigue a | notas |
+|---|---|---|---|---|
+| `blood_moon` | moon | 45 s | → `full_moon` | tinte rojo, variante `berserker` del spawner |
+| `eclipse` | moon | 45 s | → `full_moon` | tinte violeta, variante `shade` |
+| `full_moon` | moon | 40 s | *solo secuela* | XP y suerte temporales |
+| `enemy_rain` | rain | 35 s | → `golden_rain` | 3-6 enemigos cada 1.5 s |
+| `radioactive_rain` | rain | 40 s | → `golden_rain` | charcos ácidos |
+| `golden_rain` | rain | 40 s | *solo secuela* | ×2 puntos y mitad de precio |
+| `enemy_tsunami` | disaster | 3 s | — | una ola, puede repetirse |
+| `earthquake` | disaster | 25 s | — | sacudida + HUD desplazado |
+| `meteor_shower` | disaster | 30 s | — | zonas marcadas, luego impacto |
+
+Campos de fila: `id`, `group`, `weight` (dentro de su grupo), `duration`,
+`start`/`tick`/`stop` (nombres de método, `tick` y `stop` opcionales),
+`follow_up` y `follow_up_only`.
+
+- **Duración**: `weather_duration_overrides` por arena (mismo patrón que
+  `event_weight_overrides`) y, **solo para lunas y lluvias**,
+  `RunState.sky_duration_multiplier`. Los desastres son fijos: un pacto que
+  vende «lunas más largas» no debe vender también una lluvia de meteoritos
+  más larga. *(Esto reemplazó los exports `sky_event_duration` y
+  `full_moon_duration`, que no podían vivir dentro de un catálogo `const`.)*
+- **La tirada del tick de eventos** va del grupo más raro al más común:
+  desastre (`disaster_chance` 0.08 + `RunState.disaster_chance_bonus`),
+  luego lluvia (`rain_chance` 0.12 + `event_chance_bonus`), luego luna (la
+  fórmula de siempre + `event_chance_bonus` + por uso demoníaco). Así un
+  desastre no queda aplastado por lluvias y lunas más frecuentes.
+- **`sky_event_min_gap` vale para los tres grupos**: la exclusividad es
+  «una a la vez», el gap es «no una detrás de otra».
+- **Las secuelas** arrancan sin gap y **sin restaurar el cielo primero**:
+  restaurar lanzaba un tween de 2 s compitiendo con el de 1.5 s de la
+  secuela sobre las mismas propiedades, y ganaba el largo.
+
+### La entrada forzada
+
+**`start_sky_event(kind)` sigue siendo el hook público del grupo** y ahora
+FUERZA una fila: para lo que esté corriendo (con su `stop`, nunca a la
+brava) y arranca aunque el gap no haya pasado. Es la misma puerta para
+tres llamadores: el probe tras cada cambio de etapa (que es lo que mide la
+puerta `CIELO_TRAS_AVANCE` de `verificar.sh`), `BONK_WEATHER_NOW` y el
+altar de eventos. Un invocador que no hiciera nada por el gap se leería
+como roto.
+
+**Las lunas conservan su log literal `Sky event: %s for %.0fs`**, que es lo
+que esa puerta cuenta. Las lluvias y los desastres no lo imprimen: no
+tiñen nada de lo que esa puerta habla.
+
+### Desmontaje
+
+El `stop` de la fila viva corre desde `on_stage_ended()` y `_exit_tree()`,
+**antes** del `_snap_sky_back()` que ya había: una lluvia dorada que
+terminara con la etapa dejaría un multiplicador de puntos ×2 en cada raider
+y un descuento de 0.5 en `RunState`, y los dos sobreviven a la arena.
+`on_stage_started(arena)` arranca con el canal vacío, y `RunState.reset()`
+devuelve `price_discount` a 1.0.
+
+### Las lluvias
+
+- **`enemy_rain`**: cada 1.5 s elige 3-6 puntos caminables a 12-25 m de un
+  raider al azar, los telegrafía (`Telegraph.spawn_disc`, 1 s) y genera un
+  enemigo **a ras de suelo** por `EnemySpawner.spawn_at_points()`. **No
+  caen desde altura**: un cuerpo cayendo es un cuerpo con velocidad
+  vertical fuera del suelo, que es justo lo que el detector de voladores
+  del harness existe para atrapar — y ese detector es deliberadamente
+  estrecho y no se ensancha por decorado. La «caída» es el disco más una
+  ráfaga descendente.
+- **`radioactive_rain`**: cada muerte deja un charco ácido en el cadáver
+  (`EnemyBase._drop_acid_pool` → `WorldDirector.spawn_acid_pool`), más uno
+  extra cada 2 s cerca de un raider. `AcidPool` (`scripts/fx/acid_pool.gd`,
+  fila `acid_pool` en `Pools`, grupo `acid_pools`) **tiene su propio tick de
+  daño**, a diferencia de `BloodPoolFx`, que es solo cosmético porque
+  `blood_vial.gd` lleva sus ticks: aquí no hay arma detrás, y un charco que
+  necesitara un ticker externo obligaría al director a llevar una lista —
+  y esa lista sería lo que se filtra en un cambio de etapa. **Solo daña
+  raiders**: ácido que también derritiera a la horda haría del peor clima
+  del juego el mejor sitio donde estar. Tope duro `MAX_LIVE_ACID_POOLS` 24
+  y separación de 3 m; lo que pasa de ahí **se salta en silencio** (un
+  `WARNING:` haría fallar el soak por funcionar como está diseñado, y subir
+  el tope no es un arreglo).
+- **`golden_rain`** (solo como secuela): `set_points_source("golden_rain", 2.0)`
+  en los grupos `player` **y** `downed_players`, y `RunState.price_discount`
+  0.5 leído por `chest_price()`, `roulette_price()` y el precio del
+  manantial — y por tanto por el vendedor de objetos, que cotiza su
+  mostrador con `chest_price`. **Fuera**: el vendedor de power-ups y el
+  precio de mascotas, que son la economía larga de la partida.
+
+### Los desastres
+
+- **`enemy_tsunami`**: una ola. Anuncia el lado («desde el norte»…) y vierte
+  `tsunami_base` 40 + 4 × minuto de etapa enemigos en trozos de 6 por frame
+  a lo largo de un arco de ~60° a 40-60 m, y termina sola. Puede volver a
+  salir más tarde.
+- **`earthquake`**: `Juice.shake` cada 0.5 s, polvo en cada raider cada 3 s
+  y **el `offset` del CanvasLayer del HUD** oscilando ±14 px a 20 Hz — una
+  sola escritura mueve barras, reloj, tiras de equipamiento y los minimapas
+  de cada vista, que es lo que significa «los sprites se mueven». El mapa
+  de Tab vive en otra capa y se queda quieto a propósito: un mapa temblando
+  sería ilegible. `stop` lo devuelve a cero.
+- **`meteor_shower`**: cada 0.8 s marca una zona (disco naranja, 1.2 s) y
+  luego impacta: los raiders dentro reciben 40 × (1 + minuto × 0.05) y los
+  enemigos **el triple**. Un desastre que solo dañara al equipo sería un
+  impuesto, y uno que solo dañara a la horda un regalo; siendo los dos, lo
+  que se castiga es quedarse quieto. Tope `MAX_LIVE_TELEGRAPHS` 16.
+
+### El altar de eventos
+
+`scripts/world/event_altar.gd` (`EventAltar extends Interactable`, escena
+`scenes/world/shrines/EventAltar.tscn`, `marker_kind = &"event_altar"` puesto
+en `_init()`, gratis, un solo uso, se hunde). Invoca una fila al azar
+**excepto `golden_rain` y `full_moon`**: esas dos son lo que paga haber
+sobrevivido a una mala, y un altar que las regalara dejaría sin sentido a
+las lluvias y lunas que las ganan. Si ya hay clima corriendo, **rechaza** en
+vez de encolar. Log `Event altar used: <id>`.
+
+### La insignia del HUD
+
+Junto al reloj: nombre y segundos restantes, teñida por **grupo** (tres
+colores leen como tres tipos de problema; nueve leerían como decoración).
+La lee del director en vez de que el director la empuje: es una vista, y un
+push necesitaría una señal disparada desde tres grupos distintos.
+
 ## Misiones y meta-progresión
 
 - Qué es: misiones que pagan esquirlas; las esquirlas compran personajes y rangos de reliquia de la Armería. Todo persiste en `user://save.json`.
@@ -862,7 +998,8 @@ Variables de entorno:
 | `BONK_POWERUP_NOW=<id>` | concede ese power-up al slot 0 a los 20 s y **lo re-concede en cada expiración** |
 | `BONK_STAR_NOW=1` | suelta una estrella **quieta** a los pies del raider a los 30 s |
 | `BONK_POWERUP_BOOST=1` | multiplica ×50 la probabilidad de drop por baja (lo lee `EnemySpawner`) |
-| `BONK_POI_NOW=a,b,c` | siembra esos POIs a 8 m del raider a los 20 s: `vendor_items`, `vendor_powerups`, `vendor_animals`, `pet_box` |
+| `BONK_POI_NOW=a,b,c` | siembra esos POIs a 8 m del raider a los 20 s: `vendor_items`, `vendor_powerups`, `vendor_animals`, `pet_box`, `event_altar` |
+| `BONK_WEATHER_NOW=<id>` | fuerza ese clima a los 30 s por la misma entrada forzada que usa el altar |
 | `BONK_POINTS=<n>` | le da esos puntos al slot 0 al arrancar, para que un soak de vendedor pueda pagar |
 | `BONK_PERF=1` | enciende el overlay de rendimiento del HUD |
 

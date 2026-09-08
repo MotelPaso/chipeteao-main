@@ -74,10 +74,8 @@ const DIFFICULTY_XP_SHARE: float = 0.75
 ##   elite_chance_bonus     -> EnemySpawner.elite_chance()
 ##   sky_duration_multiplier-> WorldDirector sky event length
 ##   event_chance_bonus     -> WorldDirector sky event probability
-##   disaster_chance_bonus  -> NOTHING YET. Deliberate forward hook for the
-##     disasters of part C, like RunState.demonic_uses was for iteration 42.
-##     A pact can already sell it, and the cost is real the moment part C
-##     reads it; until then it is stored and reset like the others.
+##   disaster_chance_bonus  -> WorldDirector disaster roll (iteration 55:
+##                             the first thing rolled on an event tick).
 var elite_chance_bonus: float = 0.0
 var sky_duration_multiplier: float = 1.0
 var event_chance_bonus: float = 0.0
@@ -107,6 +105,13 @@ const POWERUP_VENDOR_BASE_PRICE: int = 100
 ## multiply — the number itself is the ladder, and it climbs only when a
 ## sale actually happens.
 var powerup_vendor_price: int = POWERUP_VENDOR_BASE_PRICE
+## Multiplier on everything the party BUYS with run points while the
+## golden rain falls (1.0 idle, 0.5 during it). Chests, the roulette and
+## the spring read it — and therefore the item vendor, which prices its
+## shelf off chest_price. The power-up vendor and the pet prices are
+## deliberately outside it: those two ladders are the run's long-term
+## economy, and halving them for forty seconds would flatten both.
+var price_discount: float = 1.0
 ## XP curve: cost of the level being climbed to, in gems (level 1 -> 2
 ## costs XP_BASE + XP_PER_LEVEL). The whole pacing of a run rides on these
 ## three numbers, so they are named instead of buried in _xp_required.
@@ -167,6 +172,7 @@ func reset() -> void:
 	chest_price_multiplier = 1.0
 	roulette_price_multiplier = 1.0
 	powerup_vendor_price = POWERUP_VENDOR_BASE_PRICE
+	price_discount = 1.0
 	# Counters credited during a run live in a SaveData buffer that only a
 	# run END merges into the persisted ledger; starting (or abandoning) a
 	# run drops whatever is still pending, which is what makes save_data's
@@ -267,7 +273,7 @@ func _resum_difficulty() -> void:
 ## Current price of a chest of the given rarity, in run points.
 func chest_price(rarity_name: String) -> int:
 	var base := int(CHEST_BASE_PRICES.get(rarity_name, CHEST_BASE_PRICES["Common"]))
-	return ceili(float(base) * chest_price_multiplier)
+	return ceili(float(base) * chest_price_multiplier * price_discount)
 
 
 ## Every opened chest makes all the others pricier (global multiplier).
@@ -278,7 +284,7 @@ func register_chest_opened() -> void:
 ## Current price of a roulette spin, in run points: the shrine's own base
 ## price times the run-wide growth below.
 func roulette_price(base_price: int) -> int:
-	return ceili(float(base_price) * roulette_price_multiplier)
+	return ceili(float(base_price) * roulette_price_multiplier * price_discount)
 
 
 ## Every spin makes the next one cost ROULETTE_PRICE_GROWTH times more,

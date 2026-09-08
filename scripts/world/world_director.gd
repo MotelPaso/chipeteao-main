@@ -25,6 +25,7 @@ const CHARGE_SHRINE_SCENE := preload("res://scenes/world/shrines/ChargeShrine.ts
 const CURSE_SHRINE_SCENE := preload("res://scenes/world/shrines/CurseShrine.tscn")
 const SPRING_SHRINE_SCENE := preload("res://scenes/world/shrines/SpringShrine.tscn")
 const ROULETTE_SHRINE_SCENE := preload("res://scenes/world/shrines/RouletteShrine.tscn")
+const EVENT_ALTAR_SCENE := preload("res://scenes/world/shrines/EventAltar.tscn")
 const PET_BOX_SCENE := preload("res://scenes/world/PetBox.tscn")
 const VENDOR_SCENE := preload("res://scenes/world/Vendor.tscn")
 const PortalShrineScript := preload("res://scripts/world/portal_shrine.gd")
@@ -49,6 +50,9 @@ const EVENT_LIBRARY: Array[Dictionary] = [
 	# starve them.
 	{"id": "vendor", "weight": 0.8, "method": &"_event_vendor"},
 	{"id": "pet_box", "weight": 0.35, "method": &"_event_pet_box"},
+	# The event altar (iteration 55). No `altar` flag: that flag drives the
+	# charge/demonic cadence and its unspent cap, and this one is neither.
+	{"id": "event_altar", "weight": 0.4, "method": &"_event_event_altar"},
 ]
 
 ## Rejection-sampling budget for a clear POI spot, and for the ring sample
@@ -158,6 +162,8 @@ const POI_PLATFORM_Y: float = 0.5
 @export var max_vendors: int = 2
 ## Chance a stage opens with a pet box already standing.
 @export var start_pet_box_chance: float = 0.5
+## Chance a stage opens with an event altar already standing.
+@export var start_event_altar_chance: float = 0.5
 @export var altar_cap_base: int = 3
 @export var altar_cap_minutes: float = 3.0
 ## Share of the run-start chests (scene-placed and the extras below) that
@@ -180,11 +186,50 @@ const POI_PLATFORM_Y: float = 0.5
 ## full moon that buffs the party.
 @export var sky_event_chance: float = 0.18
 @export var sky_event_chance_per_demonic: float = 0.08
+## The gap applies to EVERY weather group, not just the moons: exclusivity
+## is about "one at a time", this is about "not back to back".
 @export var sky_event_min_gap: float = 150.0
-@export var sky_event_duration: float = 45.0
-@export var full_moon_duration: float = 40.0
 @export var full_moon_xp_bonus: float = 50.0
 @export var full_moon_luck_bonus: float = 30.0
+## Rolled BEFORE the rain and the moon on an event tick, so the rarest
+## group gets first refusal. Demonic pacts sell this directly.
+@export var disaster_chance: float = 0.08
+## Rolled after the disaster, before the moon.
+@export var rain_chance: float = 0.12
+## Per-arena duration overrides for WEATHER_CATALOG, keyed by weather id,
+## in seconds. Mirrors event_weight_overrides: an id left out keeps the
+## catalog duration. (This replaced the old sky_event_duration and
+## full_moon_duration exports, which could not live in a const catalog.)
+@export var weather_duration_overrides: Dictionary[String, float] = {}
+@export_group("Rains (iteration 55)")
+@export var enemy_rain_interval: float = 1.5
+@export var enemy_rain_min_drops: int = 3
+@export var enemy_rain_max_drops: int = 6
+@export var enemy_rain_min_distance: float = 12.0
+@export var enemy_rain_max_distance: float = 25.0
+@export var acid_pool_interval: float = 2.0
+@export var acid_pool_radius: float = 2.0
+@export var acid_pool_lifetime: float = 6.0
+@export var acid_pool_spawn_range: float = 20.0
+## Points multiplier and price discount while the golden rain falls.
+@export var golden_points_multiplier: float = 2.0
+@export var golden_price_discount: float = 0.5
+@export_group("Disasters (iteration 55)")
+@export var tsunami_base: int = 40
+@export var tsunami_per_minute: int = 4
+@export var tsunami_arc_min: float = 40.0
+@export var tsunami_arc_max: float = 60.0
+@export var earthquake_shake_interval: float = 0.5
+@export var earthquake_shake_strength: float = 0.25
+@export var earthquake_hud_amplitude: float = 14.0
+@export var earthquake_hud_hz: float = 20.0
+@export var earthquake_dust_interval: float = 3.0
+@export var meteor_interval: float = 0.8
+@export var meteor_range: float = 20.0
+@export var meteor_radius: float = 3.0
+@export var meteor_telegraph: float = 1.2
+@export var meteor_damage: float = 40.0
+@export var meteor_enemy_scale: float = 3.0
 
 ## RAW half-extent of the arena plate, as published by the "arena_bounds"
 ## node (scatter.gd's own default is 80.0); bounds_margin is subtracted at
@@ -209,8 +254,13 @@ var _placed_pois: Array[Node3D] = []
 ## Live beacons (supply chests, altars, springs, rifts).
 var _beacons: Array[TimedBeacon] = []
 ## Sky event state: current kind, seconds left, gap timer, cached lights.
-var _sky_kind: String = ""
-var _sky_left: float = 0.0
+## THE live weather, or empty: {id, group, time_left}. One at a time
+## across all three groups — that exclusivity is the whole point of having
+## one channel instead of three timers that could overlap.
+var active_weather: Dictionary = {}
+## Scratch owned by the running row's start/tick/stop, cleared on start so
+## a row never reads the previous one's leftovers.
+var _weather_state: Dictionary = {}
 var _sky_gap_left: float = 0.0
 var _sun: DirectionalLight3D = null
 var _sun_color: Color = Color.WHITE
@@ -254,8 +304,8 @@ func on_stage_started(arena: Node3D) -> void:
 	_sun_energy = 1.0
 	_ambient_color = Color.WHITE
 	_ambient_energy = 1.0
-	_sky_kind = ""
-	_sky_left = 0.0
+	active_weather = {}
+	_weather_state = {}
 	_sky_gap_left = 0.0
 	_bounds = null
 	for node: Node in get_tree().get_nodes_in_group("arena_bounds"):
@@ -288,6 +338,7 @@ func on_stage_started(arena: Node3D) -> void:
 	_spawn_portals()
 	_spawn_roulettes()
 	_spawn_start_pet_boxes()
+	_spawn_start_event_altars()
 
 
 ## 0-1 pet boxes at stage start (iteration 54). Zero is a real outcome:
@@ -297,6 +348,18 @@ func _spawn_start_pet_boxes() -> void:
 	if randf() >= start_pet_box_chance:
 		return
 	_spawn_pet_box(_claim_clear_point())
+
+
+## 0-1 event altars at stage start, like the pet box: a stage that always
+## opened with one would make the weather feel scheduled rather than found.
+func _spawn_start_event_altars() -> void:
+	# Short-circuited, like the weather roll: a chance of zero must draw NO
+	# random number. The game RNG is one shared stream and this runs at
+	# stage start, so a die rolled here shifts where the portals, the
+	# roulettes and every shuffled POI land.
+	if start_event_altar_chance <= 0.0 or randf() >= start_event_altar_chance:
+		return
+	_spawn_event_altar(_claim_clear_point())
 
 
 ## Stage teardown (RunRoot, before the arena is freed): restore the sky the
@@ -309,9 +372,11 @@ func on_stage_ended() -> void:
 	# the next map drops chests and altars into a scene about to be freed
 	# (see the note in RunRoot._swap_stage about inherited process modes).
 	set_physics_process(false)
+	# The row's own stop() FIRST: a golden rain that ended with the stage
+	# would otherwise leave a x2 points source on every raider and a 0.5
+	# price discount in RunState, both of which outlive the arena.
+	_stop_weather(false)
 	_snap_sky_back()
-	_sky_kind = ""
-	_sky_left = 0.0
 	_beacons.clear()
 	_placed_points.clear()
 	_anchor_points.clear()
@@ -344,6 +409,7 @@ func _stage_parent() -> Node:
 ## tint tween halfway. Snap the cached lighting back on the way out so a
 ## blood moon cannot bleed into the next run through a shared resource.
 func _exit_tree() -> void:
+	_stop_weather(false)
 	_snap_sky_back()
 
 
@@ -417,13 +483,13 @@ func _physics_process(delta: float) -> void:
 	_tick_beacons(delta)
 	if not events_enabled:
 		return
-	_tick_sky(delta)
+	_tick_weather(delta)
 	_event_timer -= delta
 	if _event_timer > 0.0:
 		return
 	_event_timer = _next_event_gap()
 	_fire_random_event()
-	_maybe_sky_event()
+	_maybe_weather()
 
 
 ## Raises the stage's exit portal the first frame the stage counts as
@@ -800,6 +866,19 @@ func _event_vendor() -> void:
 	print("Vendor arrived: %s" % String(row.id))
 
 
+## The event altar: free, one use, and whatever it summons is a surprise.
+func _event_event_altar() -> void:
+	_spawn_event_altar(_event_point())
+	_announce("Un cristal de tormenta se alza en el campo...")
+
+
+func _spawn_event_altar(at: Vector3) -> Node3D:
+	var altar := EVENT_ALTAR_SCENE.instantiate() as Node3D
+	_stage_parent().add_child(altar)
+	altar.global_position = at
+	return altar
+
+
 ## A pet box, free and one-use. Rarer than a vendor because a companion is
 ## a bigger swing than a purchase and the player pays nothing for it.
 func _event_pet_box() -> void:
@@ -979,10 +1058,134 @@ func _spawn_beacon(at: Vector3, color: Color) -> Node3D:
 	return beacon
 
 
-## --- sky events -------------------------------------------------------------
+## --- weather ----------------------------------------------------------------
+## ONE channel for moons, rains and disasters (iteration 55). They are
+## independent kinds but never overlap: `active_weather` holds at most one
+## row, so "only one moon, rain or disaster at a time" is a property of the
+## data structure rather than three timers that have to agree.
+##
+## In code this is WEATHER, never "event": EVENT_LIBRARY above is the
+## POI/event-tick table and the two meanings would collide on every read.
+## The player-facing word stays «evento» (the altar summons one).
+##
+## Row fields:
+##   id/group:   identifier and one of moon | rain | disaster.
+##   weight:     roll weight WITHIN its group.
+##   duration:   seconds, before weather_duration_overrides and, for moons
+##               and rains, RunState.sky_duration_multiplier. Disasters are
+##               fixed: a pact that sells "longer moons" must not also sell
+##               a longer meteor shower.
+##   start/tick/stop: method names, called through call(). tick and stop
+##               may be empty.
+##   follow_up:  the row that starts the instant this one ends, with no
+##               gap (blood_moon/eclipse -> full_moon, and the two rains ->
+##               golden_rain: the reward for having survived the bad one).
+##   follow_up_only: never rolled directly; only reachable as a follow_up.
+const WEATHER_CATALOG: Array[Dictionary] = [
+	{
+		"id": "blood_moon", "group": "moon", "weight": 1.0, "duration": 45.0,
+		"start": &"_weather_start_blood_moon", "tick": &"", "stop": &"",
+		"follow_up": "full_moon",
+	},
+	{
+		"id": "eclipse", "group": "moon", "weight": 1.0, "duration": 45.0,
+		"start": &"_weather_start_eclipse", "tick": &"", "stop": &"",
+		"follow_up": "full_moon",
+	},
+	{
+		"id": "full_moon", "group": "moon", "weight": 1.0, "duration": 40.0,
+		"start": &"_weather_start_full_moon", "tick": &"", "stop": &"",
+		"follow_up_only": true,
+	},
+	{
+		"id": "enemy_rain", "group": "rain", "weight": 1.0, "duration": 35.0,
+		"start": &"_weather_start_enemy_rain", "tick": &"_weather_tick_enemy_rain",
+		"stop": &"", "follow_up": "golden_rain",
+	},
+	{
+		"id": "radioactive_rain", "group": "rain", "weight": 1.0, "duration": 40.0,
+		"start": &"_weather_start_radioactive_rain",
+		"tick": &"_weather_tick_radioactive_rain",
+		"stop": &"_weather_stop_radioactive_rain", "follow_up": "golden_rain",
+	},
+	{
+		"id": "golden_rain", "group": "rain", "weight": 1.0, "duration": 40.0,
+		"start": &"_weather_start_golden_rain", "tick": &"",
+		"stop": &"_weather_stop_golden_rain", "follow_up_only": true,
+	},
+	{
+		# One wave, not a window: its tick spends three seconds pouring the
+		# wave in and then ends the disaster itself. It can roll again later.
+		"id": "enemy_tsunami", "group": "disaster", "weight": 1.0, "duration": 3.0,
+		"start": &"_weather_start_tsunami", "tick": &"_weather_tick_tsunami",
+		"stop": &"",
+	},
+	{
+		"id": "earthquake", "group": "disaster", "weight": 1.0, "duration": 25.0,
+		"start": &"_weather_start_earthquake", "tick": &"_weather_tick_earthquake",
+		"stop": &"_weather_stop_earthquake",
+	},
+	{
+		"id": "meteor_shower", "group": "disaster", "weight": 1.0, "duration": 30.0,
+		"start": &"_weather_start_meteors", "tick": &"_weather_tick_meteors",
+		"stop": &"",
+	},
+]
 
-func _maybe_sky_event() -> void:
-	if not _sky_kind.is_empty() or _sky_gap_left > 0.0:
+## Groups whose length a demonic pact can stretch (RunState.sky_duration_multiplier).
+const STRETCHABLE_GROUPS: Array[String] = ["moon", "rain"]
+## Weather ids the event altar refuses to summon: the two rewards. An altar
+## that could hand out a golden rain outright would make the rains that earn
+## it pointless.
+const ALTAR_EXCLUDED: Array[String] = ["golden_rain", "full_moon"]
+## Cap on live acid pools and the spacing between them. A cap that is
+## RAISED to fit more pools is not a fix; spawns past it are skipped.
+const MAX_LIVE_ACID_POOLS: int = 24
+const ACID_POOL_SPACING: float = 3.0
+## Cap on live meteor telegraphs, for the same reason (the pool of discs is
+## 32 and the rest of the game uses it too).
+const MAX_LIVE_TELEGRAPHS: int = 16
+## Bodies the tsunami pours in per physics frame. Forty in one frame is a
+## visible hitch; spread over the row's three seconds nobody notices.
+const TSUNAMI_PER_FRAME: int = 6
+## Half-width of the arc the wave comes from, in radians (~60 degrees wide).
+const TSUNAMI_ARC_SPREAD: float = 0.52
+## Acid damage per second to a raider standing in a pool.
+const ACID_DAMAGE_PER_SECOND: float = 4.0
+
+
+static func weather_row(id: String) -> Dictionary:
+	for row: Dictionary in WEATHER_CATALOG:
+		if String(row.id) == id:
+			return row
+	return {}
+
+
+## Seconds this row runs for, with the arena override and — for moons and
+## rains only — the pact multiplier.
+func _weather_duration(row: Dictionary) -> float:
+	var seconds := float(weather_duration_overrides.get(String(row.id), row.duration))
+	if STRETCHABLE_GROUPS.has(String(row.group)):
+		seconds *= RunState.sky_duration_multiplier
+	return seconds
+
+
+## The event-tick roll: rarest group first, so a disaster is not crowded
+## out by the commoner rains and moons.
+func _maybe_weather() -> void:
+	if not active_weather.is_empty() or _sky_gap_left > 0.0:
+		return
+	# Short-circuited so a group whose chance is ZERO draws NO random
+	# number. Not a micro-optimisation: the game RNG is one shared stream,
+	# and a die rolled for a disabled group shifts every later draw in the
+	# run — which is how disabling a group "changed" the arena layout.
+	var disaster_odds := disaster_chance + RunState.disaster_chance_bonus
+	if disaster_odds > 0.0 and randf() < disaster_odds:
+		_start_weather(_roll_group("disaster"))
+		return
+	var rain_odds := rain_chance + RunState.event_chance_bonus
+	if rain_odds > 0.0 and randf() < rain_odds:
+		_start_weather(_roll_group("rain"))
 		return
 	# Demonic pacts can sell sky-event odds outright (iteration 47), on top
 	# of the per-use tilt every demonic completion already adds.
@@ -990,63 +1193,456 @@ func _maybe_sky_event() -> void:
 			+ sky_event_chance_per_demonic * float(RunState.demonic_uses)
 	if randf() >= chance:
 		return
-	start_sky_event("blood_moon" if randf() < 0.5 else "eclipse")
+	_start_weather(_roll_group("moon"))
 
 
-## Group hook too (tests / future altars): starts a sky event by name.
+## A weighted id from one group, skipping the follow-up-only rows.
+func _roll_group(group: String) -> String:
+	var total := 0.0
+	for row: Dictionary in WEATHER_CATALOG:
+		if String(row.group) == group and not bool(row.get("follow_up_only", false)):
+			total += float(row.weight)
+	if total <= 0.0:
+		return ""
+	var roll := randf() * total
+	for row: Dictionary in WEATHER_CATALOG:
+		if String(row.group) != group or bool(row.get("follow_up_only", false)):
+			continue
+		roll -= float(row.weight)
+		if roll <= 0.0:
+			return String(row.id)
+	return ""
+
+
+## PUBLIC group hook (the probe, BONK_WEATHER_NOW, the event altar): FORCES
+## a row. It stops whatever is running and starts even inside the gap —
+## exclusivity is a rule, the gap is only a cadence, and a forced summon
+## that silently did nothing would make the altar feel broken and would
+## break verificar.sh's CIELO_TRAS_AVANCE gate.
 func start_sky_event(kind: String) -> void:
-	_cache_lights()
-	_sky_kind = kind
-	match kind:
-		"blood_moon":
-			var dark_duration := sky_event_duration * RunState.sky_duration_multiplier
-			_sky_left = dark_duration
-			get_tree().call_group("enemy_spawner", "set_sky_event", kind, dark_duration)
-			_tint_sky(Color(1.0, 0.25, 0.2), 0.9, Color(0.5, 0.1, 0.1))
-			_announce("LUNA DE SANGRE — ¡la horda enloquece!")
-		"eclipse":
-			var dark_duration := sky_event_duration * RunState.sky_duration_multiplier
-			_sky_left = dark_duration
-			get_tree().call_group("enemy_spawner", "set_sky_event", kind, dark_duration)
-			_tint_sky(Color(0.35, 0.3, 0.5), 0.35, Color(0.12, 0.1, 0.2))
-			_announce("ECLIPSE — las sombras entran por todos lados")
-		"full_moon":
-			# The pact sells "the moons last longer", so the good one grows
-			# too — a cost that only stretched the bad half would read as a
-			# straight penalty rather than a bargain.
-			var full_duration := full_moon_duration * RunState.sky_duration_multiplier
-			_sky_left = full_duration
-			for node: Node in get_tree().get_nodes_in_group("player"):
-				var stats := PlayerStats.find_in(node)
-				if stats != null:
-					stats.add_timed_boon("xp_gain", full_moon_xp_bonus, full_duration)
-					stats.add_timed_boon("luck", full_moon_luck_bonus, full_duration)
-			_tint_sky(Color(0.85, 0.9, 1.0), 1.3, Color(0.6, 0.65, 0.9))
-			_announce("LUNA LLENA — la fortuna y la sabiduría te sonríen")
-		_:
-			push_warning("WorldDirector: unknown sky event '%s'" % kind)
-			_sky_kind = ""
+	_start_weather(kind, true)
+
+
+## The event altar's roll: any row except the two rewards.
+func random_altar_weather() -> String:
+	var total := 0.0
+	for row: Dictionary in WEATHER_CATALOG:
+		if not ALTAR_EXCLUDED.has(String(row.id)):
+			total += float(row.weight)
+	if total <= 0.0:
+		return ""
+	var roll := randf() * total
+	for row: Dictionary in WEATHER_CATALOG:
+		if ALTAR_EXCLUDED.has(String(row.id)):
+			continue
+		roll -= float(row.weight)
+		if roll <= 0.0:
+			return String(row.id)
+	return ""
+
+
+func _start_weather(id: String, forced: bool = false) -> void:
+	if id.is_empty():
+		return
+	var row := weather_row(id)
+	if row.is_empty():
+		push_warning("WorldDirector: unknown weather '%s'" % id)
+		return
+	if not active_weather.is_empty():
+		if not forced:
 			return
-	print("Sky event: %s for %.0fs" % [kind, _sky_left])
+		# Forced: the running row is stopped properly, never just dropped —
+		# its stop() is what releases the tint, the points source and the
+		# HUD offset.
+		_stop_weather(false)
+	_cache_lights()
+	_weather_state = {}
+	var seconds := _weather_duration(row)
+	active_weather = {"id": id, "group": String(row.group), "time_left": seconds}
+	call(row.start)
+	if String(row.group) == "disaster":
+		# Extra line so a soak can grep disasters apart from the weather
+		# they share a channel with.
+		print("Disaster: %s" % id)
+	print("Weather started: %s" % id)
 
 
-func _tick_sky(delta: float) -> void:
+func _tick_weather(delta: float) -> void:
 	_sky_gap_left = maxf(_sky_gap_left - delta, 0.0)
-	if _sky_kind.is_empty():
+	if active_weather.is_empty():
 		return
-	_sky_left -= delta
-	if _sky_left > 0.0:
+	var row := weather_row(String(active_weather.id))
+	var tick: StringName = row.get("tick", &"")
+	if not tick.is_empty():
+		call(tick, delta)
+	# The tick can end the weather itself (the tsunami does once its wave
+	# is in), and then there is nothing left to count down.
+	if active_weather.is_empty():
 		return
-	var ended := _sky_kind
-	_sky_kind = ""
-	if ended == "full_moon":
-		_restore_sky()
-		_sky_gap_left = sky_event_min_gap
-	else:
-		# Every dark moon is followed by a bright one. Tint STRAIGHT into
-		# it: restoring first spawned a 2 s tween racing the full moon's
-		# 1.5 s one over the same properties, and the longer restore won.
-		start_sky_event("full_moon")
+	active_weather.time_left = float(active_weather.time_left) - delta
+	if float(active_weather.time_left) > 0.0:
+		return
+	_stop_weather(true)
+
+
+## Ends the live row. `chain` is false for teardown (stage swap, run exit):
+## the follow-up must not start into an arena that is going away.
+func _stop_weather(chain: bool) -> void:
+	if active_weather.is_empty():
+		return
+	var id := String(active_weather.id)
+	var row := weather_row(id)
+	var stop: StringName = row.get("stop", &"")
+	active_weather = {}
+	if not stop.is_empty():
+		call(stop)
+	_weather_state = {}
+	print("Weather ended: %s" % id)
+	if not chain:
+		return
+	var follow_up := String(row.get("follow_up", ""))
+	if not follow_up.is_empty():
+		# Straight into it, no restore first: restoring spawned a 2 s tween
+		# racing the follow-up's 1.5 s one over the same properties, and the
+		# longer restore won.
+		_start_weather(follow_up)
+		return
+	_restore_sky()
+	_sky_gap_left = sky_event_min_gap
+
+
+## --- moons ------------------------------------------------------------------
+
+func _weather_start_blood_moon() -> void:
+	var seconds := float(active_weather.time_left)
+	get_tree().call_group("enemy_spawner", "set_sky_event", "blood_moon", seconds)
+	_tint_sky(Color(1.0, 0.25, 0.2), 0.9, Color(0.5, 0.1, 0.1))
+	_announce("LUNA DE SANGRE — ¡la horda enloquece!")
+	_print_sky_event("blood_moon", seconds)
+
+
+func _weather_start_eclipse() -> void:
+	var seconds := float(active_weather.time_left)
+	get_tree().call_group("enemy_spawner", "set_sky_event", "eclipse", seconds)
+	_tint_sky(Color(0.35, 0.3, 0.5), 0.35, Color(0.12, 0.1, 0.2))
+	_announce("ECLIPSE — las sombras entran por todos lados")
+	_print_sky_event("eclipse", seconds)
+
+
+func _weather_start_full_moon() -> void:
+	# The pact sells "the moons last longer", so the good one grows too — a
+	# cost that only stretched the bad half would read as a straight
+	# penalty rather than a bargain.
+	var seconds := float(active_weather.time_left)
+	for node: Node in get_tree().get_nodes_in_group("player"):
+		var stats := PlayerStats.find_in(node)
+		if stats != null:
+			stats.add_timed_boon("xp_gain", full_moon_xp_bonus, seconds)
+			stats.add_timed_boon("luck", full_moon_luck_bonus, seconds)
+	_tint_sky(Color(0.85, 0.9, 1.0), 1.3, Color(0.6, 0.65, 0.9))
+	_announce("LUNA LLENA — la fortuna y la sabiduría te sonríen")
+	_print_sky_event("full_moon", seconds)
+
+
+## The moons keep their original log line VERBATIM: tools/verificar.sh's
+## CIELO_TRAS_AVANCE gate counts it after every stage change to prove the
+## director re-cached the new map's lights. Rains and disasters do not
+## print it — they tint nothing that gate is about.
+func _print_sky_event(kind: String, seconds: float) -> void:
+	print("Sky event: %s for %.0fs" % [kind, seconds])
+
+
+## --- rains ------------------------------------------------------------------
+
+func _weather_start_enemy_rain() -> void:
+	_weather_state["drop_left"] = 0.0
+	_tint_sky(Color(0.6, 0.8, 1.0), 0.8, Color(0.35, 0.45, 0.6))
+	_announce("LLUVIA DE ENEMIGOS — ¡caen del cielo!")
+
+
+## Enemies "fall" as a telegraph plus a downward streak, and then simply
+## appear on the ground. They are NOT dropped from a height: a body falling
+## in is a body with upward-then-downward velocity off the floor, which is
+## exactly what the harness's airborne detector exists to catch — and that
+## detector is deliberately narrow and must not be widened for scenery.
+func _weather_tick_enemy_rain(delta: float) -> void:
+	_weather_state["drop_left"] = float(_weather_state.get("drop_left", 0.0)) - delta
+	if float(_weather_state["drop_left"]) > 0.0:
+		return
+	_weather_state["drop_left"] = enemy_rain_interval
+	var anchor_body := Coop.random_player(get_tree())
+	if anchor_body == null:
+		return
+	var wanted := randi_range(enemy_rain_min_drops, enemy_rain_max_drops)
+	var points: Array[Vector3] = []
+	for i in wanted:
+		var point := _rain_point(anchor_body.global_position,
+				enemy_rain_min_distance, enemy_rain_max_distance)
+		if point == Vector3.INF:
+			continue
+		points.append(point)
+		Telegraph.spawn_disc(self, point, 1.4, 1.0, Color(0.6, 0.85, 1.0))
+		Juice.burst(point + Vector3.UP * 3.0, Color(0.6, 0.85, 1.0), 6)
+	if not points.is_empty():
+		# NOT the horde budget: a rain is ambient weather that runs for 35
+		# seconds, and the extra 40 bodies of horde headroom kept the arena
+		# pinned at its cap for the whole window — a wall the party cannot
+		# push through, which stopped a stage soak from ever reaching its
+		# exit portal. The tsunami below is the one that IS a wave.
+		get_tree().call_group("enemy_spawner", "spawn_at_points", points, false)
+
+
+func _weather_start_radioactive_rain() -> void:
+	_weather_state["pool_left"] = 0.0
+	_tint_sky(Color(0.5, 1.0, 0.4), 0.85, Color(0.2, 0.4, 0.15))
+	_announce("LLUVIA RADIACTIVA — el suelo se vuelve ácido")
+
+
+func _weather_tick_radioactive_rain(delta: float) -> void:
+	_weather_state["pool_left"] = float(_weather_state.get("pool_left", 0.0)) - delta
+	if float(_weather_state["pool_left"]) > 0.0:
+		return
+	_weather_state["pool_left"] = acid_pool_interval
+	var anchor_body := Coop.random_player(get_tree())
+	if anchor_body == null:
+		return
+	var point := _rain_point(anchor_body.global_position, 2.0, acid_pool_spawn_range)
+	if point != Vector3.INF:
+		spawn_acid_pool(point)
+
+
+func _weather_stop_radioactive_rain() -> void:
+	# The pools outlive the rain by design (they are already on the ground
+	# and lethal); each one expires on its own clock, and the stage swap
+	# reclaims any that are still live through Pools.release_all_live.
+	pass
+
+
+## PUBLIC (EnemyBase calls it on death while the radioactive rain runs):
+## one acid puddle, subject to the live cap and the spacing rule. Skipped
+## silently past either — a warning here would fail a soak for working as
+## designed, and raising the cap to fit more is not a fix.
+func spawn_acid_pool(at: Vector3) -> void:
+	if not is_weather_active("radioactive_rain"):
+		return
+	var live := get_tree().get_nodes_in_group(&"acid_pools")
+	if live.size() >= MAX_LIVE_ACID_POOLS:
+		return
+	var spacing_sq := ACID_POOL_SPACING * ACID_POOL_SPACING
+	for node: Node in live:
+		var pool := node as Node3D
+		if pool != null and pool.global_position.distance_squared_to(at) < spacing_sq:
+			return
+	var fresh := Pools.acquire_scene(Pools.ACID_POOL_SCENE) as AcidPool
+	if fresh == null:
+		return
+	fresh.play(at, acid_pool_radius, acid_pool_lifetime, ACID_DAMAGE_PER_SECOND)
+
+
+## True while `id` is the live weather. THE public read for anything that
+## has to behave differently under one (EnemyBase's acid drop, the HUD).
+func is_weather_active(id: String) -> bool:
+	return not active_weather.is_empty() and String(active_weather.id) == id
+
+
+func _weather_start_golden_rain() -> void:
+	_tint_sky(Color(1.0, 0.85, 0.4), 1.2, Color(0.6, 0.5, 0.2))
+	# BOTH groups: a downed raider still earns the points their teammates
+	# bank on their behalf, and the source has to come off them too.
+	for body: Node3D in _all_raiders():
+		if body.has_method("set_points_source"):
+			body.call("set_points_source", "golden_rain", golden_points_multiplier)
+	RunState.price_discount = golden_price_discount
+	_announce("LLUVIA DORADA — todo brilla y todo vale la mitad")
+
+
+func _weather_stop_golden_rain() -> void:
+	for body: Node3D in _all_raiders():
+		if body.has_method("clear_points_source"):
+			body.call("clear_points_source", "golden_rain")
+	RunState.price_discount = 1.0
+
+
+## Every raider, standing or downed. Party-wide effects have to reach both
+## groups: a downed body leaves "player" and joins "downed_players".
+func _all_raiders() -> Array[Node3D]:
+	var bodies: Array[Node3D] = []
+	for group: String in ["player", "downed_players"]:
+		for node: Node in get_tree().get_nodes_in_group(group):
+			var body := node as Node3D
+			if body != null and is_instance_valid(body):
+				bodies.append(body)
+	return bodies
+
+
+## A walkable, grounded point in a ring around `origin`, or Vector3.INF
+## when the mask offers none. Rain and meteors both land through here, so
+## nothing weather drops can end up inside the arena's rocks.
+func _rain_point(origin: Vector3, min_distance: float, max_distance: float) -> Vector3:
+	for attempt in EVENT_POINT_ATTEMPTS:
+		var angle := randf() * TAU
+		var pos := origin + Vector3(cos(angle), 0.0, sin(angle)) \
+				* randf_range(min_distance, max_distance)
+		var limit := _arena_half_extent - bounds_margin
+		pos.x = clampf(pos.x, -limit, limit)
+		pos.z = clampf(pos.z, -limit, limit)
+		if _walkable(pos):
+			pos.y = _ground_height(pos)
+			return pos
+	return Vector3.INF
+
+
+## --- disasters --------------------------------------------------------------
+
+func _weather_start_tsunami() -> void:
+	var anchor_body := Coop.random_player(get_tree())
+	var origin := anchor_body.global_position if anchor_body != null else Vector3.ZERO
+	var angle := randf() * TAU
+	_weather_state["angle"] = angle
+	_weather_state["origin"] = origin
+	var wanted := tsunami_base + tsunami_per_minute * int(_minutes())
+	_weather_state["left"] = wanted
+	_announce("¡TSUNAMI DE ENEMIGOS! %s" % _compass_word(angle))
+
+
+## Poured in over the row's three seconds, in per-frame chunks: forty-plus
+## bodies made in one frame is a visible hitch, and the horde cap inside
+## spawn_at_points bounds the total anyway.
+func _weather_tick_tsunami(_delta: float) -> void:
+	var left := int(_weather_state.get("left", 0))
+	if left <= 0:
+		return
+	var chunk := mini(left, TSUNAMI_PER_FRAME)
+	var origin: Vector3 = _weather_state.get("origin", Vector3.ZERO)
+	var angle := float(_weather_state.get("angle", 0.0))
+	var points: Array[Vector3] = []
+	for i in chunk:
+		# A 60 degree arc on ONE side: a tsunami is a wall coming from
+		# somewhere, not a ring closing in (that is what a horde is).
+		var spread := angle + randf_range(-TSUNAMI_ARC_SPREAD, TSUNAMI_ARC_SPREAD)
+		var pos := origin + Vector3(cos(spread), 0.0, sin(spread)) \
+				* randf_range(tsunami_arc_min, tsunami_arc_max)
+		var limit := _arena_half_extent - bounds_margin
+		pos.x = clampf(pos.x, -limit, limit)
+		pos.z = clampf(pos.z, -limit, limit)
+		if _walkable(pos):
+			points.append(pos)
+	if not points.is_empty():
+		get_tree().call_group("enemy_spawner", "spawn_at_points", points, true)
+	_weather_state["left"] = left - chunk
+
+
+func _weather_start_earthquake() -> void:
+	_weather_state["shake_left"] = 0.0
+	_weather_state["dust_left"] = 0.0
+	_weather_state["hud_time"] = 0.0
+	_announce("¡TERREMOTO! El suelo no se queda quieto")
+
+
+func _weather_tick_earthquake(delta: float) -> void:
+	_weather_state["shake_left"] = float(_weather_state.get("shake_left", 0.0)) - delta
+	if float(_weather_state["shake_left"]) <= 0.0:
+		_weather_state["shake_left"] = earthquake_shake_interval
+		Juice.shake(earthquake_shake_strength)
+	_weather_state["dust_left"] = float(_weather_state.get("dust_left", 0.0)) - delta
+	if float(_weather_state["dust_left"]) <= 0.0:
+		_weather_state["dust_left"] = earthquake_dust_interval
+		for body: Node3D in _all_raiders():
+			Juice.burst(body.global_position, Color(0.6, 0.55, 0.45), 8)
+	# The HUD is a CanvasLayer, so ONE offset moves every element it owns —
+	# bars, timer, loadout strips and the per-view minimaps — which is what
+	# "the sprites move around" means. The Tab map is a different layer and
+	# deliberately stays still: a map that shook would be unreadable.
+	var hud_time := float(_weather_state.get("hud_time", 0.0)) + delta
+	_weather_state["hud_time"] = hud_time
+	var phase := hud_time * earthquake_hud_hz * TAU
+	get_tree().call_group("hud", "set_quake_offset", Vector2(
+			sin(phase) * earthquake_hud_amplitude,
+			cos(phase * 1.3) * earthquake_hud_amplitude))
+
+
+func _weather_stop_earthquake() -> void:
+	get_tree().call_group("hud", "set_quake_offset", Vector2.ZERO)
+
+
+func _weather_start_meteors() -> void:
+	_weather_state["meteor_left"] = 0.0
+	_weather_state["pending"] = []
+	_tint_sky(Color(1.0, 0.6, 0.35), 0.95, Color(0.4, 0.25, 0.15))
+	_announce("¡LLUVIA DE METEORITOS! Sal de los círculos")
+
+
+func _weather_tick_meteors(delta: float) -> void:
+	var pending: Array = _weather_state.get("pending", [])
+	for i in range(pending.size() - 1, -1, -1):
+		var strike: Dictionary = pending[i]
+		strike["left"] = float(strike["left"]) - delta
+		if float(strike["left"]) > 0.0:
+			pending[i] = strike
+			continue
+		pending.remove_at(i)
+		_meteor_impact(strike["at"])
+	_weather_state["pending"] = pending
+	_weather_state["meteor_left"] = float(_weather_state.get("meteor_left", 0.0)) - delta
+	if float(_weather_state["meteor_left"]) > 0.0:
+		return
+	_weather_state["meteor_left"] = meteor_interval
+	if pending.size() >= MAX_LIVE_TELEGRAPHS:
+		return
+	var anchor_body := Coop.random_player(get_tree())
+	if anchor_body == null:
+		return
+	var at := _rain_point(anchor_body.global_position, 3.0, meteor_range)
+	if at == Vector3.INF:
+		return
+	Telegraph.spawn_disc(self, at, meteor_radius, meteor_telegraph,
+			Color(1.0, 0.55, 0.2))
+	pending.append({"at": at, "left": meteor_telegraph})
+	_weather_state["pending"] = pending
+
+
+## One meteor lands. Enemies take the brunt: a disaster that only hurt the
+## party would be a pure tax, and one that only hurt the horde would be a
+## gift — this is both, which is what makes standing still the mistake.
+func _meteor_impact(at: Vector3) -> void:
+	Juice.burst(at + Vector3.UP * 0.5, Color(1.0, 0.6, 0.25), 26)
+	Juice.shake(0.35)
+	Telegraph.spawn_disc(self, at, meteor_radius * 0.8, 0.5, Color(0.35, 0.2, 0.15))
+	var damage := meteor_damage * (1.0 + _minutes() * 0.05)
+	var radius_sq := meteor_radius * meteor_radius
+	for body: Node3D in _all_raiders():
+		if _flat_distance_sq(body.global_position, at) <= radius_sq:
+			var health := Health.find_in(body)
+			if health != null and not health.is_dead:
+				health.take_damage(damage)
+	for node: Node in get_tree().get_nodes_in_group("enemies"):
+		var enemy := node as Node3D
+		if enemy == null or not enemy.is_inside_tree():
+			continue
+		if _flat_distance_sq(enemy.global_position, at) > radius_sq:
+			continue
+		var enemy_health := Health.find_in(enemy)
+		if enemy_health != null and not enemy_health.is_dead:
+			enemy_health.take_damage(damage * meteor_enemy_scale)
+
+
+static func _flat_distance_sq(a: Vector3, b: Vector3) -> float:
+	var span := a - b
+	span.y = 0.0
+	return span.length_squared()
+
+
+## Which way the tsunami comes from, for the announce. Four words is
+## enough: the player needs a direction to run, not a bearing.
+static func _compass_word(angle: float) -> String:
+	var turns := fposmod(angle / TAU, 1.0)
+	if turns < 0.125 or turns >= 0.875:
+		return "desde el este"
+	if turns < 0.375:
+		return "desde el sur"
+	if turns < 0.625:
+		return "desde el oeste"
+	return "desde el norte"
 
 
 func _cache_lights() -> void:
