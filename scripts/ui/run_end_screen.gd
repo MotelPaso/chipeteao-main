@@ -195,13 +195,18 @@ func _center_title_pivot() -> void:
 
 
 func _on_retry_pressed() -> void:
-	ScreenFade.leave_run()
+	# The return is checked (screen_fade.gd asks callers to): a press that
+	# lands while a cut is already running is DROPPED, and swallowing that
+	# silently leaves a live button that looks broken.
+	if not ScreenFade.leave_run():
+		return
 
 
 ## Retry's cleanup, but back to the select screen for a new loadout (the
 ## GameConfig selection survives, so the screen reopens on the last pick).
 func _on_change_character_pressed() -> void:
-	ScreenFade.leave_run(CHARACTER_SELECT_SCENE_PATH)
+	if not ScreenFade.leave_run(CHARACTER_SELECT_SCENE_PATH):
+		return
 
 
 func _on_quit_pressed() -> void:

@@ -23,7 +23,7 @@ Lo que NO se traduce nunca: los `id` de catálogo, los `node_name`, los nombres 
 18. Compuestos: verbo + sustantivo en plural (Perforacorazones, Matarreyes, Cazacoronas, Levantatapas); mata- no elide nunca. Escupesol va en singular (quitasol, girasol).
 19. Los glifos de dos letras de item_catalog.gd se re-siglan al nombre español (tabla en «terminos»); un glifo «WS» sobre «Piedra de afilar» se lee como bug.
 20. Brevedad: la etiqueta española no debe crecer más de ~10% sobre la inglesa en HUD, insignias y botones. Si crece, se recorta el adjetivo, nunca el sentido.
-21. El mapa de Tab **no** es un menú y su título no lleva verbo: la cabecera es «Etapa N · Vuelta M — MM:SS» y los tres paneles son sustantivos sueltos («Estadísticas», «Jugadores», «Objetos»). La leyenda nombra **familias** en plural («Cofres», «Altares», «Portales») y en singular solo lo que es único en la etapa («Jefe», «Salida», «Manantial», «Ruleta»).
+21. El mapa de Tab **no** es un menú y su título no lleva verbo: la cabecera es «Etapa N · Vuelta M — MM:SS» y los paneles son sustantivos sueltos — hoy cinco: «Power-ups», «Mascota», «Estadísticas», «Jugadores», «Objetos». La leyenda nombra **familias** en plural («Cofres», «Altares», «Portales») y en singular solo lo que es único en la etapa («Jefe», «Salida», «Manantial», «Ruleta»).
 
 ## Personajes (no se traducen)
 
@@ -42,6 +42,10 @@ Lo que NO se traduce nunca: los `id` de catálogo, los `node_name`, los nombres 
 | Miro | Miro |
 | Bogg | Bogg |
 | Kael | Kael |
+| Bramble | Bramble |
+| Boxeador | Boxeador |
+| PNG gucci morty | PNG gucci morty |
+| Backyardigan | Backyardigan |
 
 ## Armas
 
@@ -120,10 +124,6 @@ Lo que NO se traduce nunca: los `id` de catálogo, los `node_name`, los nombres 
 | Master Key | Llave maestra |
 | Superhero Mask | Máscara de superhéroe |
 | Cosmic Worm | Gusano cósmico |
-| Alien Egg | Huevo alienígena |
-| Dino Egg | Huevo de dino |
-| Angry Egg | Huevo furioso |
-| Capybara Friend | Amigo capibara |
 | glyph "WS" | glifo "PA" |
 | glyph "IR" | glifo "RH" |
 | glyph "LC" | glifo "MO" |
@@ -136,10 +136,9 @@ Lo que NO se traduce nunca: los `id` de catálogo, los `node_name`, los nombres 
 | glyph "MK" | glifo "LM" |
 | glyph "SM" | glifo "MS" |
 | glyph "CW" | glifo "GC" |
-| glyph "AL" | glifo "HA" |
-| glyph "DN" | glifo "HD" |
-| glyph "AB" | glifo "HF" |
-| glyph "CP" | glifo "AC" |
+| glyph "CL" | glifo "CE" (Cinturón Eléctrico) |
+| glyph "SS" | glifo "SS" (Sangre Sayayin) |
+| glyph "ZK" | glifo "ZK" (Zenkai) |
 | glyph "SP" (Spring Boots) | glifo "RS" (por «reSorte»: «BR» ya es Tomo de Bruma) |
 
 ## Mascotas
@@ -474,6 +473,8 @@ el arcoíris, no en el nombre.
 | `[E] See the animals` | `[E] Ver los animales` |
 | `[E] See the power-up` | `[E] Ver el power-up` |
 | `[E] See the goods` | `[E] Ver la mercancía` |
+| `[E] Trade` (respaldo de una fila sin `prompt`) | `[E] Comerciar` |
+| `Serving again in %d s` (espera tras cerrar sin comprar; **sin `[E] `**, porque no hay nada que pulsar) | Atiende de nuevo en %d s |
 | `[E] Open the box` | `[E] Abrir la caja` |
 | `A box with a paw appears...` | Una caja con una huella aparece en el campo... |
 | `The box is empty.` | La caja está vacía. |
@@ -589,7 +590,6 @@ evolución.
 | `Settings` | Ajustes |
 | `v0.0.0` | v0.0.0 |
 | `v%s` | v%s |
-| `T%d` | G%d |
 | `Jugadores` | Jugadores |
 | `Conecta %d mando(s) para %d jugadores` | Conecta %d control(es) para %d jugadores |
 | `P1 teclado+ratón · P2-P%d mando · %d mando(s)` | J1 teclado+mouse · J2-J%d control · %d control(es) |

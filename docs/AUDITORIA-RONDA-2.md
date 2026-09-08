@@ -82,37 +82,37 @@ marcadores de cadena > deriva de documentación.
 |---|---|---|---|---|
 | L1-1 | HIGH | `scripts/world/run_root.gd:194` | Un cambio de etapa con un menú de vendedor o de ruleta abierto deja el árbol pausado **para siempre**: esos `CanvasLayer` cuelgan de la arena (`vendor.gd:162`, `roulette_shrine.gd:82`), así que `_arena.free()` los destruye sin pasar por su `_close()` —el único `get_tree().paused = false` que existe— y `was_paused` ya era `true`, así que el paso 7 tampoco despausa. `_swap_stage` nunca llama al hook `dismiss()` del grupo `blocking_ui_closable`. Contradice el CHANGELOG 54 («VendorUi … pauses and always unpauses») y el propio comentario de `vendor.gd:160`. | **fixed** (58), aserción `Swap menu: paused=true` → `false` |
 | L1-2 | MEDIUM | `scripts/world/run_root.gd:129` | `advance_stage()` no comprueba `RunState.run_active`: una pulsación de portal cuya cortina sobrevive a la party reconstruye una etapa entera para una partida ya doblada al guardado. | **fixed** (58) |
-| L1-3 | MEDIUM | `docs/ARQUITECTURA.md:297` | (sembrado) «para explícitamente el spawner **y el director**»: `_swap_stage` solo para el spawner (`run_root.gd:157`); el director se para a sí mismo dentro de `on_stage_ended` (`world_director.gd:387`), en el paso 3. El comentario del propio `run_root.gd:152-156` repite el error. | pendiente (59, doc) |
-| L1-4 | MEDIUM | `docs/ARQUITECTURA.md:300` | El formato documentado de `Stage sweep:` tiene 6 campos; el código imprime 10 y `verificar.sh` greppea el literal de 10. | pendiente (59, doc) |
+| L1-3 | MEDIUM | `docs/ARQUITECTURA.md:297` | (sembrado) «para explícitamente el spawner **y el director**»: `_swap_stage` solo para el spawner (`run_root.gd:157`); el director se para a sí mismo dentro de `on_stage_ended` (`world_director.gd:387`), en el paso 3. El comentario del propio `run_root.gd:152-156` repite el error. | **fixed** (59, doc) |
+| L1-4 | MEDIUM | `docs/ARQUITECTURA.md:300` | El formato documentado de `Stage sweep:` tiene 6 campos; el código imprime 10 y `verificar.sh` greppea el literal de 10. | **fixed** (59, doc) |
 | L1-5 | MEDIUM | `scripts/world/exit_portal.gd:120` | Marca `_taken`/`consume()` **antes** de que `advance_stage()` pueda declinar (ScreenFade ocupado), dejando un portal muerto. Contradice `run_root.gd:137-139`. | **fixed** (58) |
 | L1-6 | MEDIUM | `scripts/ui/roulette_ui.gd:87` | El vigía de auto-cierre mira solo `_player`, nunca `_shrine`; su hermano `vendor_ui.gd:126` mira los dos. | **fixed** (58) |
-| L1-7 | MEDIUM | `docs/ARQUITECTURA.md:56`, `:956` | `blocking_ui_closable` «hoy solo la ruleta» y `dismiss()` «sin llamador todavía»: `vendor_ui.gd:99/115` es un segundo miembro desde la iteración 54. | pendiente (59, doc) |
-| L1-8 | LOW | `docs/ARQUITECTURA.md:33` | El contrato del grupo `enemy_spawner` sigue anunciando `apply_tier_spec`, borrado con los grados en la iteración 50. | pendiente (59, doc) |
+| L1-7 | MEDIUM | `docs/ARQUITECTURA.md:56`, `:956` | `blocking_ui_closable` «hoy solo la ruleta» y `dismiss()` «sin llamador todavía»: `vendor_ui.gd:99/115` es un segundo miembro desde la iteración 54. | **fixed** (59, doc) |
+| L1-8 | LOW | `docs/ARQUITECTURA.md:33` | El contrato del grupo `enemy_spawner` sigue anunciando `apply_tier_spec`, borrado con los grados en la iteración 50. | **fixed** (59, doc) |
 | L1-9 | LOW | `scripts/systems/save_data.gd:113` | `Save path overridden:` no estaba en el inventario de logs. | **fixed** (57) |
-| L1-10 | LOW | `scripts/systems/save_data.gd:20`, `:34` | Comentarios de cabecera obsoletos (`best_endless_minutes`, reglas de desbloqueo de mapa). | pendiente (59, doc) |
-| L1-11 | LOW | `scripts/world/run_systems.gd:42` | `show_stage_tag` corre antes de que `RunRoot._ready` resuelva `stage_index`: una partida que empieza pasada la etapa 1 muestra «E1» hasta el primer cruce. | pendiente (59) |
+| L1-10 | LOW | `scripts/systems/save_data.gd:20`, `:34` | Comentarios de cabecera obsoletos (`best_endless_minutes`, reglas de desbloqueo de mapa). | deferred: comentarios de cabecera, sin consumidor; cambian con el próximo toque de `save_data.gd` |
+| L1-11 | LOW | `scripts/world/run_systems.gd:42` | `show_stage_tag` corre antes de que `RunRoot._ready` resuelva `stage_index`: una partida que empieza pasada la etapa 1 muestra «E1» hasta el primer cruce. | deferred: solo alcanzable con `BONK_ARENA` apuntando a un bioma que no es el primero; ninguna partida real empieza pasada la etapa 1 |
 | L1-12 | LOW | `scenes/world/RunSystems.tscn:34` | El nodo `FogOfWar` está declarado después de la sección `[connection]`. | deferred: carga bien hoy; reordenarlo es un cambio de escena sin síntoma |
-| L1-13 | LOW | `scripts/ui/run_end_screen.gd:198`, `:204` | Se descarta el retorno de `ScreenFade.leave_run()`; `pause_menu.gd:148` sí lo comprueba. | pendiente (59) |
-| L1-14 | LOW | `scripts/ui/screen_fade.gd:87` | `await action.call()` no tiene ruta de fallo: una acción que revienta deja `_busy` y el rectángulo negro puestos para siempre. | pendiente (59) |
+| L1-13 | LOW | `scripts/ui/run_end_screen.gd:198`, `:204` | Se descarta el retorno de `ScreenFade.leave_run()`; `pause_menu.gd:148` sí lo comprueba. | **fixed** (59) |
+| L1-14 | LOW | `scripts/ui/screen_fade.gd:87` | `await action.call()` no tiene ruta de fallo: una acción que revienta deja `_busy` y el rectángulo negro puestos para siempre. | deferred: un `_busy` colgado necesita que la acción reviente, y no hay ninguna que lo haga hoy; el arreglo honesto (un vigía en el autoload) es más grande que el hallazgo |
 
 ### Carril 2 — director del mundo, clima, POIs, economía, props
 
 | Id | Sev | Dónde | Qué | Estado |
 |---|---|---|---|---|
-| L2-1 | MEDIUM | `scripts/world/world_director.gd:1364` | `_weather_start_full_moon` reparte solo al grupo `player`: un raider derribado se queda sin la luna llena entera. Su hermana `_weather_start_golden_rain` sí recorre los dos grupos. Además los dos boons van **sin tag**. | pendiente (59) |
-| L2-2 | MEDIUM | `scripts/world/world_director.gd:1530` | La ola del tsunami se dimensiona con el reloj de **partida**; `docs/ARQUITECTURA.md:768` dice «minuto de **etapa**», que es a donde la iteración 50 movió jefes y hordas. | pendiente (59) |
+| L2-1 | MEDIUM | `scripts/world/world_director.gd:1364` | `_weather_start_full_moon` reparte solo al grupo `player`: un raider derribado se queda sin la luna llena entera. Su hermana `_weather_start_golden_rain` sí recorre los dos grupos. Además los dos boons van **sin tag**. | **fixed** (59) |
+| L2-2 | MEDIUM | `scripts/world/world_director.gd:1530` | La ola del tsunami se dimensiona con el reloj de **partida**; `docs/ARQUITECTURA.md:768` dice «minuto de **etapa**», que es a donde la iteración 50 movió jefes y hordas. | **fixed** (59) |
 | L2-3 | MEDIUM | `scripts/world/world_director.gd:493` | `_physics_process` sale antes de `_tick_weather` en cuanto `run_active` cae, así que un clima vivo **nunca se para al terminar la partida**: el desplazamiento del HUD queda congelado, `price_discount` se queda en 0.5 y la fuente de puntos de la lluvia dorada sobrevive hasta el siguiente `RunState.reset()`. | **fixed** (58) |
-| L2-4 | MEDIUM | `scripts/world/event_altar.gd:117` | El altar **fuerza** y reemplaza el clima activo; `CHANGELOG.md:57` y `docs/ARQUITECTURA.md:790` dicen que **rechaza**. El código lleva su razón escrita al lado: la deriva está en los documentos. | pendiente (59, doc) |
+| L2-4 | MEDIUM | `scripts/world/event_altar.gd:117` | El altar **fuerza** y reemplaza el clima activo; `CHANGELOG.md:57` y `docs/ARQUITECTURA.md:790` dicen que **rechaza**. El código lleva su razón escrita al lado: la deriva está en los documentos. | **fixed** (59, doc) |
 | L2-5 | MEDIUM | `scripts/world/vendor.gd:153` | `_interact` abre un menú que pausa el árbol sin mirar `ui_blocking`, y `vendor_ui._close` despausa incondicionalmente: puede soltar una pausa que era del selector de cartas. | **fixed** (58) |
-| L2-6 | LOW | `scripts/world/world_director.gd:352` | `_spawn_start_pet_boxes` tira `randf()` incondicionalmente, rompiendo la regla de cortocircuito que sus dos vecinas explican textualmente. | pendiente (59) |
-| L2-7 | LOW | `scripts/world/world_director.gd:418` | El último recurso de `_stage_parent()` (`return self`) cuelga un spawn de etapa del director persistente, invisible para el barrido. | pendiente (59) |
-| L2-8 | LOW | `scripts/world/world_director.gd:1602` | Una lluvia de meteoros que termina por duración descarta los impactos pendientes. | pendiente (59) |
-| L2-9 | LOW | `scripts/world/world_director.gd:1045` | `_despawn_chest` construye el tween de hundimiento en el **director**, no en el cofre. | pendiente (59) |
-| L2-10 | LOW | `scripts/world/run_root.gd:267` | El campo `beacons=` del barrido es estructuralmente siempre 0: `on_stage_ended` ya vació `_beacons` en el paso 3. | pendiente (59) |
+| L2-6 | LOW | `scripts/world/world_director.gd:352` | `_spawn_start_pet_boxes` tira `randf()` incondicionalmente, rompiendo la regla de cortocircuito que sus dos vecinas explican textualmente. | **fixed** (59) |
+| L2-7 | LOW | `scripts/world/world_director.gd:418` | El último recurso de `_stage_parent()` (`return self`) cuelga un spawn de etapa del director persistente, invisible para el barrido. | deferred: la ventana (`_arena == null` con el director procesando) está cerrada por `set_physics_process(false)` en `on_stage_ended`; devolver `null` ahí necesita revisar cada llamador |
+| L2-8 | LOW | `scripts/world/world_director.gd:1602` | Una lluvia de meteoros que termina por duración descarta los impactos pendientes. | deferred: resolver los impactos pendientes al parar cambia lo que hace un desastre, que es una decisión de diseño de la iteración 55 |
+| L2-9 | LOW | `scripts/world/world_director.gd:1045` | `_despawn_chest` construye el tween de hundimiento en el **director**, no en el cofre. | **fixed** (59) |
+| L2-10 | LOW | `scripts/world/run_root.gd:267` | El campo `beacons=` del barrido es estructuralmente siempre 0: `on_stage_ended` ya vació `_beacons` en el paso 3. | **fixed** (59) — y el campo pasó a ser real: `on_stage_ended` ahora LIBERA los nodos de baliza en vez de solo vaciar la lista |
 | L2-11 | LOW | `scripts/world/vendor.gd:154` | Un puesto en `retry_cooldown` sigue `available` y con su prompt puesto mientras ignora cada pulsación. | **fixed** (58) |
-| L2-12 | LOW | `scripts/world/curse_shrine.gd:214` | Comentario obsoleto («sin consumidor hasta la parte C»). | pendiente (59, doc) |
+| L2-12 | LOW | `scripts/world/curse_shrine.gd:214` | Comentario obsoleto («sin consumidor hasta la parte C»). | **fixed** (59, doc) |
 | L2-13 | LOW | `scenes/tests/arena_probe.gd:27` | Lista `BONK_POI_NOW` de la cabecera incompleta. | **fixed** (57) |
-| L2-14 | LOW | `scripts/world/world_director.gd:1144`, `:1305`, `docs/ARQUITECTURA.md:769` | Tres textos dicen que el tick del tsunami «termina solo»; lo termina su duración. | pendiente (59, doc) |
+| L2-14 | LOW | `scripts/world/world_director.gd:1144`, `:1305`, `docs/ARQUITECTURA.md:769` | Tres textos dicen que el tick del tsunami «termina solo»; lo termina su duración. | deferred: comentarios; el comportamiento documentado y el real coinciden en lo que importa (la duración termina la fila) |
 
 ### Carril 3 — enemigos, spawner, posesión, pools, FX
 
@@ -121,9 +121,9 @@ marcadores de cadena > deriva de documentación.
 | L3-1 | HIGH | `scripts/systems/enemy_spawner.gd:652` | `_freeze_new_bodies` recorre solo `enemies` y `boss`, pero un Duneburrower **enterrado** ya salió de `enemies` (`duneburrower.gd:107`) y no entra en ningún otro grupo: Tiempo detenido no lo congela nunca. Sigue moviéndose y su `_erupt` golpea a la party dentro de la ventana cuya promesa entera es «nada te toca» — y, al no estar en `_frozen`, `frozen_bodies()` tampoco puede delatarlo. | **fixed** en el código (58); **prueba incompleta** — ver «Las tres aserciones de los HIGH» |
 | L3-2 | MEDIUM | `scripts/systems/power_ups.gd:169` | `time_stop` se empuja una sola vez desde `_apply_row` y no está en `_sync()`: un cambio de etapa deja caer una congelación viva (el spawner nuevo nace con `_freeze_left = 0`) mientras la casilla del HUD sigue contando. | **fixed** (58) |
 | L3-3 | MEDIUM | `scripts/enemies/enemy_base.gd:292` | `_tint_possessed()` escribe `mesh.material_overlay` directo en vez de tomar una ranura: `Juice.flash` restaura `current_overlay()` (nulo), así que el primer golpe borra el tinte morado del sirviente para siempre. | **fixed** (58) |
-| L3-4 | MEDIUM | `scripts/enemies/enemy_base.gd:336` | `_tick_climb` limpia `_climbing` solo al tocar suelo: un cuerpo que pierde contacto conserva la bandera mientras cae, y con ella `_clamp_solver_launch` sale antes de tiempo **y** el detector de vuelo del harness lo exime. | pendiente (59) |
+| L3-4 | MEDIUM | `scripts/enemies/enemy_base.gd:336` | `_tick_climb` limpia `_climbing` solo al tocar suelo: un cuerpo que pierde contacto conserva la bandera mientras cae, y con ella `_clamp_solver_launch` sale antes de tiempo **y** el detector de vuelo del harness lo exime. | deferred: tocar `_climbing` mueve a la vez la pinza del solver y una de las dos exenciones del detector de vuelo; sin un caso reproducible el riesgo supera al hallazgo |
 | L3-5 | MEDIUM | `scripts/enemies/enemy_base.gd:781` | `_on_died` de un sirviente no lo saca de `POSSESSED_GROUP`: los cadáveres cuentan contra `max_possessed` durante 0.3 s y pueden provocar un `Possessed expired:` falso. | **fixed** (58) |
-| L3-6 | LOW | `scripts/systems/enemy_spawner.gd:877` | `spawn_at_points` quedó insertada **dentro** del bloque de documentación de `spawn_pressure_burst`; el de `elite_chance()` quedó huérfano 170 líneas más arriba. | pendiente (59) |
+| L3-6 | LOW | `scripts/systems/enemy_spawner.gd:877` | `spawn_at_points` quedó insertada **dentro** del bloque de documentación de `spawn_pressure_burst`; el de `elite_chance()` quedó huérfano 170 líneas más arriba. | deferred: bloques de documentación mal colocados, sin efecto en ejecución |
 | L3-7 | LOW | `scripts/systems/enemy_spawner.gd:865` | `spawn_minions()` no tiene ningún llamador: `Rotking._resolve_summon` sigue instanciando a mano y saltándose `_make_enemy_at`. **Anterior a la ronda** (viene de antes de `main`). | deferred: anterior a la ronda (ver Seguimiento) |
 | L3-8 | LOW | `scripts/weapons/necro_staff.gd:184` | `possessed_count()` es código muerto y su docstring describe mal lo que imprime el harness; en co-op el `possessed=a/b` compara los sirvientes de toda la party contra el tope de un solo portador. | **fixed** (58, mitad del harness) |
 | L3-9 | LOW | `scripts/weapons/necro_staff.gd:176` | `while mine.size() >= max_possessed` no termina si `max_possessed` llegara a 0 o menos, y las tablas de evolución escriben propiedades por nombre. | **fixed** (58) |
@@ -134,17 +134,17 @@ marcadores de cadena > deriva de documentación.
 | Id | Sev | Dónde | Qué | Estado |
 |---|---|---|---|---|
 | L4-1 | HIGH | `scripts/systems/item_bag.gd:291` | `_start_aura` pone `SAIYAN_TAG` en sus tres boons pero **nunca llama a `clear_timed_boons(SAIYAN_TAG)`**, así que un re-disparo dentro de los 12 s **apila** un segundo aura en vez de reemplazarlo y la primera expiración se lleva solo la mitad. Es exactamente lo que su propio comentario (`item_bag.gd:288`), el docstring de `add_timed_boon` y el CHANGELOG 56 dicen que está prevenido. `PowerUps._apply_row` es el único sitio del proyecto que lo hace bien. | **fixed** (58), aserción `Saiyan boons: max=9 of 3` → `max=3 of 3` |
-| L4-2 | MEDIUM | `scripts/world/world_director.gd:1364` | (mismo defecto que L2-1, visto desde el otro lado: los boons de luna llena no llevan tag y no cubren a los caídos). | pendiente (59) |
+| L4-2 | MEDIUM | `scripts/world/world_director.gd:1364` | (mismo defecto que L2-1, visto desde el otro lado: los boons de luna llena no llevan tag y no cubren a los caídos). | **fixed** (59) con L2-1 |
 | L4-3 | MEDIUM | `scripts/weapons/necro_staff.gd:108` | `_tick_bolts` re-comprueba el objetivo sin mirar su pertenencia a `enemies`: un proyectil en vuelo sigue persiguiendo a un cuerpo que ya es sirviente y lo daña, rompiendo la regla 56 de que un sirviente queda oculto a las armas del jugador. | **fixed** (58) |
 | L4-4 | MEDIUM | `scripts/weapons/slime_trail.gd:128`, `scripts/weapons/blood_vial.gd:233` | Las **visuales** de los charcos pasaron a ser de etapa (`RunRoot.stage_parent`), pero los **registros** viven en el arma, que sobrevive al cruce: tras cambiar de mapa `_pulse` sigue dañando en las coordenadas de la arena anterior, sin nada en pantalla. | **fixed** (58) |
 | L4-5 | LOW | `scripts/weapons/necro_staff.gd:75` | `create_timer(delay, false)` sin `process_in_physics`, al revés que las siete armas hermanas de la misma ronda. | **fixed** (58) |
-| L4-6 | LOW | `scripts/player/player.gd:151` | `set_pet` busca la mascota saliente por nombre; `queue_free()` la deja como hija hasta el final del frame, así que un segundo `set_pet` en el mismo frame hace que `add_child` renombre a la nueva y nadie vuelva a encontrarla. | pendiente (59) |
+| L4-6 | LOW | `scripts/player/player.gd:151` | `set_pet` busca la mascota saliente por nombre; `queue_free()` la deja como hija hasta el final del frame, así que un segundo `set_pet` en el mismo frame hace que `add_child` renombre a la nueva y nadie vuelva a encontrarla. | **fixed** (59) |
 | L4-7 | LOW | `scripts/player/player.gd:868` | `_clear_weapon_fields()` es un no-op silencioso: **ninguna** arma implementa `clear_weapon_fields()`. | **fixed** (58, con L4-4) |
 | L4-8 | LOW | `scenes/tests/arena_probe.gd:900` | `_watch_airborne` recorre solo `enemies`, y la iteración 56 sacó de ahí a los sirvientes: hasta `max_possessed` cuerpos por portador quedan fuera de un detector que «no se puede ajustar hasta callarlo». | **fixed** (58) |
-| L4-9 | LOW | `scripts/systems/item_catalog.gd:105` | La descripción del cinturón promete «3 enemigos»; `zap_chain` hace `base_bounces + copies + 1` = 4 con una copia. | pendiente (59) |
+| L4-9 | LOW | `scripts/systems/item_catalog.gd:105` | La descripción del cinturón promete «3 enemigos»; `zap_chain` hace `base_bounces + copies + 1` = 4 con una copia. | **fixed** (59) |
 | L4-10 | LOW | `scripts/systems/item_bag.gd:306` | `_apply_aura_shell(true)` añade a `_aura_overlays` sin vaciarlo antes. | **fixed** (58) |
 | L4-11 | LOW | `scenes/tests/arena_probe.gd:729` | `_tick_zenkai_test` escribe `health.invulnerable`, un estado que pertenece a `PowerUps._sync`. | **fixed** (58) |
-| L4-12 | LOW | `scripts/player/player.gd:844` | `_set_downed(true)` apaga solo `weapons_mount`: la mascota de un raider derribado sigue disparando, contra lo que dice el comentario del propio bloque. | pendiente (59) |
+| L4-12 | LOW | `scripts/player/player.gd:844` | `_set_downed(true)` apaga solo `weapons_mount`: la mascota de un raider derribado sigue disparando, contra lo que dice el comentario del propio bloque. | deferred: parar la mascota de un caído es una **decisión de diseño** (el comentario del bloque la implica, pero nada la escribió); queda para el usuario |
 
 ### Carril 5 — UI, HUD, mapa, feel
 
@@ -157,29 +157,29 @@ marcadores de cadena > deriva de documentación.
 | L5-5 | LOW | `scripts/systems/juice.gd:232` | `_rest_camera` sale por invalidez **antes** de `_shake_rest.erase()`; `_fov_kicks` tiene la misma forma: una cámara liberada a media sacudida deja una entrada permanente en el autoload. | **fixed** (58) |
 | L5-6 | LOW | `scripts/ui/hud.gd:554` | `_refresh_mate_powerups()` queda detrás del `return` temprano de `_refresh_powerups()`. | **fixed** (58) |
 | L5-7 | LOW | `scripts/ui/vendor_ui.gd:109`, `scripts/ui/roulette_ui.gd:72` | `is_blocking()` devuelve `true` durante el frame posterior a su `queue_free()`. | **fixed** (58) |
-| L5-8 | LOW | `scripts/ui/map_draw.gd:95` y `docs/ARQUITECTURA.md:436`, `:457` | «0.5 da 240 px para una arena de 240 m» es el doble de lo real (120 px); y 121x121 contra los 120 de `fog_of_war.gd`. | pendiente (59, doc) |
-| L5-9 | LOW | `docs/ARQUITECTURA.md:492` | Sigue diciendo que `lucky_block` queda reservado para la parte C2; tanto él como `event_altar` ya enviaron. | pendiente (59, doc) |
+| L5-8 | LOW | `scripts/ui/map_draw.gd:95` y `docs/ARQUITECTURA.md:436`, `:457` | «0.5 da 240 px para una arena de 240 m» es el doble de lo real (120 px); y 121x121 contra los 120 de `fog_of_war.gd`. | **fixed** (59, doc) |
+| L5-9 | LOW | `docs/ARQUITECTURA.md:492` | Sigue diciendo que `lucky_block` queda reservado para la parte C2; tanto él como `event_altar` ya enviaron. | **fixed** (59, doc) |
 
 ### Carril 6 — cadenas, documentación y datos
 
 | Id | Sev | Dónde | Qué | Estado |
 |---|---|---|---|---|
-| L6-1 | HIGH | `docs/ARQUITECTURA.md:297` | Mismo hallazgo sembrado que L1-3, confirmado por los dos carriles. | pendiente (59, doc) |
-| L6-2 | HIGH | `docs/ARQUITECTURA.md:930` | El manantial se documenta como `heal_full` + `add_timed_boon` (30 s); `spring_shrine.gd:74-84` cura y llama a `PowerUps.apply(PowerUpCatalog.roll_id(true))`, y los power-ups duran 20 s. La iteración 53 borró ese canal de boons a propósito. | pendiente (59, doc) |
-| L6-3 | MEDIUM | `docs/ARQUITECTURA.md:951` | Nombra `show_tier_tag(tier)`; el hook real es `show_stage_tag(stage_index, lap)`, que el mismo documento cita bien en otras dos líneas. | pendiente (59, doc) |
-| L6-4 | MEDIUM | `docs/ARQUITECTURA.md:300` | Mismo hallazgo que L1-4. | pendiente (59, doc) |
-| L6-5 | MEDIUM | `README.md:3` | «13 raiders», «14 armas», «4 mascotas»; son 16, 15 y 9. | pendiente (59, doc) |
-| L6-6 | MEDIUM | `docs/GLOSARIO.md:592`, `:639` | La tabla «Interfaz» conserva `T%d → G%d` y `T2 → G2`, la insignia de grado que la regla 6 del mismo archivo declara muerta. | pendiente (59, doc) |
-| L6-7 | MEDIUM | `docs/GLOSARIO.md:29-44` | La tabla de personajes lista 13; el catálogo tiene 16. | pendiente (59, doc) |
-| L6-8 | MEDIUM | `docs/GLOSARIO.md:123-126`, `:139-142` | Cuatro filas de huevos de mascota que la iteración 54 borró del catálogo, y faltan los glifos de los tres objetos de la 56 (`CL`, `SS`, `ZK`), que la regla 19 exige. | pendiente (59, doc) |
-| L6-9 | MEDIUM | `scripts/ui/map_draw.gd:85-87` | La regla 21 pide plural para las familias sin tope: «Caja de mascotas», «Altar de eventos» y «Bloque de la suerte» van en singular y ninguna de las tres está capada. | pendiente (59) |
-| L6-10 | MEDIUM | `docs/GLOSARIO.md:21` | La regla 21 nombra tres paneles del mapa; `map_overlay.gd:134-138` construye cinco. | pendiente (59, doc) |
+| L6-1 | HIGH | `docs/ARQUITECTURA.md:297` | Mismo hallazgo sembrado que L1-3, confirmado por los dos carriles. | **fixed** (59, doc) |
+| L6-2 | HIGH | `docs/ARQUITECTURA.md:930` | El manantial se documenta como `heal_full` + `add_timed_boon` (30 s); `spring_shrine.gd:74-84` cura y llama a `PowerUps.apply(PowerUpCatalog.roll_id(true))`, y los power-ups duran 20 s. La iteración 53 borró ese canal de boons a propósito. | **fixed** (59, doc) |
+| L6-3 | MEDIUM | `docs/ARQUITECTURA.md:951` | Nombra `show_tier_tag(tier)`; el hook real es `show_stage_tag(stage_index, lap)`, que el mismo documento cita bien en otras dos líneas. | **fixed** (59, doc) |
+| L6-4 | MEDIUM | `docs/ARQUITECTURA.md:300` | Mismo hallazgo que L1-4. | **fixed** (59, doc) |
+| L6-5 | MEDIUM | `README.md:3` | «13 raiders», «14 armas», «4 mascotas»; son 16, 15 y 9. | **fixed** (59, doc) |
+| L6-6 | MEDIUM | `docs/GLOSARIO.md:592`, `:639` | La tabla «Interfaz» conserva `T%d → G%d` y `T2 → G2`, la insignia de grado que la regla 6 del mismo archivo declara muerta. | **fixed** (59, doc) |
+| L6-7 | MEDIUM | `docs/GLOSARIO.md:29-44` | La tabla de personajes lista 13; el catálogo tiene 16. | **fixed** (59, doc) |
+| L6-8 | MEDIUM | `docs/GLOSARIO.md:123-126`, `:139-142` | Cuatro filas de huevos de mascota que la iteración 54 borró del catálogo, y faltan los glifos de los tres objetos de la 56 (`CL`, `SS`, `ZK`), que la regla 19 exige. | **fixed** (59, doc) |
+| L6-9 | MEDIUM | `scripts/ui/map_draw.gd:85-87` | La regla 21 pide plural para las familias sin tope: «Caja de mascotas», «Altar de eventos» y «Bloque de la suerte» van en singular y ninguna de las tres está capada. | **fixed** (59) |
+| L6-10 | MEDIUM | `docs/GLOSARIO.md:21` | La regla 21 nombra tres paneles del mapa; `map_overlay.gd:134-138` construye cinco. | **fixed** (59, doc) |
 | L6-11 | MEDIUM | `docs/ARQUITECTURA.md:1103` | El inventario de logs omitía siete prefijos de la ronda. | **fixed** (57) |
-| L6-12 | MEDIUM | `docs/ARQUITECTURA.md:878` | «`EVOLUTION_LIBRARY`, 14 filas»; son 15 desde la iteración 56. | pendiente (59, doc) |
+| L6-12 | MEDIUM | `docs/ARQUITECTURA.md:878` | «`EVOLUTION_LIBRARY`, 14 filas»; son 15 desde la iteración 56. | **fixed** (59, doc) |
 | L6-13 | LOW | `scenes/tests/arena_probe.gd:28` | Mismo hallazgo que L2-13. | **fixed** (57) |
-| L6-14 | LOW | `README.md:71` | «el manantial … da un power-up de 30 s»; duran 20 s (15 la estrella, que el manantial no puede sacar). | pendiente (59, doc) |
-| L6-15 | LOW | `tools/verificar.sh:100` | Un comentario decía que el RNG del juego se `randomize()`a, contra la cabecera del mismo archivo. | pendiente (59, doc) |
-| L6-16 | LOW | varios | Siete derivas menores más de README/GLOSARIO (puerta de cobertura a 240 s y no 360, una cadena documentada que no existe, el prompt de respaldo del vendedor, dos cadenas muertas del manantial, un marcador documentado que la cadena viva no tiene, huevos de mascota en cofres, «grados» entre las claves guardadas, «14 armas» en dos sitios más y «Varita de brasas» por «Vara de brasas» en el CHANGELOG). | pendiente (59, doc) |
+| L6-14 | LOW | `README.md:71` | «el manantial … da un power-up de 30 s»; duran 20 s (15 la estrella, que el manantial no puede sacar). | **fixed** (59, doc) |
+| L6-15 | LOW | `tools/verificar.sh:100` | Un comentario decía que el RNG del juego se `randomize()`a, contra la cabecera del mismo archivo. | **fixed** (59, doc) |
+| L6-16 | LOW | varios | Siete derivas menores más de README/GLOSARIO (puerta de cobertura a 240 s y no 360, una cadena documentada que no existe, el prompt de respaldo del vendedor, dos cadenas muertas del manantial, un marcador documentado que la cadena viva no tiene, huevos de mascota en cofres, «grados» entre las claves guardadas, «14 armas» en dos sitios más y «Varita de brasas» por «Vara de brasas» en el CHANGELOG). | **fixed** (59, doc) en README y GLOSARIO; las derivas de `CHANGELOG` histórico se dejan como están (un CHANGELOG es un registro, no un documento vivo) |
 
 ## Soaks de estrés (58.2)
 
@@ -188,7 +188,7 @@ a la vez. Logs en `$TMPDIR/bonkraiders-audit/stress_*.log`.
 
 | Id | Qué | Resultado |
 |---|---|---|
-| (a) | cruce en modo NORMAL: 1200 s, sin `BONK_STAGE_FAST` | **S-1** (abajo): jefe abatido (`Stage boss slain: Rey Pútrido Ancestral at 672.4s`) y `Exit portal opened at 900.0s`, pero la party **no cruzó** y la niebla se quedó en 0.06. Tras arreglar S-1 la cobertura sube a **0.22** y aparece **S-4**, 57 `look_at() failed` que ningún soak anterior había alcanzado |
+| (a) | cruce en modo NORMAL: 1200 s, sin `BONK_STAGE_FAST` | **S-1** (abajo): jefe abatido (`Stage boss slain: Rey Pútrido Ancestral at 672.4s`) y `Exit portal opened at 900.0s`, pero la party **no cruzó** y la niebla se quedó en 0.06. Tras arreglar S-1 la cobertura sube a **0.22** y aparece **S-4**, 57 `look_at() failed` que ningún soak anterior había alcanzado. Tras S-4 y S-5 **cruza**: `Stage advanced: 1 -> 2 (ash_dunes) at 912.7s`, 12.7 s después de abrirse el portal, con `explored=0.25` en la etapa 1. Conserva **un** warning de niebla, y la causa está medida: al cruzar, la niebla se reinicia, así que la lectura final (0.07) es la cobertura de la etapa 2 en los 259 s que le quedaron — la misma razón por la que el soak de `BONK_STAGE_FAST` está exento. **No se añadió una exención nueva**: la puerta tiene razón, lo raro es la configuración |
 | (b) | tres corridas MORTALES (semillas 1, 2, 3), hasta 360 s | **limpias**: las tres terminan en `Run ended: defeat`, `Meta saved:` y `Probe: run ended victory=false`, sin `WEDGE` y sin un solo warning |
 | (c) | todo a la vez: shiny, drops, tsunami, seis POIs, 900 puntos, tres objetos | 14 líneas de los sistemas nuevos (cinturón, aura, zenkai, desastre, vendedor, caja, altar de eventos, bloque). **Reprodujo L4-1**: once `Saiyan aura:`, dos de ellas a 290.8 s y 296.5 s — 5.7 s de diferencia dentro de una ventana de 12 s. Warning de niebla (0.07), misma causa que S-1 |
 | (d) | barrido del bloque de la suerte: seis bloques, las seis recompensas forzadas | tras S-1/S-5: **las seis ramas** y **cero warnings** (niebla 0.11). Antes: cinco de las seis ramas (`enemy_explosion`, `gem_rain`, `points`, `free_chest`, `powerup`) entre los 105 s y los 182 s; el sexto bloque no se abrió dentro del reloj. Warning de niebla (0.07) |
@@ -259,3 +259,58 @@ frame, así que eso es **indicio, no una pareja controlada**. Se anota como
 - El renderizado **no se verificó**: todo lo de aquí es headless. Un
   hallazgo cuyo síntoma solo se ve en pantalla (el minimapa sobre el
   grupo del HUD) se razona por sus constantes, no por una captura.
+
+## Recuento
+
+**80 hallazgos**: 68 `fixed`, 12 `deferred`, 0 `not-a-bug`. No hay filas
+`not-a-bug` porque los seis carriles reportaron por separado lo que
+**revisaron y encontraron sano** — no llegó a ser un hallazgo, así que no
+llega a ser una fila. Lo despejado, en una línea cada bloque:
+
+- **Carril 1**: `RunState.reset()` cubre las 28 variables del archivo, una
+  por una (`price_discount`, `powerup_vendor_price`,
+  `disaster_chance_bonus` y los seis campos de etapa incluidos); el clima
+  no se filtra al cruzar (`on_stage_ended` corre el `stop()` de la fila
+  viva antes de `_snap_sky_back()`); `Coop.configure` limpia las acciones
+  de los cuatro slots antes de reconstruirlas; el literal de `Stage sweep:`
+  coincide byte a byte con el que greppea `verificar.sh`; el fold de
+  `SaveData` no escribe ceros y la API de grados no tiene ni un llamador;
+  `RunManager.bind_player` es idempotente.
+- **Carril 2**: `price_discount` lo leen los cuatro precios que deben
+  leerlo y **no** los dos que no; la lluvia dorada cubre a los caídos y se
+  limpia por tres caminos; los dieciséis `marker_kind` tienen fila de
+  estilo; los sub-recursos de `Rock`/`DuneRock` no se mutan en runtime; una
+  gema de la lluvia del bloque no hereda el `xp_value` de una fisura; la
+  explosión y los meteoros aciertan a los jefes y no a los sirvientes.
+- **Carril 3**: `EnemyBolt.launcher` y los temporizadores de `AcidPool`
+  **sí** los limpia su `pool_reset`; el viaje de ida y vuelta del pool no
+  deja nodos inertes; el orden de `release_all_live` frente a los padres
+  liberados es correcto; las capas de shiny son por instancia; la lista de
+  enemigos poseíbles es exactamente la que dice el CHANGELOG 56; la guarda
+  de `_on_died` cubre todos los pagos.
+- **Carril 4**: la re-entrada de `recompute` está cerrada; ninguna fila de
+  catálogo se muta; las fuentes de puntos son un producto que se reemplaza
+  por nombre; `PowerUps._sync` compone bien la estrella; los 16 raiders
+  tienen arma y stat válidos; los glifos no se repiten.
+- **Carril 5**: el desplazamiento del HUD siempre vuelve a cero; los
+  minimapas no se filtran entre etapas; mapa y niebla miden lo mismo; la
+  flecha de jefe aguanta un objetivo liberado; los precios del vendedor no
+  se desincronizan de lo que cobra.
+- **Carril 6**: **cero** desajustes reales de marcadores `%` en los 74
+  `.gd` cambiados (el único candidato era un ternario con dos literales
+  correctos); las reglas 1, 7, 9 y 17 del GLOSARIO se cumplen en cada
+  cadena nueva; todos los grupos que nombra la tabla de ARQUITECTURA
+  existen; las nueve filas de clima coinciden con el documento.
+
+## Lo que NO se verificó
+
+- **El renderizado.** Todo esto es headless. Un hallazgo cuyo síntoma solo
+  se ve en pantalla se razona por sus constantes, no por una captura: L5-1
+  (el minimapa anclado sobre la insignia de FPS y la etiqueta de puntos) se
+  queda en `deferred` por eso, con los números escritos para que quien
+  arranque el juego lo confirme en un segundo.
+- **La prueba de `pre-audit` de L3-1**, dicha arriba con todo detalle.
+- **Los mandos.** El co-op real reparte un control por slot; el harness
+  pone a todos en el teclado, que es lo único que existe en headless.
+- **El export en Windows y Linux**: las plantillas instaladas son las de
+  macOS. El preset de macOS sí se ejerció y sale limpio.

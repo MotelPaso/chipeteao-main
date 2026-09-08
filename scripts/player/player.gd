@@ -148,9 +148,15 @@ func set_pet(new_pet_id: String) -> void:
 	if new_pet_id == pet_id:
 		return
 	var leaving := PetCatalog.by_id(pet_id)
-	var old_pet := get_node_or_null("Pet_" + pet_id) as Pet
-	if old_pet != null:
-		old_pet.queue_free()
+	# By TYPE, not by name: queue_free leaves the node a child until the
+	# end of the frame, so a second set_pet in the same frame made
+	# add_child rename the incoming Pet ("Pet_doki" -> "@Pet_doki@2") and
+	# no later call could ever find it again — two companions following
+	# one raider, both firing, forever.
+	for child: Node in get_children():
+		var old_pet := child as Pet
+		if old_pet != null:
+			old_pet.queue_free()
 	pet_id = new_pet_id
 	if not leaving.is_empty():
 		_announce_pet(PET_LEAVES % String(leaving.display_name),

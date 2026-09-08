@@ -104,7 +104,7 @@ const ITEM_LIBRARY: Array[Dictionary] = [
 	{
 		"id": "electric_belt", "display_name": "Cinturón eléctrico", "rarity": "Rare",
 		"glyph": "CL", "kind": "shock_dash",
-		"description": "Al derrapar, un rayo salta entre 3 enemigos (uno más por copia)",
+		"description": "Al derrapar, un rayo salta entre 4 enemigos (uno más por copia)",
 	},
 	{
 		"id": "saiyan_blood", "display_name": "Sangre sayayin", "rarity": "Epic",

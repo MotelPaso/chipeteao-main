@@ -211,7 +211,7 @@ func _pay_cost(cost: Dictionary) -> float:
 		"events":
 			RunState.event_chance_bonus += fraction
 		"disasters":
-			# Stored, with no consumer until the disasters of part C — the
+			# Read by WorldDirector._maybe_weather since iteration 55 — the
 			# same forward hook RunState documents.
 			RunState.disaster_chance_bonus += fraction
 		_:

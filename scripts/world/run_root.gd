@@ -226,6 +226,16 @@ func _swap_stage() -> void:
 		print("RunRoot: left %s" % from_id)
 
 
+## Beacons still standing. on_stage_ended now FREES its beacon nodes
+## rather than only dropping the list, so a non-zero answer here is a real
+## leak — before that fix this field could never be anything but zero.
+func _live_beacons() -> int:
+	var director := get_tree().get_first_node_in_group("world_director")
+	if director == null or not director.has_method("beacon_count"):
+		return 0
+	return int(director.call("beacon_count"))
+
+
 ## Every enemy body, freed immediately. free() and not queue_free() so the
 ## sweep two lines later counts what is REALLY gone: a queued free lands at
 ## the end of the frame, after the count.
@@ -287,10 +297,7 @@ func _print_sweep() -> void:
 		for node: Node in _stage_leftovers(arena):
 			if node is Chest:
 				chests += 1
-	var beacons := 0
-	var director := get_tree().get_first_node_in_group("world_director")
-	if director != null and director.has_method("beacon_count"):
-		beacons = int(director.call("beacon_count"))
+	var beacons := _live_beacons()
 	print(("Stage sweep: enemies=%d gems=%d orbs=%d chests=%d altars=%d beacons=%d"
 			+ " pickups=%d boxes=%d vendors=%d possessed=%d") % [
 			get_tree().get_node_count_in_group(&"enemies"),

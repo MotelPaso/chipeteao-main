@@ -225,8 +225,9 @@ done
 # Este soak necesita el DOBLE de reloj que los otros: 60 s hasta la puerta,
 # 70 s de espera deliberada para que la rampa pseudo-infinita registre un
 # minuto, y después cruzar el mapa hasta un portal que aparece a 40 m o más.
-# Con 240 s el recorrido llega justo y falla por varianza (el orden de
-# contactos de la física diverge aunque el mundo sea reproducible).
+# Con 240 s el recorrido llega justo y falla por varianza: el mundo SÍ es
+# reproducible (BONK_GAME_SEED fija cartas, spawns, scatter y relieve),
+# pero el orden de contactos de la física diverge y la partida con él.
 STAGE_SECS=$(( SECS * 2 ))
 STAGE_FRAMES=$(( STAGE_SECS * 60 ))
 echo "== soak etapa (HollowWoods, BONK_STAGE_FAST, ${STAGE_SECS}s de partida) =="

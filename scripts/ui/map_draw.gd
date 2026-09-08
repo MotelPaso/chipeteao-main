@@ -82,9 +82,9 @@ const MARKER_LABELS: Dictionary[StringName, String] = {
 	&"exit": "Salida",
 	&"powerup": "Power-ups",
 	&"vendor": "Vendedores",
-	&"pet_box": "Caja de mascotas",
-	&"event_altar": "Altar de eventos",
-	&"lucky_block": "Bloque de la suerte",
+	&"pet_box": "Cajas de mascotas",
+	&"event_altar": "Altares de eventos",
+	&"lucky_block": "Bloques de la suerte",
 }
 
 ## Kinds that deliberately get NO legend row. Each is a VARIANT of a kind

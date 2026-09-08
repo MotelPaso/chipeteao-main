@@ -349,8 +349,11 @@ func on_stage_started(arena: Node3D) -> void:
 ## 0-1 pet boxes at stage start (iteration 54). Zero is a real outcome:
 ## a companion should feel like something the map offered, not something
 ## every stage hands out.
+## A chance of zero must draw NO random number: the run stream is shared,
+## so a die rolled here shifts every shuffled POI after it. Its two
+## siblings below already say so; this one drew unconditionally.
 func _spawn_start_pet_boxes() -> void:
-	if randf() >= start_pet_box_chance:
+	if start_pet_box_chance <= 0.0 or randf() >= start_pet_box_chance:
 		return
 	_spawn_pet_box(_claim_clear_point())
 
@@ -390,6 +393,13 @@ func on_stage_ended() -> void:
 	# price discount in RunState, both of which outlive the arena.
 	_stop_weather(false)
 	_snap_sky_back()
+	# The beacon NODES, not just the list: they are parented to the arena
+	# and would die with it one step later, but the stage sweep runs
+	# BEFORE that and its contract is "every counter is zero here". Only
+	# the list was being dropped, so the sweep's beacons= field could
+	# never be anything but zero and the gate on it was decorative.
+	for entry: TimedBeacon in _beacons:
+		_free_beacon(entry.node)
 	_beacons.clear()
 	_placed_points.clear()
 	_anchor_points.clear()
@@ -1050,7 +1060,10 @@ func _despawn_chest(chest: Chest) -> void:
 	# A missed chest must not credit the chests_opened quest counter.
 	chest.meta_stat_id = ""
 	chest.consume()
-	var tween := create_tween()
+	# The CHEST's tween, not the director's: this node outlives the arena,
+	# and a stage swap inside the 0.4 s would free the chest under a tween
+	# still animating it. Every other sink in the round does it this way.
+	var tween := chest.create_tween()
 	tween.tween_property(chest, "scale", Vector3.ONE * 0.05, 0.4) \
 			.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_IN)
 	tween.tween_callback(chest.queue_free)
@@ -1364,16 +1377,28 @@ func _weather_start_eclipse() -> void:
 	_print_sky_event("eclipse", seconds)
 
 
+## Tag on the full moon's two boons, so a second moon inside the first
+## one's window replaces them instead of stacking (add_timed_boon appends;
+## only clear_timed_boons drops by tag).
+const FULL_MOON_TAG: String = "full_moon"
+
+
 func _weather_start_full_moon() -> void:
 	# The pact sells "the moons last longer", so the good one grows too — a
 	# cost that only stretched the bad half would read as a straight
 	# penalty rather than a bargain.
 	var seconds := float(active_weather.time_left)
-	for node: Node in get_tree().get_nodes_in_group("player"):
-		var stats := PlayerStats.find_in(node)
+	# BOTH groups and TAGGED, like the golden rain below. A sky event is a
+	# permanent-for-its-window gift to the whole party, and a raider that
+	# happened to be down when the moon rose used to come back to a deficit
+	# nothing would ever repay; the tag is what makes a forced re-summon
+	# (the event altar) replace the boons instead of stacking them.
+	for body: Node3D in _all_raiders():
+		var stats := PlayerStats.find_in(body)
 		if stats != null:
-			stats.add_timed_boon("xp_gain", full_moon_xp_bonus, seconds)
-			stats.add_timed_boon("luck", full_moon_luck_bonus, seconds)
+			stats.clear_timed_boons(FULL_MOON_TAG)
+			stats.add_timed_boon("xp_gain", full_moon_xp_bonus, seconds, FULL_MOON_TAG)
+			stats.add_timed_boon("luck", full_moon_luck_bonus, seconds, FULL_MOON_TAG)
 	_tint_sky(Color(0.85, 0.9, 1.0), 1.3, Color(0.6, 0.65, 0.9))
 	_announce("LUNA LLENA — la fortuna y la sabiduría te sonríen")
 	_print_sky_event("full_moon", seconds)
@@ -1535,7 +1560,12 @@ func _weather_start_tsunami() -> void:
 	var angle := randf() * TAU
 	_weather_state["angle"] = angle
 	_weather_state["origin"] = origin
-	var wanted := tsunami_base + tsunami_per_minute * int(_minutes())
+	# The STAGE clock, not the run clock: iteration 50 moved the boss
+	# timetable and the hordes onto stage_time so every map of a run gets
+	# its own full stretch, and docs/ARQUITECTURA.md documents this wave
+	# the same way. Off the run clock, a tsunami on a fresh third stage
+	# asked for a wave sized by half an hour of play.
+	var wanted := tsunami_base + tsunami_per_minute * int(RunState.stage_time / 60.0)
 	_weather_state["left"] = wanted
 	_announce("¡TSUNAMI DE ENEMIGOS! %s" % _compass_word(angle))
 
