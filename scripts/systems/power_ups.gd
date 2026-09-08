@@ -45,6 +45,18 @@ var permanent_max_hp: float = 0.0
 
 ## Live rows: {id, kind, expires_at}. Ordered by pickup.
 var _active: Array[Dictionary] = []
+## Raised by RunState.stage_changed, consumed on the next physics frame:
+## the new arena's nodes are built by then, so _sync writes to the live
+## spawner instead of the one that was just freed.
+var _stage_changed: bool = false
+
+
+## The component rides the raider across a stage change; the nodes it
+## publishes to do not. Flagged rather than synced on the spot, because
+## the arena is still being built when this fires.
+func _ready() -> void:
+	RunState.stage_changed.connect(func(_index: int, _map_id: String) -> void:
+		_stage_changed = true)
 ## One recompute per frame no matter how many kills land in it.
 var _recompute_queued: bool = false
 ## Edge detection for the one consumer that needs a "just ended" moment
@@ -97,6 +109,17 @@ func active() -> Array[Dictionary]:
 
 ## True while any live row carries this behavior kind. The star turns them
 ## all on, so consumers ask this and never "is the star running".
+## Seconds left on the longest live row of `kind`, or 0.0 when none is
+## running. The counterpart to has() for consumers that need the clock
+## rather than the flag.
+func _remaining(kind: String) -> float:
+	var left := 0.0
+	for entry: Dictionary in _active:
+		if String(entry.get("kind", "")) == kind:
+			left = maxf(left, float(entry.expires_at) - RunState.run_time)
+	return left
+
+
 func has(kind: String) -> bool:
 	for entry: Dictionary in _active:
 		if String(entry.kind) == kind:
@@ -127,6 +150,11 @@ func on_kill() -> void:
 func _physics_process(_delta: float) -> void:
 	if _active.is_empty():
 		return
+	if _stage_changed:
+		# The arena (and its spawner) was replaced under us: re-publish
+		# every kind-driven state to the nodes that were just built.
+		_stage_changed = false
+		_sync()
 	var expired := false
 	for i in range(_active.size() - 1, -1, -1):
 		if RunState.run_time >= float(_active[i].expires_at):
@@ -184,6 +212,16 @@ func _sync() -> void:
 			body.call("set_points_source", POINTS_SOURCE, gold_points_multiplier)
 		else:
 			body.call("clear_points_source", POINTS_SOURCE)
+	# time_stop is a kind-driven consumer like every other one here, and
+	# it lives on a node that does NOT survive a stage change: the arena's
+	# spawner is freed with its arena and the next one is born with an
+	# empty freeze clock, while this component (and the HUD tile counting
+	# it down) rode across on the raider. Re-pushed from the live row, so
+	# the freeze crosses with the party. freeze_enemies takes the MAX, so
+	# saying it again is free.
+	var freeze_left := _remaining("time_stop")
+	if freeze_left > 0.0:
+		get_tree().call_group("enemy_spawner", "freeze_enemies", freeze_left)
 	var flying := has("flight")
 	if _was_flying and not flying and body != null and body.has_method("end_flight"):
 		# An edge, not a state: the raider may be hanging over a blocked

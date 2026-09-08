@@ -6,10 +6,14 @@ extends CanvasLayer
 ##
 ## Pause safety: this layer holds the whole tree paused, so it must never
 ## be able to outlive its owner. It closes itself if the raider that
-## opened it goes away, exposes dismiss() for anything that needs to shut
-## it down programmatically (group "blocking_ui_closable"), and on a
-## headless display it plays itself — a soak has nobody to press SPIN, and
-## a wheel waiting forever freezes the whole run.
+## opened it — or the shrine it belongs to, on a stage teardown — goes
+## away, exposes dismiss() for anything that needs to shut it down
+## programmatically (group "blocking_ui_closable"), and on a headless
+## display it plays itself — a soak has nobody to press SPIN, and a wheel
+## waiting forever freezes the whole run. The release also runs from
+## _exit_tree, so a panel freed rather than closed still hands the tree
+## back — and, like the card picker, it never releases a pause another
+## blocking layer has taken over.
 
 ## Sweep tunables. The delays are derived from sweep_time, so the constant
 ## actually controls the length of the spin.
@@ -40,6 +44,11 @@ var _close_button: Button = null
 var _result_label: Label = null
 var _points_label: Label = null
 var _spinning: bool = false
+## True only between the _ready that paused the tree and the release that
+## hands it back (pause_menu.gd's _pause_owned rule). Both the close and the
+## _exit_tree backstop go through it, so the pause is released exactly once
+## and a panel that never got as far as pausing releases nothing.
+var _pause_held: bool = false
 
 
 ## MUST be called before add_child(): _ready builds the panel from the
@@ -63,14 +72,20 @@ func _ready() -> void:
 	add_to_group("blocking_ui_closable")
 	_build()
 	get_tree().paused = true
+	_pause_held = true
 	Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
 	set_process(true)
 	if DisplayServer.get_name() == "headless":
 		_auto_play()
 
 
+## PauseMenu/UpgradeCardUi contract ("ui_blocking"): true while this layer
+## owns the tree pause. False once it is queued for deletion — the node
+## stays in the group until the delete queue flushes at the end of the
+## frame, and a dying wheel answering "yes" makes the card picker (or a
+## stage swap) skip its own unpause for that frame.
 func is_blocking() -> bool:
-	return true
+	return not is_queued_for_deletion()
 
 
 ## Programmatic close (soak harnesses, teardown). Mid-spin it waits: the
@@ -82,12 +97,15 @@ func dismiss() -> void:
 
 
 ## The tree is paused, so nothing else can notice that the raider who
-## opened the wheel is gone (co-op wipe, scene teardown). Nobody would be
-## left to press Leave, and the pause would outlive the run.
+## opened the wheel is gone (co-op wipe) — or that the shrine itself went
+## with the stage. Nobody would be left to press Leave, and the pause would
+## outlive the run. Both references are checked, like the vendor's panel:
+## the price and the spin are read off the shrine, so a wheel whose altar is
+## gone has nothing left to sell either.
 func _process(_delta: float) -> void:
 	if is_queued_for_deletion():
 		return
-	if not is_instance_valid(_player):
+	if not is_instance_valid(_player) or not is_instance_valid(_shrine):
 		_close()
 
 
@@ -288,7 +306,44 @@ func _auto_play() -> void:
 		_close()
 
 
+## Guarded because several paths can reach it — Esc, the Salir button, the
+## headless leave backstop, the watchdog above — and the tree pause must be
+## released exactly once, by whichever gets here first.
 func _close() -> void:
+	if is_queued_for_deletion():
+		return
+	_release_pause()
+	queue_free()
+
+
+## Hands the tree back, at most once, and only when it is OURS to hand back
+## (upgrade_card_ui.gd's rule). A spin can put another "ui_blocking" layer
+## on screen — the card picker off a rolled prize — and the run can end
+## under this panel, in which case the run-end screen owns the pause and the
+## mouse; unpausing in either case would resume the world behind somebody
+## else's modal and steal the mouse from its buttons.
+func _release_pause() -> void:
+	if not _pause_held:
+		return
+	_pause_held = false
+	if not RunState.run_active or _other_blocking_ui_open():
+		return
 	get_tree().paused = false
 	Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
-	queue_free()
+
+
+## Any OTHER member of "ui_blocking" holding the pause right now?
+func _other_blocking_ui_open() -> bool:
+	for node: Node in get_tree().get_nodes_in_group("ui_blocking"):
+		if node == self or not node.has_method(&"is_blocking"):
+			continue
+		if node.call(&"is_blocking") == true:
+			return true
+	return false
+
+
+## _close() is the only path that unpauses, so a panel FREED instead of
+## closed — free() from a harness, the stage parent going with a stage swap
+## — would strand a paused tree with nothing left on screen to release it.
+func _exit_tree() -> void:
+	_release_pause()

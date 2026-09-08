@@ -126,8 +126,21 @@ func _place_party() -> void:
 ## Public (exit portal, through the "run_root" group): tears the current
 ## stage down and builds the next one behind a fade. Ignored while a swap
 ## is already running.
+## Whether a swap can START right now. Synchronous on purpose: a caller
+## that spends itself to take the portal has to know BEFORE it does,
+## and advance_stage is a coroutine whose answer only comes back after
+## the whole swap — by which time the portal has been freed with its
+## own arena.
+func can_advance_stage() -> bool:
+	return not _swapping and RunState.run_active and not ScreenFade.is_busy()
+
+
 func advance_stage() -> void:
-	if _swapping:
+	# A run that already ended must not build another stage: the fold has
+	# read stages_cleared_total, laps_completed and visited_map_ids, and a
+	# swap landing after it would move all three behind the ledger's back
+	# and run the next stage's fixtures under the run-end screen.
+	if _swapping or not RunState.run_active:
 		return
 	_swapping = true
 	# Awaited, so this method is a coroutine too — callers fire it and
@@ -146,6 +159,19 @@ func _swap_stage() -> void:
 	var from_id := String(MapCatalog.MAP_LIBRARY[from_index % MapCatalog.MAP_LIBRARY.size()].id)
 	# 1. Freeze the world. The pause also stops player input, which is what
 	#    keeps a raider from walking into a scene being freed.
+	# 0. Close every blocking menu that CAN be closed, and do it before
+	#    anything here reads the pause. Those layers (VendorUi, RouletteUi)
+	#    hang off the ARENA, so step 5 frees them without ever running
+	#    their _close() — the only place either one hands the pause back —
+	#    and a `was_paused` read while one of them still held it would be
+	#    true, so step 7 would decline to unpause as well. A swap landing
+	#    on an open stall left the tree paused for the rest of the process,
+	#    with Esc refused (PauseMenu._open returns on an already-paused
+	#    tree) and nothing alive left to press Salir. `dismiss()` is
+	#    exactly the hook the "blocking_ui_closable" group was declared for.
+	#    Menus that are NOT closable (the card picker) keep their pause and
+	#    are handled by _other_blocking_ui_open() at the end.
+	get_tree().call_group(&"blocking_ui_closable", "dismiss")
 	var was_paused := get_tree().paused
 	get_tree().paused = true
 	# The pause is NOT enough on its own: process_mode INHERITS, and the

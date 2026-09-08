@@ -10,6 +10,11 @@ extends EnemyBase
 enum State { SURFACED, BURROWED, ERUPTING }
 
 const TELEGRAPH_COLOR := Color(0.95, 0.7, 0.25)
+## Group a worm joins WHILE BURROWED, because burrowing takes it out of
+## "enemies" and anything that has to reach every live body — the
+## spawner's time stop, first of all — would otherwise skip the one enemy
+## that can still hurt you from under the sand.
+const BURROWED_GROUP: StringName = &"burrowed"
 const IMPACT_COLOR := Color(1.0, 0.85, 0.45)
 const SAND_BURST_COLOR := Color(0.8, 0.66, 0.4)
 
@@ -105,6 +110,12 @@ func _burrow() -> void:
 	# so a collision exception is what actually lets the mound slide UNDER
 	# them instead of ramming (or climbing) their capsule.
 	remove_from_group("enemies")
+	# ...but still findable by anything that must reach EVERY live body.
+	# Leaving "enemies" is what hides the worm from weapons and from the
+	# horde; it also hid it from EnemySpawner's freeze, so Tiempo detenido
+	# never stopped a burrowed worm and its eruption landed inside the one
+	# window whose whole promise is that nothing can touch you.
+	add_to_group(BURROWED_GROUP)
 	collision_layer = 0
 	collision_mask = 1
 	_tunneled_players.clear()
@@ -144,6 +155,7 @@ func _erupt() -> void:
 	global_position.x = _strike_point.x
 	global_position.z = _strike_point.z
 	add_to_group("enemies")
+	remove_from_group(BURROWED_GROUP)
 	collision_layer = _surface_layer
 	collision_mask = _surface_mask
 	for body: PhysicsBody3D in _tunneled_players:

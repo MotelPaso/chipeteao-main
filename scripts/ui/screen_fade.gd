@@ -38,6 +38,14 @@ func _ready() -> void:
 	add_child(_rect)
 
 
+## True while a cut is running, i.e. while every new request would be
+## dropped. The busy contract is documented above and callers are told to
+## reason about it; without an accessor the only way to find out was to
+## fire a request and lose it.
+func is_busy() -> bool:
+	return _busy
+
+
 ## Returns false when a fade is already running and this request was
 ## dropped without doing anything.
 func transition(action: Callable) -> bool:

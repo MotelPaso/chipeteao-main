@@ -491,6 +491,14 @@ func _make_start_chest_free(chest: Chest) -> bool:
 
 func _physics_process(delta: float) -> void:
 	if not RunState.run_active:
+		# The run just ended (a wipe, an extraction). on_stage_ended and
+		# _exit_tree cover the other two ways weather can outlive its
+		# window, but neither of them fires here: the end screen keeps the
+		# arena alive and paused. A row left running keeps the HUD's quake
+		# offset frozen, keeps RunState.price_discount at the golden
+		# rain's 0.5 and keeps its points source on every raider until the
+		# next reset.
+		_stop_weather(false)
 		return
 	_tick_exit_portal()
 	_tick_beacons(delta)

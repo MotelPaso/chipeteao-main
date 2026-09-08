@@ -61,6 +61,13 @@ func _combat_tick(player: Node3D, distance: float) -> void:
 		_fire_timer = fire_cooldown
 
 
+## Below this squared length an aim is "no direction at all" (the caster
+## is standing on its target). A millimetre squared: anything a physics
+## solver leaves is orders of magnitude bigger, and anything smaller
+## cannot be normalized into a basis.
+const AIM_EPSILON_SQ: float = 0.000001
+
+
 func _fire_bolt(player: Node3D) -> bool:
 	# Pooled, parented to the scene root so the bolt outlives its caster.
 	var bolt := Pools.acquire_scene(bolt_scene) as EnemyBolt
@@ -73,8 +80,16 @@ func _fire_bolt(player: Node3D) -> bool:
 	# (player jumping right overhead) look_at cannot build a basis, so swap
 	# in a sideways up vector — WeaponBase.safe_up is the one guard, and the
 	# one threshold, every aim in the game goes through.
-	var aim := (player.global_position + Vector3.UP * target_height
-			- bolt.global_position).normalized()
+	var to_target := player.global_position + Vector3.UP * target_height \
+			- bolt.global_position
+	# A skirmisher shoved onto the raider by the horde fires from EXACTLY
+	# the target point: normalized() hands back a zero vector, look_at is
+	# given an origin equal to its target and errors out (57 times in one
+	# 1200 s soak), leaving the bolt pointing wherever the pool parked it.
+	# The caster's own facing is the honest fallback — it is where the
+	# body was already looking when it decided to shoot.
+	var aim := to_target.normalized() if to_target.length_squared() > AIM_EPSILON_SQ \
+			else -global_transform.basis.z
 	bolt.look_at(bolt.global_position + aim, WeaponBase.safe_up(aim))
 	return true
 

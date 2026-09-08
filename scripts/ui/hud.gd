@@ -528,6 +528,11 @@ func _build_weather_badge() -> Label:
 ## includes the WHOLE seconds left, so the row repaints once a second
 ## while a power-up runs and not five times.
 func _refresh_powerups() -> void:
+	# Teammates first, and ABOVE the slot-0 guard: the mate chips read every
+	# OTHER raider's power-ups, so hanging them behind this HUD's own body
+	# froze every chip at its last value for the rest of the run whenever
+	# slot 0 was missing (never bound, or freed).
+	_refresh_mate_powerups()
 	if _loadout_player == null or not is_instance_valid(_loadout_player):
 		return
 	var powerups := PowerUps.find_in(_loadout_player)
@@ -551,7 +556,6 @@ func _refresh_powerups() -> void:
 	if signature != _powerup_signature:
 		_powerup_signature = signature
 		_powerup_box = _rebuild_powerup_row(entries)
-	_refresh_mate_powerups()
 
 
 func _rebuild_powerup_row(entries: Array[Dictionary]) -> HBoxContainer:

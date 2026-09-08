@@ -35,6 +35,12 @@ extends Node
 ##   BONK_POWERUP_NOW=<id>  grants that power-up to slot 0 at 20 s and
 ##                          RE-GRANTS it on every expiry, so a 120 s soak
 ##                          spends its whole clock inside the effect
+##   BONK_POWERUP_AT=<s>    moves BONK_POWERUP_NOW's first grant off its
+##                          default 20 s. A freeze that starts at 20 s and
+##                          is re-granted forever catches every enemy
+##                          while it is still SURFACED, so states that
+##                          only exist later in a cycle (a Duneburrower
+##                          underground) are unreachable at the default
 ##   BONK_STAR_NOW=1        drops a STATIONARY star at the raider's feet
 ##                          at 30 s (the roaming one is hard to intercept
 ##                          on purpose, and a soak has to be able to)
@@ -50,6 +56,14 @@ extends Node
 ##                          pay instead of rolling (the last entry
 ##                          repeats). Six blocks plus the six ids execute
 ##                          every LUCKY_REWARDS branch in one soak
+##   BONK_SWAP_MENU=1       forces the ONE overlap a stage swap can have
+##                          with a blocking menu: the frame a closable
+##                          menu owns the pause, the probe fires a stage
+##                          swap through the run_root group and reports
+##                          `Swap menu: paused=%s` five seconds later.
+##                          `true` is the wedge that leaves a run with no
+##                          way back — needs a menu to open, e.g.
+##                          BONK_POI_NOW=vendor_items BONK_POINTS=2000
 ##   BONK_POINTS=<n>        grants slot 0 that many run points at start, so
 ##                          a vendor soak can actually afford the shelf
 ##   BONK_WEATHER_NOW=<id>  forces that weather at 30 s (the director's own
@@ -201,6 +215,22 @@ var _rescue_time: float = 0.0
 var _rescue_given_up: Dictionary[int, float] = {}
 ## Actions held per slot, so a release goes to the right action set.
 var _held: Dictionary[String, bool] = {}
+
+## --- audit assertions (iteration 58) ----------------------------------------
+## BONK_SWAP_MENU: seconds between firing the swap and reading the pause.
+## Long enough for ScreenFade's cut (0.22 + 0.26) plus the swap's own
+## settle frames and the next stage's build.
+const SWAP_MENU_REPORT: float = 5.0
+var _swap_menu: bool = false
+var _swap_menu_fired: bool = false
+var _swap_menu_left: float = 0.0
+## Largest number of SAIYAN-tagged timed boons seen on the leader at once.
+## Three is the whole aura; more means a re-trigger stacked instead of
+## replacing, which is what item_bag's own comment says cannot happen.
+const SAIYAN_TAG: String = "saiyan"
+const SAIYAN_BOONS_PER_AURA: int = 3
+var _saiyan_watch: bool = false
+var _saiyan_max: int = 0
 
 ## --- run end (iteration 57) -------------------------------------------------
 ## A mortal soak ends at death BY DESIGN: RunManager pauses the tree and
@@ -360,6 +390,8 @@ var _exit_rush: bool = false
 ## moment it lapses. Not a loop of pickups: the point is to hold ONE
 ## effect on for a whole short soak so its edge cases get exercised.
 const POWERUP_NOW_AT: float = 20.0
+## BONK_POWERUP_AT overrides the line above; -1 means "use the default".
+var _powerup_at: float = POWERUP_NOW_AT
 ## BONK_STAR_NOW=1 drops its star at this run time.
 const STAR_NOW_AT: float = 30.0
 ## Enemies sampled per frame during a freeze. Three is enough to catch a
@@ -379,18 +411,20 @@ var _flight_holding: bool = false
 ## The carrier's current servant cap, or 0 when nobody carries the staff.
 ## Read off the weapon so an upgrade card or the evolution moves it, and
 ## the soak's possessed=a/b can prove a never exceeds b.
+## Summed over the WHOLE party, not read off the leader: possessed= counts
+## every servant in the group, so comparing it against one carrier's cap
+## printed a > b in co-op while every per-carrier cap was being honoured.
 func _possession_cap() -> int:
-	var lead := _lead_player()
-	if lead == null:
-		return 0
-	var mount := lead.get_node_or_null("Weapons")
-	if mount == null:
-		return 0
-	for child: Node in mount.get_children():
-		var staff := child as NecroStaff
-		if staff != null:
-			return staff.max_possessed
-	return 0
+	var cap := 0
+	for body: Node3D in _party_bodies():
+		var mount := body.get_node_or_null("Weapons")
+		if mount == null:
+			continue
+		for child: Node in mount.get_children():
+			var staff := child as NecroStaff
+			if staff != null:
+				cap += staff.max_possessed
+	return cap
 
 
 ## BONK_ITEM_NOW: items to grant slot 0 once, at this run time.
@@ -417,6 +451,8 @@ const ZENKAI_TEST_SHIELD: float = 3.0
 var _zenkai_test: bool = false
 var _zenkai_stage: int = 0
 var _zenkai_left: float = 0.0
+## Health.invulnerable as PowerUps left it, restored after the test blow.
+var _zenkai_invulnerable: bool = false
 
 ## BONK_WEATHER_NOW: forced once, at this run time. Late enough that the
 ## arena and its lights are cached, early enough that even a 240 s soak
@@ -450,6 +486,26 @@ var _freeze_moved: int = 0
 var _freeze_damage_events: int = 0
 ## instance id -> position when this body was last sampled frozen.
 var _freeze_positions: Dictionary[int, Vector3] = {}
+## Burrower accounting for the same window, on its own line. A Duneburrower
+## UNDERGROUND has left the "enemies" group on purpose, so the spawner's
+## frozen set never contained it and `moved` above could not see it: the one
+## enemy that can still hurt the party through a time stop was the only one
+## the freeze detector was blind to. Walked off the spawner's children
+## instead of a group, so this reads the same before and after the fix.
+var _worms_sampled: int = 0
+var _worms_moved: int = 0
+## Samples in which a BURROWED worm was not in the spawner's frozen set.
+## The state assertion, and the one that does not depend on luck: `moved`
+## needs the worm to actually be sliding at the moment it is sampled,
+## `loose` only needs it to be underground while time is stopped, which
+## is the whole defect.
+var _worms_loose: int = 0
+var _worm_positions: Dictionary[int, Vector3] = {}
+## Duneburrower.State.BURROWED, by value: the probe cannot name the enum
+## without hard-coupling to that script, and the order is stable
+## (SURFACED, BURROWED, ERUPTING) — the same assumption the airborne
+## detector already makes for ERUPTING.
+const BURROWER_BURROWED: int = 1
 ## Health of the lead raider, connected once so enemy damage during a
 ## freeze can be counted.
 var _lead_health: Health = null
@@ -534,6 +590,9 @@ func _ready() -> void:
 	if not _powerup_now.is_empty() and PowerUpCatalog.by_id(_powerup_now).is_empty():
 		push_error("ArenaProbe: unknown BONK_POWERUP_NOW '%s'" % _powerup_now)
 		_powerup_now = ""
+	var powerup_at := OS.get_environment("BONK_POWERUP_AT")
+	if powerup_at.is_valid_float():
+		_powerup_at = maxf(powerup_at.to_float(), 0.0)
 	_star_now = OS.get_environment("BONK_STAR_NOW") == "1"
 	_weather_now = OS.get_environment("BONK_WEATHER_NOW")
 	if not _weather_now.is_empty() \
@@ -549,6 +608,12 @@ func _ready() -> void:
 		for entry: String in item_list.split(",", false):
 			_item_now.append(entry.strip_edges())
 	_zenkai_test = OS.get_environment("BONK_ZENKAI_TEST") == "1"
+	_swap_menu = OS.get_environment("BONK_SWAP_MENU") == "1"
+	# Watched only where it can happen, so every other soak keeps its log
+	# exactly as it was.
+	for entry: String in _item_now:
+		if entry.begins_with("saiyan_blood"):
+			_saiyan_watch = true
 	var points_text := OS.get_environment("BONK_POINTS")
 	if points_text.is_valid_int():
 		_grant_points.call_deferred(int(points_text))
@@ -750,6 +815,11 @@ func _exit_tree() -> void:
 	# reading: nothing went down and nothing was stood up.
 	print("Party: downs=%d revives=%d" % [_party_downs, _party_revives])
 	print("Party pets: %s" % _party_pets_seen)
+	if _saiyan_watch:
+		# One aura is SAIYAN_BOONS_PER_AURA boons. More than that at once
+		# means a re-trigger stacked with the aura it was supposed to
+		# replace, and the first expiry takes back only part of it.
+		print("Saiyan boons: max=%d of %d" % [_saiyan_max, SAIYAN_BOONS_PER_AURA])
 	# Skipped under BONK_STAGE_FAST: that soak resets the fog every minute
 	# when it crosses a stage, so its coverage says nothing about the walk.
 	# Skipped under BONK_POWERUP_NOW for the same reason: that switch holds
@@ -868,6 +938,8 @@ func _physics_process(delta: float) -> void:
 	_tick_stage_flow(delta)
 	_tick_map_overlay(delta)
 	_tick_party(delta)
+	_tick_swap_menu(delta)
+	_watch_saiyan_boons()
 	_tick_powerup_switches()
 	_tick_item_now(delta)
 	_tick_zenkai_test(delta)
@@ -902,7 +974,7 @@ func _physics_process(delta: float) -> void:
 ## eighty seconds of ordinary play, and the acceptance checks below only
 ## mean something while the effect is on.
 func _tick_powerup_switches() -> void:
-	if RunState.run_time < POWERUP_NOW_AT:
+	if RunState.run_time < _powerup_at:
 		return
 	var lead := _lead_player()
 	if lead == null:
@@ -999,7 +1071,11 @@ func _tick_zenkai_test(delta: float) -> void:
 			_zenkai_stage = 1
 			_zenkai_left = ZENKAI_TEST_SHIELD
 			# Invulnerability OFF for the blow itself: the arming signal is
-			# damaged(), and a refused hit never emits it.
+			# damaged(), and a refused hit never emits it. Saved and put
+			# back rather than forced: the flag belongs to PowerUps._sync
+			# (Inmortalidad), and combining this switch with that power-up
+			# used to cancel it until the next apply or expiry.
+			_zenkai_invulnerable = health.invulnerable
 			health.invulnerable = false
 			health.take_damage(health.max_hp * 0.95)
 			health.invulnerable = true
@@ -1009,7 +1085,7 @@ func _tick_zenkai_test(delta: float) -> void:
 				return
 			_zenkai_stage = 2
 			health.heal_full()
-			health.invulnerable = false
+			health.invulnerable = _zenkai_invulnerable
 			print("ArenaProbe: zenkai test healed")
 
 
@@ -1135,15 +1211,24 @@ func _watch_time_stop() -> void:
 		_freeze_moved = 0
 		_freeze_damage_events = 0
 		_freeze_positions.clear()
+		_worms_sampled = 0
+		_worms_moved = 0
+		_worms_loose = 0
+		_worm_positions.clear()
 		_connect_lead_health()
 	elif not frozen and _freeze_active:
 		_freeze_active = false
 		print("Time stop: sampled=%d moved=%d damage_events=%d"
 				% [_freeze_sampled, _freeze_moved, _freeze_damage_events])
+		# A separate line, never a field on the one above: that format is
+		# the verification interface of three soaks and is frozen.
+		print("Time stop worms: sampled=%d moved=%d loose=%d"
+				% [_worms_sampled, _worms_moved, _worms_loose])
 		return
 	if not frozen:
 		return
 	var bodies: Array = spawner.call("frozen_bodies")
+	_watch_frozen_worms(spawner as Node, bodies)
 	for i in mini(TIME_STOP_SAMPLE, bodies.size()):
 		var body := bodies[i] as Node3D
 		if body == null or not body.is_inside_tree():
@@ -1154,6 +1239,40 @@ func _watch_time_stop() -> void:
 				_freeze_moved += 1
 			_freeze_sampled += 1
 		_freeze_positions[id] = body.global_position
+
+
+## Every Duneburrower under the spawner, frozen or not: a burrowed one is
+## in NO group, so it can only be found by walking the spawner's children.
+## `_erupt` is the duck-type — the probe cannot name the script without
+## hard-coupling to it, the same way the airborne detector cannot name its
+## state enum.
+func _watch_frozen_worms(spawner: Node, frozen: Array) -> void:
+	if spawner == null:
+		return
+	var frozen_ids: Dictionary[int, bool] = {}
+	for node: Variant in frozen:
+		var body := node as Node
+		if body != null and is_instance_valid(body):
+			frozen_ids[body.get_instance_id()] = true
+	for child: Node in spawner.get_children():
+		var body := child as Node3D
+		if body == null or not body.is_inside_tree() or not body.has_method(&"_erupt"):
+			continue
+		var health := Health.find_in(body)
+		if health != null and health.is_dead:
+			# A body that died inside the window is deliberately let go
+			# (EnemyBase._on_died restores its processing), so its death
+			# slide is not a freeze that leaked.
+			continue
+		var id := body.get_instance_id()
+		var state: Variant = body.get("_state")
+		if state != null and int(state) == BURROWER_BURROWED and not frozen_ids.has(id):
+			_worms_loose += 1
+		if _worm_positions.has(id):
+			_worms_sampled += 1
+			if body.global_position.distance_to(_worm_positions[id]) > TIME_STOP_EPSILON:
+				_worms_moved += 1
+		_worm_positions[id] = body.global_position
 
 
 ## Counts enemy-sourced damage on the lead raider while a freeze runs.
@@ -1196,11 +1315,19 @@ func _watch_airborne(delta: float) -> void:
 	if get_tree().paused:
 		return
 	var live: Dictionary[int, bool] = {}
-	for node: Node in get_tree().get_nodes_in_group("enemies"):
+	# "possessed" as well as "enemies": iteration 56 moved servants OUT of
+	# the enemies group, which quietly took up to max_possessed bodies per
+	# carrier out of a detector whose whole point is that it cannot be
+	# tuned into silence.
+	var bodies: Array[Node] = get_tree().get_nodes_in_group("enemies")
+	bodies.append_array(get_tree().get_nodes_in_group(&"possessed"))
+	for node: Node in bodies:
 		var body := node as CharacterBody3D
 		if body == null or not body.is_inside_tree():
 			continue
 		var id := body.get_instance_id()
+		if live.has(id):
+			continue
 		live[id] = true
 		if _airborne_seen.has(id):
 			continue
@@ -1600,11 +1727,28 @@ func _release_holds() -> void:
 ## recently tried.
 func _pick_waypoint(from: Vector3) -> void:
 	_leg_time_left = LEG_TIMEOUT
+	# The tour is allowed to work a small area — that is where the loot
+	# is — but not forever. A horde that drops faster than the walk
+	# consumes kept the raider inside a 20 m bubble for a whole 1200 s
+	# soak (measured: 54 chests dropped, 18 opened, explored frozen at
+	# 0.06 while the marker count climbed). After BUBBLE_LEGS legs that
+	# never left BUBBLE_RADIUS of where the streak began, the next
+	# waypoint is a ROAM whatever is lying at the raider's feet.
+	# ...but NOT while the exit rush is on. A forced roam there sends the
+	# tour away from the one target the rush exists to reach, and the
+	# portal lands 40 m or more from the party by design: measured, a
+	# 720 s stage soak that never crossed with 16 of its 22 legs timing
+	# out. Nothing outranks the rush except a downed teammate.
+	var roaming_forced := false if _exit_rush else _bubble_expired(from)
 	# A power-up on the ground outranks everything nearby (iteration 53):
 	# it is free, it expires in 45 s, and walking into it is the whole
 	# interaction — no press, no linger. Only if one is CLOSE, though: a
 	# tour that crossed the map for every drop would stop touring.
-	var pickup := _nearest_pickup(from)
+	# It does NOT outrank the exit rush: with a drop every few seconds the
+	# detour kept re-winning for the whole 300 s the exit portal was open
+	# and the party never crossed — which is the one thing the rush
+	# exists to guarantee.
+	var pickup := _nearest_pickup(from) if not _exit_rush and not roaming_forced else null
 	if pickup != null:
 		_target = null
 		_waypoint = pickup.global_position
@@ -1612,7 +1756,7 @@ func _pick_waypoint(from: Vector3) -> void:
 			print("ArenaProbe: heading to power-up %s at %.1fm"
 					% [pickup.get("powerup_id"), _flat(from).distance_to(_flat(_waypoint))])
 		return
-	var target := _nearest_interactable(from)
+	var target := _nearest_interactable(from) if not roaming_forced else null
 	_target = target
 	if target != null:
 		_visited[target.get_instance_id()] = RunState.run_time
@@ -1633,6 +1777,59 @@ func _pick_waypoint(from: Vector3) -> void:
 				return
 	var half := FALLBACK_HALF_EXTENT
 	_waypoint = Vector3(_rng.randf_range(-half, half), from.y, _rng.randf_range(-half, half))
+
+
+## BONK_SWAP_MENU: fires a stage swap on the frame a closable blocking
+## menu owns the pause, then reports whether the tree came back. Those
+## layers hang off the ARENA, so the swap frees them without their
+## _close() ever running — and _close() is the only place either one
+## hands the pause back.
+func _tick_swap_menu(delta: float) -> void:
+	if not _swap_menu:
+		return
+	if _swap_menu_fired:
+		_swap_menu_left -= delta
+		if _swap_menu_left <= 0.0:
+			_swap_menu = false
+			print("Swap menu: paused=%s" % get_tree().paused)
+		return
+	if not get_tree().paused:
+		return
+	var open := false
+	for node: Node in get_tree().get_nodes_in_group(&"blocking_ui_closable"):
+		var shown: Variant = node.get("visible")
+		if shown == null or bool(shown):
+			open = true
+			break
+	if not open:
+		return
+	_swap_menu_fired = true
+	_swap_menu_left = SWAP_MENU_REPORT
+	print("Swap menu: firing a stage swap at %.1fs" % RunState.run_time)
+	get_tree().call_group("run_root", "advance_stage")
+
+
+## Counts the SAIYAN-tagged boons on the leader. Reads the private list
+## rather than adding an accessor to shipped code: the harness already
+## duck-types into private state elsewhere (_climbing, _state), and the
+## number only exists to prove a tag contract nothing else can observe.
+func _watch_saiyan_boons() -> void:
+	if not _saiyan_watch:
+		return
+	var lead := _lead_player()
+	if lead == null:
+		return
+	var stats := PlayerStats.find_in(lead)
+	if stats == null:
+		return
+	var raw: Variant = stats.get("_timed_boons")
+	if not (raw is Array):
+		return
+	var tagged := 0
+	for entry: Variant in (raw as Array):
+		if entry is Dictionary and String((entry as Dictionary).get("tag", "")) == SAIYAN_TAG:
+			tagged += 1
+	_saiyan_max = maxi(_saiyan_max, tagged)
 
 
 ## --- co-op party (iteration 57) ---------------------------------------------
@@ -1769,7 +1966,14 @@ func _drive_rescue(lead: CharacterBody3D, delta: float) -> bool:
 		_rescue_given_up[body.get_instance_id()] = RunState.run_time
 		_rescue_target = null
 		_hold_action(0, &"interact", false)
-		push_warning("ArenaProbe: gave up rescuing %s after %.0fs"
+		# A PRINT and not a warning: giving up on a body that cannot be
+		# reached right now is a decision this tour is allowed to make —
+		# the horde shoves the leader off, the corpse is behind a rock —
+		# and the raider is picked up on a later pass (measured: a body
+		# abandoned at 165 s was standing again by 250 s). The gate that
+		# matters is verificar.sh's "at least one Player revived:", which
+		# a rescue that never works still fails.
+		print("ArenaProbe: gave up rescuing %s after %.0fs"
 				% [body.name, _rescue_time])
 		_pick_waypoint(lead.global_position)
 		return false
@@ -1781,6 +1985,37 @@ func _drive_rescue(lead: CharacterBody3D, delta: float) -> bool:
 		return true
 	_release_move()
 	_hold_action(0, &"interact", true)
+	return true
+
+
+## Legs the tour may spend inside one bubble before it is made to roam,
+## and how big that bubble is. Eight legs is more than a chest cluster
+## takes and far less than the 70 legs the pinned 1200 s soak spent in
+## one; 25 m is a little over the pickup detour, so a streak of pickups
+## counts as one bubble.
+const BUBBLE_LEGS: int = 8
+const BUBBLE_RADIUS: float = 25.0
+var _bubble_origin: Vector3 = Vector3.ZERO
+var _bubble_legs: int = 0
+var _bubble_started: bool = false
+
+
+## True when this leg must be a ROAM because the last BUBBLE_LEGS all
+## stayed inside BUBBLE_RADIUS of where the streak began. Resets the
+## streak as it fires, so the tour goes back to normal afterwards.
+func _bubble_expired(from: Vector3) -> bool:
+	if not _bubble_started or _flat(from).distance_to(_flat(_bubble_origin)) > BUBBLE_RADIUS:
+		_bubble_started = true
+		_bubble_origin = from
+		_bubble_legs = 0
+		return false
+	_bubble_legs += 1
+	if _bubble_legs < BUBBLE_LEGS:
+		return false
+	_bubble_legs = 0
+	_bubble_origin = from
+	if _debug:
+		print("ArenaProbe: bubble expired, roaming")
 	return true
 
 

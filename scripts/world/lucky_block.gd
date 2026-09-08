@@ -31,8 +31,13 @@ const LUCKY_REWARDS: Array[Dictionary] = [
 const CHEST_SCENE: PackedScene = preload("res://scenes/world/chests/Chest.tscn")
 ## Chance the well pays a power-up instead of the better item.
 const WELL_POWERUP_CHANCE: float = 0.3
-## Items the well offers at once, plus the "keep everything" card.
-const WELL_OFFERS: int = 3
+## Items the well offers at once, plus the "keep everything" card. TWO,
+## not three: the card UI has exactly three slots and drops the surplus
+## without a word, so three items plus the refusal made four options and
+## the refusal was the one that fell off — a raider carrying three items
+## was forced to give one away, in the one reward whose whole point is
+## that it asks a question you may answer with no.
+const WELL_OFFERS: int = 2
 const WELL_TITLE: String = "El pozo pide una ofrenda"
 const WELL_NOTHING: String = "Nada"
 const WELL_NOTHING_LINE: String = "Te quedas con todo"

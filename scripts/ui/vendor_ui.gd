@@ -27,7 +27,9 @@ extends CanvasLayer
 ## dismiss() for anything that needs to shut it down programmatically
 ## (group "blocking_ui_closable"), and on a headless display it plays
 ## itself: a soak has nobody to press a card, and a stall waiting forever
-## freezes the whole run.
+## freezes the whole run. The release also runs from _exit_tree, so a panel
+## freed rather than closed still hands the tree back — and, like the card
+## picker, it never releases a pause another blocking layer has taken over.
 
 ## Vendor kinds (VENDOR_LIBRARY row ids). Identifiers, never shown.
 const KIND_ANIMALS: String = "animals"
@@ -76,6 +78,11 @@ var _close_button: Button = null
 ## One sale per stall: set the moment the vendor accepts, and every card
 ## goes dead with it.
 var _sold: bool = false
+## True only between the _ready that paused the tree and the release that
+## hands it back (pause_menu.gd's _pause_owned rule). Both the close and the
+## _exit_tree backstop go through it, so the pause is released exactly once
+## and a panel that never got as far as pausing releases nothing.
+var _pause_held: bool = false
 
 
 ## MUST be called before add_child(): _ready rolls the shelf from the
@@ -100,14 +107,20 @@ func _ready() -> void:
 	_offers = _build_offers()
 	_build()
 	get_tree().paused = true
+	_pause_held = true
 	Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
 	set_process(true)
 	if DisplayServer.get_name() == "headless":
 		_auto_play()
 
 
+## PauseMenu/UpgradeCardUi contract ("ui_blocking"): true while this layer
+## owns the tree pause. False once it is queued for deletion — the node
+## stays in the group until the delete queue flushes at the end of the
+## frame, and a dying stall answering "yes" makes the card picker (or a
+## stage swap) skip its own unpause for that frame.
 func is_blocking() -> bool:
-	return true
+	return not is_queued_for_deletion()
 
 
 ## Programmatic close (soak harnesses, teardown). Nothing here is worth
@@ -404,10 +417,13 @@ func _refresh_points() -> void:
 
 
 func _on_buy(index: int) -> void:
-	# The stall can be gone by the time a queued press is handled (a stage
-	# teardown lands on the same frame): _process closes for that, but the
-	# press must not reach a freed vendor on its way out.
-	if _sold or not is_instance_valid(_vendor) or index >= _offers.size():
+	# The stall — or the buyer — can be gone by the time a queued press is
+	# handled (a stage teardown lands on the same frame, a co-op wipe frees
+	# the raider): _process closes for that, but input is flushed BEFORE
+	# _process inside a frame, so the press must not reach a freed vendor or
+	# a freed raider on its way out.
+	if _sold or not is_instance_valid(_vendor) or not is_instance_valid(_player) \
+			or index >= _offers.size():
 		return
 	var offer := _offers[index]
 	if not _vendor.buy(offer, _player):
@@ -452,6 +468,10 @@ func _auto_play() -> void:
 
 
 func _first_affordable() -> int:
+	# Reached after _auto_play's await, so the raider it prices against may
+	# have been freed in between: nothing is affordable to a dead buyer.
+	if not is_instance_valid(_player):
+		return -1
 	var purse := int(_player.get("points"))
 	for i in _offers.size():
 		if purse >= int(_offers[i].price):
@@ -465,6 +485,38 @@ func _first_affordable() -> int:
 func _close() -> void:
 	if is_queued_for_deletion():
 		return
+	_release_pause()
+	queue_free()
+
+
+## Hands the tree back, at most once, and only when it is OURS to hand back
+## (upgrade_card_ui.gd's rule). A purchase can put another "ui_blocking"
+## layer on screen — the card picker off a bought item — and the run can end
+## under this panel, in which case the run-end screen owns the pause and the
+## mouse; unpausing in either case would resume the world behind somebody
+## else's modal and steal the mouse from its buttons.
+func _release_pause() -> void:
+	if not _pause_held:
+		return
+	_pause_held = false
+	if not RunState.run_active or _other_blocking_ui_open():
+		return
 	get_tree().paused = false
 	Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
-	queue_free()
+
+
+## Any OTHER member of "ui_blocking" holding the pause right now?
+func _other_blocking_ui_open() -> bool:
+	for node: Node in get_tree().get_nodes_in_group("ui_blocking"):
+		if node == self or not node.has_method(&"is_blocking"):
+			continue
+		if node.call(&"is_blocking") == true:
+			return true
+	return false
+
+
+## _close() is the only path that unpauses, so a panel FREED instead of
+## closed — free() from a harness, the stage parent going with a stage swap
+## — would strand a paused tree with nothing left on screen to release it.
+func _exit_tree() -> void:
+	_release_pause()

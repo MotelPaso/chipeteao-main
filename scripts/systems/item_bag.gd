@@ -288,6 +288,13 @@ func _start_aura(copies: int) -> void:
 	# TAGGED: a second aura replaces the first instead of stacking with it,
 	# which is what keeps a long run from ending in a permanent tripled
 	# raider.
+	# TAGGED means nothing on its own: add_timed_boon APPENDS, and only
+	# clear_timed_boons drops by tag. Without this line a second aura
+	# inside the twelve seconds stacked on the first and the first
+	# expiry took back only half of it — exactly what the comment above,
+	# add_timed_boon's own docstring and CHANGELOG 56 all say cannot
+	# happen. PowerUps._apply_row is the pattern.
+	stats.clear_timed_boons(SAIYAN_TAG)
 	stats.add_timed_boon("damage", aura_damage * scale, aura_duration, SAIYAN_TAG)
 	stats.add_timed_boon("cooldown", aura_cooldown * scale, aura_duration, SAIYAN_TAG)
 	stats.add_timed_boon("move_speed", aura_move_speed * scale, aura_duration, SAIYAN_TAG)
@@ -303,7 +310,12 @@ func _start_aura(copies: int) -> void:
 ## Golden shell over the seal's meshes, the way Juice.flash does it —
 ## material_overlay, restored on the way out. NEVER SealRig.apply_tint,
 ## which is the character's identity colour and would stay changed.
+## Cleared before it is refilled: a re-trigger used to append a second
+## full copy of the rig, so the list grew for as long as the aura kept
+## being retriggered and the way out nulled each mesh several times.
 func _apply_aura_shell(on: bool) -> void:
+	if on:
+		_aura_overlays.clear()
 	if not on:
 		for mesh: MeshInstance3D in _aura_overlays:
 			if is_instance_valid(mesh):

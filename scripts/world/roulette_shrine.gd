@@ -73,6 +73,17 @@ func _interact(player: Node) -> void:
 		return
 	if _ui != null and is_instance_valid(_ui):
 		return
+	# Never over another tree-pausing layer: the wheel's panel releases the
+	# pause when it closes, and that pause could belong to the card picker
+	# or to the Esc menu. Same contract (and same shape) as
+	# pause_menu.gd's, where a member without is_blocking() counts as
+	# blocking — the rule is only worth having if forgetting it fails SAFE.
+	for node: Node in get_tree().get_nodes_in_group("ui_blocking"):
+		if not node.has_method(&"is_blocking"):
+			push_warning("ui_blocking member without is_blocking(): %s" % node.name)
+			return
+		if node.call(&"is_blocking") == true:
+			return
 	_ui = RouletteUiScript.new()
 	_ui.setup(self, player)
 	# Under the CURRENT SCENE, never under /root: this layer holds the

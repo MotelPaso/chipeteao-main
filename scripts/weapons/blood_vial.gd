@@ -70,6 +70,10 @@ var _flask_mesh: SphereMesh
 
 
 func _ready() -> void:
+	# Same reason as SlimeTrail's: the pool visuals are stage-scoped and
+	# these records are not, so the map change is what drops them.
+	RunState.stage_changed.connect(
+			func(_index: int, _map_id: String) -> void: clear_weapon_fields())
 	# The lobbed flask stays a visible projectile — one shared mesh for
 	# every throw. The landing pool visual is the pooled BloodPool scene
 	# (darker rim + slow bubbles).
@@ -95,15 +99,25 @@ func _physics_process(delta: float) -> void:
 ## Parked straight away rather than faded — expire()'s fade tween would have
 ## to be created on a node that may already be leaving the tree with us.
 func _exit_tree() -> void:
+	clear_weapon_fields()
+	# Flasks belong to the WEAPON, not to a stage: they are in flight for
+	# a fraction of a second and a swap frees them with the arena anyway.
+	for flask: MeshInstance3D in _flasks_in_flight:
+		if is_instance_valid(flask):
+			flask.queue_free()
+	_flasks_in_flight.clear()
+
+
+## The optional half of Player's downed contract, and the stage hook: the
+## pool VISUALS are stage-scoped since iteration 49 while these records
+## ride across on the raider, so without this _tick_pools kept damaging at
+## the old arena's coordinates after a swap, with nothing on screen.
+func clear_weapon_fields() -> void:
 	for pool: BloodPoolEntry in _pools:
 		if pool.visual != null and is_instance_valid(pool.visual):
 			Pools.release(pool.visual)
 		pool.visual = null
 	_pools.clear()
-	for flask: MeshInstance3D in _flasks_in_flight:
-		if is_instance_valid(flask):
-			flask.queue_free()
-	_flasks_in_flight.clear()
 
 
 ## The in-range enemy with the most neighbors within cluster_radius (among

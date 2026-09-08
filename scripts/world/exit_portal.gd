@@ -117,6 +117,13 @@ func _interact(_player: Node) -> void:
 	if root == null or not root.has_method("advance_stage"):
 		push_warning("ExitPortal: no run root to advance the stage.")
 		return
+	# Asked BEFORE the portal spends itself. advance_stage declines while
+	# a fade is already running or the run has ended, and consuming first
+	# left the stage with a dead portal and the party with no way out —
+	# the opposite of what run_root's own comment promises ("the stage
+	# stands, and the portal can be pressed again").
+	if not bool(root.call("can_advance_stage")):
+		return
 	_taken = true
 	consume()
 	_emit_completed()

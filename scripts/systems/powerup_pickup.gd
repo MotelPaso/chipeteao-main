@@ -54,6 +54,8 @@ var _material: StandardMaterial3D = null
 var _time: float = 0.0
 var _left: float = 0.0
 var _ground_y: float = 0.0
+## False until the drop has been placed and _ground_y is worth reading.
+var _ground_captured: bool = false
 var _heading: Vector2 = Vector2.RIGHT
 var _bounces: int = 0
 var _taken: bool = false
@@ -79,7 +81,13 @@ func _ready() -> void:
 		return
 	_color = _row.get("color", Color.WHITE)
 	_left = star_lifetime if roaming else lifetime
-	_ground_y = global_position.y
+	# NOT captured here: every spawn path sets the position AFTER
+	# add_child, so at _ready this read the PARENT's origin instead of the
+	# drop point. Taken on the first physics frame instead, when the drop
+	# has been placed. It is only the fallback for a scene with no
+	# Terrain, but a fallback that is wrong is worse than one that is
+	# missing — a star in such a scene hopped around y = 0.
+	_ground_captured = false
 	# The layers and `monitorable` are set in PowerUpPickup.tscn, NOT here:
 	# a drop is spawned from EnemyBase._on_died, which itself runs inside a
 	# Health.died emitted from take_damage — often mid-dispatch of some
@@ -139,6 +147,7 @@ func _build_visual() -> void:
 func _physics_process(delta: float) -> void:
 	if _taken:
 		return
+	_capture_ground()
 	_time += delta
 	_left -= delta
 	if _left <= 0.0:
@@ -197,6 +206,15 @@ func _walkable(xz: Vector2) -> bool:
 	if _bounds == null or not _bounds.has_method("is_walkable"):
 		return true
 	return bool(_bounds.call("is_walkable", xz))
+
+
+## Ground level under the drop, captured once the spawn has been placed.
+## Only read when there is no Terrain to ask.
+func _capture_ground() -> void:
+	if _ground_captured:
+		return
+	_ground_captured = true
+	_ground_y = global_position.y
 
 
 func _ground_height(xz: Vector2) -> float:

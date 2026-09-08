@@ -108,6 +108,10 @@ var _separation_cache: Vector3 = Vector3.ZERO
 ## albedo/emission on it every frame (_tick_shiny), which Material alone
 ## does not expose.
 var _overlay_elite: StandardMaterial3D = null
+## Possession outranks everything: whose side a body is on is the first
+## thing you need to read off it, and a servant is never elite (the raise
+## copies the corpse and never rolls one).
+var _overlay_possessed: Material = null
 var _overlay_variant: Material = null
 var _overlay_status: Material = null
 ## Meshes of the visual rig, resolved once at ready: the four overlay
@@ -278,18 +282,22 @@ func end_possession() -> void:
 	queue_free()
 
 
+## Through the overlay SLOT protocol, not by writing material_overlay by
+## hand: Juice.flash restores current_overlay() after every damage flash,
+## and a tint that is not in a slot is not in that answer — so the first
+## hit a servant took erased the one thing on screen saying it was yours,
+## permanently. One material for the whole rig: it carries no per-mesh
+## state, and _refresh_overlay writes the same one to each of them.
 func _tint_possessed() -> void:
-	for mesh: MeshInstance3D in _meshes:
-		if not is_instance_valid(mesh):
-			continue
-		var overlay := StandardMaterial3D.new()
-		overlay.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-		overlay.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-		overlay.albedo_color = Color(POSSESSED_TINT, 0.35)
-		overlay.emission_enabled = true
-		overlay.emission = POSSESSED_TINT
-		overlay.emission_energy_multiplier = 1.4
-		mesh.material_overlay = overlay
+	var overlay := StandardMaterial3D.new()
+	overlay.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	overlay.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	overlay.albedo_color = Color(POSSESSED_TINT, 0.35)
+	overlay.emission_enabled = true
+	overlay.emission = POSSESSED_TINT
+	overlay.emission_energy_multiplier = 1.4
+	_overlay_possessed = overlay
+	_refresh_overlay()
 
 
 func _script_name() -> String:
@@ -508,6 +516,8 @@ func _apply_poison_tint(on: bool) -> void:
 ## can restore the COMPOSED state instead of whatever happened to be in the
 ## slot when they started.
 func current_overlay() -> Material:
+	if _overlay_possessed != null:
+		return _overlay_possessed
 	if _overlay_elite != null:
 		return _overlay_elite
 	if _overlay_variant != null:
@@ -783,6 +793,13 @@ func _on_died() -> void:
 		# XP, no points, no orbs, no chest roll, no bestiary bump. It
 		# already paid all of that once, as the corpse it was raised from.
 		# Only the visual death is kept.
+		# It leaves the possessed group with the same breath: a corpse
+		# left in it for the 0.3 s of its death tween counted against the
+		# carrier's max_possessed, so the staff could "expire" a body that
+		# was already dead — a spurious Possessed expired: in a log that
+		# is the verification interface.
+		_possessed = false
+		remove_from_group(POSSESSED_GROUP)
 		_death_feedback()
 		_death_tween()
 		return

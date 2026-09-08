@@ -649,7 +649,10 @@ func _tick_freeze(delta: float) -> void:
 
 
 func _freeze_new_bodies() -> void:
-	for group: StringName in [&"enemies", &"boss"]:
+	# "burrowed" is not decoration: a Duneburrower underground has left
+	# "enemies" on purpose, and without this line the one body that can
+	# damage the party through a freeze was the only one never frozen.
+	for group: StringName in [&"enemies", &"boss", Duneburrower.BURROWED_GROUP]:
 		for node: Node in get_tree().get_nodes_in_group(group):
 			var body := node as Node3D
 			if body == null or not body.is_inside_tree():

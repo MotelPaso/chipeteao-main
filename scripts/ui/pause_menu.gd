@@ -31,6 +31,12 @@ var _pause_owned: bool = false
 
 func _ready() -> void:
 	visible = false
+	# In the group it has been READING since it was written: this menu owns
+	# the tree pause while it is up, and every other blocking layer decides
+	# whether to release a pause by asking this group. Absent from it, the
+	# Esc pause was invisible to all of them — a stall opened over the menu
+	# would hand the world back on its way out.
+	add_to_group("ui_blocking")
 	_apply_styles()
 	_resume_button.pressed.connect(_close)
 	_settings_button.pressed.connect(_on_settings_pressed)
@@ -52,6 +58,13 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 	_open()
 	get_viewport().set_input_as_handled()
+
+
+## "ui_blocking" contract: true while this menu owns the pause. Its own
+## _blocking_ui_open() below skips nothing, so this has to answer honestly
+## — and it does: Esc closes a visible menu before that check is reached.
+func is_blocking() -> bool:
+	return visible
 
 
 ## Any layer that owns (or is about to own) the tree pause right now?

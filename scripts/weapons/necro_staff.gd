@@ -72,7 +72,10 @@ func fire(target: Node3D) -> void:
 		# Staggered, and each one re-acquires: by the time the third bolt
 		# leaves, the first may have already killed what it was aimed at.
 		var delay := extra_bolt_stagger * float(i)
-		get_tree().create_timer(delay, false).timeout.connect(_launch_at_fresh_target)
+		# process_in_physics, like every other multi-shot weapon of this
+		# round: damage belongs on the same tick the rest of the combat
+		# runs on, not on an idle frame between two of them.
+		get_tree().create_timer(delay, false, true).timeout.connect(_launch_at_fresh_target)
 
 
 func _launch_at_fresh_target() -> void:
@@ -105,8 +108,14 @@ func _tick_bolts(delta: float) -> void:
 	for i in range(_bolts.size() - 1, -1, -1):
 		var bolt := _bolts[i]
 		bolt.left -= delta
+		# A body that left the "enemies" group is gone AS A TARGET even
+		# though it is still alive: it was raised as a servant by another
+		# carrier between the launch and now, and iteration 56's rule is
+		# that a servant is invisible to player weapons. Without this the
+		# bolt kept homing and killed a teammate's minion.
 		var target_gone := bolt.target == null or not is_instance_valid(bolt.target) \
-				or not bolt.target.is_inside_tree()
+				or not bolt.target.is_inside_tree() \
+				or not bolt.target.is_in_group(&"enemies")
 		if bolt.left <= 0.0 or target_gone:
 			_kill_bolt(i)
 			continue
@@ -173,7 +182,12 @@ func _trim_servants() -> void:
 		var servant := node as EnemyBase
 		if servant != null and servant.possession_carrier() == carrier_player():
 			mine.append(servant)
-	while mine.size() >= max_possessed:
+	# maxi(..., 1) and the emptiness test together: pop_front on an empty
+	# array returns null, the guard below skips it and the size stays 0,
+	# which is still >= a max_possessed of 0 — and evolution rows write
+	# weapon properties by NAME, so a mults entry naming this one could
+	# reach zero and hang the physics thread.
+	while not mine.is_empty() and mine.size() >= maxi(max_possessed, 1):
 		var oldest := mine.pop_front() as EnemyBase
 		if oldest != null and is_instance_valid(oldest):
 			oldest.end_possession()

@@ -119,6 +119,12 @@ func open_choice(title: String, options: Array[Dictionary], recipient: Node = nu
 		on_pick: Callable = Callable(), tag: String = "") -> void:
 	if not RunState.run_active or options.is_empty():
 		return
+	if options.size() > _cards.size():
+		# The surplus is dropped silently below, and the option a caller
+		# appends LAST is usually the one that matters (the lucky well's
+		# refusal card). Say so instead of losing it quietly.
+		push_warning("UpgradeCardUI: %d options for %d cards — '%s' drops the surplus"
+				% [options.size(), _cards.size(), title])
 	_serve_or_queue({"kind": KIND_CHOICE, "title": title, "options": options,
 			"recipient": recipient, "on_pick": on_pick, "tag": tag})
 

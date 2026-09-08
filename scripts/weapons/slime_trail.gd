@@ -55,6 +55,12 @@ var _puddle_mesh: CylinderMesh = null
 
 
 func _ready() -> void:
+	# The puddle VISUALS are stage-scoped (RunRoot.stage_parent) while
+	# these records ride across on the raider, so a stage change has to
+	# drop them or _tick_puddles keeps pulsing at the old arena's
+	# coordinates with nothing on screen to explain the damage.
+	RunState.stage_changed.connect(
+			func(_index: int, _map_id: String) -> void: clear_weapon_fields())
 	_puddle_mesh = CylinderMesh.new()
 	_puddle_mesh.top_radius = 1.0
 	_puddle_mesh.bottom_radius = 1.0
@@ -90,6 +96,17 @@ func _physics_process(delta: float) -> void:
 ## spot rather than faded — the fade tween would have to be created on a
 ## node that may already be leaving the tree with us.
 func _exit_tree() -> void:
+	clear_weapon_fields()
+
+
+## The optional half of Player's downed contract, and the stage hook.
+## Iteration 49 moved the VISUALS to the arena (RunRoot.stage_parent) but
+## left the records on the weapon, which rides across on the raider: after
+## a stage change _tick_puddles kept pulsing at the previous arena's world
+## coordinates, dealing damage nobody could see in a map where nothing was
+## standing there. Player._clear_weapon_fields has been looking for this
+## method since the co-op down path was written; no weapon implemented it.
+func clear_weapon_fields() -> void:
 	for puddle: SlimePuddle in _puddles:
 		if puddle.visual != null and is_instance_valid(puddle.visual):
 			puddle.visual.queue_free()

@@ -125,6 +125,9 @@ var _vignette_tween: Tween
 
 # --- FOV kick state (one entry per camera currently kicked) ---
 var _fov_kicks: Dictionary[int, FovKick] = {}
+## Reused scratch for the per-tick sweep, like _expired_flash_keys: a
+## dictionary cannot be erased from while it is being iterated.
+var _expired_fov_keys: Array[int] = []
 
 # --- level pulse state ---
 ## Process frame the last level ring/sting fired on: RunState emits
@@ -164,6 +167,7 @@ func _process(delta: float) -> void:
 			Engine.time_scale = 1.0
 	_tick_flashes(delta)
 	_tick_shake(delta)
+	_tick_fov_kicks()
 
 
 # --- camera shake -----------------------------------------------------------
@@ -230,12 +234,23 @@ func _release_shake_cameras() -> void:
 
 
 func _rest_camera(camera: Camera3D) -> void:
-	if camera == null or not is_instance_valid(camera):
+	if camera == null:
 		return
-	var rest: Vector2 = _shake_rest.get(camera.get_instance_id(), Vector2.ZERO)
+	if not is_instance_valid(camera):
+		# A camera freed mid-shake takes its instance id with it (asking a
+		# freed object for anything is an error), so its rest entry is found
+		# by resolving the ids instead. The bookkeeping HAS to go: this is an
+		# autoload, and a stage swap or a co-op slot leaving retires a camera
+		# per view, every time.
+		for key: int in _shake_rest.keys():
+			if not is_instance_id_valid(key):
+				_shake_rest.erase(key)
+		return
+	var key := camera.get_instance_id()
+	var rest: Vector2 = _shake_rest.get(key, Vector2.ZERO)
 	camera.h_offset = rest.x
 	camera.v_offset = rest.y
-	_shake_rest.erase(camera.get_instance_id())
+	_shake_rest.erase(key)
 
 
 # --- hit stop ---------------------------------------------------------------
@@ -421,6 +436,26 @@ func fov_kick_end(camera: Camera3D = null) -> void:
 	kick.tween.tween_property(kick.camera, "fov", kick.base_fov, fov_kick_out_time) \
 			.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
 	kick.tween.tween_callback(_on_fov_restored.bind(key))
+
+
+## Entries only ever leave on the normal paths (the restore tween finishing,
+## or fov_kick_end finding the camera already gone), and a raider whose
+## camera dies MID-SLIDE reaches neither: the kick would sit in this
+## autoload holding a dead Camera3D for the rest of the process, one per
+## view per run in split-screen. Swept here instead — the dictionary is
+## empty except during a slide, so this costs a branch.
+func _tick_fov_kicks() -> void:
+	if _fov_kicks.is_empty():
+		return
+	_expired_fov_keys.clear()
+	for key: int in _fov_kicks:
+		var kick: FovKick = _fov_kicks[key]
+		if is_instance_valid(kick.camera):
+			continue
+		_kill_fov_tween(kick)
+		_expired_fov_keys.append(key)
+	for key: int in _expired_fov_keys:
+		_fov_kicks.erase(key)
 
 
 func _on_fov_restored(key: int) -> void:

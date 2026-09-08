@@ -53,6 +53,15 @@ const VENDOR_LIBRARY: Array[Dictionary] = [
 
 const VENDOR_UI_SCRIPT := preload("res://scripts/ui/vendor_ui.gd")
 
+## Line shown INSTEAD of the stall's own while the retry cooldown runs. No
+## "[E] " prefix, unlike every other prompt: the token promises a press that
+## does something, and during the cooldown there is nothing to press — so it
+## reads as a state, the way the chest quotes a price it knows you cannot
+## pay instead of offering to open.
+const COOLDOWN_PROMPT_TEMPLATE: String = "Atiende de nuevo en %d s"
+## Prompt for a row that has none (a bad `kind` export).
+const DEFAULT_PROMPT: String = "[E] Comerciar"
+
 ## The power-up price multiplies by this with every purchase, run-wide.
 const POWERUP_PRICE_GROWTH: float = 1.5
 
@@ -83,7 +92,7 @@ func _ready() -> void:
 	# NOT the "altars" group: the WorldDirector's altar cap counts that one,
 	# and a stall standing around would starve the altar cadence.
 	add_to_group(&"vendors")
-	set_prompt(String(row().get("prompt", "[E] Comerciar")))
+	set_prompt(_row_prompt())
 	_build_visual()
 
 
@@ -145,15 +154,45 @@ func _build_visual() -> void:
 
 func _physics_process(delta: float) -> void:
 	_time += delta
-	_cooldown_left = maxf(_cooldown_left - delta, 0.0)
+	if _cooldown_left > 0.0:
+		_cooldown_left = maxf(_cooldown_left - delta, 0.0)
+		_refresh_cooldown_prompt()
 	if _sign != null and available:
 		_sign.position.y = 2.2 + sin(_time * 1.6) * 0.04
+
+
+## The stall's own line, from its VENDOR_LIBRARY row.
+func _row_prompt() -> String:
+	return String(row().get("prompt", DEFAULT_PROMPT))
+
+
+## Counts the wait down on the prompt and hands the stall's own line back
+## the moment it ends. Without it the stall kept offering its goods while
+## refusing every press for 20 s — Chest and RouletteShrine both swap their
+## line when they say no, and a prompt that lies is worse than none.
+## Ungated by range on purpose: the cooldown can run out while nobody is
+## watching, and the restore still has to happen.
+func _refresh_cooldown_prompt() -> void:
+	var line: String = _row_prompt() if _cooldown_left <= 0.0 \
+			else COOLDOWN_PROMPT_TEMPLATE % ceili(_cooldown_left)
+	# Only on a real change: set_prompt rewrites the Label3D (which rebuilds
+	# its text mesh), and this line moves once a second, not once a frame.
+	if line == prompt_text:
+		return
+	set_prompt(line)
 
 
 func _interact(player: Node) -> void:
 	if _sold or not available or _cooldown_left > 0.0:
 		return
 	if _ui != null and is_instance_valid(_ui):
+		return
+	# Never open a tree-pausing menu OVER another one: this stall's panel
+	# releases the pause when it closes, and that pause could belong to the
+	# card picker. The soak roots the whole run under an always-processing
+	# node, so Interactable._unhandled_input still fires while paused and the
+	# probe presses interact every 0.75 s while it lingers.
+	if _blocking_ui_open():
 		return
 	var ui := VENDOR_UI_SCRIPT.new() as CanvasLayer
 	ui.call("setup", self, player)
@@ -164,6 +203,20 @@ func _interact(player: Node) -> void:
 	ui.tree_exited.connect(_on_menu_closed)
 
 
+## Any "ui_blocking" layer up right now? Same contract (and same shape) as
+## pause_menu.gd: a member that does not expose is_blocking() COUNTS as
+## blocking — the contract is only worth having if forgetting it fails SAFE.
+func _blocking_ui_open() -> bool:
+	for node: Node in get_tree().get_nodes_in_group("ui_blocking"):
+		if not node.has_method(&"is_blocking"):
+			push_warning("ui_blocking member without is_blocking(): %s" % node.name)
+			return true
+		var blocking: Variant = node.call(&"is_blocking")
+		if blocking == true:
+			return true
+	return false
+
+
 ## The menu is gone. If nothing was bought the stall stays, but goes quiet
 ## for a while — otherwise the soak's repeated interact would reopen it on
 ## the very next frame.
@@ -171,6 +224,9 @@ func _on_menu_closed() -> void:
 	_ui = null
 	if not _sold:
 		_cooldown_left = retry_cooldown
+		# Said straight away, not on the next physics tick: the raider is
+		# standing in the ring at the moment the panel folds, reading this.
+		_refresh_cooldown_prompt()
 
 
 ## THE purchase. Charges, grants, logs, and closes the stall. Returns
