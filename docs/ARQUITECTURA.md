@@ -45,6 +45,8 @@ El acoplamiento cruzado va siempre por aquí. Lista actual:
 | `enemy_projectiles` | bolts enemigos en vuelo | el flag `frozen` de Tiempo detenido |
 | `springs` | el manantial vivo (como máximo uno) | el peso 0 de su fila de evento |
 | `acid_pools` | charcos ácidos vivos (iteración 55) | el tope y la separación de la lluvia radiactiva |
+| `possessed` | siervos del nigromante (iteración 56) | `Stage sweep: possessed=`, el cupo por portador y la limpieza de etapa |
+| `lucky_blocks` | bloques de la suerte vivos | limpieza de etapa |
 | `vendors` | los puestos vivos (máximo 2) | el peso 0 de su fila y `Stage sweep: vendors=` |
 | `pet_boxes` | las cajas de mascotas vivas | limpieza de etapa y `Stage sweep: boxes=` |
 | `boss_ui` | HUD + flecha de jefe | `track_boss(boss, title)`, `track_objective(node)`, `announce` |
@@ -795,6 +797,68 @@ colores leen como tres tipos de problema; nueve leerían como decoración).
 La lee del director en vez de que el director la empuje: es una vista, y un
 push necesitaría una señal disparada desde tres grupos distintos.
 
+## Poseídos (Báculo de nigromante)
+
+Lo que mata el báculo **se levanta de tu lado** (iteración 56).
+
+- **El cadáver muere entero primero.** `Health.died` es síncrona, así que
+  cuando `deal_damage` regresa `EnemyBase._on_died` ya corrió: gema de XP,
+  puntos, orbes, tirada de cofre de élite y bestiario, todo pagado. El
+  siervo es una **copia nueva** de la misma escena en el sitio del muerto,
+  así que la baja es baja **y** siervo, nunca una en lugar de la otra.
+- **Un siervo no paga nada al expirar.** Ya pagó una vez como cadáver, y
+  un arma capaz de cobrar dos veces por el mismo cuerpo dejaría a las demás
+  en ruido estadístico. `_on_died` corta todos los pagos con la bandera
+  `_possessed` y conserva solo la muerte visual.
+- **Solo pueden ser poseídos los cuerpo a cuerpo.** El contrato es
+  `EnemyBase.possessable` y el interruptor real es
+  **`_pick_target() -> Node3D`**, que `_physics_process` usa en vez de
+  llamar a `Coop.nearest_player` directo: todo lo de abajo (el seek, el
+  encaramiento y `_combat_tick`, que daña la `Health` que le den) ya es
+  agnóstico del objetivo, así que ese único override cambia el bando.
+
+| Script | ¿Poseíble? | Por qué |
+|---|---|---|
+| `grunt`, `tank` | **sí** | su `_combat_tick` daña `Health.find_in(target)`, sea quien sea |
+| `skirmisher` | no | dispara `EnemyBolt`s que solo dañan al grupo `player` |
+| `sunspitter` | no | su rayo se filtra por el mismo grupo |
+| `duneburrower` | no | guarda y restaura sus propias capas y grupo en cada ciclo de excavación |
+| `boss_base` (y `rotking`, `sarcognath`, `fenwraith`) | no | los jefes llegan al equipo por `damage_players_in_disc` / `Coop.alive_players` |
+| `secret_boss_base` (y `grubthing`, `coffer_mimic`) | no | un minijefe secreto es un jefe, y su muerte desbloquea un raider |
+
+- **Capas**: el siervo sale del grupo `enemies` (que declara la escena), lo
+  que de una sola vez lo esconde de las armas del jugador, del conteo vivo
+  del spawner y del tiempo detenido — los tres leen ese grupo. Pasa a
+  `collision_layer` 8 con máscara 1 (terreno) **más una excepción explícita
+  por raider**: los jugadores comparten la capa 1 con el mundo, así que una
+  máscara que lo dejara atravesar raiders lo dejaría atravesar el suelo.
+- **Cupo** `max_possessed` 12 por portador; el más viejo expira para hacer
+  sitio (un cupo que rechazara al nuevo se sentiría roto justo cuando el
+  arma funciona). Expira también si el portador muere y en cada cambio de
+  etapa. Logs `Possessed spawned:` / `Possessed expired:`.
+
+## Bloques de la suerte
+
+`scripts/world/lucky_block.gd` (`LuckyBlock extends Interactable`, escena
+`scenes/world/chests/LuckyBlock.tscn`, grupo `lucky_blocks`, `marker_kind`
+`&"lucky_block"` en `_init()`). Parece un cofre y no lo es: **gratis, raro y
+siempre paga algo**. No hay precio ni rareza — el objeto entero es la
+sorpresa, y por eso todos los premios son buenos y se diferencian en
+**tipo**, no en tamaño.
+
+`LUCKY_REWARDS` es una tabla con pesos y una rama cada uno: `enemy_explosion`
+(todo lo no-jefe a 12 m muere; los jefes pierden 15% de HP máx.), `gem_rain`
+(25 gemas), `points` (+80), `free_chest`, `powerup` (nunca la estrella) y
+`well`.
+
+**El pozo** es el único premio que hace una pregunta: ofrece hasta 3 de tus
+objetos más «Nada» por `open_choice`, y entregar uno devuelve un objeto de
+la rareza siguiente (Legendario se queda en Legendario) o, un 30% de las
+veces, un power-up. **Sin objetos paga un power-up y no abre menú**:
+`open_choice` retorna sin hacer nada con una lista vacía, y un bloque que se
+quedara callado se leería como roto. Log `Lucky block: <premio>`, uno por
+apertura, nombrando lo que de verdad se pagó.
+
 ## Misiones y meta-progresión
 
 - Qué es: misiones que pagan esquirlas; las esquirlas compran personajes y rangos de reliquia de la Armería. Todo persiste en `user://save.json`.
@@ -838,8 +902,13 @@ push necesitaría una señal disparada desde tres grupos distintos.
 ## Objetos y puntos de partida
 
 - Qué es: economía por jugador dentro de la partida. Cada muerte paga `EnemyBase.points_value` (shiny x5, jefes `BossBase.boss_points_value` = 25, escalado por `apply_tier`) al raider **más cercano** (`Player.add_points`, señal `points_changed`; se reinicia cada partida).
-- Archivos: `scripts/systems/item_catalog.gd` (`ITEM_LIBRARY`, 16 filas), `scripts/systems/item_bag.gd` (`ItemBag`, nodo del Player junto a `Stats`), `scripts/world/chest.gd`, `scripts/systems/run_state.gd` (`chest_price`, `register_chest_opened`, `CHEST_BASE_PRICES`, `CHEST_PRICE_GROWTH`).
-- Objeto nuevo: una fila con `id`, `display_name`, `rarity` **fija en inglés** (id de `UpgradePool.RARITIES`), `glyph` (sigla de dos letras del nombre **español**; `icon` opcional con ruta a textura), `description`, y opcionalmente `effects` y/o `kind` (`magnet`, `poison_on_hit`, `titan`, `spiders`, `hook`, `pet`). Los ids por `kind` se resuelven con el helper del catálogo, no con literales repetidos.
+- Archivos: `scripts/systems/item_catalog.gd` (`ITEM_LIBRARY`, 19 filas), `scripts/systems/item_bag.gd` (`ItemBag`, nodo del Player junto a `Stats`), `scripts/world/chest.gd`, `scripts/systems/run_state.gd` (`chest_price`, `register_chest_opened`, `CHEST_BASE_PRICES`, `CHEST_PRICE_GROWTH`).
+- Objeto nuevo: una fila con `id`, `display_name`, `rarity` **fija en inglés** (id de `UpgradePool.RARITIES`), `glyph` (sigla de dos letras del nombre **español**; `icon` opcional con ruta a textura), `description`, y opcionalmente `effects` y/o `kind` (`magnet`, `poison_on_hit`, `titan`, `spiders`, `hook`, y desde la iteración 56 `shock_dash`, `saiyan`, `zenkai`). Los ids por `kind` se resuelven con el helper del catálogo, no con literales repetidos. **El kind `pet` ya no existe**: las mascotas son un slot del Player desde la iteración 54.
+- `ItemBag.remove_item(item_id) -> bool` devuelve UNA copia (lo usa el pozo del bloque de la suerte) y repite los tres seguimientos de `add_item` en el mismo orden: reescala el titán, pide `recompute` y emite `items_changed`.
+- **Los tres de la iteración 56**, cada uno un `kind` con una rama:
+  - **Cinturón eléctrico** (`shock_dash`): el Player emite `slide_started(direction)` y la bolsa engancha ahí — el derrape no tenía señal porque nada fuera del Player necesitaba saberlo. El rayo salta desde `carrier_player().global_position`, **nunca** desde la bolsa (`ItemBag extends Node`, no tiene transformada: un `Node3D` hijo suyo se queda en el origen del mundo). Pega con `scripts/weapons/belt_bolt.gd` (`BeltBolt extends WeaponBase`, hijo **de la bolsa** y no del montaje `Weapons`, así que ni la tira del HUD ni el tope de 5 armas ni el pool de mejoras lo ven), de modo que `deal_damage` le da crítico, robo de vida y los hooks de muerte gratis. Log `Belt bolt: hits=%d`.
+  - **Sangre sayayin** (`saiyan`): cuenta bajas y cada 40 (×0.85 por copia, piso 15) enciende 12 s de aura con boons **etiquetados** (`tag = "saiyan"`, así un re-disparo se reemplaza en vez de apilarse) y una carcasa dorada por `material_overlay` a la manera de `Juice.flash` — **nunca** `SealRig.apply_tint`, que es el color de identidad del personaje. Log `Saiyan aura:`.
+  - **Zenkai** (`zenkai`): **se arma** con `Health.damaged` por debajo del 10% (es la única señal que significa «algo me hizo daño»: `take_damage` no emite `hp_changed`) y **dispara** con `hp_changed` por encima del 50%. Ignora las señales levantadas durante un `recompute` — `_push_bonus_max_hp_to_health` escribe `max_hp` y cura desde dentro de ese cuerpo, y sin la guarda `PlayerStats.is_recomputing()` el objeto se dispararía con su propia reconstrucción, para siempre. Los stacks son un canal permanente de todas las estadísticas (+8% cada uno). Log `Zenkai triggered:`.
 - Hooks de arma: `WeaponBase.deal_damage` avisa a la bolsa del portador con `on_weapon_hit(body)` y `on_weapon_kill(pos, weapon)`. `Projectile.extra_on_hit` + `tint()` sirven para proyectiles especiales (arañas).
 - Cofres — **dos modos** (iteración 47):
   - **De pago**: `rarity` fija en la instancia o tirada en `_ready` (pesos de rareza + `luck_bonus` de la party, piso `min_rarity`); el tinte y el precio se fijan ahí para que se lean a distancia. Precio = base por rareza × multiplicador global que crece x1.25 con **cada** cofre de pago abierto.
@@ -998,8 +1067,11 @@ Variables de entorno:
 | `BONK_POWERUP_NOW=<id>` | concede ese power-up al slot 0 a los 20 s y **lo re-concede en cada expiración** |
 | `BONK_STAR_NOW=1` | suelta una estrella **quieta** a los pies del raider a los 30 s |
 | `BONK_POWERUP_BOOST=1` | multiplica ×50 la probabilidad de drop por baja (lo lee `EnemySpawner`) |
-| `BONK_POI_NOW=a,b,c` | siembra esos POIs a 8 m del raider a los 20 s: `vendor_items`, `vendor_powerups`, `vendor_animals`, `pet_box`, `event_altar` |
+| `BONK_POI_NOW=a,b,c` | siembra esos POIs a 8 m del raider a los 20 s: `vendor_items`, `vendor_powerups`, `vendor_animals`, `pet_box`, `event_altar`, `lucky_block` |
 | `BONK_WEATHER_NOW=<id>` | fuerza ese clima a los 30 s por la misma entrada forzada que usa el altar |
+| `BONK_WEAPON=<id>` | el raider arranca con esa arma en vez de la de su personaje, por la misma vía de concesión |
+| `BONK_ITEM_NOW=a,b:2` | concede esos objetos al slot 0 a los 10 s (`id:n` para n copias) y hace que el recorrido **derrape** cada ~3 s, único disparador del cinturón |
+| `BONK_ZENKAI_TEST=1` | a los 60 s: golpe del 95%, 3 s invulnerable y curación completa — el bajón-y-supervivencia con el que Zenkai se arma |
 | `BONK_POINTS=<n>` | le da esos puntos al slot 0 al arrancar, para que un soak de vendedor pueda pagar |
 | `BONK_PERF=1` | enciende el overlay de rendimiento del HUD |
 
@@ -1028,5 +1100,5 @@ Para lógica aislada sigue sirviendo un harness desechable `extends SceneTree` (
 - **Español latinoamericano para todo lo visible, inglés para todo lo estructural.** La tabla es `docs/GLOSARIO.md`. En inglés y sin tocar: ids, `node_name`, grupos, `StringName`, rutas `res://`, claves de `SaveData` y los `print()`/`push_warning()`. Los marcadores de formato (`%d %s %.1f %02d %%`) conservan número y orden exactos.
 - **Tunables como `@export`** con defaults en el script; los overrides por instancia viven en la escena (el horario de jefes por arena, las escenas del spawner). Antes de mover un `@export` de sitio, comprueba qué `.tscn` lo overridea: las tres arenas overridean el `EnemySpawner`.
 - **Números mágicos a `const` con nombre y comentario del porqué.** Un `0.5` suelto en dos archivos es la forma en que dos copias del mismo cálculo se separan.
-- **Logs de una línea** en eventos clave — son la interfaz de verificación de los soaks headless, van **en inglés** y se conservan. Inventario actual: `Run ended:`, `Meta saved:`, `Save recovered from backup:`, `Boss spawned:`, `Boss chests dropped:`, `Elite chest dropped:`, `Horde:`, `Sky event:`, `Chest opened:`, `Altar charged:`, `Altar left:`, `Altar placed:`, `Demonic altar used:`, `Demonic pact:`, `Spawn skipped:`, `Stage advanced:`, `Stage sweep:`, `Stage carry:`, `Stage gate:`, `Stage boss slain:`, `Exit portal opened`, `Portal used: exit`, `Pseudo-infinite:`, `Run stages:`, `Terrain built:`, `Probe legs:`, `Greed shrine:`, `Roulette spun:`, `Spring used:`, `Portal used:`, `Portals placed:`, `Weapon evolved:`, `Weapon ascended:`, `Pet joined:`, `Secret miniboss awakened:`, `Secret boss slain:`, `Arena mask:`, `Start layout:`, `Daily run scored:`, `Void rescue:`. Al crear un evento mayor, añade el tuyo con el mismo formato.
+- **Logs de una línea** en eventos clave — son la interfaz de verificación de los soaks headless, van **en inglés** y se conservan. Inventario actual: `Run ended:`, `Meta saved:`, `Save recovered from backup:`, `Boss spawned:`, `Boss chests dropped:`, `Elite chest dropped:`, `Horde:`, `Sky event:`, `Chest opened:`, `Altar charged:`, `Altar left:`, `Altar placed:`, `Demonic altar used:`, `Demonic pact:`, `Spawn skipped:`, `Stage advanced:`, `Stage sweep:`, `Stage carry:`, `Stage gate:`, `Stage boss slain:`, `Exit portal opened`, `Portal used: exit`, `Pseudo-infinite:`, `Run stages:`, `Terrain built:`, `Probe legs:`, `Greed shrine:`, `Roulette spun:`, `Spring used:`, `Portal used:`, `Portals placed:`, `Weapon evolved:`, `Weapon ascended:`, `Pet joined:`, `Secret miniboss awakened:`, `Secret boss slain:`, `Arena mask:`, `Start layout:`, `Daily run scored:`, `Void rescue:`, `Power-up picked:`, `Power-up dropped:`, `Star roam:`, `Flight landing:`, `Pet box opened:`, `Vendor arrived:`, `Vendor sold:`, `Time stop:`, `Immortal blocked:`, `Weather started:`, `Weather ended:`, `Disaster:`, `Event altar used:`, `Possessed spawned:`, `Possessed expired:`, `Belt bolt:`, `Saiyan aura:`, `Zenkai triggered:`, `Lucky block:`. Al crear un evento mayor, añade el tuyo con el mismo formato.
 - **Verificar antes de dar por hecho un cambio**: `tools/verificar.sh`. Un cambio que no pasa el import o ensucia el log de un soak no está terminado.

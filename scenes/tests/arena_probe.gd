@@ -32,6 +32,13 @@ extends Node
 ##                          a vendor soak can actually afford the shelf
 ##   BONK_WEATHER_NOW=<id>  forces that weather at 30 s (the director's own
 ##                          cadence needs many minutes to offer all nine)
+##   BONK_WEAPON=<id>       the raider starts with THAT weapon instead of
+##                          the character's, on the same grant path
+##   BONK_ITEM_NOW=a,b:2    grants those items to slot 0 at 10 s (`id:n` for
+##                          n copies) and makes the tour DASH every ~3 s
+##   BONK_ZENKAI_TEST=1     at 60 s: a 95% hit, three invulnerable seconds,
+##                          then a full heal — the dip-and-survive Zenkai
+##                          arms on and would otherwise need real bad luck
 ##
 ## The raider WALKS AND INTERACTS by default (iteration 45). A parked raider
 ## silently skips every movement-gated system — Slime Trail only drops
@@ -264,6 +271,48 @@ const FLIGHT_HOLD_PERIOD: float = 15.0
 const FLIGHT_HOLD_TIME: float = 5.0
 var _flight_holding: bool = false
 
+## The carrier's current servant cap, or 0 when nobody carries the staff.
+## Read off the weapon so an upgrade card or the evolution moves it, and
+## the soak's possessed=a/b can prove a never exceeds b.
+func _possession_cap() -> int:
+	var lead := _lead_player()
+	if lead == null:
+		return 0
+	var mount := lead.get_node_or_null("Weapons")
+	if mount == null:
+		return 0
+	for child: Node in mount.get_children():
+		var staff := child as NecroStaff
+		if staff != null:
+			return staff.max_possessed
+	return 0
+
+
+## BONK_ITEM_NOW: items to grant slot 0 once, at this run time.
+const ITEM_NOW_AT: float = 10.0
+## While that switch is set the tour DASHES on this cadence. The electric
+## belt has no other trigger, and the ordinary walk never dashes (the dash
+## is sprint held plus a movement wish).
+const ITEM_DASH_PERIOD: float = 3.0
+## Sprint has to be held across a frame boundary for Player._can_start_slide
+## to see it together with a movement wish.
+const ITEM_DASH_HOLD: float = 0.12
+var _item_now: Array[String] = []
+var _items_granted: bool = false
+var _dash_left: float = ITEM_DASH_PERIOD
+var _dash_holding: bool = false
+
+## BONK_ZENKAI_TEST: the dip-and-survive that arms Zenkai, staged at this
+## run time. Left to chance it needs a raider to nearly die and then be
+## healed, which a godmoded soak never does.
+const ZENKAI_TEST_AT: float = 60.0
+## Seconds of invulnerability between the hit and the heal, so nothing can
+## finish the raider off in between.
+const ZENKAI_TEST_SHIELD: float = 3.0
+var _zenkai_test: bool = false
+var _zenkai_stage: int = 0
+var _zenkai_left: float = 0.0
+
 ## BONK_WEATHER_NOW: forced once, at this run time. Late enough that the
 ## arena and its lights are cached, early enough that even a 240 s soak
 ## sees the whole row plus its follow-up.
@@ -336,6 +385,12 @@ func _ready() -> void:
 		get_tree().quit(1)
 		return
 	RunState.stage_changed.connect(_on_stage_changed)
+	# BEFORE the run is instantiated: Player._apply_character reads it while
+	# the raider spawns, so a switch set afterwards would arrive too late.
+	var weapon_id := OS.get_environment("BONK_WEAPON")
+	if not weapon_id.is_empty():
+		Player.starting_weapon_override = weapon_id
+		print("ArenaProbe: weapon=%s" % weapon_id)
 	add_child(scene.instantiate())
 	_walking = OS.get_environment("BONK_WALK") != "0"
 	_debug = OS.get_environment("BONK_PROBE_DEBUG") == "1"
@@ -366,6 +421,11 @@ func _ready() -> void:
 	if not poi_list.is_empty():
 		for entry: String in poi_list.split(",", false):
 			_poi_now.append(entry.strip_edges())
+	var item_list := OS.get_environment("BONK_ITEM_NOW")
+	if not item_list.is_empty():
+		for entry: String in item_list.split(",", false):
+			_item_now.append(entry.strip_edges())
+	_zenkai_test = OS.get_environment("BONK_ZENKAI_TEST") == "1"
 	var points_text := OS.get_environment("BONK_POINTS")
 	if points_text.is_valid_int():
 		_grant_points.call_deferred(int(points_text))
@@ -535,14 +595,20 @@ func _physics_process(delta: float) -> void:
 	_tick_stage_flow(delta)
 	_tick_map_overlay(delta)
 	_tick_powerup_switches()
+	_tick_item_now(delta)
+	_tick_zenkai_test(delta)
 	_watch_time_stop()
 	_watch_airborne(delta)
 	_watch_blocked_cell(delta)
 	if _frames % 120 == 0:
-		print("frame %d paused=%s run_time=%.1f active=%s enemies=%d level=%d airborne=%d explored=%.2f" % [
+		# APPENDED to, never reordered: verificar.sh parses level= off the
+		# last one of these.
+		print(("frame %d paused=%s run_time=%.1f active=%s enemies=%d level=%d"
+				+ " airborne=%d explored=%.2f possessed=%d/%d") % [
 				_frames, get_tree().paused, RunState.run_time, RunState.run_active,
 				get_tree().get_node_count_in_group("enemies"), RunState.level,
-				_airborne_total, _explored_fraction()])
+				_airborne_total, _explored_fraction(),
+				get_tree().get_node_count_in_group(&"possessed"), _possession_cap()])
 		_sample_blocked_hits()
 	var card_ui_open := false
 	for node: Node in get_tree().get_nodes_in_group("upgrade_ui"):
@@ -601,6 +667,76 @@ func _tick_flight_hold() -> void:
 		return
 	_flight_holding = want_hold
 	_send_action(&"jump", want_hold)
+
+
+## BONK_ITEM_NOW: grants the listed items once, then keeps the tour
+## dashing so the electric belt has something to fire on.
+func _tick_item_now(delta: float) -> void:
+	if _item_now.is_empty():
+		return
+	var lead := _lead_player()
+	if lead == null:
+		return
+	if not _items_granted and RunState.run_time >= ITEM_NOW_AT:
+		_items_granted = true
+		var bag := ItemBag.find_in(lead)
+		if bag != null:
+			for entry: String in _item_now:
+				var parts := entry.split(":", false)
+				var item_id := parts[0]
+				var copies := int(parts[1]) if parts.size() > 1 and parts[1].is_valid_int() else 1
+				if ItemCatalog.by_id(item_id).is_empty():
+					push_error("ArenaProbe: unknown BONK_ITEM_NOW '%s'" % item_id)
+					continue
+				for i in copies:
+					bag.add_item(item_id)
+				print("ArenaProbe: granted item %s x%d" % [item_id, copies])
+	if not _items_granted:
+		return
+	_dash_left -= delta
+	if _dash_holding:
+		if _dash_left <= 0.0:
+			_dash_holding = false
+			_dash_left = ITEM_DASH_PERIOD
+			_send_action(&"sprint", false)
+		return
+	if _dash_left <= 0.0:
+		_dash_holding = true
+		_dash_left = ITEM_DASH_HOLD
+		_send_action(&"sprint", true)
+
+
+## BONK_ZENKAI_TEST: hit the raider down to 5% of max HP, shield it for a
+## few seconds so nothing finishes the job, then heal it full. That dip and
+## recovery is exactly the pair of signals Zenkai arms and triggers on.
+func _tick_zenkai_test(delta: float) -> void:
+	if not _zenkai_test:
+		return
+	var lead := _lead_player()
+	if lead == null:
+		return
+	var health := Health.find_in(lead)
+	if health == null:
+		return
+	match _zenkai_stage:
+		0:
+			if RunState.run_time < ZENKAI_TEST_AT:
+				return
+			_zenkai_stage = 1
+			_zenkai_left = ZENKAI_TEST_SHIELD
+			# Invulnerability OFF for the blow itself: the arming signal is
+			# damaged(), and a refused hit never emits it.
+			health.invulnerable = false
+			health.take_damage(health.max_hp * 0.95)
+			health.invulnerable = true
+		1:
+			_zenkai_left -= delta
+			if _zenkai_left > 0.0:
+				return
+			_zenkai_stage = 2
+			health.heal_full()
+			health.invulnerable = false
+			print("ArenaProbe: zenkai test healed")
 
 
 ## BONK_WEATHER_NOW: one forced summon. Through start_sky_event, which is
@@ -675,6 +811,8 @@ func _build_poi(poi: String) -> Node3D:
 			return load("res://scenes/world/PetBox.tscn").instantiate() as Node3D
 		"event_altar":
 			return load("res://scenes/world/shrines/EventAltar.tscn").instantiate() as Node3D
+		"lucky_block":
+			return load("res://scenes/world/chests/LuckyBlock.tscn").instantiate() as Node3D
 		"vendor_items", "vendor_powerups", "vendor_animals":
 			var vendor := load("res://scenes/world/Vendor.tscn").instantiate() as Node3D
 			# Set before it enters the tree: Vendor._ready reads it.

@@ -24,6 +24,14 @@ extends EnemyBase
 var _fire_timer: float = 1.0
 
 
+func _init() -> void:
+	# Not possessable (iteration 56): it fires pooled EnemyBolts that only
+	# damage group "player", so a possessed one would keep attacking the
+	# party it now belongs to. Only contact fighters, whose _combat_tick
+	# damages whatever Health it is handed, can switch sides.
+	possessable = false
+
+
 func _behavior_tick(delta: float) -> void:
 	_fire_timer = maxf(_fire_timer - delta, 0.0)
 

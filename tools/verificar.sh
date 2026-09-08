@@ -114,7 +114,7 @@ if grep -qE "$PATRON_ERROR" "$STAGE_LOG"; then
 	FALLOS=$((FALLOS + 1))
 else
 	AVANCES=$(grep -c '^Stage advanced: ' "$STAGE_LOG")
-	SWEEPS_SUCIOS=$(grep '^Stage sweep: ' "$STAGE_LOG" | grep -cv 'enemies=0 gems=0 orbs=0 chests=0 altars=0 beacons=0 pickups=0 boxes=0 vendors=0')
+	SWEEPS_SUCIOS=$(grep '^Stage sweep: ' "$STAGE_LOG" | grep -cv 'enemies=0 gems=0 orbs=0 chests=0 altars=0 beacons=0 pickups=0 boxes=0 vendors=0 possessed=0')
 	CARRIES=$(grep -c '^Stage carry: ' "$STAGE_LOG")
 	# Las líneas van en PARES (una antes del cruce y otra después). Cada
 	# par tiene que coincidir consigo mismo; entre un cruce y el siguiente

@@ -186,8 +186,11 @@ Variables de entorno del harness:
 | `BONK_POWERUP_NOW=<id>` | concede ese power-up al jugador 1 a los 20 s y **se lo vuelve a dar en cada expiración**, para que un soak corto pase todo su reloj dentro del efecto |
 | `BONK_STAR_NOW=1` | suelta una **estrella quieta** a los pies del raider a los 30 s (la que ronda el mapa es difícil de interceptar a propósito) |
 | `BONK_POWERUP_BOOST=1` | multiplica ×50 la probabilidad de que una baja suelte un power-up, para que los drops salgan dentro de un soak |
-| `BONK_POI_NOW=a,b,c` | siembra esos POIs junto al raider a los 20 s (`vendor_items`, `vendor_powerups`, `vendor_animals`, `pet_box`, `event_altar`) |
+| `BONK_POI_NOW=a,b,c` | siembra esos POIs junto al raider a los 20 s (`vendor_items`, `vendor_powerups`, `vendor_animals`, `pet_box`, `event_altar`, `lucky_block`) |
 | `BONK_WEATHER_NOW=<id>` | fuerza ese clima a los 30 s (`blood_moon`, `eclipse`, `full_moon`, `enemy_rain`, `radioactive_rain`, `golden_rain`, `enemy_tsunami`, `earthquake`, `meteor_shower`) |
+| `BONK_WEAPON=<id>` | el raider arranca con esa arma en vez de la de su personaje |
+| `BONK_ITEM_NOW=a,b:2` | concede esos objetos al jugador 1 a los 10 s y hace que derrape cada ~3 s |
+| `BONK_ZENKAI_TEST=1` | escena de bajón y recuperación a los 60 s, para armar Zenkai |
 | `BONK_POINTS=<n>` | le da esos puntos de partida al jugador 1, para que un soak de vendedor pueda comprar |
 | `BONK_PERF=1` | overlay de rendimiento del HUD (FPS, conteos, pools) |
 

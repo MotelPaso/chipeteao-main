@@ -15,6 +15,17 @@ extends BossBase
 @export var secret_boss_id: String = ""
 
 
+func _init() -> void:
+	# Not possessable (iteration 56): a secret miniboss is a boss, and its
+	# death unlocks a raider, so a possessed one would keep attacking the
+	# party it now belongs to. Only contact fighters, whose _combat_tick
+	# damages whatever Health it is handed, can switch sides.
+	possessable = false
+	# BossBase._init is not called implicitly when a subclass defines its
+	# own, and everything it may come to set belongs here too.
+	super()
+
+
 func _ready() -> void:
 	super()
 	_health.died.connect(_on_secret_boss_died)

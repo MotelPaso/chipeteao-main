@@ -117,6 +117,21 @@ var _meshes: Array[MeshInstance3D] = []
 ## together they cap a single scramble at max_climb_height.
 var _climb_start_y: float = 0.0
 var _climbing: bool = false
+## Possession (iteration 56). A servant of the party: it fights enemies,
+## enemies ignore it, and it pays nothing when it goes.
+@export var possessable: bool = true
+const POSSESSED_GROUP: StringName = &"possessed"
+## Its own collision layer, off the enemy one (2) and off world/players (1).
+const POSSESSED_LAYER: int = 8
+const POSSESSED_TINT := Color(0.65, 0.35, 0.95)
+## How far a servant looks for something to fight.
+const POSSESSED_SEEK_RANGE: float = 30.0
+var _possessed: bool = false
+var _possess_carrier: Node3D = null
+var _possess_left: float = 0.0
+## Set by end_possession so the two paths that can reach it (the clock and
+## the carrier dying on the same frame) cannot free the body twice.
+var _expiring_possession: bool = false
 
 
 func _ready() -> void:
@@ -146,11 +161,19 @@ func _physics_process(delta: float) -> void:
 	# landing a contact hit, a dead skirmisher firing one last bolt.
 	if _health.is_dead:
 		return
+	if _possessed:
+		_tick_possession(delta)
+		if _expiring_possession:
+			return
 	_behavior_tick(delta)
 
 	var steer := Vector3.ZERO
 	var seek := Vector3.ZERO
-	var player := Coop.nearest_player(get_tree(), global_position)
+	# NOT Coop.nearest_player directly: a possessed body overrides this to
+	# hunt enemies instead, and everything downstream (the seek, the facing
+	# and _combat_tick, which damages whatever Health it is handed) is
+	# already target-agnostic.
+	var player := _pick_target()
 	if player != null:
 		var to_player := player.global_position - global_position
 		to_player.y = 0.0
@@ -185,6 +208,103 @@ func _physics_process(delta: float) -> void:
 	if _arena_limit != INF:
 		global_position.x = clampf(global_position.x, -_arena_limit, _arena_limit)
 		global_position.z = clampf(global_position.z, -_arena_limit, _arena_limit)
+
+
+## Who this body fights. The base answer is the nearest standing raider;
+## a possessed servant answers with the nearest ENEMY instead. Every
+## caller downstream is target-agnostic, so this one override is the whole
+## side-switch.
+func _pick_target() -> Node3D:
+	if _possessed:
+		return _nearest_enemy()
+	return Coop.nearest_player(get_tree(), global_position)
+
+
+## Nearest live enemy within POSSESSED_SEEK_RANGE, for a servant.
+func _nearest_enemy() -> Node3D:
+	var best: Node3D = null
+	var best_distance := POSSESSED_SEEK_RANGE * POSSESSED_SEEK_RANGE
+	for node: Node in get_tree().get_nodes_in_group("enemies"):
+		var body := node as Node3D
+		if body == null or not body.is_inside_tree():
+			continue
+		var distance := global_position.distance_squared_to(body.global_position)
+		if distance <= best_distance:
+			best_distance = distance
+			best = body
+	return best
+
+
+## Turns this body into a servant of `carrier` for `duration` seconds.
+##
+## It LEAVES the "enemies" group (declared in the scene root), so every
+## player weapon, the spawner's live count and time stop all stop seeing
+## it — all three scan that group, which is what makes one removal enough.
+## It keeps its own layer off the enemy one and adds an explicit exception
+## per raider: players share collision layer 1 with the world, so a mask
+## that let it walk through raiders would also let it walk through terrain.
+func make_possessed(carrier: Node3D, duration: float) -> void:
+	_possessed = true
+	_possess_carrier = carrier
+	_possess_left = duration
+	remove_from_group("enemies")
+	add_to_group(POSSESSED_GROUP)
+	collision_layer = POSSESSED_LAYER
+	collision_mask = 1
+	for group: String in ["player", "downed_players"]:
+		for node: Node in get_tree().get_nodes_in_group(group):
+			var body := node as CollisionObject3D
+			if body != null:
+				add_collision_exception_with(body)
+	_tint_possessed()
+	print("Possessed spawned: %s" % _script_name())
+
+
+## The raider this servant belongs to, or null when it is not possessed.
+func possession_carrier() -> Node3D:
+	return _possess_carrier if _possessed else null
+
+
+## Ends the possession early (the cap made room, the carrier died, or the
+## clock ran out). A servant pays NOTHING: it already paid once as the
+## corpse it was raised from, and letting it pay twice would make the
+## necromancer the only weapon worth carrying.
+func end_possession() -> void:
+	if not _possessed or _expiring_possession:
+		return
+	_expiring_possession = true
+	print("Possessed expired: %s" % _script_name())
+	Juice.burst(global_position + Vector3.UP * 0.8, POSSESSED_TINT, 12)
+	queue_free()
+
+
+func _tint_possessed() -> void:
+	for mesh: MeshInstance3D in _meshes:
+		if not is_instance_valid(mesh):
+			continue
+		var overlay := StandardMaterial3D.new()
+		overlay.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		overlay.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		overlay.albedo_color = Color(POSSESSED_TINT, 0.35)
+		overlay.emission_enabled = true
+		overlay.emission = POSSESSED_TINT
+		overlay.emission_energy_multiplier = 1.4
+		mesh.material_overlay = overlay
+
+
+func _script_name() -> String:
+	var script_resource := get_script() as Script
+	if script_resource == null:
+		return "enemy"
+	return script_resource.resource_path.get_file().get_basename()
+
+
+## Servant bookkeeping: the clock, and the carrier going away.
+func _tick_possession(delta: float) -> void:
+	_possess_left -= delta
+	if _possess_left <= 0.0 or not is_instance_valid(_possess_carrier) \
+			or not _possess_carrier.is_inside_tree():
+		end_possession()
 
 
 ## THE only way an enemy is allowed to gain height is _tick_climb. Anything
@@ -658,6 +778,14 @@ func _on_died() -> void:
 	remove_from_group("enemies")
 	set_physics_process(false)
 	_collision.set_deferred("disabled", true)
+	if _possessed:
+		# A servant killed in the field pays NOTHING — no kill credit, no
+		# XP, no points, no orbs, no chest roll, no bestiary bump. It
+		# already paid all of that once, as the corpse it was raised from.
+		# Only the visual death is kept.
+		_death_feedback()
+		_death_tween()
+		return
 	RunState.add_kill()
 	# Bestiary counter (Collection screen): keyed by the script's file name
 	# ("kills_grunt", "kills_rotking", ...), so no per-enemy code or export.
@@ -670,6 +798,11 @@ func _on_died() -> void:
 	_drop_acid_pool()
 	_award_points()
 	_death_feedback()
+	_death_tween()
+
+
+## The squash-out every corpse shares, servants included.
+func _death_tween() -> void:
 	var tween := create_tween()
 	tween.set_parallel(true)
 	tween.tween_property(_visual, "rotation:x", -TAU * 0.25, 0.3) \

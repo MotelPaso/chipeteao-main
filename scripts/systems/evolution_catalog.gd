@@ -102,6 +102,13 @@ const EVOLUTION_LIBRARY: Array[Dictionary] = [
 		"flavor": "un halo ardiente que nadie cruza y vive",
 	},
 	{
+		"weapon_id": "necro_staff", "weapon_node": "NecroStaff",
+		"evolved_name": "Corona del Rey Lich", "glyph": "CN",
+		"mults": {"damage": 1.6},
+		"adds": {"possess_duration": 4.0, "max_possessed": 6},
+		"flavor": "un ejército que ya no cabe en el campo",
+	},
+	{
 		"weapon_id": "storm_rod", "weapon_node": "StormRod",
 		"evolved_name": "Corona de tempestad", "glyph": "CT",
 		"mults": {"damage": 1.7},

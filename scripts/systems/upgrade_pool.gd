@@ -138,6 +138,25 @@ const WEAPON_LIBRARY: Array[Dictionary] = [
 		],
 	},
 	{
+		"id": "necro_staff", "display_name": "Báculo de nigromante", "glyph": "BN",
+		"node_name": "NecroStaff", "scene": "res://scenes/weapons/NecroStaff.tscn",
+		"flavor": "lo que mata se levanta de tu lado",
+		"extra_entries": [
+			{
+				"id": "necro_staff_duration", "title": "Posesión más larga",
+				"description": "Tus siervos duran %d%% más",
+				"target": "weapon/NecroStaff", "property": "possess_duration",
+				"op": "mul_percent", "amount": 25.0,
+			},
+			{
+				"id": "necro_staff_cap", "title": "Más siervos",
+				"description": "Puedes tener %d siervos más a la vez",
+				"target": "weapon/NecroStaff", "property": "max_possessed",
+				"op": "add", "amount": 3.0,
+			},
+		],
+	},
+	{
 		"id": "storm_rod", "display_name": "Pararrayos", "glyph": "PY",
 		"node_name": "StormRod", "scene": "res://scenes/weapons/StormRod.tscn",
 		"flavor": "rayos que se bifurcan entre enemigos apretados",
@@ -623,6 +642,16 @@ static func autoload_node(node_name: StringName) -> Node:
 
 
 ## WEAPON_LIBRARY row for a mount node name (empty when unknown).
+## Row by WEAPON_LIBRARY id, or empty. The by-node lookups below answer
+## "what is this live weapon"; this one answers "what is this id", which
+## is what a catalog-driven grant needs.
+static func weapon_by_id(weapon_id: String) -> Dictionary:
+	for row: Dictionary in WEAPON_LIBRARY:
+		if String(row.id) == weapon_id:
+			return row
+	return {}
+
+
 static func weapon_by_node(node_name: String) -> Dictionary:
 	if _weapons_by_node.is_empty():
 		_weapons_by_node = CatalogIndex.build(WEAPON_LIBRARY, "node_name")

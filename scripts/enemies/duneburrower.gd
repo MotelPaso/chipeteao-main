@@ -48,6 +48,15 @@ var _tunneled_players: Array[PhysicsBody3D] = []
 @onready var _mound: Node3D = $Mound
 
 
+func _init() -> void:
+	# Not possessable (iteration 56): it caches and restores its own
+	# layers and group on every burrow cycle, so a possessed one would
+	# keep attacking the party it now belongs to. Only contact fighters,
+	# whose _combat_tick damages whatever Health it is handed, can switch
+	# sides.
+	possessable = false
+
+
 func _ready() -> void:
 	super()
 	_state_timer = surface_duration

@@ -85,6 +85,15 @@ var _gamble_boons: Array[Dictionary] = []
 var _altar_boons: Array[Dictionary] = []
 ## Timed boons (springs, roulette curses): {stat, amount, expires_at}
 ## in RunState.run_time seconds; dropped (with a recompute) on expiry.
+## Zenkai: percent per stack per copy, and the stats it lifts. max_hp and
+## luck are flat channels, so the same number reads as +8 HP and +8 luck
+## per stack rather than a percentage — accepted, because the alternative
+## is a second table for two fields.
+const ZENKAI_PERCENT_PER_STACK: float = 8.0
+const ZENKAI_STATS: Array[String] = [
+	"damage", "cooldown", "area", "move_speed", "crit_chance", "max_hp", "luck"]
+
+
 var _timed_boons: Array[Dictionary] = []
 
 ## Character passive (CharacterCatalog row data). Kinds:
@@ -282,11 +291,24 @@ func set_character_passive(stat: String, amount: float, kind: String = "per_leve
 ## character passive (recompute, not accumulate). Call after any change.
 ## Four phases, in this order and no other: everything back to baseline,
 ## every source applied, the caps, then the push to outside consumers.
+## True while recompute() is running. _push_bonus_max_hp_to_health writes
+## max_hp and heals INSIDE that body, and both emit hp_changed — so any
+## listener that can ask for another recompute (Zenkai does) has to be able
+## to tell "the raider healed" from "the stat layer rebuilt itself".
+func is_recomputing() -> bool:
+	return _recomputing
+
+
+var _recomputing: bool = false
+
+
 func recompute() -> void:
+	_recomputing = true
 	_reset_derived()
 	_apply_sources()
 	_clamp_derived()
 	_publish_derived()
+	_recomputing = false
 
 
 ## Every derived field back to its baseline (the value with zero sources).
@@ -327,6 +349,11 @@ func _apply_sources() -> void:
 	# Altar boons and live timed boons (iteration 41).
 	_apply_boons(_altar_boons)
 	_apply_boons(_timed_boons)
+	# Zenkai (iteration 56): a permanent all-stat channel, read from the
+	# stacks the bag banked. Same shape as the power-up total below — a
+	# stored count re-applied on every rebuild, never accumulated onto a
+	# derived value that _reset_derived would wipe.
+	_apply_zenkai()
 	# Power-ups (iteration 53): the vampire's permanent max HP is a STORED
 	# TOTAL on the component, re-added here on every recompute — never
 	# accumulated onto bonus_max_hp, which _reset_derived wipes.
@@ -422,6 +449,22 @@ func _apply_pet_stat() -> void:
 	if stat.is_empty():
 		return
 	_apply_effect(stat, float(pet.get("amount_per_level", 0.0)) * float(RunState.level))
+
+
+## Zenkai stacks lift EVERY stat that matters by a flat percentage each.
+## Deliberately broad: the item is Legendary, it only pays when the raider
+## came back from under 10% HP, and a narrow bonus would be invisible next
+## to the tomes already stacked by the time it triggers.
+func _apply_zenkai() -> void:
+	var bag := ItemBag.find_in(get_parent())
+	if bag == null:
+		return
+	var stacks := bag.zenkai_stacks
+	if stacks <= 0:
+		return
+	var percent := float(stacks) * ZENKAI_PERCENT_PER_STACK
+	for stat: String in ZENKAI_STATS:
+		_apply_effect(stat, percent)
 
 
 ## Permanent totals banked by power-ups (Modo vampiro raises max HP per

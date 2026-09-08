@@ -1,0 +1,8 @@
+[gd_scene load_steps=2 format=3 uid="uid://cluckyblk1k2p0a"]
+
+[ext_resource type="Script" path="res://scripts/world/lucky_block.gd" id="1_lucky"]
+
+[node name="LuckyBlock" type="Area3D"]
+collision_layer = 0
+collision_mask = 1
+script = ExtResource("1_lucky")

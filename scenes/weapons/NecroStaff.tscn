@@ -1,0 +1,9 @@
+[gd_scene load_steps=2 format=3 uid="uid://cnecrostaff1k2p"]
+
+[ext_resource type="Script" path="res://scripts/weapons/necro_staff.gd" id="1_necro"]
+
+[node name="NecroStaff" type="Node3D"]
+script = ExtResource("1_necro")
+damage = 14.0
+cooldown = 1.4
+attack_range = 9.0

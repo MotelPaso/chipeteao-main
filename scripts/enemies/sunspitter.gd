@@ -47,6 +47,14 @@ var _beam: BeamVisual
 var _hum_held: bool = false
 
 
+func _init() -> void:
+	# Not possessable (iteration 56): its beam gates on group "player", so
+	# a possessed one would keep attacking the party it now belongs to.
+	# Only contact fighters, whose _combat_tick damages whatever Health it
+	# is handed, can switch sides.
+	possessable = false
+
+
 func _ready() -> void:
 	super()
 	_aim_line = BeamVisual.create(self, AIM_COLOR, 0.05)

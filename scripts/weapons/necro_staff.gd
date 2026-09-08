@@ -50,7 +50,6 @@ var _bolts: Array[SoulBolt] = []
 
 
 func _ready() -> void:
-	super()
 	_bolt_mesh = SphereMesh.new()
 	_bolt_mesh.radius = bolt_radius
 	_bolt_mesh.height = bolt_radius * 2.0

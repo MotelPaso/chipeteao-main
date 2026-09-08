@@ -123,6 +123,10 @@ const PROMPT_PCT_UNSET: int = -2
 ## Run points (iteration 40): earned per kill by the nearest raider,
 ## spent on chests, roulettes and springs. Per player, reset every run.
 signal points_changed(total: int)
+## Emitted at the START of a dash, with the direction it went. The electric
+## belt is its only listener today; the dash had no signal before because
+## nothing outside the Player cared that it happened.
+signal slide_started(direction: Vector3)
 var points: int = 0
 
 
@@ -701,7 +705,24 @@ func is_rooted() -> bool:
 
 ## Applies a CharacterCatalog row: instances the starting weapon under the
 ## Weapons mount, tints the seal model, registers the passive.
+## Test switch (ArenaProbe, BONK_WEAPON): the id of the weapon the raider
+## starts with instead of the character's. Read here so the swap rides the
+## SAME grant path — the node_name the upgrade pool counts on, and the
+## used_weapon_ bump — instead of a second, subtly different one.
+static var starting_weapon_override: String = ""
+
 func _apply_character(character: Dictionary) -> void:
+	var row := character
+	if not starting_weapon_override.is_empty():
+		var forced := UpgradePool.weapon_by_id(starting_weapon_override)
+		if forced.is_empty():
+			push_error("Player: unknown BONK_WEAPON '%s'" % starting_weapon_override)
+		else:
+			row = character.duplicate()
+			row["weapon_scene"] = String(forced.scene)
+			row["weapon_node_name"] = String(forced.node_name)
+			row["weapon_display_name"] = String(forced.display_name)
+	character = row
 	var scene := load(String(character.weapon_scene)) as PackedScene
 	if scene == null:
 		push_warning("Player: bad starting weapon scene '%s'" % character.weapon_scene)
@@ -953,6 +974,7 @@ func _start_slide(direction: Vector3) -> void:
 	_set_body_height(slide_collision_height)
 	Juice.fov_kick_begin(view_camera())
 	Sfx.play(&"slide")
+	slide_started.emit(direction)
 
 
 func _end_slide() -> void:

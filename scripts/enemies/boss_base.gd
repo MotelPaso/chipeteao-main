@@ -68,6 +68,15 @@ var _bounds: Node3D = null
 var _tier_stacks: int = 0
 
 
+func _init() -> void:
+	# Not possessable (iteration 56): bosses reach the party through
+	# damage_players_in_disc / Coop.alive_players, so a possessed one
+	# would keep attacking the party it now belongs to. Only contact
+	# fighters, whose _combat_tick damages whatever Health it is handed,
+	# can switch sides.
+	possessable = false
+
+
 func _ready() -> void:
 	# Map marker (iteration 52): a boss is the one enemy the map shows.
 	add_to_group(&"map_markers")

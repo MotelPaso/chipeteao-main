@@ -26,6 +26,7 @@ const CURSE_SHRINE_SCENE := preload("res://scenes/world/shrines/CurseShrine.tscn
 const SPRING_SHRINE_SCENE := preload("res://scenes/world/shrines/SpringShrine.tscn")
 const ROULETTE_SHRINE_SCENE := preload("res://scenes/world/shrines/RouletteShrine.tscn")
 const EVENT_ALTAR_SCENE := preload("res://scenes/world/shrines/EventAltar.tscn")
+const LUCKY_BLOCK_SCENE := preload("res://scenes/world/chests/LuckyBlock.tscn")
 const PET_BOX_SCENE := preload("res://scenes/world/PetBox.tscn")
 const VENDOR_SCENE := preload("res://scenes/world/Vendor.tscn")
 const PortalShrineScript := preload("res://scripts/world/portal_shrine.gd")
@@ -53,6 +54,7 @@ const EVENT_LIBRARY: Array[Dictionary] = [
 	# The event altar (iteration 55). No `altar` flag: that flag drives the
 	# charge/demonic cadence and its unspent cap, and this one is neither.
 	{"id": "event_altar", "weight": 0.4, "method": &"_event_event_altar"},
+	{"id": "lucky_block", "weight": 0.25, "method": &"_event_lucky_block"},
 ]
 
 ## Rejection-sampling budget for a clear POI spot, and for the ring sample
@@ -164,6 +166,8 @@ const POI_PLATFORM_Y: float = 0.5
 @export var start_pet_box_chance: float = 0.5
 ## Chance a stage opens with an event altar already standing.
 @export var start_event_altar_chance: float = 0.5
+## Chance a stage opens with a lucky block already standing.
+@export var lucky_block_start_chance: float = 0.5
 @export var altar_cap_base: int = 3
 @export var altar_cap_minutes: float = 3.0
 ## Share of the run-start chests (scene-placed and the extras below) that
@@ -339,6 +343,7 @@ func on_stage_started(arena: Node3D) -> void:
 	_spawn_roulettes()
 	_spawn_start_pet_boxes()
 	_spawn_start_event_altars()
+	_spawn_start_lucky_blocks()
 
 
 ## 0-1 pet boxes at stage start (iteration 54). Zero is a real outcome:
@@ -360,6 +365,14 @@ func _spawn_start_event_altars() -> void:
 	if start_event_altar_chance <= 0.0 or randf() >= start_event_altar_chance:
 		return
 	_spawn_event_altar(_claim_clear_point())
+
+
+## 0-1 lucky blocks at stage start, same short-circuit rule as the altar:
+## a chance of zero must draw no random number, or it shifts the layout.
+func _spawn_start_lucky_blocks() -> void:
+	if lucky_block_start_chance <= 0.0 or randf() >= lucky_block_start_chance:
+		return
+	_spawn_lucky_block(_claim_clear_point())
 
 
 ## Stage teardown (RunRoot, before the arena is freed): restore the sky the
@@ -864,6 +877,20 @@ func _event_vendor() -> void:
 			vendor, INF))
 	_announce("¡Llega un vendedor!")
 	print("Vendor arrived: %s" % String(row.id))
+
+
+## A lucky block. Rarer than the altar: it always pays something good, and
+## something that always pays has to be something you rarely find.
+func _event_lucky_block() -> void:
+	_spawn_lucky_block(_event_point())
+	_announce("Un bloque dorado aparece en algún lugar...")
+
+
+func _spawn_lucky_block(at: Vector3) -> Node3D:
+	var block := LUCKY_BLOCK_SCENE.instantiate() as Node3D
+	_stage_parent().add_child(block)
+	block.global_position = at
+	return block
 
 
 ## The event altar: free, one use, and whatever it summons is a surprise.

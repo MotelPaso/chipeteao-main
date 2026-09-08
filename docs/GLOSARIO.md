@@ -531,6 +531,36 @@ Los nombres del clima van en **caja baja tipo oración** (regla 3) en la
 insignia del HUD («Luna de sangre»), y en **mayúsculas** solo en el anuncio
 grande, igual que ya hacían las lunas desde la iteración 42.
 
+## Objetos, nigromante y bloques (iteración 56)
+
+| Inglés | Español |
+|---|---|
+| Electric belt | Cinturón eléctrico |
+| Saiyan blood | Sangre sayayin |
+| Zenkai | Zenkai |
+| Necromancer staff | Báculo de nigromante |
+| Lich King's Crown | Corona del Rey Lich |
+| possessed / servant | poseído / siervo |
+| lucky block | bloque de la suerte |
+| well | pozo |
+| `On a dash, lightning jumps between %d enemies` | Al derrapar, un rayo salta entre %d enemigos |
+| `Saiyan aura!` | ¡Aura sayayin! |
+| `Zenkai! Everything +%d%%` | ¡Zenkai! Todo +%d%% |
+| `[E] Open lucky block` | `[E] Abrir bloque de la suerte` |
+| `The well asks for an offering` | El pozo pide una ofrenda |
+| `Nothing` | Nada |
+| `You keep everything` | Te quedas con todo |
+| `You trade it for something better` | Lo cambias por algo mejor |
+| `A golden block appears somewhere...` | Un bloque dorado aparece en algún lugar... |
+| `Longer possession` | Posesión más larga |
+| `More servants` | Más siervos |
+
+«Sangre sayayin» y «Zenkai» son guiños del compañero de equipo y viajan tal
+cual (regla 3 en caja baja tipo oración para el nombre de objeto: «Sangre
+sayayin», no «Sangre Sayayin»). «Corona del Rey Lich» lleva mayúsculas en
+las dos partes por la regla 4, como el resto de nombres propios de
+evolución.
+
 ## Rarezas
 
 > **Cuidado:** `UpgradePool.RARITIES[].name` y el campo `rarity` de `ItemCatalog` son **claves de lógica**, no texto. Se leen como id en los precios de cofre (`RunState.CHEST_BASE_PRICES`), en la tirada de objetos y en varios santuarios. Se traducen **solo al pintarlos**, con `UpgradePool.rarity_display()`.

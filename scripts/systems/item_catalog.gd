@@ -102,6 +102,21 @@ const ITEM_LIBRARY: Array[Dictionary] = [
 		"description": "Tus bajas liberan arañas venenosas que cazan a otros enemigos",
 	},
 	{
+		"id": "electric_belt", "display_name": "Cinturón eléctrico", "rarity": "Rare",
+		"glyph": "CL", "kind": "shock_dash",
+		"description": "Al derrapar, un rayo salta entre 3 enemigos (uno más por copia)",
+	},
+	{
+		"id": "saiyan_blood", "display_name": "Sangre sayayin", "rarity": "Epic",
+		"glyph": "SS", "kind": "saiyan",
+		"description": "Cada 40 bajas te envuelve un aura: daño, velocidad de ataque y velocidad",
+	},
+	{
+		"id": "zenkai", "display_name": "Zenkai", "rarity": "Legendary",
+		"glyph": "ZK", "kind": "zenkai",
+		"description": "Sobrevivir por debajo del 10% de HP sube todo un 8% para siempre",
+	},
+	{
 		"id": "cosmic_worm", "display_name": "Gusano cósmico", "rarity": "Legendary",
 		"glyph": "GC", "kind": "hook",
 		"description": "Los portales se recargan 25% más rápido por copia",

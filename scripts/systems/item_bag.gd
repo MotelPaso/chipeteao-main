@@ -42,6 +42,43 @@ signal items_changed(item_id: String, count: int)
 ## drain the dart pool and re-scan the whole horde for targets.
 @export var max_spiders_per_frame: int = 12
 
+## --- iteration 56 items -----------------------------------------------------
+## Zenkai stacks, read by PlayerStats as a permanent all-stat channel.
+## Public because that is exactly what the stat layer needs to see.
+var zenkai_stacks: int = 0
+
+@export_group("Electric belt")
+## Damage of the first bolt and the growth per extra copy live on BeltBolt;
+## this is only how far the chain reaches for its first target.
+@export var belt_first_range: float = 10.0
+@export_group("Saiyan blood")
+@export var kills_per_aura: int = 40
+## Each extra copy shortens the count; never below the floor, or the aura
+## would be permanent and stop reading as an event.
+@export var aura_kills_per_copy_scale: float = 0.85
+@export var aura_kills_floor: int = 15
+@export var aura_duration: float = 12.0
+@export var aura_damage: float = 40.0
+@export var aura_cooldown: float = 25.0
+@export var aura_move_speed: float = 20.0
+@export_group("Zenkai")
+## Arms below this share of max HP, triggers on getting back above the
+## other one. Two thresholds and not one: the raider has to actually be
+## brought back, not wobble across a single line.
+@export var zenkai_arm_ratio: float = 0.1
+@export var zenkai_trigger_ratio: float = 0.5
+
+## Tag for the aura's timed boons, so re-triggering REPLACES its own copy
+## instead of stacking a second aura on top of the first.
+const SAIYAN_TAG: String = "saiyan"
+const AURA_TINT := Color(1.0, 0.85, 0.25)
+
+var _belt: BeltBolt = null
+var _saiyan_kills: int = 0
+var _aura_left: float = 0.0
+var _aura_overlays: Array[MeshInstance3D] = []
+var _zenkai_armed: bool = false
+
 var _counts: Dictionary[String, int] = {}
 var _magnet_timer: float = 0.0
 ## Spider budget bookkeeping: the count and the physics frame it belongs to.
@@ -57,6 +94,21 @@ static func find_in(body: Node) -> ItemBag:
 		if child is ItemBag:
 			return child
 	return null
+
+
+func _ready() -> void:
+	var body := get_parent()
+	if body == null:
+		return
+	if body.has_signal("slide_started"):
+		body.connect("slide_started", _on_slide_started)
+	var health := Health.find_in(body)
+	if health != null:
+		# damaged() is the ONLY signal a combat dip raises: take_damage
+		# never emits hp_changed. Arming there and triggering on hp_changed
+		# is what makes "went low AND came back" two separate facts.
+		health.damaged.connect(_on_health_damaged)
+		health.hp_changed.connect(_on_health_hp_changed)
 
 
 func count(item_id: String) -> int:
@@ -113,7 +165,33 @@ func add_item(item_id: String) -> void:
 	SaveData.bump("item_" + item_id)
 
 
+## Gives ONE copy back (the lucky block's well trades an item for a better
+## one). False when the raider does not carry it, so a caller can tell a
+## refused trade from a completed one.
+func remove_item(item_id: String) -> bool:
+	var held := count(item_id)
+	if held <= 0:
+		return false
+	if held == 1:
+		_counts.erase(item_id)
+	else:
+		_counts[item_id] = held - 1
+	# Same three follow-ups add_item does, in the same order: the visual
+	# scale is derived from the count, and the stat layer reads this bag.
+	if String(ItemCatalog.by_id(item_id).get("kind", "")) == "titan":
+		_apply_titan_scale()
+	var stats := PlayerStats.find_in(get_parent())
+	if stats != null:
+		stats.recompute()
+	items_changed.emit(item_id, count(item_id))
+	return true
+
+
 func _physics_process(delta: float) -> void:
+	if _aura_left > 0.0:
+		_aura_left -= delta
+		if _aura_left <= 0.0:
+			_apply_aura_shell(false)
 	# Most raiders carry nothing for most of a run; skip the kind lookup.
 	if _counts.is_empty() or count_kind("magnet") <= 0:
 		return
@@ -155,6 +233,141 @@ func on_weapon_hit(target: Node3D) -> void:
 
 ## WeaponBase hook: a weapon carried by this raider just killed something
 ## at `at`. Superhero Mask: spiders leap from the corpse at other enemies.
+## --- electric belt ----------------------------------------------------------
+
+## The dash IS the trigger. The chain starts from the RAIDER's position,
+## never from this node: ItemBag extends Node and has no transform, so a
+## Node3D child of it sits at the world origin.
+func _on_slide_started(_direction: Vector3) -> void:
+	var copies := count_kind("shock_dash")
+	if copies <= 0:
+		return
+	var body := get_parent() as Node3D
+	if body == null:
+		return
+	if _belt == null or not is_instance_valid(_belt):
+		_belt = BeltBolt.new()
+		_belt.name = "BeltBolt"
+		_belt.first_range = belt_first_range
+		# Under the BAG, not the Weapons mount: everything that enumerates
+		# weapons walks that mount, so a bolt parked there would show up in
+		# the HUD strip, count against the five-weapon cap and enter the
+		# level-up pool.
+		add_child(_belt)
+	var hits := _belt.zap_chain(body.global_position, copies)
+	if hits > 0:
+		# One line per dash, and dashes are rare enough for that to stay
+		# readable in a soak.
+		print("Belt bolt: hits=%d" % hits)
+
+
+## --- saiyan blood -----------------------------------------------------------
+
+## Kills needed for the next aura at this many copies.
+func _aura_threshold(copies: int) -> int:
+	var wanted := float(kills_per_aura) * pow(aura_kills_per_copy_scale, float(copies - 1))
+	return maxi(roundi(wanted), aura_kills_floor)
+
+
+func _tick_saiyan_kill() -> void:
+	var copies := count_kind("saiyan")
+	if copies <= 0:
+		return
+	_saiyan_kills += 1
+	if _saiyan_kills < _aura_threshold(copies):
+		return
+	_saiyan_kills = 0
+	_start_aura(copies)
+
+
+func _start_aura(copies: int) -> void:
+	var stats := PlayerStats.find_in(get_parent())
+	if stats == null:
+		return
+	var scale := float(copies)
+	# TAGGED: a second aura replaces the first instead of stacking with it,
+	# which is what keeps a long run from ending in a permanent tripled
+	# raider.
+	stats.add_timed_boon("damage", aura_damage * scale, aura_duration, SAIYAN_TAG)
+	stats.add_timed_boon("cooldown", aura_cooldown * scale, aura_duration, SAIYAN_TAG)
+	stats.add_timed_boon("move_speed", aura_move_speed * scale, aura_duration, SAIYAN_TAG)
+	_aura_left = aura_duration
+	_apply_aura_shell(true)
+	var body := get_parent() as Node3D
+	if body != null:
+		Juice.burst(body.global_position + Vector3.UP * 1.0, AURA_TINT, 24)
+	get_tree().call_group("hud", "announce", "¡Aura sayayin!")
+	print("Saiyan aura: kills=%d" % _aura_threshold(copies))
+
+
+## Golden shell over the seal's meshes, the way Juice.flash does it —
+## material_overlay, restored on the way out. NEVER SealRig.apply_tint,
+## which is the character's identity colour and would stay changed.
+func _apply_aura_shell(on: bool) -> void:
+	if not on:
+		for mesh: MeshInstance3D in _aura_overlays:
+			if is_instance_valid(mesh):
+				mesh.material_overlay = null
+		_aura_overlays.clear()
+		return
+	var rig := get_parent().get_node_or_null("SealRig") as Node3D
+	if rig == null:
+		return
+	var shell := StandardMaterial3D.new()
+	shell.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	shell.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	shell.albedo_color = Color(AURA_TINT, 0.4)
+	shell.emission_enabled = true
+	shell.emission = AURA_TINT
+	shell.emission_energy_multiplier = 2.0
+	for node: Node in rig.find_children("*", "MeshInstance3D", true, false):
+		var mesh := node as MeshInstance3D
+		if mesh != null:
+			mesh.material_overlay = shell
+			_aura_overlays.append(mesh)
+
+
+## --- zenkai -----------------------------------------------------------------
+
+## Arms on a real combat dip. take_damage never emits hp_changed, so this
+## signal is the only one that means "something hurt me".
+func _on_health_damaged(_amount: float, current: float) -> void:
+	if count_kind("zenkai") <= 0:
+		return
+	var health := Health.find_in(get_parent())
+	if health != null and current <= health.max_hp * zenkai_arm_ratio:
+		_zenkai_armed = true
+
+
+## Triggers when the raider is back on their feet. Signals raised DURING a
+## recompute are ignored: _push_bonus_max_hp_to_health writes max_hp and
+## heals from inside that body, which would read as "healed back" and let
+## Zenkai trigger off its own stat rebuild, forever.
+func _on_health_hp_changed(current: float, max_hp: float) -> void:
+	if not _zenkai_armed or count_kind("zenkai") <= 0:
+		return
+	var stats := PlayerStats.find_in(get_parent())
+	if stats != null and stats.is_recomputing():
+		return
+	if current < max_hp * zenkai_trigger_ratio:
+		return
+	_zenkai_armed = false
+	zenkai_stacks += count_kind("zenkai")
+	# Deferred: this runs from inside a signal the stat layer may be about
+	# to read, and recomputing in place would re-enter it.
+	_request_recompute.call_deferred()
+	get_tree().call_group("hud", "announce",
+			"¡Zenkai! Todo +%d%%" % roundi(float(zenkai_stacks)
+					* PlayerStats.ZENKAI_PERCENT_PER_STACK))
+	print("Zenkai triggered: stacks=%d" % zenkai_stacks)
+
+
+func _request_recompute() -> void:
+	var stats := PlayerStats.find_in(get_parent())
+	if stats != null:
+		stats.recompute()
+
+
 func on_weapon_kill(at: Vector3, weapon: WeaponBase) -> void:
 	# Power-ups relay off the same hook (iteration 53): this is already
 	# THE "a weapon of mine just killed something" callback, and giving
@@ -162,6 +375,7 @@ func on_weapon_kill(at: Vector3, weapon: WeaponBase) -> void:
 	var powerups := PowerUps.find_in(get_parent())
 	if powerups != null:
 		powerups.on_kill()
+	_tick_saiyan_kill()
 	var stacks := count_kind("spiders")
 	if stacks <= 0 or weapon == null:
 		return
