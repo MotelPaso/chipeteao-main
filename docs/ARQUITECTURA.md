@@ -41,6 +41,9 @@ El acoplamiento cruzado va siempre por aquí. Lista actual:
 | `fog` | la niebla de guerra de la partida | `reset_for_stage(arena)`, `reveal_at(xz)`, `is_explored(xz)`, `explored_fraction()` |
 | `map_markers` | todo lo que sale en el mapa (raiders, jefes, interactuables con `marker_kind`) | `map_marker_kind()`, opcional `map_marker_color()` |
 | `map_overlay` | los mapas de Tab vivos | `marker_count()` (lo lee el harness) |
+| `powerup_pickups` | power-ups en el suelo (iteración 53) | limpieza de etapa y `Stage sweep: pickups=` |
+| `enemy_projectiles` | bolts enemigos en vuelo | el flag `frozen` de Tiempo detenido |
+| `springs` | el manantial vivo (como máximo uno) | el peso 0 de su fila de evento |
 | `boss_ui` | HUD + flecha de jefe | `track_boss(boss, title)`, `track_objective(node)`, `announce` |
 | `upgrade_ui` | `UpgradeCardUI` | `open_bonus_pick(...)`, `open_choice(...)` |
 | `altars` | todo `ChargeShrine` vivo (de escena o del director) | el cupo de altares sin gastar del `WorldDirector` |
@@ -429,6 +432,141 @@ botón **BACK** en control) y está en `Coop.BASE_ACTIONS`, así que cada slot
 tiene su `p1_map_overlay`, `p2_map_overlay`… ligado solo a su dispositivo: en
 co-op cada jugador abre **su** mapa.
 
+## Power-ups
+
+Desde la iteración 53 hay **power-ups temporales**: efectos ruidosos y
+breves (20 s; la estrella 15) que caen de las bajas, salen del manantial y
+los vende un vendedor. No son tomos ni objetos: no se acumulan, no se
+eligen en una carta y **se sienten sin leer un número**.
+
+### Las cuatro piezas
+
+| Pieza | Qué es | Dónde |
+|---|---|---|
+| `PowerUpCatalog` | las 10 filas | `scripts/systems/powerup_catalog.gd` |
+| `PowerUps` | componente por raider: qué está activo y cuánto queda | `scripts/systems/power_ups.gd`, hijo de `Player.tscn`, `PowerUps.find_in(body)` |
+| `PowerUpPickup` | la gema en el suelo | `scripts/systems/powerup_pickup.gd` + `scenes/systems/PowerUpPickup.tscn`, grupo `powerup_pickups` |
+| `EnemySpawner` | la tirada del drop, el congelado y la puerta de spawn | `roll_powerup_drop`, `spawn_powerup_pickup`, `freeze_enemies` |
+
+### Añadir un power-up
+
+**Una fila.** Si el efecto es estadístico (`effects: [{stat, amount}]`) no
+hay que escribir **nada** de código: el canal de boons temporales ya
+existe. Si es un comportamiento (`kind`) se añade **una** rama en
+`PowerUps`. Dos filas llevan las dos cosas y dicen por qué: el vampiro
+(robo de vida normal + HP permanente por baja) y la estrella (`kind` sin
+`effects`, porque **es** todas las demás a la vez).
+
+La regla de acumulación es una sola: **distintos se apilan, el mismo se
+refresca** (y un refresco nunca acorta). Por eso los consumidores de
+`kind` se re-sincronizan desde `has(kind)` después de cada cambio en vez de
+apagarse al expirar: con apilado, «se acabó la inmortalidad» y «ya no soy
+inmortal» son preguntas distintas — puede seguir corriendo una estrella.
+
+Los boons estadísticos van **etiquetados** (`add_timed_boon(..., tag)` +
+`clear_timed_boons(tag)`, iteración 53): sin etiqueta, volver a agarrar
+Furia apilaría un segundo +100% y la primera expiración se llevaría la
+mitad.
+
+### Las filas de comportamiento
+
+| kind | Qué hace | Dónde vive el efecto |
+|---|---|---|
+| `immortal` | ningún golpe entra | `Health.invulnerable` (+ `Health.blocked_hits`, que el soak lee) |
+| `reflect` | el daño recibido vuelve al atacante | `Health.reflect_fraction`, evaluado **antes** del rechazo por inmortalidad |
+| `vampire` | robo de vida + **HP máx. permanente por baja** | boon de `lifesteal` + `PowerUps.permanent_max_hp` |
+| `gold` | cada baja paga doble | `Player.set_points_source(id, mult)` — un **producto de factores con nombre** |
+| `flight` | mantener salto para volar | `Player._tick_flight`, techo sobre `Terrain.height_at` |
+| `time_stop` | la horda se congela | `EnemySpawner.freeze_enemies(duration)` |
+| `star` | todas las demás, con **su** reloj de 15 s | `PowerUps.apply` recursivo sobre `star_components()` |
+
+**`permanent_max_hp` es un total guardado**, re-aplicado por
+`PlayerStats._apply_powerups()` en cada `recompute()`. Sumarlo a
+`bonus_max_hp` lo borraría el siguiente `_reset_derived()`. El componente
+pide el recompute con un `call_deferred` coalescido: un arma de área
+puede cobrar doce bajas en un frame.
+
+### Tiempo detenido
+
+El spawner es el dueño porque es el único nodo que ya conoce a **todos**:
+cuerpos, jefes y los bolts en vuelo.
+
+- Un cuerpo congelado queda en `PROCESS_MODE_DISABLED` con su `velocity`
+  **guardada y puesta a cero**. Lo de poner a cero importa dos veces: un
+  `CharacterBody3D` deshabilitado conserva la velocidad que tenía (el
+  detector de voladores del harness seguiría leyéndolo subiendo) y
+  restaurarla al descongelar es lo que evita que un enemigo lanzado
+  teletransporte la distancia que «debía».
+- **Lo que se genera durante el congelado se congela también**: una horda
+  que sigue entrando a través del tiempo detenido no es tiempo detenido.
+- **`EnemyBase._on_died` restaura el `process_mode` antes de crear su tween
+  de muerte.** Un nodo deshabilitado **sí** recibe llamadas y señales: se
+  lo puede matar congelado, y su tween quedaría atado a un nodo que no
+  procesa — nunca termina y el cadáver no se libera nunca.
+- Los bolts enemigos (grupo `enemy_projectiles`, al que `EnemyBolt` se une
+  en `_ready` **y** en `pool_reset`) llevan un **flag** `frozen`, no un
+  `set_physics_process(false)`: `NodePool` fotografía el estado de proceso
+  al soltar y lo restaura al adquirir, así que un nodo pooled congelado
+  así vuelve inerte para siempre. Un bolt congelado además **no golpea**:
+  su `Area3D` sigue vigilando (para eso es un flag y no un apagado), y sin
+  esa guarda una bala ya en el aire rompería lo único que el tiempo
+  detenido promete.
+- Los cuerpos congelados quedan **no sólidos** (`collision_layer` 0,
+  restaurada al descongelar). «La horda se congela; tú no» tiene que
+  significar libre para **moverse**, y un cuerpo deshabilitado no se puede
+  empujar: ochenta de ellos cerrados alrededor del raider serían ochenta
+  estatuas soldándolo en el sitio. Las armas buscan por **grupo y
+  distancia**, nunca por capa de colisión (`WeaponBase.enemies_in_disc`),
+  así que un congelado no sólido sigue siendo perfectamente dañable.
+
+### Vuelo
+
+Mientras corre y **se mantiene** la acción de salto, el raider sube a
+`flight_rise_speed` hasta `flight_ceiling` metros **sobre el terreno**
+(un Y absoluto lo enterraría en una colina de un mapa y lo dejaría en el
+cielo en otro); soltar el salto planea. El XZ se limita al
+`arena_half_extent` del nodo `arena_bounds` — el borde de arena es un muro
+para quien camina y no sería nada para quien vuela.
+
+**Al expirar** (`Player.end_flight()`, un borde y no un estado): si el
+raider está sobre una celda **no caminable**, se lo baja al punto caminable
+más cercano de entre `FLIGHT_LANDING_SAMPLES` muestras. Sin eso caería
+dentro de las rocas de la máscara, que es exactamente lo que el vigilante
+de celda bloqueada del harness existe para atrapar. Log `Flight landing:`.
+
+### El drop, la estrella y el manantial
+
+- **Drop por baja**: `EnemyBase._drop_powerup()` →
+  `EnemySpawner.roll_powerup_drop(raider, shiny)`. Base
+  `base_powerup_drop_chance` 0.004 × (1 + `powerup_drop_chance`/100 del
+  raider más cercano) × 5 si el cuerpo era shiny × `BONK_POWERUP_BOOST`.
+  **Aquí es donde por fin se consume la estadística `powerup_chance`** que
+  la iteración 48 dejó sin consumidor («Fortuna menor» en los altares).
+- **La estrella nunca cae de una baja.** Su única fuente es la fila
+  `star_sighting` del `WorldDirector` (peso 0.15): sale en un punto de
+  evento y **ronda** el mapa a 6 m/s rebotando contra lo no caminable y
+  contra el borde, con tinte arcoíris y 60 s de vida. Log `Star roam:`.
+- **Manantial**: cura completa + **un power-up al azar** (nunca la
+  estrella). Ya no tira su propio paquete de boons: con un roster de
+  power-ups, un manantial que diera +30% de daño mientras una Furia da
+  +100% serían dos sistemas para una idea. **Nunca caduca y solo hay uno
+  vivo**: su fila de evento pesa 0 mientras el grupo `springs` no esté
+  vacío, igual que el cupo de altares (una fila que dispara y no hace nada
+  quema toda la ventana de evento).
+
+### Ciclo de vida y UI
+
+El pickup se parenta con `RunRoot.stage_parent`, está en `powerup_pickups`
+(que `_free_stage_props()` limpia y `Stage sweep:` cuenta como
+`pickups=`), se une solo a `map_markers` con `map_marker_kind()` →
+`&"powerup"` y su propio `map_marker_color()`. Vive 45 s (la estrella 60):
+el mapa ya carga decenas de marcadores tarde en una etapa y un pickup
+eterno solo engordaría esa pila.
+
+En el HUD, una fila de fichas **sobre la barra de HP** con los segundos
+que quedan (jugador 1; en co-op los compañeros llevan un contador `◈N` en
+su fila compacta), y el mapa de Tab lista «Power-ups» con sus segundos.
+
 ## Misiones y meta-progresión
 
 - Qué es: misiones que pagan esquirlas; las esquirlas compran personajes y rangos de reliquia de la Armería. Todo persiste en `user://save.json`.
@@ -581,7 +719,15 @@ Desde la iteración 45 **el raider camina e interactúa por defecto**. Un raider
 - **Cobertura de niebla** (iteración 52): la línea de estado termina en
   `explored=` (`FogOfWar.explored_fraction()`) y al terminar el soak imprime
   `Probe fog: explored=%.2f`, avisando si quedó por debajo de
-  `FOG_MIN_EXPLORED` **0.09**. Ese número se calibró **una sola vez**, con las
+  `FOG_MIN_EXPLORED` **0.09**. La puerta **no** se aplica bajo
+  `BONK_STAGE_FAST` (la niebla se reinicia en cada etapa) ni bajo
+  `BONK_POWERUP_NOW` (ese interruptor mantiene **un** power-up encendido
+  toda la corrida, un estado que ninguna partida real alcanza: con
+  `time_stop` la horda nunca entra en alcance, no muere nada y el
+  recorrido se arrastra — medido: nivel 2 y 107 cuerpos vivos a los
+  360 s). En ambos casos la cobertura mide el interruptor, no el paseo.
+  La puerta conserva toda su fuerza donde se calibró: los cuatro soaks de
+  `tools/verificar.sh`, que no ponen ninguno de los dos. Ese número se calibró **una sola vez**, con las
   tres arenas a 360 s y las semillas de `verificar.sh`: Bosque Hueco 0.15,
   Dunas de Ceniza 0.32, Ciénaga Lóbrega 0.16 → el **60% de la peor**. Ese 40%
   de margen no es holgura para un recorrido flojo, es **varianza medida**: el
@@ -604,6 +750,7 @@ Desde la iteración 45 **el raider camina e interactúa por defecto**. Un raider
   reportaba el mapa de antes de abrirse (`markers=0`).
 - `_send_action(base, pressed)` es el sintetizador de teclas genérico (antes
   era solo `_send_interact`): misma regla de soltar en un frame posterior.
+- **Power-ups** (iteración 53): el recorrido se desvía a la gema más cercana dentro de `PICKUP_DETOUR` 20 m (caminar encima **es** la interacción: ni pulsación ni linger). Bajo `BONK_POWERUP_NOW=time_stop` muestrea hasta tres cuerpos congelados por frame y al descongelar imprime `Time stop: sampled=%d moved=%d damage_events=%d` — `moved` y `damage_events` son las dos formas en que un congelado puede ser mentira, y las dos tienen que salir en cero. Al terminar imprime `Immortal blocked:` con `Health.blocked_hits` (cacheado en vida, como la niebla). Bajo `BONK_POWERUP_NOW=flight` **mantiene el salto** 5 s cada 15 s, porque Vuelo solo hace algo mientras se mantiene; el resto de los soaks conservan el paseo de siempre.
 - Nunca toca el guardado real: re-apunta `SaveData.save_path` a `user://soak_save.json` antes de instanciar la arena.
 
 Variables de entorno:
@@ -620,6 +767,9 @@ Variables de entorno:
 | `BONK_STAGE_FAST=1` | la etapa se supera a los 60 s sin jefe; el harness espera 70 s y cruza |
 | `BONK_SAVE_PATH=<ruta>` | re-apunta el guardado (cualquier arranque headless que no sea el probe) |
 | `BONK_GAME_SEED=<int>` | siembra el RNG **del juego** (cartas, spawns, scatter y relieve): lo que hace reproducible un soak entero |
+| `BONK_POWERUP_NOW=<id>` | concede ese power-up al slot 0 a los 20 s y **lo re-concede en cada expiración** |
+| `BONK_STAR_NOW=1` | suelta una estrella **quieta** a los pies del raider a los 30 s |
+| `BONK_POWERUP_BOOST=1` | multiplica ×50 la probabilidad de drop por baja (lo lee `EnemySpawner`) |
 | `BONK_PERF=1` | enciende el overlay de rendimiento del HUD |
 
 Uso directo:

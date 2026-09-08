@@ -171,24 +171,49 @@ func _lob_flask(impact: Vector3) -> void:
 	# weapon, so binding it to the flask (which lives under the scene root)
 	# left it running against a freed weapon if the weapon went first.
 	var tween := create_tween()
-	tween.tween_method(_arc_flask.bind(flask, start, impact), 0.0, 1.0, lob_time)
-	tween.tween_callback(_shatter.bind(flask, impact))
+	# Bound as an INSTANCE ID, never as the node itself: the flask is
+	# parented into the arena and a stage swap frees it mid-flight, while
+	# this tween — owned by the weapon, which rides the persistent Player
+	# across the swap — is still running. Godot cannot marshal a freed
+	# Object into a bound argument, so the call fails at the argument
+	# BEFORE the is_instance_valid() guard inside the method can run
+	# ("Cannot convert argument from Object to Object"). An int always
+	# marshals, and the lookup below answers null for a dead one.
+	var flask_id := flask.get_instance_id()
+	tween.tween_method(_arc_flask.bind(flask_id, start, impact), 0.0, 1.0, lob_time)
+	tween.tween_callback(_shatter.bind(flask_id, impact))
 
 
 ## Flight sampler: linear lerp plus an arc lift that peaks mid-flight.
-func _arc_flask(progress: float, flask: MeshInstance3D, start: Vector3, impact: Vector3) -> void:
-	if not is_instance_valid(flask):
+func _arc_flask(progress: float, flask_id: int, start: Vector3, impact: Vector3) -> void:
+	var flask := _live_flask(flask_id)
+	if flask == null:
 		return
 	var pos := start.lerp(impact, progress)
 	pos.y += arc_height * 4.0 * progress * (1.0 - progress)
 	flask.global_position = pos
 
 
-func _shatter(flask: MeshInstance3D, impact: Vector3) -> void:
-	_flasks_in_flight.erase(flask)
-	if is_instance_valid(flask):
+func _shatter(flask_id: int, impact: Vector3) -> void:
+	var flask := _live_flask(flask_id)
+	if flask != null:
 		flask.queue_free()
+	# Rebuilt instead of erased by reference: a flask the stage swap took
+	# is already gone, and erase() cannot find a freed entry — the array
+	# would grow one dead slot per interrupted throw.
+	var kept: Array[MeshInstance3D] = []
+	for other: MeshInstance3D in _flasks_in_flight:
+		if is_instance_valid(other) and other != flask:
+			kept.append(other)
+	_flasks_in_flight = kept
 	_spawn_pool(impact)
+
+
+## The flask behind an id, or null once it has been freed.
+func _live_flask(flask_id: int) -> MeshInstance3D:
+	if not is_instance_id_valid(flask_id):
+		return null
+	return instance_from_id(flask_id) as MeshInstance3D
 
 
 func _spawn_pool(center: Vector3) -> void:

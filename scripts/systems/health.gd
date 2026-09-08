@@ -43,6 +43,20 @@ signal died
 ## @export so it travels with the rest of the player-facing strings.
 @export var dodge_text: String = "¡Esquiva!"
 
+## Set by PowerUps while Inmortalidad runs: every hit is refused outright
+## (before armor, before the evasion roll) and counted. Deliberately NOT
+## used by the soak's godmode, which raises max_hp instead — a soak has to
+## keep exercising the real damage path.
+var invulnerable: bool = false
+## Hits refused while invulnerable, for the record (the soak reads it to
+## prove an enemy actually tried).
+var blocked_hits: int = 0
+## Fraction of an incoming hit sent back to its attacker (PowerUps sets
+## 1.0 while Reflejo runs). Evaluated BEFORE the invulnerability refusal,
+## so the two power-ups compose the way the player expects: immortal AND
+## reflecting means the horde kills itself while nothing touches you.
+var reflect_fraction: float = 0.0
+
 const DODGE_POPUP_COLOR := Color(0.5, 0.88, 1.0)
 ## Armor can never fully negate a hit: every landed blow chips this much,
 ## so a stacked-armor build still has to dodge instead of going immortal.
@@ -79,6 +93,15 @@ static func find_in(body: Node) -> Health:
 ## dodge from a hit that landed for zero.
 func take_damage(amount: float, is_crit: bool = false, attacker: Node3D = null) -> float:
 	if is_dead or amount <= 0.0:
+		return 0.0
+	# Reflejo repays the RAW incoming amount, before armor and before the
+	# refusal below: what comes back is what was thrown, not what got
+	# through. A hit with no named attacker (a bolt whose caster already
+	# died) has nowhere to go back to and simply does not reflect.
+	if reflect_fraction > 0.0 and attacker != null:
+		_reflect_to(attacker, amount * reflect_fraction)
+	if invulnerable:
+		blocked_hits += 1
 		return 0.0
 	var evade_chance := _evasion_chance()
 	if evade_chance > 0.0 and randf() < evade_chance:
@@ -138,6 +161,19 @@ func revive(fraction: float) -> void:
 	is_dead = false
 	current_hp = clampf(max_hp * fraction, 1.0, max_hp)
 	hp_changed.emit(current_hp, max_hp)
+
+
+## Sends `amount` back to the attacker's own Health. `self` is passed as
+## the attacker so thorns and dodge-execute see a normal hit, and the
+## reflected hit names THIS body — which cannot start a loop, because only
+## a raider ever carries a reflect_fraction.
+func _reflect_to(attacker: Node3D, amount: float) -> void:
+	if not is_instance_valid(attacker) or attacker == get_parent():
+		return
+	var target := Health.find_in(attacker)
+	if target == null or target == self or target.is_dead:
+		return
+	target.take_damage(amount, false, get_parent() as Node3D)
 
 
 ## Chance (0-1) this body fully evades a hit: only the player evades, read

@@ -183,6 +183,9 @@ Variables de entorno del harness:
 | `BONK_STAGE_FAST=1` | la etapa se supera a los 60 s y sin jefe; el harness espera 70 s y cruza el portal |
 | `BONK_SAVE_PATH=<ruta>` | re-apunta el guardado (cualquier arranque headless que no sea el probe) |
 | `BONK_GAME_SEED=<int>` | siembra el RNG del juego (cartas, spawns, scatter y relieve): hace reproducible un soak entero |
+| `BONK_POWERUP_NOW=<id>` | concede ese power-up al jugador 1 a los 20 s y **se lo vuelve a dar en cada expiración**, para que un soak corto pase todo su reloj dentro del efecto |
+| `BONK_STAR_NOW=1` | suelta una **estrella quieta** a los pies del raider a los 30 s (la que ronda el mapa es difícil de interceptar a propósito) |
+| `BONK_POWERUP_BOOST=1` | multiplica ×50 la probabilidad de que una baja suelte un power-up, para que los drops salgan dentro de un soak |
 | `BONK_PERF=1` | overlay de rendimiento del HUD (FPS, conteos, pools) |
 
 Para lógica aislada sigue sirviendo un harness desechable `extends SceneTree` con `godot --headless --path . -s <script>` (igual que `scripts/tools/generate_sfx.gd`). Ojo: en un script `-s` **no hay autoloads**, así que no vale para nada que toque `RunState`, `SaveData` o `Coop`.

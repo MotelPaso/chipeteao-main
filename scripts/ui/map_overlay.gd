@@ -41,6 +41,7 @@ var _map: MapDraw = null
 var _dim: ColorRect = null
 var _header: Label = null
 var _legend: VBoxContainer = null
+var _powerups_body: Label = null
 var _stats_body: Label = null
 var _players_body: Label = null
 var _items_body: Label = null
@@ -129,6 +130,7 @@ func _build_ui() -> void:
 	column.grow_horizontal = Control.GROW_DIRECTION_BEGIN
 	_own(column)
 	add_child(column)
+	_powerups_body = _add_section(column, "Power-ups")
 	_stats_body = _add_section(column, "Estadísticas")
 	_players_body = _add_section(column, "Jugadores")
 	_items_body = _add_section(column, "Objetos")
@@ -213,6 +215,7 @@ func _refresh_panels() -> void:
 		title += " · Vuelta %d" % (RunState.lap + 1)
 	_header.text = "%s — %02d:%02d" % [title, seconds / 60, seconds % 60]
 	_legend.position = Vector2(PAD, size.y - PAD - _legend.size.y)
+	_powerups_body.text = _powerups_text()
 	_stats_body.text = _stats_text()
 	_players_body.text = _players_text()
 	_items_body.text = _items_text()
@@ -226,6 +229,20 @@ func _raider() -> Node3D:
 			if body != null and int(body.get("player_index")) == slot:
 				return body
 	return null
+
+
+## Live power-ups with their remaining seconds (iteration 53). The map is
+## where you look when you are deciding what to do next, and "eleven
+## seconds of Furia left" is exactly that kind of decision.
+func _powerups_text() -> String:
+	var powerups := PowerUps.find_in(_raider())
+	if powerups == null:
+		return "—"
+	var rows: PackedStringArray = PackedStringArray()
+	for live: Dictionary in powerups.active():
+		rows.append("%s  %ds" % [PowerUpCatalog.display_name_of(String(live.id)),
+				ceili(float(live.time_left))])
+	return "\n".join(rows) if not rows.is_empty() else "—"
 
 
 ## The derived stat layer, as the player reads it.

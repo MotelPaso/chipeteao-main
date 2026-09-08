@@ -39,10 +39,17 @@ const EVENT_LIBRARY: Array[Dictionary] = [
 	{"id": "charge_altar", "weight": 1.6, "method": &"_event_charge_altar", "altar": true},
 	{"id": "demonic_altar", "weight": 0.5, "method": &"_event_demonic_altar", "altar": true},
 	{"id": "spring", "weight": 0.7, "method": &"_event_spring"},
+	# The star is the only power-up nobody can farm: it is not a kill drop
+	# and no vendor sells it, so this row is the entire supply.
+	{"id": "star_sighting", "weight": 0.15, "method": &"_event_star"},
 ]
 
 ## Rejection-sampling budget for a clear POI spot, and for the ring sample
 ## an event point gets before it falls back to the run-start sampler.
+## How long the star's beacon burns. It marks WHERE it was seen, not where
+## it is: the star moves, and a beacon that tracked it would turn the one
+## thing you are supposed to chase into a thing you follow.
+const STAR_BEACON_TIME: float = 12.0
 const CLEAR_POINT_ATTEMPTS: int = 60
 const EVENT_POINT_ATTEMPTS: int = 24
 ## Fallback probe span used when there is no terrain to measure against.
@@ -142,8 +149,6 @@ const POI_PLATFORM_Y: float = 0.5
 ## accumulate for the whole run.
 @export var altar_cap_base: int = 3
 @export var altar_cap_minutes: float = 3.0
-## Springs still leave on their own; they are a consumable, not a fixture.
-@export var spring_idle_lifetime: float = 60.0
 ## Share of the run-start chests (scene-placed and the extras below) that
 ## costs nothing. Free chests roll their rarity when opened, so an early
 ## one is a real chance at a Legendary before any points exist.
@@ -674,6 +679,13 @@ func _find_clear_point(limit: float, placed: Array[Vector2],
 ## paved with altars nobody walks to".
 func _event_weight(row: Dictionary) -> float:
 	var weight := float(event_weight_overrides.get(row["id"], row["weight"]))
+	# Exactly one spring on the field (iteration 53). Weighted to zero
+	# rather than no-op'd inside _event_spring: a row that fires and does
+	# nothing burns the whole event window, which is the same reason the
+	# altar cap works this way.
+	if String(row["id"]) == "spring" \
+			and get_tree().get_node_count_in_group(&"springs") > 0:
+		return 0.0
 	if not bool(row.get("altar", false)) or weight <= 0.0:
 		return weight
 	if _unspent_altars() >= _altar_cap():
@@ -729,15 +741,32 @@ func _event_altar(scene: PackedScene, message: String) -> void:
 	print("Altar placed: %s" % ("demonic" if scene == CURSE_SHRINE_SCENE else "charge"))
 
 
+## The one spring. Like an altar since iteration 53: it stays until it is
+## drunk, so its beacon has no deadline either (the TimedBeacon's own
+## poi_worth_showing() check puts it out when the spring is spent).
 func _event_spring() -> void:
 	var spring := SPRING_SHRINE_SCENE.instantiate() as Node3D
-	spring.set("idle_lifetime", spring_idle_lifetime)
 	_stage_parent().add_child(spring)
 	spring.global_position = _event_point()
 	_beacons.append(TimedBeacon.new(
 			_spawn_beacon(spring.global_position, Color(0.4, 0.8, 1.0)),
-			spring, spring_idle_lifetime))
+			spring, INF))
 	_announce("Un manantial brota en algún lugar del campo...")
+
+
+## Star sighting: the rarest thing on the map walks across it. Spawned
+## through the spawner's own pickup door, so the stage parenting, the
+## group and the "Power-up dropped:" line are written once.
+func _event_star() -> void:
+	var spawner := get_tree().get_first_node_in_group("enemy_spawner")
+	if spawner == null or not spawner.has_method("spawn_powerup_pickup"):
+		return
+	var at := _event_point()
+	if spawner.call("spawn_powerup_pickup", at + Vector3.UP * 0.6, "star") == null:
+		return
+	_beacons.append(TimedBeacon.new(
+			_spawn_beacon(at, Color(1.0, 0.9, 0.35)), null, STAR_BEACON_TIME))
+	_announce("Algo brillante cruza el campo...")
 
 
 ## A far point from a random alive player: inside the arena band, on a

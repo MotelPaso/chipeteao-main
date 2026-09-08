@@ -180,6 +180,7 @@ func _resolve_volley() -> void:
 			return
 		bolt.damage = bolt_damage
 		bolt.global_position = origin
+		bolt.launcher = self
 		var t := 0.5 if count == 1 else float(i) / float(count - 1)
 		var bolt_angle := base_angle + lerpf(-spread * 0.5, spread * 0.5, t)
 		var flat_target := origin + Vector3(cos(bolt_angle), 0.0, sin(bolt_angle)) * 10.0

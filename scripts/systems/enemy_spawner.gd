@@ -76,6 +76,13 @@ const ELITE_CHANCE_CAP: float = 0.6
 @export var sunspitter_scene: PackedScene
 @export var burrower_scene: PackedScene
 @export var max_active: int = 80
+@export_group("Power-ups")
+## Base chance ONE kill drops a temporary power-up. Tiny on purpose: a
+## power-up has to read as an event. The raider's own powerup_drop_chance
+## stat (percent) scales it, and a shiny body multiplies it again.
+@export var base_powerup_drop_chance: float = 0.004
+@export var shiny_powerup_drop_scale: float = 5.0
+@export var powerup_pickup_scene: PackedScene = preload("res://scenes/systems/PowerUpPickup.tscn")
 @export_group("Spawn Ring")
 @export var min_radius: float = 18.0
 @export var max_radius: float = 25.0
@@ -319,6 +326,9 @@ func _ready() -> void:
 	_bounds = get_tree().get_first_node_in_group("arena_bounds") as Node3D
 	if _bounds != null:
 		arena_half_extent = float(_bounds.get("arena_half_extent")) - arena_edge_margin
+	if OS.get_environment(POWERUP_BOOST_ENV) == "1":
+		_powerup_boost = POWERUP_BOOST_SCALE
+		print("EnemySpawner: power-up drop boost x%.0f" % POWERUP_BOOST_SCALE)
 	_validate_phase_scenes()
 
 
@@ -396,6 +406,7 @@ func _minutes() -> float:
 
 
 func _physics_process(delta: float) -> void:
+	_tick_freeze(delta)
 	_relief_timer = maxf(_relief_timer - delta, 0.0)
 	_temp_buff_left = maxf(_temp_buff_left - delta, 0.0)
 	_sky_left = maxf(_sky_left - delta, 0.0)
@@ -567,6 +578,164 @@ func pick_spawn_scene() -> PackedScene:
 ## elite_start_minute, then a linear ramp that caps at elite_full_minute.
 ## Run-wide difficulty (demonic altars, Tome of Peril) multiplies it —
 ## more elites is both the threat and the reward (5x XP, orbs, points).
+## --- time stop (iteration 53) -----------------------------------------------
+## Tiempo detenido freezes the horde and leaves the party free. The
+## spawner owns it because it is the one node that already knows about
+## every enemy: bodies, bosses and the bolts in flight.
+##
+## A frozen body is PROCESS_MODE_DISABLED with its velocity stored and
+## zeroed. Zeroing matters twice: a disabled CharacterBody3D keeps the
+## velocity it had (so the probe's airborne detector would still read it
+## rising), and restoring it on thaw is what keeps a charging enemy from
+## teleporting the distance it "owed".
+##
+## It also goes NON-SOLID (collision_layer 0) for the length of the
+## freeze. "Enemies frozen, players free" has to mean free to MOVE, and a
+## disabled body cannot be pushed: eighty of them closed around a raider
+## would be eighty statues welding it in place, turning the power-up that
+## should rescue you into the one that traps you. Weapons find their
+## targets through the "enemies" GROUP and a distance test, never through
+## collision layers (see WeaponBase.enemies_in_disc), so a non-solid frozen
+## enemy is still perfectly damageable: you walk through the horde and keep
+## hitting it.
+##
+## Pooled enemy bolts get a FLAG instead (EnemyBolt.frozen): NodePool
+## snapshots is_physics_processing() on release and restores it on
+## acquire, so a bolt frozen with set_physics_process(false) would come
+## back from the pool inert forever.
+
+## Live freeze: instance id -> body, so a body freed mid-freeze is simply
+## missing on thaw instead of being a dangling reference.
+var _frozen: Dictionary[int, Node3D] = {}
+var _frozen_velocity: Dictionary[int, Vector3] = {}
+## Collision layer each frozen body had, restored on thaw (an enemy whose
+## layer stayed 0 would be permanently walk-through).
+var _frozen_layer: Dictionary[int, int] = {}
+var _freeze_left: float = 0.0
+
+
+## Group hook (PowerUps calls it through "enemy_spawner"). Refreshes to
+## the longer of the two windows, like every other timed effect here.
+func freeze_enemies(duration: float) -> void:
+	_freeze_left = maxf(_freeze_left, duration)
+	_freeze_new_bodies()
+
+
+func is_frozen() -> bool:
+	return _freeze_left > 0.0
+
+
+## Bodies currently held frozen (the soak samples them).
+func frozen_bodies() -> Array[Node3D]:
+	var bodies: Array[Node3D] = []
+	for id: int in _frozen:
+		var body := _frozen[id]
+		if is_instance_valid(body):
+			bodies.append(body)
+	return bodies
+
+
+func _tick_freeze(delta: float) -> void:
+	if _freeze_left <= 0.0:
+		return
+	_freeze_left -= delta
+	if _freeze_left > 0.0:
+		# Anything that spawned (or was summoned) during the freeze is
+		# frozen too: a horde that keeps walking in through stopped time
+		# is not stopped time.
+		_freeze_new_bodies()
+		return
+	_thaw_all()
+
+
+func _freeze_new_bodies() -> void:
+	for group: StringName in [&"enemies", &"boss"]:
+		for node: Node in get_tree().get_nodes_in_group(group):
+			var body := node as Node3D
+			if body == null or not body.is_inside_tree():
+				continue
+			var id := body.get_instance_id()
+			if _frozen.has(id):
+				continue
+			_frozen[id] = body
+			var character := body as CharacterBody3D
+			if character != null:
+				_frozen_velocity[id] = character.velocity
+				character.velocity = Vector3.ZERO
+			var collider := body as CollisionObject3D
+			if collider != null:
+				_frozen_layer[id] = collider.collision_layer
+				collider.collision_layer = 0
+			body.process_mode = Node.PROCESS_MODE_DISABLED
+	for node: Node in get_tree().get_nodes_in_group(&"enemy_projectiles"):
+		node.set("frozen", true)
+
+
+func _thaw_all() -> void:
+	for id: int in _frozen:
+		var body := _frozen[id]
+		if not is_instance_valid(body):
+			continue
+		body.process_mode = Node.PROCESS_MODE_INHERIT
+		var character := body as CharacterBody3D
+		if character != null:
+			character.velocity = _frozen_velocity.get(id, Vector3.ZERO)
+		var collider := body as CollisionObject3D
+		if collider != null and _frozen_layer.has(id):
+			collider.collision_layer = _frozen_layer[id]
+	_frozen.clear()
+	_frozen_velocity.clear()
+	_frozen_layer.clear()
+	for node: Node in get_tree().get_nodes_in_group(&"enemy_projectiles"):
+		node.set("frozen", false)
+	get_tree().call_group("hud", "announce", "El tiempo vuelve a correr.")
+
+
+## --- power-up drops (iteration 53) ------------------------------------------
+
+## True when this death should drop a power-up. `killer` is the raider the
+## roll belongs to (nearest, like the points payout), so their «Fortuna
+## menor» is what moves the odds. BONK_POWERUP_BOOST multiplies the whole
+## thing for acceptance soaks — a 0.4% base needs thousands of kills to
+## show up otherwise, which no soak has time for.
+func roll_powerup_drop(killer: Node, shiny: bool) -> bool:
+	var chance := base_powerup_drop_chance * _powerup_boost
+	var stats := PlayerStats.find_in(killer) if killer != null else null
+	if stats != null:
+		chance *= 1.0 + stats.powerup_drop_chance / 100.0
+	if shiny:
+		chance *= shiny_powerup_drop_scale
+	return randf() < chance
+
+
+## Drops one pickup at `at`. THE spawn door for power-ups on the ground:
+## the star sighting comes through here too, so the stage parenting and
+## the group membership are written once.
+func spawn_powerup_pickup(at: Vector3, powerup_id: String) -> Node3D:
+	if powerup_id.is_empty() or powerup_pickup_scene == null:
+		return null
+	var pickup := powerup_pickup_scene.instantiate() as PowerUpPickup
+	if pickup == null:
+		return null
+	pickup.setup(powerup_id)
+	# Stage-scoped, like everything else dropped into the world: the swap
+	# frees it with the rest of the stage instead of carrying it along.
+	RunRoot.stage_parent(get_tree()).add_child(pickup)
+	pickup.global_position = at
+	print("Power-up dropped: %s" % powerup_id)
+	return pickup
+
+
+## Multiplier read once from BONK_POWERUP_BOOST (test switch; 1.0 in a
+## normal run). Read at _ready, not per roll: this is on the death path.
+var _powerup_boost: float = 1.0
+
+const POWERUP_BOOST_ENV := "BONK_POWERUP_BOOST"
+## What BONK_POWERUP_BOOST=1 is worth. Chosen so a 360 s soak reliably
+## produces a handful of drops without burying the map in them.
+const POWERUP_BOOST_SCALE: float = 50.0
+
+
 ## Harness hook, reached through the "enemy_spawner" group: makes EVERY
 ## spawn roll shiny. Test-only (ArenaProbe under BONK_ELITE_BOOST=1) — the
 ## shiny path and the body crowding it causes would otherwise need twelve

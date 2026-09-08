@@ -16,6 +16,14 @@ extends Node
 ##                          crosses a stage change (RunManager reads it)
 ##   BONK_GAME_SEED=<int>   seeds the GAME's RNG (RunState.reset), which is
 ##                          what makes a whole soak reproducible
+##   BONK_POWERUP_NOW=<id>  grants that power-up to slot 0 at 20 s and
+##                          RE-GRANTS it on every expiry, so a 120 s soak
+##                          spends its whole clock inside the effect
+##   BONK_STAR_NOW=1        drops a STATIONARY star at the raider's feet
+##                          at 30 s (the roaming one is hard to intercept
+##                          on purpose, and a soak has to be able to)
+##   BONK_POWERUP_BOOST=1   multiplies the kill drop chance (read by
+##                          EnemySpawner), so drops show up inside a soak
 ##
 ## The raider WALKS AND INTERACTS by default (iteration 45). A parked raider
 ## silently skips every movement-gated system — Slime Trail only drops
@@ -62,6 +70,10 @@ const LEG_TIMEOUT: float = 40.0
 ## Seconds before the tour will head back to an interactable it already
 ## tried. Keeps a spent-but-still-available altar from pinning the walk.
 const REVISIT_COOLDOWN: float = 45.0
+## How far the tour will detour for a power-up on the ground. Short: a
+## pickup is a bonus on the way, not a destination worth crossing a
+## 240 m arena for.
+const PICKUP_DETOUR: float = 20.0
 ## Progress is sampled this often; moving less than STALL_DISTANCE in that
 ## window counts as stuck and earns a jump.
 const STALL_WINDOW: float = 1.0
@@ -200,6 +212,10 @@ var _stage_fast: bool = false
 ## It is a floor on coverage: raise it if the tour gets better, never lower
 ## it because a run came up short.
 const FOG_MIN_EXPLORED: float = 0.09
+## Hits refused by Inmortalidad, cached while the run is alive for the
+## same reason the fog reading is: _exit_tree runs after the raider is
+## gone.
+var _blocked_hits_seen: int = 0
 ## Last fog reading taken while the run was alive. _exit_tree runs during
 ## teardown, when the RunSystems that owns the fog is already gone, so the
 ## summary has to report what was measured, not what is left.
@@ -219,6 +235,41 @@ var _map_overlay_open: bool = false
 ## True once the tour has been told to drop everything and head for the
 ## exit portal (see _tick_stage_flow); re-armed on every stage change.
 var _exit_rush: bool = false
+## --- power-up switches and instrumentation (iteration 53) -------------------
+## BONK_POWERUP_NOW=<id>: granted at this run time and re-granted the
+## moment it lapses. Not a loop of pickups: the point is to hold ONE
+## effect on for a whole short soak so its edge cases get exercised.
+const POWERUP_NOW_AT: float = 20.0
+## BONK_STAR_NOW=1 drops its star at this run time.
+const STAR_NOW_AT: float = 30.0
+## Enemies sampled per frame during a freeze. Three is enough to catch a
+## body that moved without walking the whole horde every frame.
+const TIME_STOP_SAMPLE: int = 3
+## How far a frozen body may drift and still count as still. Nothing
+## should move at all; this is float noise, not a tolerance to tune.
+const TIME_STOP_EPSILON: float = 0.01
+
+## Flight soak: hold jump this long, this often. Long enough to actually
+## climb to the ceiling and drift over the blocked cells the landing rule
+## exists for.
+const FLIGHT_HOLD_PERIOD: float = 15.0
+const FLIGHT_HOLD_TIME: float = 5.0
+var _flight_holding: bool = false
+
+var _powerup_now: String = ""
+var _star_now: bool = false
+var _star_dropped: bool = false
+## Freeze accounting for one time_stop window, printed at the thaw.
+var _freeze_active: bool = false
+var _freeze_sampled: int = 0
+var _freeze_moved: int = 0
+var _freeze_damage_events: int = 0
+## instance id -> position when this body was last sampled frozen.
+var _freeze_positions: Dictionary[int, Vector3] = {}
+## Health of the lead raider, connected once so enemy damage during a
+## freeze can be counted.
+var _lead_health: Health = null
+
 var _bounds: Node3D = null
 var _in_blocked_cell: bool = false
 var _blocked_cell: Vector2i = Vector2i.ZERO
@@ -264,6 +315,11 @@ func _ready() -> void:
 	if OS.get_environment("BONK_ELITE_BOOST") == "1":
 		_apply_elite_boost.call_deferred()
 	_stage_fast = OS.get_environment("BONK_STAGE_FAST") == "1"
+	_powerup_now = OS.get_environment("BONK_POWERUP_NOW")
+	if not _powerup_now.is_empty() and PowerUpCatalog.by_id(_powerup_now).is_empty():
+		push_error("ArenaProbe: unknown BONK_POWERUP_NOW '%s'" % _powerup_now)
+		_powerup_now = ""
+	_star_now = OS.get_environment("BONK_STAR_NOW") == "1"
 	print("ArenaProbe: arena=%s walk=%s" % [path.get_file(), _walking])
 
 
@@ -342,12 +398,32 @@ func _exit_tree() -> void:
 	print("Probe legs: reached=%d timed_out=%d" % [_legs_reached, _legs_timed_out])
 	var explored := _explored_seen
 	print("Probe fog: explored=%.2f" % explored)
+	# Inmortalidad is only proved by an enemy having TRIED: the counter
+	# lives on Health, so a soak that never got hit reports 0 and the
+	# acceptance check fails, which is the point.
+	print("Immortal blocked: %d" % _blocked_hits_seen)
 	# Skipped under BONK_STAGE_FAST: that soak resets the fog every minute
 	# when it crosses a stage, so its coverage says nothing about the walk.
-	if not _stage_fast and explored < FOG_MIN_EXPLORED:
+	# Skipped under BONK_POWERUP_NOW for the same reason: that switch holds
+	# ONE power-up on for the whole soak, which is a state no real run ever
+	# reaches. Under time_stop the horde never walks into weapon range, so
+	# nothing dies, no XP drops and the tour crawls (measured: level 2 and
+	# 107 live bodies at 360 s). Coverage there measures the switch, not the
+	# walk. The gate keeps its full force where it was calibrated: every
+	# soak tools/verificar.sh runs, none of which sets either switch.
+	if not _stage_fast and _powerup_now.is_empty() and explored < FOG_MIN_EXPLORED:
 		push_warning("ArenaProbe: fog barely explored — %.2f < %.2f"
 				% [explored, FOG_MIN_EXPLORED])
 
+
+
+func _sample_blocked_hits() -> void:
+	var lead := _lead_player()
+	if lead == null:
+		return
+	var health := Health.find_in(lead)
+	if health != null:
+		_blocked_hits_seen = health.blocked_hits
 
 
 func _explored_fraction() -> float:
@@ -409,6 +485,8 @@ func _physics_process(delta: float) -> void:
 		_run_mask_sweep()
 	_tick_stage_flow(delta)
 	_tick_map_overlay(delta)
+	_tick_powerup_switches()
+	_watch_time_stop()
 	_watch_airborne(delta)
 	_watch_blocked_cell(delta)
 	if _frames % 120 == 0:
@@ -416,6 +494,7 @@ func _physics_process(delta: float) -> void:
 				_frames, get_tree().paused, RunState.run_time, RunState.run_active,
 				get_tree().get_node_count_in_group("enemies"), RunState.level,
 				_airborne_total, _explored_fraction()])
+		_sample_blocked_hits()
 	var card_ui_open := false
 	for node: Node in get_tree().get_nodes_in_group("upgrade_ui"):
 		var ui := node as CanvasLayer
@@ -425,6 +504,110 @@ func _physics_process(delta: float) -> void:
 	_watch_for_wedge(delta, card_ui_open)
 	if _walking and not get_tree().paused:
 		_drive_walk(delta)
+
+
+## --- power-up switches (iteration 53) ---------------------------------------
+
+## BONK_POWERUP_NOW / BONK_STAR_NOW. The re-grant is what makes a short
+## soak useful: one twenty-second window would leave a 120 s soak running
+## eighty seconds of ordinary play, and the acceptance checks below only
+## mean something while the effect is on.
+func _tick_powerup_switches() -> void:
+	if RunState.run_time < POWERUP_NOW_AT:
+		return
+	var lead := _lead_player()
+	if lead == null:
+		return
+	if not _powerup_now.is_empty():
+		var powerups := PowerUps.find_in(lead)
+		if powerups != null and not powerups.is_active(_powerup_now):
+			powerups.apply(_powerup_now)
+	_tick_flight_hold()
+	if _star_now and not _star_dropped and RunState.run_time >= STAR_NOW_AT:
+		_star_dropped = true
+		var spawner := get_tree().get_first_node_in_group("enemy_spawner")
+		if spawner != null and spawner.has_method("spawn_powerup_pickup"):
+			# At the raider's feet and STATIONARY: the roaming star is
+			# deliberately hard to intercept, and this switch exists to
+			# prove the pickup and its effect work, not the chase.
+			var star := spawner.call("spawn_powerup_pickup",
+					lead.global_position + Vector3.UP * 0.6, "star") as Node3D
+			if star != null:
+				star.set("roaming", false)
+
+
+## Vuelo has to be FLOWN to be tested: the power-up only does anything
+## while the jump action is held. Gated on the switch that granted it —
+## every other soak keeps the ordinary walk, because a tour that hopped
+## every fifteen seconds would be a different tour.
+func _tick_flight_hold() -> void:
+	if _powerup_now != "flight":
+		return
+	var cycle := fmod(RunState.run_time, FLIGHT_HOLD_PERIOD)
+	var want_hold := cycle < FLIGHT_HOLD_TIME
+	if want_hold == _flight_holding:
+		return
+	_flight_holding = want_hold
+	_send_action(&"jump", want_hold)
+
+
+## Time stop: while the spawner holds a freeze, sample a few frozen bodies
+## every frame and report at the thaw. `moved` and `damage_events` are the
+## two ways a freeze can be a lie — a body that kept walking, or one that
+## still landed a hit — and both must come out zero.
+func _watch_time_stop() -> void:
+	var spawner := get_tree().get_first_node_in_group("enemy_spawner")
+	var frozen := spawner != null and spawner.has_method("is_frozen") \
+			and bool(spawner.call("is_frozen"))
+	if frozen and not _freeze_active:
+		_freeze_active = true
+		_freeze_sampled = 0
+		_freeze_moved = 0
+		_freeze_damage_events = 0
+		_freeze_positions.clear()
+		_connect_lead_health()
+	elif not frozen and _freeze_active:
+		_freeze_active = false
+		print("Time stop: sampled=%d moved=%d damage_events=%d"
+				% [_freeze_sampled, _freeze_moved, _freeze_damage_events])
+		return
+	if not frozen:
+		return
+	var bodies: Array = spawner.call("frozen_bodies")
+	for i in mini(TIME_STOP_SAMPLE, bodies.size()):
+		var body := bodies[i] as Node3D
+		if body == null or not body.is_inside_tree():
+			continue
+		var id := body.get_instance_id()
+		if _freeze_positions.has(id):
+			if body.global_position.distance_to(_freeze_positions[id]) > TIME_STOP_EPSILON:
+				_freeze_moved += 1
+			_freeze_sampled += 1
+		_freeze_positions[id] = body.global_position
+
+
+## Counts enemy-sourced damage on the lead raider while a freeze runs.
+## Connected once and left connected: the raider's Health outlives every
+## freeze, and reconnecting per window would double-count.
+func _connect_lead_health() -> void:
+	if _lead_health != null and is_instance_valid(_lead_health):
+		return
+	var lead := _lead_player()
+	if lead == null:
+		return
+	_lead_health = Health.find_in(lead)
+	if _lead_health != null and not _lead_health.damaged.is_connected(_on_lead_damaged):
+		_lead_health.damaged.connect(_on_lead_damaged)
+
+
+func _on_lead_damaged(_amount: float, _current: float) -> void:
+	if _freeze_active:
+		_freeze_damage_events += 1
+
+
+func _lead_player() -> Node3D:
+	var players := get_tree().get_nodes_in_group("player")
+	return players[0] as Node3D if not players.is_empty() else null
 
 
 ## One pass over the live horde: bodies that have been rising off the floor
@@ -802,6 +985,18 @@ func _send_action(base: StringName, pressed: bool) -> void:
 ## recently tried.
 func _pick_waypoint(from: Vector3) -> void:
 	_leg_time_left = LEG_TIMEOUT
+	# A power-up on the ground outranks everything nearby (iteration 53):
+	# it is free, it expires in 45 s, and walking into it is the whole
+	# interaction — no press, no linger. Only if one is CLOSE, though: a
+	# tour that crossed the map for every drop would stop touring.
+	var pickup := _nearest_pickup(from)
+	if pickup != null:
+		_target = null
+		_waypoint = pickup.global_position
+		if _debug:
+			print("ArenaProbe: heading to power-up %s at %.1fm"
+					% [pickup.get("powerup_id"), _flat(from).distance_to(_flat(_waypoint))])
+		return
 	var target := _nearest_interactable(from)
 	_target = target
 	if target != null:
@@ -823,6 +1018,22 @@ func _pick_waypoint(from: Vector3) -> void:
 				return
 	var half := FALLBACK_HALF_EXTENT
 	_waypoint = Vector3(_rng.randf_range(-half, half), from.y, _rng.randf_range(-half, half))
+
+
+## Nearest live power-up pickup within PICKUP_DETOUR of `from`, or null.
+func _nearest_pickup(from: Vector3) -> Node3D:
+	var best: Node3D = null
+	var best_distance := PICKUP_DETOUR * PICKUP_DETOUR
+	var flat_from := _flat(from)
+	for node: Node in get_tree().get_nodes_in_group(&"powerup_pickups"):
+		var body := node as Node3D
+		if body == null or not body.is_inside_tree() or body.is_queued_for_deletion():
+			continue
+		var distance := flat_from.distance_squared_to(_flat(body.global_position))
+		if distance < best_distance:
+			best_distance = distance
+			best = body
+	return best
 
 
 ## Nearest available interactable not tried within REVISIT_COOLDOWN. Without

@@ -51,9 +51,12 @@ const MARKER_STYLES: Dictionary[StringName, Dictionary] = {
 		"size": 3.0, "always_visible": false},
 	&"exit": {"color": Color(1.0, 0.82, 0.35), "shape": "diamond",
 		"size": 6.0, "always_visible": true},
-	# --- reserved for part C (see ARQUITECTURA, «Marcadores de mapa») ---
+	# Power-up on the ground (iteration 53). It draws in its own row's
+	# colour through map_marker_color(), so a roaming star reads as a
+	# different thing from a dropped Furia.
 	&"powerup": {"color": Color(0.95, 0.95, 0.4), "shape": "dot",
 		"size": 3.0, "always_visible": false},
+	# --- reserved for part C2 (see ARQUITECTURA, «Marcadores de mapa») ---
 	&"vendor": {"color": Color(0.9, 0.75, 0.5), "shape": "square",
 		"size": 3.5, "always_visible": false},
 	&"lucky_block": {"color": Color(1.0, 0.6, 0.85), "shape": "square",
@@ -75,6 +78,7 @@ const MARKER_LABELS: Dictionary[StringName, String] = {
 	&"roulette": "Ruleta",
 	&"portal": "Portales",
 	&"exit": "Salida",
+	&"powerup": "Power-ups",
 }
 
 ## Alpha the unexplored ground is dimmed to in the composite. Not fully

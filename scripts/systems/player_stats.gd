@@ -214,12 +214,34 @@ func altar_boons() -> Array[Dictionary]:
 
 ## Temporary boon for `duration` seconds of run time (negative amounts
 ## are debuffs). Expiry is polled in _physics_process.
-func add_timed_boon(stat: String, amount: float, duration: float) -> void:
+##
+## `tag` groups boons that belong to ONE re-issuable source (a power-up
+## being picked up again while it is still running). Without it a refresh
+## stacks with itself: the second Furia would add a second +100% damage and
+## the first one's expiry would take only half of it away again.
+func add_timed_boon(stat: String, amount: float, duration: float, tag: String = "") -> void:
 	if duration <= 0.0:
 		return
 	_timed_boons.append({
-		"stat": stat, "amount": amount, "expires_at": RunState.run_time + duration})
+		"stat": stat, "amount": amount, "expires_at": RunState.run_time + duration,
+		"tag": tag})
 	recompute()
+
+
+## Drops every live boon carrying `tag` (an empty tag matches nothing, so
+## untagged boons can never be cleared by accident). Returns true when
+## something was actually removed.
+func clear_timed_boons(tag: String) -> bool:
+	if tag.is_empty():
+		return false
+	var removed := false
+	for i in range(_timed_boons.size() - 1, -1, -1):
+		if String(_timed_boons[i].get("tag", "")) == tag:
+			_timed_boons.remove_at(i)
+			removed = true
+	if removed:
+		recompute()
+	return removed
 
 
 func timed_boon_count() -> int:
@@ -303,6 +325,10 @@ func _apply_sources() -> void:
 	# Altar boons and live timed boons (iteration 41).
 	_apply_boons(_altar_boons)
 	_apply_boons(_timed_boons)
+	# Power-ups (iteration 53): the vampire's permanent max HP is a STORED
+	# TOTAL on the component, re-added here on every recompute — never
+	# accumulated onto bonus_max_hp, which _reset_derived wipes.
+	_apply_powerups()
 	# Armory relics (iteration 36): permanent meta ranks, applied through
 	# the same effect channel as tomes so stacking rules stay identical.
 	_apply_relics()
@@ -393,6 +419,15 @@ func _apply_pet_stat(pet_id: String, copies: int) -> void:
 	var copy_scale := float(copies) if String(pet.get("weapon_scene", "")).is_empty() else 1.0
 	_apply_effect(stat,
 			float(pet.get("amount_per_level", 0.0)) * float(RunState.level) * copy_scale)
+
+
+## Permanent totals banked by power-ups (Modo vampiro raises max HP per
+## kill). The component owns the number; this only re-applies it.
+func _apply_powerups() -> void:
+	var powerups := PowerUps.find_in(get_parent())
+	if powerups == null or is_zero_approx(powerups.permanent_max_hp):
+		return
+	_apply_effect("max_hp", powerups.permanent_max_hp)
 
 
 ## Every owned Armory rank contributes its catalog effect (SaveData holds

@@ -181,9 +181,31 @@ func _physics_process(delta: float) -> void:
 
 	_tick_climb(steer)
 	move_and_slide()
+	_clamp_solver_launch()
 	if _arena_limit != INF:
 		global_position.x = clampf(global_position.x, -_arena_limit, _arena_limit)
 		global_position.z = clampf(global_position.z, -_arena_limit, _arena_limit)
+
+
+## THE only way an enemy is allowed to gain height is _tick_climb. Anything
+## else that ends a frame moving upward off the floor got there through
+## move_and_slide()'s own depenetration: a body squeezed inside a crush of
+## eighty others is popped out along the cheapest axis, and often that is
+## straight up. Keeping that impulse is what "enemies flying" looks like —
+## the body sails several metres over the horde before gravity wins.
+##
+## Pre-existing and intermittent (measured on the iteration-52 head: three
+## of three 720 s stage soaks tripped the harness's airborne detector);
+## found by that detector, fixed here rather than by widening its rule.
+##
+## Narrow on purpose: on the floor a raised velocity is a ramp or a step
+## and legitimate, and while climbing it is the climb itself. Only the
+## airborne, non-climbing case is the solver talking, and its answer is
+## discarded — the body simply falls from where it was pushed to.
+func _clamp_solver_launch() -> void:
+	if _climbing or is_on_floor() or velocity.y <= 0.0:
+		return
+	velocity.y = 0.0
 
 
 ## Wall climbing: blocked by geometry while trying to move -> go up, but
@@ -626,6 +648,12 @@ static func _enemies_this_tick(tree: SceneTree) -> Array[Node]:
 
 
 func _on_died() -> void:
+	# A frozen body (time_stop) is PROCESS_MODE_DISABLED, and a disabled
+	# node still receives calls and signals: it can be killed mid-freeze.
+	# Its death tween would then be bound to a node that never processes,
+	# so the tween never finishes and the corpse never frees. Thaw first,
+	# always — the freeze has nothing left to hold once this body is dead.
+	process_mode = Node.PROCESS_MODE_INHERIT
 	# Leave the group first so weapons and separation ignore the corpse.
 	remove_from_group("enemies")
 	set_physics_process(false)
@@ -638,6 +666,7 @@ func _on_died() -> void:
 		SaveData.bump("kills_" + script_path.get_file().get_basename())
 	_drop_xp_gem()
 	_drop_health_orbs()
+	_drop_powerup()
 	_award_points()
 	_death_feedback()
 	var tween := create_tween()
@@ -682,6 +711,26 @@ func _drop_health_orbs() -> void:
 		_spawn_health_orb(global_position + Vector3.UP * 0.6)
 	if is_elite and randf() < elite_chest_chance * (1.0 + RunState.difficulty_bonus):
 		_drop_chest()
+
+
+## Temporary power-up drop (iteration 53). The base chance is tiny on
+## purpose — a power-up has to read as an event, not as loot — and the
+## raider's own powerup_drop_chance stat (A's «Fortuna menor») is finally
+## the thing that moves it. Shiny bodies roll a multiple of it.
+##
+## The STAR never drops here: it is found roaming the map (WorldDirector's
+## star_sighting), which is the only thing that makes it feel rare.
+func _drop_powerup() -> void:
+	var spawner := get_tree().get_first_node_in_group("enemy_spawner")
+	if spawner == null or not spawner.has_method("roll_powerup_drop"):
+		return
+	# Nearest raider, like the points payout: whoever was in the thick of
+	# it owns the roll, so their «Fortuna menor» is the one that counts.
+	var player := Coop.nearest_player(get_tree(), global_position)
+	if not bool(spawner.call("roll_powerup_drop", player, is_elite)):
+		return
+	spawner.call("spawn_powerup_pickup", global_position + Vector3.UP * 0.8,
+			PowerUpCatalog.roll_id(true))
 
 
 ## Elite bounty chest (iteration 42): rarity rolled with a luck tilt that

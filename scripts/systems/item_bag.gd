@@ -172,6 +172,12 @@ func on_weapon_hit(target: Node3D) -> void:
 ## WeaponBase hook: a weapon carried by this raider just killed something
 ## at `at`. Superhero Mask: spiders leap from the corpse at other enemies.
 func on_weapon_kill(at: Vector3, weapon: WeaponBase) -> void:
+	# Power-ups relay off the same hook (iteration 53): this is already
+	# THE "a weapon of mine just killed something" callback, and giving
+	# Modo vampiro its own would mean a second wiring in WeaponBase.
+	var powerups := PowerUps.find_in(get_parent())
+	if powerups != null:
+		powerups.on_kill()
 	var stacks := count_kind("spiders")
 	if stacks <= 0 or weapon == null:
 		return

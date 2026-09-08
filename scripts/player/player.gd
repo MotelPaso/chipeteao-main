@@ -23,6 +23,16 @@ extends CharacterBody3D
 @export var acceleration: float = 12.0
 @export var air_acceleration: float = 4.0
 @export var jump_velocity: float = 8.0
+@export_group("Flight (power-up)")
+## Vuelo: while the power-up runs and the jump action is HELD, the raider
+## climbs at this rate instead of falling.
+@export var flight_rise_speed: float = 9.0
+## Ceiling above the terrain under the raider. High enough to clear every
+## mesa and rock, low enough that the camera still frames the ground.
+@export var flight_ceiling: float = 12.0
+## Descent while flying with the jump released: a glide, not a drop, so
+## letting go is a way to steer and not a way to die.
+@export var flight_fall_speed: float = 4.0
 
 @export_group("Slide")
 @export var slide_speed_multiplier: float = 1.8
@@ -116,10 +126,35 @@ signal points_changed(total: int)
 var points: int = 0
 
 
+## Named multiplier sources on the points payout (iteration 53). A PRODUCT
+## of named factors, not one number: Fiebre del oro doubles it, part C2
+## adds another source, and two of them running at once must compose
+## instead of overwriting each other.
+var _points_sources: Dictionary[String, float] = {}
+
+
+## Points earned per payout, after every live source.
+func points_multiplier() -> float:
+	var factor := 1.0
+	for source_id: String in _points_sources:
+		factor *= _points_sources[source_id]
+	return factor
+
+
+func set_points_source(source_id: String, multiplier: float) -> void:
+	_points_sources[source_id] = multiplier
+
+
+func clear_points_source(source_id: String) -> void:
+	_points_sources.erase(source_id)
+
+
 func add_points(amount: int) -> void:
 	if amount <= 0:
 		return
-	points += amount
+	# Rounded UP: a x2 on a 1-point kill has to pay 2, and a x1.5 on it
+	# must not quietly pay 1.
+	points += ceili(float(amount) * points_multiplier())
 	points_changed.emit(points)
 
 
@@ -135,6 +170,16 @@ func spend_points(amount: int) -> bool:
 	points -= amount
 	points_changed.emit(points)
 	return true
+
+## Walkable points sampled when Vuelo ends over a blocked cell; the
+## closest one wins. A handful is plenty — the sampler is uniform over the
+## open cells, and any of them beats standing inside a rock.
+const FLIGHT_LANDING_SAMPLES: int = 24
+## Dropped in this far above the terrain, so the body settles instead of
+## starting the frame intersecting the ground.
+const FLIGHT_LANDING_CLEARANCE: float = 1.2
+## Kept this far inside the arena edge while flying.
+const FLIGHT_EDGE_MARGIN: float = 2.0
 
 var _gravity: float = ProjectSettings.get_setting("physics/3d/default_gravity", 9.8)
 var _default_collision_height: float = 1.8
@@ -331,7 +376,12 @@ func _physics_process(delta: float) -> void:
 	_tick_timers(delta)
 	_rescue_from_void()
 
-	if not is_on_floor():
+	# Vuelo owns vertical motion while it runs: gravity would fight the
+	# climb every frame and the raider would hover at whatever height the
+	# two happened to balance at.
+	if _tick_flight(delta):
+		pass
+	elif not is_on_floor():
 		velocity.y -= _gravity * delta
 	else:
 		# Landing refills the jump budget (iteration 48). Refilling HERE and
@@ -484,6 +534,90 @@ func _try_jump() -> void:
 	if _is_sliding:
 		_end_slide()
 	velocity.y = jump_velocity
+
+
+## --- flight (Vuelo power-up, iteration 53) ----------------------------------
+
+## Vertical motion while Vuelo runs. Returns true when it took the frame
+## over, so the caller skips gravity. Holding jump climbs to a ceiling
+## measured ABOVE THE TERRAIN (a fixed world Y would bury the raider in a
+## hill on one map and strand them in the sky on another); releasing it
+## glides down. Landing on the floor still refills the jump budget, so
+## flying does not eat the raider's multi-jump.
+func _tick_flight(delta: float) -> bool:
+	var powerups := PowerUps.find_in(self)
+	if powerups == null or not powerups.has("flight") or _is_downed:
+		return false
+	if is_on_floor():
+		_jumps_left = _max_jumps()
+	var ceiling := _ground_height() + flight_ceiling
+	if Input.is_action_pressed(_act(&"jump")) and global_position.y < ceiling:
+		velocity.y = flight_rise_speed
+	elif global_position.y >= ceiling:
+		# Pinned at the ceiling rather than bouncing off it.
+		velocity.y = minf(velocity.y, 0.0)
+	elif not is_on_floor():
+		velocity.y = -flight_fall_speed
+	else:
+		velocity.y = 0.0
+	# The arena edge is a wall for a walker and would be nothing for a
+	# flier: without this a raider could simply fly out over the void.
+	var limit := _arena_limit()
+	if limit > 0.0:
+		global_position.x = clampf(global_position.x, -limit, limit)
+		global_position.z = clampf(global_position.z, -limit, limit)
+	return true
+
+
+## Called by PowerUps the moment Vuelo ends. The raider can be hanging
+## over a blocked cell — the one place the arena guarantees is NOT
+## walkable — and falling into it trips the probe's blocked-cell watch,
+## which is exactly the guard this must not break. So: if there is no
+## walkable ground under us, glide to the nearest walkable point there is.
+func end_flight() -> void:
+	var bounds := get_tree().get_first_node_in_group("arena_bounds")
+	if bounds == null or not bounds.has_method("is_walkable"):
+		return
+	var here := Vector2(global_position.x, global_position.z)
+	if bool(bounds.call("is_walkable", here)):
+		return
+	var best := here
+	var best_distance := INF
+	if bounds.has_method("random_walkable_point"):
+		for attempt in FLIGHT_LANDING_SAMPLES:
+			var candidate: Variant = bounds.call("random_walkable_point")
+			if candidate is not Vector2:
+				continue
+			var distance := (candidate as Vector2).distance_squared_to(here)
+			if distance < best_distance:
+				best_distance = distance
+				best = candidate
+	if best == here:
+		return
+	global_position.x = best.x
+	global_position.z = best.y
+	var terrain := Terrain.find(get_tree())
+	if terrain != null:
+		global_position.y = terrain.height_at(best.x, best.y) + FLIGHT_LANDING_CLEARANCE
+	velocity = Vector3.ZERO
+	print("Flight landing: p%d moved to walkable ground" % player_index)
+
+
+## Ground height under the raider, for the flight ceiling.
+func _ground_height() -> float:
+	var terrain := Terrain.find(get_tree())
+	return terrain.height_at(global_position.x, global_position.z) if terrain != null else 0.0
+
+
+## Half-extent the flier is clamped to, or 0 when the arena publishes none.
+func _arena_limit() -> float:
+	var bounds := get_tree().get_first_node_in_group("arena_bounds")
+	if bounds == null:
+		return 0.0
+	var extent: Variant = bounds.get("arena_half_extent")
+	if extent is not float and extent is not int:
+		return 0.0
+	return float(extent) - FLIGHT_EDGE_MARGIN
 
 
 ## Jumps available from a standing start: the floor one plus whatever the

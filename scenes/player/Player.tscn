@@ -1,10 +1,11 @@
-[gd_scene load_steps=8 format=3 uid="uid://c8k2h1n3m5p0a"]
+[gd_scene load_steps=9 format=3 uid="uid://c8k2h1n3m5p0a"]
 
 [ext_resource type="Script" path="res://scripts/player/player.gd" id="1_player"]
 [ext_resource type="PackedScene" path="res://scenes/player/SealRig.tscn" id="2_rig"]
 [ext_resource type="Script" path="res://scripts/systems/health.gd" id="3_health"]
 [ext_resource type="Script" path="res://scripts/systems/player_stats.gd" id="4_stats"]
 [ext_resource type="Script" path="res://scripts/systems/item_bag.gd" id="5_bag"]
+[ext_resource type="Script" path="res://scripts/systems/power_ups.gd" id="6_powerups"]
 
 [sub_resource type="CapsuleShape3D" id="CapsuleShape3D_1"]
 resource_local_to_scene = true
@@ -45,3 +46,6 @@ script = ExtResource("4_stats")
 
 [node name="ItemBag" type="Node" parent="."]
 script = ExtResource("5_bag")
+
+[node name="PowerUps" type="Node" parent="."]
+script = ExtResource("6_powerups")

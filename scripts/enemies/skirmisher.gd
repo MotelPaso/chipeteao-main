@@ -60,6 +60,7 @@ func _fire_bolt(player: Node3D) -> bool:
 		return false
 	bolt.damage = bolt_damage
 	bolt.global_position = global_position + Vector3.UP * muzzle_height
+	bolt.launcher = self
 	# The bolt flies at the true 3D aim; when that runs near-colinear with UP
 	# (player jumping right overhead) look_at cannot build a basis, so swap
 	# in a sideways up vector — WeaponBase.safe_up is the one guard, and the

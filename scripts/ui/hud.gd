@@ -74,6 +74,20 @@ const MAP_OVERLAY_LAYER: int = 8
 var _minimaps: Array[Minimap] = []
 var _overlays: Array[MapOverlay] = []
 
+## --- active power-ups (iteration 53) ----------------------------------------
+## A row of tiles right ABOVE the HP bar (which lives bottom-centre), each
+## with the power-up's glyph and the seconds it has left. Player 1 only:
+## in co-op the mate rows carry a count instead, because four raiders with
+## four stacks would be sixteen tiles fighting the loadout strips for the
+## same corner.
+const POWERUP_ROW_OFFSET := Vector2(0.0, -104.0)
+const POWERUP_REFRESH: float = 0.2
+var _powerup_box: HBoxContainer = null
+var _powerup_signature: String = ""
+var _powerup_refresh_left: float = 0.0
+## Slot -> the "x2" chip on that teammate's compact row.
+var _mate_powerup_chips: Dictionary[int, Label] = {}
+
 @onready var _hp_bar: ProgressBar = %HpBar
 @onready var _hp_label: Label = %HpLabel
 @onready var _xp_bar: ProgressBar = %XpBar
@@ -135,6 +149,7 @@ const ICON_PLACEHOLDER := "res://assets/icons/placeholder.png"
 const ICON_LIBRARY_WEAPONS := "weapons"
 const ICON_LIBRARY_TOMES := "tomes"
 const ICON_LIBRARY_ITEMS := "items"
+const ICON_LIBRARY_POWERUPS := "powerups"
 ## Glyph drawn over the placeholder tile: smaller than the bare-tile glyph,
 ## so it reads as a label on the art rather than as the art.
 const LOADOUT_PLACEHOLDER_GLYPH_SIZE := 13
@@ -322,6 +337,12 @@ func _build_mate_bar(slot: int, health: Health, body: Node) -> void:
 	# the one who interacts), so every slot needs its own readout — the
 	# amber chip on the right belongs to player 1 alone.
 	_add_mate_points_chip(row, body)
+	# Power-up count for this teammate; hidden while they have none.
+	var powerup_chip := Label.new()
+	UiTheme.style_badge(powerup_chip, UiTheme.ACCENT)
+	powerup_chip.visible = false
+	row.add_child(powerup_chip)
+	_mate_powerup_chips[slot] = powerup_chip
 	_mate_box.add_child(row)
 	var refresh := func(current: float, max_hp: float) -> void:
 		bar.max_value = max_hp
@@ -375,6 +396,10 @@ func _process(delta: float) -> void:
 	if _fps_refresh_left <= 0.0:
 		_fps_refresh_left = FPS_BADGE_REFRESH
 		_refresh_fps_badge()
+	_powerup_refresh_left -= delta
+	if _powerup_refresh_left <= 0.0:
+		_powerup_refresh_left = POWERUP_REFRESH
+		_refresh_powerups()
 
 
 ## Polls SaveData.show_fps rather than listening for a change: the option
@@ -404,6 +429,85 @@ func _refresh_fps_badge() -> void:
 func _on_points_changed(total: int) -> void:
 	_points_label.text = "%d pts" % total
 	UiTheme.pop(_points_label, 1.15, 0.18)
+
+
+## --- active power-ups -------------------------------------------------------
+
+## Rebuilds the power-up row when it actually changed. The signature
+## includes the WHOLE seconds left, so the row repaints once a second
+## while a power-up runs and not five times.
+func _refresh_powerups() -> void:
+	if _loadout_player == null or not is_instance_valid(_loadout_player):
+		return
+	var powerups := PowerUps.find_in(_loadout_player)
+	var entries: Array[Dictionary] = []
+	if powerups != null:
+		for live: Dictionary in powerups.active():
+			var powerup_id := String(live.id)
+			var row := PowerUpCatalog.by_id(powerup_id)
+			entries.append({
+				"glyph": String(row.get("glyph", "??")),
+				"library": ICON_LIBRARY_POWERUPS,
+				"entry_id": powerup_id,
+				"color": row.get("color", Color.WHITE) as Color,
+				"corner": "%ds" % ceili(float(live.time_left)),
+				"tip": String(row.get("display_name", powerup_id)),
+				"icon": String(row.get("icon", "")),
+			})
+	var signature := ""
+	for entry: Dictionary in entries:
+		signature += "%s|%s;" % [entry.entry_id, entry.corner]
+	if signature != _powerup_signature:
+		_powerup_signature = signature
+		_powerup_box = _rebuild_powerup_row(entries)
+	_refresh_mate_powerups()
+
+
+func _rebuild_powerup_row(entries: Array[Dictionary]) -> HBoxContainer:
+	var box := _powerup_box
+	if box == null:
+		box = HBoxContainer.new()
+		box.set_anchors_preset(Control.PRESET_CENTER_BOTTOM)
+		box.grow_horizontal = Control.GROW_DIRECTION_BOTH
+		box.grow_vertical = Control.GROW_DIRECTION_BEGIN
+		box.offset_left = POWERUP_ROW_OFFSET.x
+		box.offset_top = POWERUP_ROW_OFFSET.y
+		box.alignment = BoxContainer.ALIGNMENT_CENTER
+		box.add_theme_constant_override("separation", 6)
+		box.mouse_filter = Control.MOUSE_FILTER_PASS
+		add_child(box)
+	for child: Node in box.get_children():
+		# Out of the container FIRST (see _rebuild_strip): queue_free only
+		# lands at the end of the frame and the row would jump.
+		box.remove_child(child)
+		child.queue_free()
+	for entry: Dictionary in entries:
+		box.add_child(_make_loadout_slot(entry))
+	return box
+
+
+## Co-op: a teammate's row gets the COUNT, not the tiles. It reads as "J3
+## has three power-ups running", which is all a teammate needs to know.
+func _refresh_mate_powerups() -> void:
+	for slot: int in _mate_powerup_chips:
+		var chip := _mate_powerup_chips[slot]
+		if not is_instance_valid(chip):
+			continue
+		var body := _player_at(slot)
+		var powerups := PowerUps.find_in(body) if body != null else null
+		var live := powerups.count() if powerups != null else 0
+		chip.text = "◈%d" % live if live > 0 else ""
+		chip.visible = live > 0
+
+
+## The raider in `slot`, standing or downed (a downed teammate keeps their
+## power-ups running).
+func _player_at(slot: int) -> Node:
+	for group: String in ["player", "downed_players"]:
+		for node: Node in get_tree().get_nodes_in_group(group):
+			if int(node.get("player_index")) == slot:
+				return node
+	return null
 
 
 ## --- loadout strip ----------------------------------------------------------

@@ -431,6 +431,34 @@ imprime como «Velocidad de ataque» y **en positivo**. Los nombres de arma,
 tomo y objeto del panel **Objetos** salen de los catálogos ya traducidos: el
 overlay no tiene tabla propia de nombres.
 
+## Power-ups (iteración 53)
+
+| Inglés | Español |
+|---|---|
+| power-up | power-up (invariable en plural: «power-ups»; nunca «potenciador») |
+| Haste | Celeridad total |
+| Might | Furia |
+| Wisdom | Sabiduría brígida |
+| Gold Rush | Fiebre del oro |
+| Reflect | Reflejo |
+| Vampire Mode | Modo vampiro |
+| Flight | Vuelo |
+| Immortality | Inmortalidad |
+| Time Stop | Tiempo detenido |
+| Star | Estrella |
+| `¡TIEMPO DETENIDO!` | ¡TIEMPO DETENIDO! |
+| `El tiempo vuelve a correr.` | El tiempo vuelve a correr. |
+| `[E] Drink — %d pts (heal + random power-up)` | `[E] Beber — %d pts (cura + power-up al azar)` |
+| `The spring restores and empowers you` | El manantial te restaura y te potencia |
+| `Something bright crosses the field...` | Algo brillante cruza el campo... |
+| `%s (%d s)` | `%s (%d s)` |
+
+«Power-up» se queda en inglés a propósito: es la palabra que el equipo usó
+en su propio pedido y la que cualquier jugador de este género reconoce;
+«potenciador» sería más largo (regla 20) y menos claro. La **estrella** no
+lleva apellido: en el juego es solo «Estrella», y el guiño a Mario vive en
+el arcoíris, no en el nombre.
+
 ## Rarezas
 
 > **Cuidado:** `UpgradePool.RARITIES[].name` y el campo `rarity` de `ItemCatalog` son **claves de lógica**, no texto. Se leen como id en los precios de cofre (`RunState.CHEST_BASE_PRICES`), en la tirada de objetos y en varios santuarios. Se traducen **solo al pintarlos**, con `UpgradePool.rarity_display()`.
