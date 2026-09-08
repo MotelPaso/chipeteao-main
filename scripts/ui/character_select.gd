@@ -583,8 +583,14 @@ func _populate_card(card: Button, character: Dictionary) -> void:
 		return
 	var box := CardFactory.card_box(card)
 	box.add_child(CardFactory.portrait_swatch(Color(character.tint)))
-	box.add_child(CardFactory.label(
-			String(character.display_name), 20, UiTheme.TEXT_BRIGHT))
+	# Wrapped, never trimmed: a raider's name is untranslatable AND
+	# unshortenable (GLOSARIO rule 5), and the roster now holds one long
+	# enough to run past the card edge ("PNG gucci morty" against a 7-letter
+	# previous longest). Two lines beat an ellipsis eating a proper noun.
+	var name_label := CardFactory.label(
+			String(character.display_name), 20, UiTheme.TEXT_BRIGHT)
+	name_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	box.add_child(name_label)
 	box.add_child(CardFactory.label(
 			String(character.weapon_display_name), 12, UiTheme.TEXT_DIM))
 	# Both text blocks are capped: a long translated passive used to wrap

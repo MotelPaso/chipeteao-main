@@ -44,6 +44,8 @@ El acoplamiento cruzado va siempre por aquí. Lista actual:
 | `powerup_pickups` | power-ups en el suelo (iteración 53) | limpieza de etapa y `Stage sweep: pickups=` |
 | `enemy_projectiles` | bolts enemigos en vuelo | el flag `frozen` de Tiempo detenido |
 | `springs` | el manantial vivo (como máximo uno) | el peso 0 de su fila de evento |
+| `vendors` | los puestos vivos (máximo 2) | el peso 0 de su fila y `Stage sweep: vendors=` |
+| `pet_boxes` | las cajas de mascotas vivas | limpieza de etapa y `Stage sweep: boxes=` |
 | `boss_ui` | HUD + flecha de jefe | `track_boss(boss, title)`, `track_objective(node)`, `announce` |
 | `upgrade_ui` | `UpgradeCardUI` | `open_bonus_pick(...)`, `open_choice(...)` |
 | `altars` | todo `ChargeShrine` vivo (de escena o del director) | el cupo de altares sin gastar del `WorldDirector` |
@@ -110,10 +112,99 @@ Reglas que comparten las de ataque único: el escalonado es un `const` por archi
 
 ## Mascotas
 
-- Qué es: compañeros inmortales que siguen al raider, llevan un arma propia (fuera del tope de 5 y del pool de cartas) y/o dan un stat por nivel de partida. Llegan como objetos (`ItemCatalog` con `kind: "pet"` + `pet_id`; copias extra alimentan su arma).
-- Archivos: `scripts/systems/pet_catalog.gd` (`PET_LIBRARY`, 4 filas), `scripts/systems/pet.gd` (`Pet`, hijo `top_level` del Player: `carrier_player()` de su arma encuentra al raider y usa SUS stats), `item_bag.gd` (`_spawn_or_grow_pet`), `player_stats.gd` (`_apply_items` suma `amount_per_level × RunState.level`).
-- Mascota nueva: fila con `id`, `display_name`, `weapon_scene` (o `""`), `weapon_damage_scale`, `stat`/`amount_per_level`, `shape`/`color`/`size`/`hover`, más un objeto `kind: "pet"` en `ITEM_LIBRARY`. La invariante de esas dos filas está escrita en la cabecera de `item_catalog.gd`. Log `Pet joined:`.
-- `stat_label` de `PET_LIBRARY` está traducido pero **ninguna pantalla lo pinta todavía**; no es dato muerto por decisión (el glosario lo cubre), pero tampoco te fíes de él como fuente de UI.
+**Una sola mascota por jugador** (iteración 54). El slot vive en
+`Player.pet_id` y solo lo mueve `Player.set_pet(id)`: libera la mascota
+anterior, instancia la nueva, anuncia las dos mitades del cambio por el
+toast de botín, imprime `Pet joined:` y pide un `recompute()`.
+
+**No hay copias.** Dar dos veces la misma mascota no hace nada, y por eso
+**cada fila declara arma y estadística**: una mascota es un paquete
+entero, y una fila a medias convertiría un cambio en una pérdida que el
+jugador no puede deshacer.
+
+- **De dónde salen**: solo de la **caja de mascotas** y del **traficante de
+  animales**. Los cofres y la ruleta ya no pueden dar una — se borraron las
+  filas `kind: "pet"` de `ITEM_LIBRARY` y el propio kind. Una compañera que
+  llega sin que la pidas es una compañera que tira la que elegiste.
+- **El arma** se instancia bajo la mascota (`Pet._build_weapon`), queda
+  **fuera del tope de 5 armas** y del pool de mejoras, lee las
+  estadísticas del raider (Multitud, daño, velocidad de ataque) porque el
+  `carrier_player()` del arma sube hasta él, y **nunca** toca
+  `used_weapon_<id>`: los dos únicos sitios que suben ese contador
+  (`Player._apply_character` y la concesión de `upgrade_pool.gd`) son
+  inalcanzables desde aquí, así que la Colección no desbloquea un arma que
+  nadie llevó.
+- **La estadística** la aplica `PlayerStats._apply_pet_stat()` leyendo
+  `Player.pet_id`: `amount_per_level × RunState.level`.
+- Las nueve filas tienen **arma distinta y estadística distinta**, y su
+  `stat_label` lo imprimen todas las cartas de la caja y del traficante:
+  un cambio irreversible nunca debe ser una adivinanza.
+
+| id | Nombre | Arma | Estadística |
+|---|---|---|---|
+| `alien` | Alienígena | Varita de brasas | suerte |
+| `dinosaur` | Dinosaurio | Espada corta | HP máx. |
+| `angry_bird` | Pájaro furioso | Pistola de dardos | prob. de crítico |
+| `capybara` | Capibara | Pararrayos | velocidad de ataque |
+| `doki` | Doki | Bumerán | ganancia de XP |
+| `pony` | Pony | Arco de caza | velocidad |
+| `cj7` | Cj7 | Aura | robo de vida |
+| `magic_pumpkin` | Calabaza mágica | Látigo de espinas | espinas |
+| `pokemon` | Pokemon | Orbes espirituales | daño |
+
+### Caja de mascotas
+
+`scripts/world/pet_box.gd` (`PetBox extends Interactable`, escena
+`scenes/world/PetBox.tscn`, grupo `pet_boxes`, `marker_kind` `&"pet_box"`).
+**Gratis**: el traficante vende una *elección* de tres por puntos; la caja
+es la versión que te encuentras, y su precio es haber caminado hasta ella.
+
+Tira una mascota distinta de la que llevas. Sin mascota, la da directo;
+con mascota **pregunta** por `UpgradeCardUI.open_choice`, con
+**«Cambiar por %s» como opción 0** — el harness siempre pulsa la primera,
+así que la rama interesante tiene que ser la que ejercita. Log
+`Pet box opened:`, **antes** del `Pet joined:` que imprime `set_pet`.
+
+La siembra el `WorldDirector`: fila `pet_box` (peso 0.35) y 0-1 al empezar
+la etapa (`start_pet_box_chance`).
+
+## Vendedores
+
+`scripts/world/vendor.gd` (`Vendor extends Interactable`, grupo `vendors`,
+`marker_kind` `&"vendor"`), tres kinds en una tabla `VENDOR_LIBRARY`.
+
+**El puesto es dueño de la ECONOMÍA** (qué cobra, qué entrega, el log y la
+regla de una sola venta); **`scripts/ui/vendor_ui.gd` es dueño del
+momento** (qué hay en el mostrador, qué dice una carta, qué pasa entre el
+clic y la despedida). Un kind nuevo es una fila aquí, una rama en
+`VendorUi._build_offers` y una en `Vendor.buy`.
+
+| kind | Qué vende | Precio |
+|---|---|---|
+| `animals` | 3 mascotas ≠ la que llevas, con arma y estadística en la carta | `pet_price` fijo (120) |
+| `powerups` | 1 power-up al azar, **nunca la estrella** | `RunState.powerup_vendor_price`, empieza en 100 y **×1.5 por compra**, a nivel de partida |
+| `items` | 4 objetos, cada uno con su rareza tirada con la suerte del comprador | `RunState.chest_price(rareza)`, y la venta cuenta como cofre abierto para la inflación |
+
+- **El kind se tira a escondidas.** El anuncio es «¡Llega un vendedor!» y
+  la baliza no lo dice: caminar hasta allá para averiguar cuál es **es** el
+  evento. El marcador del mapa sí lleva el color del puesto, pero está
+  bajo niebla como todo POI, así que tampoco lo adelanta.
+- **Se va después de UNA venta**; si el menú se cierra sin comprar, el
+  puesto **se queda** pero ignora `interact` durante `retry_cooldown` 20 s
+  — el harness re-dispara interactuar cada 0.75 s mientras espera, y sin
+  eso el menú se reabriría en el frame siguiente para siempre.
+- **Máximo 2 vivos** (`max_vendors`), por el mismo canal de peso 0 que usan
+  los altares y el manantial.
+- `VendorUi` sigue el patrón de `roulette_ui.gd`: `CanvasLayer` capa 15,
+  `PROCESS_MODE_ALWAYS`, grupos `ui_blocking` + `blocking_ui_closable`,
+  pausa el árbol y **siempre** la devuelve, se cierra sola si el comprador
+  o el puesto desaparecen, y en headless **se juega sola**: compra la
+  primera oferta que puede pagar o se va a los 3 s.
+- Las ofertas se tiran **una vez** en `_ready`: el panel se redibuja tras
+  cada clic, y un mostrador reconstruido en el redibujo cambiaría la
+  mercancía bajo el cursor.
+- Logs `Vendor arrived: <kind>` y `Vendor sold: <kind> <id> <precio>`, este
+  **antes** de entregar, para que el soak lea causa y después efecto.
 
 ## Añadir un personaje
 
@@ -394,8 +485,9 @@ se une solo al grupo `map_markers` cuando ese export no está vacío, y expone
   esos nodos ya tenían: no se añadió estado nuevo.
 - `secret_trigger.gd` deja `marker_kind` **vacío a propósito** y lo dice en un
   comentario: los secretos siguen siendo secretos.
-- Las **cinco últimas filas** de la tabla (`powerup`, `vendor`, `lucky_block`,
-  `pet_box`, `event_altar`) están **reservadas para la parte C**. Esa parte solo
+- `powerup` (53), `vendor` y `pet_box` (54) ya están en uso, con su fila en
+  `MARKER_LABELS` para la leyenda. Queda **`lucky_block` reservado para la
+  parte C2**. Esa parte solo
   tiene que poner el `marker_kind` en su nodo; aquí no se toca nada.
 - Un nodo puede además implementar `map_marker_color()` para pintarse con su
   propio color (rareza de cofre, por ejemplo) sin tocar la tabla.
@@ -758,7 +850,7 @@ Variables de entorno:
 | Variable | Efecto |
 |---|---|
 | `BONK_ARENA=res://scenes/world/AshDunes.tscn` | **bioma inicial** de la etapa 1 (defecto: Hollow Woods). El probe siempre arranca `Run.tscn` |
-| `BONK_CHARACTER=<id>` | raider de `CharacterCatalog` |
+| `BONK_CHARACTER=<id>` | raider de `CharacterCatalog`. Un id desconocido es un **`push_error`** desde la iteración 54 (antes se ignoraba en silencio, y un soak que creía probar un raider corría el de siempre); el probe imprime `ArenaProbe: character=<id>` |
 | `BONK_GODMODE=1` | raider con 10M de HP, para que los sistemas tardíos se ejerciten |
 | `BONK_WALK=0` | deja el raider quieto (defecto: camina) |
 | `BONK_SEED=<int>` | recorrido determinista, para reproducir un soak |
@@ -770,6 +862,8 @@ Variables de entorno:
 | `BONK_POWERUP_NOW=<id>` | concede ese power-up al slot 0 a los 20 s y **lo re-concede en cada expiración** |
 | `BONK_STAR_NOW=1` | suelta una estrella **quieta** a los pies del raider a los 30 s |
 | `BONK_POWERUP_BOOST=1` | multiplica ×50 la probabilidad de drop por baja (lo lee `EnemySpawner`) |
+| `BONK_POI_NOW=a,b,c` | siembra esos POIs a 8 m del raider a los 20 s: `vendor_items`, `vendor_powerups`, `vendor_animals`, `pet_box` |
+| `BONK_POINTS=<n>` | le da esos puntos al slot 0 al arrancar, para que un soak de vendedor pueda pagar |
 | `BONK_PERF=1` | enciende el overlay de rendimiento del HUD |
 
 Uso directo:

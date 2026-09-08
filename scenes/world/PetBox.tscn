@@ -1,0 +1,8 @@
+[gd_scene load_steps=2 format=3 uid="uid://cpetbox1k2p0a"]
+
+[ext_resource type="Script" path="res://scripts/world/pet_box.gd" id="1_petbox"]
+
+[node name="PetBox" type="Area3D"]
+collision_layer = 0
+collision_mask = 1
+script = ExtResource("1_petbox")

@@ -42,6 +42,7 @@ var _dim: ColorRect = null
 var _header: Label = null
 var _legend: VBoxContainer = null
 var _powerups_body: Label = null
+var _pet_body: Label = null
 var _stats_body: Label = null
 var _players_body: Label = null
 var _items_body: Label = null
@@ -131,6 +132,7 @@ func _build_ui() -> void:
 	_own(column)
 	add_child(column)
 	_powerups_body = _add_section(column, "Power-ups")
+	_pet_body = _add_section(column, "Mascota")
 	_stats_body = _add_section(column, "Estadísticas")
 	_players_body = _add_section(column, "Jugadores")
 	_items_body = _add_section(column, "Objetos")
@@ -216,6 +218,7 @@ func _refresh_panels() -> void:
 	_header.text = "%s — %02d:%02d" % [title, seconds / 60, seconds % 60]
 	_legend.position = Vector2(PAD, size.y - PAD - _legend.size.y)
 	_powerups_body.text = _powerups_text()
+	_pet_body.text = _pet_text()
 	_stats_body.text = _stats_text()
 	_players_body.text = _players_text()
 	_items_body.text = _items_text()
@@ -311,6 +314,23 @@ func _raider_at(player_slot: int) -> Node3D:
 			if body != null and int(body.get("player_index")) == player_slot:
 				return body
 	return null
+
+
+## The companion line: name, its weapon and the stat it pays. Shown even
+## with no pet, because "you have no companion" is itself information when
+## a pet box is somewhere on the map.
+func _pet_text() -> String:
+	var body := _raider()
+	if body == null:
+		return "—"
+	var pet_id: Variant = body.get("pet_id")
+	if pet_id == null or String(pet_id).is_empty():
+		return "Sin mascota"
+	var row := PetCatalog.by_id(String(pet_id))
+	if row.is_empty():
+		return "Sin mascota"
+	return "%s  %s\n%s" % [String(row.display_name),
+			PetCatalog.weapon_display_name(row), String(row.get("stat_label", ""))]
 
 
 ## Items with copies, then weapons with their level or milestone tier,

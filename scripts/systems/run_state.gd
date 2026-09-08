@@ -99,6 +99,14 @@ var chest_price_multiplier: float = 1.0
 ## altar into the whole run's build once the points started flowing.
 const ROULETTE_PRICE_GROWTH: float = 2.0
 var roulette_price_multiplier: float = 1.0
+## What the power-up vendor asks for its first sale of the run.
+const POWERUP_VENDOR_BASE_PRICE: int = 100
+## What the power-up vendor charges next, in run points (iteration 54).
+## A run-wide ABSOLUTE price, not a multiplier like the two above: the
+## stall sells one rolled power-up whatever it is, so there is no base to
+## multiply — the number itself is the ladder, and it climbs only when a
+## sale actually happens.
+var powerup_vendor_price: int = POWERUP_VENDOR_BASE_PRICE
 ## XP curve: cost of the level being climbed to, in gems (level 1 -> 2
 ## costs XP_BASE + XP_PER_LEVEL). The whole pacing of a run rides on these
 ## three numbers, so they are named instead of buried in _xp_required.
@@ -158,6 +166,7 @@ func reset() -> void:
 	_difficulty_sources.clear()
 	chest_price_multiplier = 1.0
 	roulette_price_multiplier = 1.0
+	powerup_vendor_price = POWERUP_VENDOR_BASE_PRICE
 	# Counters credited during a run live in a SaveData buffer that only a
 	# run END merges into the persisted ledger; starting (or abandoning) a
 	# run drops whatever is still pending, which is what makes save_data's

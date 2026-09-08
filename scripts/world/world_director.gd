@@ -25,6 +25,8 @@ const CHARGE_SHRINE_SCENE := preload("res://scenes/world/shrines/ChargeShrine.ts
 const CURSE_SHRINE_SCENE := preload("res://scenes/world/shrines/CurseShrine.tscn")
 const SPRING_SHRINE_SCENE := preload("res://scenes/world/shrines/SpringShrine.tscn")
 const ROULETTE_SHRINE_SCENE := preload("res://scenes/world/shrines/RouletteShrine.tscn")
+const PET_BOX_SCENE := preload("res://scenes/world/PetBox.tscn")
+const VENDOR_SCENE := preload("res://scenes/world/Vendor.tscn")
 const PortalShrineScript := preload("res://scripts/world/portal_shrine.gd")
 
 ## Timed world events as catalog rows (project convention: content is
@@ -42,6 +44,11 @@ const EVENT_LIBRARY: Array[Dictionary] = [
 	# The star is the only power-up nobody can farm: it is not a kill drop
 	# and no vendor sells it, so this row is the entire supply.
 	{"id": "star_sighting", "weight": 0.15, "method": &"_event_star"},
+	# Vendors and the pet box (iteration 54). No `altar` flag: the altar
+	# cadence and its cap are about altars, and a stall counted there would
+	# starve them.
+	{"id": "vendor", "weight": 0.8, "method": &"_event_vendor"},
+	{"id": "pet_box", "weight": 0.35, "method": &"_event_pet_box"},
 ]
 
 ## Rejection-sampling budget for a clear POI spot, and for the ring sample
@@ -147,6 +154,10 @@ const POI_PLATFORM_Y: float = 0.5
 ## itself growing with the minute: altar_cap_base + minutes / cap_minutes.
 ## Altars no longer time out (iteration 47), so without a cap they would
 ## accumulate for the whole run.
+## Stalls alive at once. Two is a choice between shops; three is clutter.
+@export var max_vendors: int = 2
+## Chance a stage opens with a pet box already standing.
+@export var start_pet_box_chance: float = 0.5
 @export var altar_cap_base: int = 3
 @export var altar_cap_minutes: float = 3.0
 ## Share of the run-start chests (scene-placed and the extras below) that
@@ -276,6 +287,16 @@ func on_stage_started(arena: Node3D) -> void:
 	# Run-start fixtures (iteration 41): paired portals and the roulette.
 	_spawn_portals()
 	_spawn_roulettes()
+	_spawn_start_pet_boxes()
+
+
+## 0-1 pet boxes at stage start (iteration 54). Zero is a real outcome:
+## a companion should feel like something the map offered, not something
+## every stage hands out.
+func _spawn_start_pet_boxes() -> void:
+	if randf() >= start_pet_box_chance:
+		return
+	_spawn_pet_box(_claim_clear_point())
 
 
 ## Stage teardown (RunRoot, before the arena is freed): restore the sky the
@@ -686,6 +707,11 @@ func _event_weight(row: Dictionary) -> float:
 	if String(row["id"]) == "spring" \
 			and get_tree().get_node_count_in_group(&"springs") > 0:
 		return 0.0
+	# Two stalls at most (iteration 54), same mechanism: a third would just
+	# be a third walk nobody takes before one of them sells.
+	if String(row["id"]) == "vendor" \
+			and get_tree().get_node_count_in_group(&"vendors") >= max_vendors:
+		return 0.0
 	if not bool(row.get("altar", false)) or weight <= 0.0:
 		return weight
 	if _unspent_altars() >= _altar_cap():
@@ -752,6 +778,40 @@ func _event_spring() -> void:
 			_spawn_beacon(spring.global_position, Color(0.4, 0.8, 1.0)),
 			spring, INF))
 	_announce("Un manantial brota en algún lugar del campo...")
+
+
+## A stall arrives. The KIND is rolled here and deliberately not named in
+## the announce or the beacon: walking over to find out which one it is is
+## the whole event, and a beacon that said "animals" would answer it from
+## across the map.
+func _event_vendor() -> void:
+	var vendor := VENDOR_SCENE.instantiate() as Node3D
+	var row: Dictionary = Vendor.VENDOR_LIBRARY[randi() % Vendor.VENDOR_LIBRARY.size()]
+	# Set BEFORE the node enters the tree: Vendor._ready reads it to pick
+	# its prompt, its colour and the figure behind the counter.
+	vendor.set("kind", String(row.id))
+	_stage_parent().add_child(vendor)
+	vendor.global_position = _event_point()
+	# Like an altar, the beacon burns until the stall is gone.
+	_beacons.append(TimedBeacon.new(
+			_spawn_beacon(vendor.global_position, row.get("color", Color.WHITE)),
+			vendor, INF))
+	_announce("¡Llega un vendedor!")
+	print("Vendor arrived: %s" % String(row.id))
+
+
+## A pet box, free and one-use. Rarer than a vendor because a companion is
+## a bigger swing than a purchase and the player pays nothing for it.
+func _event_pet_box() -> void:
+	_spawn_pet_box(_event_point())
+	_announce("Una caja con una huella aparece en el campo...")
+
+
+func _spawn_pet_box(at: Vector3) -> Node3D:
+	var box := PET_BOX_SCENE.instantiate() as Node3D
+	_stage_parent().add_child(box)
+	box.global_position = at
+	return box
 
 
 ## Star sighting: the rarest thing on the map walks across it. Spawned

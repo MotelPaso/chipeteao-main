@@ -219,7 +219,7 @@ func _free_enemies() -> void:
 ## sweep exists to catch. Later prompts append their own kinds here.
 func _free_stage_props() -> void:
 	var kinds: Array[StringName] = [&"altars", XpGem.LIVE_GROUP, HealthOrb.LIVE_GROUP,
-			&"powerup_pickups"]
+			&"powerup_pickups", &"pet_boxes", &"vendors"]
 	for group: StringName in kinds:
 		for node: Node in get_tree().get_nodes_in_group(group):
 			if is_instance_valid(node) and not node.is_queued_for_deletion():
@@ -265,14 +265,17 @@ func _print_sweep() -> void:
 	var director := get_tree().get_first_node_in_group("world_director")
 	if director != null and director.has_method("beacon_count"):
 		beacons = int(director.call("beacon_count"))
-	print("Stage sweep: enemies=%d gems=%d orbs=%d chests=%d altars=%d beacons=%d pickups=%d" % [
+	print(("Stage sweep: enemies=%d gems=%d orbs=%d chests=%d altars=%d beacons=%d"
+			+ " pickups=%d boxes=%d vendors=%d") % [
 			get_tree().get_node_count_in_group(&"enemies"),
 			get_tree().get_node_count_in_group(XpGem.LIVE_GROUP),
 			get_tree().get_node_count_in_group(HealthOrb.LIVE_GROUP),
 			chests,
 			get_tree().get_node_count_in_group(&"altars"),
 			beacons,
-			get_tree().get_node_count_in_group(&"powerup_pickups")])
+			get_tree().get_node_count_in_group(&"powerup_pickups"),
+			get_tree().get_node_count_in_group(&"pet_boxes"),
+			get_tree().get_node_count_in_group(&"vendors")])
 
 
 ## The party's progress, computed from the LIVE nodes on both sides of the

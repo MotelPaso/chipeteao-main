@@ -322,6 +322,8 @@ func _apply_sources() -> void:
 	# Items (iteration 40): every copy of a stat item contributes its row
 	# effects through the same channel.
 	_apply_items()
+	# The companion's stat (iteration 54): one slot, one row, level-scaled.
+	_apply_pet_stat()
 	# Altar boons and live timed boons (iteration 41).
 	_apply_boons(_altar_boons)
 	_apply_boons(_timed_boons)
@@ -402,23 +404,24 @@ func _apply_items() -> void:
 		var copies := bag.count(item_id)
 		for effect: Dictionary in row.get("effects", [] as Array):
 			_apply_effect(String(effect.stat), float(effect.amount) * float(copies))
-		if String(row.get("kind", "")) == "pet":
-			_apply_pet_stat(String(row.get("pet_id", "")), copies)
 
 
-## A pet's stat, scaling with the run level like a character passive.
-## Extra copies of a pet item normally feed the pet's WEAPON (Pet.set_copies),
-## so they must NOT also multiply the stat — except for a pet that has no
-## weapon of its own, where that channel does not exist and a second copy
-## would otherwise buy the player literally nothing.
-func _apply_pet_stat(pet_id: String, copies: int) -> void:
-	var pet := PetCatalog.by_id(pet_id)
+## The companion's stat, scaling with the run level like a character
+## passive. Read off the raider's single pet slot (iteration 54): pets are
+## no longer items, there are no copies to scale by, and the slot holds
+## exactly one id or none.
+func _apply_pet_stat() -> void:
+	var body := get_parent()
+	if body == null:
+		return
+	var pet_id: Variant = body.get("pet_id")
+	if pet_id == null or String(pet_id).is_empty():
+		return
+	var pet := PetCatalog.by_id(String(pet_id))
 	var stat := String(pet.get("stat", ""))
 	if stat.is_empty():
 		return
-	var copy_scale := float(copies) if String(pet.get("weapon_scene", "")).is_empty() else 1.0
-	_apply_effect(stat,
-			float(pet.get("amount_per_level", 0.0)) * float(RunState.level) * copy_scale)
+	_apply_effect(stat, float(pet.get("amount_per_level", 0.0)) * float(RunState.level))
 
 
 ## Permanent totals banked by power-ups (Modo vampiro raises max HP per

@@ -150,6 +150,7 @@ const ICON_LIBRARY_WEAPONS := "weapons"
 const ICON_LIBRARY_TOMES := "tomes"
 const ICON_LIBRARY_ITEMS := "items"
 const ICON_LIBRARY_POWERUPS := "powerups"
+const ICON_LIBRARY_PETS := "pets"
 ## Glyph drawn over the placeholder tile: smaller than the bare-tile glyph,
 ## so it reads as a label on the art rather than as the art.
 const LOADOUT_PLACEHOLDER_GLYPH_SIZE := 13
@@ -558,6 +559,23 @@ func _refresh_loadout() -> void:
 				"color": LOADOUT_TOME_COLOR,
 				"corner": Tome.stack_label(stats.stack_count(tome_id)),
 				"tip": title, "icon": String(tome.get("icon", "")),
+			})
+	# The companion closes the weapons+tomes strip (iteration 54): it IS a
+	# weapon slot outside the five-weapon cap plus a stat, so it belongs
+	# beside them rather than among the items.
+	var pet_id: Variant = _loadout_player.get("pet_id")
+	if pet_id != null and not String(pet_id).is_empty():
+		var pet := PetCatalog.by_id(String(pet_id))
+		if not pet.is_empty():
+			entries.append({
+				"glyph": String(pet.get("glyph", "??")),
+				"library": ICON_LIBRARY_PETS,
+				"entry_id": String(pet_id),
+				"color": pet.get("color", Color.WHITE) as Color,
+				"corner": "",
+				"tip": "%s — %s" % [String(pet.display_name),
+						String(pet.get("stat_label", ""))],
+				"icon": String(pet.get("icon", "")),
 			})
 	var items: Array[Dictionary] = []
 	var bag := ItemBag.find_in(_loadout_player)

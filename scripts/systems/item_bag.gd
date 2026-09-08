@@ -4,6 +4,9 @@ extends Node
 ## Stats. Counts every ItemCatalog item picked up this run (unlimited
 ## copies), feeds the stat-effect items into the sibling PlayerStats
 ## (which reads count(id) in its recompute) and runs the behavioral ones:
+## Pets are NOT here any more (iteration 54): the run has one companion
+## slot, owned by Player.set_pet(), and it is filled only by the pet box
+## and the animal trafficker — never by a chest or a roulette roll.
 ##   magnet        — timed map-wide XP vacuum through the "run_systems" group
 ##   poison_on_hit — every weapon hit poisons the target (on_weapon_hit)
 ##   titan         — the seal grows per copy (visual rig scale)
@@ -91,8 +94,6 @@ func add_item(item_id: String) -> void:
 				_magnet_timer = _magnet_interval()
 		"titan":
 			_apply_titan_scale()
-		"pet":
-			_spawn_or_grow_pet(String(row.get("pet_id", "")), count(item_id))
 	# Stat effects live in PlayerStats' recompute (it reads this bag).
 	var stats := PlayerStats.find_in(get_parent())
 	if stats != null:
@@ -128,23 +129,6 @@ func _physics_process(delta: float) -> void:
 
 func _magnet_interval() -> float:
 	return magnet_base_interval * pow(magnet_interval_per_extra, float(count_kind("magnet") - 1))
-
-
-## Pets (iteration 43): the first copy spawns the companion under the
-## player; later copies just feed its weapon.
-func _spawn_or_grow_pet(pet_id: String, copies: int) -> void:
-	var row := PetCatalog.by_id(pet_id)
-	if row.is_empty():
-		push_warning("ItemBag: unknown pet '%s'" % pet_id)
-		return
-	var existing := get_parent().get_node_or_null("Pet_" + pet_id) as Pet
-	if existing != null:
-		existing.set_copies(copies)
-		return
-	var pet := Pet.new()
-	pet.setup(row, copies)
-	get_parent().add_child(pet)
-	print("Pet joined: %s" % pet_id)
 
 
 ## Seal grows with every Titan Blood; capped so the camera arm still works.

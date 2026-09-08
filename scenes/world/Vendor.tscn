@@ -1,0 +1,8 @@
+[gd_scene load_steps=2 format=3 uid="uid://cvendor1k2p0a"]
+
+[ext_resource type="Script" path="res://scripts/world/vendor.gd" id="1_vendor"]
+
+[node name="Vendor" type="Area3D"]
+collision_layer = 0
+collision_mask = 1
+script = ExtResource("1_vendor")

@@ -7,7 +7,7 @@ Lo que NO se traduce nunca: los `id` de catálogo, los `node_name`, los nombres 
 2. Tuteo siempre. Imperativos: Elige, Presiona, Sobrevive, Derrota, Abate, Gana, Termina. Nunca tercera persona en logros («Viste el amanecer», no «Vio el amanecer»).
 3. Caja baja tipo oración en TODO nombre de arma, tomo (salvo la palabra del tomo), objeto, carta, misión, evolución, reliquia y enemigo: «Espada corta», «Ritmo de batalla», «Cien caídos». Nada de Title Case inglés.
 4. Llevan mayúscula inicial en las dos partes solo: topónimos (Bosque Hueco, Dunas de Ceniza, Ciénaga Lóbrega), nombres de tomo («Tomo de Furia»), nombres propios de jefe (Rey Pútrido, Cofre Mímico, Espectro de la Ciénaga) y de evolución con genitivo (Mandoble del Caudillo, Resplandor Final).
-5. Nombres de personaje intactos por regla 4 del brief: Juno, Nyx, Doc, Otto, Vex, Rook, Ash, Miro, Bogg, Kael, Torren, Wisp y **Bramble**. Bramble NO se traduce.
+5. Nombres de personaje intactos por regla 4 del brief: Juno, Nyx, Doc, Otto, Vex, Rook, Ash, Miro, Bogg, Kael, Torren, Wisp, **Bramble**, **Boxeador**, **PNG gucci morty** y **Backyardigan**. Bramble NO se traduce. Los tres nombres de la iteración 54 son palabras textuales del compañero de equipo y se copian tal cual: «Boxeador» ya está en español y NO se vuelve «Boxer», y «PNG gucci morty» conserva sus minúsculas y su sigla en mayúsculas — la regla 3 (caja baja tipo oración) nunca aplica a nombres de personaje. Si un nombre no cabe en su carta se **envuelve**, nunca se recorta: un nombre propio con puntos suspensivos es un nombre distinto.
 6. Cuatro escalas distintas, cuatro palabras: level = Nivel / «Nv %d» (el raider); **etapa = Etapa / insignia «E%d»** (el mapa dentro de la partida); **vuelta = Vuelta / «V%d»** (loops completos al circuito de mapas); rank de reliquia = Rango. **«Grado» / «G%d» quedó retirado en la iteración 50**: los grados de mapa desaparecieron junto con el selector, y la dificultad ahora sale de cuán lejos llegó la partida, no de un menú. Si ves «Grado» en notas viejas, está muerto.
 7. cooldown = «velocidad de ataque», y **siempre como bonificación positiva** (iteración 46): un enfriamiento que baja se escribe como una velocidad que sube («Enfriamiento de X -15%» → «Velocidad de ataque de X +15%»), incluido el texto de reliquias («-1.5%» → «+1.5%») y de pasivas. La matemática interna sigue siendo un multiplicador de enfriamiento (`cooldown_multiplier`, `cooldown_scale`): solo cambia lo que lee el jugador, porque «enfriamiento» obligaba a leer un número que baja como algo bueno. La palabra «enfriamiento» ya no aparece en ninguna cadena visible. «Recarga» sigue reservada a los portales («Recharging... %d s» → «Recargando... %d s», «Portals recharge» → «los portales se recargan»); usarla para cooldown crearía una sola palabra para dos sistemas.
 8. Marcadores %d %s %.1f %.2f %02d %% \n: mismo número y mismo orden que el original, sin excepción. Ninguna cadena pierde o gana marcadores.
@@ -458,6 +458,44 @@ en su propio pedido y la que cualquier jugador de este género reconoce;
 «potenciador» sería más largo (regla 20) y menos claro. La **estrella** no
 lleva apellido: en el juego es solo «Estrella», y el guiño a Mario vive en
 el arcoíris, no en el nombre.
+
+## Vendedores, caja de mascotas y mascotas nuevas (iteración 54)
+
+| Inglés | Español |
+|---|---|
+| vendor | vendedor |
+| Animal trafficker | Traficante de animales |
+| Power-up vendor | Vendedor de power-ups |
+| Item vendor | Vendedor de objetos |
+| pet box | caja de mascotas |
+| companion / pet | mascota (nunca «compañero», que es el otro jugador en co-op) |
+| `A vendor arrives!` | ¡Llega un vendedor! |
+| `The vendor packs up.` | El vendedor recoge el puesto. |
+| `[E] See the animals` | `[E] Ver los animales` |
+| `[E] See the power-up` | `[E] Ver el power-up` |
+| `[E] See the goods` | `[E] Ver la mercancía` |
+| `[E] Open the box` | `[E] Abrir la caja` |
+| `A box with a paw appears...` | Una caja con una huella aparece en el campo... |
+| `The box is empty.` | La caja está vacía. |
+| `The box opens by itself` | La caja se abre sola |
+| `Swap for %s` | Cambiar por %s |
+| `Keep %s` | Quedarme con %s |
+| `Choose what you take.` | Elige lo que te llevas. |
+| `Deal! %s` | ¡Trato hecho! %s |
+| `The vendor has nothing for you.` | El vendedor no tiene nada para ti. |
+| `No pet` | Sin mascota |
+| `%s joins` | %s se une |
+| `%s says goodbye` | %s se despide |
+| Doki | Doki |
+| Pony | Pony |
+| Cj7 | Cj7 |
+| Magic Pumpkin | Calabaza mágica |
+| Pokemon | Pokemon |
+
+Los cinco nombres de mascota son palabras del compañero de equipo y viajan
+sin traducir, como el roster de personajes: «Calabaza mágica» llegó ya en
+español y ya en caja baja tipo oración, así que traducir o reestilar
+cualquiera de los cinco inventaría un nombre que nadie del equipo usa.
 
 ## Rarezas
 

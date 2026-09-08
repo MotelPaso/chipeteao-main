@@ -24,6 +24,12 @@ extends Node
 ##                          on purpose, and a soak has to be able to)
 ##   BONK_POWERUP_BOOST=1   multiplies the kill drop chance (read by
 ##                          EnemySpawner), so drops show up inside a soak
+##   BONK_POI_NOW=a,b,c     spawns those POIs 8 m from the raider at 20 s
+##                          (vendor_items, vendor_powerups, vendor_animals,
+##                          pet_box) — the director's own cadence would
+##                          take many minutes to offer all four
+##   BONK_POINTS=<n>        grants slot 0 that many run points at start, so
+##                          a vendor soak can actually afford the shelf
 ##
 ## The raider WALKS AND INTERACTS by default (iteration 45). A parked raider
 ## silently skips every movement-gated system — Slime Trail only drops
@@ -256,6 +262,14 @@ const FLIGHT_HOLD_PERIOD: float = 15.0
 const FLIGHT_HOLD_TIME: float = 5.0
 var _flight_holding: bool = false
 
+## BONK_POI_NOW: POIs to drop next to the raider once, at POI_NOW_AT.
+const POI_NOW_AT: float = 20.0
+## Placed this far from the raider: outside the interact ring so the tour
+## has to walk the last step, close enough that it does within one leg.
+const POI_NOW_RADIUS: float = 8.0
+var _poi_now: Array[String] = []
+var _poi_spawned: bool = false
+
 var _powerup_now: String = ""
 var _star_now: bool = false
 var _star_dropped: bool = false
@@ -283,9 +297,16 @@ func _ready() -> void:
 	SaveData.save_path = "user://soak_save.json"
 	SaveData.load_from_disk()
 	# BONK_CHARACTER=<id> picks the raider (default: the config's choice).
+	# An unknown id is an ERROR, not a shrug: a soak meant to exercise one
+	# raider silently running the default one reports a green run about
+	# code it never touched.
 	var character := OS.get_environment("BONK_CHARACTER")
-	if not character.is_empty() and not CharacterCatalog.by_id(character).is_empty():
-		GameConfig.selected_character_id = character
+	if not character.is_empty():
+		if CharacterCatalog.by_id(character).is_empty():
+			push_error("ArenaProbe: unknown BONK_CHARACTER '%s'" % character)
+		else:
+			GameConfig.selected_character_id = character
+	print("ArenaProbe: character=%s" % GameConfig.selected_character_id)
 	# BONK_ARENA is a SCENE PATH for backwards compatibility, but what it
 	# selects now is the starting biome: the probe always boots Run.tscn,
 	# which owns the run and swaps arenas per stage.
@@ -320,6 +341,13 @@ func _ready() -> void:
 		push_error("ArenaProbe: unknown BONK_POWERUP_NOW '%s'" % _powerup_now)
 		_powerup_now = ""
 	_star_now = OS.get_environment("BONK_STAR_NOW") == "1"
+	var poi_list := OS.get_environment("BONK_POI_NOW")
+	if not poi_list.is_empty():
+		for entry: String in poi_list.split(",", false):
+			_poi_now.append(entry.strip_edges())
+	var points_text := OS.get_environment("BONK_POINTS")
+	if points_text.is_valid_int():
+		_grant_points.call_deferred(int(points_text))
 	print("ArenaProbe: arena=%s walk=%s" % [path.get_file(), _walking])
 
 
@@ -523,6 +551,7 @@ func _tick_powerup_switches() -> void:
 		if powerups != null and not powerups.is_active(_powerup_now):
 			powerups.apply(_powerup_now)
 	_tick_flight_hold()
+	_tick_poi_now()
 	if _star_now and not _star_dropped and RunState.run_time >= STAR_NOW_AT:
 		_star_dropped = true
 		var spawner := get_tree().get_first_node_in_group("enemy_spawner")
@@ -549,6 +578,54 @@ func _tick_flight_hold() -> void:
 		return
 	_flight_holding = want_hold
 	_send_action(&"jump", want_hold)
+
+
+## BONK_POI_NOW: one ring of requested POIs beside the raider. The
+## director offers these on its own cadence, which needs many minutes to
+## produce all four — this exists so one short soak can prove every stall
+## and the box actually work end to end.
+func _tick_poi_now() -> void:
+	if _poi_spawned or _poi_now.is_empty() or RunState.run_time < POI_NOW_AT:
+		return
+	var lead := _lead_player()
+	if lead == null:
+		return
+	_poi_spawned = true
+	var terrain := Terrain.find(get_tree())
+	for i in _poi_now.size():
+		var angle := TAU * float(i) / float(_poi_now.size())
+		var at := lead.global_position \
+				+ Vector3(cos(angle), 0.0, sin(angle)) * POI_NOW_RADIUS
+		if terrain != null:
+			at.y = terrain.height_at(at.x, at.z)
+		var node := _build_poi(_poi_now[i])
+		if node == null:
+			push_error("ArenaProbe: unknown BONK_POI_NOW entry '%s'" % _poi_now[i])
+			continue
+		RunRoot.stage_parent(get_tree()).add_child(node)
+		node.global_position = at
+		print("ArenaProbe: placed POI %s" % _poi_now[i])
+
+
+## One POI by name, or null when the name is not one this switch knows.
+func _build_poi(poi: String) -> Node3D:
+	match poi:
+		"pet_box":
+			return load("res://scenes/world/PetBox.tscn").instantiate() as Node3D
+		"vendor_items", "vendor_powerups", "vendor_animals":
+			var vendor := load("res://scenes/world/Vendor.tscn").instantiate() as Node3D
+			# Set before it enters the tree: Vendor._ready reads it.
+			vendor.set("kind", poi.trim_prefix("vendor_"))
+			return vendor
+	return null
+
+
+## BONK_POINTS: a starting purse for slot 0. Deferred so the Player exists.
+func _grant_points(amount: int) -> void:
+	var lead := _lead_player()
+	if lead != null and lead.has_method("add_points"):
+		lead.call("add_points", amount)
+		print("ArenaProbe: granted %d points" % amount)
 
 
 ## Time stop: while the spawner holds a freeze, sample a few frozen bodies

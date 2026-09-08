@@ -56,13 +56,16 @@ const MARKER_STYLES: Dictionary[StringName, Dictionary] = {
 	# different thing from a dropped Furia.
 	&"powerup": {"color": Color(0.95, 0.95, 0.4), "shape": "dot",
 		"size": 3.0, "always_visible": false},
-	# --- reserved for part C2 (see ARQUITECTURA, «Marcadores de mapa») ---
+	# Stalls and the pet box (iteration 54). A vendor draws in its own
+	# kind's colour through map_marker_color() — but only once the fog has
+	# found it, so the map never spoils which stall arrived.
 	&"vendor": {"color": Color(0.9, 0.75, 0.5), "shape": "square",
 		"size": 3.5, "always_visible": false},
-	&"lucky_block": {"color": Color(1.0, 0.6, 0.85), "shape": "square",
-		"size": 3.0, "always_visible": false},
 	&"pet_box": {"color": Color(0.7, 0.95, 0.6), "shape": "square",
 		"size": 3.5, "always_visible": false},
+	# --- reserved for part C2 (see ARQUITECTURA, «Marcadores de mapa») ---
+	&"lucky_block": {"color": Color(1.0, 0.6, 0.85), "shape": "square",
+		"size": 3.0, "always_visible": false},
 	&"event_altar": {"color": Color(0.8, 0.85, 1.0), "shape": "dot",
 		"size": 3.5, "always_visible": false},
 }
@@ -79,6 +82,8 @@ const MARKER_LABELS: Dictionary[StringName, String] = {
 	&"portal": "Portales",
 	&"exit": "Salida",
 	&"powerup": "Power-ups",
+	&"vendor": "Vendedores",
+	&"pet_box": "Caja de mascotas",
 }
 
 ## Alpha the unexplored ground is dimmed to in the composite. Not fully

@@ -4,7 +4,10 @@ extends Node3D
 ## carrier_player() walk finds the raider and reads THEIR stats) but
 ## top_level, so it follows with its own smoothing instead of riding the
 ## body rigidly. Immortal: no Health, not in any targetable group. Built
-## from a PetCatalog row: body mesh, hover height, optional weapon child.
+## from a PetCatalog row: body mesh, hover height, weapon child.
+##
+## One per raider (iteration 54): Player.set_pet() frees the old one before
+## spawning the new one, so a swap is a swap and not a menagerie.
 
 ## Follow/turn stiffness, in "1/seconds" of exponential smoothing (see
 ## _physics_process): higher is snappier, and the shape is independent of
@@ -12,25 +15,20 @@ extends Node3D
 @export var follow_speed: float = 6.0
 @export var turn_speed: float = 6.0
 @export var follow_offset: Vector3 = Vector3(-1.4, 0.0, 1.2)
-## Extra weapon damage each copy of the pet's item past the first adds.
-@export var damage_per_extra_copy: float = 0.25
-
 var pet_id: String = ""
 var _row: Dictionary = {}
 var _weapon: WeaponBase = null
 var _body: MeshInstance3D = null
 var _time: float = 0.0
-var _copies: int = 1
 ## Row fields read every frame / twice per build, resolved once in _ready.
 var _hover: float = 1.0
 var _body_color: Color = Color.WHITE
 
 
-func setup(row: Dictionary, copies: int = 1) -> void:
+func setup(row: Dictionary) -> void:
 	_row = row
 	pet_id = String(row.id)
 	name = "Pet_" + pet_id
-	_copies = copies
 
 
 func _ready() -> void:
@@ -95,23 +93,13 @@ func _build_weapon() -> void:
 	if _weapon == null:
 		return
 	_weapon.name = "PetWeapon"
-	_weapon.damage *= _damage_factor(_copies)
+	# The one scale there is (iteration 54: copies are gone). The weapon is
+	# never registered in used_weapon_<id> — it belongs to the PET, not to
+	# the raider, and the Collection page must not unlock an arsenal entry
+	# nobody earned. Only Player._apply_character and the UpgradePool grant
+	# bump that counter, and neither is reachable from here.
+	_weapon.damage *= float(_row.get("weapon_damage_scale", 0.5))
 	add_child(_weapon)
-
-
-## How much of the player version's damage the pet weapon deals at this
-## many copies. THE formula — set_copies rescales by the ratio of two of
-## these instead of repeating the growth term in a second shape.
-func _damage_factor(copies: int) -> float:
-	return float(_row.get("weapon_damage_scale", 0.5)) \
-			* (1.0 + damage_per_extra_copy * float(copies - 1))
-
-
-## More copies of the pet item: its weapon grows.
-func set_copies(copies: int) -> void:
-	if _weapon != null and copies > _copies:
-		_weapon.damage *= _damage_factor(copies) / _damage_factor(_copies)
-	_copies = copies
 
 
 func _physics_process(delta: float) -> void:

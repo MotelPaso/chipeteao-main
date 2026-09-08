@@ -175,7 +175,7 @@ Variables de entorno del harness:
 | Variable | Efecto |
 |---|---|
 | `BONK_ARENA=res://scenes/world/AshDunes.tscn` | **bioma de la etapa 1** (defecto: Bosque Hueco); el harness siempre arranca `Run.tscn` |
-| `BONK_CHARACTER=<id>` | raider concreto del catálogo |
+| `BONK_CHARACTER=<id>` | raider concreto del catálogo; un id desconocido ahora es un error, no un silencio |
 | `BONK_GODMODE=1` | raider prácticamente inmortal, para llegar a los sistemas tardíos |
 | `BONK_WALK=0` | deja el raider quieto (defecto: camina) |
 | `BONK_SEED=<int>` | recorrido determinista, para reproducir un soak |
@@ -186,6 +186,8 @@ Variables de entorno del harness:
 | `BONK_POWERUP_NOW=<id>` | concede ese power-up al jugador 1 a los 20 s y **se lo vuelve a dar en cada expiración**, para que un soak corto pase todo su reloj dentro del efecto |
 | `BONK_STAR_NOW=1` | suelta una **estrella quieta** a los pies del raider a los 30 s (la que ronda el mapa es difícil de interceptar a propósito) |
 | `BONK_POWERUP_BOOST=1` | multiplica ×50 la probabilidad de que una baja suelte un power-up, para que los drops salgan dentro de un soak |
+| `BONK_POI_NOW=a,b,c` | siembra esos POIs junto al raider a los 20 s (`vendor_items`, `vendor_powerups`, `vendor_animals`, `pet_box`) |
+| `BONK_POINTS=<n>` | le da esos puntos de partida al jugador 1, para que un soak de vendedor pueda comprar |
 | `BONK_PERF=1` | overlay de rendimiento del HUD (FPS, conteos, pools) |
 
 Para lógica aislada sigue sirviendo un harness desechable `extends SceneTree` con `godot --headless --path . -s <script>` (igual que `scripts/tools/generate_sfx.gd`). Ojo: en un script `-s` **no hay autoloads**, así que no vale para nada que toque `RunState`, `SaveData` o `Coop`.

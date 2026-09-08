@@ -21,14 +21,15 @@ extends RefCounted
 ##   effects:  OPTIONAL [{stat, amount}] PlayerStats effects PER COPY,
 ##             applied through the same channel as tomes (recompute).
 ##   kind:     OPTIONAL behavior handled by ItemBag: "magnet",
-##             "poison_on_hit", "titan", "spiders", "pet", or "hook" (a
-##             counter other systems read — altars, portals). ItemBag
-##             resolves behavior by kind, so a row's id can be renamed
-##             without silently switching its behavior off.
-## Pet rows (kind "pet") deliberately carry NO `effects`: their stat comes
-## from the PetCatalog row and scales with the run level, and PlayerStats
-## applies that separately in _apply_items. Adding `effects` here would pay
-## the same pet twice — the per-copy value of a pet belongs in PetCatalog.
+##             "poison_on_hit", "titan", "spiders", or "hook" (a counter
+##             other systems read — altars, portals). ItemBag resolves
+##             behavior by kind, so a row's id can be renamed without
+##             silently switching its behavior off.
+## There is no "pet" kind any more (iteration 54). Pets became a single
+## companion slot on the Player, filled only by the pet box and the animal
+## trafficker, so a chest or a roulette can no longer hand one out — and
+## must not be able to: a companion arriving unasked would throw away the
+## one the player chose.
 
 const ITEM_LIBRARY: Array[Dictionary] = [
 	# --- Common ---------------------------------------------------------
@@ -104,28 +105,6 @@ const ITEM_LIBRARY: Array[Dictionary] = [
 		"id": "cosmic_worm", "display_name": "Gusano cósmico", "rarity": "Legendary",
 		"glyph": "GC", "kind": "hook",
 		"description": "Los portales se recargan 25% más rápido por copia",
-	},
-	# --- Pets (iteration 43): kind "pet" spawns the PetCatalog companion;
-	# extra copies strengthen its weapon. ------------------------------------
-	{
-		"id": "pet_alien", "display_name": "Huevo alienígena", "rarity": "Epic",
-		"glyph": "HA", "kind": "pet", "pet_id": "alien",
-		"description": "Un compañero alienígena que fulmina enemigos y suma +1 de suerte por nivel",
-	},
-	{
-		"id": "pet_dinosaur", "display_name": "Huevo de dino", "rarity": "Epic",
-		"glyph": "HD", "kind": "pet", "pet_id": "dinosaur",
-		"description": "Un compañero dinosaurio que muerde y suma +2 de HP máx. por nivel",
-	},
-	{
-		"id": "pet_angry_bird", "display_name": "Huevo furioso", "rarity": "Epic",
-		"glyph": "HF", "kind": "pet", "pet_id": "angry_bird",
-		"description": "Un compañero pájaro furioso que dispara de lejos y suma crítico por nivel",
-	},
-	{
-		"id": "pet_capybara", "display_name": "Amigo capibara", "rarity": "Legendary",
-		"glyph": "AC", "kind": "pet", "pet_id": "capybara",
-		"description": "Un capibara sereno que suma ganancia de XP por nivel",
 	},
 ]
 

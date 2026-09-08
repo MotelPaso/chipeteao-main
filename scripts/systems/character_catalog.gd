@@ -196,6 +196,49 @@ const CHARACTER_LIBRARY: Array[Dictionary] = [
 		"unlock_cost": 180,
 		"tint": Color(0.4, 0.7, 1.0),
 	},
+	# Iteration 54 roster: the team's three picks. The display names are
+	# their own words and ship verbatim — no sentence case, no translation
+	# (GLOSARIO rule 5). All three cost 0, so starter_ids() grows from two
+	# to five and SaveData appends them to existing saves on load.
+	{
+		"id": "boxer", "display_name": "Boxeador",
+		"blurb": "Pega primero, pega dos veces y nunca pregunta nombres.",
+		"weapon_scene": "res://scenes/weapons/TwinDaggers.tscn",
+		"weapon_node_name": "TwinDaggers",
+		"weapon_display_name": "Dagas gemelas",
+		# Under Vex's 0.5 on purpose: the daggers swing far more often than
+		# the pistol, so a point of crit is worth more per level here.
+		"passive_description": "+0.4% de prob. de crítico por nivel",
+		"passive_stat": "crit_chance", "passive_amount": 0.4,
+		"unlock_cost": 0,
+		"tint": Color(0.86, 0.74, 0.24),
+	},
+	{
+		"id": "gucci_morty", "display_name": "PNG gucci morty",
+		"blurb": "Un recorte de baja resolución al que la suerte no deja de sonreírle.",
+		"weapon_scene": "res://scenes/weapons/DartPistol.tscn",
+		"weapon_node_name": "DartPistol",
+		"weapon_display_name": "Pistola de dardos",
+		# Torren keeps luck at 1.0 per level: a free starter matching him
+		# would leave nothing to buy for his 130 esquirlas.
+		"passive_description": "+0.6 de suerte por nivel",
+		"passive_stat": "luck", "passive_amount": 0.6,
+		"unlock_cost": 0,
+		"tint": Color(0.92, 0.34, 0.62),
+	},
+	{
+		"id": "backyardigan", "display_name": "Backyardigan",
+		"blurb": "No corre, coreografía; y todo lo que roza se prende.",
+		"weapon_scene": "res://scenes/weapons/Aura.tscn",
+		"weapon_node_name": "Aura",
+		"weapon_display_name": "Aura",
+		# Move speed IS the Aura's damage stat: a ring that only burns what
+		# it touches scales with how much ground the raider covers.
+		"passive_description": "+0.8% de velocidad de movimiento por nivel",
+		"passive_stat": "move_speed", "passive_amount": 0.8,
+		"unlock_cost": 0,
+		"tint": Color(0.14, 0.62, 0.6),
+	},
 ]
 
 
@@ -229,7 +272,8 @@ static func by_unlock_boss(boss_id: String) -> Dictionary:
 	return _by_unlock_boss.get(boss_id, {})
 
 
-## Ids playable from the start (unlock_cost 0) — GDD 5: Rook and Vex.
+## Ids playable from the start (unlock_cost 0) — Rook and Vex from GDD 5,
+## plus the iteration-54 trio.
 ## SaveData seeds a fresh save's unlocked list from this.
 static func starter_ids() -> Array[String]:
 	var ids: Array[String] = []

@@ -126,6 +126,56 @@ signal points_changed(total: int)
 var points: int = 0
 
 
+## --- companion slot (iteration 54) ------------------------------------------
+
+## The one pet following this raider ("" = none). ONE slot per player: a
+## second pet REPLACES the first, weapon and stat together, so a companion
+## is a decision and not an accumulation. Filled only by the pet box and
+## the animal trafficker — never by a chest or a roulette roll, because a
+## companion you did not choose is one that threw away the one you did.
+var pet_id: String = ""
+
+
+## Swaps the companion. Frees the old Pet node before spawning the new one
+## (the swap is the whole point), announces both halves through the loot
+## toast and re-runs the stat layer, which reads `pet_id` for the level
+## scaling. Passing "" just clears the slot.
+func set_pet(new_pet_id: String) -> void:
+	if new_pet_id == pet_id:
+		return
+	var leaving := PetCatalog.by_id(pet_id)
+	var old_pet := get_node_or_null("Pet_" + pet_id) as Pet
+	if old_pet != null:
+		old_pet.queue_free()
+	pet_id = new_pet_id
+	if not leaving.is_empty():
+		_announce_pet(PET_LEAVES % String(leaving.display_name),
+				PetCatalog.weapon_display_name(leaving), leaving)
+	if not pet_id.is_empty():
+		var row := PetCatalog.by_id(pet_id)
+		if row.is_empty():
+			push_warning("Player: unknown pet '%s'" % pet_id)
+			pet_id = ""
+		else:
+			var pet := Pet.new()
+			pet.setup(row)
+			add_child(pet)
+			_announce_pet(PET_JOINS % String(row.display_name),
+					String(row.get("stat_label", "")), row)
+			# One-line log (RunManager convention). It lives HERE and not in
+			# the two sellers: this is the only door a companion comes
+			# through, so a new source cannot forget to announce itself.
+			print("Pet joined: %s" % pet_id)
+	var stats := PlayerStats.find_in(self)
+	if stats != null:
+		stats.recompute()
+
+
+func _announce_pet(title: String, description: String, row: Dictionary) -> void:
+	get_tree().call_group("hud", "show_loot", title, description,
+			row.get("color", Color.WHITE) as Color, player_index)
+
+
 ## Named multiplier sources on the points payout (iteration 53). A PRODUCT
 ## of named factors, not one number: Fiebre del oro doubles it, part C2
 ## adds another source, and two of them running at once must compose
@@ -170,6 +220,12 @@ func spend_points(amount: int) -> bool:
 	points -= amount
 	points_changed.emit(points)
 	return true
+
+## Companion toast lines. Both carry the pet's name, so the player can see
+## what left as well as what arrived — a swap that only announced the
+## arrival would look like a free gift.
+const PET_JOINS: String = "%s se une"
+const PET_LEAVES: String = "%s se despide"
 
 ## Walkable points sampled when Vuelo ends over a blocked cell; the
 ## closest one wins. A handful is plenty — the sampler is uniform over the
