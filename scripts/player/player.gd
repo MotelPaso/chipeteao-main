@@ -892,6 +892,10 @@ func _tick_downed(delta: float) -> void:
 		_hide_revive_prompt()
 		return
 	var rescuing := false
+	# Kept, not just counted: the revive log names WHO stood the body up,
+	# which is the only way a co-op soak can tell a real rescue from a
+	# raider that came back on its own.
+	var rescuer: Player = null
 	for node: Node in get_tree().get_nodes_in_group("player"):
 		var mate := node as Player
 		if mate == null or not mate.is_inside_tree():
@@ -900,24 +904,29 @@ func _tick_downed(delta: float) -> void:
 			continue
 		if Input.is_action_pressed(mate.interact_action()):
 			rescuing = true
+			rescuer = mate
 			break
 	if rescuing:
 		# Guarded: revive_time is an @export now, and a 0 there would make
 		# every downed raider pop back up on the first frame of contact.
 		_revive_progress += delta / maxf(revive_time, 0.01)
 		if _revive_progress >= 1.0:
-			_revive()
+			_revive(rescuer)
 			return
 	else:
 		_revive_progress = maxf(_revive_progress - revive_decay_rate * delta, 0.0)
 	_update_revive_prompt(rescuing)
 
 
-func _revive() -> void:
+func _revive(rescuer: Player = null) -> void:
 	_set_downed(false)
 	health.revive(revive_heal_fraction)
 	Juice.sparkle(global_position + Vector3.UP * 1.0)
 	Sfx.play(&"heal")
+	# One-line log (RunManager convention): the down/revive path is the
+	# one co-op rule no solo soak can reach, so it needs its own line.
+	print("Player revived: p%d by p%d" % [
+			player_index, rescuer.player_index if rescuer != null else -1])
 
 
 ## Floating world-space prompt over the downed body (same Label3D scheme

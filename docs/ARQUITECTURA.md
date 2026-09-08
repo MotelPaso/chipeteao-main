@@ -987,16 +987,110 @@ sin haber exigido nada: un soak corto «pasa» aunque ningún cofre, altar
 ni portal se haya resuelto en las tres arenas. 360 s es lo que tarda el
 recorrido en cruzar una arena de 240x240.
 
-Hace `godot --headless --import`, un soak de **las tres arenas** (`HollowWoods`, `AshDunes`, `Gloomfen`) con `BONK_GODMODE=1 BONK_SEED=4242 BONK_GAME_SEED=4242`, y un **cuarto soak de etapa** (iteración 49): Bosque Hueco con `BONK_STAGE_FAST=1` y **el doble de reloj** (60 s hasta la puerta + 70 s de espera deliberada + cruzar el mapa hasta un portal que sale a 40 m o más no cabe en 240 s, y el RNG del juego se `randomize()`a por corrida, así que la semilla solo fija el paseo del harness). Ese cuarto soak queda **fuera** de la cuenta de interactuables, y `Portal used: exit` no cuenta como portal usado. Falla (exit 1) si:
+Hace `godot --headless --import`, el **lint de catálogos** y el **harness de UI** (iteración 57, los dos abajo), un soak de **las tres arenas** (`HollowWoods`, `AshDunes`, `Gloomfen`) con `BONK_GODMODE=1 BONK_SEED=4242 BONK_GAME_SEED=4242`, un **cuarto soak de etapa** (iteración 49): Bosque Hueco con `BONK_STAGE_FAST=1` y **el doble de reloj** (60 s hasta la puerta + 70 s de espera deliberada + cruzar el mapa hasta un portal que sale a 40 m o más no cabe en 240 s, y el RNG del juego se `randomize()`a por corrida, así que la semilla solo fija el paseo del harness). Ese cuarto soak queda **fuera** de la cuenta de interactuables, y `Portal used: exit` no cuenta como portal usado. Falla (exit 1) si:
 
 - el import o algún soak imprime errores/warnings de Godot (patrón amplio: `SCRIPT ERROR`, `ERROR:`, `WARNING:`, `null instance`, `previously freed`, `Resource file not found`…),
 - una arena no llega al final del soak (se colgó o murió antes) — lo mide contando las líneas `frame N ...` que el harness imprime cada 120 frames,
 - **cobertura**: el raider no pasó del nivel 3 (señal de que el arma no hace daño), o —solo en corridas de ≥240 s— ningún interactuable se resolvió. Un soak que no sube de nivel ni toca nada puede pasar «limpio» sin haber ejercitado nada.
 - **etapa**: el soak de etapa no abrió su portal, no cruzó de `hollow_woods` a `ash_dunes`, dejó algo vivo en un `Stage sweep:`, perdió progreso entre el par de `Stage carry:` de un cruce, o no produjo ningún `Sky event:` después del cruce (lo que probaría que el director no volvió a cachear las luces del mapa nuevo).
+- **co-op** (iteración 57): el quinto soak no arrancó con dos raiders (`ArenaProbe: players=2`), no cruzó de etapa, ensució un `Stage sweep:` o no produjo ningún `Player revived:`.
+- **lint / UI** (iteración 57): falta cualquiera de las nueve líneas `Catalog lint: check <nombre> ok rows=N` (con `rows` > 0) o de los trece `UiProbe: step <nombre> ok`. Las listas de nombres viven en `tools/verificar.sh` y se greppean **una por una**: una comprobación que deja de ejecutarse desaparece del log sin ruido, y un conteo la daría por buena mientras otra se repite.
+- **partida godmode terminada**: cualquier soak inmortal que imprima `Probe fog: skipped` (ver la regla de fin de partida abajo). Un raider con 10M de HP no tiene por qué morirse.
 
-La corrida completa tarda **~32 minutos** (import + 3×360 s + 1×720 s), más que el timeout de una llamada de shell: lánzala en segundo plano.
+La corrida completa (import + lint + harness de UI + 3×360 s + 1×720 s + 1×360 s de co-op) tarda **entre ~16 y ~75 minutos**, más que el timeout de una llamada de shell: lánzala en segundo plano. El reloj de una corrida lo manda el TAMAÑO DE LA HORDA, no el número de frames: medido en dos corridas de la misma cabeza y las mismas semillas, **16 min** y **75 min**. El soak de co-op es el que más se mueve (la horda escala +50% de HP y +30% de ritmo de spawn por raider extra, y un cuerpo vivo cuesta física cada frame): 78 s en una corrida y 32 min en la otra. Por eso `verificar.sh` imprime los segundos de cada fase y el total — una estimación fija envejece mal.
 
 Logs en `$TMPDIR/bonkraiders-verify/`. Cada arena imprime su resumen `nivel=… cofres=… altares=… portales=…`.
+
+### Guardado por corrida (iteración 57)
+
+`tools/verificar.sh` le da a **cada** soak y a cada harness su propio
+`BONK_SAVE_PATH` (`$LOGDIR/save_<soak>.json`), borrado junto a sus hermanos
+`.bak` y `.tmp` antes de arrancar. Alcance, dicho con honestidad: los soaks
+godmode nunca terminan la partida, así que **nunca doblaban meta**; lo que sí
+arrastraban era lo que `SaveData.bump` acredita **durante** la corrida
+(bestiario `kills_<script>`, `used_weapon_<id>`), y cualquier corrida mortal o
+del harness de UI escribía encima esquirlas, misiones y desbloqueos en el mismo
+archivo. Borrar solo el `.json` no era un reset: `load_from_disk` cae al `.bak`
+(«Save recovered from backup»), así que el borrado tiene que llevarse los tres.
+
+### `scenes/tests/CatalogLint.tscn` + `catalog_lint.gd` (iteración 57)
+
+Las referencias cruzadas que **ningún soak puede comprobar**, porque una rota
+no revienta: simplemente no hace nada. Un `passive_stat` mal escrito le cuesta
+a su raider la pasiva entera y deja un warning enterrado en un log de 20 000
+líneas; una ruta `scene` con un typo solo falla el día que alguien tira esa
+fila; un glifo repetido entre dos catálogos pinta la sigla equivocada.
+
+Nueve comprobaciones, una línea `Catalog lint: check <nombre> ok rows=%d` por
+cada una que pasa y un `push_error` por cada fallo:
+
+| Comprobación | Qué mira |
+|---|---|
+| `ids_unique` | id repetido dentro de cada librería (13 librerías) |
+| `glyphs_unique` | glifo repetido **entre** armas, evoluciones, tomos, objetos y power-ups |
+| `paths_exist` | toda ruta `scene` / `weapon_scene` / `scene_path` / `icon`, con `ResourceLoader.exists` |
+| `stat_ids` | todo `passive_stat`, `stat` de objeto/power-up/mascota/reliquia y stat de boon de altar o pacto contra las ramas del `match` de `PlayerStats._apply_effect` |
+| `character_weapons` | el `weapon_node_name` de cada raider existe como `node_name` en `WEAPON_LIBRARY` |
+| `director_methods` | todo `method` de `EVENT_LIBRARY` y todo `start`/`tick`/`stop` de `WEATHER_CATALOG` está declarado en `world_director.gd` |
+| `weapon_properties` | toda `extra_entries.property` y toda clave `mults`/`adds` de evolución existe en el arma destino (se instancia la escena y se lee su lista de propiedades) |
+| `vendor_lucky_roulette_ids` | ids únicos en `VENDOR_LIBRARY`, `LUCKY_REWARDS` y `OUTCOMES` |
+| `marker_labels` | todo `marker_kind` que algún script asigna y toda clave de `MARKER_STYLES` (salvo `player`/`boss`/`exit`) tiene fila en `MARKER_LABELS`, **a menos que** esté en `MapDraw.LEGEND_VARIANTS` |
+
+`rows` es lo que se inspeccionó **de verdad**, y **cero filas es un fallo**: una
+comprobación que recorre una lista vacía pasa por el motivo equivocado, que es
+exactamente cómo una constante renombrada pasaría desapercibida.
+
+`MapDraw.LEGEND_VARIANTS` nombra las tres variantes que a propósito **no**
+llevan fila de leyenda (`chest_free`, `altar_demonic`, `altar_greed`): cada una
+es una variante de una familia que ya tiene la suya, y una línea por variante
+convertiría una leyenda de un vistazo en una taxonomía. Nombrarlas en una
+constante en vez de dejarlas implícitas es lo que le permite al lint distinguir
+una omisión deliberada de una olvidada.
+
+### `scenes/tests/UiProbe.tscn` + `ui_probe.gd` (iteración 57)
+
+**Siete de las nueve escenas de UI no las arrancaba nada**: CharacterSelect,
+Collection, QuestLog, RelicShop y SettingsPanel no se instanciaban nunca, y
+PauseMenu y RunEndScreen las instanciaba `RunSystems.tscn` sin que nadie las
+abriera. Un handler que revienta en su primera pulsación, un menú que no
+devuelve la pausa, un nombre `%` renombrado en un `.tscn`: nada de eso podía
+ensuciar un soak, porque ningún soak pasaba por ahí.
+
+```sh
+godot --headless --fixed-fps 60 --quit-after 7200 res://scenes/tests/UiProbe.tscn
+```
+
+Arquitectura, porque el botón de inicio y los de la pantalla final
+**reemplazan `current_scene`**: el script raíz de la escena hace una sola cosa
+en su `_ready` — crear el **driver** y añadirlo a `get_tree().root` con
+`call_deferred` (añadir un hijo a la raíz desde dentro de un `_ready` da
+«Parent node is busy setting up children»). El driver vive como hermano de
+`current_scene`, con `process_mode = ALWAYS`, así que sobrevive a todos los
+cambios de escena; tras cada corte re-adquiere `current_scene` y **espera a que
+la cortina de `ScreenFade` termine** antes de pulsar nada, porque una pulsación
+que cae dentro de esa ventana se descarta en silencio.
+
+Pulsa los **controles reales**: por nombre único resuelto contra su propio
+dueño (`%SettingsButton` existe en `CharacterSelect.tscn` **y** en
+`PauseMenu.tscn`), por texto solo los construidos en código (Colección,
+Armería, el «Sí» de la carta de confirmación), y `ui_cancel` como
+`InputEventAction` parseado con la soltada en un frame **posterior**. Antes de
+cada `pressed.emit()` comprueba `not disabled and is_visible_in_tree()`:
+`pressed.emit()` se salta las dos cosas, así que un harness que solo emite
+prueba que el handler corre, no que un jugador pudiera llegar a él. Nunca llama
+a un handler con guion bajo.
+
+Trece pasos, cada uno con su `UiProbe: step <nombre> ok`: `collection`,
+`quests`, `relics`, `coop_count_reject`, `unlock_confirm`, `cards_all`,
+`start_run`, `pause_open`, `settings_toggle`, `pause_close`, `extract`,
+`retry`, `done`; cierra con `UiProbe: done steps=%d`.
+
+Cada paso tiene un **plazo en frames** que hace `push_error` con su nombre y
+sale. El plazo por defecto son 600 frames y es un detector de **cuelgue**, no
+un cronómetro: `start_run` (1200) y `retry` (900) esperan al reloj de partida
+(`RunState.run_time` ≥ 10 y ≥ 5, o sea 600 y 300 frames por sí solos), así que
+el plazo por defecto se dispararía en una corrida **sana**. Los dos plazos
+largos están tabulados en `STEP_DEADLINES` con ese motivo escrito al lado.
 
 ### El harness: `scenes/tests/ArenaProbe.tscn` + `arena_probe.gd`
 
@@ -1038,6 +1132,40 @@ Desde la iteración 45 **el raider camina e interactúa por defecto**. Un raider
   `_exit_tree` el nodo de niebla ya no está y leerla ahí reportaba 0.00. El
   soak de etapa (`BONK_STAGE_FAST`) no pasa por esta puerta: dura 60 s por
   etapa a propósito y no le da tiempo a explorar nada.
+  A los dos interruptores se suma, desde la iteración 57, una **regla
+  semántica** (no un interruptor nuevo): **una partida terminada no puede
+  explorar**. Un soak mortal acaba en la muerte del raider, así que la
+  fracción que alcanzó dice cuánto vivió, no cómo camina el recorrido.
+  Cuando la regla se aplica el harness imprime
+  `Probe fog: skipped (run ended at %.1fs)`, de modo que el salto **nunca es
+  silencioso** — y `tools/verificar.sh` **falla** cualquier soak GODMODE que
+  imprima esa línea, porque un raider con 10M de HP no tiene por qué morirse.
+- **Fin de partida** (iteración 57): sin `BONK_GODMODE`, el harness se conecta
+  a `RunManager.run_ended` (por el grupo `run_manager`), imprime
+  `Probe: run ended victory=%s` dos frames después de `Meta saved:` y sale.
+  Antes de esto una corrida mortal dejaba el árbol pausado bajo la pantalla
+  final —que **no** se juega sola en headless, a diferencia de la ruleta y del
+  vendedor— hasta que saltaba el `PAUSE_WEDGE_WARN` a los 20 s. La ruta de
+  «Reintentar» de esa pantalla es cosa del harness de UI, no de este.
+- **Co-op** (iteración 57): con `BONK_PLAYERS=N` el harness llama a
+  `Coop.configure` **antes** de instanciar `Run.tscn` (que es lo que
+  `RunSystems._spawn_party` lee dentro de su propio `_ready`), con todos los
+  slots en el teclado — un soak no tiene controles, y `_rebuild_slot_actions`
+  duplica los eventos de teclado por slot, así que `p0_*` y `p1_*` acaban
+  siendo dos juegos de acciones distintos sobre las mismas teclas, que es
+  justo lo que necesita un harness que sintetiza acciones por nombre.
+  `_apply_godmode` cubre **solo al slot 0**: el slot 1 se queda mortal, que es
+  lo que permite que `BONK_DOWN_NOW` aterrice. Todo helper que dice «el
+  raider» resuelve al líder por `player_index == 0`, nunca por «el primero del
+  grupo» (con dos cuerpos el orden del grupo es orden de spawn). Los slots 1+
+  **siguen** al líder y no interactúan nunca: dos recorridos duplicarían las
+  cuentas de interactuables con las que se calibró cada puerta. Y una **regla
+  de rescate** manda por encima de todo lo demás, el rush al portal incluido:
+  con un cuerpo de `downed_players` a menos de 6 m, el líder camina hasta él y
+  **mantiene** interactuar (`_hold_action`, no la pulsación de un frame:
+  `Player._tick_downed` quiere 3 s continuos de la acción **del rescatador**)
+  hasta que se levanta. Al final imprime `Party: downs=%d revives=%d` y
+  `Party pets: p0=%s p1=%s`.
 - **Mapa de Tab** (iteración 52): cada `MAP_OVERLAY_INTERVAL` 60 s pulsa
   `map_overlay`, lo mantiene `MAP_OVERLAY_HOLD` 2 s y suelta. Imprime
   `Map overlay: open markers=%d` y `Map overlay: closed`. El conteo se lee
@@ -1048,7 +1176,7 @@ Desde la iteración 45 **el raider camina e interactúa por defecto**. Un raider
 - `_send_action(base, pressed)` es el sintetizador de teclas genérico (antes
   era solo `_send_interact`): misma regla de soltar en un frame posterior.
 - **Power-ups** (iteración 53): el recorrido se desvía a la gema más cercana dentro de `PICKUP_DETOUR` 20 m (caminar encima **es** la interacción: ni pulsación ni linger). Bajo `BONK_POWERUP_NOW=time_stop` muestrea hasta tres cuerpos congelados por frame y al descongelar imprime `Time stop: sampled=%d moved=%d damage_events=%d` — `moved` y `damage_events` son las dos formas en que un congelado puede ser mentira, y las dos tienen que salir en cero. Al terminar imprime `Immortal blocked:` con `Health.blocked_hits` (cacheado en vida, como la niebla). Bajo `BONK_POWERUP_NOW=flight` **mantiene el salto** 5 s cada 15 s, porque Vuelo solo hace algo mientras se mantiene; el resto de los soaks conservan el paseo de siempre.
-- Nunca toca el guardado real: re-apunta `SaveData.save_path` a `user://soak_save.json` antes de instanciar la arena.
+- Nunca toca el guardado real: usa `BONK_SAVE_PATH` si está puesta y `user://soak_save.json` si no, antes de instanciar la partida.
 
 Variables de entorno:
 
@@ -1056,18 +1184,22 @@ Variables de entorno:
 |---|---|
 | `BONK_ARENA=res://scenes/world/AshDunes.tscn` | **bioma inicial** de la etapa 1 (defecto: Hollow Woods). El probe siempre arranca `Run.tscn` |
 | `BONK_CHARACTER=<id>` | raider de `CharacterCatalog`. Un id desconocido es un **`push_error`** desde la iteración 54 (antes se ignoraba en silencio, y un soak que creía probar un raider corría el de siempre); el probe imprime `ArenaProbe: character=<id>` |
-| `BONK_GODMODE=1` | raider con 10M de HP, para que los sistemas tardíos se ejerciten |
+| `BONK_PLAYERS=<1-4>` | tamaño de la party (iteración 57); `Coop.configure` antes de instanciar `Run.tscn`. El probe imprime `ArenaProbe: players=%d slot1=%s` contado sobre los **grupos**, no sobre el interruptor |
+| `BONK_CHARACTER2=<id>` | raider del slot 1 (defecto: la fila siguiente del catálogo) |
+| `BONK_DOWN_NOW=<seg>` | golpe letal al slot 1 a ese segundo y cada 60 s después: fuerza el ciclo derribo/reanimación en vez de esperar a que la horda lo elija |
+| `BONK_GODMODE=1` | raider con 10M de HP, para que los sistemas tardíos se ejerciten. **Solo el slot 0** desde la iteración 57 |
 | `BONK_WALK=0` | deja el raider quieto (defecto: camina) |
 | `BONK_SEED=<int>` | recorrido determinista, para reproducir un soak |
 | `BONK_PROBE_DEBUG=1` | narra el recorrido (waypoints, llegadas, pulsaciones) |
 | `BONK_ELITE_BOOST=1` | todo spawn sale shiny (`force_elite_spawns` por grupo) |
 | `BONK_STAGE_FAST=1` | la etapa se supera a los 60 s sin jefe; el harness espera 70 s y cruza |
-| `BONK_SAVE_PATH=<ruta>` | re-apunta el guardado (cualquier arranque headless que no sea el probe) |
+| `BONK_SAVE_PATH=<ruta>` | re-apunta el guardado. Lo honran `SaveData._ready` (cualquier arranque headless) **y** el propio probe, antes de instanciar la partida; `tools/verificar.sh` le da a cada soak el suyo |
 | `BONK_GAME_SEED=<int>` | siembra el RNG **del juego** (cartas, spawns, scatter y relieve): lo que hace reproducible un soak entero |
 | `BONK_POWERUP_NOW=<id>` | concede ese power-up al slot 0 a los 20 s y **lo re-concede en cada expiración** |
 | `BONK_STAR_NOW=1` | suelta una estrella **quieta** a los pies del raider a los 30 s |
 | `BONK_POWERUP_BOOST=1` | multiplica ×50 la probabilidad de drop por baja (lo lee `EnemySpawner`) |
-| `BONK_POI_NOW=a,b,c` | siembra esos POIs a 8 m del raider a los 20 s: `vendor_items`, `vendor_powerups`, `vendor_animals`, `pet_box`, `event_altar`, `lucky_block` |
+| `BONK_POI_NOW=a,b,c` | siembra esos POIs a 8 m del raider a los 20 s: `vendor_items`, `vendor_powerups`, `vendor_animals`, `pet_box`, `event_altar`, `lucky_block`. Las repeticiones se conservan (seis `lucky_block` siembran seis bloques) |
+| `BONK_LUCKY_REWARD=a,b` | cola de recompensas que pagan los bloques siguientes en vez de tirar la tabla (la última se repite); un id desconocido es `push_error`. Cola **estática** en `lucky_block.gd`, porque la tirada es estática y tiene que sobrevivir entre bloques |
 | `BONK_WEATHER_NOW=<id>` | fuerza ese clima a los 30 s por la misma entrada forzada que usa el altar |
 | `BONK_WEAPON=<id>` | el raider arranca con esa arma en vez de la de su personaje, por la misma vía de concesión |
 | `BONK_ITEM_NOW=a,b:2` | concede esos objetos al slot 0 a los 10 s (`id:n` para n copias) y hace que el recorrido **derrape** cada ~3 s, único disparador del cinturón |
@@ -1100,5 +1232,5 @@ Para lógica aislada sigue sirviendo un harness desechable `extends SceneTree` (
 - **Español latinoamericano para todo lo visible, inglés para todo lo estructural.** La tabla es `docs/GLOSARIO.md`. En inglés y sin tocar: ids, `node_name`, grupos, `StringName`, rutas `res://`, claves de `SaveData` y los `print()`/`push_warning()`. Los marcadores de formato (`%d %s %.1f %02d %%`) conservan número y orden exactos.
 - **Tunables como `@export`** con defaults en el script; los overrides por instancia viven en la escena (el horario de jefes por arena, las escenas del spawner). Antes de mover un `@export` de sitio, comprueba qué `.tscn` lo overridea: las tres arenas overridean el `EnemySpawner`.
 - **Números mágicos a `const` con nombre y comentario del porqué.** Un `0.5` suelto en dos archivos es la forma en que dos copias del mismo cálculo se separan.
-- **Logs de una línea** en eventos clave — son la interfaz de verificación de los soaks headless, van **en inglés** y se conservan. Inventario actual: `Run ended:`, `Meta saved:`, `Save recovered from backup:`, `Boss spawned:`, `Boss chests dropped:`, `Elite chest dropped:`, `Horde:`, `Sky event:`, `Chest opened:`, `Altar charged:`, `Altar left:`, `Altar placed:`, `Demonic altar used:`, `Demonic pact:`, `Spawn skipped:`, `Stage advanced:`, `Stage sweep:`, `Stage carry:`, `Stage gate:`, `Stage boss slain:`, `Exit portal opened`, `Portal used: exit`, `Pseudo-infinite:`, `Run stages:`, `Terrain built:`, `Probe legs:`, `Greed shrine:`, `Roulette spun:`, `Spring used:`, `Portal used:`, `Portals placed:`, `Weapon evolved:`, `Weapon ascended:`, `Pet joined:`, `Secret miniboss awakened:`, `Secret boss slain:`, `Arena mask:`, `Start layout:`, `Daily run scored:`, `Void rescue:`, `Power-up picked:`, `Power-up dropped:`, `Star roam:`, `Flight landing:`, `Pet box opened:`, `Vendor arrived:`, `Vendor sold:`, `Time stop:`, `Immortal blocked:`, `Weather started:`, `Weather ended:`, `Disaster:`, `Event altar used:`, `Possessed spawned:`, `Possessed expired:`, `Belt bolt:`, `Saiyan aura:`, `Zenkai triggered:`, `Lucky block:`. Al crear un evento mayor, añade el tuyo con el mismo formato.
+- **Logs de una línea** en eventos clave — son la interfaz de verificación de los soaks headless, van **en inglés** y se conservan. Inventario actual: `Run ended:`, `Meta saved:`, `Save recovered from backup:`, `Boss spawned:`, `Boss chests dropped:`, `Elite chest dropped:`, `Horde:`, `Sky event:`, `Chest opened:`, `Altar charged:`, `Altar left:`, `Altar placed:`, `Demonic altar used:`, `Demonic pact:`, `Spawn skipped:`, `Stage advanced:`, `Stage sweep:`, `Stage carry:`, `Stage gate:`, `Stage boss slain:`, `Exit portal opened`, `Portal used: exit`, `Pseudo-infinite:`, `Run stages:`, `Terrain built:`, `Probe legs:`, `Greed shrine:`, `Roulette spun:`, `Spring used:`, `Portal used:`, `Portals placed:`, `Weapon evolved:`, `Weapon ascended:`, `Pet joined:`, `Secret miniboss awakened:`, `Secret boss slain:`, `Arena mask:`, `Start layout:`, `Daily run scored:`, `Void rescue:`, `Power-up picked:`, `Power-up dropped:`, `Star roam:`, `Flight landing:`, `Pet box opened:`, `Vendor arrived:`, `Vendor sold:`, `Time stop:`, `Immortal blocked:`, `Weather started:`, `Weather ended:`, `Disaster:`, `Event altar used:`, `Possessed spawned:`, `Possessed expired:`, `Belt bolt:`, `Saiyan aura:`, `Zenkai triggered:`, `Lucky block:`, `Save path overridden:`, `Player revived:`, `Vendor buyer:`. Al crear un evento mayor, añade el tuyo con el mismo formato. Las líneas de los harness van aparte y también se conservan, porque `tools/verificar.sh` las greppea: `Probe legs:`, `Probe fog:` (incluida su forma `Probe fog: skipped`), `Probe: run ended`, `Mask sweep:`, `Map overlay:`, `Time stop:`, `Immortal blocked:`, `HUD offset:`, `Party:`, `Party pets:`, `Points sources:`, `Catalog lint:`, `UiProbe:`.
 - **Verificar antes de dar por hecho un cambio**: `tools/verificar.sh`. Un cambio que no pasa el import o ensucia el log de un soak no está terminado.

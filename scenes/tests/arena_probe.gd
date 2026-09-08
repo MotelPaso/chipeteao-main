@@ -8,7 +8,23 @@ extends Node
 ## Env switches:
 ##   BONK_ARENA=res://...   arena scene (default: Hollow Woods)
 ##   BONK_CHARACTER=<id>    raider from CharacterCatalog
-##   BONK_GODMODE=1         unkillable raider, so late systems get exercised
+##   BONK_PLAYERS=<1-4>     party size (iteration 57). Coop.configure runs
+##                          BEFORE Run.tscn is instanced, which is what
+##                          RunSystems._spawn_party reads; every slot is
+##                          on the keyboard device, because a soak has no
+##                          pads. Slot 0 leads and interacts, slots 1+
+##                          FOLLOW and never interact on their own
+##   BONK_CHARACTER2=<id>   raider for slot 1 (default: the catalog row
+##                          after slot 0's, so the two differ)
+##   BONK_DOWN_NOW=<secs>   lands a lethal hit on slot 1 at that run time
+##                          and every 60 s after, so the down/revive path
+##                          is FORCED instead of hoped for
+##   BONK_GODMODE=1         unkillable raider, so late systems get
+##                          exercised. Slot 0 ONLY: slot 1 stays mortal,
+##                          which is what makes BONK_DOWN_NOW land
+##   BONK_SAVE_PATH=<path>  where this soak's save lives (default:
+##                          user://soak_save.json). Honoured here, before
+##                          the run boots, as well as by SaveData itself
 ##   BONK_WALK=0            hold the raider still (default: it walks, see below)
 ##   BONK_SEED=<int>        deterministic walk, for reproducing a soak
 ##   BONK_ELITE_BOOST=1     every spawn rolls shiny (crowding stress test)
@@ -26,8 +42,14 @@ extends Node
 ##                          EnemySpawner), so drops show up inside a soak
 ##   BONK_POI_NOW=a,b,c     spawns those POIs 8 m from the raider at 20 s
 ##                          (vendor_items, vendor_powerups, vendor_animals,
-##                          pet_box) — the director's own cadence would
-##                          take many minutes to offer all four
+##                          pet_box, event_altar, lucky_block) — the
+##                          director's own cadence would take many minutes
+##                          to offer all six. Repeats are kept, so six
+##                          lucky_block entries spawn six blocks
+##   BONK_LUCKY_REWARD=a,b  queue of reward ids successive lucky blocks
+##                          pay instead of rolling (the last entry
+##                          repeats). Six blocks plus the six ids execute
+##                          every LUCKY_REWARDS branch in one soak
 ##   BONK_POINTS=<n>        grants slot 0 that many run points at start, so
 ##                          a vendor soak can actually afford the shelf
 ##   BONK_WEATHER_NOW=<id>  forces that weather at 30 s (the director's own
@@ -56,6 +78,8 @@ extends Node
 ## fail. See the two blocks of constants below.
 
 const DEFAULT_ARENA := "res://scenes/world/HollowWoods.tscn"
+## Save file when BONK_SAVE_PATH is not set. Never the player's ledger.
+const DEFAULT_SAVE_PATH := "user://soak_save.json"
 ## The one scene a run boots into since iteration 49. BONK_ARENA no longer
 ## names the scene to instance — it names the BIOME to soak, which becomes
 ## GameConfig.start_map_id and therefore stage 1.
@@ -106,6 +130,87 @@ const INTERACT_INTERVAL: float = 0.75
 ## blocking UI wedged the soak — worth a log line, since a wedged run looks
 ## exactly like a clean one in the frame counter.
 const PAUSE_WEDGE_WARN: float = 20.0
+
+## --- co-op (iteration 57) ---------------------------------------------------
+## Slots 1+ FOLLOW the leader on a SHORT leash. Both numbers are set by
+## REVIVE_NOTICE_RANGE below, not by taste: the leader only notices a
+## downed body within 6 m, so a follower that trails further than that
+## goes down out of sight and its corpse is orphaned for the rest of the
+## soak. Measured with a 4 m leash and 6 m wander legs: the single forced
+## down at 45 s was never rescued and the soak reported zero revives.
+## They never target an interactable — one raider touring is what every
+## existing gate was calibrated against.
+const FOLLOW_DISTANCE: float = 2.5
+## A follower with nothing to chase takes short random legs instead of
+## standing still, so its own movement code (and the horde's interest in
+## it) still runs. Short enough to stay inside the notice range.
+const FOLLOW_LEG_TIME: float = 3.0
+const FOLLOW_LEG_RANGE: float = 3.0
+## How close the leader gets to a downed body before it holds interact.
+## Player.revive_radius is 3.0; this leaves room for the arrival test.
+const REVIVE_APPROACH: float = 2.0
+## A downed body this close makes the rescue outrank EVERYTHING, the exit
+## rush included: a party that walks out on its own corpse is not a party.
+const REVIVE_NOTICE_RANGE: float = 6.0
+## BONK_DOWN_NOW: after the first forced down, another one every this
+## often, so one soak exercises the path more than once.
+const DOWN_NOW_PERIOD: float = 60.0
+## HP the FOLLOWERS get under BONK_GODMODE. Not the leader's ten million:
+## a follower that cannot go down makes BONK_DOWN_NOW prove nothing and
+## the revive gate untestable. But a follower on base HP is a punching
+## bag — the co-op horde scales +50% HP and +30% spawn rate per extra
+## raider, and the follower walks into it without touring: measured, 33
+## downs in one 360 s soak, one every ten seconds. The rescue rule
+## outranks even the exit rush by design, so the leader spent the whole
+## soak on its teammate's corpse and the party never crossed a stage —
+## the gate failed on a harness artefact, not on a game bug. This pool
+## survives ordinary contact for about a minute and still dies instantly
+## to BONK_DOWN_NOW, which hits for twice max_hp.
+const FOLLOWER_GODMODE_HP: float = 2000.0
+## Seconds the leader will spend on ONE rescue before giving up on that
+## body and going back to the tour. Ten times Player.revive_time, so it
+## can only fire when the rescue is genuinely impossible — a corpse behind
+## a rock, or one that keeps being knocked out of reach. Without it a
+## single unreachable body pins the whole tour for the rest of the soak
+## and the stage never gets crossed, which is a harness failure wearing a
+## game failure's clothes.
+const RESCUE_TIMEOUT: float = 30.0
+## ...and it is left alone for this long afterwards, so the tour actually
+## gets somewhere instead of turning round the moment it steps away.
+const RESCUE_COOLDOWN: float = 45.0
+
+var _players: int = 1
+var _down_now_at: float = -1.0
+var _down_next: float = 0.0
+var _party_downs: int = 0
+var _party_revives: int = 0
+## Last pet reading taken while the run was alive (see _party_pets_text).
+var _party_pets_seen: String = "none"
+## instance ids currently in "downed_players", so a transition is counted
+## once instead of every frame.
+var _down_seen: Dictionary[int, bool] = {}
+## Follower state, per slot: seconds left on its random leg and where it
+## is heading.
+var _follow_left: Dictionary[int, float] = {}
+var _follow_to: Dictionary[int, Vector3] = {}
+## The downed body the leader is currently rescuing, or null.
+var _rescue_target: Node3D = null
+## Seconds spent on the current rescue (see RESCUE_TIMEOUT).
+var _rescue_time: float = 0.0
+## instance id -> run_time when a rescue of that body was abandoned.
+var _rescue_given_up: Dictionary[int, float] = {}
+## Actions held per slot, so a release goes to the right action set.
+var _held: Dictionary[String, bool] = {}
+
+## --- run end (iteration 57) -------------------------------------------------
+## A mortal soak ends at death BY DESIGN: RunManager pauses the tree and
+## RunEndScreen has no headless self-play, so without this the probe would
+## sit in its own WEDGE warning until the frame budget ran out. Two frames
+## after "Meta saved:" (which RunManager prints immediately before it
+## emits run_ended) is late enough for the fold's own logs to land.
+const RUN_END_QUIT_FRAMES: int = 2
+var _run_end_left: int = -1
+var _run_ended_at: float = -1.0
 
 var _frames: int = 0
 var _walking: bool = true
@@ -358,9 +463,16 @@ var _blocked_reported: bool = false
 
 func _ready() -> void:
 	# Never fold a soak into the real save: re-point SaveData at a scratch
-	# file (fresh defaults) before the arena boots.
-	SaveData.save_path = "user://soak_save.json"
+	# file (fresh defaults) before the arena boots. BONK_SAVE_PATH wins
+	# when it is set (iteration 57), so tools/verificar.sh can hand every
+	# soak its OWN fresh file — the shared user://soak_save.json carried
+	# the bestiary and used-weapon counters one soak credited into the
+	# next one, which is a difference between runs nobody asked for.
+	var save_override := OS.get_environment(SaveData.SAVE_PATH_ENV)
+	SaveData.save_path = save_override if not save_override.is_empty() \
+			else DEFAULT_SAVE_PATH
 	SaveData.load_from_disk()
+	print("ArenaProbe: save=%s" % SaveData.save_path)
 	# BONK_CHARACTER=<id> picks the raider (default: the config's choice).
 	# An unknown id is an ERROR, not a shrug: a soak meant to exercise one
 	# raider silently running the default one reports a green run about
@@ -391,7 +503,18 @@ func _ready() -> void:
 	if not weapon_id.is_empty():
 		Player.starting_weapon_override = weapon_id
 		print("ArenaProbe: weapon=%s" % weapon_id)
+	# BEFORE the run is instantiated, for the same reason as the weapon:
+	# RunSystems._spawn_party reads Coop.player_count inside its own
+	# _ready, so a party configured after this line is a solo run.
+	_configure_party()
 	add_child(scene.instantiate())
+	# Mortal soaks end at death (iteration 57): RunManager pauses the tree
+	# and the run-end screen has no headless self-play, so without this
+	# the probe would sit in its own WEDGE warning for the rest of its
+	# frame budget. Through the group, like every other cross-scene reach.
+	var manager := get_tree().get_first_node_in_group("run_manager")
+	if manager != null and manager.has_signal("run_ended"):
+		manager.connect("run_ended", _on_run_ended)
 	_walking = OS.get_environment("BONK_WALK") != "0"
 	_debug = OS.get_environment("BONK_PROBE_DEBUG") == "1"
 	var seed_text := OS.get_environment("BONK_SEED")
@@ -429,7 +552,22 @@ func _ready() -> void:
 	var points_text := OS.get_environment("BONK_POINTS")
 	if points_text.is_valid_int():
 		_grant_points.call_deferred(int(points_text))
+	var down_text := OS.get_environment("BONK_DOWN_NOW")
+	if down_text.is_valid_float():
+		_down_now_at = maxf(down_text.to_float(), 0.0)
+		_down_next = _down_now_at
+	var lucky_list := OS.get_environment("BONK_LUCKY_REWARD")
+	if not lucky_list.is_empty():
+		var wanted: Array[String] = []
+		for entry: String in lucky_list.split(",", false):
+			wanted.append(entry.strip_edges())
+		LuckyBlock.force_rewards(wanted)
+		print("ArenaProbe: lucky rewards %s" % ", ".join(wanted))
 	print("ArenaProbe: arena=%s walk=%s" % [path.get_file(), _walking])
+	# Counted off the GROUPS, not off the switch: the number that matters
+	# is how many raiders RunSystems actually spawned, and a party that
+	# quietly came up one short is exactly what this line exists to show.
+	_report_party.call_deferred()
 
 
 ## Stage bookkeeping the tour needs: the dwell that lets the
@@ -492,13 +630,110 @@ func _apply_elite_boost() -> void:
 	print("ArenaProbe: elite boost on")
 
 
+## The leader gets the ten-million pool; the followers get
+## FOLLOWER_GODMODE_HP, which is a pool they can still be knocked out of.
+## Godmoding the whole party would make BONK_DOWN_NOW unable to land and
+## the down/revive path — the one co-op rule no solo soak can reach —
+## impossible to exercise. The leader stays immortal because a dead leader
+## ends the tour.
 func _apply_godmode() -> void:
-	for node: Node in get_tree().get_nodes_in_group("player"):
-		var health := Health.find_in(node)
-		if health != null:
-			health.max_hp = 10000000.0
-			health.heal_full()
-	print("ArenaProbe: godmode on")
+	for body: Node3D in _party_bodies():
+		var health := Health.find_in(body)
+		if health == null:
+			continue
+		var leader := int(body.get("player_index")) == 0
+		health.max_hp = 10000000.0 if leader else FOLLOWER_GODMODE_HP
+		health.heal_full()
+	print("ArenaProbe: godmode on (slot 0 immortal, followers %.0f hp)"
+			% FOLLOWER_GODMODE_HP)
+
+
+## BONK_PLAYERS: freezes the party into Coop BEFORE Run.tscn is
+## instanced. Every slot is on the keyboard device: a soak has no pads,
+## and Coop._rebuild_slot_actions duplicates the keyboard events per slot,
+## so p0_* and p1_* end up as separate action sets bound to the same keys
+## — which is exactly what the probe needs, since it synthesizes actions
+## by name instead of pressing anything.
+func _configure_party() -> void:
+	var count_text := OS.get_environment("BONK_PLAYERS")
+	if not count_text.is_valid_int():
+		return
+	_players = clampi(int(count_text), 1, Coop.MAX_PLAYERS)
+	if _players <= 1:
+		return
+	var slot0 := GameConfig.selected_character_id
+	var characters: Array[String] = [slot0]
+	var second := OS.get_environment("BONK_CHARACTER2")
+	if not second.is_empty() and CharacterCatalog.by_id(second).is_empty():
+		push_error("ArenaProbe: unknown BONK_CHARACTER2 '%s'" % second)
+		second = ""
+	if second.is_empty():
+		second = _next_character_id(slot0)
+	characters.append(second)
+	# Slots 2 and 3 (unused by verificar.sh today, but the switch takes
+	# 1-4) keep walking the catalog so no two slots share a raider.
+	while characters.size() < _players:
+		characters.append(_next_character_id(characters[characters.size() - 1]))
+	var devices: Array[int] = []
+	for i in _players:
+		devices.append(Coop.KEYBOARD_DEVICE)
+	Coop.configure(_players, devices, characters)
+
+
+## The catalog row after `character_id`, wrapping. Deliberately not a
+## random pick: a soak that changes raiders between runs changes what it
+## is measuring.
+func _next_character_id(character_id: String) -> String:
+	var rows := CharacterCatalog.CHARACTER_LIBRARY
+	for i in rows.size():
+		if String(rows[i].id) == character_id:
+			return String(rows[(i + 1) % rows.size()].id)
+	return String(rows[0].id)
+
+
+## Party size read off the GROUPS after RunSystems._spawn_party has run,
+## never off the switch: a party that came up one short (a slot that
+## failed to spawn, a raider that died on frame one) is exactly what this
+## line exists to show, and the switch would report the wish.
+func _report_party() -> void:
+	var bodies := _party_bodies()
+	var slot1 := "none"
+	if _body_in_slot(1) != null:
+		# Player keeps no id of its own; Coop is where the slot's raider
+		# was decided, and reading it back proves the party was configured
+		# before RunSystems spawned it.
+		slot1 = Coop.character_for_slot(1)
+	print("ArenaProbe: players=%d slot1=%s" % [bodies.size(), slot1])
+
+
+## Every raider, standing or downed, sorted by slot.
+func _party_bodies() -> Array[Node3D]:
+	var bodies: Array[Node3D] = []
+	for group: StringName in [&"player", &"downed_players"]:
+		for node: Node in get_tree().get_nodes_in_group(group):
+			var body := node as Node3D
+			if body != null and body.is_inside_tree():
+				bodies.append(body)
+	bodies.sort_custom(func(a: Node3D, b: Node3D) -> bool:
+		return int(a.get("player_index")) < int(b.get("player_index")))
+	return bodies
+
+
+## The raider in a given slot, standing or downed, or null.
+func _body_in_slot(slot: int) -> Node3D:
+	for body: Node3D in _party_bodies():
+		if int(body.get("player_index")) == slot:
+			return body
+	return null
+
+
+## RunManager.run_ended: a mortal soak is FINISHED here. Quitting a beat
+## later lets the fold's own lines ("Run ended:", "Run stages:",
+## "Meta saved:") land in the log first.
+func _on_run_ended(victory: bool) -> void:
+	_run_ended_at = RunState.run_time
+	_run_end_left = RUN_END_QUIT_FRAMES
+	print("Probe: run ended victory=%s" % victory)
 
 
 ## Printed once, on the way out: a summary the soak script can read.
@@ -511,6 +746,10 @@ func _exit_tree() -> void:
 	# lives on Health, so a soak that never got hit reports 0 and the
 	# acceptance check fails, which is the point.
 	print("Immortal blocked: %d" % _blocked_hits_seen)
+	# Co-op accounting. Zero/zero in a solo soak, which is the honest
+	# reading: nothing went down and nothing was stood up.
+	print("Party: downs=%d revives=%d" % [_party_downs, _party_revives])
+	print("Party pets: %s" % _party_pets_seen)
 	# Skipped under BONK_STAGE_FAST: that soak resets the fog every minute
 	# when it crosses a stage, so its coverage says nothing about the walk.
 	# Skipped under BONK_POWERUP_NOW for the same reason: that switch holds
@@ -520,13 +759,40 @@ func _exit_tree() -> void:
 	# 107 live bodies at 360 s). Coverage there measures the switch, not the
 	# walk. The gate keeps its full force where it was calibrated: every
 	# soak tools/verificar.sh runs, none of which sets either switch.
-	if not _stage_fast and _powerup_now.is_empty() and explored < FOG_MIN_EXPLORED:
+	# Third exemption, and a SEMANTIC one rather than a switch (iteration
+	# 57): a finished run cannot explore. A mortal soak ends at the
+	# raider's death, so the fraction it reached says how long it lived,
+	# not how well the tour walks. The skip is never silent — the line
+	# below is what says so, and tools/verificar.sh fails any GODMODE soak
+	# that prints it, because a godmoded run has no business ending.
+	if _run_ended_at >= 0.0:
+		print("Probe fog: skipped (run ended at %.1fs)" % _run_ended_at)
+	elif not _stage_fast and _powerup_now.is_empty() and explored < FOG_MIN_EXPLORED:
 		push_warning("ArenaProbe: fog barely explored — %.2f < %.2f"
 				% [explored, FOG_MIN_EXPLORED])
 
 
 
+## One field per slot: the companion each raider is carrying. Sampled
+## WHILE THE RUN IS ALIVE, like the fog fraction, because _exit_tree runs
+## during teardown when the raiders are already gone (the first version
+## of this line reported "none" for a party that had two pets).
+## The vendor and the pet box both hand a pet to whoever paid, and in
+## co-op that is the only way to see the payout landed on the buyer.
+func _party_pets_text() -> String:
+	var text := ""
+	for body: Node3D in _party_bodies():
+		var pet: Variant = body.get("pet_id")
+		var id := String(pet) if pet != null else ""
+		text += "p%d=%s " % [int(body.get("player_index")),
+				id if not id.is_empty() else "none"]
+	return text.strip_edges() if not text.is_empty() else "none"
+
+
 func _sample_blocked_hits() -> void:
+	var pets := _party_pets_text()
+	if pets != "none":
+		_party_pets_seen = pets
 	var lead := _lead_player()
 	if lead == null:
 		return
@@ -555,7 +821,7 @@ func _tick_map_overlay(delta: float) -> void:
 		_map_overlay_close_left -= delta
 		if _map_overlay_close_left <= 0.0:
 			_map_overlay_open = false
-			_send_action(&"map_overlay", true)
+			_send_action(0, &"map_overlay", true)
 			_release_map_overlay.call_deferred()
 			print("Map overlay: closed")
 		return
@@ -566,12 +832,12 @@ func _tick_map_overlay(delta: float) -> void:
 	_map_overlay_open = true
 	_map_overlay_close_left = MAP_OVERLAY_HOLD
 	_map_overlay_report_left = MAP_OVERLAY_REPORT_DELAY
-	_send_action(&"map_overlay", true)
+	_send_action(0, &"map_overlay", true)
 	_release_map_overlay.call_deferred()
 
 
 func _release_map_overlay() -> void:
-	_send_action(&"map_overlay", false)
+	_send_action(0, &"map_overlay", false)
 
 
 ## Marker count of slot 0's overlay, MAP_OVERLAY_REPORT_DELAY after the
@@ -589,11 +855,19 @@ func _report_map_markers() -> void:
 
 func _physics_process(delta: float) -> void:
 	_frames += 1
+	# A mortal soak is over the moment RunManager says so; the countdown
+	# only exists so the fold's own log lines land before the quit.
+	if _run_end_left >= 0:
+		_run_end_left -= 1
+		if _run_end_left < 0:
+			get_tree().quit(0)
+			return
 	if not _swept and _frames >= _sweep_at_frame:
 		_swept = true
 		_run_mask_sweep()
 	_tick_stage_flow(delta)
 	_tick_map_overlay(delta)
+	_tick_party(delta)
 	_tick_powerup_switches()
 	_tick_item_now(delta)
 	_tick_zenkai_test(delta)
@@ -666,7 +940,7 @@ func _tick_flight_hold() -> void:
 	if want_hold == _flight_holding:
 		return
 	_flight_holding = want_hold
-	_send_action(&"jump", want_hold)
+	_send_action(0, &"jump", want_hold)
 
 
 ## BONK_ITEM_NOW: grants the listed items once, then keeps the tour
@@ -698,12 +972,12 @@ func _tick_item_now(delta: float) -> void:
 		if _dash_left <= 0.0:
 			_dash_holding = false
 			_dash_left = ITEM_DASH_PERIOD
-			_send_action(&"sprint", false)
+			_send_action(0, &"sprint", false)
 		return
 	if _dash_left <= 0.0:
 		_dash_holding = true
 		_dash_left = ITEM_DASH_HOLD
-		_send_action(&"sprint", true)
+		_send_action(0, &"sprint", true)
 
 
 ## BONK_ZENKAI_TEST: hit the raider down to 5% of max HP, shield it for a
@@ -755,6 +1029,11 @@ func _watch_weather_end() -> void:
 		return
 	if not _weather_seen.is_empty():
 		_report_hud_offset()
+		# Golden rain is the one row that writes a POINTS SOURCE on every
+		# raider and a run-wide price discount; both have to be back to
+		# 1.00 the frame it clears, on the downed raider too.
+		if _weather_seen == "golden_rain":
+			_report_points_sources()
 	_weather_seen = now
 
 
@@ -762,6 +1041,19 @@ func _watch_weather_end() -> void:
 ## at every "Weather ended:" so a soak can prove it, and printed even when
 ## the weather was not the quake: a non-zero offset after ANY weather is a
 ## leak, and only checking after the quake would miss it.
+## The party's points multipliers, one field per slot. Printed when a
+## points-writing weather clears: a source left behind is invisible in
+## every other log, and pays the wrong number for the rest of the run.
+func _report_points_sources() -> void:
+	var line := "Points sources:"
+	for body: Node3D in _party_bodies():
+		var factor: Variant = body.call("points_multiplier") \
+				if body.has_method("points_multiplier") else null
+		line += " p%d=%.2f" % [int(body.get("player_index")),
+				float(factor) if factor != null else -1.0]
+	print(line)
+
+
 func _report_hud_offset() -> void:
 	for node: Node in get_tree().get_nodes_in_group("hud"):
 		var hud := node as CanvasLayer
@@ -883,9 +1175,16 @@ func _on_lead_damaged(_amount: float, _current: float) -> void:
 		_freeze_damage_events += 1
 
 
+## The LEADER is the body with player_index 0, never "the first node in
+## the group" (iteration 57): with two raiders the group order is spawn
+## order, and every helper that steers, godmodes or reads "the raider"
+## would silently follow whoever happened to be first.
 func _lead_player() -> Node3D:
-	var players := get_tree().get_nodes_in_group("player")
-	return players[0] as Node3D if not players.is_empty() else null
+	for node: Node in get_tree().get_nodes_in_group("player"):
+		var body := node as Node3D
+		if body != null and int(body.get("player_index")) == 0:
+			return body
+	return null
 
 
 ## One pass over the live horde: bodies that have been rising off the floor
@@ -1088,10 +1387,7 @@ func _raider_rids() -> Array[RID]:
 
 
 func _lead_raider() -> CharacterBody3D:
-	var players := get_tree().get_nodes_in_group("player")
-	if players.is_empty():
-		return null
-	var lead := players[0] as CharacterBody3D
+	var lead := _lead_player() as CharacterBody3D
 	if lead == null or not lead.is_inside_tree():
 		return null
 	return lead
@@ -1132,13 +1428,15 @@ func _flat(at: Vector3) -> Vector2:
 ## anything. Pressing the actions also means the soak exercises the real
 ## input path (slide, sprint gating, free-orbit basis) instead of bypassing it.
 func _drive_walk(delta: float) -> void:
-	var players := get_tree().get_nodes_in_group("player")
-	if players.is_empty():
+	var lead := _lead_raider()
+	if lead == null:
 		_release_move()
+		_release_holds()
 		return
-	var lead := players[0] as CharacterBody3D
-	if lead == null or not lead.is_inside_tree():
-		_release_move()
+	# A downed teammate within REVIVE_NOTICE_RANGE outranks the current
+	# target, the linger and the exit rush: the party leaves together or
+	# the co-op rule this soak exists to prove never runs.
+	if _drive_rescue(lead, delta):
 		return
 	if _linger_left > 0.0:
 		_linger_left -= delta
@@ -1195,20 +1493,20 @@ func _unstick(lead: CharacterBody3D, delta: float) -> void:
 ## Converts a world-space heading into held move actions. Player builds its
 ## wish direction as `transform.basis * Vector3(input.x, 0, input.y)`, so the
 ## heading has to come back through the body's own basis.
-func _hold_move_toward(body: CharacterBody3D, to: Vector3) -> void:
+func _hold_move_toward(body: CharacterBody3D, to: Vector3, slot: int = 0) -> void:
 	var heading := to - body.global_position
 	heading.y = 0.0
 	if heading.length_squared() < 0.01:
-		_release_move()
+		_release_move(slot)
 		return
 	var local := body.transform.basis.inverse() * heading.normalized()
-	_hold_axis(&"move_right", &"move_left", local.x)
-	_hold_axis(&"move_back", &"move_forward", local.z)
+	_hold_axis(slot, &"move_right", &"move_left", local.x)
+	_hold_axis(slot, &"move_back", &"move_forward", local.z)
 
 
-func _hold_axis(positive: StringName, negative: StringName, amount: float) -> void:
-	var forward := Coop.action(0, positive)
-	var backward := Coop.action(0, negative)
+func _hold_axis(slot: int, positive: StringName, negative: StringName, amount: float) -> void:
+	var forward := Coop.action(slot, positive)
+	var backward := Coop.action(slot, negative)
 	if amount >= 0.0:
 		Input.action_press(forward, absf(amount))
 		Input.action_release(backward)
@@ -1217,9 +1515,9 @@ func _hold_axis(positive: StringName, negative: StringName, amount: float) -> vo
 		Input.action_release(forward)
 
 
-func _release_move() -> void:
+func _release_move(slot: int = 0) -> void:
 	for base: StringName in [&"move_left", &"move_right", &"move_forward", &"move_back"]:
-		Input.action_release(Coop.action(0, base))
+		Input.action_release(Coop.action(slot, base))
 
 
 ## Synthesizes a real "interact" press so shrines, chests, portals and
@@ -1244,17 +1542,56 @@ func _release_interact() -> void:
 
 
 func _send_interact(pressed: bool) -> void:
-	_send_action(&"interact", pressed)
+	_send_action(0, &"interact", pressed)
 
 
-## One synthesized action press for slot 0. A PARSED InputEventAction, not
-## Input.action_press: an _unhandled_input handler only ever sees the
-## parsed kind, and Input.is_action_just_pressed sees both.
-func _send_action(base: StringName, pressed: bool) -> void:
+## One synthesized action press for a SLOT (iteration 57). A PARSED
+## InputEventAction, not Input.action_press: an _unhandled_input handler
+## only ever sees the parsed kind, and Input.is_action_just_pressed sees
+## both. In co-op the slot decides the action SET (p0_* vs p1_*), which
+## is what makes a revive work: Player._tick_downed polls the RESCUER's
+## own interact action, so a press sent as slot 0 can never revive
+## anybody if slot 1 is the one standing next to the body.
+func _send_action(slot: int, base: StringName, pressed: bool) -> void:
 	var event := InputEventAction.new()
-	event.action = Coop.action(0, base)
+	event.action = Coop.action(slot, base)
 	event.pressed = pressed
 	Input.parse_input_event(event)
+
+
+## HOLD mode: keeps an action pressed across frames until it is released.
+## A revive needs Player.revive_time (3 s) of CONTINUOUS hold, which the
+## press/release-next-frame pattern can never produce.
+##
+## Re-ASSERTED every frame against the real Input state, not cached as a
+## bool: the tour's own interact tap queues its release with
+## call_deferred, and that release can land AFTER a hold started on the
+## same frame. Trusting a cached flag there left the leader "holding" an
+## action that was already up — the raider stood over its downed teammate
+## for the rest of the soak while the revive bar decayed, which is a
+## harness livelock that reads exactly like a game bug.
+func _hold_action(slot: int, base: StringName, held: bool) -> void:
+	var key := "%d/%s" % [slot, base]
+	if held:
+		_held[key] = true
+		if not Input.is_action_pressed(Coop.action(slot, base)):
+			_send_action(slot, base, true)
+		return
+	if not bool(_held.get(key, false)):
+		return
+	_held[key] = false
+	_send_action(slot, base, false)
+
+
+## Drops every held action. Called when the thing being held goes away,
+## so a hold cannot outlive its reason.
+func _release_holds() -> void:
+	for key: String in _held.keys():
+		if not bool(_held[key]):
+			continue
+		var parts := key.split("/", false)
+		_send_action(int(parts[0]), StringName(parts[1]), false)
+	_held.clear()
 
 
 ## Next destination: the nearest still-available Interactable that this tour
@@ -1296,6 +1633,155 @@ func _pick_waypoint(from: Vector3) -> void:
 				return
 	var half := FALLBACK_HALF_EXTENT
 	_waypoint = Vector3(_rng.randf_range(-half, half), from.y, _rng.randf_range(-half, half))
+
+
+## --- co-op party (iteration 57) ---------------------------------------------
+
+## Everything the extra slots need, once per physics frame: the forced
+## down, the followers' own walking, and the down/revive bookkeeping the
+## soak reports at the end.
+func _tick_party(delta: float) -> void:
+	_watch_party_downs()
+	if _players <= 1:
+		return
+	_tick_forced_down()
+	_tick_followers(delta)
+
+
+## BONK_DOWN_NOW: a lethal hit on slot 1, on a cadence. Left to chance, a
+## down needs the horde to single out the follower, which a soak cannot
+## be asked to wait for — and without a down there is no revive to prove.
+## Slot 1 is mortal precisely because _apply_godmode only covers slot 0.
+func _tick_forced_down() -> void:
+	if _down_now_at < 0.0 or RunState.run_time < _down_next:
+		return
+	_down_next = RunState.run_time + DOWN_NOW_PERIOD
+	var body := _body_in_slot(1)
+	if body == null or body.is_in_group(&"downed_players"):
+		return
+	var health := Health.find_in(body)
+	if health == null or health.is_dead:
+		return
+	# Invulnerability off for the blow itself, the same way the zenkai
+	# test does it: a refused hit never reaches _on_health_died.
+	health.invulnerable = false
+	health.take_damage(health.max_hp * 2.0)
+	print("ArenaProbe: forced down p1 at %.1fs" % RunState.run_time)
+
+
+## Slots 1+ FOLLOW and never interact. Two raiders both touring would
+## double the interaction counts every existing gate in verificar.sh was
+## calibrated against, and the point of the co-op soak is the co-op RULES
+## (party spawn, split screen, shared XP, downs, revives), not a second
+## tour.
+func _tick_followers(delta: float) -> void:
+	var lead := _lead_raider()
+	for slot: int in range(1, _players):
+		var body := _body_in_slot(slot) as CharacterBody3D
+		if body == null or not body.is_inside_tree() \
+				or body.is_in_group(&"downed_players"):
+			_release_move(slot)
+			continue
+		if lead != null and _flat(body.global_position) \
+				.distance_to(_flat(lead.global_position)) > FOLLOW_DISTANCE:
+			_follow_left[slot] = 0.0
+			_hold_move_toward(body, lead.global_position, slot)
+			continue
+		# Close enough: short random legs, so the follower is not a statue
+		# parked on the leader's head. Its own movement code, the horde's
+		# interest in it and the split-screen view all keep running.
+		var left := float(_follow_left.get(slot, 0.0)) - delta
+		if left <= 0.0:
+			left = FOLLOW_LEG_TIME
+			var angle := _rng.randf() * TAU
+			_follow_to[slot] = body.global_position \
+					+ Vector3(cos(angle), 0.0, sin(angle)) * FOLLOW_LEG_RANGE
+		_follow_left[slot] = left
+		_hold_move_toward(body,
+				_follow_to.get(slot, body.global_position) as Vector3, slot)
+
+
+## Counts the transitions in and out of "downed_players". A revive is
+## only counted when the body came BACK to the party: a corpse that left
+## the group because the run ended is not a rescue.
+func _watch_party_downs() -> void:
+	var live: Dictionary[int, bool] = {}
+	for node: Node in get_tree().get_nodes_in_group(&"downed_players"):
+		var id := node.get_instance_id()
+		live[id] = true
+		if not _down_seen.has(id):
+			_down_seen[id] = true
+			_party_downs += 1
+	for id: int in _down_seen.keys():
+		if live.has(id):
+			continue
+		_down_seen.erase(id)
+		var body := instance_from_id(id) as Node
+		if body != null and is_instance_valid(body) and body.is_in_group(&"player"):
+			_party_revives += 1
+
+
+## The downed body the leader should go stand up, or null. Deliberately
+## short-ranged: a rescue that crossed the map would replace the tour.
+func _nearest_downed(from: Vector3) -> Node3D:
+	var best: Node3D = null
+	var best_distance := REVIVE_NOTICE_RANGE * REVIVE_NOTICE_RANGE
+	var flat_from := _flat(from)
+	for node: Node in get_tree().get_nodes_in_group(&"downed_players"):
+		var body := node as Node3D
+		if body == null or not body.is_inside_tree():
+			continue
+		var gave_up: float = _rescue_given_up.get(body.get_instance_id(), -INF)
+		if RunState.run_time - gave_up < RESCUE_COOLDOWN:
+			continue
+		var distance := flat_from.distance_squared_to(_flat(body.global_position))
+		if distance < best_distance:
+			best_distance = distance
+			best = body
+	return best
+
+
+## THE rule that outranks everything, _exit_rush included: a party does
+## not walk out on its own corpse. Returns true while it owns the walk.
+## The hold is what matters — Player._tick_downed wants revive_time
+## seconds of CONTINUOUS interact from the RESCUER's own action set, which
+## a press-and-release-next-frame can never produce.
+func _drive_rescue(lead: CharacterBody3D, delta: float) -> bool:
+	var body := _nearest_downed(lead.global_position)
+	if body == null:
+		if _rescue_target != null:
+			_rescue_target = null
+			_hold_action(0, &"interact", false)
+			_pick_waypoint(lead.global_position)
+		return false
+	if body != _rescue_target:
+		_rescue_target = body
+		_rescue_time = 0.0
+		# Drop whatever the tour was doing, the way the exit rush does.
+		_target = null
+		_linger_left = 0.0
+		_leg_time_left = LEG_TIMEOUT
+		if _debug:
+			print("ArenaProbe: rescuing %s at %.1fm" % [body.name,
+					_flat(lead.global_position).distance_to(_flat(body.global_position))])
+	_rescue_time += delta
+	if _rescue_time >= RESCUE_TIMEOUT:
+		_rescue_given_up[body.get_instance_id()] = RunState.run_time
+		_rescue_target = null
+		_hold_action(0, &"interact", false)
+		push_warning("ArenaProbe: gave up rescuing %s after %.0fs"
+				% [body.name, _rescue_time])
+		_pick_waypoint(lead.global_position)
+		return false
+	if _flat(lead.global_position).distance_to(_flat(body.global_position)) \
+			> REVIVE_APPROACH:
+		_hold_action(0, &"interact", false)
+		_hold_move_toward(lead, body.global_position)
+		_unstick(lead, delta)
+		return true
+	_release_move()
+	_hold_action(0, &"interact", true)
+	return true
 
 
 ## Nearest live power-up pickup within PICKUP_DETOUR of `from`, or null.

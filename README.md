@@ -139,16 +139,24 @@ Los archivos clave para tocar contenido son los **catálogos** en `scripts/syste
 
 ## Verificación
 
-**El comando por defecto tras cualquier cambio** es el script de verificación: hace el import, un soak de las **tres** arenas y un **cuarto soak de etapa** que cruza de mapa, y falla si alguno ensucia el log, se cuelga, no ejercita nada o pierde progreso al cruzar. Tarda ~32 minutos.
+**El comando por defecto tras cualquier cambio** es el script de verificación: hace el import, el **lint de catálogos**, el **harness de UI**, un soak de las **tres** arenas, un **cuarto soak de etapa** que cruza de mapa y un **quinto soak de co-op** con dos raiders, y falla si alguno ensucia el log, se cuelga, no ejercita nada, pierde progreso al cruzar o no reanima a nadie. Tarda entre ~16 y ~75 minutos según cuánto crezca la horda.
 
 ```sh
 tools/verificar.sh            # 360 s de partida por arena (el modo estándar)
 tools/verificar.sh 720        # corrida larga, para cambios de ritmo tardío
 ```
 
-**Nunca con menos de 360 s**: por debajo, la puerta de cobertura de interactuables se salta en silencio y el script imprime OK sin haber exigido nada. La corrida completa tarda ~32 minutos (3 × 360 s + 1 × 720 s + import).
+**Nunca con menos de 360 s**: por debajo, la puerta de cobertura de interactuables se salta en silencio y el script imprime OK sin haber exigido nada. La corrida completa (3 × 360 s + 1 × 720 s + 1 × 360 s de co-op + lint + harness de UI + import) tarda **entre ~16 y ~75 minutos**: el reloj lo manda el tamaño de la horda y no el número de frames — medido en dos corridas de la misma cabeza y las mismas semillas, 16 min y 75 min, con el soak de co-op moviéndose entre 78 s y 32 min. El script imprime los segundos de cada fase y el total.
 
-Falla (exit 1) si el import o un soak imprimen errores/warnings de Godot, si una arena no llega al final de su soak, si no alcanza la cobertura mínima (el raider tiene que pasar de nivel 3; en corridas de ≥240 s tiene que abrir un cofre, cargar un altar o usar un portal), o si el soak de etapa no abre su portal, no cruza a las Dunas de Ceniza, deja algo vivo al cruzar, pierde progreso o no vuelve a producir un evento de cielo en el mapa nuevo. Los logs quedan en `$TMPDIR/bonkraiders-verify/` y cada arena imprime su resumen `nivel=… cofres=… altares=… portales=…`.
+Falla (exit 1) si el import, el lint, el harness de UI o un soak imprimen errores/warnings de Godot, si una arena no llega al final de su soak, si no alcanza la cobertura mínima (el raider tiene que pasar de nivel 3; en corridas de ≥240 s tiene que abrir un cofre, cargar un altar o usar un portal), si un soak **godmode** termina su partida sola, o si el soak de etapa no abre su portal, no cruza a las Dunas de Ceniza, deja algo vivo al cruzar, pierde progreso o no vuelve a producir un evento de cielo en el mapa nuevo. Los logs quedan en `$TMPDIR/bonkraiders-verify/` y cada arena imprime su resumen `nivel=… cofres=… altares=… portales=…`.
+
+Las dos piezas nuevas de la iteración 57 y el quinto soak:
+
+- **Lint de catálogos** (`scenes/tests/CatalogLint.tscn`): las referencias cruzadas que ningún soak puede comprobar, porque una rota no revienta — simplemente no hace nada. Nueve comprobaciones (`ids_unique`, `glyphs_unique`, `paths_exist`, `stat_ids`, `character_weapons`, `director_methods`, `weapon_properties`, `vendor_lucky_roulette_ids`, `marker_labels`), cada una con su línea `Catalog lint: check <nombre> ok rows=N`. `rows` es lo que se inspeccionó de verdad: **cero filas es un fallo**, porque una comprobación que recorre una lista vacía pasa por el motivo equivocado.
+- **Harness de UI** (`scenes/tests/UiProbe.tscn`): siete de las nueve escenas de UI no las arrancaba nada. Trece pasos que pulsan los **controles reales** (Colección, Misiones, Armería, el rechazo de la fila de co-op, el desbloqueo de un raider con su carta de confirmación, todas las cartas, iniciar la incursión, abrir y cerrar la pausa, Ajustes con «Mostrar FPS», extraerse y reintentar), cada uno con su `UiProbe: step <nombre> ok`. Un control que falta, una precondición rechazada o una pausa que no se suelta es un `push_error`.
+- **Soak de co-op**: dos raiders (`BONK_PLAYERS=2`), el slot 1 **mortal** a propósito (godmode cubre solo al slot 0) y derribado a los 45 s con `BONK_DOWN_NOW`, para que el ciclo derribo/reanimación —lo único que ningún soak en solitario puede alcanzar— se ejercite de verdad. Exige `ArenaProbe: players=2`, un cruce de etapa, barridos limpios y al menos un `Player revived:`.
+
+**Guardado por corrida**: cada soak y cada harness recibe su propio `BONK_SAVE_PATH`, borrado con sus hermanos `.bak` y `.tmp` antes de arrancar. Antes todos compartían `user://soak_save.json`: los soaks godmode no doblan meta (nunca terminan la partida), pero sí acumulan los contadores que `SaveData.bump` acredita durante la corrida (bestiario `kills_<script>`, `used_weapon_<id>`), y cualquier corrida mortal o de UI le escribía encima esquirlas, misiones y desbloqueos. Borrar solo el `.json` no era un reset: `load_from_disk` cae al `.bak`.
 
 Por debajo, los comandos sueltos siguen sirviendo:
 
@@ -168,7 +176,9 @@ BONK_ARENA=res://scenes/world/Gloomfen.tscn BONK_GODMODE=1 \
   godot --headless --fixed-fps 60 --quit-after 36000 res://scenes/tests/ArenaProbe.tscn
 ```
 
-`scenes/tests/ArenaProbe.tscn` arranca `Run.tscn` como hijo de un nodo siempre activo, imprime estado cada 2 s, elige sola la primera carta en cada subida de nivel y —desde la iteración 45— **camina e interactúa**: recorre los interactuables disponibles manejando las acciones de input reales, se queda quieto al llegar para que los altares de carga completen su canal, salta cuando se atasca y avisa por `push_warning` si una UI bloqueante deja la partida encallada. Un raider aparcado se salta en silencio todo sistema condicionado al movimiento, y un soak así reporta "sin errores" sobre código que nunca corrió. Nunca toca el guardado real: re-apunta `SaveData.save_path` a `user://soak_save.json`.
+`scenes/tests/ArenaProbe.tscn` arranca `Run.tscn` como hijo de un nodo siempre activo, imprime estado cada 2 s, elige sola la primera carta en cada subida de nivel y —desde la iteración 45— **camina e interactúa**: recorre los interactuables disponibles manejando las acciones de input reales, se queda quieto al llegar para que los altares de carga completen su canal, salta cuando se atasca y avisa por `push_warning` si una UI bloqueante deja la partida encallada. Un raider aparcado se salta en silencio todo sistema condicionado al movimiento, y un soak así reporta "sin errores" sobre código que nunca corrió. Nunca toca el guardado real: usa `BONK_SAVE_PATH` si está puesta y `user://soak_save.json` si no.
+
+Desde la iteración 57 también sabe jugar **en co-op** (`BONK_PLAYERS`): el slot 0 lidera e interactúa, los demás **siguen** al líder y nunca interactúan por su cuenta (dos recorridos duplicarían las cuentas de interactuables con las que se calibró cada puerta), y una **regla de rescate** manda por encima de todo lo demás —el rush al portal incluido—: con un cuerpo derribado a menos de 6 m, el líder camina hasta él y **mantiene** interactuar hasta que se levanta. Sin godmode, el harness se entera del final de la partida por `RunManager.run_ended`, imprime `Probe: run ended victory=%s` y se va: una corrida mortal termina en la muerte por diseño, y la pantalla final no se juega sola en headless.
 
 Variables de entorno del harness:
 
@@ -176,17 +186,21 @@ Variables de entorno del harness:
 |---|---|
 | `BONK_ARENA=res://scenes/world/AshDunes.tscn` | **bioma de la etapa 1** (defecto: Bosque Hueco); el harness siempre arranca `Run.tscn` |
 | `BONK_CHARACTER=<id>` | raider concreto del catálogo; un id desconocido ahora es un error, no un silencio |
-| `BONK_GODMODE=1` | raider prácticamente inmortal, para llegar a los sistemas tardíos |
+| `BONK_PLAYERS=<1-4>` | tamaño de la party (iteración 57). `Coop.configure` corre **antes** de instanciar `Run.tscn`, que es lo que lee `RunSystems._spawn_party`; todos los slots van al teclado, porque un soak no tiene controles |
+| `BONK_CHARACTER2=<id>` | raider del slot 1 (defecto: la fila del catálogo siguiente a la del slot 0, para que los dos difieran) |
+| `BONK_DOWN_NOW=<seg>` | derriba al slot 1 a ese segundo de partida y cada 60 s después, para **forzar** el ciclo derribo/reanimación en vez de esperarlo |
+| `BONK_GODMODE=1` | raider prácticamente inmortal, para llegar a los sistemas tardíos. **Solo el slot 0**: el slot 1 se queda mortal, que es lo que hace que `BONK_DOWN_NOW` pueda aterrizar |
 | `BONK_WALK=0` | deja el raider quieto (defecto: camina) |
 | `BONK_SEED=<int>` | recorrido determinista, para reproducir un soak |
 | `BONK_PROBE_DEBUG=1` | narra el recorrido (waypoints, llegadas, pulsaciones) |
 | `BONK_STAGE_FAST=1` | la etapa se supera a los 60 s y sin jefe; el harness espera 70 s y cruza el portal |
-| `BONK_SAVE_PATH=<ruta>` | re-apunta el guardado (cualquier arranque headless que no sea el probe) |
+| `BONK_SAVE_PATH=<ruta>` | re-apunta el guardado. Lo honra `SaveData` en cualquier arranque headless **y** el propio harness, antes de que la partida arranque; `tools/verificar.sh` le da a cada soak el suyo |
 | `BONK_GAME_SEED=<int>` | siembra el RNG del juego (cartas, spawns, scatter y relieve): hace reproducible un soak entero |
 | `BONK_POWERUP_NOW=<id>` | concede ese power-up al jugador 1 a los 20 s y **se lo vuelve a dar en cada expiración**, para que un soak corto pase todo su reloj dentro del efecto |
 | `BONK_STAR_NOW=1` | suelta una **estrella quieta** a los pies del raider a los 30 s (la que ronda el mapa es difícil de interceptar a propósito) |
 | `BONK_POWERUP_BOOST=1` | multiplica ×50 la probabilidad de que una baja suelte un power-up, para que los drops salgan dentro de un soak |
-| `BONK_POI_NOW=a,b,c` | siembra esos POIs junto al raider a los 20 s (`vendor_items`, `vendor_powerups`, `vendor_animals`, `pet_box`, `event_altar`, `lucky_block`) |
+| `BONK_POI_NOW=a,b,c` | siembra esos POIs junto al raider a los 20 s (`vendor_items`, `vendor_powerups`, `vendor_animals`, `pet_box`, `event_altar`, `lucky_block`). Las repeticiones se conservan: seis `lucky_block` siembran seis bloques |
+| `BONK_LUCKY_REWARD=a,b` | cola de recompensas que pagan los bloques de la suerte siguientes en vez de tirar la tabla (la última entrada se repite). Seis bloques más los seis ids ejecutan todas las ramas de `LUCKY_REWARDS` en un solo soak |
 | `BONK_WEATHER_NOW=<id>` | fuerza ese clima a los 30 s (`blood_moon`, `eclipse`, `full_moon`, `enemy_rain`, `radioactive_rain`, `golden_rain`, `enemy_tsunami`, `earthquake`, `meteor_shower`) |
 | `BONK_WEAPON=<id>` | el raider arranca con esa arma en vez de la de su personaje |
 | `BONK_ITEM_NOW=a,b:2` | concede esos objetos al jugador 1 a los 10 s y hace que derrape cada ~3 s |

@@ -70,8 +70,7 @@ const MARKER_STYLES: Dictionary[StringName, Dictionary] = {
 		"size": 3.5, "always_visible": false},
 }
 
-## Player-facing name per kind, for the overlay's legend. Kinds missing
-## here simply do not get a legend row.
+## Player-facing name per kind, for the overlay's legend.
 const MARKER_LABELS: Dictionary[StringName, String] = {
 	&"player": "Jugadores",
 	&"boss": "Jefe",
@@ -86,6 +85,18 @@ const MARKER_LABELS: Dictionary[StringName, String] = {
 	&"pet_box": "Caja de mascotas",
 	&"event_altar": "Altar de eventos",
 	&"lucky_block": "Bloque de la suerte",
+}
+
+## Kinds that deliberately get NO legend row. Each is a VARIANT of a kind
+## that already has one — a free chest is a chest, a demonic or greed
+## altar is an altar — and one line per variant would turn a legend you
+## read at a glance into a taxonomy. Named here instead of left implicit
+## so the catalog lint can tell a deliberate omission from a forgotten
+## one: any other kind missing from MARKER_LABELS is a bug.
+const LEGEND_VARIANTS: Dictionary[StringName, bool] = {
+	&"chest_free": true,
+	&"altar_demonic": true,
+	&"altar_greed": true,
 }
 
 ## Alpha the unexplored ground is dimmed to in the composite. Not fully

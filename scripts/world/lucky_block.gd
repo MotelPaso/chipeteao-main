@@ -38,6 +38,15 @@ const WELL_NOTHING: String = "Nada"
 const WELL_NOTHING_LINE: String = "Te quedas con todo"
 const WELL_GIVE_LINE: String = "Lo cambias por algo mejor"
 
+## Harness override (ArenaProbe, BONK_LUCKY_REWARD): reward ids the next
+## blocks pay instead of rolling. STATIC, because the roll is static and
+## because the queue has to survive between blocks — a soak with six
+## blocks in BONK_POI_NOW is how all six branches get executed in one run,
+## and left to the weighted table that takes hundreds of blocks. The last
+## entry repeats, so one id holds for every block. Empty in every real
+## game: nothing but the probe ever writes it.
+static var _forced_rewards: Array[String] = []
+
 var _spent: bool = false
 var _time: float = 0.0
 var _body: MeshInstance3D = null
@@ -144,7 +153,30 @@ func _finish() -> void:
 	_sink()
 
 
+## Queues the reward ids the next blocks pay (harness only). An unknown
+## id is a push_error and is dropped: a soak that believed it was testing
+## the well while the table rolled points reports a green run about a
+## branch it never ran.
+static func force_rewards(ids: Array[String]) -> void:
+	var known: Dictionary[String, bool] = {}
+	for row: Dictionary in LUCKY_REWARDS:
+		known[String(row.id)] = true
+	_forced_rewards.clear()
+	for id: String in ids:
+		if known.has(id):
+			_forced_rewards.append(id)
+		else:
+			push_error("LuckyBlock: unknown forced reward '%s'" % id)
+
+
 static func _roll_reward() -> String:
+	# The harness queue, when one is loaded: consumed front to back, and
+	# the last entry stays so a one-id queue holds for every block.
+	if not _forced_rewards.is_empty():
+		var forced := _forced_rewards[0]
+		if _forced_rewards.size() > 1:
+			_forced_rewards.remove_at(0)
+		return forced
 	var total := 0.0
 	for row: Dictionary in LUCKY_REWARDS:
 		total += float(row.weight)

@@ -187,6 +187,12 @@ func buy(offer: Dictionary, player: Node) -> bool:
 	# soak reads cause then effect — this line, then whatever the payout
 	# announces itself ("Pet joined:", "Power-up picked:").
 	print("Vendor sold: %s %s %d" % [kind, _payload_id(offer), price])
+	# Separate line, never a field on the one above: "Vendor sold:" is the
+	# verification interface of three soaks and its shape is frozen. WHICH
+	# raider paid only matters in co-op, and only a co-op soak can prove
+	# the payout lands on the buyer rather than on slot 0.
+	var buyer: Variant = player.get("player_index")
+	print("Vendor buyer: p%d" % (int(buyer) if buyer != null else -1))
 	match String(offer.get("kind", "")):
 		"animals":
 			if player.has_method("set_pet"):
