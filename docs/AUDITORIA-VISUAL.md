@@ -114,6 +114,18 @@ Nada de esto es geometría, así que la cámara no puede decidirlo:
    cámara real. El shader corre; es una decisión de arte, fuera del alcance.
 5. **Sensación y ritmo**: nada de esto se juzga en una captura.
 
+## La comprobación del switch
+
+Sobre la cabeza final, el mismo comando con y sin `--headless`:
+
+| Corrida | Resultado |
+|---|---|
+| Con ventana, Bosque Hueco, 60 s (`--quit-after 3600`) | **11 PNG y 11 líneas `Shot saved:`**, sin un solo `WARNING:` ni `ERROR:` |
+| La misma con `--headless` | **`Shots skipped: headless`**, cero PNG (ni siquiera crea el directorio) |
+
+Y `tools/verificar.sh` termina en **`VERIFICACIÓN OK`** (18 min 24 s) con las
+puertas sin tocar.
+
 ## Límites de esta ronda
 
 - **Una resolución y una ventana**: 1280x720. Ni pantalla completa, ni
@@ -127,6 +139,14 @@ Nada de esto es geometría, así que la cámara no puede decidirlo:
   juego: la pantalla se dibuja bien y un jugador la cerraría. Queda anotado
   para quien quiera enseñarle a comprar.
 - **La cámara no juzga**: dice si algo se dibuja, dónde y encima de qué.
+- **Una corrida con ventana tiene el teclado de verdad.** El juego recibe las
+  teclas del sistema como cualquier ventana enfocada, así que un `Escape`
+  perdido —el que manda otra app al cambiar el foco, por ejemplo— abre el
+  menú de pausa y congela el soak. Pasó una vez en esta ronda y la sonda lo
+  dijo con todas las letras: `ArenaProbe: WEDGE — tree paused 20s with no
+  card UI; blocking=["PauseMenu"]`. No es un fallo del juego. Si una corrida
+  con ventana se queda quieta, **eso es lo primero que hay que mirar en el
+  log**; repetirla suele bastar.
 - **El soak de etapa de `verificar.sh` es variable, y en esta ronda se vio.**
   Una corrida de la cabeza final no cruzó de mapa en 720 s
   (`Probe legs: reached=6 timed_out=16`, horda de 81 cuerpos al final) y
