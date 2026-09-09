@@ -55,6 +55,7 @@ directorio es de sesión; el comando de arriba las regenera.
 | V4 | MEDIA | HUD, abajo al centro | La fila de power-ups activos no era una fila: era una **columna de 104 px de alto** con la ficha estirada, dibujada **encima de la barra de vida** y partiendo por la mitad el texto de HP | `_rebuild_powerup_row` escribía `offset_left` y `offset_top` y **no** `offset_right` ni `offset_bottom`. `set_anchors_preset` pone los cuatro a cero, así que el contenedor quedaba anclado al borde inferior de la ventana con 104 px de alto en vez de colapsado en el punto de anclaje | iteración 61: se escriben los cuatro offsets, el contenedor toma su tamaño mínimo y crece hacia arriba y hacia los lados | `09-hudcheck-before/shot_31.7s.png`, `w_eclipse/shot_44.2s.png`, `pu_flight/shot_29.6s.png` | `10-hudcheck/shot_31.7s.png`, `after/pu_timestop/shot_44.6s.png` |
 | V5 | BAJA | HUD, abajo a la derecha | En cuanto el raider recogía **un solo objeto**, su ficha se dibujaba encima de `%PauseHintLabel` y «Esc — Pausa» se quedaba en «Esc —» | Las dos tiras terminaban a 20 px del borde inferior (`offset_bottom = -20`, alto 48) y la pista está a 12 px del borde con 20 px de alto: se solapan 12 px | iteración 61: `BOTTOM_STRIP_MARGIN` 36 para **las dos** tiras, que se leen como una sola fila | `09-hudcheck-before/shot_31.7s.png`, `w_eclipse/shot_44.2s.png` | `10-hudcheck/shot_31.7s.png`, `after/poi2/shot_91.1s_lucky.png` |
 | V6 | BAJA | HUD, arriba a la derecha | La insignia de FPS empezaba dentro de la etiqueta de puntos (se solapan ~4 px). Invisible mientras el minimapa las tapaba a las dos (V3), visible en cuanto V3 se arregló | `FPS_BADGE_OFFSET.y` = 76 contra un `%PointsLabel` que arranca en 56 con fuente 18 | iteración 61: 76 → 88, y la pila queda escrita como pila en `ARQUITECTURA.md` | `09-hudcheck-before/shot_31.7s.png` (la insignia dentro del mapa) | `10-hudcheck/shot_31.7s.png` |
+| V7 | **ALTA** | Toda la interfaz, en cuanto la ventana deja de medir 1280x720 | **Al maximizar (el botón verde del Mac) el HUD, los menús y los botones se quedaban a menos de la mitad de su tamaño relativo.** Reportado por el jugador sobre la build exportada | `project.godot` **no declaraba `[display]`**, así que corría con los valores por defecto de Godot: base 1152x648 y `stretch/mode = "disabled"`. «disabled» significa que un `Control` mide lo mismo en PÍXELES pase lo que pase con la ventana, así que al pasar de 1280x720 a 3024x1898 todo se encogió a ojo. Ninguna puerta podía verlo: es el mismo agujero que dejó pasar el suelo invisible | iteración 62: base **1280x720** con `stretch/mode = "canvas_items"` y `aspect = "expand"`. `canvas_items` escala solo el 2D y deja el 3D nativo; `expand` evita barras negras en el 1.59:1 del MacBook. La base es 1280x720 porque es sobre lo que está calibrado `hud.gd`: **el mismo fotograma a 1280x720 antes y después difiere en 0 píxeles de 921 600** | `scale-before/2560x1440/shot_10.0s.png` | `scale-after/2560x1440/shot_10.0s.png`, `scale-after/fullscreen/shot_10.0s.png` (3024x1898 reales), `scale-after/ui2560/ui_05_cards_all_p8.png`, `scale-after/coop2560/shot_16.0s.png` |
 | H1 | — | El harness, no el juego | Las fotos de evento salían **un fotograma antes del evento**: el mapa de Tab se fotografiaba cerrado, un clima forzado se fotografiaba con el tinte del anterior y un cambio de etapa en negro a mitad del fundido | El evento y su aspecto no ocurren en el mismo fotograma: el overlay abre al siguiente del Tab, el tinte entra en rampa y la etapa va detrás del corte de `ScreenFade` | iteración 60: `ShotCamera.request_in(delay, stem)`; etapa y clima esperan 1.5 s, el mapa 0.6 s | `poi/shot_59.2s_map.png` (mapa cerrado), `w_golden_rain/shot_30.0s_weather_golden_rain.png` (tinte anterior), `stage/shot_133.7s_stage2.png` (fundido) | `after/poi/shot_59.2s_map.png`, `after/w_golden_rain/shot_30.0s_weather_golden_rain.png`, `after/stage/shot_136.1s_stage2.png` |
 
 ## Lo que se miró y estaba bien
@@ -94,6 +95,9 @@ Una captura por fila, todas de la pasada posterior a los arreglos.
 | Armería | `after/ui/ui_02_relics_p2.png` | seis reliquias con descripción, escalera de rangos en rombos y precio, «Volver» |
 | Ajustes | `after/ui/ui_08_settings_toggle_p1.png` | cinco filas (efectos, ambiente, sensibilidad, pantalla completa, mostrar FPS) y «Volver» |
 | Fin de partida | `after/ui/ui_10_extract_p1.png` | «INCURSIÓN ABANDONADA» sobre la partida |
+| La interfaz a cuatro resoluciones | `scale-after/{1280x720,1920x1080,2560x1440,fullscreen}/shot_10.0s.png` | mismo tamaño relativo en las cuatro; el 3D se sigue renderizando a resolución nativa (los PNG salen a 1280x720, 1920x1080, 2560x1440 y 3024x1898) |
+| Los menús a 2560x1440 | `scale-after/ui2560/ui_05_cards_all_p8.png` | las 13 pruebas del harness de UI en verde y las fichas, títulos y botones escalados |
+| Pantalla dividida a 2560x1440 | `scale-after/coop2560/shot_16.0s.png` | las dos celdas y sus minimapas escalan con la ventana |
 | Shader de suelo del bioma | prueba temporal con `ALBEDO = vec3(n, 0, 1-n)` | el ruido de valor **sí** corre; se ve suave porque su celda es de ~2.9 m y la cámara está a unos metros del suelo. Revertido |
 
 ## Lo que sigue necesitando ojos humanos
@@ -123,14 +127,17 @@ Sobre la cabeza final, el mismo comando con y sin `--headless`:
 | Con ventana, Bosque Hueco, 60 s (`--quit-after 3600`) | **11 PNG y 11 líneas `Shot saved:`**, sin un solo `WARNING:` ni `ERROR:` |
 | La misma con `--headless` | **`Shots skipped: headless`**, cero PNG (ni siquiera crea el directorio) |
 
-Y `tools/verificar.sh` termina en **`VERIFICACIÓN OK`** (18 min 24 s) con las
-puertas sin tocar.
+Y `tools/verificar.sh` termina en **`VERIFICACIÓN OK`** con las puertas sin
+tocar: 18 min 24 s en la cabeza de la iteración 61 y 14 min 17 s en la de la
+62 (la del cambio de escala).
 
 ## Límites de esta ronda
 
-- **Una resolución y una ventana**: 1280x720. Ni pantalla completa, ni
-  relaciones de aspecto raras, ni 4 jugadores (el reparto de celdas para 4 se
-  arregló por la misma regla que el de 2, pero no se fotografió).
+- **Resoluciones cubiertas** (tras la iteración 62): 1280x720, 1920x1080,
+  2560x1440 y pantalla completa real (3024x1898). **No** cubiertas: ventanas
+  más pequeñas que la base, monitores ultrapanorámicos, ni 4 jugadores (el
+  reparto de celdas para 4 se arregló por la misma regla que el de 2, pero no
+  se fotografió).
 - **El arte es placeholder a propósito** (iconos de dos letras): fuera del
   alcance por encargo.
 - **La tienda del vendedor encalla el harness.** La sonda no sabe comprar, así

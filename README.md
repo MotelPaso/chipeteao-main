@@ -99,10 +99,24 @@ godot --headless --export-release "macOS" builds/Bonkraiders.app
 
 Para Windows/Linux se usan los mismos comandos con `"Windows Desktop"` / `"Linux/X11"`, pero hay que **descargar antes las export templates 4.7.2** de la plataforma destino (Editor > Manage Export Templates, o `Godot_v4.7.2-stable_export_templates.tpz`). La carpeta `builds/` está en `.gitignore`. Versión actual: `0.1.0` (`config/version` en `project.godot`, mostrada en el selector).
 
+## Resolución y escala de la interfaz
+
+La interfaz se diseña sobre un lienzo de **1280x720** y se estira con
+`stretch/mode = "canvas_items"` + `aspect = "expand"` (`[display]` en
+`project.godot`, iteración 62). Eso quiere decir que el HUD y los menús
+conservan su tamaño **relativo** en cualquier ventana —incluida la pantalla
+completa del Mac— mientras el mundo 3D se sigue renderizando a resolución
+nativa. Hasta la 61 el proyecto no declaraba nada de `[display]` y corría con
+los valores por defecto de Godot (1152x648, `disabled`), con lo que maximizar
+la ventana dejaba toda la interfaz a menos de la mitad de su tamaño. Al añadir
+interfaz se piensa en ese lienzo de 1280x720 y se ancla a un borde o a una
+esquina; los detalles y la consecuencia en la sensibilidad del ratón están en
+`docs/ARQUITECTURA.md` → «Escala de la interfaz».
+
 ## Estructura del proyecto
 
 ```
-project.godot            # autoloads, input map, escena principal
+project.godot            # autoloads, input map, escena principal, escala de UI
 export_presets.cfg       # presets macOS / Windows / Linux
 GDD.md                   # documento de diseño
 CHANGELOG.md             # una línea por iteración (45 hasta ahora)

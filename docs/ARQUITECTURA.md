@@ -986,6 +986,45 @@ La existencia se comprueba con `ResourceLoader.exists(path, "Texture2D")`, **no*
 - Fin de partida: `run_manager.gd` (señal `run_ended`, cableada dentro de `RunSystems.tscn`) → `run_end_screen.gd`, cuya coreografía sale de una tabla `ENDINGS` (título, subtítulo, color por final) en vez de ramas.
 - **Longitud del español**: las superficies del HUD y las tarjetas son tolerantes a etiquetas más largas, pero la regla del glosario sigue vigente — una etiqueta española no debe crecer más de ~10% sobre la inglesa en HUD, insignias y botones.
 
+## Escala de la interfaz
+
+**La interfaz se diseña sobre 1280x720 y se ESTIRA.** `project.godot`
+declara desde la iteración 62:
+
+```
+window/size/viewport_width=1280
+window/size/viewport_height=720
+window/stretch/mode="canvas_items"
+window/stretch/aspect="expand"
+```
+
+Antes no declaraba nada de `[display]`, y los valores por defecto de Godot
+son 1152x648 con `stretch/mode = "disabled"`. **«disabled» quiere decir que
+un `Control` mide lo mismo en PÍXELES pase lo que pase con la ventana**: al
+darle al botón verde del Mac el viewport pasaba de 1280x720 a la pantalla
+entera (3024x1898 medidos) y el HUD, los menús y los botones se quedaban a
+menos de la mitad de su tamaño relativo. Lo reportó el jugador; ninguna
+puerta podía verlo, por lo mismo que el suelo invisible de la iteración 60.
+
+Las tres decisiones, y por qué:
+
+| Ajuste | Por qué ese y no otro |
+|---|---|
+| `canvas_items` | escala el sistema de coordenadas **2D** y deja el 3D renderizando a resolución NATIVA: interfaz del mismo tamaño relativo en cualquier ventana y mundo nítido. `viewport` habría escalado también el 3D y lo habría dejado borroso |
+| `expand` | la pantalla de un MacBook no es 16:9 (3024x1898 es 1.59:1) y `keep` habría metido barras negras. Con `expand` el factor es el menor de los dos ejes y el sobrante se ve como **más mundo**; el HUD está anclado a las esquinas, así que sigue en sus esquinas |
+| base 1280x720 | es la resolución sobre la que está calibrado cada número de `hud.gd` y con la que se verificó la ronda visual entera. Medido: el mismo fotograma a 1280x720 antes y después del cambio difiere en **0 píxeles de 921 600** |
+
+**Consecuencia deliberada en el ratón.** `Player._apply_look` lee
+`InputEventMouseMotion.relative`, y con stretch ese vector llega en unidades
+de CANVAS, no en píxeles de ventana. La sensibilidad deja de depender de la
+resolución — antes, maximizar la ventana la subía sola. A 1280x720 el factor
+es 1 y el número guardado en Ajustes significa exactamente lo que siempre.
+
+**Al añadir interfaz**: se piensa en el lienzo de 1280x720 y se ancla a un
+borde o a una esquina. Nada de posiciones absolutas pensadas para una
+pantalla concreta, y nada de leer `DisplayServer.window_get_size()` para
+colocar un `Control`: eso es lo que el stretch ya resuelve.
+
 ## Sistemas transversales
 
 - **Pools** (`scripts/systems/pools.gd` + `node_pool.gd`): pooling de los **14** hotspots (gemas, orbes, dardos, flechas, bumerán, bolts enemigos, bursts de muerte, popups, discos de telégrafo, arco de tajo, fogonazo, latigazo, brasas, charcos). Contrato de uso: spawn = `Pools.acquire_scene(escena)`, despawn = `Pools.release(nodo)`; el script pooled implementa `pool_reset()` restaurando estado recién-spawneado. **Escena nueva de alta rotación = UNA fila en `Pools.POOLS`** (`name`, `scene`, `warm`, `cap`); antes eran tres listas paralelas que se desincronizaban en silencio. `pool_size_overrides` permite tunear sin tocar la tabla. Sin registrar, `acquire_scene` cae a instanciar normal.
