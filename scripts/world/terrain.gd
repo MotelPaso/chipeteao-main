@@ -339,6 +339,16 @@ func _build_mesh() -> void:
 	var indices := PackedInt32Array()
 	indices.resize(cells * cells * 6)
 	var cursor := 0
+	# WINDING. Godot's front face is the CLOCKWISE one seen from the front,
+	# so a ground meant to be walked on has to be clockwise seen from +Y —
+	# which is the same as saying cross(v1 - v0, v2 - v0) points DOWN.
+	# Emitted the other way round (iterations 51-59) the whole terrain is
+	# back-face culled from every camera above it: you fall onto a collider
+	# you cannot see, the arena reads as a floating set of props over the
+	# backdrop, and NOTHING says so in a log. That is exactly what shipped,
+	# because every gate this project has runs --headless and the dummy
+	# renderer rasterises nothing. _assert_winding below is the guard that
+	# makes the mistake fail a headless soak from now on.
 	for iz in cells:
 		for ix in cells:
 			var top_left := iz * verts + ix
@@ -346,12 +356,13 @@ func _build_mesh() -> void:
 			var bottom_left := top_left + verts
 			var bottom_right := bottom_left + 1
 			indices[cursor] = top_left
-			indices[cursor + 1] = bottom_left
-			indices[cursor + 2] = top_right
+			indices[cursor + 1] = top_right
+			indices[cursor + 2] = bottom_left
 			indices[cursor + 3] = top_right
-			indices[cursor + 4] = bottom_left
-			indices[cursor + 5] = bottom_right
+			indices[cursor + 4] = bottom_right
+			indices[cursor + 5] = bottom_left
 			cursor += 6
+	_assert_winding(vertices, indices)
 	var arrays := []
 	arrays.resize(Mesh.ARRAY_MAX)
 	arrays[Mesh.ARRAY_VERTEX] = vertices
@@ -368,6 +379,27 @@ func _build_mesh() -> void:
 	_mesh_instance.mesh = mesh
 	if surface_material != null:
 		_mesh_instance.material_override = surface_material
+
+
+## The one thing about this mesh a headless soak could not see until it
+## was asserted: which way its triangles face. Checked on the FIRST
+## triangle only — every cell is emitted by the same three lines, so one
+## of them being upside down means all of them are.
+##
+## `up` here is the RIGHT-HAND normal of the triangle as listed. Godot
+## culls the counter-clockwise side, so a face that is front-facing from
+## above lists its vertices clockwise seen from +Y, and its right-hand
+## normal therefore points DOWN. A positive Y is the bug.
+func _assert_winding(vertices: PackedVector3Array, indices: PackedInt32Array) -> void:
+	if indices.size() < 3:
+		return
+	var v0 := vertices[indices[0]]
+	var v1 := vertices[indices[1]]
+	var v2 := vertices[indices[2]]
+	var up := (v1 - v0).cross(v2 - v0)
+	if up.y >= 0.0:
+		push_error("Terrain: ground triangles wound the wrong way — "
+				+ "the whole surface is back-face culled from above")
 
 
 ## HeightMapShape3D on layer 1, one sample per world unit, node unscaled.

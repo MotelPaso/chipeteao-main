@@ -209,6 +209,8 @@ Variables de entorno del harness:
 | `BONK_ZENKAI_TEST=1` | escena de bajón y recuperación a los 60 s, para armar Zenkai |
 | `BONK_POINTS=<n>` | le da esos puntos de partida al jugador 1, para que un soak de vendedor pueda comprar |
 | `BONK_PERF=1` | overlay de rendimiento del HUD (FPS, conteos, pools) |
+| `BONK_SHOT_DIR=<dir>` | **guarda PNG de la corrida en ese directorio** (iteración 60). Es lo que convierte el harness en una cámara: todas las puertas de este proyecto corren `--headless`, cuyo renderizador de pega no compila shaders ni dibuja nada, así que un suelo culeado, un material que no llega o un panel encima del reloj dan un log perfectamente verde. Captura desde dentro del motor (`Viewport.get_texture().get_image()` tras `frame_post_draw`), no con un capturador de pantalla: macOS le niega `screencapture` a una terminal sin permiso de Grabación de Pantalla. **Bajo `--headless` se ignora** e imprime una sola vez `Shots skipped: headless`. Lo llevan `ArenaProbe` y `UiProbe` |
+| `BONK_SHOT_EVERY=<s>` | segundos entre fotos periódicas (10 por defecto; `UiProbe` usa 2). Las fotos de evento —cambio de etapa, clima, vendedor, caja de mascotas, bloque de la suerte, power-up, mapa Tab, primera carta de nivel— se sacan igual, y las tres que tardan en verse (etapa, clima, mapa) esperan a que el fundido o el tinte terminen |
 
 Para lógica aislada sigue sirviendo un harness desechable `extends SceneTree` con `godot --headless --path . -s <script>` (igual que `scripts/tools/generate_sfx.gd`). Ojo: en un script `-s` **no hay autoloads**, así que no vale para nada que toque `RunState`, `SaveData` o `Coop`.
 

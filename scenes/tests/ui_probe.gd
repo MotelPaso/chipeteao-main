@@ -108,7 +108,25 @@ class Driver extends Node:
 	## Actions waiting for their release frame (see _send_action).
 	var _release: Array[StringName] = []
 
+	## --- screenshots (iteration 60) ------------------------------------
+	## BONK_SHOT_DIR, the same switch the soak harness carries and for the
+	## same reason: every assertion in this file is about NODES — a control
+	## that exists, is visible, is not disabled — and none of that can see
+	## a panel drawn over the clock or a label clipped to two letters.
+	## Ignored under --headless, which is how tools/verificar.sh runs it,
+	## so the gate is untouched.
+	## Two seconds, not ten: this harness crosses seven screens in about a
+	## minute and a ten-second cadence would photograph three of them.
+	const SHOT_EVERY_DEFAULT: float = 2.0
+	var _camera: ShotCamera = null
+	## The (step, phase) the last shot was taken for. A step is not one
+	## screen — _visit_meta_screen opens Colección, checks it and comes
+	## back inside a single step — so the PHASE is what changes when the
+	## picture would change.
+	var _shot_at: Vector2i = Vector2i(-1, -1)
+
 	func _ready() -> void:
+		_camera = ShotCamera.new(get_viewport(), SHOT_EVERY_DEFAULT)
 		if OS.get_environment(SaveData.SAVE_PATH_ENV).is_empty():
 			SaveData.save_path = FALLBACK_SAVE_PATH
 			SaveData.load_from_disk()
@@ -117,8 +135,9 @@ class Driver extends Node:
 		print("UiProbe: shards=%d" % SaveData.shards)
 		get_tree().change_scene_to_file(CHARACTER_SELECT_PATH)
 
-	func _process(_delta: float) -> void:
+	func _process(delta: float) -> void:
 		_flush_releases()
+		_tick_shots(delta)
 		if _failed:
 			return
 		# One settle per CUT: ScreenFade keeps fading for FADE_OUT_TIME
@@ -152,7 +171,25 @@ class Driver extends Node:
 		_phase = 0
 		if _step >= STEPS.size():
 			print("UiProbe: done steps=%d" % _steps_done)
+			_camera.final_shot()
 			get_tree().quit(0)
+
+	## One shot whenever the driver moves to a new (step, phase) — which is
+	## one per SCREEN — plus the camera's own periodic frame, which catches
+	## the fades and the settles in between.
+	func _tick_shots(delta: float) -> void:
+		if not _camera.enabled():
+			return
+		var at := Vector2i(_step, _phase)
+		if at != _shot_at:
+			_shot_at = at
+			_camera.request("ui_%02d_%s_p%d" % [_step, STEPS[mini(_step,
+					STEPS.size() - 1)], _phase])
+		_camera.tick(delta, _periodic_shot_stem)
+
+	func _periodic_shot_stem() -> String:
+		return "ui_%02d_%s_t%d" % [_step, STEPS[mini(_step, STEPS.size() - 1)],
+				Engine.get_frames_drawn()]
 
 	func _deadline(step_name: String) -> int:
 		return int(STEP_DEADLINES.get(step_name, STEP_DEADLINE_FRAMES))

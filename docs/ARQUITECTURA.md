@@ -360,6 +360,19 @@ persecución en vez de enriquecerla. Lo que compra el relieve es legibilidad
   `add_surface_from_arrays` sobre arrays empaquetados, no con `SurfaceTool`:
   un vértice por llamada sobre 241×241 son cientos de miles de llamadas de
   GDScript y tarda segundos. Presupuesto: **400 ms**; medido 92-115 ms.
+- **El sentido de los triángulos (iteración 60).** Godot considera **frontal
+  la cara horaria vista desde delante**, así que un suelo que se pisa se
+  emite **horario visto desde +Y** — lo mismo que decir que
+  `cross(v1 − v0, v2 − v0)` apunta **hacia abajo**. De la iteración 51 a la
+  59 salió al revés y **el suelo era transparente**: el terreno se
+  culeaba por back-face desde cualquier cámara por encima, se caminaba sobre
+  un collider invisible y la arena se veía como un puñado de props flotando
+  sobre el disco del backdrop. Es lo que el jugador reportó y lo que ninguna
+  puerta pudo ver, porque todas corren `--headless` y el renderizador de
+  pega no rasteriza nada. `_assert_winding()` comprueba ahora el primer
+  triángulo en **cada** construcción y hace `push_error` si mira hacia
+  arriba, que es un fallo de `tools/verificar.sh` **sin** necesidad de
+  pantalla. Ver «Verificación → La cámara del harness».
 - **Pads planos**: bajo el spawn (`spawn_flat_radius`), bajo cada grupo
   autorizado de `Verticality` y bajo cada sitio de meseta, con una banda de
   mezcla de 6 m. **Nunca bajo los POI barajables**, cuyo XZ cambia después: a
@@ -949,10 +962,6 @@ Cada casilla de la tira de equipamiento resuelve su arte en este orden:
 La existencia se comprueba con `ResourceLoader.exists(path, "Texture2D")`, **no** con `FileAccess.file_exists`: en una build exportada el PNG viaja empaquetado como `.ctex` y el chequeo de archivo daría falso. El único PNG del repo es el placeholder, generado por `scripts/tools/generate_placeholder_icon.gd` (`godot --headless -s ...`, sin autoloads, hermano de `generate_sfx.gd`) y commiteado junto a su `.import`.
 
 - HUD (`hud.gd`): grupos `hud` y `boss_ui`; API por grupo: `announce(msg)`, `announce_major(msg)` (ceremonias), `track_boss(boss, title)`, `show_stage_tag(stage_index, lap)`. Barras HP/XP, cronómetro (se repinta solo cuando cambia el segundo), bajas, rachas, insignia de puntos, `Dificultad +N%`, filas compactas J2-J4 en co-op, **toast de botín** (`show_loot`) y **badge de FPS** opcional arriba a la derecha (`SaveData.show_fps`, Ajustes → «Mostrar FPS»; se sondea, no se escucha, porque la opción se cambia con el HUD vivo o antes de que exista). Desde la iteración 48 la tira de equipamiento son **dos**: armas y tomos abajo a la izquierda, objetos abajo a la derecha. Overlay de perf oculto: export `show_perf_probe` o `BONK_PERF=1`. El daño a un compañero **no** dispara viñeta/shake globales, solo el pop de su fila. Desde la iteración 52 el HUD también **construye y ancla** el minimapa y el mapa de Tab de cada jugador (`_build_map_widgets`, `_anchor_to_cell`) y les reenvía `on_stage_started(arena)` — ver «Minimapa y mapa (Tab)».
-- Flecha de jefe (`boss_arrow.gd`): `bind_view(camera, carrier)` inyecta la cámara y el raider de esa vista. Sin inyección cae al viewport raíz (solo) — ver la convención de cámaras.
-- Cartas (`upgrade_card_ui.gd`): en `RunState.leveled_up` pausa el árbol y ofrece 3 tiradas de `UpgradePool.roll_offer()` **de un solo lado del pool** (ver «Cartas de mejora»); los picks extra se encolan.
-- **`open_choice(title, options, recipient, on_pick, tag)`** (iteración 47) es la **única** ampliación del contrato: dibuja opciones que el llamador construyó (`{title, description, color, ...payload}`) y le devuelve la elegida por `on_pick`. No tira rareza, no aplica nada, no es un framework de menús. Existe así a propósito: la pausa, la cola, el título con destinatario de co-op, el look de `UiTheme.style_card` y —sobre todo— el harness de soaks (que responde llamando `_on_card_pressed(0)` sobre cualquier nodo visible del grupo `upgrade_ui`) siguen funcionando **porque una elección ES un pick**. Una UI bloqueante nueva sería una forma nueva de encallar una partida.
-- **Toast de botín** (`hud.show_loot(title, description, color, player_index)`, grupo `hud`): tarjeta abajo al centro ~3 s, encolada si llegan varias, con etiqueta `J%d` en co-op. La llama **`ItemBag.add_item`**, que es la única puerta por la que entra un objeto (cofres, ruleta, lo que venga): una llamada por fuente habría que escribirla otra vez en cada fuente nueva, y la de la ruleta nunca se escribió. El Tomo del Azar también se anuncia ahí: `PlayerStats.add_tome` **devuelve** los boons que acaba de tirar, `UpgradePool.apply` los propaga y `UpgradeCardUI` los pinta con `Tome.boon_text()`. **`open_bonus_pick(title, luck_bonus, min_rarity, recipient)`** lleva destinatario explícito: en co-op, un cofre o altar tiene que decir a **quién** le toca la carta, no confiar en «el jugador de turno».
 - Contrato de pausa: quien posee la pausa se une a `ui_blocking` y expone `is_blocking() -> bool`; `pause_menu.gd` mantiene además su propio flag `_pause_owned`, así que nunca devuelve una pausa que no tomó ni roba la de las cartas o el fin de partida. Al añadir una UI que pause, seguir este patrón (y unirse a `blocking_ui_closable` si acepta cierre por código; hoy ese grupo no tiene llamador, es la puerta que dejó la ruleta abierta para el harness).
 - Fin de partida: `run_manager.gd` (señal `run_ended`, cableada dentro de `RunSystems.tscn`) → `run_end_screen.gd`, cuya coreografía sale de una tabla `ENDINGS` (título, subtítulo, color por final) en vez de ramas.
 - **Longitud del español**: las superficies del HUD y las tarjetas son tolerantes a etiquetas más largas, pero la regla del glosario sigue vigente — una etiqueta española no debe crecer más de ~10% sobre la inglesa en HUD, insignias y botones.
@@ -1222,6 +1231,38 @@ escena principal, o F6 en el editor) **ya no funciona** desde la iteración
 elige el bioma con `BONK_ARENA` / `GameConfig.start_map_id`.
 
 Para lógica aislada sigue sirviendo un harness desechable `extends SceneTree` (patrón de `generate_sfx.gd`) con `godot --headless --path . -s res://...`. Ojo: en un script `-s` **no hay autoloads**, así que no sirve para nada que toque `RunState`, `SaveData` o `Coop`.
+
+### La cámara del harness: `BONK_SHOT_DIR` (iteración 60)
+
+**El agujero que tapa.** Todo lo que este proyecto verifica corre
+`--headless`, y el `DisplayServer` de pega **no compila un shader ni
+rasteriza un triángulo**. Eso deja una clase entera de fallo sin puerta
+posible: una malla culeada al revés, un material que nunca llega, un panel
+dibujado encima del reloj, una etiqueta cortada. Todos dan un log
+perfectamente verde. Las iteraciones 51 a 59 pasaron `verificar.sh` con **el
+suelo de las tres arenas invisible**, y quien lo vio fue el jugador.
+
+`scenes/tests/shot_camera.gd` (`class_name ShotCamera`, `RefCounted`) es lo
+que lo cierra, y lo llevan **los dos** harnesses:
+
+| | |
+|---|---|
+| Cómo captura | `Viewport.get_texture().get_image().save_png()` **tras `await RenderingServer.frame_post_draw`**. Antes de ese await `get_image()` devuelve el fotograma anterior, que para una foto de evento es el de justo antes del evento |
+| Por qué desde dentro | macOS le niega `screencapture` a una terminal sin permiso de Grabación de Pantalla, y un soak no tiene a quién pedírselo. Desde el motor no hace falta permiso ninguno |
+| Headless | **se ignora**, con un `Shots skipped: headless` una sola vez. Un PNG vacío sería peor que ninguno |
+| Cuándo dispara | cada `BONK_SHOT_EVERY` s (10 por defecto, 2 en `UiProbe`), en cada cambio de etapa, clima, llegada de vendedor, caja de mascotas abierta, bloque de la suerte resuelto, power-up recogido, apertura del mapa Tab y en la primera carta de nivel; `final.png` al salir |
+| Retardo | etapa y clima esperan `SHOT_SETTLE` 1.5 s y el mapa 0.6 s (`ShotCamera.request_in`): el overlay abre al fotograma siguiente al Tab, el tinte de un clima entra en rampa y un cambio de etapa va detrás del fundido de `ScreenFade` |
+| Qué NO hace | nada que una puerta lea. Con la variable sin poner, todas sus líneas son no-ops, y el temporizador se alimenta del delta de física —no de `RunState.run_time`— precisamente para que un menú que congela el reloj **sí** salga fotografiado |
+
+**Los eventos se leen del árbol, no de los logs.** Un `print` no es algo a lo
+que otro nodo se pueda suscribir: un vendedor es un miembro nuevo del grupo
+`vendors`, la caja y el bloque avisan por el `interaction_completed` que ya
+emitían, y un power-up es un id que el líder no llevaba en la muestra
+anterior.
+
+**Lo que la cámara no puede juzgar** y sigue necesitando ojos humanos:
+sensación, ritmo, legibilidad de un texto sobre un fondo movido y si el arte
+gusta. Lo que sí decide sola: si algo se dibuja, dónde, y encima de qué.
 
 ## Convenciones
 

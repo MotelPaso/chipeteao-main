@@ -75,6 +75,16 @@ extends Node
 ##   BONK_ZENKAI_TEST=1     at 60 s: a 95% hit, three invulnerable seconds,
 ##                          then a full heal — the dip-and-survive Zenkai
 ##                          arms on and would otherwise need real bad luck
+##   BONK_SHOT_DIR=<dir>    saves PNG frames of the soak into <dir> — the
+##                          switch that turns this harness into a CAMERA
+##                          (iteration 60). Every gate this project has
+##                          ran --headless, whose dummy renderer compiles
+##                          no shader and draws nothing, so a floor that
+##                          never rasterises reads exactly like a healthy
+##                          one in a log. Ignored (once, loudly) under
+##                          --headless: `Shots skipped: headless`
+##   BONK_SHOT_EVERY=<s>    seconds between periodic shots (default 10).
+##                          Event shots are taken regardless
 ##
 ## The raider WALKS AND INTERACTS by default (iteration 45). A parked raider
 ## silently skips every movement-gated system — Slime Trail only drops
@@ -266,6 +276,21 @@ var _legs_timed_out: int = 0
 var _stall_check: float = 0.0
 var _last_position: Vector3 = Vector3.ZERO
 var _rng := RandomNumberGenerator.new()
+
+## --- screenshots (iteration 60) ---------------------------------------------
+## BONK_SHOT_DIR turns the soak into a camera. The capture itself lives in
+## ShotCamera, which UiProbe carries too; what belongs here is WHEN a
+## picture is worth taking in a run. Nothing in this section can make a
+## gate easier — with the switch unset every line of it is a no-op.
+var _camera: ShotCamera = null
+## instance ids already accounted for in the vendor / pet box / lucky block
+## groups, so one node fires one shot however long it stands there.
+var _shot_seen: Dictionary[int, bool] = {}
+## Power-up ids the leader carried on the last sample; a new one is a pickup.
+var _shot_powerups: Dictionary[String, bool] = {}
+## One card-picker shot per soak: a long run levels up dozens of times and
+## every one of them looks the same.
+var _card_shot_taken: bool = false
 
 ## --- airborne detector (iteration 48) ---------------------------------------
 ## Enemies were reported "flying" when the horde crowds. The rule is fixed
@@ -518,6 +543,10 @@ var _blocked_reported: bool = false
 
 
 func _ready() -> void:
+	# BEFORE anything else: RunState.stage_changed fires for stage 1 from
+	# inside the add_child() below and asks this camera for a frame, so a
+	# handle created further down would be null when the first shot is due.
+	_camera = ShotCamera.new(get_viewport())
 	# Never fold a soak into the real save: re-point SaveData at a scratch
 	# file (fresh defaults) before the arena boots. BONK_SAVE_PATH wins
 	# when it is set (iteration 57), so tools/verificar.sh can hand every
@@ -686,6 +715,7 @@ func _on_stage_changed(stage_index: int, map_id: String) -> void:
 	_dwell_left = 0.0
 	_exit_rush = false
 	print("ArenaProbe: stage %d is %s" % [stage_index + 1, map_id])
+	_request_settled_shot(SHOT_SETTLE, "stage%d" % (stage_index + 1))
 
 
 ## BONK_ELITE_BOOST=1: every spawn rolls shiny. Through the group, like
@@ -803,6 +833,7 @@ func _on_run_ended(victory: bool) -> void:
 
 ## Printed once, on the way out: a summary the soak script can read.
 func _exit_tree() -> void:
+	_camera.final_shot()
 	# One-line log (RunManager convention) for headless soaks.
 	print("Probe legs: reached=%d timed_out=%d" % [_legs_reached, _legs_timed_out])
 	var explored := _explored_seen
@@ -904,6 +935,7 @@ func _tick_map_overlay(delta: float) -> void:
 	_map_overlay_report_left = MAP_OVERLAY_REPORT_DELAY
 	_send_action(0, &"map_overlay", true)
 	_release_map_overlay.call_deferred()
+	_request_settled_shot(SHOT_SETTLE_MAP, "map")
 
 
 func _release_map_overlay() -> void:
@@ -923,6 +955,77 @@ func _report_map_markers() -> void:
 	print("Map overlay: open markers=%d" % markers)
 
 
+## --- screenshots (iteration 60) ---------------------------------------------
+
+## The periodic shot's name. A Callable because the stem carries the run
+## clock, which is only known at the moment the shot comes due.
+func _periodic_shot_stem() -> String:
+	return "shot_%.1fs" % RunState.run_time
+
+
+## The run events worth a frame each, read off the TREE rather than off the
+## log lines the systems print — a print is not something another node can
+## subscribe to. A vendor is a new member of its own group; the pet box and
+## the lucky block announce themselves through the Interactable signal both
+## of them already emit; a power-up is an id the leader did not carry on
+## the previous sample.
+func _watch_shot_events() -> void:
+	if not _camera.enabled():
+		return
+	for node: Node in get_tree().get_nodes_in_group(&"vendors"):
+		var id := node.get_instance_id()
+		if _shot_seen.has(id):
+			continue
+		_shot_seen[id] = true
+		_request_shot("vendor_%s" % String(node.get("kind")))
+	_watch_shot_interactables(&"pet_boxes", "petbox")
+	_watch_shot_interactables(&"lucky_blocks", "lucky")
+	var lead := _lead_player()
+	var powerups := PowerUps.find_in(lead) if lead != null else null
+	if powerups == null:
+		return
+	var live: Dictionary[String, bool] = {}
+	for row: Dictionary in powerups.active():
+		var id := String(row.id)
+		live[id] = true
+		if not _shot_powerups.has(id):
+			_request_shot("powerup_%s" % id)
+	_shot_powerups = live
+
+
+## One connection per node in `group`, so the shot lands when the thing is
+## USED and not when it spawns: an unopened box is not a picture of a box
+## being opened.
+func _watch_shot_interactables(group: StringName, tag: String) -> void:
+	for node: Node in get_tree().get_nodes_in_group(group):
+		var id := node.get_instance_id()
+		if _shot_seen.has(id):
+			continue
+		_shot_seen[id] = true
+		var spot := node as Interactable
+		if spot != null:
+			spot.interaction_completed.connect(_request_shot.bind(tag))
+
+
+## Queues one event shot, named for the run time it happened at.
+func _request_shot(tag: String) -> void:
+	_camera.request("%s_%s" % [_periodic_shot_stem(), tag])
+
+
+## Seconds a "what it looks like" shot waits after its event. The overlay
+## opens on the frame after the Tab press, a weather tint ramps in over
+## about a second and a stage change is behind ScreenFade's cut, so a
+## picture taken on the event frame shows the moment BEFORE it every time
+## — which is how the first pass of this session photographed a map that
+## was not open yet.
+const SHOT_SETTLE: float = 1.5
+const SHOT_SETTLE_MAP: float = 0.6
+
+
+func _request_settled_shot(delay: float, tag: String) -> void:
+	_camera.request_in(delay, "%s_%s" % [_periodic_shot_stem(), tag])
+
+
 func _physics_process(delta: float) -> void:
 	_frames += 1
 	# A mortal soak is over the moment RunManager says so; the countdown
@@ -937,6 +1040,8 @@ func _physics_process(delta: float) -> void:
 		_run_mask_sweep()
 	_tick_stage_flow(delta)
 	_tick_map_overlay(delta)
+	_watch_shot_events()
+	_camera.tick(delta, _periodic_shot_stem)
 	_tick_party(delta)
 	_tick_swap_menu(delta)
 	_watch_saiyan_boons()
@@ -961,6 +1066,15 @@ func _physics_process(delta: float) -> void:
 		var ui := node as CanvasLayer
 		if ui != null and ui.visible and ui.has_method("_on_card_pressed"):
 			card_ui_open = true
+			# BEFORE the press, and only for the first picker of the soak:
+			# this harness answers a card the frame it appears, so the one
+			# screen a level-up puts in front of the player would never be
+			# photographed otherwise. The press is NOT delayed — the shot
+			# is asked for, the card is answered, and the camera saves
+			# whatever the next drawn frame holds.
+			if not _card_shot_taken:
+				_card_shot_taken = true
+				_request_shot("card")
 			ui.call("_on_card_pressed", 0)
 	_watch_for_wedge(delta, card_ui_open)
 	if _walking and not get_tree().paused:
@@ -1103,6 +1217,8 @@ func _watch_weather_end() -> void:
 	var now := String(weather.get("id", "")) if not weather.is_empty() else ""
 	if now == _weather_seen:
 		return
+	if not now.is_empty():
+		_request_settled_shot(SHOT_SETTLE, "weather_%s" % now)
 	if not _weather_seen.is_empty():
 		_report_hud_offset()
 		# Golden rain is the one row that writes a POINTS SOURCE on every
