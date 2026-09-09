@@ -150,7 +150,7 @@ marcadores de cadena > deriva de documentación.
 
 | Id | Sev | Dónde | Qué | Estado |
 |---|---|---|---|---|
-| L5-1 | MEDIUM | `scripts/ui/hud.gd:68` | El minimapa se ancla **encima** del grupo superior derecho del propio HUD: `MINIMAP_SOLO_TOP` 46 + margen 14 deja el mapa de 150 px en y 60..210, tapando la insignia de FPS y dos tercios de `%PointsLabel`; en co-op el `top` es 14 y también tapa `%KillsLabel`. Contradice `hud.gd:66-68` y `docs/ARQUITECTURA.md:501` («bajo la insignia de FPS»). | deferred: geométrico pero solo visible al renderizar, que esta auditoría no verifica |
+| L5-1 | MEDIUM | `scripts/ui/hud.gd:68` | El minimapa se ancla **encima** del grupo superior derecho del propio HUD: `MINIMAP_SOLO_TOP` 46 + margen 14 deja el mapa de 150 px en y 60..210, tapando la insignia de FPS y dos tercios de `%PointsLabel`; en co-op el `top` es 14 y también tapa `%KillsLabel`. Contradice `hud.gd:66-68` y `docs/ARQUITECTURA.md:501` («bajo la insignia de FPS»). | **fixed** (61) — la auditoría VISUAL lo confirmó en pantalla y resultó peor de lo que decían las constantes: la etiqueta de puntos quedaba tapada entera y la insignia de FPS dibujada DENTRO del cuadro del mapa. Ver `docs/AUDITORIA-VISUAL.md` V3, con captura antes y después |
 | L5-2 | MEDIUM | `scripts/ui/upgrade_card_ui.gd:292` | `_roll()` muestra solo `_cards.size()` (3) opciones y descarta el resto **en silencio**: el pozo del bloque de la suerte ofrece 3 objetos + la carta «Nada», así que un raider con tres o más objetos pierde la opción de negarse. | **fixed** (58) |
 | L5-3 | MEDIUM | `scripts/ui/vendor_ui.gd:465`, `scripts/ui/roulette_ui.gd:291` | `_close()` es la única liberación de la pausa y es incondicional, sin hook en `_exit_tree`/`NOTIFICATION_PREDELETE`; `upgrade_card_ui.gd:532` sí se guarda. | **fixed** (58) |
 | L5-4 | LOW | `scripts/ui/vendor_ui.gd:410`, `:455` | `_on_buy` y `_first_affordable` leen `_player` sin comprobar validez. | **fixed** (58) |
@@ -309,6 +309,10 @@ llega a ser una fila. Lo despejado, en una línea cada bloque:
   (el minimapa anclado sobre la insignia de FPS y la etiqueta de puntos) se
   queda en `deferred` por eso, con los números escritos para que quien
   arranque el juego lo confirme en un segundo.
+  - **Cerrado en la iteración 61**, y el límite resultó ser más caro de lo
+    que parecía: la misma ceguera dejaba pasar un suelo invisible en las
+    tres arenas. `docs/AUDITORIA-VISUAL.md` documenta la ronda visual y
+    `BONK_SHOT_DIR` es la puerta que la hace repetible.
 - **La prueba de `pre-audit` de L3-1**, dicha arriba con todo detalle.
 - **Los mandos.** El co-op real reparte un control por slot; el harness
   pone a todos en el teclado, que es lo único que existe en headless.

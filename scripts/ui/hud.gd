@@ -40,7 +40,15 @@ const PERF_PROBE_REFRESH := 0.25
 ## probe above: that one is a developer overlay behind an export/env
 ## switch, this one is a shipped option and shows nothing but the rate.
 const FPS_BADGE_REFRESH := 0.25
-const FPS_BADGE_OFFSET := Vector2(16.0, 76.0)
+## The top-right column is a STACK, and this is its third floor:
+## %KillsLabel (HUD.tscn, top 22, font 20), %PointsLabel (top 56, font 18,
+## so it ends around 82) and then this badge. At 76 it started inside the
+## points label (iteration 61 read it on screen); 88 clears it.
+const FPS_BADGE_OFFSET := Vector2(16.0, 88.0)
+## What the badge occupies once it is drawn: font 13 plus UiTheme's 3 px of
+## padding on each side. Only used to place what hangs BELOW it, so it does
+## not have to be exact — it has to be an over-estimate, and it is.
+const FPS_BADGE_HEIGHT := 26.0
 const FPS_BADGE_FONT_SIZE := 13
 const FPS_BADGE_TEXT := "%d FPS"
 
@@ -63,9 +71,14 @@ const SplitScreenView := preload("res://scripts/systems/split_screen.gd")
 
 ## Inset of a minimap from the top-right corner of its own cell.
 const MINIMAP_MARGIN := Vector2(14.0, 14.0)
-## Extra top inset for player 1 in SOLO, so the map clears the run timer
-## and the stage badge that live in the top-centre/right cluster.
-const MINIMAP_SOLO_TOP: float = 46.0
+## Top inset for a map whose cell touches the TOP of the window, so it
+## hangs below the whole top-right stack instead of over it (L5-1 of the
+## round-2 audit, confirmed on screen in iteration 61: at 46 + 14 the map
+## started at y 60 and covered %PointsLabel, the FPS badge and — in co-op,
+## where the extra inset was not applied at all — %KillsLabel too).
+## The stack is window-anchored, so EVERY cell along the top edge has to
+## clear it, not only the solo one.
+const MINIMAP_TOP_UNDER_HUD: float = FPS_BADGE_OFFSET.y + FPS_BADGE_HEIGHT + 8.0
 ## The overlay draws above the HUD and below the card picker (layer 10).
 const MAP_OVERLAY_LAYER: int = 8
 
@@ -138,6 +151,12 @@ const LOADOUT_GLYPH_FONT_SIZE := 16
 const LOADOUT_CORNER_FONT_SIZE := 10
 ## Blank spacer between the weapon / tome / item groups of the strip.
 const LOADOUT_GROUP_GAP := 8.0
+## How far the two bottom strips (build on the left, bag on the right) sit
+## above the bottom of the window, and how tall they are. The margin has to
+## clear %PauseHintLabel, which HUD.tscn pins 12 px off the bottom with a
+## 20 px box.
+const BOTTOM_STRIP_MARGIN := 36.0
+const BOTTOM_STRIP_HEIGHT := 48.0
 ## Icon convention (iteration 48): a slot draws
 ## res://assets/icons/<library>/<id>.png when that file exists, and
 ## ICON_PLACEHOLDER with the catalog glyph on top when it does not, so real
@@ -175,8 +194,15 @@ const WEATHER_GROUP_COLORS: Dictionary[String, Color] = {
 	"disaster": Color(1.0, 0.55, 0.3),
 }
 const WEATHER_BADGE_REFRESH: float = 0.2
-## Where the badge sits relative to the run timer.
-const WEATHER_BADGE_OFFSET := Vector2(0.0, 26.0)
+## Gap between the bottom of the clock's own badge box and the top of the
+## weather chip hanging under it. NOT an absolute offset any more
+## (iteration 61): 26 px from the timer's TOP is inside a label whose font
+## is 34 px, so the chip was drawn across the bottom half of the clock and
+## the run time was unreadable for the whole of every weather.
+const WEATHER_BADGE_GAP: float = 4.0
+## Fallback for the line above when the timer has not been laid out yet
+## (the badge is built lazily, so in practice it always has been).
+const WEATHER_BADGE_MIN_DROP: float = 46.0
 
 var _weather_badge: Label = null
 var _weather_refresh_left: float = 0.0
@@ -300,7 +326,10 @@ func _build_map_widgets(player_count: int) -> void:
 		minimap.anchor_bottom = cell.position.y
 		minimap.offset_left = -Minimap.SIZE - MINIMAP_MARGIN.x
 		minimap.offset_right = -MINIMAP_MARGIN.x
-		var top := MINIMAP_MARGIN.y + (MINIMAP_SOLO_TOP if count == 1 else 0.0)
+		# Cells along the window's top edge share it with the kills/points/
+		# FPS stack; the ones below only owe their own margin.
+		var top := MINIMAP_TOP_UNDER_HUD if is_zero_approx(cell.position.y) \
+				else MINIMAP_MARGIN.y
 		minimap.offset_top = top
 		minimap.offset_bottom = top + Minimap.SIZE
 		add_child(minimap)
@@ -517,7 +546,12 @@ func _build_weather_badge() -> Label:
 	UiTheme.style_badge(badge, UiTheme.TEXT_BRIGHT)
 	badge.set_anchors_preset(Control.PRESET_CENTER_TOP)
 	badge.grow_horizontal = Control.GROW_DIRECTION_BOTH
-	badge.position = WEATHER_BADGE_OFFSET
+	# Under the clock's own box, measured off the label instead of guessed:
+	# the timer's height is its font size plus the badge padding UiTheme
+	# gives it, and neither of those is a number this line should carry a
+	# copy of.
+	badge.position = Vector2(0.0,
+			maxf(_timer_label.size.y, WEATHER_BADGE_MIN_DROP) + WEATHER_BADGE_GAP)
 	_timer_label.add_child(badge)
 	return badge
 
@@ -565,8 +599,17 @@ func _rebuild_powerup_row(entries: Array[Dictionary]) -> HBoxContainer:
 		box.set_anchors_preset(Control.PRESET_CENTER_BOTTOM)
 		box.grow_horizontal = Control.GROW_DIRECTION_BOTH
 		box.grow_vertical = Control.GROW_DIRECTION_BEGIN
+		# ALL FOUR offsets, which is the whole bug this line used to carry
+		# (iteration 61): set_anchors_preset zeroes them, so leaving right
+		# and bottom alone left the row anchored to the window's bottom
+		# edge and 104 px TALL — a column of stretched tiles drawn across
+		# the HP bar and its label instead of a row above them. Collapsed
+		# to a point at the anchor, the container takes its own minimum
+		# size and grows up and out from there.
 		box.offset_left = POWERUP_ROW_OFFSET.x
+		box.offset_right = POWERUP_ROW_OFFSET.x
 		box.offset_top = POWERUP_ROW_OFFSET.y
+		box.offset_bottom = POWERUP_ROW_OFFSET.y
 		box.alignment = BoxContainer.ALIGNMENT_CENTER
 		box.add_theme_constant_override("separation", 6)
 		box.mouse_filter = Control.MOUSE_FILTER_PASS
@@ -745,8 +788,12 @@ func _rebuild_strip(box: HBoxContainer, entries: Array[Dictionary],
 			box.offset_left = 16.0
 		else:
 			box.offset_right = -16.0
-		box.offset_bottom = -20.0
-		box.offset_top = -68.0
+		# 36, not 20 (iteration 61): %PauseHintLabel sits at the bottom
+		# right of the window, 12 px up and 20 px tall, so a strip ending
+		# 20 px from the bottom drew its last tile straight over "Esc —
+		# Pausa" the moment the raider picked up a single item.
+		box.offset_bottom = -BOTTOM_STRIP_MARGIN
+		box.offset_top = -BOTTOM_STRIP_MARGIN - BOTTOM_STRIP_HEIGHT
 		box.add_theme_constant_override("separation", 6)
 		# PASS, not IGNORE: the slots need to be hit-testable for their
 		# tooltips, and PASS still lets the click through to the 3D world.

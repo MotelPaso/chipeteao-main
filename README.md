@@ -108,6 +108,9 @@ GDD.md                   # documento de diseño
 CHANGELOG.md             # una línea por iteración (45 hasta ahora)
 docs/ARQUITECTURA.md     # mapa de sistemas: dónde tocar para extender cada cosa
 docs/GLOSARIO.md         # terminología canónica es-419 (obligatoria)
+docs/AUDITORIA-RONDA-2.md  # registro de la auditoría de código (80 hallazgos)
+docs/AUDITORIA-VISUAL.md   # registro de la auditoría VISUAL: qué se vio en pantalla,
+                         #   con captura de antes y después por hallazgo
 tools/verificar.sh       # import + soak de las 3 arenas + soak de etapa + cobertura
 assets/
   audio/sfx/             # 20 wav sintetizados (regenerables, ver ARQUITECTURA)
