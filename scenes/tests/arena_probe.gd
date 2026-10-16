@@ -283,6 +283,9 @@ var _rng := RandomNumberGenerator.new()
 ## picture is worth taking in a run. Nothing in this section can make a
 ## gate easier — with the switch unset every line of it is a no-op.
 var _camera: ShotCamera = null
+## Frame-cost meter (iteration 63): a `Perf` line every 10 s of game time and
+## a `Perf summary` on the way out. Always on — it only reads the clock.
+var _perf: PerfMeter = null
 ## instance ids already accounted for in the vendor / pet box / lucky block
 ## groups, so one node fires one shot however long it stands there.
 var _shot_seen: Dictionary[int, bool] = {}
@@ -547,6 +550,7 @@ func _ready() -> void:
 	# inside the add_child() below and asks this camera for a frame, so a
 	# handle created further down would be null when the first shot is due.
 	_camera = ShotCamera.new(get_viewport())
+	_perf = PerfMeter.new(get_tree())
 	# Never fold a soak into the real save: re-point SaveData at a scratch
 	# file (fresh defaults) before the arena boots. BONK_SAVE_PATH wins
 	# when it is set (iteration 57), so tools/verificar.sh can hand every
@@ -834,6 +838,7 @@ func _on_run_ended(victory: bool) -> void:
 ## Printed once, on the way out: a summary the soak script can read.
 func _exit_tree() -> void:
 	_camera.final_shot()
+	_perf.summary()
 	# One-line log (RunManager convention) for headless soaks.
 	print("Probe legs: reached=%d timed_out=%d" % [_legs_reached, _legs_timed_out])
 	var explored := _explored_seen
@@ -1024,6 +1029,11 @@ const SHOT_SETTLE_MAP: float = 0.6
 
 func _request_settled_shot(delay: float, tag: String) -> void:
 	_camera.request_in(delay, "%s_%s" % [_periodic_shot_stem(), tag])
+
+
+## Drawn frames, not physics ticks: the meter times what a player waits for.
+func _process(_delta: float) -> void:
+	_perf.tick()
 
 
 func _physics_process(delta: float) -> void:
