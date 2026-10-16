@@ -152,25 +152,34 @@ func build_background(_arena: Node3D = null) -> void:
 
 ## Paints the arena mask's blocked cells darker, so the map shows the
 ## irregular shape of the stage instead of a clean square.
+## Decided per PIXEL, by the cell its centre falls in. It used to paint each
+## cell as a square of round(cell_size * scale) pixels, which only works
+## while a cell is a whole number of pixels: at 5 m cells (iteration 63)
+## and 0.5 px/m a cell is 2.5 px, and the rounded squares overlapped into
+## darker stripes.
 func _darken_blocked_cells(bounds: Node) -> void:
 	if bounds == null or background == null or not bounds.has_method(&"blocked_cells"):
 		return
 	var cells: Variant = bounds.call(&"blocked_cells")
 	if cells is not Array:
 		return
-	var cell_size := float(bounds.call(&"cell_size")) if bounds.has_method(&"cell_size") else 10.0
-	var pixels := background.get_width()
-	var scale := float(pixels) / maxf(half_extent * 2.0, 0.001)
+	var blocked: Dictionary[Vector2i, bool] = {}
 	for cell: Vector2i in cells:
-		var center: Vector2 = bounds.call(&"cell_center", cell)
-		var origin := Vector2(center.x - cell_size * 0.5, center.y - cell_size * 0.5)
-		var from := Vector2i(int(floor((origin.x + half_extent) * scale)),
-				int(floor((origin.y + half_extent) * scale)))
-		var span := maxi(int(round(cell_size * scale)), 1)
-		for py in range(from.y, mini(from.y + span, pixels)):
-			for px in range(from.x, mini(from.x + span, pixels)):
-				if px < 0 or py < 0:
-					continue
+		blocked[cell] = true
+	if blocked.is_empty():
+		return
+	var cell_size := float(bounds.call(&"cell_size")) if bounds.has_method(&"cell_size") else 10.0
+	# The grid's own origin, through the scatter's arithmetic, so the two
+	# can never disagree about where a cell starts.
+	var corner: Vector2 = bounds.call(&"cell_center", Vector2i.ZERO)
+	corner -= Vector2.ONE * cell_size * 0.5
+	var pixels := background.get_width()
+	var meters := half_extent * 2.0 / float(pixels)
+	for py in pixels:
+		var row := floori((-half_extent + (float(py) + 0.5) * meters - corner.y) / cell_size)
+		for px in pixels:
+			var column := floori((-half_extent + (float(px) + 0.5) * meters - corner.x) / cell_size)
+			if blocked.has(Vector2i(column, row)):
 				background.set_pixel(px, py, background.get_pixel(px, py).darkened(0.55))
 
 
