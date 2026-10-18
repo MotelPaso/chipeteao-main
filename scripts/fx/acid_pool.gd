@@ -67,6 +67,10 @@ func _build_visual() -> void:
 	mesh.top_radius = BASE_RADIUS
 	mesh.bottom_radius = BASE_RADIUS
 	mesh.height = 0.08
+	# Explicit tessellation: no height rings on an 8 cm slab, 24 sides for
+	# a disc a couple of metres wide (the engine default is 64 x 4).
+	mesh.radial_segments = 24
+	mesh.rings = 1
 	_disc.mesh = mesh
 	# Per-instance material: the fade writes alpha, and a shared resource
 	# would fade every other puddle on the map with it.

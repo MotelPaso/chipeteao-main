@@ -111,6 +111,39 @@ text = "Mostrar FPS"
 [node name="FpsCheck" type="CheckButton" parent="Center/Panel/VBox/FpsRow"]
 unique_name_in_owner = true
 
+[node name="QualityRow" type="HBoxContainer" parent="Center/Panel/VBox"]
+theme_override_constants/separation = 16
+
+[node name="QualityLabel" type="Label" parent="Center/Panel/VBox/QualityRow"]
+custom_minimum_size = Vector2(180, 0)
+theme_override_colors/font_color = Color(0.85, 0.87, 0.9, 1)
+theme_override_font_sizes/font_size = 16
+text = "Calidad gráfica"
+
+[node name="QualityButtons" type="HBoxContainer" parent="Center/Panel/VBox/QualityRow"]
+theme_override_constants/separation = 8
+
+[node name="QualityHigh" type="Button" parent="Center/Panel/VBox/QualityRow/QualityButtons"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(82, 34)
+theme_override_font_sizes/font_size = 15
+toggle_mode = true
+text = "Alta"
+
+[node name="QualityMedium" type="Button" parent="Center/Panel/VBox/QualityRow/QualityButtons"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(82, 34)
+theme_override_font_sizes/font_size = 15
+toggle_mode = true
+text = "Media"
+
+[node name="QualityLow" type="Button" parent="Center/Panel/VBox/QualityRow/QualityButtons"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(82, 34)
+theme_override_font_sizes/font_size = 15
+toggle_mode = true
+text = "Baja"
+
 [node name="BackButton" type="Button" parent="Center/Panel/VBox"]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(0, 44)

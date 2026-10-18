@@ -96,7 +96,13 @@ var _overlays: Array[MapOverlay] = []
 const POWERUP_ROW_OFFSET := Vector2(0.0, -104.0)
 const POWERUP_REFRESH: float = 0.2
 var _powerup_box: HBoxContainer = null
-var _powerup_signature: String = ""
+## Ids of the row's tiles, in order: its STRUCTURE. Only a change here
+## rebuilds the row; the seconds in the corners are patched in place.
+var _powerup_ids: String = ""
+## Corner text and corner Label of each tile, in row order (see
+## _swap_powerup_corners). A null Label is a tile built without one.
+var _powerup_corner_texts: PackedStringArray = PackedStringArray()
+var _powerup_corners: Array[Label] = []
 var _powerup_refresh_left: float = 0.0
 ## Slot -> the "x2" chip on that teammate's compact row.
 var _mate_powerup_chips: Dictionary[int, Label] = {}
@@ -117,6 +123,10 @@ var _mate_powerup_chips: Dictionary[int, Label] = {}
 
 var _hp_fill: StyleBoxFlat
 var _health: Health
+## The (current, max) _refresh_hp last drew. NAN never compares equal, so
+## the first call always draws.
+var _hp_drawn_current: float = NAN
+var _hp_drawn_max: float = NAN
 var _hp_value_tween: Tween = null
 var _xp_value_tween: Tween = null
 var _boss_value_tween: Tween = null
@@ -558,9 +568,11 @@ func _build_weather_badge() -> Label:
 
 ## --- active power-ups -------------------------------------------------------
 
-## Rebuilds the power-up row when it actually changed. The signature
-## includes the WHOLE seconds left, so the row repaints once a second
-## while a power-up runs and not five times.
+## Rebuilds the power-up row when the SET of power-ups changed, and only
+## re-letters the corners when just the whole seconds left did — which is
+## once a second for as long as any power-up runs. A full rebuild there
+## threw away and rebuilt five or six nodes, a StyleBox and up to three
+## ResourceLoader.exists checks per tile, to change one number.
 func _refresh_powerups() -> void:
 	# Teammates first, and ABOVE the slot-0 guard: the mate chips read every
 	# OTHER raider's power-ups, so hanging them behind this HUD's own body
@@ -584,12 +596,46 @@ func _refresh_powerups() -> void:
 				"tip": String(row.get("display_name", powerup_id)),
 				"icon": String(row.get("icon", "")),
 			})
-	var signature := ""
+	var ids := ""
+	var corners := PackedStringArray()
 	for entry: Dictionary in entries:
-		signature += "%s|%s;" % [entry.entry_id, entry.corner]
-	if signature != _powerup_signature:
-		_powerup_signature = signature
-		_powerup_box = _rebuild_powerup_row(entries)
+		ids += "%s;" % entry.entry_id
+		corners.append(String(entry.corner))
+	if ids == _powerup_ids and _swap_powerup_corners(corners):
+		return
+	_powerup_ids = ids
+	_powerup_corner_texts = corners
+	_powerup_box = _rebuild_powerup_row(entries)
+
+
+## Same tiles, new seconds: each tile whose corner text changed gets a new
+## corner Label from _make_corner_label — the very builder a fresh tile
+## uses — in the place a fresh tile has it (the last child of the tile's
+## inner Control). The rest of a tile is a function of its power-up id,
+## and the ids did not change, so the row ends up as a rebuild would have
+## left it. False when a tile cannot be patched (no corner Label to swap,
+## or an empty corner, which a fresh tile would draw with none); the
+## caller then rebuilds the whole row.
+func _swap_powerup_corners(corners: PackedStringArray) -> bool:
+	if corners.size() != _powerup_corners.size():
+		return false
+	for i in corners.size():
+		if corners[i] == _powerup_corner_texts[i]:
+			continue
+		# Checked on the array slot, before any typed local holds it.
+		if not is_instance_valid(_powerup_corners[i]) or corners[i].is_empty():
+			return false
+		var old: Label = _powerup_corners[i]
+		var inner := old.get_parent()
+		# Out FIRST, like every rebuild here: queue_free only lands at the
+		# end of the frame.
+		inner.remove_child(old)
+		old.queue_free()
+		var fresh := _make_corner_label(corners[i])
+		inner.add_child(fresh)
+		_powerup_corners[i] = fresh
+		_powerup_corner_texts[i] = corners[i]
+	return true
 
 
 func _rebuild_powerup_row(entries: Array[Dictionary]) -> HBoxContainer:
@@ -619,8 +665,15 @@ func _rebuild_powerup_row(entries: Array[Dictionary]) -> HBoxContainer:
 		# lands at the end of the frame and the row would jump.
 		box.remove_child(child)
 		child.queue_free()
+	_powerup_corners.clear()
 	for entry: Dictionary in entries:
-		box.add_child(_make_loadout_slot(entry))
+		var slot := _make_loadout_slot(entry)
+		box.add_child(slot)
+		_powerup_corners.append(slot.get_meta(&"corner_label", null) as Label)
+		# A one-time handoff: _powerup_corners owns the label from here on,
+		# and a meta left behind would keep pointing at the label the next
+		# corner swap frees.
+		slot.remove_meta(&"corner_label")
 	return box
 
 
@@ -869,21 +922,33 @@ func _make_loadout_slot(entry: Dictionary) -> Control:
 		inner.add_child(glyph)
 	var corner_text := String(entry.corner)
 	if not corner_text.is_empty():
-		var corner := Label.new()
-		corner.text = corner_text
-		corner.add_theme_font_size_override("font_size", LOADOUT_CORNER_FONT_SIZE)
-		corner.add_theme_color_override("font_color", UiTheme.TEXT_BRIGHT)
-		corner.add_theme_color_override("font_outline_color", UiTheme.OUTLINE_DARK)
-		corner.add_theme_constant_override("outline_size", 4)
-		corner.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-		corner.vertical_alignment = VERTICAL_ALIGNMENT_BOTTOM
-		corner.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		# MINSIZE preset: pinned to the bottom-right corner at its own text
-		# size, 3 px in from the border.
-		corner.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_RIGHT,
-				Control.PRESET_MODE_MINSIZE, 3)
+		var corner := _make_corner_label(corner_text)
 		inner.add_child(corner)
+		# The power-up row re-letters this label instead of rebuilding the
+		# tile (see _swap_powerup_corners).
+		slot.set_meta(&"corner_label", corner)
 	return slot
+
+
+## The level / stack / seconds tag in a tile's bottom-right corner. Built
+## detached and placed by its preset BEFORE it is parented, on both paths
+## that make one (a fresh tile and a patched power-up corner), so the two
+## cannot lay out differently.
+func _make_corner_label(text: String) -> Label:
+	var corner := Label.new()
+	corner.text = text
+	corner.add_theme_font_size_override("font_size", LOADOUT_CORNER_FONT_SIZE)
+	corner.add_theme_color_override("font_color", UiTheme.TEXT_BRIGHT)
+	corner.add_theme_color_override("font_outline_color", UiTheme.OUTLINE_DARK)
+	corner.add_theme_constant_override("outline_size", 4)
+	corner.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	corner.vertical_alignment = VERTICAL_ALIGNMENT_BOTTOM
+	corner.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	# MINSIZE preset: pinned to the bottom-right corner at its own text
+	# size, 3 px in from the border.
+	corner.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_RIGHT,
+			Control.PRESET_MODE_MINSIZE, 3)
+	return corner
 
 
 ## The texture a slot draws, in order of precedence: the catalog row's own
@@ -917,6 +982,19 @@ func _on_health_died() -> void:
 
 
 func _refresh_hp(current: float, max_hp: float) -> void:
+	# A repeat of the numbers already drawn, with the bar settled on them
+	# (same scale, value exactly `current`, no ease in flight), is a no-op
+	# all the way down: the ease below would run from `current` to
+	# `current`, and the label, the fill colour and the pulse state are pure
+	# functions of these two numbers. Lifesteal sends exactly that on every
+	# landed hit while the raider is at full HP. Short of all of it the
+	# normal path runs, so an ease restarted mid-flight still restarts.
+	if current == _hp_drawn_current and max_hp == _hp_drawn_max \
+			and _hp_bar.max_value == max_hp and _hp_bar.value == current \
+			and (_hp_value_tween == null or not _hp_value_tween.is_valid()):
+		return
+	_hp_drawn_current = current
+	_hp_drawn_max = max_hp
 	# Snap when the scale itself changes (new run / max-HP growth) so the
 	# bar never animates across two different scales; otherwise ease.
 	if not is_equal_approx(_hp_bar.max_value, max_hp):

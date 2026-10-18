@@ -38,6 +38,10 @@ func _ready() -> void:
 	mesh.top_radius = 1.0
 	mesh.bottom_radius = 1.0
 	mesh.height = 0.05
+	# Explicit tessellation: no height rings on a 5 cm slab, and 32 sides
+	# (half the engine default) keep the always-on ring round at full area.
+	mesh.radial_segments = 32
+	mesh.rings = 1
 	var material := StandardMaterial3D.new()
 	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA

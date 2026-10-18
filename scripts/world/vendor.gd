@@ -123,6 +123,9 @@ func _build_visual() -> void:
 	var body := CapsuleMesh.new()
 	body.radius = 0.35
 	body.height = 1.5
+	# Explicit tessellation (engine default 64 sides); default 8 rings.
+	body.radial_segments = 16
+	body.rings = 8
 	figure.mesh = body
 	var cloth := StandardMaterial3D.new()
 	cloth.albedo_color = tint

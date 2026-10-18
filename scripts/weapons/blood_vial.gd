@@ -80,6 +80,10 @@ func _ready() -> void:
 	_flask_mesh = SphereMesh.new()
 	_flask_mesh.radius = 0.14
 	_flask_mesh.height = 0.24
+	# Explicit tessellation: the engine default (64 x 32, ~4.2k triangles)
+	# is absurd for a 28 cm flask seen for half a second.
+	_flask_mesh.radial_segments = 12
+	_flask_mesh.rings = 6
 	var flask_material := StandardMaterial3D.new()
 	flask_material.albedo_color = Color(0.5, 0.06, 0.1)
 	flask_material.emission_enabled = true
@@ -135,8 +139,10 @@ func acquire_target() -> Node3D:
 	var cluster_sq := cluster_radius * cluster_radius
 	for body: Node3D in candidates:
 		var neighbors := 0
+		# Hoisted out of the inner loop: nothing in it moves a body.
+		var body_position := body.global_position
 		for other: Node3D in candidates:
-			if other != body and body.global_position \
+			if other != body and body_position \
 					.distance_squared_to(other.global_position) <= cluster_sq:
 				neighbors += 1
 		if neighbors > best_neighbors:

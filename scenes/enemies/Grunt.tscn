@@ -16,22 +16,30 @@ roughness = 0.4
 material = SubResource("StandardMaterial3D_skin")
 radius = 0.42
 height = 1.0
+radial_segments = 24
+rings = 6
 
 [sub_resource type="SphereMesh" id="SphereMesh_head"]
 material = SubResource("StandardMaterial3D_skin")
 radius = 0.34
 height = 0.68
+radial_segments = 24
+rings = 12
 
 [sub_resource type="CylinderMesh" id="CylinderMesh_horn"]
 material = SubResource("StandardMaterial3D_skin")
 top_radius = 0.0
 bottom_radius = 0.09
 height = 0.32
+radial_segments = 8
+rings = 0
 
 [sub_resource type="SphereMesh" id="SphereMesh_eye"]
 material = SubResource("StandardMaterial3D_eye")
 radius = 0.06
 height = 0.12
+radial_segments = 8
+rings = 4
 
 [sub_resource type="CapsuleShape3D" id="CapsuleShape3D_grunt"]
 radius = 0.42
@@ -67,10 +75,12 @@ mesh = SubResource("CylinderMesh_horn")
 
 [node name="EyeL" type="MeshInstance3D" parent="Visual"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.13, 1.18, -0.31)
+cast_shadow = 0
 mesh = SubResource("SphereMesh_eye")
 
 [node name="EyeR" type="MeshInstance3D" parent="Visual"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.13, 1.18, -0.31)
+cast_shadow = 0
 mesh = SubResource("SphereMesh_eye")
 
 [node name="Health" type="Node" parent="."]

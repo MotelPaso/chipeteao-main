@@ -5,6 +5,11 @@ extends Area3D
 ## 1), so bodies on the enemy layer are never even detected — an enemy
 ## bolt can never damage an enemy. Releases back to Pools on any body hit
 ## (player, floor, prop) or after max_distance so strays never linger.
+## `monitorable` is off in EnemyBolt.tscn: the bolt only ever DETECTS
+## bodies, and no script in the game detects areas (no area_entered, no
+## overlapping-area query, no collide_with_areas), so being detectable
+## only cost the physics server area-vs-area bookkeeping. NodePool records
+## the value on release and restores it on acquire, so recycling keeps it off.
 
 @export var speed: float = 10.0
 @export var damage: float = 8.0

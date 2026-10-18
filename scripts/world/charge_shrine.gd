@@ -116,6 +116,13 @@ var _zone_radius: float = DEFAULT_ZONE_RADIUS
 ## Per-instance materials for the ring and the disc (see _own_material).
 var _ring_material: StandardMaterial3D = null
 var _disc_material: StandardMaterial3D = null
+## Last energy/alpha _tick_marking wrote into those materials (NAN = never,
+## so the first tick always writes). An idle altar sits at the same values
+## for minutes, and every material write re-uploads its uniforms; nothing
+## else writes these two materials, so skipping a same-value write draws
+## exactly what rewriting it did.
+var _marked_energy: float = NAN
+var _marked_alpha: float = NAN
 
 
 func _init() -> void:
@@ -187,6 +194,10 @@ func _build_progress_disc() -> MeshInstance3D:
 	mesh.top_radius = radius
 	mesh.bottom_radius = radius
 	mesh.height = 0.04
+	# Same 64 sides as the scene's ProgressDisc (a 9 m disc has to stay
+	# round against its ring); no height rings on a 4 cm slab.
+	mesh.radial_segments = 64
+	mesh.rings = 1
 	disc.mesh = mesh
 	disc.position.y = 0.06
 	disc.scale = Vector3(0.001, 1.0, 0.001)
@@ -216,7 +227,11 @@ func _physics_process(delta: float) -> void:
 		# left the Area3D, so the cancel below came from the live-players
 		# check, not from an exit). Polling the ring here is what keeps
 		# such an altar from sitting on its resume prompt forever.
-		if available and not live_players_in_range().is_empty():
+		# player_in_range first: it is true whenever the backing array holds
+		# anybody (Interactable keeps the two in step), and the live list is
+		# a subset of that array, so an empty ring can skip the two arrays
+		# live_players_in_range() would build every frame for nothing.
+		if available and player_in_range and not live_players_in_range().is_empty():
 			_on_range_entered()
 		return
 	# A downed raider never leaves the Area3D, so body_exited alone would
@@ -249,6 +264,10 @@ func _tick_marking() -> void:
 		var beat := 0.5 + 0.5 * sin(_time * MARK_PULSE_HZ)
 		energy = lerpf(RING_ENERGY_IDLE, RING_ENERGY_MARKED, beat)
 		alpha = lerpf(RING_ALPHA_IDLE, RING_ALPHA_MARKED, beat)
+	if energy == _marked_energy and alpha == _marked_alpha:
+		return
+	_marked_energy = energy
+	_marked_alpha = alpha
 	if _ring_material != null:
 		_ring_material.emission_energy_multiplier = energy
 		_ring_material.albedo_color.a = alpha
@@ -261,11 +280,12 @@ func _tick_marking() -> void:
 func _player_near() -> bool:
 	var band := _zone_radius * APPROACH_BAND_SCALE
 	var band_sq := band * band
-	for node: Node in Coop.alive_players(get_tree()):
-		var body := node as Node3D
-		if body != null and global_position.distance_squared_to(body.global_position) <= band_sq:
-			return true
-	return false
+	# "Anybody inside the band" is "the nearest is inside the band": same
+	# standing-raider filter and the same distance expression as the old
+	# alive_players() walk, without the Array it built per altar per frame.
+	var nearest := Coop.nearest_player(get_tree(), global_position)
+	return nearest != null \
+			and global_position.distance_squared_to(nearest.global_position) <= band_sq
 
 
 ## Master Keys held by the raider(s) still standing in the ring: the best

@@ -1,6 +1,6 @@
 class_name PerfMeter
 extends RefCounted
-## Frame-cost meter the soak harness carries (iteration 63).
+## Frame-cost meter the soak harness carries (iteration 64).
 ##
 ## WHY IT EXISTS. Every soak runs with --fixed-fps 60, which advances game
 ## time by exactly 1/60 s per frame and then runs the next frame as fast as

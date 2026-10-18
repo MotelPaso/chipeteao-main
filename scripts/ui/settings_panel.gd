@@ -26,6 +26,12 @@ const VOLUME_MAX := 100.0
 @onready var _sensitivity_value: Label = %SensitivityValue
 @onready var _fullscreen_check: CheckButton = %FullscreenCheck
 @onready var _fps_check: CheckButton = %FpsCheck
+## Graphics preset (iteration 64), one toggle per SaveData.graphics_quality
+## index — Alta, Media, Baja, in that order. Three buttons in a ButtonGroup
+## instead of an OptionButton: the panel has no popup anywhere else, and a
+## popup list is one more surface to style and to navigate with a pad.
+@onready var _quality_buttons: Array[Button] = [%QualityHigh as Button,
+		%QualityMedium as Button, %QualityLow as Button]
 @onready var _back_button: Button = %BackButton
 
 var _open_tween: Tween = null
@@ -39,6 +45,11 @@ func _ready() -> void:
 	_sensitivity_slider.value_changed.connect(_on_sensitivity_changed)
 	_fullscreen_check.toggled.connect(_on_fullscreen_toggled)
 	_fps_check.toggled.connect(_on_fps_toggled)
+	var quality_group := ButtonGroup.new()
+	for index in _quality_buttons.size():
+		var button := _quality_buttons[index]
+		button.button_group = quality_group
+		button.toggled.connect(_on_quality_toggled.bind(index))
 	_back_button.pressed.connect(close)
 
 
@@ -88,6 +99,8 @@ func _refresh_controls() -> void:
 	_sensitivity_slider.set_value_no_signal(SaveData.mouse_sensitivity)
 	_fullscreen_check.set_pressed_no_signal(SaveData.fullscreen)
 	_fps_check.set_pressed_no_signal(SaveData.show_fps)
+	for index in _quality_buttons.size():
+		_quality_buttons[index].set_pressed_no_signal(index == SaveData.graphics_quality)
 	_refresh_sensitivity_label(_sensitivity_slider.value)
 
 
@@ -114,6 +127,13 @@ func _on_fullscreen_toggled(on: bool) -> void:
 
 func _on_fps_toggled(on: bool) -> void:
 	Settings.set_show_fps(on)
+
+
+## A ButtonGroup toggles the old choice OFF as well; only the button that
+## turned on carries a decision.
+func _on_quality_toggled(on: bool, index: int) -> void:
+	if on:
+		Settings.set_graphics_quality(index)
 
 
 ## Slider bounds come from the code that clamps the stored values, not
@@ -151,4 +171,15 @@ func _apply_styles() -> void:
 		slider.add_theme_icon_override("grabber_highlight", grabber_hi)
 		slider.add_theme_icon_override("grabber_disabled", grabber)
 	_sensitivity_value.add_theme_color_override("font_color", UiTheme.ACCENT)
+	for button: Button in _quality_buttons:
+		UiTheme.style_button(button, UiTheme.ACCENT)
+		# The project's only toggle buttons have one state the shared button
+		# look never needed: the mouse over the preset that is already
+		# chosen. Godot 4.7's default theme has no "hover_pressed" box but
+		# does have a "font_hover_pressed_color", so without these two that
+		# state would mix the engine's look into the panel's.
+		var chosen := button.get_theme_stylebox("pressed").duplicate() as StyleBoxFlat
+		chosen.border_color = UiTheme.ACCENT
+		button.add_theme_stylebox_override("hover_pressed", chosen)
+		button.add_theme_color_override("font_hover_pressed_color", UiTheme.TEXT_BRIGHT)
 	UiTheme.style_button(_back_button, UiTheme.ACCENT, true)

@@ -45,6 +45,12 @@ var _target: Node3D = null
 var _aim_line: BeamVisual
 var _beam: BeamVisual
 var _hum_held: bool = false
+## The sight ray's query, built once with the same factory call (world
+## layer 1 only) and re-aimed per cast: _beam_sight runs every tick the
+## spitter aims, fires, or waits on a blocked line, and used to allocate a
+## fresh query object each time. Only from/to ever change on it.
+var _sight_query: PhysicsRayQueryParameters3D = \
+		PhysicsRayQueryParameters3D.create(Vector3.ZERO, Vector3.ZERO, 1)
 
 
 func _init() -> void:
@@ -165,8 +171,9 @@ func _end_fire() -> void:
 func _beam_sight(player: Node3D, line: BeamVisual, thickness: float = -1.0) -> Node3D:
 	var from := global_position + Vector3.UP * muzzle_height
 	var to := player.global_position + Vector3.UP * target_height
-	var ray := PhysicsRayQueryParameters3D.create(from, to, 1)
-	var hit := get_world_3d().direct_space_state.intersect_ray(ray)
+	_sight_query.from = from
+	_sight_query.to = to
+	var hit := get_world_3d().direct_space_state.intersect_ray(_sight_query)
 	var burned: Node3D = null
 	var end := to
 	if not hit.is_empty():

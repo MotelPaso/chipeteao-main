@@ -52,6 +52,12 @@ const DEFAULT_AMBIENT_VOLUME := 100.0
 const DEFAULT_MOUSE_SENSITIVITY := 1.0
 const MIN_MOUSE_SENSITIVITY := 0.3
 const MAX_MOUSE_SENSITIVITY := 2.0
+## Graphics preset (iteration 64): 0 Alta, 1 Media, 2 Baja. What each one
+## does lives in Settings (settings_apply.gd), the only applier; the save
+## only keeps the index. Alta is what the game always rendered, so a save
+## without the key — every save before this iteration — plays unchanged.
+const DEFAULT_GRAPHICS_QUALITY := 0
+const MAX_GRAPHICS_QUALITY := 2
 
 ## Test harnesses point this at a scratch file before load_from_disk().
 var save_path: String = DEFAULT_SAVE_PATH
@@ -96,6 +102,8 @@ var fullscreen: bool = false
 ## User-facing FPS readout in the HUD (iteration 48). Independent from the
 ## debug perf probe, which stays hidden behind its own export/env switch.
 var show_fps: bool = false
+## Graphics preset index, 0..MAX_GRAPHICS_QUALITY (see the const above).
+var graphics_quality: int = DEFAULT_GRAPHICS_QUALITY
 
 
 ## Env override (test-only, iteration 49): BONK_SAVE_PATH re-points the
@@ -454,6 +462,7 @@ func _apply_defaults() -> void:
 	mouse_sensitivity = DEFAULT_MOUSE_SENSITIVITY
 	fullscreen = false
 	show_fps = false
+	graphics_quality = DEFAULT_GRAPHICS_QUALITY
 
 
 ## Missing/legacy "settings" (pre-iteration-22 saves) or malformed entries
@@ -470,6 +479,9 @@ func _load_settings(value: Variant) -> void:
 			MIN_MOUSE_SENSITIVITY, MAX_MOUSE_SENSITIVITY)
 	fullscreen = _as_bool(settings.get("fullscreen"), false)
 	show_fps = _as_bool(settings.get("show_fps"), false)
+	graphics_quality = clampi(
+			_as_int(settings.get("graphics_quality"), DEFAULT_GRAPHICS_QUALITY),
+			0, MAX_GRAPHICS_QUALITY)
 
 
 ## The persisted ledger. Note it serializes `counters` only: whatever the
@@ -490,6 +502,7 @@ func _to_save_dict() -> Dictionary[String, Variant]:
 			"mouse_sensitivity": mouse_sensitivity,
 			"fullscreen": fullscreen,
 			"show_fps": show_fps,
+			"graphics_quality": graphics_quality,
 		},
 	}
 

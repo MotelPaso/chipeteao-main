@@ -25,28 +25,38 @@ material = SubResource("StandardMaterial3D_hide_dark")
 top_radius = 0.4
 bottom_radius = 0.46
 height = 0.5
+radial_segments = 16
+rings = 0
 
 [sub_resource type="CylinderMesh" id="CylinderMesh_seg2"]
 material = SubResource("StandardMaterial3D_hide")
 top_radius = 0.32
 bottom_radius = 0.4
 height = 0.45
+radial_segments = 16
+rings = 0
 
 [sub_resource type="CylinderMesh" id="CylinderMesh_seg3"]
 material = SubResource("StandardMaterial3D_hide_dark")
 top_radius = 0.24
 bottom_radius = 0.32
 height = 0.4
+radial_segments = 16
+rings = 0
 
 [sub_resource type="SphereMesh" id="SphereMesh_head"]
 material = SubResource("StandardMaterial3D_pale")
 radius = 0.3
 height = 0.6
+radial_segments = 24
+rings = 12
 
 [sub_resource type="SphereMesh" id="SphereMesh_mound"]
 material = SubResource("StandardMaterial3D_sand")
 radius = 0.72
 height = 0.5
+radial_segments = 24
+rings = 12
 
 [sub_resource type="CapsuleShape3D" id="CapsuleShape3D_burrower"]
 radius = 0.45

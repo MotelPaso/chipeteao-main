@@ -20,12 +20,16 @@ const SIZE: float = 150.0
 const FRAME_PAD: float = 3.0
 ## Markers are drawn smaller here than on the full-screen overlay.
 const MARKER_SCALE: float = 0.75
-## Seconds between marker collections and composites. The fog itself
-## paints on its own slower tick; this is what turns it into a picture.
+## Seconds between marker collections and composite checks. The fog
+## itself paints on its own slower tick; this is what turns it into a
+## picture — when it changed (see _composite_if_changed).
 const REFRESH: float = 0.1
 
 var _map: MapDraw = null
 var _refresh_left: float = 0.0
+## composite_key() as of the last composite this widget ran. Empty means
+## "unknown": the next refresh composites whatever the key says.
+var _composited: Array = []
 
 
 func _ready() -> void:
@@ -44,6 +48,10 @@ func on_stage_started(_arena: Node3D = null) -> void:
 	if _map == null:
 		_map = MapDraw.new(get_tree())
 	_map.build_background()
+	# build_background rewrites the picture's pixels, and the key cannot see
+	# an edit made inside an Image it already knows: forget it, so the next
+	# refresh composites unconditionally.
+	_composited = []
 	_map.collect_markers()
 	queue_redraw()
 
@@ -56,10 +64,43 @@ func _process(delta: float) -> void:
 		return
 	_refresh_left = REFRESH
 	# Both are plain methods with no Control involved, so a headless soak
-	# exercises the map even where _draw() is never dispatched.
+	# exercises the map even where _draw() is never dispatched. Markers move
+	# every tick and are always collected; the composite only when its
+	# inputs moved.
 	_map.collect_markers()
-	_map.composite()
+	_composite_if_changed()
 	queue_redraw()
+
+
+## MapDraw.composite() is a pure function of the background Image and the
+## fog image: a 14 400-pixel get_pixel/set_pixel loop (~1.5 ms of GDScript)
+## that, run unconditionally, was most of this widget's cost and a spike
+## every sixth frame. The fog only changes when a raider steps onto ground
+## nobody has seen, so on most ticks the texture it would upload is the
+## one already on screen.
+func _composite_if_changed() -> void:
+	var key := composite_key(_map, get_tree())
+	if key == _composited:
+		return
+	_composited = key
+	_map.composite()
+
+
+## Everything MapDraw.composite() reads, as one comparable value: the
+## background Image the map holds (build_background swaps in a new one per
+## stage), the fog node, and that fog's revision (which moves exactly when
+## its image does). Equal keys mean composite() would write the very pixels
+## it wrote last time. Edits INSIDE the background are not visible here,
+## which is why every build_background call also clears the caller's key.
+## Static and shared with MapOverlay, so the two consumers cannot disagree
+## about when their picture is stale.
+static func composite_key(map: MapDraw, tree: SceneTree) -> Array:
+	var fog := FogOfWar.find(tree)
+	return [
+		map.background.get_instance_id() if map.background != null else 0,
+		fog.get_instance_id() if fog != null else 0,
+		fog.revision if fog != null else -1,
+	]
 
 
 func marker_count() -> int:

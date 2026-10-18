@@ -375,6 +375,28 @@ class Driver extends Node:
 				if SaveData.show_fps != before:
 					_fail("toggling %FpsCheck twice did not restore SaveData.show_fps")
 					return false
+				# Graphics preset (iteration 64): Media must reach both the
+				# save and the root viewport's 3D scale, and Alta must give
+				# back exactly the native 1.0 every earlier build rendered.
+				var medium := panel.get_node_or_null("%QualityMedium") as Button
+				var high := panel.get_node_or_null("%QualityHigh") as Button
+				if medium == null or high == null:
+					_fail("no %QualityMedium / %QualityHigh under the settings panel")
+					return false
+				var quality_before := SaveData.graphics_quality
+				medium.button_pressed = true
+				if SaveData.graphics_quality != 1 or high.button_pressed \
+						or not is_equal_approx(get_tree().root.scaling_3d_scale, 0.75):
+					_fail("pressing %%QualityMedium left quality=%d scale=%.2f" % [
+							SaveData.graphics_quality, get_tree().root.scaling_3d_scale])
+					return false
+				high.button_pressed = true
+				if SaveData.graphics_quality != 0 \
+						or not is_equal_approx(get_tree().root.scaling_3d_scale, 1.0):
+					_fail("pressing %%QualityHigh left quality=%d scale=%.2f" % [
+							SaveData.graphics_quality, get_tree().root.scaling_3d_scale])
+					return false
+				Settings.set_graphics_quality(quality_before)
 				_phase = 2
 				return false
 			2:

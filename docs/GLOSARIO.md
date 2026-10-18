@@ -352,6 +352,7 @@ Lo que NO se traduce nunca: los `id` de catálogo, los `node_name`, los nombres 
 | mouse | mouse (NUNCA «ratón») |
 | Player 1 / P1 | Jugador 1 / J1 (NUNCA «P1») |
 | Show FPS | Mostrar FPS (FPS no se traduce ni se declina) |
+| graphics quality | calidad gráfica (iteración 64; los tres niveles son adjetivos femeninos que concuerdan con «calidad»: Alta, Media, Baja — nunca «High/Medium/Low» ni «Ultra») |
 | jump | salto (mid-air jump = salto en el aire) |
 | power-up | power-up (con guion, invariable en plural: «power-up»/«power-ups») |
 
@@ -668,6 +669,10 @@ evolución.
 | `Fullscreen` | Pantalla completa |
 | `Show FPS` | Mostrar FPS |
 | `%d FPS` | %d FPS |
+| `Graphics quality` | Calidad gráfica |
+| `High` (quality) | Alta |
+| `Medium` (quality) | Media |
+| `Low` (quality) | Baja |
 | `YOU DIED` | MORISTE |
 | `RUN COMPLETE` | INCURSIÓN COMPLETA |
 | `EXTRACTED` | EXTRACCIÓN LOGRADA |

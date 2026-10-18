@@ -452,7 +452,14 @@ Reparto de trabajo, y **cuándo** corre cada cosa:
   sombreado por altura; 0.5 px/m = 240 px para una arena de 240 m) y oscurece
   las celdas que la máscara bloquea, para que el mapa tenga la **forma
   irregular** de la etapa y no un cuadrado limpio.
-- `composite()` — en el tick de refresco (10 Hz). Fondo × niebla en una única
+- `composite()` — en el tick de refresco (10 Hz), **pero solo si cambió algo
+  que lee** (iteración 64): el minimapa y el overlay comparan
+  `Minimap.composite_key()` —identidad de la `Image` de fondo, identidad del
+  nodo de niebla y `FogOfWar.revision`— y se la saltan si es la misma de la
+  última vez; `on_stage_started` borra la clave. Recomponer costaba 1,5-2,8 ms
+  (según la carga de la máquina) cada 6 frames aunque nada hubiera cambiado. **Contrato**: si
+  `composite()` empieza a leer otra cosa, esa cosa entra en la clave; y quien
+  escriba `FogOfWar.image` fuera de `fog_of_war.gd` sube `revision`. Fondo × niebla en una única
   `ImageTexture` que el consumidor solo blitea. Lo inexplorado se atenúa a
   `FOG_ALPHA` 0.85, **no** se pinta opaco: la silueta del mapa es una pista, lo
   que hay **encima** es la recompensa.
@@ -1038,6 +1045,91 @@ colocar un `Control`: eso es lo que el stretch ya resuelve.
 - **Co-op** (`scripts/systems/coop.gd`, autoload `Coop`): `player_count`, `devices`, `character_ids`, `action(slot, base)` (acciones clonadas por slot), `look_vector(slot)`, `nearest_player(tree, from)`, `random_player(tree)`, `alive_players(tree)`, `alive_player_count(tree)`. El snapshot de jugadores está tipado y su invalidación es explícita (`invalidate_players()`): si spawneas o liberas un raider fuera de `RunSystems`, invalídalo.
 - **Pantalla dividida** (`scripts/systems/split_screen.gd`): un `SubViewportContainer` por jugador con una cámara que **espeja** la del jugador (transform, `fov`, `h_offset`, `v_offset`, `cull_mask` — la lista completa está en `CameraPair.sync()`; una vista que se saltaba los offsets no temblaba). Las cámaras fuente se apuntan a `Juice.FEEL_CAMERA_GROUP`.
 
+## Rendimiento (iteración 64)
+
+**Cómo se mide.** Cada soak imprime una línea `Perf t=...` cada 600 frames
+(media, p50, p95, p99 y máximo del frame, junto a enemigos, nodos, huérfanos,
+draw calls y primitivas) y un `Perf summary` al salir (`PerfMeter`,
+`scenes/tests/perf_meter.gd`). Bajo `--fixed-fps 60` el reloj de pared de
+un frame headless **es** el costo de CPU de ese frame con el renderer
+anulado. Con ventana suma la GPU, pero en un Mac solo en **pantalla
+completa**: en ventana el compositor la topa a la frecuencia del panel
+aunque se pase `--disable-vsync`. Dos corridas con la misma semilla
+divergen después de ~38 s, así que una comparación de frame time se hace
+con **varias semillas por lado** y medianas, nunca con una corrida.
+
+**Física: Jolt.** `project.godot` fija `3d/physics_engine="Jolt Physics"`.
+`DEFAULT` es GodotPhysics3D en 4.7, y con él el `move_and_slide` de cada
+enemigo costaba 130-400 µs (95 % de su tick), más cuando la horda se
+apretaba: 80 enemigos pasaban los 16,6 ms del frame **solo en CPU**, y un
+cuerpo trabado en la masa llegó a 33 ms por tick él solo. Medido con 18
+pares de soaks de 360 s (6 semillas × 3 arenas): frame medio 7,8 → 1,9 ms,
+p99 27 → 4,9 ms, tirones de más de 33 ms 37 → 0, con la misma progresión
+(nivel mediano 14 y 14, bajas 342 y 351, cofres abiertos 7 y 8,5). Sin
+enemigos, el raider camina igual con los dos motores (misma velocidad y
+mismos atascos por semilla). Lo que cambia y hay que saber:
+
+- Los monitores `PHYSICS_3D_ACTIVE_OBJECTS` y `PHYSICS_3D_COLLISION_PAIRS`
+  leen **0** con Jolt: las columnas `bodies`/`pairs` de `Perf` dejaron de
+  servir.
+- Desde 4.5 un `Area3D` **sí** detecta cuerpos estáticos con Jolt (el ajuste
+  que lo apagaba se eliminó), así que proyectiles y bolts siguen chocando
+  con el terreno y las rocas.
+- El proyecto no usa joints ni `RigidBody3D`, que es donde Jolt más difiere.
+- Todo lo medido antes de esta iteración (umbrales de soak, recetas de
+  puertas, comportamientos de contacto) se midió con GodotPhysics. Una rama
+  abierta antes de la iteración 64 re-corre su puerta con Jolt al
+  rebasarse sobre ella.
+
+**`monitorable = false` en los `Area3D`.** Nadie en el proyecto detecta un
+área como área (ni `area_entered`, ni `get_overlapping_areas`, ni consultas
+con `collide_with_areas`), así que las áreas de pickups, cofres, santuarios,
+proyectiles y bolts lo tienen apagado. Si una mecánica nueva necesita
+detectar un área, se enciende **en esa escena** y se dice en su cabecera.
+`NodePool` registra y restaura el valor, así que el pool no lo pisa.
+
+**Mallas primitivas con teselado explícito.** Un `SphereMesh` sin
+`radial_segments`/`rings` son 4 224 triángulos: los dos ojos de 6 cm de un
+Grunt eran la mitad de sus 17 536. Toda `SphereMesh`, `CapsuleMesh`,
+`CylinderMesh` y `TorusMesh` —en escena o creada con `.new()`— declara sus
+segmentos, con la silueta a menos de ~1 cm del círculo real a escala de
+autor: cabezas y cuerpos 24×12, orbes y bolts 12×6, ojos y llamitas 8×4,
+gemas 4×2, conos y cilindros sin anillos intermedios. El disco de telégrafo
+de los jefes declara 64 lados a propósito (el valor por defecto, escrito
+para que se vea que es una decisión): su borde **es** la zona de golpe que
+el jugador lee. `cast_shadow = 0` en partes de menos de ~0,1 m (ojos,
+dientes, gemas, llamitas) y en FX pequeños que brillan (orbes, el orbe de
+vida, el anillo de nivel, el disco de telégrafo).
+
+**Separación de la horda en grilla.** `EnemyBase._separation_push` ya no
+recorre la horda entera por cuerpo: una grilla espacial de celdas de
+`SEPARATION_CELL_SIZE` (1,25 m, mayor que el `separation_radius` más grande)
+se arma una vez por tick y cada cuerpo mira su celda y las 8 vecinas. Mismos
+vecinos y misma contribución que antes; solo cambia el orden de suma en coma
+flotante. **Invariante**: un enemigo solo se mueve dentro de su propio
+`_physics_process` (que reubica su celda) o entre ticks. Algo que lo
+teletransporte o lo empuje a mitad de tick desde otro nodo tiene que
+reubicarlo también.
+
+**Tope de cofres de recompensa.** `EnemyBase.BOUNTY_CHEST_CAP` (30): con
+30 cofres de élite **sin abrir** en el mapa, un élite muerto no suelta otro
+hasta que se abra alguno o cambie la etapa (`Elite chest capped: ...` en el
+log). Antes no expiraban ni tenían tope: un soak de 15 minutos terminaba con
+~390 en el suelo. Los cofres de jefe no cuentan. El harness imprime
+`Probe bounty chests: max=%d cap=%d` y `verificar.sh` falla si se pasa.
+
+**Calidad gráfica** (Ajustes → «Calidad gráfica», `SaveData.graphics_quality`,
+aplicada por `Settings`): Alta es lo de siempre; Media renderiza el 3D al
+75 % con FSR 1 y deja las sombras del sol a 60 m en dos cortes; Baja, al
+50 % y sin sombras del sol. El 2D no se escala nunca (`canvas_items`), así
+que el HUD queda nítido en cualquier preset. Las `SubViewport` de la
+pantalla dividida no heredan la escala de la raíz: entran al grupo
+`world_views` y `Settings` se la aplica. El sol de cada etapa recibe el
+preset en `RunState.stage_changed` y guarda lo que su arena tenía de fábrica
+(meta `authored_sun_shadow`) para que volver a Alta lo restaure exacto. Log:
+`Graphics: quality=%d scale=%.2f suns=%d views=%d`; el soak de co-op corre en
+Media (`BONK_GRAPHICS=1`) y lo exige.
+
 ## Verificación
 
 ### `tools/verificar.sh`
@@ -1061,11 +1153,12 @@ Hace `godot --headless --import`, el **lint de catálogos** y el **harness de UI
 - una arena no llega al final del soak (se colgó o murió antes) — lo mide contando las líneas `frame N ...` que el harness imprime cada 120 frames,
 - **cobertura**: el raider no pasó del nivel 3 (señal de que el arma no hace daño), o —solo en corridas de ≥240 s— ningún interactuable se resolvió. Un soak que no sube de nivel ni toca nada puede pasar «limpio» sin haber ejercitado nada.
 - **etapa**: el soak de etapa no abrió su portal, no cruzó de `hollow_woods` a `ash_dunes`, dejó algo vivo en un `Stage sweep:`, perdió progreso entre el par de `Stage carry:` de un cruce, o no produjo ningún `Sky event:` después del cruce (lo que probaría que el director no volvió a cachear las luces del mapa nuevo).
-- **co-op** (iteración 57): el quinto soak no arrancó con dos raiders (`ArenaProbe: players=2`), no cruzó de etapa, ensució un `Stage sweep:` o no produjo ningún `Player revived:`.
+- **co-op** (iteración 57): el quinto soak no arrancó con dos raiders (`ArenaProbe: players=2`), no cruzó de etapa, ensució un `Stage sweep:` o no produjo ningún `Player revived:`. Desde la iteración 64 corre en calidad Media y además falla sin la línea `Graphics: quality=1 scale=0.75 suns=1 views=2` (el preset llegó al sol y a las dos `SubViewport`).
+- **tope de cofres** (iteración 64): a cualquiera de los cinco soaks le falta `Probe bounty chests: max=N cap=M`, o `N` pasa de `M`. El conteo cuenta los cofres que hay, no pasa por el tope, así que quitar el tope se ve en cuanto un soak deja caer más de 30 — cosa que no pasa siempre: de las dos corridas que cerraron la iteración 64, el soak de etapa llegó a 30 en una y a 6 en la otra.
 - **lint / UI** (iteración 57): falta cualquiera de las nueve líneas `Catalog lint: check <nombre> ok rows=N` (con `rows` > 0) o de los trece `UiProbe: step <nombre> ok`. Las listas de nombres viven en `tools/verificar.sh` y se greppean **una por una**: una comprobación que deja de ejecutarse desaparece del log sin ruido, y un conteo la daría por buena mientras otra se repite.
 - **partida godmode terminada**: cualquier soak inmortal que imprima `Probe fog: skipped` (ver la regla de fin de partida abajo). Un raider con 10M de HP no tiene por qué morirse.
 
-La corrida completa (import + lint + harness de UI + 3×360 s + 1×720 s + 1×360 s de co-op) tarda **entre ~16 y ~75 minutos**, más que el timeout de una llamada de shell: lánzala en segundo plano. El reloj de una corrida lo manda el TAMAÑO DE LA HORDA, no el número de frames: medido en dos corridas de la misma cabeza y las mismas semillas, **16 min** y **75 min**. El soak de co-op es el que más se mueve (la horda escala +50% de HP y +30% de ritmo de spawn por raider extra, y un cuerpo vivo cuesta física cada frame): 78 s en una corrida y 32 min en la otra. Por eso `verificar.sh` imprime los segundos de cada fase y el total — una estimación fija envejece mal.
+La corrida completa (import + lint + harness de UI + 3×360 s + 1×720 s + 1×360 s de co-op) tarda **entre ~16 y ~75 minutos**, más que el timeout de una llamada de shell: lánzala en segundo plano. El reloj de una corrida lo manda el TAMAÑO DE LA HORDA, no el número de frames: medido en dos corridas de la misma cabeza y las mismas semillas, **16 min** y **75 min**. El soak de co-op es el que más se mueve (la horda escala +50% de HP y +30% de ritmo de spawn por raider extra, y un cuerpo vivo cuesta física cada frame): 78 s en una corrida y 32 min en la otra. Por eso `verificar.sh` imprime los segundos de cada fase y el total — una estimación fija envejece mal. **Desde Jolt (iteración 64)** la corrida completa tardó 3-5 min en las tres medidas de esa iteración: el costo por cuerpo que estiraba el reloj es lo que Jolt se llevó.
 
 Logs en `$TMPDIR/bonkraiders-verify/`. Cada arena imprime su resumen `nivel=… cofres=… altares=… portales=…`.
 
@@ -1276,6 +1369,7 @@ Variables de entorno:
 | `BONK_ZENKAI_TEST=1` | a los 60 s: golpe del 95%, 3 s invulnerable y curación completa — el bajón-y-supervivencia con el que Zenkai se arma |
 | `BONK_POINTS=<n>` | le da esos puntos al slot 0 al arrancar, para que un soak de vendedor pueda pagar |
 | `BONK_PERF=1` | enciende el overlay de rendimiento del HUD |
+| `BONK_GRAPHICS=<0-2>` | preset gráfico del soak (iteración 64): 0 Alta, 1 Media, 2 Baja. Se aplica antes de arrancar la partida, así que el sol de la primera etapa ya lo recibe. **No se guarda** en el save del soak, y un valor que no sea 0-2 es un `push_error`, como un `BONK_CHARACTER` desconocido. Sin el interruptor, el harness aplica el preset del save del soak (no el del jugador, que `Settings` aplicó al arrancar) |
 
 Uso directo:
 
@@ -1334,5 +1428,5 @@ gusta. Lo que sí decide sola: si algo se dibuja, dónde, y encima de qué.
 - **Español latinoamericano para todo lo visible, inglés para todo lo estructural.** La tabla es `docs/GLOSARIO.md`. En inglés y sin tocar: ids, `node_name`, grupos, `StringName`, rutas `res://`, claves de `SaveData` y los `print()`/`push_warning()`. Los marcadores de formato (`%d %s %.1f %02d %%`) conservan número y orden exactos.
 - **Tunables como `@export`** con defaults en el script; los overrides por instancia viven en la escena (el horario de jefes por arena, las escenas del spawner). Antes de mover un `@export` de sitio, comprueba qué `.tscn` lo overridea: las tres arenas overridean el `EnemySpawner`.
 - **Números mágicos a `const` con nombre y comentario del porqué.** Un `0.5` suelto en dos archivos es la forma en que dos copias del mismo cálculo se separan.
-- **Logs de una línea** en eventos clave — son la interfaz de verificación de los soaks headless, van **en inglés** y se conservan. Inventario actual: `Run ended:`, `Meta saved:`, `Save recovered from backup:`, `Boss spawned:`, `Boss chests dropped:`, `Elite chest dropped:`, `Horde:`, `Sky event:`, `Chest opened:`, `Altar charged:`, `Altar left:`, `Altar placed:`, `Demonic altar used:`, `Demonic pact:`, `Spawn skipped:`, `Stage advanced:`, `Stage sweep:`, `Stage carry:`, `Stage gate:`, `Stage boss slain:`, `Exit portal opened`, `Portal used: exit`, `Pseudo-infinite:`, `Run stages:`, `Terrain built:`, `Probe legs:`, `Greed shrine:`, `Roulette spun:`, `Spring used:`, `Portal used:`, `Portals placed:`, `Weapon evolved:`, `Weapon ascended:`, `Pet joined:`, `Secret miniboss awakened:`, `Secret boss slain:`, `Arena mask:`, `Start layout:`, `Daily run scored:`, `Void rescue:`, `Power-up picked:`, `Power-up dropped:`, `Star roam:`, `Flight landing:`, `Pet box opened:`, `Vendor arrived:`, `Vendor sold:`, `Time stop:`, `Immortal blocked:`, `Weather started:`, `Weather ended:`, `Disaster:`, `Event altar used:`, `Possessed spawned:`, `Possessed expired:`, `Belt bolt:`, `Saiyan aura:`, `Zenkai triggered:`, `Lucky block:`, `Save path overridden:`, `Player revived:`, `Vendor buyer:`. Al crear un evento mayor, añade el tuyo con el mismo formato. Las líneas de los harness van aparte y también se conservan, porque `tools/verificar.sh` las greppea: `Probe legs:`, `Probe fog:` (incluida su forma `Probe fog: skipped`), `Probe: run ended`, `Mask sweep:`, `Map overlay:`, `Time stop:`, `Immortal blocked:`, `HUD offset:`, `Party:`, `Party pets:`, `Points sources:`, `Catalog lint:`, `UiProbe:`, `Swap menu:`, `Saiyan boons:`, `Time stop worms:`.
+- **Logs de una línea** en eventos clave — son la interfaz de verificación de los soaks headless, van **en inglés** y se conservan. Inventario actual: `Run ended:`, `Meta saved:`, `Save recovered from backup:`, `Boss spawned:`, `Boss chests dropped:`, `Elite chest dropped:`, `Horde:`, `Sky event:`, `Chest opened:`, `Altar charged:`, `Altar left:`, `Altar placed:`, `Demonic altar used:`, `Demonic pact:`, `Spawn skipped:`, `Stage advanced:`, `Stage sweep:`, `Stage carry:`, `Stage gate:`, `Stage boss slain:`, `Exit portal opened`, `Portal used: exit`, `Pseudo-infinite:`, `Run stages:`, `Terrain built:`, `Probe legs:`, `Greed shrine:`, `Roulette spun:`, `Spring used:`, `Portal used:`, `Portals placed:`, `Weapon evolved:`, `Weapon ascended:`, `Pet joined:`, `Secret miniboss awakened:`, `Secret boss slain:`, `Arena mask:`, `Start layout:`, `Daily run scored:`, `Void rescue:`, `Power-up picked:`, `Power-up dropped:`, `Star roam:`, `Flight landing:`, `Pet box opened:`, `Vendor arrived:`, `Vendor sold:`, `Time stop:`, `Immortal blocked:`, `Weather started:`, `Weather ended:`, `Disaster:`, `Event altar used:`, `Possessed spawned:`, `Possessed expired:`, `Belt bolt:`, `Saiyan aura:`, `Zenkai triggered:`, `Lucky block:`, `Save path overridden:`, `Player revived:`, `Vendor buyer:`, `Elite chest capped:`, `Graphics:`. Al crear un evento mayor, añade el tuyo con el mismo formato. Las líneas de los harness van aparte y también se conservan, porque `tools/verificar.sh` las greppea: `Probe legs:`, `Probe fog:` (incluida su forma `Probe fog: skipped`), `Probe: run ended`, `Mask sweep:`, `Map overlay:`, `Time stop:`, `Immortal blocked:`, `HUD offset:`, `Party:`, `Party pets:`, `Points sources:`, `Catalog lint:`, `UiProbe:`, `Swap menu:`, `Saiyan boons:`, `Time stop worms:`, `Probe bounty chests:`, `Perf` (y `Perf summary:`, del `PerfMeter`).
 - **Verificar antes de dar por hecho un cambio**: `tools/verificar.sh`. Un cambio que no pasa el import o ensucia el log de un soak no está terminado.

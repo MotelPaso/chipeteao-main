@@ -49,16 +49,22 @@ material = SubResource("StandardMaterial3D_gold")
 top_radius = 0.0
 bottom_radius = 0.07
 height = 0.2
+radial_segments = 8
+rings = 0
 
 [sub_resource type="CapsuleMesh" id="CapsuleMesh_crableg"]
 material = SubResource("StandardMaterial3D_sandstone_dark")
 radius = 0.1
 height = 0.55
+radial_segments = 8
+rings = 2
 
 [sub_resource type="SphereMesh" id="SphereMesh_ember"]
 material = SubResource("StandardMaterial3D_ember")
 radius = 0.06
 height = 0.12
+radial_segments = 8
+rings = 4
 
 [sub_resource type="CapsuleShape3D" id="CapsuleShape3D_mimic"]
 radius = 0.8
@@ -98,26 +104,32 @@ mesh = SubResource("BoxMesh_maw")
 
 [node name="EmberL" type="MeshInstance3D" parent="Visual"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.3, 1.14, -0.42)
+cast_shadow = 0
 mesh = SubResource("SphereMesh_ember")
 
 [node name="EmberR" type="MeshInstance3D" parent="Visual"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.3, 1.14, -0.42)
+cast_shadow = 0
 mesh = SubResource("SphereMesh_ember")
 
 [node name="ToothLowA" type="MeshInstance3D" parent="Visual"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.5, 1.14, -0.5)
+cast_shadow = 0
 mesh = SubResource("CylinderMesh_tooth")
 
 [node name="ToothLowB" type="MeshInstance3D" parent="Visual"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.17, 1.14, -0.5)
+cast_shadow = 0
 mesh = SubResource("CylinderMesh_tooth")
 
 [node name="ToothLowC" type="MeshInstance3D" parent="Visual"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.17, 1.14, -0.5)
+cast_shadow = 0
 mesh = SubResource("CylinderMesh_tooth")
 
 [node name="ToothLowD" type="MeshInstance3D" parent="Visual"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, 1.14, -0.5)
+cast_shadow = 0
 mesh = SubResource("CylinderMesh_tooth")
 
 [node name="LidPivot" type="Node3D" parent="Visual"]
@@ -129,14 +141,17 @@ mesh = SubResource("BoxMesh_lid")
 
 [node name="ToothUpA" type="MeshInstance3D" parent="Visual/LidPivot"]
 transform = Transform3D(1, 0, 0, 0, -1, 0, 0, 0, -1, -0.36, -0.04, -0.98)
+cast_shadow = 0
 mesh = SubResource("CylinderMesh_tooth")
 
 [node name="ToothUpB" type="MeshInstance3D" parent="Visual/LidPivot"]
 transform = Transform3D(1, 0, 0, 0, -1, 0, 0, 0, -1, 0, -0.04, -0.98)
+cast_shadow = 0
 mesh = SubResource("CylinderMesh_tooth")
 
 [node name="ToothUpC" type="MeshInstance3D" parent="Visual/LidPivot"]
 transform = Transform3D(1, 0, 0, 0, -1, 0, 0, 0, -1, 0.36, -0.04, -0.98)
+cast_shadow = 0
 mesh = SubResource("CylinderMesh_tooth")
 
 [node name="LegFL" type="MeshInstance3D" parent="Visual"]

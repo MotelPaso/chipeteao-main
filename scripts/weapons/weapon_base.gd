@@ -166,11 +166,15 @@ func acquire_target() -> Node3D:
 	var nearest: Node3D = null
 	var search_range := targeting_range()
 	var nearest_dist_sq := search_range * search_range
+	# Read once: an idle weapon runs this scan every physics frame, and the
+	# loop only reads transforms, so the per-enemy native getter on our own
+	# position returned the same value every time.
+	var origin := global_position
 	for enemy in get_tree().get_nodes_in_group("enemies"):
 		var body := enemy as Node3D
 		if body == null or not body.is_inside_tree():
 			continue
-		var dist_sq := global_position.distance_squared_to(body.global_position)
+		var dist_sq := origin.distance_squared_to(body.global_position)
 		if dist_sq <= nearest_dist_sq:
 			nearest_dist_sq = dist_sq
 			nearest = body
@@ -313,9 +317,10 @@ func enemies_in_arc(center: Vector3, center_dir: Vector3, reach: float,
 		var body := node as Node3D
 		if body == null or not body.is_inside_tree():
 			continue
-		if center.distance_squared_to(body.global_position) > reach_sq:
+		var body_position := body.global_position
+		if center.distance_squared_to(body_position) > reach_sq:
 			continue
-		var to_body := body.global_position - center
+		var to_body := body_position - center
 		to_body.y = 0.0
 		if to_body.length_squared() > DEGENERATE_LENGTH_SQ \
 				and center_dir.angle_to(to_body) > half_arc:

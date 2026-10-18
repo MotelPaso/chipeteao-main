@@ -134,6 +134,15 @@ var _expired_fov_keys: Array[int] = []
 ## leveled_up once PER LEVEL, so one fat gem can fire it three times in a
 ## single frame.
 var _level_pulse_frame: int = -1
+## The level ring's mesh, built on the first level-up and shared by every
+## ring after it: each ring used to mint its own TorusMesh (engine default
+## 64 x 32, 4k triangles regenerated per level-up). The material stays one
+## per ring, duplicated from _level_ring_material, because the fade writes
+## its alpha — GeometryInstance3D.transparency would avoid the copy but
+## only works on Forward+, and a PC without Vulkan/D3D12 falls back to the
+## Compatibility renderer, where the ring would stop fading.
+var _level_ring_mesh: TorusMesh = null
+var _level_ring_material: StandardMaterial3D = null
 
 
 func _ready() -> void:
@@ -522,20 +531,15 @@ func _spawn_level_ring(at: Vector3) -> void:
 	var scene_root := RunRoot.stage_parent(get_tree())
 	if scene_root == null:
 		return
+	if _level_ring_mesh == null:
+		_build_level_ring_assets()
 	var ring := MeshInstance3D.new()
-	var mesh := TorusMesh.new()
-	mesh.inner_radius = 0.42
-	mesh.outer_radius = 0.55
-	ring.mesh = mesh
-	var material := StandardMaterial3D.new()
-	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	material.albedo_color = Color(level_pulse_color.r, level_pulse_color.g,
-			level_pulse_color.b, 0.85)
-	material.emission_enabled = true
-	material.emission = level_pulse_color
-	material.emission_energy_multiplier = 2.4
+	ring.mesh = _level_ring_mesh
+	var material := _level_ring_material.duplicate() as StandardMaterial3D
 	ring.material_override = material
+	# An alpha material never reaches the shadow pass anyway; saying so
+	# keeps the ring out of the shadow cull as well.
+	ring.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	scene_root.add_child(ring)
 	ring.global_position = at
 	ring.scale = Vector3(0.4, 0.55, 0.4)
@@ -550,6 +554,28 @@ func _spawn_level_ring(at: Vector3) -> void:
 	tween.tween_property(material, "albedo_color:a", 0.0, level_pulse_duration) \
 			.set_ease(Tween.EASE_IN)
 	tween.chain().tween_callback(ring.queue_free)
+
+
+## Builds the shared level-ring mesh and the material every ring copies
+## (see _level_ring_mesh).
+## Lazy, so the material reads level_pulse_color where the old per-ring
+## build did: at the first level-up, after any inspector override.
+func _build_level_ring_assets() -> void:
+	_level_ring_mesh = TorusMesh.new()
+	_level_ring_mesh.inner_radius = 0.42
+	_level_ring_mesh.outer_radius = 0.55
+	# Explicit tessellation: the ring swells to ~2.5 m, where 32 slices
+	# still read round; 8 sides are plenty for the thin tube.
+	_level_ring_mesh.rings = 32
+	_level_ring_mesh.ring_segments = 8
+	_level_ring_material = StandardMaterial3D.new()
+	_level_ring_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	_level_ring_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	_level_ring_material.albedo_color = Color(level_pulse_color.r, level_pulse_color.g,
+			level_pulse_color.b, 0.85)
+	_level_ring_material.emission_enabled = true
+	_level_ring_material.emission = level_pulse_color
+	_level_ring_material.emission_energy_multiplier = 2.4
 
 
 # --- shared math ------------------------------------------------------------

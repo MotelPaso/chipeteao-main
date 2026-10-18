@@ -49,6 +49,8 @@ func _ready() -> void:
 	# Unit height: _spawn_beam encodes the real span in scale.y.
 	_beam_mesh.height = 1.0
 	_beam_mesh.radial_segments = BEAM_SEGMENTS
+	# A straight streak: height rings only add collinear vertices.
+	_beam_mesh.rings = 1
 	var material := StandardMaterial3D.new()
 	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
@@ -111,13 +113,16 @@ func _next_link(from: Node3D, hit_ids: Dictionary[int, bool],
 		fork_range: float) -> Node3D:
 	var nearest: Node3D = null
 	var nearest_dist_sq := fork_range * fork_range
+	# Read once, here, where the old per-enemy read started: the loop below
+	# only reads, so `from` cannot move while it runs.
+	var from_position := from.global_position
 	for enemy in get_tree().get_nodes_in_group("enemies"):
 		var body := enemy as Node3D
 		if body == null or not body.is_inside_tree():
 			continue
 		if hit_ids.has(body.get_instance_id()):
 			continue
-		var dist_sq := from.global_position.distance_squared_to(body.global_position)
+		var dist_sq := from_position.distance_squared_to(body.global_position)
 		if dist_sq <= nearest_dist_sq:
 			nearest_dist_sq = dist_sq
 			nearest = body
