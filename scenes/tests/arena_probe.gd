@@ -83,6 +83,9 @@ extends Node
 ##                          never rasterises reads exactly like a healthy
 ##                          one in a log. Ignored (once, loudly) under
 ##                          --headless: `Shots skipped: headless`
+##   BONK_GRAPHICS=<0-2>    graphics preset for the soak (iteration 64):
+##                          0 Alta, 1 Media, 2 Baja. Applied before the run
+##                          boots, so the first stage's sun already gets it
 ##   BONK_SHOT_EVERY=<s>    seconds between periodic shots (default 10).
 ##                          Event shots are taken regardless
 ##
@@ -283,6 +286,12 @@ var _rng := RandomNumberGenerator.new()
 ## picture is worth taking in a run. Nothing in this section can make a
 ## gate easier — with the switch unset every line of it is a no-op.
 var _camera: ShotCamera = null
+## Frame-cost meter (iteration 64): a `Perf` line every 10 s of game time and
+## a `Perf summary` on the way out. Always on — it only reads the clock.
+var _perf: PerfMeter = null
+## Most unopened elite bounty chests seen on the map at once (iteration 64),
+## sampled with the frame line. Reported against EnemyBase.BOUNTY_CHEST_CAP.
+var _bounty_chests_max: int = 0
 ## instance ids already accounted for in the vendor / pet box / lucky block
 ## groups, so one node fires one shot however long it stands there.
 var _shot_seen: Dictionary[int, bool] = {}
@@ -547,6 +556,7 @@ func _ready() -> void:
 	# inside the add_child() below and asks this camera for a frame, so a
 	# handle created further down would be null when the first shot is due.
 	_camera = ShotCamera.new(get_viewport())
+	_perf = PerfMeter.new(get_tree())
 	# Never fold a soak into the real save: re-point SaveData at a scratch
 	# file (fresh defaults) before the arena boots. BONK_SAVE_PATH wins
 	# when it is set (iteration 57), so tools/verificar.sh can hand every
@@ -557,6 +567,10 @@ func _ready() -> void:
 	SaveData.save_path = save_override if not save_override.is_empty() \
 			else DEFAULT_SAVE_PATH
 	SaveData.load_from_disk()
+	# Settings applied the PLAYER's graphics preset at boot, before this
+	# re-point: a windowed soak would render at whatever the real save says
+	# while the log reported the scratch save's preset.
+	Settings.apply_graphics()
 	print("ArenaProbe: save=%s" % SaveData.save_path)
 	# BONK_CHARACTER=<id> picks the raider (default: the config's choice).
 	# An unknown id is an ERROR, not a shrug: a soak meant to exercise one
@@ -592,6 +606,23 @@ func _ready() -> void:
 	# RunSystems._spawn_party reads Coop.player_count inside its own
 	# _ready, so a party configured after this line is a solo run.
 	_configure_party()
+	# BEFORE the run is instantiated: the preset reaches the first stage's
+	# sun through RunState.stage_changed, which fires inside add_child.
+	# An unknown value is an ERROR, like BONK_CHARACTER: a soak meant to
+	# run on Media silently running on Alta is a green log about nothing.
+	# Written to SaveData without Settings.set_graphics_quality, so nothing
+	# is persisted: a manual soak on the shared scratch save must not leave
+	# the next one on a preset nobody asked for.
+	var graphics := OS.get_environment("BONK_GRAPHICS")
+	if not graphics.is_empty():
+		if not graphics.is_valid_int() \
+				or graphics.to_int() < 0 or graphics.to_int() > SaveData.MAX_GRAPHICS_QUALITY:
+			push_error("ArenaProbe: BONK_GRAPHICS must be 0-%d, got '%s'"
+					% [SaveData.MAX_GRAPHICS_QUALITY, graphics])
+		else:
+			SaveData.graphics_quality = graphics.to_int()
+			Settings.apply_graphics()
+			print("ArenaProbe: graphics=%d" % SaveData.graphics_quality)
 	add_child(scene.instantiate())
 	# Mortal soaks end at death (iteration 57): RunManager pauses the tree
 	# and the run-end screen has no headless self-play, so without this
@@ -834,6 +865,9 @@ func _on_run_ended(victory: bool) -> void:
 ## Printed once, on the way out: a summary the soak script can read.
 func _exit_tree() -> void:
 	_camera.final_shot()
+	_perf.summary()
+	print("Probe bounty chests: max=%d cap=%d" % [_bounty_chests_max,
+			EnemyBase.BOUNTY_CHEST_CAP])
 	# One-line log (RunManager convention) for headless soaks.
 	print("Probe legs: reached=%d timed_out=%d" % [_legs_reached, _legs_timed_out])
 	var explored := _explored_seen
@@ -1026,6 +1060,11 @@ func _request_settled_shot(delay: float, tag: String) -> void:
 	_camera.request_in(delay, "%s_%s" % [_periodic_shot_stem(), tag])
 
 
+## Drawn frames, not physics ticks: the meter times what a player waits for.
+func _process(_delta: float) -> void:
+	_perf.tick()
+
+
 func _physics_process(delta: float) -> void:
 	_frames += 1
 	# A mortal soak is over the moment RunManager says so; the countdown
@@ -1061,6 +1100,8 @@ func _physics_process(delta: float) -> void:
 				_airborne_total, _explored_fraction(),
 				get_tree().get_node_count_in_group(&"possessed"), _possession_cap()])
 		_sample_blocked_hits()
+		_bounty_chests_max = maxi(_bounty_chests_max,
+				EnemyBase.unopened_bounty_chests(get_tree()))
 	var card_ui_open := false
 	for node: Node in get_tree().get_nodes_in_group("upgrade_ui"):
 		var ui := node as CanvasLayer

@@ -19,6 +19,7 @@ radius = 0.18
 [node name="Projectile" type="Area3D" groups=["player_shots"]]
 collision_layer = 0
 collision_mask = 2
+monitorable = false
 script = ExtResource("1_projectile")
 
 [node name="Tracer" type="MeshInstance3D" parent="."]

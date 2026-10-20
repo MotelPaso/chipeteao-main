@@ -13,6 +13,8 @@ emission_energy_multiplier = 2.2
 material = SubResource("StandardMaterial3D_bolt")
 radius = 0.16
 height = 0.32
+radial_segments = 12
+rings = 6
 
 [sub_resource type="BoxMesh" id="BoxMesh_tail"]
 material = SubResource("StandardMaterial3D_bolt")
@@ -24,6 +26,7 @@ radius = 0.2
 [node name="EnemyBolt" type="Area3D" groups=["enemy_bolts"]]
 collision_layer = 0
 collision_mask = 1
+monitorable = false
 script = ExtResource("1_bolt")
 
 [node name="Core" type="MeshInstance3D" parent="."]

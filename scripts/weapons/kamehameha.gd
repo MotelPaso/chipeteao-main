@@ -39,6 +39,10 @@ func _ready() -> void:
 	_beam_mesh.top_radius = 1.0
 	_beam_mesh.bottom_radius = 1.0
 	_beam_mesh.height = 1.0
+	# Explicit tessellation: a straight beam gains nothing from height rings,
+	# and 16 sides read as round at its width.
+	_beam_mesh.radial_segments = 16
+	_beam_mesh.rings = 1
 	var material := StandardMaterial3D.new()
 	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA

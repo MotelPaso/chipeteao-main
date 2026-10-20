@@ -50,6 +50,10 @@ func _build_body() -> void:
 			var capsule := CapsuleMesh.new()
 			capsule.radius = size * 0.6
 			capsule.height = size * 2.2
+			# Explicit tessellation (engine default 64 sides): 16 sides at
+			# pet size; the default 8 rings keep the round ends.
+			capsule.radial_segments = 16
+			capsule.rings = 8
 			_body.mesh = capsule
 		"box":
 			var box := BoxMesh.new()
@@ -59,6 +63,9 @@ func _build_body() -> void:
 			var sphere := SphereMesh.new()
 			sphere.radius = size
 			sphere.height = size * 2.0
+			# Explicit tessellation (engine default 64 x 32, ~4.2k tris).
+			sphere.radial_segments = 16
+			sphere.rings = 8
 			_body.mesh = sphere
 	var material := StandardMaterial3D.new()
 	material.albedo_color = _body_color
@@ -73,6 +80,9 @@ func _build_body() -> void:
 		var eye_mesh := SphereMesh.new()
 		eye_mesh.radius = size * 0.14
 		eye_mesh.height = size * 0.28
+		# A bead a few centimetres wide: 8 x 4 is indistinguishable.
+		eye_mesh.radial_segments = 8
+		eye_mesh.rings = 4
 		eye.mesh = eye_mesh
 		var eye_material := StandardMaterial3D.new()
 		eye_material.albedo_color = Color(0.05, 0.05, 0.08)

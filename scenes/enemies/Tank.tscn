@@ -36,6 +36,8 @@ size = Vector3(0.9, 0.55, 0.6)
 material = SubResource("StandardMaterial3D_dark")
 radius = 0.2
 height = 0.4
+radial_segments = 24
+rings = 12
 
 [sub_resource type="BoxMesh" id="BoxMesh_visor"]
 material = SubResource("StandardMaterial3D_visor")

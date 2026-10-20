@@ -107,6 +107,13 @@ camera_zoom_out={
 
 [physics]
 
+; Jolt Physics (iteración 64). "DEFAULT" es GodotPhysics3D en 4.7, y con él
+; cada move_and_slide de un enemigo costaba 130-400 us: 80 enemigos ya
+; pasaban los 16,6 ms del frame en CPU sin dibujar nada. Con Jolt, en 18
+; pares de soaks de 360 s, el frame medio pasa de 7,8 a 1,9 ms y los
+; tirones de 37 a 0 (docs/ARQUITECTURA.md, «Rendimiento»).
+; Explícito para que un cambio del "DEFAULT" del motor no lo deshaga.
+3d/physics_engine="Jolt Physics"
 3d/default_gravity=20.0
 
 [rendering]

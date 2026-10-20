@@ -47,6 +47,12 @@ var _stats_body: Label = null
 var _players_body: Label = null
 var _items_body: Label = null
 var _refresh_left: float = 0.0
+## Minimap.composite_key() as of this overlay's last composite; empty =
+## unknown, so the next refresh composites unconditionally.
+var _composited: Array = []
+## Last body _has_raider() saw for this slot. Only ever a shortcut for
+## that per-frame yes/no: anything that reads the raider still scans.
+var _seen_raider: Node3D = null
 
 
 func _ready() -> void:
@@ -65,6 +71,9 @@ func on_stage_started(arena: Node3D = null) -> void:
 	if _map == null:
 		_map = MapDraw.new(get_tree())
 	_map.build_background(arena)
+	# The key cannot see pixels rewritten inside a known Image (see
+	# Minimap.composite_key): forget it.
+	_composited = []
 	_map.collect_markers()
 	queue_redraw()
 
@@ -78,7 +87,7 @@ func _process(delta: float) -> void:
 	# Hidden whenever something else owns the screen. Checked BEFORE the
 	# toggle so a press landing on the same frame as a death cannot open a
 	# map over the run-end screen.
-	if not RunState.run_active or get_tree().paused or _raider() == null:
+	if not RunState.run_active or get_tree().paused or not _has_raider():
 		if visible:
 			visible = false
 		return
@@ -90,7 +99,7 @@ func _process(delta: float) -> void:
 			# would show the previous refresh's markers and stats.
 			_refresh_left = REFRESH
 			_map.collect_markers()
-			_map.composite()
+			_composite_if_changed()
 			_refresh_panels()
 			queue_redraw()
 	if not visible or _map == null:
@@ -102,9 +111,20 @@ func _process(delta: float) -> void:
 	# Plain methods, no Control involved: a headless soak exercises the
 	# whole map path whether or not _draw() is ever dispatched.
 	_map.collect_markers()
-	_map.composite()
+	_composite_if_changed()
 	_refresh_panels()
 	queue_redraw()
+
+
+## Same gate as the minimap's (Minimap._composite_if_changed): this
+## overlay's own MapDraw keeps the texture of its last composite, hidden or
+## not, so on open it only recomposites when the fog moved since.
+func _composite_if_changed() -> void:
+	var key := Minimap.composite_key(_map, get_tree())
+	if key == _composited:
+		return
+	_composited = key
+	_map.composite()
 
 
 ## --- layout ---------------------------------------------------------------
@@ -217,11 +237,14 @@ func _refresh_panels() -> void:
 		title += " · Vuelta %d" % (RunState.lap + 1)
 	_header.text = "%s — %02d:%02d" % [title, seconds / 60, seconds % 60]
 	_legend.position = Vector2(PAD, size.y - PAD - _legend.size.y)
-	_powerups_body.text = _powerups_text()
-	_pet_body.text = _pet_text()
-	_stats_body.text = _stats_text()
+	# One scan for the four panels that read this slot's raider: nothing in
+	# between can move a body between groups.
+	var raider := _raider()
+	_powerups_body.text = _powerups_text(raider)
+	_pet_body.text = _pet_text(raider)
+	_stats_body.text = _stats_text(raider)
 	_players_body.text = _players_text()
-	_items_body.text = _items_text()
+	_items_body.text = _items_text(raider)
 
 
 ## This slot's raider, standing or downed; null when the slot is empty.
@@ -234,11 +257,30 @@ func _raider() -> Node3D:
 	return null
 
 
+## `_raider() != null`, asked every frame even while the overlay is hidden,
+## without the two group scans when the body seen last time still answers
+## it: inside the tree, in one of the two groups, still this slot. A body
+## like that is one _raider()'s scan would reach, so it could not answer
+## null; when it does not hold, the full scan decides and is remembered.
+## is_inside_tree() is not optional: a node keeps its groups after it
+## leaves the tree, but the tree's group lists drop it.
+func _has_raider() -> bool:
+	# Read through the member, never copied into a typed local first: a
+	# freed body cannot be assigned to a typed variable.
+	if is_instance_valid(_seen_raider) and _seen_raider.is_inside_tree() \
+			and (_seen_raider.is_in_group(&"player") \
+				or _seen_raider.is_in_group(&"downed_players")) \
+			and int(_seen_raider.get("player_index")) == slot:
+		return true
+	_seen_raider = _raider()
+	return _seen_raider != null
+
+
 ## Live power-ups with their remaining seconds (iteration 53). The map is
 ## where you look when you are deciding what to do next, and "eleven
 ## seconds of Furia left" is exactly that kind of decision.
-func _powerups_text() -> String:
-	var powerups := PowerUps.find_in(_raider())
+func _powerups_text(raider: Node3D) -> String:
+	var powerups := PowerUps.find_in(raider)
 	if powerups == null:
 		return "—"
 	var rows: PackedStringArray = PackedStringArray()
@@ -252,8 +294,7 @@ func _powerups_text() -> String:
 ## `cooldown_multiplier` is shown as ATTACK SPEED and POSITIVE (GLOSARIO
 ## rule 7): 0.8 is "+20% de velocidad de ataque", never "-20% de
 ## enfriamiento". The multiplier itself is untouched, only the wording.
-func _stats_text() -> String:
-	var body := _raider()
+func _stats_text(body: Node3D) -> String:
 	var stats := PlayerStats.find_in(body) if body != null else null
 	if stats == null:
 		return "—"
@@ -319,8 +360,7 @@ func _raider_at(player_slot: int) -> Node3D:
 ## The companion line: name, its weapon and the stat it pays. Shown even
 ## with no pet, because "you have no companion" is itself information when
 ## a pet box is somewhere on the map.
-func _pet_text() -> String:
-	var body := _raider()
+func _pet_text(body: Node3D) -> String:
 	if body == null:
 		return "—"
 	var pet_id: Variant = body.get("pet_id")
@@ -336,8 +376,7 @@ func _pet_text() -> String:
 ## Items with copies, then weapons with their level or milestone tier,
 ## then tomes with their stack numeral — the same three families the HUD
 ## strip shows, spelled out with full names because there is room here.
-func _items_text() -> String:
-	var body := _raider()
+func _items_text(body: Node3D) -> String:
 	if body == null:
 		return "—"
 	var rows: PackedStringArray = PackedStringArray()

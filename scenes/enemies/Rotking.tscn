@@ -29,37 +29,51 @@ material = SubResource("StandardMaterial3D_bark")
 top_radius = 0.78
 bottom_radius = 1.05
 height = 1.9
+radial_segments = 24
+rings = 0
 
 [sub_resource type="CylinderMesh" id="CylinderMesh_root"]
 material = SubResource("StandardMaterial3D_bark_dark")
 top_radius = 0.34
 bottom_radius = 0.44
 height = 0.6
+radial_segments = 16
+rings = 0
 
 [sub_resource type="SphereMesh" id="SphereMesh_head"]
 material = SubResource("StandardMaterial3D_bark_dark")
 radius = 0.5
 height = 1.0
+radial_segments = 24
+rings = 12
 
 [sub_resource type="SphereMesh" id="SphereMesh_crown"]
 material = SubResource("StandardMaterial3D_moss")
 radius = 0.9
 height = 0.85
+radial_segments = 24
+rings = 12
 
 [sub_resource type="SphereMesh" id="SphereMesh_tuft"]
 material = SubResource("StandardMaterial3D_moss")
 radius = 0.32
 height = 0.6
+radial_segments = 24
+rings = 12
 
 [sub_resource type="CapsuleMesh" id="CapsuleMesh_arm"]
 material = SubResource("StandardMaterial3D_bark_dark")
 radius = 0.26
 height = 1.7
+radial_segments = 24
+rings = 6
 
 [sub_resource type="SphereMesh" id="SphereMesh_fist"]
 material = SubResource("StandardMaterial3D_bark")
 radius = 0.36
 height = 0.72
+radial_segments = 24
+rings = 12
 
 [sub_resource type="BoxMesh" id="BoxMesh_seam"]
 material = SubResource("StandardMaterial3D_amber")
@@ -73,6 +87,8 @@ size = Vector3(0.13, 0.55, 0.2)
 material = SubResource("StandardMaterial3D_amber")
 radius = 0.1
 height = 0.2
+radial_segments = 8
+rings = 4
 
 [sub_resource type="CapsuleShape3D" id="CapsuleShape3D_boss"]
 radius = 1.05

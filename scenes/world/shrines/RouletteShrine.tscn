@@ -27,12 +27,16 @@ material = SubResource("StandardMaterial3D_stone")
 top_radius = 0.6
 bottom_radius = 0.9
 height = 1.2
+radial_segments = 16
+rings = 1
 
 [sub_resource type="CylinderMesh" id="CylinderMesh_wheel"]
 material = SubResource("StandardMaterial3D_wheel")
 top_radius = 1.4
 bottom_radius = 1.4
 height = 0.16
+radial_segments = 24
+rings = 1
 
 [sub_resource type="BoxMesh" id="BoxMesh_spoke"]
 material = SubResource("StandardMaterial3D_gold")
@@ -53,6 +57,7 @@ height = 1.4
 [node name="RouletteShrine" type="Area3D"]
 collision_layer = 0
 collision_mask = 1
+monitorable = false
 script = ExtResource("1_roulette")
 prompt_height = 3.0
 

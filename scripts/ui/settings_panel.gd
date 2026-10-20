@@ -28,6 +28,12 @@ const VOLUME_MAX := 100.0
 @onready var _ambient_value: Label = %AmbientValue
 @onready var _fullscreen_check: CheckButton = %FullscreenCheck
 @onready var _fps_check: CheckButton = %FpsCheck
+## Graphics preset (iteration 64), one toggle per SaveData.graphics_quality
+## index — Alta, Media, Baja, in that order. Three buttons in a ButtonGroup
+## instead of an OptionButton: the panel has no popup anywhere else, and a
+## popup list is one more surface to style and to navigate with a pad.
+@onready var _quality_buttons: Array[Button] = [%QualityHigh as Button,
+		%QualityMedium as Button, %QualityLow as Button]
 @onready var _back_button: Button = %BackButton
 
 var _open_tween: Tween = null
@@ -41,6 +47,11 @@ func _ready() -> void:
 	_sensitivity_slider.value_changed.connect(_on_sensitivity_changed)
 	_fullscreen_check.toggled.connect(_on_fullscreen_toggled)
 	_fps_check.toggled.connect(_on_fps_toggled)
+	var quality_group := ButtonGroup.new()
+	for index in _quality_buttons.size():
+		var button := _quality_buttons[index]
+		button.button_group = quality_group
+		button.toggled.connect(_on_quality_toggled.bind(index))
 	_back_button.pressed.connect(close)
 
 
@@ -90,6 +101,8 @@ func _refresh_controls() -> void:
 	_sensitivity_slider.set_value_no_signal(SaveData.mouse_sensitivity)
 	_fullscreen_check.set_pressed_no_signal(SaveData.fullscreen)
 	_fps_check.set_pressed_no_signal(SaveData.show_fps)
+	for index in _quality_buttons.size():
+		_quality_buttons[index].set_pressed_no_signal(index == SaveData.graphics_quality)
 	_refresh_sensitivity_label(_sensitivity_slider.value)
 	_refresh_volume_labels()
 
@@ -126,6 +139,13 @@ func _on_fullscreen_toggled(on: bool) -> void:
 
 func _on_fps_toggled(on: bool) -> void:
 	Settings.set_show_fps(on)
+
+
+## A ButtonGroup toggles the old choice OFF as well; only the button that
+## turned on carries a decision.
+func _on_quality_toggled(on: bool, index: int) -> void:
+	if on:
+		Settings.set_graphics_quality(index)
 
 
 ## Slider bounds come from the code that clamps the stored values, not
@@ -166,6 +186,12 @@ func _apply_styles() -> void:
 		value_label.add_theme_color_override("font_color", UiTheme.ACCENT)
 	for check: CheckButton in [_fullscreen_check, _fps_check]:
 		UiTheme.style_toggle(check)
+	for button: Button in _quality_buttons:
+		UiTheme.style_button(button, UiTheme.ACCENT)
+		var chosen := button.get_theme_stylebox("pressed").duplicate() as StyleBoxFlat
+		chosen.border_color = UiTheme.ACCENT
+		button.add_theme_stylebox_override("hover_pressed", chosen)
+		button.add_theme_color_override("font_hover_pressed_color", UiTheme.TEXT_BRIGHT)
 	_add_section_headers()
 	UiTheme.style_button(_back_button, UiTheme.ACCENT, true)
 

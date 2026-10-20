@@ -1080,6 +1080,11 @@ func _spawn_beacon(at: Vector3, color: Color) -> Node3D:
 	mesh.top_radius = 0.55
 	mesh.bottom_radius = 0.25
 	mesh.height = 22.0
+	# Explicit tessellation (iteration 64): the engine default is 64 sides
+	# and 4 rings. 16 sides keep the 0.55 m top within 1 cm of round, and
+	# rings only subdivide a straight side, so 0 looks identical.
+	mesh.radial_segments = 16
+	mesh.rings = 0
 	pillar.mesh = mesh
 	pillar.position.y = 11.0
 	var material := StandardMaterial3D.new()

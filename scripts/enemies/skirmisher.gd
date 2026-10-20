@@ -90,7 +90,25 @@ func _fire_bolt(player: Node3D) -> bool:
 	# body was already looking when it decided to shoot.
 	var aim := to_target.normalized() if to_target.length_squared() > AIM_EPSILON_SQ \
 			else -global_transform.basis.z
-	bolt.look_at(bolt.global_position + aim, WeaponBase.safe_up(aim))
+	var up := WeaponBase.safe_up(aim)
+	var aim_at := bolt.global_position + aim
+	# look_at refuses an origin it deems equal to its target, and it decides
+	# that with Vector3.is_equal_approx — a tolerance RELATIVE to the
+	# coordinates — so even a unit aim does not rule it out. After the guard
+	# above, one stage soak of iteration 64 still logged "Node origin and
+	# target are in the same position" here, once in ~20 soaks, and eight
+	# instrumented reruns never reproduced it. The engine's own predicate
+	# picks the path: the usual one is untouched, and the degenerate one
+	# builds the very basis look_at would (Basis.looking_at on the aim, the
+	# scale kept) with no position comparison to fail, and says what it saw.
+	if bolt.global_position.is_equal_approx(aim_at):
+		print("Skirmisher degenerate aim: bolt=%v aim=%v self=%v" % [
+				bolt.global_position, aim, global_position])
+		var bolt_scale := bolt.scale
+		bolt.global_transform = Transform3D(Basis.looking_at(aim, up), bolt.global_position)
+		bolt.scale = bolt_scale
+	else:
+		bolt.look_at(aim_at, up)
 	return true
 
 

@@ -227,6 +227,11 @@ func _launch_glob_visual(from: Vector3, to: Vector3, duration: float) -> void:
 	var mesh := SphereMesh.new()
 	mesh.radius = GLOB_VISUAL_RADIUS
 	mesh.height = GLOB_VISUAL_RADIUS * 2.0
+	# Explicit tessellation: the SphereMesh default (64 x 32) is 4,224
+	# triangles for a 0.24 m blob, rebuilt on every spit. 12 x 6 keeps the
+	# silhouette within 1 cm of round, the rule every enemy rig follows.
+	mesh.radial_segments = 12
+	mesh.rings = 6
 	var material := StandardMaterial3D.new()
 	material.albedo_color = GLOB_COLOR
 	material.emission_enabled = true

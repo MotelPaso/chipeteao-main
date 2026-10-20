@@ -30,6 +30,7 @@ radius = 0.16
 [node name="Arrow" type="Area3D" groups=["player_shots"]]
 collision_layer = 0
 collision_mask = 2
+monitorable = false
 script = ExtResource("1_arrow")
 speed = 40.0
 homing_enabled = false

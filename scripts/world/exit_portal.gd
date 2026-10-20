@@ -46,6 +46,11 @@ func _init() -> void:
 	meta_stat_id = ""
 	collision_layer = 0
 	collision_mask = 1
+	# Nothing in the game detects areas as areas (no area_entered or
+	# overlapping-area query anywhere), so being detectable only parks this
+	# ring in the physics broadphase for nothing. Set here, before the node
+	# enters the tree, like the scene-built interactables set it in .tscn.
+	monitorable = false
 
 
 func _ready() -> void:
@@ -66,6 +71,10 @@ func _build_visual() -> void:
 	var torus := TorusMesh.new()
 	torus.inner_radius = ring_radius - 0.16
 	torus.outer_radius = ring_radius + 0.16
+	# Explicit tessellation (engine default 64 x 32, 4k tris): 32 slices
+	# keep a 2.2 m ring round, 8 sides are plenty for a 16 cm tube.
+	torus.rings = 32
+	torus.ring_segments = 8
 	_ring.mesh = torus
 	_ring.position.y = 0.07
 	_ring.material_override = _glow_material(0.95)
@@ -75,6 +84,9 @@ func _build_visual() -> void:
 	mesh.top_radius = PILLAR_TOP_RADIUS
 	mesh.bottom_radius = ring_radius
 	mesh.height = PILLAR_HEIGHT
+	# Explicit tessellation: a straight cone needs no height rings.
+	mesh.radial_segments = 24
+	mesh.rings = 1
 	_pillar.mesh = mesh
 	_pillar.position.y = PILLAR_HEIGHT * 0.5
 	_pillar.material_override = _glow_material(0.3, true)

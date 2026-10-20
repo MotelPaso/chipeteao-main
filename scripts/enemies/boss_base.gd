@@ -258,6 +258,12 @@ func _spawn_spike_cluster(center: Vector3, spread_radius: float, color: Color,
 	spike_mesh.top_radius = 0.0
 	spike_mesh.bottom_radius = bottom_radius
 	spike_mesh.height = spike_length
+	# Explicit tessellation: the CylinderMesh defaults (64 sides, 4 rings)
+	# make each 0.2 m cone 704 triangles, built anew on every eruption. 12
+	# sides keep the silhouette within 7 mm of round; rings only subdivide
+	# the straight side (same normals at every height), so 0 looks identical.
+	spike_mesh.radial_segments = 12
+	spike_mesh.rings = 0
 	var material := StandardMaterial3D.new()
 	material.albedo_color = color
 	material.roughness = roughness

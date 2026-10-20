@@ -65,6 +65,9 @@ func _build_visual() -> void:
 	var orb := SphereMesh.new()
 	orb.radius = 0.45
 	orb.height = 0.9
+	# Explicit tessellation (engine default 64 x 32, ~4.2k tris).
+	orb.radial_segments = 16
+	orb.rings = 8
 	_glass.mesh = orb
 	# Per-instance material: the swirl writes emission energy, and a shared
 	# resource would pulse every other altar on the map with it.

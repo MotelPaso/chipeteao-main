@@ -65,7 +65,7 @@ func _process(delta: float) -> void:
 		visible = false
 		return
 	var view := camera.get_viewport()
-	var marked := _current_target(_resolve_reference())
+	var marked := _current_target()
 	if marked == null or view == null:
 		visible = false
 		return
@@ -184,10 +184,14 @@ func compute_placement(unprojected: Vector2, behind: bool,
 ## so the first one in the group wins — enough for a camera-less harness.
 ## What the arrow points at right now: the nearest live boss, else the
 ## tracked objective while it still exists.
-func _current_target(reference: Node3D) -> Node3D:
-	var boss := _nearest_live_boss(reference)
-	if boss != null:
-		return boss
+## The reference only ranks bosses against each other, so with the group
+## empty — most of a run — neither its party scan nor the boss scan runs:
+## both would end in the null this skips straight to.
+func _current_target() -> Node3D:
+	if get_tree().get_node_count_in_group(&"boss") > 0:
+		var boss := _nearest_live_boss(_resolve_reference())
+		if boss != null:
+			return boss
 	if _objective != null and not is_instance_valid(_objective):
 		_objective = null
 	if _objective != null and not _objective.is_inside_tree():
