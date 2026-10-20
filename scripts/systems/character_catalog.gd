@@ -111,7 +111,7 @@ const CHARACTER_LIBRARY: Array[Dictionary] = [
 		"weapon_display_name": "Bumerán",
 		"passive_description": "+2 de HP máx. por nivel",
 		"passive_stat": "max_hp", "passive_amount": 2.0,
-		"unlock_cost": 100,
+		"unlock_cost": 0,
 		"tint": Color(0.62, 0.44, 0.26),
 	},
 	{

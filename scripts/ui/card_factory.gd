@@ -14,6 +14,10 @@ extends RefCounted
 
 ## Centered card label. Callers add autowrap/line caps themselves — the
 ## grid cards trim, the wide rows don't.
+## Shared height of the portrait frame and the padlock that replaces it,
+## so locked and unlocked cards line up row by row.
+const PORTRAIT_HEIGHT := 56.0
+
 static func label(label_text: String, font_size: int, color: Color) -> Label:
 	var made := Label.new()
 	made.text = label_text
@@ -64,14 +68,28 @@ static func palette_strip(palette: Array) -> HBoxContainer:
 
 
 ## Tinted stand-in for character art in the body color.
-static func portrait_swatch(tint: Color) -> Panel:
+static func portrait_swatch(tint: Color, monogram: String = "") -> Panel:
 	var swatch := Panel.new()
-	swatch.custom_minimum_size = Vector2(0.0, 40.0)
-	var style := UiTheme.flat(tint, 8)
-	style.border_color = tint.lightened(0.25)
+	swatch.custom_minimum_size = Vector2(0.0, PORTRAIT_HEIGHT)
+	swatch.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	# Dark-to-tint body with a bright rim: reads as a portrait frame
+	# instead of a flat paint chip.
+	var style := UiTheme.flat(tint.darkened(0.35), 10)
+	style.border_color = tint.lightened(0.3)
 	style.set_border_width_all(2)
-	UiTheme.add_glow(style, tint, 5, 0.3)
+	style.border_width_bottom = 4
+	UiTheme.add_glow(style, tint, 6, 0.35)
 	swatch.add_theme_stylebox_override("panel", style)
+	if not monogram.is_empty():
+		# The raider's initial, big and outlined, so every card has a face
+		# until real portrait art lands.
+		var letter := label(monogram.left(1).to_upper(), 30, UiTheme.TEXT_BRIGHT)
+		letter.set_anchors_preset(Control.PRESET_FULL_RECT)
+		letter.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		letter.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		letter.add_theme_color_override("font_outline_color", tint.darkened(0.7))
+		letter.add_theme_constant_override("outline_size", 6)
+		swatch.add_child(letter)
 	return swatch
 
 
@@ -79,14 +97,14 @@ static func portrait_swatch(tint: Color) -> Panel:
 ## the portrait swatch would be, so "locked" reads without any glyph font.
 static func lock_glyph() -> Control:
 	var glyph := Control.new()
-	glyph.custom_minimum_size = Vector2(0.0, 40.0)
+	glyph.custom_minimum_size = Vector2(0.0, PORTRAIT_HEIGHT)
 	glyph.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var shackle := Panel.new()
 	shackle.set_anchors_preset(Control.PRESET_CENTER_TOP)
 	shackle.offset_left = -8.0
 	shackle.offset_right = 8.0
-	shackle.offset_top = 4.0
-	shackle.offset_bottom = 20.0
+	shackle.offset_top = 12.0
+	shackle.offset_bottom = 28.0
 	var arch := StyleBoxFlat.new()
 	arch.draw_center = false
 	arch.border_color = UiTheme.TEXT_FAINT
@@ -99,8 +117,8 @@ static func lock_glyph() -> Control:
 	body.set_anchors_preset(Control.PRESET_CENTER_TOP)
 	body.offset_left = -11.0
 	body.offset_right = 11.0
-	body.offset_top = 16.0
-	body.offset_bottom = 34.0
+	body.offset_top = 24.0
+	body.offset_bottom = 42.0
 	body.add_theme_stylebox_override("panel", UiTheme.flat(UiTheme.TEXT_FAINT, 3))
 	glyph.add_child(body)
 	return glyph

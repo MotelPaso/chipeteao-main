@@ -582,7 +582,8 @@ func _populate_card(card: Button, character: Dictionary) -> void:
 		_settle_card(card, _pending_unlock_id == character_id)
 		return
 	var box := CardFactory.card_box(card)
-	box.add_child(CardFactory.portrait_swatch(Color(character.tint)))
+	box.add_child(CardFactory.portrait_swatch(Color(character.tint),
+			String(character.display_name)))
 	# Wrapped, never trimmed: a raider's name is untranslatable AND
 	# unshortenable (GLOSARIO rule 5), and the roster now holds one long
 	# enough to run past the card edge ("PNG gucci morty" against a 7-letter
@@ -690,21 +691,23 @@ func _populate_locked_card(card: Button, character: Dictionary) -> void:
 	cost.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	UiTheme.style_badge(cost, UiTheme.SHARD_BLUE,
 			Color(0.07, 0.1, 0.14, 0.9), UiTheme.SHARD_BLUE.darkened(0.5))
+	# The chip used to take SIZE_EXPAND_FILL itself, which stretched the
+	# pill into a tall empty box; a spacer now soaks up the slack and the
+	# price sits at the bottom of every locked card, aligned across a row.
+	var spacer := Control.new()
+	spacer.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	spacer.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	box.add_child(spacer)
+	box.add_child(cost)
 	var hint_text := String(character.get("unlock_hint", ""))
-	if hint_text.is_empty():
-		cost.size_flags_vertical = Control.SIZE_EXPAND_FILL
-		box.add_child(cost)
-	else:
+	if not hint_text.is_empty():
 		# Boss-unlockable characters advertise both paths: the Shard price
 		# and the catalog's vague clue toward the hidden-boss unlock.
-		box.add_child(cost)
 		var hint := CardFactory.label(
-				"— o %s" % hint_text, 10, UiTheme.SHARD_BLUE.darkened(0.25))
+				"o %s" % hint_text, 10, UiTheme.SHARD_BLUE.darkened(0.25))
 		hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		hint.max_lines_visible = UNLOCK_HINT_MAX_LINES
 		hint.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
-		hint.size_flags_vertical = Control.SIZE_EXPAND_FILL
-		hint.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 		box.add_child(hint)
 	UiTheme.style_card(card, UiTheme.BORDER_LOCKED, 2, false)
 
@@ -712,7 +715,8 @@ func _populate_locked_card(card: Button, character: Dictionary) -> void:
 ## The inline purchase prompt the locked card flips into when affordable.
 func _populate_confirm_card(card: Button, character: Dictionary) -> void:
 	var box := CardFactory.card_box(card)
-	box.add_child(CardFactory.portrait_swatch(Color(character.tint)))
+	box.add_child(CardFactory.portrait_swatch(Color(character.tint),
+			String(character.display_name)))
 	box.add_child(CardFactory.label(
 			String(character.display_name), 20, UiTheme.TEXT_BRIGHT))
 	var ask := CardFactory.label(

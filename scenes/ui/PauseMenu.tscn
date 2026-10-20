@@ -52,7 +52,7 @@ text = "Ajustes"
 unique_name_in_owner = true
 custom_minimum_size = Vector2(280, 48)
 theme_override_font_sizes/font_size = 20
-text = "Extraerse (terminar incursión)"
+text = "Terminar"
 
 [node name="QuitButton" type="Button" parent="Root/Center/MenuPanel/VBox"]
 unique_name_in_owner = true

@@ -276,6 +276,57 @@ static func grabber_icon(color: Color, diameter: int = 18) -> GradientTexture2D:
 	return texture
 
 
+## Pill switch drawn pixel by pixel (no texture assets), used as the
+## CheckButton on/off icons. `on` slides the knob right and fills the
+## track with the accent; off is a dim track with a gray knob. Edges are
+## antialiased from the signed distance to the capsule and the knob.
+static func toggle_icon(on: bool, accent: Color = ACCENT,
+		width: int = 46, height: int = 26) -> ImageTexture:
+	var image := Image.create(width, height, false, Image.FORMAT_RGBA8)
+	var radius := height * 0.5
+	var track := accent.darkened(0.25) if on else Color(0.16, 0.17, 0.23)
+	var rim := accent.lightened(0.2) if on else BORDER_DIM
+	var knob := TEXT_BRIGHT if on else TEXT_FAINT
+	var knob_center := Vector2(width - radius if on else radius, radius)
+	var knob_radius := radius - 4.0
+	for y in height:
+		for x in width:
+			var p := Vector2(x + 0.5, y + 0.5)
+			# Capsule distance: clamp to the segment between the end caps.
+			var cx := clampf(p.x, radius, width - radius)
+			var d_track := p.distance_to(Vector2(cx, radius)) - (radius - 0.5)
+			var a_track := clampf(0.5 - d_track, 0.0, 1.0)
+			if a_track <= 0.0:
+				continue
+			var color := track
+			if d_track > -1.5:
+				color = rim
+			var d_knob := p.distance_to(knob_center) - knob_radius
+			color = color.lerp(knob, clampf(0.5 - d_knob, 0.0, 1.0))
+			color.a = a_track
+			image.set_pixel(x, y, color)
+	return ImageTexture.create_from_image(image)
+
+
+## CheckButton as a pill switch: the drawn on/off icons in every state,
+## and no button chrome around them.
+static func style_toggle(check: CheckButton, accent: Color = ACCENT) -> void:
+	var on := toggle_icon(true, accent)
+	var off := toggle_icon(false, accent)
+	for icon_name: String in ["checked", "checked_disabled", "checked_mirrored",
+			"checked_disabled_mirrored"]:
+		check.add_theme_icon_override(icon_name, on)
+	for icon_name: String in ["unchecked", "unchecked_disabled",
+			"unchecked_mirrored", "unchecked_disabled_mirrored"]:
+		check.add_theme_icon_override(icon_name, off)
+	var none := StyleBoxEmpty.new()
+	for state: String in ["normal", "hover", "pressed", "hover_pressed",
+			"disabled", "focus"]:
+		check.add_theme_stylebox_override(state, none)
+	check.focus_mode = Control.FOCUS_ALL
+	check.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+
+
 ## Layered bar treatment: dark trough + rounded fill with a top gloss
 ## line and a brighter leading-edge tick (right border of the fill).
 ## Returns the fill so callers can recolor it live (HP green→red ramp).

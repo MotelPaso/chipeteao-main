@@ -35,7 +35,7 @@ var area_multiplier: float = 1.0
 var move_speed_multiplier: float = 1.0
 var crit_chance: float = 0.0
 var crit_damage: float = 2.0
-var lifesteal: float = 0.0
+var lifesteal: float = 10.0
 var armor: float = 0.0
 var luck: float = 0.0
 ## Chance (0-1, capped at max_evasion) to fully dodge incoming damage; the
@@ -45,7 +45,7 @@ var evasion: float = 0.0
 var thorns: float = 0.0
 ## Max-HP granted on top of the Health node's own max_hp (which generic
 ## Stout Heart cards also raise); pushed into Health as a DELTA.
-var bonus_max_hp: float = 0.0
+var bonus_max_hp: float = 100.0
 ## Iteration 39 stat layer:
 ## Flat extra projectiles on every volley weapon (WeaponBase.effective_projectile_count).
 var projectile_bonus: int = 0

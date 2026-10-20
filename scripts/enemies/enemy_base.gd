@@ -7,8 +7,8 @@ extends CharacterBody3D
 ## Subclasses shape behavior through the virtual hooks below.
 ## make_elite() upgrades any enemy into a glowing elite variant.
 
-@export var move_speed: float = 4.0
-@export var turn_speed: float = 10.0
+@export var move_speed: float = 9.0
+@export var turn_speed: float = 40.0
 @export var separation_radius: float = 1.2
 @export var separation_strength: float = 1.5
 @export var xp_gem_scene: PackedScene

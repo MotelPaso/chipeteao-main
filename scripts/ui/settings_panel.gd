@@ -24,6 +24,8 @@ const VOLUME_MAX := 100.0
 @onready var _ambient_slider: HSlider = %AmbientSlider
 @onready var _sensitivity_slider: HSlider = %SensitivitySlider
 @onready var _sensitivity_value: Label = %SensitivityValue
+@onready var _sfx_value: Label = %SfxValue
+@onready var _ambient_value: Label = %AmbientValue
 @onready var _fullscreen_check: CheckButton = %FullscreenCheck
 @onready var _fps_check: CheckButton = %FpsCheck
 @onready var _back_button: Button = %BackButton
@@ -89,6 +91,7 @@ func _refresh_controls() -> void:
 	_fullscreen_check.set_pressed_no_signal(SaveData.fullscreen)
 	_fps_check.set_pressed_no_signal(SaveData.show_fps)
 	_refresh_sensitivity_label(_sensitivity_slider.value)
+	_refresh_volume_labels()
 
 
 func _refresh_sensitivity_label(value: float) -> void:
@@ -97,10 +100,19 @@ func _refresh_sensitivity_label(value: float) -> void:
 
 func _on_sfx_changed(value: float) -> void:
 	Settings.set_sfx_volume(value)
+	_refresh_volume_labels()
 
 
 func _on_ambient_changed(value: float) -> void:
 	Settings.set_ambient_volume(value)
+	_refresh_volume_labels()
+
+
+## Volumes read as a percentage next to their slider, like the
+## sensitivity multiplier does, so all three rows end in a number.
+func _refresh_volume_labels() -> void:
+	_sfx_value.text = "%d%%" % roundi(_sfx_slider.value)
+	_ambient_value.text = "%d%%" % roundi(_ambient_slider.value)
 
 
 func _on_sensitivity_changed(value: float) -> void:
@@ -150,5 +162,38 @@ func _apply_styles() -> void:
 		slider.add_theme_icon_override("grabber", grabber)
 		slider.add_theme_icon_override("grabber_highlight", grabber_hi)
 		slider.add_theme_icon_override("grabber_disabled", grabber)
-	_sensitivity_value.add_theme_color_override("font_color", UiTheme.ACCENT)
+	for value_label: Label in [_sensitivity_value, _sfx_value, _ambient_value]:
+		value_label.add_theme_color_override("font_color", UiTheme.ACCENT)
+	for check: CheckButton in [_fullscreen_check, _fps_check]:
+		UiTheme.style_toggle(check)
+	_add_section_headers()
 	UiTheme.style_button(_back_button, UiTheme.ACCENT, true)
+
+
+## Small spaced headers that group the rows (sound / controls / screen),
+## each with a faint rule, so the panel reads as sections instead of a
+## flat list.
+func _add_section_headers() -> void:
+	var vbox := _title_label.get_parent()
+	var sections: Array = [
+		["SONIDO", _sfx_slider.get_parent()],
+		["CONTROLES", _sensitivity_slider.get_parent()],
+		["PANTALLA", _fullscreen_check.get_parent()],
+	]
+	for section: Array in sections:
+		var header := VBoxContainer.new()
+		header.add_theme_constant_override("separation", 4)
+		var text := Label.new()
+		text.text = String(section[0])
+		text.add_theme_font_override("font", UiTheme.spaced_font(3))
+		text.add_theme_font_size_override("font_size", 12)
+		text.add_theme_color_override("font_color", UiTheme.TEXT_FAINT)
+		header.add_child(text)
+		var rule := ColorRect.new()
+		rule.custom_minimum_size = Vector2(0.0, 1.0)
+		rule.color = Color(UiTheme.BORDER_DIM, 0.5)
+		rule.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		header.add_child(rule)
+		var row: Control = section[1]
+		vbox.add_child(header)
+		vbox.move_child(header, row.get_index())
