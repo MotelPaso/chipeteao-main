@@ -12,12 +12,13 @@ extends RefCounted
 ## the "how a card is assembled" layer, not a second design system.
 
 
-## Centered card label. Callers add autowrap/line caps themselves — the
-## grid cards trim, the wide rows don't.
 ## Shared height of the portrait frame and the padlock that replaces it,
 ## so locked and unlocked cards line up row by row.
 const PORTRAIT_HEIGHT := 56.0
 
+
+## Centered card label. Callers add autowrap/line caps themselves — the
+## grid cards trim, the wide rows don't.
 static func label(label_text: String, font_size: int, color: Color) -> Label:
 	var made := Label.new()
 	made.text = label_text

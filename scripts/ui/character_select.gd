@@ -679,36 +679,36 @@ func _populate_locked_card(card: Button, character: Dictionary) -> void:
 			String(character.display_name), 20, UiTheme.TEXT_FAINT))
 	box.add_child(CardFactory.label(String(character.weapon_display_name), 12,
 			UiTheme.TEXT_FAINT.darkened(0.15)))
-	var passive := CardFactory.label(String(character.passive_description), 12,
-			UiTheme.TEXT_FAINT.darkened(0.15))
-	passive.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	passive.max_lines_visible = LOCKED_PASSIVE_MAX_LINES
-	passive.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
-	box.add_child(passive)
 	# Price chip: a small shard-blue pill so the cost reads as a button.
+	# It goes right under the identity lines, which are one line each on
+	# every card, so the price sits at the same height across a whole row
+	# no matter how far the passive or the hint below it wrap. (At the
+	# bottom of the card it could not: a two-line passive plus a two-line
+	# hint does not fit in CARD_SIZE, and the chip slid down on some cards.)
+	# SHRINK_CENTER keeps the pill its own size instead of a tall box.
 	var cost := CardFactory.label("%d esquirlas" % int(character.get("unlock_cost", 0)),
 			13, UiTheme.SHARD_BLUE)
 	cost.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	UiTheme.style_badge(cost, UiTheme.SHARD_BLUE,
 			Color(0.07, 0.1, 0.14, 0.9), UiTheme.SHARD_BLUE.darkened(0.5))
-	# The chip used to take SIZE_EXPAND_FILL itself, which stretched the
-	# pill into a tall empty box; a spacer now soaks up the slack and the
-	# price sits at the bottom of every locked card, aligned across a row.
-	var spacer := Control.new()
-	spacer.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	spacer.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	box.add_child(spacer)
 	box.add_child(cost)
 	var hint_text := String(character.get("unlock_hint", ""))
 	if not hint_text.is_empty():
 		# Boss-unlockable characters advertise both paths: the Shard price
-		# and the catalog's vague clue toward the hidden-boss unlock.
+		# and, right under it, the catalog's vague clue toward the
+		# hidden-boss unlock.
 		var hint := CardFactory.label(
 				"o %s" % hint_text, 10, UiTheme.SHARD_BLUE.darkened(0.25))
 		hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		hint.max_lines_visible = UNLOCK_HINT_MAX_LINES
 		hint.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 		box.add_child(hint)
+	var passive := CardFactory.label(String(character.passive_description), 12,
+			UiTheme.TEXT_FAINT.darkened(0.15))
+	passive.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	passive.max_lines_visible = LOCKED_PASSIVE_MAX_LINES
+	passive.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	box.add_child(passive)
 	UiTheme.style_card(card, UiTheme.BORDER_LOCKED, 2, false)
 
 

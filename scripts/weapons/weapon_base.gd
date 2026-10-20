@@ -21,7 +21,7 @@ const UP_COLINEAR_DOT: float = 0.99
 
 @export var damage: float = 10.0
 @export var cooldown: float = 1.0
-@export var attack_range: float = 40.0
+@export var attack_range: float = 3.0
 @export var projectile_count: int = 1
 ## Per-weapon cooldown multiplier ("Flurry"-style upgrades lower it); stacks
 ## multiplicatively with the player-wide cooldown multiplier, leaving the

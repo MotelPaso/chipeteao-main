@@ -37,7 +37,7 @@ extends CharacterBody3D
 @export_group("Slide")
 @export var slide_speed_multiplier: float = 1.8
 @export var slide_duration: float = 0.6
-@export var slide_cooldown: float = 0.4
+@export var slide_cooldown: float = 0.8
 @export var slide_collision_height: float = 0.9
 
 ## A slide needs real momentum behind it, not a standing start: the body

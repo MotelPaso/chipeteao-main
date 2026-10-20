@@ -9,7 +9,7 @@ extends WeaponBase
 ## Seconds one slash flash lasts (kept snappy for the fast cooldown).
 @export var slash_time: float = 0.1
 ## Crescent radius of one dagger cut.
-@export var slash_radius: float = 5.0
+@export var slash_radius: float = 1.0
 ## Slash swipe tint (pale violet, matching the old blades' emission).
 @export var slash_color: Color = Color(0.8, 0.65, 1.0)
 

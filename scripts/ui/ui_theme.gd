@@ -309,7 +309,9 @@ static func toggle_icon(on: bool, accent: Color = ACCENT,
 
 
 ## CheckButton as a pill switch: the drawn on/off icons in every state,
-## and no button chrome around them.
+## no button chrome around them, and an accent ring on focus so keyboard
+## and pad players can see which switch they are on (the same rule as
+## style_card: focus must read as loudly as a hover).
 static func style_toggle(check: CheckButton, accent: Color = ACCENT) -> void:
 	var on := toggle_icon(true, accent)
 	var off := toggle_icon(false, accent)
@@ -321,8 +323,16 @@ static func style_toggle(check: CheckButton, accent: Color = ACCENT) -> void:
 		check.add_theme_icon_override(icon_name, off)
 	var none := StyleBoxEmpty.new()
 	for state: String in ["normal", "hover", "pressed", "hover_pressed",
-			"disabled", "focus"]:
+			"disabled"]:
 		check.add_theme_stylebox_override(state, none)
+	var ring := StyleBoxFlat.new()
+	ring.draw_center = false
+	ring.border_color = accent
+	ring.set_border_width_all(2)
+	ring.set_corner_radius_all(17)
+	ring.set_expand_margin_all(4.0)
+	add_glow(ring, accent, 6, 0.28)
+	check.add_theme_stylebox_override("focus", ring)
 	check.focus_mode = Control.FOCUS_ALL
 	check.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 
