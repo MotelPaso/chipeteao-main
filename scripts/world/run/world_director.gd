@@ -29,7 +29,7 @@ const EVENT_ALTAR_SCENE := preload("res://scenes/world/shrines/EventAltar.tscn")
 const LUCKY_BLOCK_SCENE := preload("res://scenes/world/chests/LuckyBlock.tscn")
 const PET_BOX_SCENE := preload("res://scenes/world/PetBox.tscn")
 const VENDOR_SCENE := preload("res://scenes/world/Vendor.tscn")
-const PortalShrineScript := preload("res://scripts/world/portal_shrine.gd")
+const PortalShrineScript := preload("res://scripts/world/interactables/portal_shrine.gd")
 
 ## Timed world events as catalog rows (project convention: content is
 ## data). `weight` is relative; `method` runs the event. A new event is

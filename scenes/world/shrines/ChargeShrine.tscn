@@ -1,6 +1,6 @@
 [gd_scene load_steps=13 format=3 uid="uid://cshrn1chrg4ka"]
 
-[ext_resource type="Script" path="res://scripts/world/charge_shrine.gd" id="1_charge"]
+[ext_resource type="Script" path="res://scripts/world/interactables/charge_shrine.gd" id="1_charge"]
 [ext_resource type="Material" uid="uid://crockm6hw5fy4" path="res://assets/materials/rock.tres" id="2_rock"]
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_crystal"]

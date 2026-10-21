@@ -1,6 +1,6 @@
 [gd_scene format=3 uid="uid://cwfkigmsvreqf"]
 
-[ext_resource type="Script" uid="uid://ddfplghyqfu1e" path="res://scripts/ui/character_select.gd" id="1_charselect"]
+[ext_resource type="Script" uid="uid://ddfplghyqfu1e" path="res://scripts/ui/meta/character_select.gd" id="1_charselect"]
 [ext_resource type="PackedScene" path="res://scenes/ui/SettingsPanel.tscn" id="2_settingspanel"]
 [ext_resource type="Shader" uid="uid://cnndc4w2t8jrk" path="res://assets/ui/menu_backdrop.gdshader" id="3_backdrop"]
 
@@ -12,20 +12,20 @@ shader_parameter/fog_color = Color(0.18, 0.26, 0.33, 1)
 shader_parameter/fog_strength = 0.2
 shader_parameter/drift_speed = 0.03
 
-[node name="CharacterSelect" type="Control" unique_id=1577225871]
+[node name="CharacterSelect" type="Control" unique_id=183065464]
 layout_mode = 3
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
 script = ExtResource("1_charselect")
 
-[node name="Background" type="ColorRect" parent="." unique_id=1258058867]
+[node name="Background" type="ColorRect" parent="." unique_id=136765249]
 material = SubResource("ShaderMaterial_backdrop")
 layout_mode = 0
 anchor_right = 1.0
 anchor_bottom = 1.0
 
-[node name="ShardsLabel" type="Label" parent="." unique_id=1665442018]
+[node name="ShardsLabel" type="Label" parent="." unique_id=1553655346]
 unique_name_in_owner = true
 layout_mode = 0
 anchor_left = 1.0
@@ -39,7 +39,7 @@ theme_override_font_sizes/font_size = 20
 text = "Esquirlas: 0"
 horizontal_alignment = 2
 
-[node name="Layout" type="MarginContainer" parent="." unique_id=88924800]
+[node name="Layout" type="MarginContainer" parent="." unique_id=1388084542]
 layout_mode = 0
 anchor_right = 1.0
 anchor_bottom = 1.0
@@ -48,40 +48,40 @@ theme_override_constants/margin_top = 16
 theme_override_constants/margin_right = 24
 theme_override_constants/margin_bottom = 36
 
-[node name="VBox" type="VBoxContainer" parent="Layout" unique_id=560275734]
+[node name="VBox" type="VBoxContainer" parent="Layout" unique_id=1114694285]
 layout_mode = 2
 theme_override_constants/separation = 12
 
-[node name="TitleLabel" type="Label" parent="Layout/VBox" unique_id=1928918430]
+[node name="TitleLabel" type="Label" parent="Layout/VBox" unique_id=371227716]
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_colors/font_color = Color(0.96, 0.78, 0.3, 1)
 theme_override_font_sizes/font_size = 48
-text = "BONKRAIDERS"
+text = "CHIPETIAO"
 horizontal_alignment = 1
 
-[node name="SubtitleLabel" type="Label" parent="Layout/VBox" unique_id=1953365932]
+[node name="SubtitleLabel" type="Label" parent="Layout/VBox" unique_id=1758191480]
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_colors/font_color = Color(0.72, 0.74, 0.78, 1)
 theme_override_font_sizes/font_size = 16
-text = "Elige tu coto de caza y tu raider"
+text = "Elige tu personaje!1!11!"
 horizontal_alignment = 1
 
-[node name="ContentScroll" type="ScrollContainer" parent="Layout/VBox" unique_id=925690584]
+[node name="ContentScroll" type="ScrollContainer" parent="Layout/VBox" unique_id=2027905377]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(0, 180)
 layout_mode = 2
 size_flags_vertical = 3
 follow_focus = true
 
-[node name="Content" type="VBoxContainer" parent="Layout/VBox/ContentScroll" unique_id=2115680649]
+[node name="Content" type="VBoxContainer" parent="Layout/VBox/ContentScroll" unique_id=2004073487]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 3
 theme_override_constants/separation = 12
 
-[node name="CardsGrid" type="GridContainer" parent="Layout/VBox/ContentScroll/Content" unique_id=252641054]
+[node name="CardsGrid" type="GridContainer" parent="Layout/VBox/ContentScroll/Content" unique_id=1996494530]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 4
@@ -89,7 +89,7 @@ theme_override_constants/h_separation = 18
 theme_override_constants/v_separation = 14
 columns = 4
 
-[node name="ButtonRow" type="HFlowContainer" parent="Layout/VBox" unique_id=1250239762]
+[node name="ButtonRow" type="HFlowContainer" parent="Layout/VBox" unique_id=2057266018]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 3
@@ -97,21 +97,21 @@ theme_override_constants/h_separation = 16
 theme_override_constants/v_separation = 10
 alignment = 1
 
-[node name="StartButton" type="Button" parent="Layout/VBox/ButtonRow" unique_id=1896570339]
+[node name="StartButton" type="Button" parent="Layout/VBox/ButtonRow" unique_id=271936123]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(300, 52)
 layout_mode = 2
 theme_override_font_sizes/font_size = 22
 text = "Iniciar incursión"
 
-[node name="QuestsButton" type="Button" parent="Layout/VBox/ButtonRow" unique_id=1602364653]
+[node name="QuestsButton" type="Button" parent="Layout/VBox/ButtonRow" unique_id=518393122]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(150, 52)
 layout_mode = 2
 theme_override_font_sizes/font_size = 20
 text = "Misiones"
 
-[node name="SettingsButton" type="Button" parent="." unique_id=1043158438]
+[node name="SettingsButton" type="Button" parent="." unique_id=269148445]
 unique_name_in_owner = true
 layout_mode = 0
 offset_left = 24.0
@@ -121,7 +121,7 @@ offset_bottom = 46.0
 theme_override_font_sizes/font_size = 14
 text = "Ajustes"
 
-[node name="VersionLabel" type="Label" parent="." unique_id=1208404904]
+[node name="VersionLabel" type="Label" parent="." unique_id=942715455]
 unique_name_in_owner = true
 layout_mode = 0
 anchor_left = 1.0
@@ -137,6 +137,6 @@ theme_override_font_sizes/font_size = 12
 text = "v0.0.0"
 horizontal_alignment = 2
 
-[node name="SettingsPanel" parent="." unique_id=1001619897 instance=ExtResource("2_settingspanel")]
+[node name="SettingsPanel" parent="." unique_id=1176860960 instance=ExtResource("2_settingspanel")]
 unique_name_in_owner = true
 anchors_preset = 0

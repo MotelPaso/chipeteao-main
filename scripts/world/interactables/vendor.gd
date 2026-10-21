@@ -51,7 +51,7 @@ const VENDOR_LIBRARY: Array[Dictionary] = [
 @export var retry_cooldown: float = 20.0
 @export var sink_time: float = 0.6
 
-const VENDOR_UI_SCRIPT := preload("res://scripts/ui/vendor_ui.gd")
+const VENDOR_UI_SCRIPT := preload("res://scripts/ui/game/vendor_ui.gd")
 
 ## Line shown INSTEAD of the stall's own while the retry cooldown runs. No
 ## "[E] " prefix, unlike every other prompt: the token promises a press that

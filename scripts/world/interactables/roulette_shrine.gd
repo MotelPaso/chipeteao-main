@@ -26,7 +26,7 @@ const OUTCOMES: Array[Dictionary] = [
 	{"id": "enemy_frenzy", "label": "Enemigos más fuertes 30 s", "weight": 6.0, "color": Color(0.92, 0.28, 0.24)},
 ]
 
-const RouletteUiScript := preload("res://scripts/ui/roulette_ui.gd")
+const RouletteUiScript := preload("res://scripts/ui/game/roulette_ui.gd")
 
 var _wheel: MeshInstance3D = null
 var _time: float = 0.0

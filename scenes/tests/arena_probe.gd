@@ -494,7 +494,7 @@ var _zenkai_invulnerable: bool = false
 ## Preloaded, not the bare class name: world_director.gd declares no
 ## class_name, so its static weather_row() is only reachable through the
 ## script resource.
-const WEATHER_DIRECTOR := preload("res://scripts/world/world_director.gd")
+const WEATHER_DIRECTOR := preload("res://scripts/world/run/world_director.gd")
 const WEATHER_NOW_AT: float = 30.0
 var _weather_now: String = ""
 var _weather_forced: bool = false

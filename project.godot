@@ -18,43 +18,18 @@ config/icon="res://icon.svg"
 
 [autoload]
 
-RunState="*res://scripts/systems/run_state.gd"
-GameConfig="*res://scripts/systems/game_config.gd"
-Coop="*res://scripts/systems/coop.gd"
-SaveData="*res://scripts/systems/save_data.gd"
-Juice="*res://scripts/systems/juice.gd"
-Sfx="*res://scripts/systems/sfx.gd"
-Settings="*res://scripts/systems/settings_apply.gd"
-Pools="*res://scripts/systems/pools.gd"
+RunState="*res://scripts/systems/autoloads/run_state.gd"
+GameConfig="*res://scripts/systems/autoloads/game_config.gd"
+Coop="*res://scripts/systems/autoloads/coop.gd"
+SaveData="*res://scripts/systems/autoloads/save_data.gd"
+Juice="*res://scripts/systems/autoloads/juice.gd"
+Sfx="*res://scripts/systems/autoloads/sfx.gd"
+Settings="*res://scripts/systems/autoloads/settings_apply.gd"
+Pools="*res://scripts/systems/autoloads/pools.gd"
 ScreenFade="*res://scripts/ui/screen_fade.gd"
 
 [display]
 
-; Base de diseño de TODA la interfaz (iteración 62). Sin esta sección el
-; proyecto corría con los valores por defecto de Godot —1152x648 y
-; `stretch/mode = "disabled"`—, y "disabled" significa que un Control mide
-; lo mismo en PIXELES pase lo que pase con la ventana: al darle al botón
-; verde del Mac el viewport pasaba de 1280x720 a la pantalla entera y el
-; HUD, los menús y los botones se quedaban a menos de la mitad de su
-; tamaño relativo. Reportado jugando la build exportada.
-;
-; `canvas_items` escala el sistema de coordenadas 2D al tamaño de la
-; ventana y deja el 3D renderizando a resolución NATIVA, que es lo que se
-; quiere: interfaz del mismo tamaño relativo en cualquier ventana y mundo
-; nítido. `viewport` habría escalado también el 3D y lo habría dejado
-; borroso.
-;
-; `expand` en vez de `keep`: la relación de aspecto de un MacBook no es
-; 16:9, y `keep` habría metido barras negras. Con `expand` el factor de
-; escala es el menor de los dos ejes y el sobrante se ve como más mundo;
-; el HUD está anclado a las esquinas, así que sigue en sus esquinas.
-;
-; EFECTO LATERAL DELIBERADO: `Player._apply_look` lee
-; `InputEventMouseMotion.relative`, que con stretch llega en unidades de
-; CANVAS y no en píxeles de ventana. La sensibilidad del ratón deja de
-; depender de la resolución — antes maximizar la ventana la subía sola.
-; A 1280x720 el factor es 1 y el número guardado significa lo mismo que
-; siempre.
 window/size/viewport_width=1280
 window/size/viewport_height=720
 window/stretch/mode="canvas_items"
@@ -132,12 +107,6 @@ camera_zoom_out={
 
 [physics]
 
-; Jolt Physics (iteración 64). "DEFAULT" es GodotPhysics3D en 4.7, y con él
-; cada move_and_slide de un enemigo costaba 130-400 us: 80 enemigos ya
-; pasaban los 16,6 ms del frame en CPU sin dibujar nada. Con Jolt, en 18
-; pares de soaks de 360 s, el frame medio pasa de 7,8 a 1,9 ms y los
-; tirones de 37 a 0 (docs/ARQUITECTURA.md, «Rendimiento»).
-; Explícito para que un cambio del "DEFAULT" del motor no lo deshaga.
 3d/physics_engine="Jolt Physics"
 3d/default_gravity=20.0
 

@@ -1,7 +1,7 @@
 [gd_scene load_steps=33 format=3 uid="uid://bashdu2ne7q4c"]
 
-[ext_resource type="Script" path="res://scripts/world/arena.gd" id="1_arena"]
-[ext_resource type="Script" path="res://scripts/world/backdrop.gd" id="90_backdrop"]
+[ext_resource type="Script" path="res://scripts/world/run/arena.gd" id="1_arena"]
+[ext_resource type="Script" path="res://scripts/world/run/backdrop.gd" id="90_backdrop"]
 [ext_resource type="Script" path="res://scripts/systems/enemy_spawner.gd" id="2_spawner"]
 [ext_resource type="PackedScene" uid="uid://bqgr4nt0h3v2e" path="res://scenes/enemies/Grunt.tscn" id="3_grunt"]
 [ext_resource type="PackedScene" path="res://scenes/enemies/Skirmisher.tscn" id="4_skirmisher"]
@@ -9,7 +9,7 @@
 [ext_resource type="PackedScene" path="res://scenes/enemies/Sunspitter.tscn" id="19_sunspitter"]
 [ext_resource type="PackedScene" path="res://scenes/enemies/Duneburrower.tscn" id="20_burrower"]
 [ext_resource type="PackedScene" path="res://scenes/enemies/Sarcognath.tscn" id="21_sarcognath"]
-[ext_resource type="Script" path="res://scripts/world/scatter.gd" id="6_scatter"]
+[ext_resource type="Script" path="res://scripts/world/run/scatter.gd" id="6_scatter"]
 [ext_resource type="PackedScene" uid="uid://ccact1du9sw3a" path="res://scenes/world/props/Cactus.tscn" id="7_cactus"]
 [ext_resource type="PackedScene" uid="uid://dobel2du6kt5b" path="res://scenes/world/props/Obelisk.tscn" id="8_obelisk"]
 [ext_resource type="PackedScene" uid="uid://bdrock3du4mp7c" path="res://scenes/world/props/DuneRock.tscn" id="9_dunerock"]
@@ -23,7 +23,7 @@
 [ext_resource type="Script" path="res://scripts/systems/ambient_bed.gd" id="17_ambient"]
 [ext_resource type="AudioStream" path="res://assets/audio/ambient/desert_wind.wav" id="18_wind"]
 [ext_resource type="PackedScene" path="res://scenes/world/secrets/HummingSkull.tscn" id="24_skull"]
-[ext_resource type="Script" path="res://scripts/world/terrain.gd" id="90_terrain"]
+[ext_resource type="Script" path="res://scripts/world/run/terrain.gd" id="90_terrain"]
 
 [sub_resource type="Shader" id="Shader_sand"]
 code = "shader_type spatial;

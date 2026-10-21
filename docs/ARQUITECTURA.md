@@ -63,9 +63,9 @@ El refactor de la iteración 45 extrajo la duplicación que estaba causando bugs
 
 | Archivo | `class_name` | Qué unifica |
 |---|---|---|
-| `scripts/systems/catalog_index.gd` | `CatalogIndex` | Índice `id -> fila` para los ocho catálogos. `build(rows, campo)` y `values_where(...)`. Cada catálogo guarda su `static var` de índice y conserva su `by_id()` público: cambia el coste de la búsqueda, no el contrato. `PlayerStats.recompute()` resolvía una fila por stack en un bucle lineal. |
-| `scripts/systems/magnet_pickup.gd` | `MagnetPickup` | Chasis de los pickups tirados (`XpGem`, `HealthOrb`): idle con giro/bob, homing acelerado al raider en pie más cercano (radio × `RunState.pickup_radius_multiplier`), captura por proximidad y caducidad. La subclase aporta `LIVE_GROUP`, qué hace recolectar y el adorno propio. |
-| `scripts/ui/meta_screen.gd` | `MetaScreen` | Chasis de las tres pantallas entre partidas (Registro de misiones, Armería, Colección): fondo, título, insignia, botón Volver, entrada escalonada y el conteo de esquirlas. Contrato de escena: `%TitleLabel`, `%BadgeLabel`, `%List`, `%BackButton`. Hooks: `_badge_color()`, `_tracks_shards()`, `_build_rows(list)`; momentos compartidos: `payoff()`, `reject()`, `rebuild()`. |
+| `scripts/systems/catalogs/catalog_index.gd` | `CatalogIndex` | Índice `id -> fila` para los ocho catálogos. `build(rows, campo)` y `values_where(...)`. Cada catálogo guarda su `static var` de índice y conserva su `by_id()` público: cambia el coste de la búsqueda, no el contrato. `PlayerStats.recompute()` resolvía una fila por stack en un bucle lineal. |
+| `scripts/systems/pickups/magnet_pickup.gd` | `MagnetPickup` | Chasis de los pickups tirados (`XpGem`, `HealthOrb`): idle con giro/bob, homing acelerado al raider en pie más cercano (radio × `RunState.pickup_radius_multiplier`), captura por proximidad y caducidad. La subclase aporta `LIVE_GROUP`, qué hace recolectar y el adorno propio. |
+| `scripts/ui/meta/meta_screen.gd` | `MetaScreen` | Chasis de las tres pantallas entre partidas (Registro de misiones, Armería, Colección): fondo, título, insignia, botón Volver, entrada escalonada y el conteo de esquirlas. Contrato de escena: `%TitleLabel`, `%BadgeLabel`, `%List`, `%BackButton`. Hooks: `_badge_color()`, `_tracks_shards()`, `_build_rows(list)`; momentos compartidos: `payoff()`, `reject()`, `rebuild()`. |
 | `scripts/ui/card_factory.gd` | `CardFactory` | Constructores sin estado de la carpintería de tarjetas del selector (etiquetas, cajas, muestras de color, styleboxes por estado). Los colores siguen viniendo de `UiTheme`; esto es «cómo se arma una tarjeta», no un segundo sistema de diseño. |
 | `scripts/fx/fx_mesh.gd` | `FxMesh` | `strip(vertices, colors)`: la tira de triángulos que comparten el arco de tajo y el latigazo. |
 
@@ -80,7 +80,7 @@ Helpers compartidos que ya existían pero **crecieron** en esta iteración (ver 
 ## Añadir un arma nueva
 
 - Qué es: nodos hijos del mount `Weapons` del Player que disparan solos por cooldown al enemigo más cercano del grupo `enemies`.
-- Archivos: `scripts/weapons/weapon_base.gd` (clase `WeaponBase`), `scripts/systems/upgrade_pool.gd` (`WEAPON_LIBRARY`, 14 armas), `scenes/weapons/`.
+- Archivos: `scripts/weapons/weapon_base.gd` (clase `WeaponBase`), `scripts/systems/catalogs/upgrade_pool.gd` (`WEAPON_LIBRARY`, 14 armas), `scenes/weapons/`.
 - Contrato `WeaponBase`: exporta `damage/cooldown/attack_range/projectile_count/cooldown_scale`; la subclase sobreescribe `fire(target)` y canaliza **todo** golpe por `deal_damage(target_health)` (aplica multiplicador global, crit, lifesteal y los hooks de objetos del portador). Helpers de stats: `effective_damage()`, `effective_cooldown()`, `area_scale()` (radios/arcos, no `attack_range`), `effective_projectile_count()`, `duration_scale()`, `targeting_range()`.
 - **Barridos de área compartidos (iteración 45)**: `enemies_in_disc(centro, radio, ventana_y)`, `enemies_in_sphere(centro, radio)`, `enemies_in_lane(origen, dir, largo, ancho)`, `enemies_in_arc(centro, dir, alcance, ángulo)` y `damage_all(bodies)`. Cuatro armas repetían el mismo bucle con los mismos dos números mágicos; si tu arma golpea una forma, **úsala desde aquí** en vez de escribir un `get_nodes_in_group("enemies")` nuevo. Los helpers de aim (`aim_dir_or`, `flat_dir_or`, `safe_up`) son estáticos y cubren los casos degenerados (vector nulo, dirección colineal con Y).
 - Visual efímero: `spawn_fx_mesh(mesh)` construye el `MeshInstance3D` en la raíz de escena con la configuración correcta (lo que antes copiaban cuatro armas).
@@ -157,7 +157,7 @@ jugador no puede deshacer.
 
 ### Caja de mascotas
 
-`scripts/world/pet_box.gd` (`PetBox extends Interactable`, escena
+`scripts/world/interactables/pet_box.gd` (`PetBox extends Interactable`, escena
 `scenes/world/PetBox.tscn`, grupo `pet_boxes`, `marker_kind` `&"pet_box"`).
 **Gratis**: el traficante vende una *elección* de tres por puntos; la caja
 es la versión que te encuentras, y su precio es haber caminado hasta ella.
@@ -173,11 +173,11 @@ la etapa (`start_pet_box_chance`).
 
 ## Vendedores
 
-`scripts/world/vendor.gd` (`Vendor extends Interactable`, grupo `vendors`,
+`scripts/world/interactables/vendor.gd` (`Vendor extends Interactable`, grupo `vendors`,
 `marker_kind` `&"vendor"`), tres kinds en una tabla `VENDOR_LIBRARY`.
 
 **El puesto es dueño de la ECONOMÍA** (qué cobra, qué entrega, el log y la
-regla de una sola venta); **`scripts/ui/vendor_ui.gd` es dueño del
+regla de una sola venta); **`scripts/ui/game/vendor_ui.gd` es dueño del
 momento** (qué hay en el mostrador, qué dice una carta, qué pasa entre el
 clic y la despedida). Un kind nuevo es una fila aquí, una rama en
 `VendorUi._build_offers` y una en `Vendor.buy`.
@@ -212,7 +212,7 @@ clic y la despedida). Un kind nuevo es una fila aquí, una rama en
 ## Añadir un personaje
 
 - Qué es: arma inicial + pasiva escalable, todo datos; el select y el spawn del Player leen la fila, no hay código por personaje.
-- Archivos: `scripts/systems/character_catalog.gd` (`CHARACTER_LIBRARY`, 13 filas), consumidores: `scripts/player/player.gd` (`_apply_character`), `scripts/ui/character_select.gd`, `scripts/systems/player_stats.gd`.
+- Archivos: `scripts/systems/catalogs/character_catalog.gd` (`CHARACTER_LIBRARY`, 13 filas), consumidores: `scripts/player/player.gd` (`_apply_character`), `scripts/ui/meta/character_select.gd`, `scripts/systems/player_stats.gd`.
 - Fila: `id`, `display_name` (los nombres propios **no se traducen**, glosario regla 5), `blurb`, `weapon_scene` + `weapon_node_name` (**debe** coincidir con el `node_name` de `WEAPON_LIBRARY` para que el pool lo vea como poseída), `weapon_display_name`, `passive_description`, `passive_stat` + `passive_amount`, `tint`.
 - Los campos **obligatorios** se leen duro a propósito (una fila malformada revienta de inmediato); solo los opcionales usan `.get()` con default. No conviertas los primeros a `.get()`: convierte un error de datos en un personaje silenciosamente roto.
 - `passive_kind` (opcional): `"per_level"` (defecto), `"speed_to_damage"` (Juno) o `"evasion_execute"` (Nyx). `passive_base` = cantidad ya activa a nivel 1 (Doc). Ids de stat = los de `PlayerStats._apply_effect`.
@@ -222,7 +222,7 @@ clic y la despedida). Un kind nuevo es una fila aquí, una rama en
 ## Añadir un tomo
 
 - Qué es: pasivas apilables (máx. 5 stacks) que alimentan la capa de stats del jugador.
-- Archivos: `scripts/systems/tome.gd` (`TOME_LIBRARY`, 15 filas), aplicado por `scripts/systems/player_stats.gd`; las cartas las genera `upgrade_pool.gd` (`_tome_entries`).
+- Archivos: `scripts/systems/catalogs/tome.gd` (`TOME_LIBRARY`, 15 filas), aplicado por `scripts/systems/player_stats.gd`; las cartas las genera `upgrade_pool.gd` (`_tome_entries`).
 - Fila: `id`, `display_name` («Tomo de X» / «Tomo del X», glosario), `description` (el `%d` se rellena con la cantidad del **primer** efecto), `effects: [{stat, amount}]`. Una fila nueva basta: el pool ofrece el siguiente stack automáticamente.
 - Ojo con el nombre: `hud.gd` recorta el prefijo para la sigla de la tira de equipamiento usando `TOME_NAME_PREFIXES`, **ordenado del más largo al más corto** (`"Tomo del "` antes que `"Tomo de "`). Al revés, «Tomo del Azar» quedaría como «l Azar». Un prefijo nuevo se añade ahí respetando ese orden.
 - Escalado: `amount` es el valor a potencia Común; la rareza de la carta lo multiplica (`UpgradePool.RARITIES`: Common 1.0 / Rare 1.5 / Epic 2.0 / Legendary 3.0). La `luck` del jugador inclina los pesos al tirar.
@@ -249,7 +249,7 @@ clic y la despedida). Un kind nuevo es una fila aquí, una rama en
 
 - Qué es: chasis sobre `EnemyBase` con barra de vida en HUD, clamp de arena, escalado Elder/tier/party y pago en anillo de gemas + orbes de vida.
 - Archivos: `scripts/enemies/boss_base.gd` (`BossBase`), ejemplos con máquina de estados propia: `rotking.gd`, `sarcognath.gd`, `fenwraith.gd`; telégrafos: `scenes/fx/TelegraphDisc.tscn`.
-- Escena: raíz en grupos `boss` + `enemies`. En `_ready` el chasis ya hace `call_group("boss_ui", "track_boss", self, boss_title)` — la barra del HUD y la flecha de pantalla (`scripts/ui/boss_arrow.gd`) se enganchan solas.
+- Escena: raíz en grupos `boss` + `enemies`. En `_ready` el chasis ya hace `call_group("boss_ui", "track_boss", self, boss_title)` — la barra del HUD y la flecha de pantalla (`scripts/ui/game/boss_arrow.gd`) se enganchan solas.
 - Sobreescribir **`_scale_attack_damage(mult)`** con los números del moveset. `_apply_elite_damage` delega en él, así que un jefe que pase por `apply_tier_scaling` escala su moveset en vez de quedarse en daño base; `make_elite()` es un no-op en jefes a propósito.
 - **`apply_tier(hp_mult, damage_mult = -1.0, payout_mult = -1.0)`** (contrato cambiado en la iteración 45): tres canales separados, `-1.0` = «igual que HP». El spawner los llena así, y la razón está en su comentario: HP lleva rematch × tier × dificultad × tamaño de party; **daño** lleva lo mismo **sin** el factor de party (cuatro cuerpos ya absorben más golpes: escalar también el golpe cobra doble); pago lleva rematch × tier solamente (`RunState.difficulty_xp_multiplier()` ya paga la parte de dificultad al recolectar). Compone: llamarlo dos veces multiplica dos veces.
 - Piezas compartidas del chasis: `_clamp_to_arena` y `_safe_arena_point` (respetan `arena_bounds`), `_play_boss_entrance`, `_spawn_spike_cluster`, y **un único slot de tween de señal** (`_play_cue`/`_begin_cue`/`_kill_cue`) — dos telégrafos solapados ya no se pisan el visual.
@@ -261,9 +261,9 @@ clic y la despedida). Un kind nuevo es una fila aquí, una rama en
 ## Añadir un mapa
 
 - Qué es: una fila de catálogo + una escena de arena. **El orden de `MAP_LIBRARY` es el orden de la partida** (iteración 50): una fila nueva insertada en medio cambia la progresión de todos inmediatamente. No hay desbloqueos de mapa ni grados; a un bioma se llega jugando.
-- Archivos: `scripts/systems/map_catalog.gd` (`MAP_LIBRARY`), `scripts/world/run_root.gd`, `scripts/world/arena.gd`, `scripts/world/scatter.gd`, arenas existentes como plantilla.
+- Archivos: `scripts/systems/catalogs/map_catalog.gd` (`MAP_LIBRARY`), `scripts/world/run/run_root.gd`, `scripts/world/run/arena.gd`, `scripts/world/run/scatter.gd`, arenas existentes como plantilla.
 - Fila: `id`, `display_name` (topónimo, mayúscula en las dos partes), `blurb`, `scene_path`, `palette`. Nada más: `unlock_stat`, `locked_hint` y `tiers` desaparecieron con los grados.
-- Escena de arena (copiar `AshDunes.tscn`): raíz `Node3D` **con `scripts/world/arena.gd` y su `map_id`**, `WorldEnvironment` + luz, `Floor` y `Perimeter` (muros, capa 1), `Backdrop` (`scripts/world/backdrop.gd`, sus anillos de colinas se derivan de `arena_half_extent`), spots de verticalidad y props a mano (en grupo `scatter_keepout`), nodo de scatter con `scatter.gd` (seed determinista; su `arena_half_extent` es la **fuente única del tamaño de arena** — 120.0 = 240x240 — publicada por el grupo `arena_bounds`, la leen `BossBase` y `EnemySpawner` restando su margen), `Interactables`, `EnemySpawner` (con `phase_preset` y sus escenas/horario), `AmbientBed`, un nodo **`Terrain`** con `scripts/world/terrain.gd`, su `amplitude` del bioma y el `ShaderMaterial` del suelo en `surface_material` (colocado **después** del scatter en orden de árbol), y un `Marker3D` llamado `SpawnPoint` (dónde aterriza el equipo). Los muros del `Perimeter` se escriben **estáticos** en la escena: formas `(1, 17, 242)` / `(242, 17, 1)` centradas en ±120.5 y y = 3.5. Unos **13 POI barajables** bajo `Interactables`. **NO** instancia `RunSystems.tscn`: eso vive una sola vez en `Run.tscn`.
+- Escena de arena (copiar `AshDunes.tscn`): raíz `Node3D` **con `scripts/world/run/arena.gd` y su `map_id`**, `WorldEnvironment` + luz, `Floor` y `Perimeter` (muros, capa 1), `Backdrop` (`scripts/world/run/backdrop.gd`, sus anillos de colinas se derivan de `arena_half_extent`), spots de verticalidad y props a mano (en grupo `scatter_keepout`), nodo de scatter con `scatter.gd` (seed determinista; su `arena_half_extent` es la **fuente única del tamaño de arena** — 120.0 = 240x240 — publicada por el grupo `arena_bounds`, la leen `BossBase` y `EnemySpawner` restando su margen), `Interactables`, `EnemySpawner` (con `phase_preset` y sus escenas/horario), `AmbientBed`, un nodo **`Terrain`** con `scripts/world/run/terrain.gd`, su `amplitude` del bioma y el `ShaderMaterial` del suelo en `surface_material` (colocado **después** del scatter en orden de árbol), y un `Marker3D` llamado `SpawnPoint` (dónde aterriza el equipo). Los muros del `Perimeter` se escriben **estáticos** en la escena: formas `(1, 17, 242)` / `(242, 17, 1)` centradas en ±120.5 y y = 3.5. Unos **13 POI barajables** bajo `Interactables`. **NO** instancia `RunSystems.tscn`: eso vive una sola vez en `Run.tscn`.
 - Los `@export` del `EnemySpawner` los overridean las tres arenas en su `.tscn`: mover esos exports a un colaborador rompe los tres mapas. Si hace falta partir el spawner, hay que migrar las escenas a la vez.
 
 ## Partida por etapas
@@ -274,9 +274,9 @@ Una partida es una **secuencia de etapas**, una por mapa, en el orden de `MAP_LI
 
 | Archivo | Qué hace |
 |---|---|
-| `scenes/world/Run.tscn` + `scripts/world/run_root.gd` (`RunRoot`, grupo `run_root`) | La raíz persistente. Hijos: `RunSystems` y `ArenaHost`. API: `arena_root()` / `current_arena()`, `advance_stage()`, y el estático `RunRoot.stage_parent(tree)`. |
-| `scripts/world/arena.gd` (`Arena`, grupo `arena_root`) | Raíz de cada bioma. `map_id`, `SpawnPoint`, y el **orden** del ciclo de vida. |
-| `scripts/world/exit_portal.gd` (`ExitPortal`) | El portal de salida de la etapa. |
+| `scenes/world/Run.tscn` + `scripts/world/run/run_root.gd` (`RunRoot`, grupo `run_root`) | La raíz persistente. Hijos: `RunSystems` y `ArenaHost`. API: `arena_root()` / `current_arena()`, `advance_stage()`, y el estático `RunRoot.stage_parent(tree)`. |
+| `scripts/world/run/arena.gd` (`Arena`, grupo `arena_root`) | Raíz de cada bioma. `map_id`, `SpawnPoint`, y el **orden** del ciclo de vida. |
+| `scripts/world/run/exit_portal.gd` (`ExitPortal`) | El portal de salida de la etapa. |
 | `RunState` | `stage_index`, `lap`, `stage_time`, `stage_boss_dead`, `stage_cleared`, `pseudo_infinite_time`, `stages_cleared_total`, `endless_seconds_total`, `laps_completed`, `visited_map_ids`, `cleared_map_ids`, señal `stage_changed(stage_index, map_id)`, y `begin_stage()` / `mark_stage_cleared(map_id)`. Los índices son **0-based**; todo lo que ve el jugador (o un log) imprime `+ 1`. |
 
 ### El orden del ciclo de vida de una etapa (es load-bearing)
@@ -321,7 +321,7 @@ Corre dentro de `ScreenFade.transition_async(action)` — el hermano que **esper
 ## Terreno
 
 Desde la iteración 51 el suelo de una arena **no es una placa plana**: es
-`scripts/world/terrain.gd` (`class_name Terrain extends StaticBody3D`, grupo
+`scripts/world/run/terrain.gd` (`class_name Terrain extends StaticBody3D`, grupo
 `terrain`, `static func find(tree)`), un heightmap suave de amplitud baja
 (bosque 2.5, dunas 3.0, ciénaga 1.5) con mesetas encima.
 
@@ -336,15 +336,15 @@ persecución en vez de enriquecerla. Lo que compra el relieve es legibilidad
   `BONK_GAME_SEED` y la Cacería diaria reproducen el mismo relieve **y** los
   mismos props encima.
   - **De dónde sale esa semilla** (corregido en la iteración 52): de
-    `randi()`, es decir del **stream de la partida**, el que
-    `RunState.reset()` acaba de sembrar. Antes era `_rng.randomize()`, que
-    resiembra desde la entropía del sistema y **es sorda** a ese `seed()`:
-    `BONK_GAME_SEED` no reproducía nada: dos soaks con la misma semilla
-    salían con máscara, props y relieve distintos (medido: `168/576` vs
-    `167/576` celdas bloqueadas, `min=-1.8 max=1.8` vs `min=-2.1 max=2.0`).
-    Lo encontró la puerta de niebla de esta misma iteración, comparando dos
-    corridas que debían ser idénticas. Una partida normal no cambia: ahí
-    `reset()` hace `randomize()` sobre el mismo stream.
+	`randi()`, es decir del **stream de la partida**, el que
+	`RunState.reset()` acaba de sembrar. Antes era `_rng.randomize()`, que
+	resiembra desde la entropía del sistema y **es sorda** a ese `seed()`:
+	`BONK_GAME_SEED` no reproducía nada: dos soaks con la misma semilla
+	salían con máscara, props y relieve distintos (medido: `168/576` vs
+	`167/576` celdas bloqueadas, `min=-1.8 max=1.8` vs `min=-2.1 max=2.0`).
+	Lo encontró la puerta de niebla de esta misma iteración, comparando dos
+	corridas que debían ser idénticas. Una partida normal no cambia: ahí
+	`reset()` hace `randomize()` sobre el mismo stream.
 - **Orden de construcción**: se arma en `_ready`, que corre **antes** de
   `Arena._ready` (los hijos primero) y **después** del `_enter_tree` del
   scatter, así que la máscara y los sitios de meseta ya existen. Quien pueda
@@ -435,8 +435,8 @@ respondible mirando alrededor.
 | Pieza | Qué es | Dónde vive |
 |---|---|---|
 | `FogOfWar` | lo que el equipo **ha visto** de la etapa | `scripts/systems/fog_of_war.gd`, nodo de `RunSystems.tscn`, grupo `fog`, `static find(tree)` |
-| `MapDraw` | **el** dibujante: fondo, composición con niebla, marcadores, proyección | `scripts/ui/map_draw.gd` (`RefCounted`, `MapDraw.new(get_tree())`) |
-| `Minimap` / `MapOverlay` | los dos consumidores | `scripts/ui/minimap.gd`, `scripts/ui/map_overlay.gd`, ambos creados por el HUD |
+| `MapDraw` | **el** dibujante: fondo, composición con niebla, marcadores, proyección | `scripts/ui/maps/map_draw.gd` (`RefCounted`, `MapDraw.new(get_tree())`) |
+| `Minimap` / `MapOverlay` | los dos consumidores | `scripts/ui/maps/minimap.gd`, `scripts/ui/maps/map_overlay.gd`, ambos creados por el HUD |
 
 **`MapDraw` es uno solo a propósito.** Un widget de 150 px y un overlay de
 media pantalla comparten el 100% de la lógica (la imagen del terreno, el
@@ -521,16 +521,16 @@ se une solo al grupo `map_markers` cuando ese export no está vacío, y expone
   0.1 s. En solitario va arriba a la derecha, **bajo la insignia de FPS**; en
   co-op, uno por celda de pantalla dividida.
   - **Dónde empieza, exactamente (iteración 61).** La columna de arriba a la
-    derecha es una **pila**: `%KillsLabel` (arriba 22), `%PointsLabel` (56) y
-    la insignia de FPS (88), y el mapa cuelga **debajo de las tres**
-    (`MINIMAP_TOP_UNDER_HUD` = offset de la insignia + su alto + 8). Esa
-    regla la aplica **toda celda que toque el borde superior de la ventana**,
-    no solo la de una partida en solitario: la pila está anclada a la
-    ventana, no a la celda. Hasta la 60 el inset extra era `46` y solo se
-    aplicaba en solitario, así que el mapa arrancaba en y 60 y tapaba la
-    etiqueta de puntos y la insignia de FPS —y en co-op, sin inset ninguno,
-    también las bajas— (L5-1 de la auditoría de la ronda 2, diferido allí
-    por ser solo visible al renderizar y confirmado en pantalla aquí).
+	derecha es una **pila**: `%KillsLabel` (arriba 22), `%PointsLabel` (56) y
+	la insignia de FPS (88), y el mapa cuelga **debajo de las tres**
+	(`MINIMAP_TOP_UNDER_HUD` = offset de la insignia + su alto + 8). Esa
+	regla la aplica **toda celda que toque el borde superior de la ventana**,
+	no solo la de una partida en solitario: la pila está anclada a la
+	ventana, no a la celda. Hasta la 60 el inset extra era `46` y solo se
+	aplicaba en solitario, así que el mapa arrancaba en y 60 y tapaba la
+	etiqueta de puntos y la insignia de FPS —y en co-op, sin inset ninguno,
+	también las bajas— (L5-1 de la auditoría de la ronda 2, diferido allí
+	por ser solo visible al renderizar y confirmado en pantalla aquí).
 - **`MapOverlay`**: capa **8** (bajo `UpgradeCardUI` 10 — una carta abierta
   tiene que verse por encima), `PROCESS_MODE_ALWAYS`, grupo `map_overlay`.
   Cabecera «Etapa N · Vuelta M — MM:SS», leyenda abajo a la izquierda y tres
@@ -569,9 +569,9 @@ eligen en una carta y **se sienten sin leer un número**.
 
 | Pieza | Qué es | Dónde |
 |---|---|---|
-| `PowerUpCatalog` | las 10 filas | `scripts/systems/powerup_catalog.gd` |
+| `PowerUpCatalog` | las 10 filas | `scripts/systems/catalogs/powerup_catalog.gd` |
 | `PowerUps` | componente por raider: qué está activo y cuánto queda | `scripts/systems/power_ups.gd`, hijo de `Player.tscn`, `PowerUps.find_in(body)` |
-| `PowerUpPickup` | la gema en el suelo | `scripts/systems/powerup_pickup.gd` + `scenes/systems/PowerUpPickup.tscn`, grupo `powerup_pickups` |
+| `PowerUpPickup` | la gema en el suelo | `scripts/systems/pickups/powerup_pickup.gd` + `scenes/systems/PowerUpPickup.tscn`, grupo `powerup_pickups` |
 | `EnemySpawner` | la tirada del drop, el congelado y la puerta de spawn | `roll_powerup_drop`, `spawn_powerup_pickup`, `freeze_enemies` |
 
 ### Añadir un power-up
@@ -813,7 +813,7 @@ devuelve `price_discount` a 1.0.
 
 ### El altar de eventos
 
-`scripts/world/event_altar.gd` (`EventAltar extends Interactable`, escena
+`scripts/world/interactables/event_altar.gd` (`EventAltar extends Interactable`, escena
 `scenes/world/shrines/EventAltar.tscn`, `marker_kind = &"event_altar"` puesto
 en `_init()`, gratis, un solo uso, se hunde). Invoca una fila al azar
 **excepto `golden_rain` y `full_moon`**: esas dos son lo que paga haber
@@ -870,7 +870,7 @@ Lo que mata el báculo **se levanta de tu lado** (iteración 56).
 
 ## Bloques de la suerte
 
-`scripts/world/lucky_block.gd` (`LuckyBlock extends Interactable`, escena
+`scripts/world/interactables/lucky_block.gd` (`LuckyBlock extends Interactable`, escena
 `scenes/world/chests/LuckyBlock.tscn`, grupo `lucky_blocks`, `marker_kind`
 `&"lucky_block"` en `_init()`). Parece un cofre y no lo es: **gratis, raro y
 siempre paga algo**. No hay precio ni rareza — el objeto entero es la
@@ -893,7 +893,7 @@ apertura, nombrando lo que de verdad se pagó.
 ## Misiones y meta-progresión
 
 - Qué es: misiones que pagan esquirlas; las esquirlas compran personajes y rangos de reliquia de la Armería. Todo persiste en `user://save.json`.
-- Archivos: `scripts/systems/quest_catalog.gd` (`QUEST_LIBRARY`, 40 filas), `scripts/systems/save_data.gd` (autoload `SaveData`), UI: `scripts/ui/quest_log.gd`, fin de partida: `scripts/systems/run_manager.gd`.
+- Archivos: `scripts/systems/catalogs/quest_catalog.gd` (`QUEST_LIBRARY`, 40 filas), `scripts/systems/autoloads/save_data.gd` (autoload `SaveData`), UI: `scripts/ui/meta/quest_log.gd`, fin de partida: `scripts/systems/run_manager.gd`.
 - Fila de misión: `id`, `display_name`, `description` (imperativo, tuteo), `stat` (id de contador — **lista canónica en la cabecera de `save_data.gd`**), `target`, `reward`. Un contador nuevo no necesita registro: `bump` crea la clave.
 - **Contrato transaccional (iteración 45)**: los sistemas en partida acreditan con `SaveData.bump(id)` / `raise_to(id, valor)`, que caen en un **buffer de partida** (`_run_counters` / `_run_highs`). Solo el fin de partida lo funde en el ledger persistido (`fold_run_results`); `RunState.reset()` lo descarta. Consecuencia observable y deliberada: **abandonar una partida con «Salir al menú» ya no deja rastro de nada** — ni `bosses_killed`, ni `chests_opened`, ni `used_weapon_<id>` para la Colección. Antes esos contadores se filtraban al siguiente guardado y se podían farmear sin terminar partidas.
   - `stat(id)` lee ledger + buffer (para mostrar progreso); la **evaluación de misiones lee solo el ledger**, así que una misión nunca se marca completa con contadores que un abandono va a revertir.
@@ -906,7 +906,7 @@ apertura, nombrando lo que de verdad se pagó.
 
 - Qué es: cada carta invertida en un arma es un nivel de arma (`WeaponBase.upgrade_level`); cada múltiplo de `EvolutionCatalog.EVOLVE_AT_LEVEL` (**10**) es un **hito**. El primero evoluciona el arma si tiene receta; los siguientes —y también el primero para un arma sin receta— son **ascensos**: un escalón plano sin fila de catálogo (`WeaponBase.ASCEND_MULTS`: daño ×1.15, `cooldown_scale` ×0.9, alcance ×1.1, y +1 proyectil en los tiers pares). Así ningún arma deja de mejorar nunca. No intervienen cofres ni tomos.
 - `WeaponBase.ascension_tier` cuenta los hitos pasados (la evolución del nivel 10 es el tier 1). El HUD pinta `N%d` (nivel) por debajo del primer hito y `★%d` (tier) desde ahí.
-- Archivos: `scripts/systems/evolution_catalog.gd` (`EVOLUTION_LIBRARY`, 15 filas, indexada por `weapon_id`; `try_advance_by_level`), `scripts/weapons/weapon_base.gd` (`upgrade_level`, `ascension_tier`, `evolve()`, `ascend()`, y el aplicador genérico `_apply_stat_tables` que comparten), `scripts/systems/upgrade_pool.gd` (`apply` llama a `try_advance_by_level` tras cada carta de arma), `scripts/ui/hud.gd` (`announce_major`).
+- Archivos: `scripts/systems/catalogs/evolution_catalog.gd` (`EVOLUTION_LIBRARY`, 15 filas, indexada por `weapon_id`; `try_advance_by_level`), `scripts/weapons/weapon_base.gd` (`upgrade_level`, `ascension_tier`, `evolve()`, `ascend()`, y el aplicador genérico `_apply_stat_tables` que comparten), `scripts/systems/catalogs/upgrade_pool.gd` (`apply` llama a `try_advance_by_level` tras cada carta de arma), `scripts/ui/game/hud.gd` (`announce_major`).
 - Ceremonia compartida por ambos hitos (fanfarria, sparkle, shake) + banner propio: «¡%s evolucionó a %s!» y «¡%s asciende!». Logs `Weapon evolved:` y `Weapon ascended: <arma> tier <n>`.
 - Evolución nueva: una fila con `weapon_id`/`weapon_node`, `evolved_name`, `mults`/`adds` (aplicados genéricamente sobre cualquier propiedad del arma vía get/set) y `flavor` para la Colección. El banner busca el `display_name` traducido en `WEAPON_LIBRARY`, no capitaliza el id. La ceremonia bumpea `evo_<weapon_id>` + `evolutions_total` e imprime `Weapon evolved:`.
 - `evolution_catalog.gd` tiene funciones `static`; para alcanzar autoloads desde ahí hay **un** helper estático en el archivo, no `Engine.get_main_loop()` repetido.
@@ -924,16 +924,16 @@ apertura, nombrando lo que de verdad se pagó.
 
 ## Colección, Armería y modos meta
 
-- **Colección** (`scripts/ui/collection.gd` + `scenes/ui/Collection.tscn`, `extends MetaScreen`): lee contadores de `SaveData` — `used_weapon_<id>` (bump en `Player._apply_character` y `UpgradePool._grant_weapon`), `evo_<id>`, `kills_<script>` (bump en `EnemyBase._on_died`, keyed por nombre de archivo del script — un enemigo nuevo entra al bestiario añadiendo su fila a `BESTIARY` en `collection.gd`). Recuerda el contrato transaccional: una partida abandonada no registra nada aquí.
-- **Armería / reliquias** (`scripts/systems/relic_catalog.gd`, `scripts/ui/relic_shop.gd`, `extends MetaScreen`): 6 reliquias de stats permanentes por rangos; `SaveData.relic_ranks` + `purchase_relic()`; `PlayerStats._apply_relics()` las aplica en cada `recompute()` por el mismo canal `_apply_effect` que los tomos. Reliquia nueva = una fila (id de stat de `_apply_effect`).
-- **Registro de misiones** (`scripts/ui/quest_log.gd`, `extends MetaScreen`): filas con `enum RowState`.
+- **Colección** (`scripts/ui/meta/collection.gd` + `scenes/ui/Collection.tscn`, `extends MetaScreen`): lee contadores de `SaveData` — `used_weapon_<id>` (bump en `Player._apply_character` y `UpgradePool._grant_weapon`), `evo_<id>`, `kills_<script>` (bump en `EnemyBase._on_died`, keyed por nombre de archivo del script — un enemigo nuevo entra al bestiario añadiendo su fila a `BESTIARY` en `collection.gd`). Recuerda el contrato transaccional: una partida abandonada no registra nada aquí.
+- **Armería / reliquias** (`scripts/systems/catalogs/relic_catalog.gd`, `scripts/ui/meta/relic_shop.gd`, `extends MetaScreen`): 6 reliquias de stats permanentes por rangos; `SaveData.relic_ranks` + `purchase_relic()`; `PlayerStats._apply_relics()` las aplica en cada `recompute()` por el mismo canal `_apply_effect` que los tomos. Reliquia nueva = una fila (id de stat de `_apply_effect`).
+- **Registro de misiones** (`scripts/ui/meta/quest_log.gd`, `extends MetaScreen`): filas con `enum RowState`.
 - **Cacería diaria**: `GameConfig.daily_mode/daily_seed/daily_date`; `RunState.reset()` siembra el RNG global con la semilla y `scatter.gd` la adopta, así cartas/spawns/layout/máscara son deterministas por fecha. Score en `GameConfig.daily_score` (estática); `RunManager` lo registra (`daily_best_<fecha>` vía `raise_to`, `daily_runs`). Log `Daily run scored:`.
 - **Partida sin reloj**: `RunManager` no termina la partida por tiempo. `survival_goal` (900 s) es el hito que califica el final como victoria; `extract_run()` (grupo `run_manager`, lo llama el botón **Extraerse** del `PauseMenu`) cierra la partida con el fold normal. `RunEndScreen` titula EXTRACCIÓN LOGRADA / INCURSIÓN ABANDONADA cuando alguien sigue en pie. `survival_text` tiene **exactamente un** `%d`, relleno con `survival_goal` en minutos: retunear el objetivo no puede dejar el banner anunciando otro número.
 
 ## Objetos y puntos de partida
 
 - Qué es: economía por jugador dentro de la partida. Cada muerte paga `EnemyBase.points_value` (shiny x5, jefes `BossBase.boss_points_value` = 25, escalado por `apply_tier`) al raider **más cercano** (`Player.add_points`, señal `points_changed`; se reinicia cada partida).
-- Archivos: `scripts/systems/item_catalog.gd` (`ITEM_LIBRARY`, 19 filas), `scripts/systems/item_bag.gd` (`ItemBag`, nodo del Player junto a `Stats`), `scripts/world/chest.gd`, `scripts/systems/run_state.gd` (`chest_price`, `register_chest_opened`, `CHEST_BASE_PRICES`, `CHEST_PRICE_GROWTH`).
+- Archivos: `scripts/systems/catalogs/item_catalog.gd` (`ITEM_LIBRARY`, 19 filas), `scripts/systems/item_bag.gd` (`ItemBag`, nodo del Player junto a `Stats`), `scripts/world/interactables/chest.gd`, `scripts/systems/autoloads/run_state.gd` (`chest_price`, `register_chest_opened`, `CHEST_BASE_PRICES`, `CHEST_PRICE_GROWTH`).
 - Objeto nuevo: una fila con `id`, `display_name`, `rarity` **fija en inglés** (id de `UpgradePool.RARITIES`), `glyph` (sigla de dos letras del nombre **español**; `icon` opcional con ruta a textura), `description`, y opcionalmente `effects` y/o `kind` (`magnet`, `poison_on_hit`, `titan`, `spiders`, `hook`, y desde la iteración 56 `shock_dash`, `saiyan`, `zenkai`). Los ids por `kind` se resuelven con el helper del catálogo, no con literales repetidos. **El kind `pet` ya no existe**: las mascotas son un slot del Player desde la iteración 54.
 - `ItemBag.remove_item(item_id) -> bool` devuelve UNA copia (lo usa el pozo del bloque de la suerte) y repite los tres seguimientos de `add_item` en el mismo orden: reescala el titán, pide `recompute` y emite `items_changed`.
 - **Los tres de la iteración 56**, cada uno un `kind` con una rama:
@@ -950,7 +950,7 @@ apertura, nombrando lo que de verdad se pagó.
 ## Santuarios, cofres y secretos
 
 - Qué es: interactuables de mundo con prompt flotante y acción `interact`.
-- Archivos: base `scripts/world/interactable.gd` (`Interactable extends Area3D`); `chest.gd`, `charge_shrine.gd`, `curse_shrine.gd` (extiende `ChargeShrine`), `greed_shrine.gd`, `spring_shrine.gd`, `roulette_shrine.gd` + `scripts/ui/roulette_ui.gd`, `portal_shrine.gd`; secretos: `secret_trigger.gd`, `odd_stump.gd`, `humming_skull.gd`, `scripts/enemies/secret_boss_base.gd`.
+- Archivos: base `scripts/world/interactables/interactable.gd` (`Interactable extends Area3D`); `chest.gd`, `charge_shrine.gd`, `curse_shrine.gd` (extiende `ChargeShrine`), `greed_shrine.gd`, `spring_shrine.gd`, `roulette_shrine.gd` + `scripts/ui/game/roulette_ui.gd`, `portal_shrine.gd`; secretos: `secret_trigger.gd`, `odd_stump.gd`, `humming_skull.gd`, `scripts/enemies/secret_boss_base.gd`.
 - Contrato `Interactable`: sobreescribir `_interact(player)` (y opcionalmente `_on_range_entered/_exited`); llamar `consume()` al gastarse (bumpea `meta_stat_id` y apaga el prompt); `dim_visuals()` para el gris de «usado»; `_emit_completed()` da destello + sonido.
 - **Quién está en el anillo (iteración 45)**: `_players_in_range` es la lista real; `player_in_range` es solo «alguno». Un raider **derribado sigue en la lista** (su cuerpo nunca sale del árbol, así que `body_exited` no dispara): para saber quién puede sostener un ritual, usar **`live_players_in_range()`** y `nearest_live_player()`. `best_item_count_in_range(item_id)` da el mejor conteo de un objeto entre los presentes.
 - **Prompts**: el texto por defecto de cada interactuable vive en un solo sitio, y el botón se escribe como el literal `[E]` (`Interactable.INTERACT_TOKEN`), que la etiqueta sustituye por el glifo del control (`[Y]`) según el slot que esté en el anillo. Un prompt nuevo **tiene que** escribir `[E]` literal para que el token funcione.
@@ -981,10 +981,10 @@ La existencia se comprueba con `ResourceLoader.exists(path, "Texture2D")`, **no*
 
 - HUD (`hud.gd`): grupos `hud` y `boss_ui`; API por grupo: `announce(msg)`, `announce_major(msg)` (ceremonias), `track_boss(boss, title)`, `show_stage_tag(stage_index, lap)`. Barras HP/XP, cronómetro (se repinta solo cuando cambia el segundo), bajas, rachas, insignia de puntos, `Dificultad +N%`, filas compactas J2-J4 en co-op, **toast de botín** (`show_loot`) y **badge de FPS** opcional arriba a la derecha (`SaveData.show_fps`, Ajustes → «Mostrar FPS»; se sondea, no se escucha, porque la opción se cambia con el HUD vivo o antes de que exista). Desde la iteración 48 la tira de equipamiento son **dos**: armas y tomos abajo a la izquierda, objetos abajo a la derecha. Overlay de perf oculto: export `show_perf_probe` o `BONK_PERF=1`. El daño a un compañero **no** dispara viñeta/shake globales, solo el pop de su fila. Desde la iteración 52 el HUD también **construye y ancla** el minimapa y el mapa de Tab de cada jugador (`_build_map_widgets`, `_anchor_to_cell`) y les reenvía `on_stage_started(arena)` — ver «Minimapa y mapa (Tab)».
   - **Las cuatro zonas del HUD y quién no puede pisar a quién** (iteración 61, todo confirmado en captura; ver `docs/AUDITORIA-VISUAL.md`):
-    - **Arriba al centro**: cronómetro, y **debajo de su caja** —no encima— la chapa de clima. Se mide con `_timer_label.size.y + WEATHER_BADGE_GAP` en vez de un offset fijo, porque el alto del reloj es su fuente (34) más el relleno que le pone `UiTheme.style_badge`, y ninguno de esos dos números debe estar copiado en la línea que coloca la chapa.
-    - **Arriba a la derecha**: bajas (22), puntos (56), insignia de FPS (88) y el minimapa debajo de las tres.
-    - **Abajo al centro**: barra de HP con su etiqueta, y la fila de power-ups **por encima** (`POWERUP_ROW_OFFSET`). Los **cuatro** offsets del contenedor se escriben: `set_anchors_preset` los pone a cero, así que dejar `right`/`bottom` sin tocar deja la fila anclada al borde inferior y de **104 px de alto**, es decir una columna de fichas estiradas encima de la barra de vida.
-    - **Abajo a los lados**: las dos tiras de equipamiento, a `BOTTOM_STRIP_MARGIN` 36 del borde para dejar libre `%PauseHintLabel` («Esc — Pausa»), que la escena fija a 12 del borde con 20 px de alto.
+	- **Arriba al centro**: cronómetro, y **debajo de su caja** —no encima— la chapa de clima. Se mide con `_timer_label.size.y + WEATHER_BADGE_GAP` en vez de un offset fijo, porque el alto del reloj es su fuente (34) más el relleno que le pone `UiTheme.style_badge`, y ninguno de esos dos números debe estar copiado en la línea que coloca la chapa.
+	- **Arriba a la derecha**: bajas (22), puntos (56), insignia de FPS (88) y el minimapa debajo de las tres.
+	- **Abajo al centro**: barra de HP con su etiqueta, y la fila de power-ups **por encima** (`POWERUP_ROW_OFFSET`). Los **cuatro** offsets del contenedor se escriben: `set_anchors_preset` los pone a cero, así que dejar `right`/`bottom` sin tocar deja la fila anclada al borde inferior y de **104 px de alto**, es decir una columna de fichas estiradas encima de la barra de vida.
+	- **Abajo a los lados**: las dos tiras de equipamiento, a `BOTTOM_STRIP_MARGIN` 36 del borde para dejar libre `%PauseHintLabel` («Esc — Pausa»), que la escena fija a 12 del borde con 20 px de alto.
 - Flecha de jefe (`boss_arrow.gd`): `bind_view(camera, carrier)` inyecta la cámara y el raider de esa vista. Sin inyección cae al viewport raíz (solo) — ver la convención de cámaras.
 - Cartas (`upgrade_card_ui.gd`): en `RunState.leveled_up` pausa el árbol y ofrece 3 tiradas de `UpgradePool.roll_offer()` **de un solo lado del pool** (ver «Cartas de mejora»); los picks extra se encolan.
 - **`open_choice(title, options, recipient, on_pick, tag)`** (iteración 47) es la **única** ampliación del contrato: dibuja opciones que el llamador construyó (`{title, description, color, ...payload}`) y le devuelve la elegida por `on_pick`. No tira rareza, no aplica nada, no es un framework de menús. Existe así a propósito: la pausa, la cola, el título con destinatario de co-op, el look de `UiTheme.style_card` y —sobre todo— el harness de soaks (que responde llamando `_on_card_pressed(0)` sobre cualquier nodo visible del grupo `upgrade_ui`) siguen funcionando **porque una elección ES un pick**. Una UI bloqueante nueva sería una forma nueva de encallar una partida.
@@ -1034,15 +1034,15 @@ colocar un `Control`: eso es lo que el stretch ya resuelve.
 
 ## Sistemas transversales
 
-- **Pools** (`scripts/systems/pools.gd` + `node_pool.gd`): pooling de los **14** hotspots (gemas, orbes, dardos, flechas, bumerán, bolts enemigos, bursts de muerte, popups, discos de telégrafo, arco de tajo, fogonazo, latigazo, brasas, charcos). Contrato de uso: spawn = `Pools.acquire_scene(escena)`, despawn = `Pools.release(nodo)`; el script pooled implementa `pool_reset()` restaurando estado recién-spawneado. **Escena nueva de alta rotación = UNA fila en `Pools.POOLS`** (`name`, `scene`, `warm`, `cap`); antes eran tres listas paralelas que se desincronizaban en silencio. `pool_size_overrides` permite tunear sin tocar la tabla. Sin registrar, `acquire_scene` cae a instanciar normal.
+- **Pools** (`scripts/systems/autoloads/pools.gd` + `node_pool.gd`): pooling de los **14** hotspots (gemas, orbes, dardos, flechas, bumerán, bolts enemigos, bursts de muerte, popups, discos de telégrafo, arco de tajo, fogonazo, latigazo, brasas, charcos). Contrato de uso: spawn = `Pools.acquire_scene(escena)`, despawn = `Pools.release(nodo)`; el script pooled implementa `pool_reset()` restaurando estado recién-spawneado. **Escena nueva de alta rotación = UNA fila en `Pools.POOLS`** (`name`, `scene`, `warm`, `cap`); antes eran tres listas paralelas que se desincronizaban en silencio. `pool_size_overrides` permite tunear sin tocar la tabla. Sin registrar, `acquire_scene` cae a instanciar normal.
   - Contrato del `NodePool`: `release()` **registra** en el nodo lo que apaga (`process`, `physics_process`, `monitoring`, `monitorable`) y `acquire()` restaura exactamente eso. El pool no inventa estado (no fuerza processing sobre escenas que no definen callbacks) ni deja un `Area3D` aparcado escuchando. Métricas: `total_created` (churn) y `peak_parked`.
-- **Juice** (`scripts/systems/juice.gd`, autoload): hooks semánticos de una línea — `enemy_died(pos, color)`, `boss_died(...)`, `crit_punch()`, `player_hurt()`, `sparkle(pos)`, `burst(...)`, `flash(visual)`, `shake(...)`, `hit_stop(...)`, `fov_kick_begin(camera)` / `fov_kick_end(camera)`. Una mecánica nueva con impacto debería llamar a uno existente antes que inventar efectos propios; tunables como exports del autoload. `Juice.damp(tasa, delta)` es el peso de suavizado compartido: se usa como `lerp(a, b, Juice.damp(r, d))` y es independiente del framerate (el `tasa * delta` de siempre es su aproximación de Euler y deriva con el frame time). El rig de la foca, las mascotas y la cámara se asientan a la misma velocidad real gracias a él.
-- **Sfx** (`scripts/systems/sfx.gd`, autoload): `Sfx.play(&"id")` sobre un pool de voces con jitter de pitch y rate-limit; loops con `acquire_loop/release_loop`, siempre **con refcount** (un solo camino, sin caso especial para el primer dueño) y `stop_all_loops()` para los cortes de escena. Sonido nuevo = receta en `scripts/tools/generate_sfx.gd` (síntesis determinista) + entrada en `STREAMS` (y `id_volume_db`). Regenerar los 20 wav: `godot --headless --path . -s res://scripts/tools/generate_sfx.gd`.
+- **Juice** (`scripts/systems/autoloads/juice.gd`, autoload): hooks semánticos de una línea — `enemy_died(pos, color)`, `boss_died(...)`, `crit_punch()`, `player_hurt()`, `sparkle(pos)`, `burst(...)`, `flash(visual)`, `shake(...)`, `hit_stop(...)`, `fov_kick_begin(camera)` / `fov_kick_end(camera)`. Una mecánica nueva con impacto debería llamar a uno existente antes que inventar efectos propios; tunables como exports del autoload. `Juice.damp(tasa, delta)` es el peso de suavizado compartido: se usa como `lerp(a, b, Juice.damp(r, d))` y es independiente del framerate (el `tasa * delta` de siempre es su aproximación de Euler y deriva con el frame time). El rig de la foca, las mascotas y la cámara se asientan a la misma velocidad real gracias a él.
+- **Sfx** (`scripts/systems/autoloads/sfx.gd`, autoload): `Sfx.play(&"id")` sobre un pool de voces con jitter de pitch y rate-limit; loops con `acquire_loop/release_loop`, siempre **con refcount** (un solo camino, sin caso especial para el primer dueño) y `stop_all_loops()` para los cortes de escena. Sonido nuevo = receta en `scripts/tools/generate_sfx.gd` (síntesis determinista) + entrada en `STREAMS` (y `id_volume_db`). Regenerar los 20 wav: `godot --headless --path . -s res://scripts/tools/generate_sfx.gd`.
 - **Capa de stats** (`scripts/systems/player_stats.gd`, nodo `Stats` del Player): guarda stacks de tomos + pasiva + reliquias + objetos + boons y **recalcula todo desde cero** en `recompute()` en cada cambio (nunca acumular sobre valores derivados). `recompute()` está partido en cuatro fases nombradas; `_apply_boons()` recorre gamble/altar/temporales en un solo bucle y `_apply_items()` hace una sola pasada por la bolsa. Stat nuevo: campo derivado + rama en `_apply_effect(stat, amount)` + que el consumidor lo lea (armas vía helpers de `WeaponBase`; `Health` recibe `armor`/`evasion` empujados). Los suelos de multiplicador son const documentadas.
 - **Stats de la iteración 48**: `extra_jumps` (id `jumps`) da saltos en el aire extra — `Player._try_jump` gasta un presupuesto `_jumps_left` que se recarga **al pisar suelo** (no dentro del salto, para que quien se cae de un borde conserve los suyos), con tope `PlayerStats.MAX_EXTRA_JUMPS`; y `powerup_drop_chance` (id `powerup_chance`, en porcentaje). Ambos entran al pool de boons de altar y `extra_jumps` además al catálogo de objetos («Botas de resorte», Rara).
 - **Knobs de partida sin consumidor (ganchos hacia adelante)**: `PlayerStats.powerup_drop_chance` y `RunState.disaster_chance_bonus` lo escriben los pactos demoníacos y **nadie lo lee todavía** — son los ganchos de los power-ups y los desastres de la parte C, igual que `demonic_uses` fue el gancho de la iteración 42. Un altar ya vende el primero y un pacto el segundo, así que **existen y se reinician** (`recompute()` / `reset()`) aunque nadie los lea todavía. No los borres por «dato muerto»: sin ellos, la carta que los vende miente.
 - **Health** (`scripts/systems/health.gd`): componente hijo reutilizable; señales `damaged`, `damaged_by(attacker)` (thorns), `dodged(attacker)` (ejecuciones), `hp_changed(current, max)` y `died`. El **setter de `max_hp` es dueño de la invariante**: un cuerpo a vida llena sigue lleno tras subirle el máximo, uno herido queda clampado, y `hp_changed` reporta ambos valores — ningún sitio que escale HP tiene que acordarse. Un golpe siempre quita al menos `MIN_CHIP_DAMAGE` (o su valor bruto si ya era menor), así que la armadura nunca vuelve a un cuerpo inmortal. `Health.find_in(body)` / `PlayerStats.find_in(body)` son la forma estándar de encontrar componentes.
-- **Co-op** (`scripts/systems/coop.gd`, autoload `Coop`): `player_count`, `devices`, `character_ids`, `action(slot, base)` (acciones clonadas por slot), `look_vector(slot)`, `nearest_player(tree, from)`, `random_player(tree)`, `alive_players(tree)`, `alive_player_count(tree)`. El snapshot de jugadores está tipado y su invalidación es explícita (`invalidate_players()`): si spawneas o liberas un raider fuera de `RunSystems`, invalídalo.
+- **Co-op** (`scripts/systems/autoloads/coop.gd`, autoload `Coop`): `player_count`, `devices`, `character_ids`, `action(slot, base)` (acciones clonadas por slot), `look_vector(slot)`, `nearest_player(tree, from)`, `random_player(tree)`, `alive_players(tree)`, `alive_player_count(tree)`. El snapshot de jugadores está tipado y su invalidación es explícita (`invalidate_players()`): si spawneas o liberas un raider fuera de `RunSystems`, invalídalo.
 - **Pantalla dividida** (`scripts/systems/split_screen.gd`): un `SubViewportContainer` por jugador con una cámara que **espeja** la del jugador (transform, `fov`, `h_offset`, `v_offset`, `cull_mask` — la lista completa está en `CameraPair.sync()`; una vista que se saltaba los offsets no temblaba). Las cámaras fuente se apuntan a `Juice.FEEL_CAMERA_GROUP`.
 
 ## Rendimiento (iteración 64)
@@ -1423,7 +1423,7 @@ gusta. Lo que sí decide sola: si algo se dibuja, dónde, y encima de qué.
 - **Señales y grupos, no referencias duras** entre escenas: `call_group(...)` / `get_first_node_in_group(...)` para todo acoplamiento cruzado; rutas de nodo solo dentro de la propia escena.
 - **`resource_local_to_scene = true` en todo sub-recurso que se mute en runtime.** Un `[sub_resource]` de una `.tscn` es **UN objeto compartido por todas las instancias** de esa escena: mutarlo desde el script cambia el de todos los demás y se filtra a la partida siguiente. Casos ya marcados: la `CapsuleShape3D` del Player (el derrape le cambia la altura — sin la marca, derrapar encogía a toda la party), y los `ParticleProcessMaterial` de `DeathBurst`, `BloodPool`, `WhipCrack` y `TelegraphDisc` (se tintan por spawn). Si tu script escribe en `mesh`, `shape`, `material`, `process_material` o cualquier `SubResource("...")`, márcalo en la escena y **dilo en la cabecera del script**.
 - **Los repartos «a toda la party» cubren también a los caídos.** Un raider derribado **sale del grupo `player`** y entra en `downed_players` (`Player._set_downed`). Un efecto permanente para la partida (boon de altar, evento de cielo, desbloqueo) que solo recorra `player` le deja al caído un déficit que nada repone. Recorre los dos grupos (`for group in ["player", "downed_players"]`, como `charge_shrine._grant_reward`) salvo que la mecánica exija estar en pie a propósito. Dentro de un `Interactable`, la pregunta correcta es `live_players_in_range()`.
-- **Cualquier cosa que actúe sobre una cámara la recibe explícitamente.** En co-op el viewport raíz **no tiene cámara activa**: las cámaras que renderizan viven en los `SubViewport` de `SplitScreen`. `get_viewport().get_camera_3d()` devuelve `null` (o la equivocada) en cuanto hay dos jugadores. Por eso `Juice.fov_kick_begin/end` reciben la cámara del deslizador, la flecha de jefe (`scripts/ui/boss_arrow.gd`) recibe la suya por `bind_view(camera, carrier)`, y las cámaras fuente se registran en `Juice.FEEL_CAMERA_GROUP` para que el shake llegue. `Player.view_camera()` es el accesor de la cámara propia de un raider. Nunca busques «la» cámara.
+- **Cualquier cosa que actúe sobre una cámara la recibe explícitamente.** En co-op el viewport raíz **no tiene cámara activa**: las cámaras que renderizan viven en los `SubViewport` de `SplitScreen`. `get_viewport().get_camera_3d()` devuelve `null` (o la equivocada) en cuanto hay dos jugadores. Por eso `Juice.fov_kick_begin/end` reciben la cámara del deslizador, la flecha de jefe (`scripts/ui/game/boss_arrow.gd`) recibe la suya por `bind_view(camera, carrier)`, y las cámaras fuente se registran en `Juice.FEEL_CAMERA_GROUP` para que el shake llegue. `Player.view_camera()` es el accesor de la cámara propia de un raider. Nunca busques «la» cámara.
 - **Los nombres de rareza son identificadores.** `UpgradePool.RARITIES[].name` (`Common`/`Rare`/`Epic`/`Legendary`) llavea precios de cofre, el campo `rarity` de `ITEM_LIBRARY` y los pisos `min_rarity` en nueve archivos: **no se traduce nunca**. Para mostrarla en pantalla, `UpgradePool.rarity_display(id)` — es el único punto de traducción, y nada compara contra su resultado.
 - **Español latinoamericano para todo lo visible, inglés para todo lo estructural.** La tabla es `docs/GLOSARIO.md`. En inglés y sin tocar: ids, `node_name`, grupos, `StringName`, rutas `res://`, claves de `SaveData` y los `print()`/`push_warning()`. Los marcadores de formato (`%d %s %.1f %02d %%`) conservan número y orden exactos.
 - **Tunables como `@export`** con defaults en el script; los overrides por instancia viven en la escena (el horario de jefes por arena, las escenas del spawner). Antes de mover un `@export` de sitio, comprueba qué `.tscn` lo overridea: las tres arenas overridean el `EnemySpawner`.

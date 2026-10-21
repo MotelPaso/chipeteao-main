@@ -1,14 +1,14 @@
 [gd_scene load_steps=31 format=3]
 
-[ext_resource type="Script" path="res://scripts/world/arena.gd" id="1_arena"]
-[ext_resource type="Script" path="res://scripts/world/backdrop.gd" id="90_backdrop"]
+[ext_resource type="Script" path="res://scripts/world/run/arena.gd" id="1_arena"]
+[ext_resource type="Script" path="res://scripts/world/run/backdrop.gd" id="90_backdrop"]
 [ext_resource type="Script" path="res://scripts/systems/enemy_spawner.gd" id="2_spawner"]
 [ext_resource type="PackedScene" uid="uid://bqgr4nt0h3v2e" path="res://scenes/enemies/Grunt.tscn" id="3_grunt"]
 [ext_resource type="PackedScene" path="res://scenes/enemies/Skirmisher.tscn" id="4_skirmisher"]
 [ext_resource type="PackedScene" path="res://scenes/enemies/Tank.tscn" id="5_tank"]
 [ext_resource type="PackedScene" path="res://scenes/enemies/Duneburrower.tscn" id="6_burrower"]
 [ext_resource type="PackedScene" path="res://scenes/enemies/Fenwraith.tscn" id="7_fenwraith"]
-[ext_resource type="Script" path="res://scripts/world/scatter.gd" id="9_scatter"]
+[ext_resource type="Script" path="res://scripts/world/run/scatter.gd" id="9_scatter"]
 [ext_resource type="PackedScene" uid="uid://ctree3hw7ka2f" path="res://scenes/world/props/Tree.tscn" id="10_tree"]
 [ext_resource type="PackedScene" uid="uid://brock5hw2mv8d" path="res://scenes/world/props/Rock.tscn" id="11_rock"]
 [ext_resource type="PackedScene" uid="uid://bstum8hw1tj5e" path="res://scenes/world/props/Stump.tscn" id="12_stump"]
@@ -21,7 +21,7 @@
 [ext_resource type="PackedScene" uid="uid://cchst4lut7qb3" path="res://scenes/world/chests/Chest.tscn" id="21_chest"]
 [ext_resource type="Script" path="res://scripts/systems/ambient_bed.gd" id="22_ambient"]
 [ext_resource type="AudioStream" path="res://assets/audio/ambient/forest_wind.wav" id="23_wind"]
-[ext_resource type="Script" path="res://scripts/world/terrain.gd" id="90_terrain"]
+[ext_resource type="Script" path="res://scripts/world/run/terrain.gd" id="90_terrain"]
 
 [sub_resource type="Shader" id="Shader_marsh"]
 code = "shader_type spatial;
