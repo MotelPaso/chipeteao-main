@@ -167,6 +167,7 @@ vertical_alignment = 1
 
 [node name="AnnounceLabel" type="Label" parent="." unique_id=1984146509]
 unique_name_in_owner = true
+visible = false
 anchors_preset = 5
 anchor_left = 0.5
 anchor_right = 0.5

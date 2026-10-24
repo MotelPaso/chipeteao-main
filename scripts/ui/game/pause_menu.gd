@@ -46,7 +46,7 @@ func _ready() -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
-	if not event.is_action_pressed("ui_cancel"):
+	if not event.is_action_pressed("pause_game"):
 		return
 	if _settings_panel.visible:
 		return  # the panel handles Esc itself and returns to these buttons
