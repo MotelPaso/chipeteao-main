@@ -504,35 +504,35 @@ static func _apply_property(target: Object, property: String, op: String,
 
 ## Stat entries every owned weapon contributes (same scaling for all
 ## weapons; per-weapon extras ride along from the library row).
-## The descriptions concatenate the weapon's display name on purpose: in
-## Spanish the stat noun leads ("Daño de la Espada corta +25%"), so the
-## name sits in the middle and the "%d" count per card never changes.
+## Weapon-stat descriptions carry NO weapon name: the card UI shows a
+## weapon label for any entry whose `target` starts with "weapon/", and
+## the label resolves the display name via weapon_display_name() — so the
+## extra_entries here read as upgrades without repeating the weapon name.
 static func _entries_for_weapon(weapon: Dictionary) -> Array[Dictionary]:
-	var display: String = weapon.display_name
 	var target: String = "weapon/" + String(weapon.node_name)
 	var entries: Array[Dictionary] = [
 		{
-			"id": String(weapon.id) + "_damage", "title": "Filo aguzado",
-			"description": "Daño de " + display + " +%d%%",
+			"id": String(weapon.id) + "_damage", "title": "Afilado",
+			"description": "Aumenta el daño en un %d%%",
 			"target": target, "property": "damage",
 			"op": "mul_percent", "amount": WEAPON_DAMAGE_STEP,
 		},
 		{
 			"id": String(weapon.id) + "_cooldown", "title": "Mano rápida",
-			"description": "Velocidad de ataque de " + display + " +%d%%",
+			"description": "Aumenta la velocidad de ataque en un %d%%",
 			"target": target, "property": "cooldown",
 			"op": "mul_percent", "amount": WEAPON_COOLDOWN_STEP,
 		},
 		{
 			"id": String(weapon.id) + "_range", "title": "Largo alcance",
-			"description": "Alcance de " + display + " +%d%%",
+			"description": "Aumenta el alcance en un %d%%",
 			"target": target, "property": "attack_range",
 			"op": "mul_percent", "amount": WEAPON_RANGE_STEP,
 		},
 		# Two-stat cards (iteration 38): one level, two knobs.
 		{
 			"id": String(weapon.id) + "_tempered", "title": "Temple",
-			"description": "Daño de " + display + " +%d%%, alcance +%d%%",
+			"description": "Aumenta el daño en un %d%%\nAumenta el alcance en un %d%%",
 			"target": target,
 			"effects": [
 				{"property": "damage", "op": "mul_percent", "amount": TEMPERED_STEPS.x},
@@ -542,7 +542,7 @@ static func _entries_for_weapon(weapon: Dictionary) -> Array[Dictionary]:
 		},
 		{
 			"id": String(weapon.id) + "_rhythm", "title": "Ritmo de batalla",
-			"description": "Velocidad de ataque de " + display + " +%d%%, daño +%d%%",
+			"description": "Aumenta la velocidad de ataque en un %d%%\nAumenta el daño en un %d%%",
 			"target": target,
 			"effects": [
 				{"property": "cooldown", "op": "mul_percent", "amount": RHYTHM_STEPS.x},
@@ -597,7 +597,7 @@ static func _new_weapon_entry(weapon: Dictionary) -> Dictionary:
 		"id": "gain_" + String(weapon.id),
 		"kind": "new_weapon",
 		"title": String(weapon.display_name),
-		"description": "Arma nueva: " + String(weapon.flavor),
+		"description": String(weapon.flavor),
 		"scene": String(weapon.scene),
 		"weapon_name": String(weapon.node_name),
 		"weapon_id": String(weapon.id),

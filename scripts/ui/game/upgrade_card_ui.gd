@@ -327,6 +327,10 @@ func _populate_choice_card(card: Button, option: Dictionary, tag: String) -> voi
 	var desc_label := card.get_node("CardBox/DescLabel") as Label
 	desc_label.text = String(option.get("description", ""))
 	desc_label.add_theme_color_override("font_color", UiTheme.TEXT_DIM)
+	# Caller options are not weapon-targeted; hide the label so a rolled
+	# card's weapon name can never survive onto a choice card.
+	var weap_label := card.get_node("CardBox/WeapLabel") as Label
+	weap_label.visible = false
 	UiTheme.style_card(card, color)
 	card.self_modulate = Color.WHITE
 
@@ -346,12 +350,28 @@ func _populate_card(card: Button, item: Dictionary) -> void:
 	UiTheme.style_badge(rarity_label, Color(0.07, 0.075, 0.1),
 			rarity_color, rarity_color.lightened(0.2))
 	rarity_label.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	
 	var title_label := card.get_node("CardBox/TitleLabel") as Label
 	title_label.text = item.title
 	title_label.add_theme_color_override("font_color", UiTheme.TEXT_BRIGHT)
+	
 	var desc_label := card.get_node("CardBox/DescLabel") as Label
 	desc_label.text = item.description
 	desc_label.add_theme_color_override("font_color", UiTheme.TEXT_DIM)
+	# Weapon label: any rolled card that invests in a weapon (its target is
+	# "weapon/<NodeName>" — per-weapon stat cards AND catalog extras) names
+	# the weapon it upgrades here. New-weapon, tome and generic stat cards
+	# have no such target, so the label stays hidden.
+	var weap_label := card.get_node("CardBox/WeapLabel") as Label
+	var weapon_target := String(item.entry.get("target", ""))
+	if weapon_target.begins_with("weapon/"):
+		weap_label.text = UpgradePool.weapon_display_name(
+				weapon_target.get_slice("/", 1))
+		weap_label.add_theme_color_override("font_color", UiTheme.TEXT_DIM)
+		weap_label.visible = true
+	else:
+		weap_label.visible = false
+
 	UiTheme.style_card(card, rarity_color)
 	if String(rarity.name) == "Legendary":
 		# Slow shine: the whole card breathes brighter (the shadow glow in

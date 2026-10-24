@@ -6,3 +6,5 @@ builds/
 .agents/
 .claude/skills/
 skills-lock.json
+graphify-out
+.opencode

@@ -1,11 +1,11 @@
-[gd_scene load_steps=9 format=3 uid="uid://c8k2h1n3m5p0a"]
+[gd_scene format=3 uid="uid://c8k2h1n3m5p0a"]
 
-[ext_resource type="Script" path="res://scripts/player/player.gd" id="1_player"]
-[ext_resource type="PackedScene" path="res://scenes/player/SealRig.tscn" id="2_rig"]
-[ext_resource type="Script" path="res://scripts/systems/health.gd" id="3_health"]
-[ext_resource type="Script" path="res://scripts/systems/player_stats.gd" id="4_stats"]
-[ext_resource type="Script" path="res://scripts/systems/item_bag.gd" id="5_bag"]
-[ext_resource type="Script" path="res://scripts/systems/power_ups.gd" id="6_powerups"]
+[ext_resource type="Script" uid="uid://xo02ww6qmhyl" path="res://scripts/player/player.gd" id="1_player"]
+[ext_resource type="PackedScene" uid="uid://kmmhqyfs65a3" path="res://scenes/player/SealRig.tscn" id="2_rig"]
+[ext_resource type="Script" uid="uid://cri04aqp0thps" path="res://scripts/systems/health.gd" id="3_health"]
+[ext_resource type="Script" uid="uid://0p2186xko3pi" path="res://scripts/systems/player_stats.gd" id="4_stats"]
+[ext_resource type="Script" uid="uid://bj6h07uuf8ckk" path="res://scripts/systems/item_bag.gd" id="5_bag"]
+[ext_resource type="Script" uid="uid://cmnn3k6k76em8" path="res://scripts/systems/power_ups.gd" id="6_powerups"]
 
 [sub_resource type="CapsuleShape3D" id="CapsuleShape3D_1"]
 resource_local_to_scene = true
@@ -15,37 +15,43 @@ height = 1.8
 [sub_resource type="SphereShape3D" id="SphereShape3D_1"]
 radius = 0.05
 
-[node name="Player" type="CharacterBody3D" groups=["player"]]
+[node name="Player" type="CharacterBody3D" unique_id=286333552 groups=["player"]]
 collision_mask = 3
 script = ExtResource("1_player")
+move_speed = 8.6
+acceleration = 40.0
+air_acceleration = 12.0
+jump_velocity = 8.7
+slide_speed_multiplier = 2.21
+slide_duration = 0.3
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="." unique_id=782222361]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.9, 0)
 shape = SubResource("CapsuleShape3D_1")
 
-[node name="SealRig" parent="." instance=ExtResource("2_rig")]
+[node name="SealRig" parent="." unique_id=1718191975 instance=ExtResource("2_rig")]
 
-[node name="SpringArm3D" type="SpringArm3D" parent="."]
+[node name="SpringArm3D" type="SpringArm3D" parent="." unique_id=1407797706]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.75, 0)
 shape = SubResource("SphereShape3D_1")
 spring_length = 5.0
 
-[node name="Camera3D" type="Camera3D" parent="SpringArm3D"]
+[node name="Camera3D" type="Camera3D" parent="SpringArm3D" unique_id=977713088]
 current = true
 fov = 70.0
 
-[node name="Weapons" type="Node3D" parent="."]
+[node name="Weapons" type="Node3D" parent="." unique_id=1474513695]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.1, 0)
 
-[node name="Health" type="Node" parent="."]
+[node name="Health" type="Node" parent="." unique_id=1341696357]
 script = ExtResource("3_health")
 max_hp = 100.0
 
-[node name="Stats" type="Node" parent="."]
+[node name="Stats" type="Node" parent="." unique_id=1783081145]
 script = ExtResource("4_stats")
 
-[node name="ItemBag" type="Node" parent="."]
+[node name="ItemBag" type="Node" parent="." unique_id=452109888]
 script = ExtResource("5_bag")
 
-[node name="PowerUps" type="Node" parent="."]
+[node name="PowerUps" type="Node" parent="." unique_id=751190086]
 script = ExtResource("6_powerups")

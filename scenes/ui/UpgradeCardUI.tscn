@@ -1,6 +1,6 @@
-[gd_scene load_steps=4 format=3]
+[gd_scene format=3 uid="uid://c52x8kekju83l"]
 
-[ext_resource type="Script" path="res://scripts/ui/game/upgrade_card_ui.gd" id="1_cardui"]
+[ext_resource type="Script" uid="uid://x86tvc5e0d4i" path="res://scripts/ui/game/upgrade_card_ui.gd" id="1_cardui"]
 
 [sub_resource type="Shader" id="Shader_radialdim"]
 code = "shader_type canvas_item;
@@ -15,40 +15,46 @@ void fragment() {
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_radialdim"]
 shader = SubResource("Shader_radialdim")
 
-[node name="UpgradeCardUI" type="CanvasLayer"]
+[node name="UpgradeCardUI" type="CanvasLayer" unique_id=202503535]
 process_mode = 3
 layer = 10
 script = ExtResource("1_cardui")
 
-[node name="Dim" type="ColorRect" parent="."]
+[node name="Dim" type="ColorRect" parent="." unique_id=1199190599]
 unique_name_in_owner = true
 material = SubResource("ShaderMaterial_radialdim")
-anchor_right = 1.0
-anchor_bottom = 1.0
-color = Color(1, 1, 1, 1)
-
-[node name="Center" type="CenterContainer" parent="."]
+anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
 
-[node name="VBox" type="VBoxContainer" parent="Center"]
+[node name="Center" type="CenterContainer" parent="." unique_id=167809616]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+
+[node name="VBox" type="VBoxContainer" parent="Center" unique_id=1070187283]
+layout_mode = 2
 theme_override_constants/separation = 26
 
-[node name="LevelLabel" type="Label" parent="Center/VBox"]
+[node name="LevelLabel" type="Label" parent="Center/VBox" unique_id=2054016027]
 unique_name_in_owner = true
+layout_mode = 2
 theme_override_colors/font_color = Color(0.96, 0.93, 0.82, 1)
 theme_override_font_sizes/font_size = 34
-horizontal_alignment = 1
 text = "¡Subiste de nivel!"
+horizontal_alignment = 1
 
-[node name="Cards" type="HBoxContainer" parent="Center/VBox"]
+[node name="Cards" type="HBoxContainer" parent="Center/VBox" unique_id=1162184487]
+layout_mode = 2
 theme_override_constants/separation = 22
 
-[node name="Card1" type="Button" parent="Center/VBox/Cards"]
+[node name="Card1" type="Button" parent="Center/VBox/Cards" unique_id=1652539684]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(230, 250)
+layout_mode = 2
 
-[node name="CardBox" type="VBoxContainer" parent="Center/VBox/Cards/Card1"]
+[node name="CardBox" type="VBoxContainer" parent="Center/VBox/Cards/Card1" unique_id=456957871]
+layout_mode = 0
 anchor_right = 1.0
 anchor_bottom = 1.0
 offset_left = 16.0
@@ -58,30 +64,44 @@ offset_bottom = -14.0
 mouse_filter = 2
 theme_override_constants/separation = 10
 
-[node name="RarityLabel" type="Label" parent="Center/VBox/Cards/Card1/CardBox"]
+[node name="RarityLabel" type="Label" parent="Center/VBox/Cards/Card1/CardBox" unique_id=1308444246]
+layout_mode = 2
 theme_override_font_sizes/font_size = 14
-horizontal_alignment = 1
 text = "COMÚN"
-
-[node name="TitleLabel" type="Label" parent="Center/VBox/Cards/Card1/CardBox"]
-theme_override_font_sizes/font_size = 24
 horizontal_alignment = 1
-autowrap_mode = 3
-text = "Título"
 
-[node name="DescLabel" type="Label" parent="Center/VBox/Cards/Card1/CardBox"]
+[node name="TitleLabel" type="Label" parent="Center/VBox/Cards/Card1/CardBox" unique_id=1209538386]
+custom_minimum_size = Vector2(0.005, 0)
+layout_mode = 2
+theme_override_font_sizes/font_size = 24
+text = "Título"
+horizontal_alignment = 1
+autowrap_mode = 2
+
+[node name="DescLabel" type="Label" parent="Center/VBox/Cards/Card1/CardBox" unique_id=478567201]
+layout_mode = 2
 size_flags_vertical = 3
 theme_override_font_sizes/font_size = 16
+text = "Descripción"
 horizontal_alignment = 1
 vertical_alignment = 1
-autowrap_mode = 3
-text = "Descripción"
+autowrap_mode = 2
 
-[node name="Card2" type="Button" parent="Center/VBox/Cards"]
+[node name="WeapLabel" type="Label" parent="Center/VBox/Cards/Card1/CardBox" unique_id=470970283]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.63, 0.63, 0.68, 1)
+theme_override_font_sizes/font_size = 13
+text = "arma"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="Card2" type="Button" parent="Center/VBox/Cards" unique_id=1175148330]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(230, 250)
+layout_mode = 2
 
-[node name="CardBox" type="VBoxContainer" parent="Center/VBox/Cards/Card2"]
+[node name="CardBox" type="VBoxContainer" parent="Center/VBox/Cards/Card2" unique_id=72205672]
+layout_mode = 0
 anchor_right = 1.0
 anchor_bottom = 1.0
 offset_left = 16.0
@@ -91,30 +111,42 @@ offset_bottom = -14.0
 mouse_filter = 2
 theme_override_constants/separation = 10
 
-[node name="RarityLabel" type="Label" parent="Center/VBox/Cards/Card2/CardBox"]
+[node name="RarityLabel" type="Label" parent="Center/VBox/Cards/Card2/CardBox" unique_id=644586022]
+layout_mode = 2
 theme_override_font_sizes/font_size = 14
-horizontal_alignment = 1
 text = "COMÚN"
-
-[node name="TitleLabel" type="Label" parent="Center/VBox/Cards/Card2/CardBox"]
-theme_override_font_sizes/font_size = 24
 horizontal_alignment = 1
-autowrap_mode = 3
-text = "Título"
 
-[node name="DescLabel" type="Label" parent="Center/VBox/Cards/Card2/CardBox"]
+[node name="TitleLabel" type="Label" parent="Center/VBox/Cards/Card2/CardBox" unique_id=512331043]
+layout_mode = 2
+theme_override_font_sizes/font_size = 24
+text = "Título"
+horizontal_alignment = 1
+
+[node name="DescLabel" type="Label" parent="Center/VBox/Cards/Card2/CardBox" unique_id=157241923]
+layout_mode = 2
 size_flags_vertical = 3
 theme_override_font_sizes/font_size = 16
+text = "Descripción"
 horizontal_alignment = 1
 vertical_alignment = 1
-autowrap_mode = 3
-text = "Descripción"
+autowrap_mode = 2
 
-[node name="Card3" type="Button" parent="Center/VBox/Cards"]
+[node name="WeapLabel" type="Label" parent="Center/VBox/Cards/Card2/CardBox" unique_id=1624676029]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.63, 0.63, 0.68, 1)
+theme_override_font_sizes/font_size = 13
+text = "arma"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="Card3" type="Button" parent="Center/VBox/Cards" unique_id=1815785046]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(230, 250)
+layout_mode = 2
 
-[node name="CardBox" type="VBoxContainer" parent="Center/VBox/Cards/Card3"]
+[node name="CardBox" type="VBoxContainer" parent="Center/VBox/Cards/Card3" unique_id=1564181187]
+layout_mode = 0
 anchor_right = 1.0
 anchor_bottom = 1.0
 offset_left = 16.0
@@ -124,21 +156,32 @@ offset_bottom = -14.0
 mouse_filter = 2
 theme_override_constants/separation = 10
 
-[node name="RarityLabel" type="Label" parent="Center/VBox/Cards/Card3/CardBox"]
+[node name="RarityLabel" type="Label" parent="Center/VBox/Cards/Card3/CardBox" unique_id=780409859]
+layout_mode = 2
 theme_override_font_sizes/font_size = 14
-horizontal_alignment = 1
 text = "COMÚN"
-
-[node name="TitleLabel" type="Label" parent="Center/VBox/Cards/Card3/CardBox"]
-theme_override_font_sizes/font_size = 24
 horizontal_alignment = 1
-autowrap_mode = 3
-text = "Título"
 
-[node name="DescLabel" type="Label" parent="Center/VBox/Cards/Card3/CardBox"]
+[node name="TitleLabel" type="Label" parent="Center/VBox/Cards/Card3/CardBox" unique_id=1781353845]
+layout_mode = 2
+theme_override_font_sizes/font_size = 24
+text = "Título"
+horizontal_alignment = 1
+autowrap_mode = 2
+
+[node name="DescLabel" type="Label" parent="Center/VBox/Cards/Card3/CardBox" unique_id=2136364788]
+layout_mode = 2
 size_flags_vertical = 3
 theme_override_font_sizes/font_size = 16
+text = "Descripción"
 horizontal_alignment = 1
 vertical_alignment = 1
-autowrap_mode = 3
-text = "Descripción"
+autowrap_mode = 2
+
+[node name="WeapLabel" type="Label" parent="Center/VBox/Cards/Card3/CardBox" unique_id=641705008]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.63, 0.63, 0.68, 1)
+theme_override_font_sizes/font_size = 13
+text = "arma"
+horizontal_alignment = 1
+vertical_alignment = 1
