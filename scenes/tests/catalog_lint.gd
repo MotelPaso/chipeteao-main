@@ -162,7 +162,8 @@ func _check_paths_exist() -> void:
 		["POWERUP_LIBRARY", PowerUpCatalog.POWERUP_LIBRARY, "id"],
 		["TOME_LIBRARY", Tome.TOME_LIBRARY, "id"],
 	]
-	var path_keys: Array[String] = ["scene", "weapon_scene", "scene_path", "icon"]
+	var path_keys: Array[String] = ["scene", "weapon_scene", "scene_path", "icon",
+			"model_scene"]
 	for entry: Array in sources:
 		var library_name := String(entry[0])
 		var library: Array[Dictionary] = entry[1]

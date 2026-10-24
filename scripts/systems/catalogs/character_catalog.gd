@@ -32,7 +32,18 @@ extends RefCounted
 ##             the kill, so the mapping lives here, not in boss code.
 ##   unlock_hint (optional): vague select-screen clue for the boss path,
 ##             rendered on the locked card beside the Shard price.
-##   tint:     placeholder capsule body color (also the card swatch).
+##   tint:     the character's body identity colour (also the card swatch).
+##   model_scene (optional): cosmetic body for THIS character — a model
+##             wrapper scene (like foca_character.tscn) or a raw .glb.
+##             Absent = the seal.
+##   model_scale (optional): uniform scale multiplier applied on top of the
+##             model scene's own transform — raw .glb rows declare their
+##             sizing (the seal needs 0.6), wrapper scenes carry their own.
+##             Absent/<=0 = no rescaling.
+##   tint_material_prefix (optional): resource_name prefix of THIS model's
+##             tintable materials (each export names them differently;
+##             surfaces whose materials do not carry the prefix stay
+##             untouched). Absent = the seal's "Azul personaje".
 
 ##
 ## Player-facing text: display_name, blurb, weapon_display_name,
@@ -211,6 +222,11 @@ const CHARACTER_LIBRARY: Array[Dictionary] = [
 		"passive_description": "+0.4% de prob. de crítico por nivel",
 		"passive_stat": "crit_chance", "passive_amount": 0.4,
 		"unlock_cost": 0,
+		# The two rows proving the per-character body swap: a placeholder
+		# wrapper with its own tint-prefix-named material, until real GLBs
+		# for these two exist. Everything else stays on the seal.
+		"model_scene": "res://assets/models/placeholder_character.tscn",
+		"tint_material_prefix": "Placeholder personaje",
 		"tint": Color(0.86, 0.74, 0.24),
 	},
 	{
@@ -223,6 +239,7 @@ const CHARACTER_LIBRARY: Array[Dictionary] = [
 		# would leave nothing to buy for his 130 esquirlas.
 		"passive_description": "+0.6 de suerte por nivel",
 		"passive_stat": "luck", "passive_amount": 0.6,
+		"model_scene": "res://assets/models/gucci_morty.tscn",
 		"unlock_cost": 0,
 		"tint": Color(0.92, 0.34, 0.62),
 	},
@@ -237,6 +254,8 @@ const CHARACTER_LIBRARY: Array[Dictionary] = [
 		"passive_description": "+0.8% de velocidad de movimiento por nivel",
 		"passive_stat": "move_speed", "passive_amount": 0.8,
 		"unlock_cost": 0,
+		"model_scene": "res://assets/models/placeholder_character.tscn",
+		"tint_material_prefix": "Placeholder personaje",
 		"tint": Color(0.14, 0.62, 0.6),
 	},
 ]

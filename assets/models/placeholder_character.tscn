@@ -1,0 +1,34 @@
+[gd_scene format=3]
+
+[sub_resource type="StandardMaterial3D" id="1_tint"]
+resource_name = "Placeholder personaje"
+albedo_color = Color(1, 1, 1, 1)
+roughness = 0.7
+
+[sub_resource type="StandardMaterial3D" id="2_detail"]
+resource_name = "Placeholder detalle"
+albedo_color = Color(0.1, 0.1, 0.1, 1)
+
+[sub_resource type="CapsuleMesh" id="3_body"]
+radius = 0.35
+height = 1.0
+radial_segments = 16
+rings = 6
+material = SubResource("1_tint")
+
+[sub_resource type="SphereMesh" id="4_nose"]
+radius = 0.1
+height = 0.2
+radial_segments = 12
+rings = 5
+material = SubResource("2_detail")
+
+[node name="PlaceholderCharacter" type="Node3D"]
+
+[node name="Body" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.5, 0)
+mesh = SubResource("3_body")
+
+[node name="Nose" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.65, -0.38)
+mesh = SubResource("4_nose")

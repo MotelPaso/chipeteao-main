@@ -1,0 +1,8 @@
+[gd_scene format=3]
+
+[ext_resource type="PackedScene" path="res://assets/models/foca.glb" id="1_foca"]
+
+[node name="FocaCharacter" type="Node3D"]
+
+[node name="Foca" parent="." instance=ExtResource("1_foca")]
+transform = Transform3D(-0.6, 0, 0, 0, 0.6, 0, 0, 0, -0.6, 0, 0, 0)

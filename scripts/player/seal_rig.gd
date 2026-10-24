@@ -1,18 +1,31 @@
 class_name SealRig
 extends Node3D
-## Visual rig for the player's seal model (assets/models/foca.glb): purely
-## cosmetic — the gameplay capsule/collision stays on Player. Owns the
+## Visual rig for the player's body model: purely cosmetic — the gameplay
+## capsule/collision stays on Player. WHICH body is per-character catalog
+## data (setup(), called from Player._apply_character): a row with no model
+## fields falls back to the seal (assets/models/foca.glb). Owns the
 ## per-character tint (one material duplicate per spawn shared by every
-## "Azul personaje" surface), hides the model's baked SUELO floor plane,
-## and layers cheap procedural motion on the Model child: idle breathing,
-## movement lean/bob, jump stretch, slide squash (flat + nose-down), and
-## the pause-immune death face-plant. No skeletal animations exist in the
-## model; everything here is transform math on cached targets — zero
-## per-frame allocations.
+## surface whose material name carries the row's tint prefix), hides the
+## model's baked SUELO floor plane, and layers cheap procedural motion on
+## the Model child: idle breathing, movement lean/bob, jump stretch, slide
+## squash (flat + nose-down), and the pause-immune death face-plant. No
+## skeletal animations exist in any model; everything here is transform
+## math on cached targets — zero per-frame allocations.
 
 ## Prefix of the material resource_name that receives the character tint
-## (the GLB exporter suffixes it, e.g. "Azul personaje.001").
+## (the GLB exporter suffixes it, e.g. "Azul personaje.001"). Each model
+## names its tintable materials its own way; a character row overrides
+## this via tint_material_prefix.
 const TINT_MATERIAL_PREFIX := "Azul personaje"
+
+## Body loaded when a character row names no model: the seal WRAPPER scene,
+## which bakes the seal's own yaw flip and 0.6 scale, so the fallback needs
+## no rig-side special case (a raw .glb row would pass a model_scale).
+const DEFAULT_MODEL_SCENE := "res://assets/models/foca_character.tscn"
+
+## Display name of the model any export junk hides by (the seal's baked
+## floor plane). Purely cosmetic garbage; other models may not name one.
+const HIDDEN_NODE_NAME := "SUELO"
 
 @export_group("Idle")
 ## Breathing scale-Y pulse amplitude (0.02 = +-2%).
@@ -41,6 +54,12 @@ const TINT_MATERIAL_PREFIX := "Azul personaje"
 ## Nose-down pitch (radians) while sliding.
 @export var slide_pitch: float = 0.22
 
+@export_group("Death")
+## Height above the model origin the face-plant lifts the body to while
+## it rests on the floor — body shapes differ, the wide seal reads right
+## on 0.55.
+@export var death_lift: float = 0.55
+
 ## Convergence rates for the smoothed motion state, in "fraction closed per
 ## second" (see _damp): lean/bob/stretch settle quickly, the slide squash a
 ## touch faster so the flatten reads as an impact.
@@ -52,8 +71,10 @@ const SQUASH_DAMP_RATE: float = 14.0
 ## The player body whose velocity drives lean/bob; null outside a player
 ## (test harnesses) keeps the rig idle-only.
 var _body: CharacterBody3D = null
-## The single tint material instance shared by all "Azul" surfaces.
+## The single tint material instance shared by all tint-prefix surfaces.
 var _tint_material: StandardMaterial3D = null
+## resource_name prefix of the CURRENT model's tintable materials.
+var _tint_prefix: String = TINT_MATERIAL_PREFIX
 var _slide_ratio: float = 1.0
 var _phase: float = 0.0
 var _dead: bool = false
@@ -78,14 +99,52 @@ static func _damp(rate: float, delta: float) -> float:
 
 func _ready() -> void:
 	_body = get_parent() as CharacterBody3D
-	var floor_plane := _model.find_child("SUELO", true, false) as MeshInstance3D
-	if floor_plane != null:
-		floor_plane.visible = false
 
 
-## Per-character tint: ONE duplicate of the model's shared "Azul personaje"
+## Cosmetic body swap with a CharacterCatalog row's model data. Empty
+## scene path = the default seal; the scale MULTIPLIES what the model
+## scene already carries (1.0 / non-positive = no rescaling — the wrapper
+## scenes bake their own transform, raw .glb rows declare one); an empty
+## tint prefix falls back to the seal's "Azul personaje".
+func setup(model_scene: String, model_scale: float, tint_prefix: String) -> void:
+	_clear_model()
+	_tint_material = null
+	_tint_prefix = tint_prefix if not tint_prefix.is_empty() else TINT_MATERIAL_PREFIX
+	var path := model_scene if not model_scene.is_empty() else DEFAULT_MODEL_SCENE
+	var packed := load(path) as PackedScene
+	if packed == null:
+		# Cosmetic only: the gameplay body never depended on the rig, so a
+		# bad path costs an invisible character and one warning.
+		push_warning("SealRig: model scene '%s' does not load" % path)
+		return
+	var model := packed.instantiate()
+	if model == null:
+		push_warning("SealRig: '%s' instantiates to nothing" % path)
+		return
+	var body := model as Node3D
+	if body == null:
+		push_warning("SealRig: root of '%s' is not a Node3D" % path)
+		model.free()
+		return
+	if model_scale > 0.0 and model_scale != 1.0:
+		body.scale = body.scale * model_scale
+	_model.add_child(body)
+	for node: Node in _model.find_children(HIDDEN_NODE_NAME, "MeshInstance3D", true, false):
+		(node as MeshInstance3D).visible = false
+
+
+## Throws out the previous body so a re-setup swaps cleanly; queue_free
+## keeps it safe from a freed-node window since setup runs inside the
+## spawn's own _ready chain.
+func _clear_model() -> void:
+	for child: Node in _model.get_children():
+		child.queue_free()
+
+
+## Per-character tint: ONE duplicate of the model's shared tint-prefix
 ## material, recolored and overridden onto every surface that used it
-## (body, base, arms). Eyes/tusks/gel keep their imported materials.
+## (the seal's body, base, arms). Eyes/tusks/gel keep their imported
+## materials.
 func apply_tint(tint: Color) -> void:
 	for node: Node in _model.find_children("*", "MeshInstance3D", true, false):
 		var mesh_node := node as MeshInstance3D
@@ -94,7 +153,7 @@ func apply_tint(tint: Color) -> void:
 		for surface: int in mesh_node.mesh.get_surface_count():
 			var material := mesh_node.mesh.surface_get_material(surface)
 			if material == null \
-					or not material.resource_name.begins_with(TINT_MATERIAL_PREFIX):
+					or not material.resource_name.begins_with(_tint_prefix):
 				continue
 			if _tint_material == null:
 				_tint_material = material.duplicate() as StandardMaterial3D
@@ -173,7 +232,7 @@ func play_death() -> void:
 	_death_tween.set_parallel(true)
 	_death_tween.tween_property(_model, "rotation:x", -TAU * 0.25, 0.5) \
 			.set_trans(Tween.TRANS_BOUNCE).set_ease(Tween.EASE_OUT)
-	_death_tween.tween_property(_model, "position:y", 0.55, 0.5) \
+	_death_tween.tween_property(_model, "position:y", death_lift, 0.5) \
 			.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
 	_death_tween.tween_property(_model, "scale", Vector3(1.0, 1.0, 0.8), 0.5) \
 			.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)

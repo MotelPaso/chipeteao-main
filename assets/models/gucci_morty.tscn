@@ -1,0 +1,18 @@
+[gd_scene format=3 uid="uid://c54rkyley2lcs"]
+
+[sub_resource type="CompressedTexture2D" id="CompressedTexture2D_njjyq"]
+load_path = "res://.godot/imported/gucci_morty.jpg-7731eb21cf2e7f0d3c4755cebbedd4f9.s3tc.ctex"
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_ryuik"]
+albedo_texture = SubResource("CompressedTexture2D_njjyq")
+
+[sub_resource type="QuadMesh" id="QuadMesh_mxfcd"]
+material = SubResource("StandardMaterial3D_ryuik")
+size = Vector2(1.455, 1.35)
+center_offset = Vector3(0.005, 0, 0)
+
+[node name="GucciMorty" type="Node3D" unique_id=27530451]
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="." unique_id=1478856254]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.006945491, 0.6738883, -0.06544721)
+mesh = SubResource("QuadMesh_mxfcd")
