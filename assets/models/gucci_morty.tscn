@@ -16,3 +16,7 @@ center_offset = Vector3(0.005, 0, 0)
 [node name="MeshInstance3D" type="MeshInstance3D" parent="." unique_id=1478856254]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.006945491, 0.6738883, -0.06544721)
 mesh = SubResource("QuadMesh_mxfcd")
+
+[node name="MeshInstance3D2" type="MeshInstance3D" parent="." unique_id=929840497]
+transform = Transform3D(-0.99981964, 0, 0.01899334, 0, 1, 0, -0.01899334, 0, -0.99981964, -0.006945491, 0.6738883, -0.06544721)
+mesh = SubResource("QuadMesh_mxfcd")
