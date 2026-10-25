@@ -1,6 +1,6 @@
 [gd_scene load_steps=6 format=3 uid="uid://bdrock3du4mp7c"]
 
-[ext_resource type="Material" uid="uid://bredrm3du9rc4" path="res://assets/materials/red_rock.tres" id="1_redrock"]
+[ext_resource type="Material" path="res://assets/materials/boulder_red.tres" id="1_redrock"]
 
 [sub_resource type="SphereMesh" id="SphereMesh_blob"]
 material = ExtResource("1_redrock")

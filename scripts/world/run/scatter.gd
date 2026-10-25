@@ -10,22 +10,15 @@ extends Node3D
 ## always has wide walkable lanes (canopies carry no collision, so only
 ## trunks/rocks actually block).
 
-## Worst-case horizontal half-width of one mask rock, per unit of uniform
-## scale: the smallest distance from the prop's origin to its own convex
-## hull's footprint boundary, over every heading (Rock 0.944, DuneRock
-## 0.992 — the smaller one is the safe assumption, since _spawn_prop
-## rotates each prop at random around Y). Baked off the blob meshes; it
-## moves only if the blob transforms in Rock.tscn/DuneRock.tscn do.
-const MASK_ROCK_HALF_WIDTH: float = 0.94
-## Radius of the player capsule (Player.tscn), which is also the capsule
-## the ArenaProbe mask sweep pushes along every blocked-cell boundary: a
-## rock this close to a sample still blocks it.
-const PLAYER_CAPSULE_RADIUS: float = 0.4
-## sqrt(2), as a compile-time constant: the fill lattice's budget is all
-## about the DIAGONAL of a lattice square (the farthest a point of the cell
-## can sit from the rock that has to cover it) and about the jitter, which
-## can push that rock a diagonal further away.
-const DIAGONAL: float = 1.4142136
+## The four steps of the mask's 4-neighbourhood: blob growth, the notch
+## fill, the flood fill and the region split all walk the same one.
+const STEPS: Array[Vector2i] = [Vector2i.LEFT, Vector2i.RIGHT, Vector2i.UP, Vector2i.DOWN]
+## "No cell found", for the formation seed picker.
+const NO_CELL := Vector2i(-1, -1)
+## Pull toward cells already touching the formation on two or more sides
+## while it grows: what makes a formation a solid mass instead of a
+## scribble of one-cell arms.
+const FORMATION_COMPACTNESS: float = 1.0
 
 @export var scatter_seed: int = 71382
 
@@ -49,31 +42,48 @@ const DIAGONAL: float = 1.4142136
 
 @export_group("Arena Mask")
 ## Iteration 44: the square arena gets an IRREGULAR walkable shape each
-## run — a coarse cell grid where a few random blobs of cells are blocked
-## and packed solid with oversized rocks (iteration 48: no invisible
-## collider, the rocks ARE the wall). A flood fill from the spawn
-## guarantees every open cell is reachable on foot; unreachable pockets
-## are blocked too. Spawner, director and this scatter all ask
-## is_walkable() before placing anything.
+## run — a coarse cell grid where a few regions of cells are blocked by
+## rock (iteration 48: no invisible collider, the rock IS the wall;
+## iteration 63: one sculpted RockFormation per region instead of a lattice
+## of boulders). A flood fill from the spawn guarantees every open cell is
+## reachable on foot; unreachable pockets are blocked too. Spawner, director
+## and this scatter all ask is_walkable() before placing anything.
 @export var mask_enabled: bool = true
-@export var mask_cell_size: float = 10.0
-@export var mask_blobs_min: int = 13
-@export var mask_blobs_max: int = 22
-## Cells per blob (random walk length).
-@export var mask_blob_cells: int = 12
-## Below this open fraction the mask is rebuilt with fewer blobs.
-@export var mask_min_open_fraction: float = 0.62
-## Mask rocks per axis inside a blocked cell: the fill is a jittered square
-## lattice, so this is 3 x 3 = 9 rocks per blocked cell. Load bearing
-## together with mask_rock_scale_min — see the budget in _fill_budget_gap();
-## coarsening either one opens holes the ArenaProbe mask sweep reports.
-@export var mask_rocks_per_side: int = 3
-## How far a lattice rock may wander off its slot. Pure looks: without it
-## the blocked regions read as a checkerboard of boulders.
-@export var mask_rock_jitter: float = 0.3
-## Uniform scale range of every mask rock.
-@export var mask_rock_scale_min: float = 2.9
-@export var mask_rock_scale_max: float = 3.6
+## 5 m since iteration 63 (it was 10). A formation can only be as round as
+## the grid it is drawn on: at 10 m every formation came out a Tetris piece
+## of 2-4 squares with dead-straight cliffs, and no margin noise hides that.
+@export var mask_cell_size: float = 5.0
+## Rock formations seeded per stage. Iteration 63 cut this from 13-22
+## random-walk blobs, which buried a fifth to a third of every arena under
+## rock (120-133 of 576 cells on the seed-7 soaks, up to 38% by the old
+## open-fraction gate).
+@export var mask_blobs_min: int = 5
+@export var mask_blobs_max: int = 8
+## Cells each formation grows to from its seed (25 m² each at 5 m cells).
+@export var mask_blob_cells_min: int = 20
+@export var mask_blob_cells_max: int = 50
+## How hard a formation stretches along its own random axis while it
+## grows: 0 grows round massifs, ~3 grows ridges. Each formation rolls its
+## own stretch in [0, this], so a stage gets both.
+@export var mask_ridge_bias: float = 3.0
+## Minimum Chebyshev distance between two formation seeds, in cells, so
+## the formations stay distinct landmarks instead of fusing into one plate.
+@export var mask_blob_spacing: int = 10
+## Open cells always left between two different formations. Each one
+## reaches up to RockFormation.margin_max past its cells, so a one-cell gap
+## would close to a slot barely wider than a raider.
+@export var mask_formation_gap: int = 2
+## Width of the outer ring of cells where rock never seeds or grows. With
+## the perimeter band always open a formation cannot cut a corner off, and
+## cutting corners off is what made the flood fill seal whole corners of
+## the map into the giant plates iterations 51-62 shipped.
+@export var mask_border_cells: int = 2
+## Radius around the spawn and each authored verticality spot that never
+## gets rock. In metres, so it survives a change of mask_cell_size (it used
+## to be "the cell and its neighbours", i.e. 10-20 m at 10 m cells).
+@export var mask_protect_radius: float = 15.0
+## Below this open fraction the mask is rebuilt with fewer formations.
+@export var mask_min_open_fraction: float = 0.84
 
 ## Blocked cells (grid coords -> true) and the grid size (cells per side).
 var _blocked: Dictionary[Vector2i, bool] = {}
@@ -102,6 +112,34 @@ var _mesa_sites: PackedVector2Array = PackedVector2Array()
 @export var mesa_scale_min: float = 1.0
 @export var mesa_scale_max: float = 1.6
 @export var mesa_ramp_offset: float = 5.5
+## Radius around a mesa site that must be free of blocked cells: the
+## platform at its largest plus the ramp's reach, so neither one is ever
+## built into the side of a rock formation.
+@export var mesa_clearance: float = 12.0
+
+@export_group("Rock Formations (iteration 63)")
+## Every connected region of blocked cells becomes ONE RockFormation (see
+## rock_formation.gd): a faceted massif whose collision is its own mesh.
+## Colours are sRGB, like any albedo picked in the inspector.
+@export var formation_rock_color: Color = Color(0.31, 0.32, 0.35)
+@export var formation_cap_color: Color = Color(0.25, 0.39, 0.2)
+## How much of the cap tint the gentle tops take (0 = bare rock).
+@export var formation_cap_strength: float = 0.65
+## +- brightness of horizontal strata bands (0 = none).
+@export var formation_strata: float = 0.05
+## How hard heights snap to ledges (0 = crags, 1 = stepped mesas).
+@export var formation_terrace: float = 0.0
+## Cliff skirt height, and the extra rise toward a formation's crest.
+## Together (plus noise) they stay under RockFormation.max_height, which
+## stays under what one enemy climb can scale.
+@export var formation_cliff_height: float = 2.6
+@export var formation_peak_height: float = 4.0
+## Facet size in metres (rounded so it divides mask_cell_size exactly).
+@export var formation_step: float = 2.0
+## Interior props keep this far from any blocked cell. A formation reaches
+## up to RockFormation.margin_max past its cells, and a tree growing out of
+## a cliff face reads as a bug.
+@export var formation_clearance: float = 2.5
 
 @export_group("Interior Scatter")
 ## Props land in [-half_extent, half_extent] on X/Z; keep this inside the
@@ -193,7 +231,7 @@ func mesa_sites() -> PackedVector2Array:
 ## is built for its stage.
 func place_props() -> void:
 	if mask_enabled:
-		_fill_blocked_cells()
+		_raise_formations()
 	_build_mesas()
 	for node: Node in get_tree().get_nodes_in_group("scatter_keepout"):
 		var spot := node as Node3D
@@ -247,7 +285,7 @@ func _is_clear(pos: Vector3) -> bool:
 	var flat := Vector2(pos.x, pos.z)
 	if flat.length() < spawn_clear_radius:
 		return false
-	if not is_walkable(flat):
+	if not _clear_of_mask(flat, formation_clearance):
 		return false
 	for keepout in _keepouts_xz:
 		if keepout.distance_to(flat) < keepout_radius:
@@ -344,7 +382,8 @@ func _pick_mesa_sites() -> void:
 				_rng.randf_range(-mesa_half_extent, mesa_half_extent))
 		if candidate.length() < mesa_min_spacing:
 			continue
-		if mask_enabled and not is_walkable(candidate):
+		if mask_enabled and not (_clear_of_mask(candidate, mesa_clearance)
+				and _clear_of_mask(candidate, mesa_clearance * 0.5)):
 			continue
 		var clear := true
 		for other: Vector2 in authored:
@@ -459,8 +498,8 @@ func random_walkable_point(margin: float = 4.0) -> Vector2:
 	return Vector2.ZERO
 
 
-## Cells that must stay open: the spawn and every hand-placed keepout
-## (verticality spots, rock clusters) plus their 4-neighbors.
+## Cells that must stay open: every cell within mask_protect_radius of the
+## spawn or of a hand-placed keepout (verticality spots, rock clusters).
 func _protected_cells() -> Dictionary[Vector2i, bool]:
 	var protected: Dictionary[Vector2i, bool] = {}
 	var seeds: Array[Vector2] = [Vector2.ZERO]
@@ -468,37 +507,47 @@ func _protected_cells() -> Dictionary[Vector2i, bool]:
 		var spot := node as Node3D
 		if spot != null and not (spot is Interactable):
 			seeds.append(Vector2(spot.global_position.x, spot.global_position.z))
+	var reach := ceili(mask_protect_radius / mask_cell_size) + 1
+	var half := mask_cell_size * 0.5
 	for seed_xz: Vector2 in seeds:
-		var cell := _cell_of(seed_xz)
-		for dx in range(-1, 2):
-			for dy in range(-1, 2):
-				protected[cell + Vector2i(dx, dy)] = true
+		var home := _cell_of(seed_xz)
+		for dx in range(-reach, reach + 1):
+			for dy in range(-reach, reach + 1):
+				var cell := home + Vector2i(dx, dy)
+				# Distance from the seed to the cell's SQUARE, not its centre:
+				# a cell the circle merely clips is still ground the spot needs.
+				var center := _cell_center(cell)
+				var gap := Vector2(maxf(absf(seed_xz.x - center.x) - half, 0.0),
+						maxf(absf(seed_xz.y - center.y) - half, 0.0))
+				if gap.length() <= mask_protect_radius:
+					protected[cell] = true
 	return protected
 
 
 func _build_mask() -> void:
 	_mask_cells_per_side = maxi(ceili(arena_half_extent * 2.0 / mask_cell_size), 3)
 	var protected := _protected_cells()
-	var blobs := _rng.randi_range(mask_blobs_min, mask_blobs_max)
+	var formations := _rng.randi_range(mask_blobs_min, mask_blobs_max)
 	for attempt in 4:
 		_blocked.clear()
-		for blob in blobs:
-			var cell := Vector2i(_rng.randi_range(0, _mask_cells_per_side - 1),
-					_rng.randi_range(0, _mask_cells_per_side - 1))
-			var steps: Array[Vector2i] = [Vector2i.LEFT, Vector2i.RIGHT, Vector2i.UP, Vector2i.DOWN]
-			for step in mask_blob_cells:
-				# Block the cell and one side neighbor, so blobs come out
-				# two cells thick instead of thin scribbles.
-				var thick := cell + steps[_rng.randi_range(0, 3)]
-				for c: Vector2i in [cell, thick]:
-					if _in_grid(c) and not protected.has(c):
-						_blocked[c] = true
-				cell += steps[_rng.randi_range(0, 3)]
+		var seeds: Array[Vector2i] = []
+		# Which formation grew each blocked cell, so the next one can keep
+		# mask_formation_gap away from it.
+		var owners: Dictionary[Vector2i, int] = {}
+		for formation in formations:
+			var seed_cell := _pick_formation_seed(seeds, protected, owners)
+			if seed_cell == NO_CELL:
+				continue
+			seeds.append(seed_cell)
+			_grow_formation(seed_cell,
+					_rng.randi_range(mask_blob_cells_min, mask_blob_cells_max),
+					protected, owners, seeds.size())
+		_fill_notches(protected)
 		_seal_unreachable(protected)
 		if float(open_cell_count()) / float(_mask_cells_per_side * _mask_cells_per_side) \
 				>= mask_min_open_fraction:
 			break
-		blobs = maxi(blobs - 1, 1)
+		formations = maxi(formations - 1, 1)
 	var cells := _mask_cells_per_side * _mask_cells_per_side
 	# The OPEN FRACTION is the number that matters (mask_min_open_fraction
 	# is the gate the rebuild loop above is chasing), so the log states it
@@ -507,12 +556,127 @@ func _build_mask() -> void:
 			_blocked.size(), cells, float(open_cell_count()) / float(maxi(cells, 1))])
 
 
+## True where rock may seed or grow: inside the grid, off the open border
+## ring, and not a protected cell (spawn, authored verticality).
+func _rock_may_grow(cell: Vector2i, protected: Dictionary[Vector2i, bool]) -> bool:
+	var last := _mask_cells_per_side - 1 - mask_border_cells
+	return cell.x >= mask_border_cells and cell.y >= mask_border_cells \
+			and cell.x <= last and cell.y <= last and not protected.has(cell)
+
+
+## A seed cell for the next formation, at least mask_blob_spacing cells
+## (Chebyshev) from every seed so far and clear of every formation grown so
+## far, or NO_CELL when the stage is full.
+func _pick_formation_seed(seeds: Array[Vector2i], protected: Dictionary[Vector2i, bool],
+		owners: Dictionary[Vector2i, int]) -> Vector2i:
+	for attempt in 32:
+		var cell := Vector2i(
+				_rng.randi_range(mask_border_cells, _mask_cells_per_side - 1 - mask_border_cells),
+				_rng.randi_range(mask_border_cells, _mask_cells_per_side - 1 - mask_border_cells))
+		if _blocked.has(cell) or not _rock_may_grow(cell, protected):
+			continue
+		if _crowds_formation(cell, -1, owners):
+			continue
+		var crowded := false
+		for other: Vector2i in seeds:
+			if maxi(absi(other.x - cell.x), absi(other.y - cell.y)) < mask_blob_spacing:
+				crowded = true
+				break
+		if not crowded:
+			return cell
+	return NO_CELL
+
+
+## True when `cell` is within mask_formation_gap cells (Chebyshev) of a cell
+## grown by any formation other than `index`.
+func _crowds_formation(cell: Vector2i, index: int, owners: Dictionary[Vector2i, int]) -> bool:
+	for dx in range(-mask_formation_gap, mask_formation_gap + 1):
+		for dy in range(-mask_formation_gap, mask_formation_gap + 1):
+			var owner_index: int = owners.get(cell + Vector2i(dx, dy), index)
+			if owner_index != index:
+				return true
+	return false
+
+
+## Grows one formation from `start` to `size` cells by accretion: every
+## step adds one cell of the frontier (the free 4-neighbours of what has
+## grown so far), weighted toward the formation's own random axis (ridges)
+## and toward cells already walled on two or more sides (solid masses). The
+## random walk it replaces drew one-cell scribbles and crosses that no rock
+## could be made to look like.
+func _grow_formation(start: Vector2i, size: int, protected: Dictionary[Vector2i, bool],
+		owners: Dictionary[Vector2i, int], index: int) -> void:
+	var axis := Vector2.from_angle(_rng.randf_range(0.0, TAU))
+	var stretch := _rng.randf_range(0.0, mask_ridge_bias)
+	var grown: Dictionary[Vector2i, bool] = {}
+	var frontier: Dictionary[Vector2i, bool] = {}
+	var next_cell := start
+	while true:
+		grown[next_cell] = true
+		frontier.erase(next_cell)
+		_blocked[next_cell] = true
+		owners[next_cell] = index
+		if grown.size() >= size:
+			return
+		for step: Vector2i in STEPS:
+			var next := next_cell + step
+			if not grown.has(next) and _rock_may_grow(next, protected) \
+					and not _crowds_formation(next, index, owners):
+				frontier[next] = true
+		if frontier.is_empty():
+			return
+		var options: Array[Vector2i] = []
+		var weights: Array[float] = []
+		var total := 0.0
+		for cell: Vector2i in frontier:
+			var along := absf(Vector2(cell - start).normalized().dot(axis))
+			var walls := 0
+			for side: Vector2i in STEPS:
+				if grown.has(cell + side):
+					walls += 1
+			var weight := 1.0 + stretch * along * along \
+					+ FORMATION_COMPACTNESS * float(walls - 1)
+			options.append(cell)
+			weights.append(weight)
+			total += weight
+		var pick := _rng.randf() * total
+		next_cell = options[options.size() - 1]
+		for option in options.size():
+			pick -= weights[option]
+			if pick <= 0.0:
+				next_cell = options[option]
+				break
+
+
+## Open cells walled by rock on three or four sides become rock too. A 10 m
+## alcove closed on three sides is space nobody fights in, and its square
+## outline is the one thing a formation's margin cannot hide.
+func _fill_notches(protected: Dictionary[Vector2i, bool]) -> void:
+	for sweep in 3:
+		var notches: Array[Vector2i] = []
+		for x in _mask_cells_per_side:
+			for y in _mask_cells_per_side:
+				var cell := Vector2i(x, y)
+				if _blocked.has(cell) or not _rock_may_grow(cell, protected):
+					continue
+				var walls := 0
+				for step: Vector2i in STEPS:
+					if _blocked.has(cell + step):
+						walls += 1
+				if walls >= 3:
+					notches.append(cell)
+		if notches.is_empty():
+			return
+		for cell: Vector2i in notches:
+			_blocked[cell] = true
+
+
 ## Flood fill from the spawn cell; open cells it cannot reach are sealed
 ## so "walk anywhere" holds for every remaining open cell. PROTECTED cells
 ## (the spawn and the hand-placed verticality spots) are never sealed:
 ## if a blob ring cut one off, a corridor is carved back to reached ground
 ## and the fill re-run, so both invariants survive — everything open is
-## reachable AND no authored spot is ever buried under mask rocks.
+## reachable AND no authored spot is ever buried under a rock formation.
 func _seal_unreachable(protected: Dictionary[Vector2i, bool]) -> void:
 	var reached := _reachable_cells()
 	var carved := false
@@ -537,8 +701,8 @@ func _reachable_cells() -> Dictionary[Vector2i, bool]:
 	var frontier: Array[Vector2i] = [start]
 	while not frontier.is_empty():
 		var cell: Vector2i = frontier.pop_back()
-		for dir: Vector2i in [Vector2i.LEFT, Vector2i.RIGHT, Vector2i.UP, Vector2i.DOWN]:
-			var next := cell + dir
+		for step: Vector2i in STEPS:
+			var next := cell + step
 			if not _in_grid(next) or reached.has(next) or _blocked.has(next):
 				continue
 			reached[next] = true
@@ -574,48 +738,87 @@ func _carve_corridor(from: Vector2i, reached: Dictionary[Vector2i, bool]) -> boo
 	return carved
 
 
-## Every blocked cell becomes a REAL rock field: a jittered square lattice
-## of oversized rocks whose footprints overlap enough to cover the WHOLE
-## cell, boundary included. Iteration 48 dropped the invisible 7 m box that
-## used to stand here — the player bumped into nothing next to the rocks,
-## and climbing enemies walked along its roof at y~7, which reads as flying.
-## The fill covers the interior and not just the rim on purpose: a raider
-## can jump onto the rocks and walk the ridge (a soak caught exactly that),
-## and over a hollow cell it would drop into ground the mask calls
-## unreachable and get stuck there. With no floor left inside a blocked
-## cell, coming down means landing on rock the player can see.
-func _fill_blocked_cells() -> void:
-	if _blocked.is_empty() or rock_scene == null:
+## Every connected region of blocked cells becomes ONE RockFormation
+## (iteration 63) that covers the WHOLE region, boundary included, with
+## solid rock — rock_formation.gd says why the seal is structural rather
+## than likely. Iteration 48 dropped the invisible 7 m box that used to
+## stand here (the player bumped into nothing next to the rocks, and
+## climbing enemies walked along its roof at y~7, which reads as flying);
+## iterations 48-62 then packed every blocked cell with a 3x3 lattice of
+## oversized sphere rocks, ~1,200 props a stage that read as grey bubble
+## wrap over a square grid. The interior is rock and not just the rim, on
+## purpose: a raider can jump onto a formation and walk its crest (a soak
+## caught exactly that), and over a hollow region it would drop into ground
+## the mask calls unreachable and get stuck there.
+func _raise_formations() -> void:
+	if _blocked.is_empty():
 		return
-	var gap := _fill_budget_gap()
-	if gap > 0.0:
-		push_warning("Arena mask fill is %.2f m short per rock: raise mask_rocks_per_side or mask_rock_scale_min"
-				% gap)
-	var span := mask_cell_size / float(maxi(mask_rocks_per_side, 1))
-	for cell: Vector2i in _blocked:
-		var center := _cell_center(cell)
-		for ix in mask_rocks_per_side:
-			for iz in mask_rocks_per_side:
-				var slot := Vector2(
-						(float(ix) + 0.5) * span - mask_cell_size * 0.5,
-						(float(iz) + 0.5) * span - mask_cell_size * 0.5)
-				var spot := center + slot + Vector2(
-						_rng.randf_range(-mask_rock_jitter, mask_rock_jitter),
-						_rng.randf_range(-mask_rock_jitter, mask_rock_jitter))
-				_spawn_prop(rock_scene, Vector3(spot.x, 0.0, spot.y),
-						_rng.randf_range(mask_rock_scale_min, mask_rock_scale_max))
+	var started := Time.get_ticks_msec()
+	var terrain := Terrain.find(get_tree())
+	if terrain != null:
+		terrain.ensure_built()
+	var regions := _blocked_regions()
+	var faces := 0
+	var shapes := 0
+	var seal_low := 0
+	var tallest := 0.0
+	for index in regions.size():
+		var formation := RockFormation.new()
+		formation.name = "RockFormation%d" % index
+		formation.cell_size = mask_cell_size
+		formation.half_extent = arena_half_extent
+		formation.mesh_step = formation_step
+		formation.cliff_height = formation_cliff_height
+		formation.peak_height = formation_peak_height
+		formation.terrace_strength = formation_terrace
+		formation.rock_color = formation_rock_color
+		formation.cap_color = formation_cap_color
+		formation.cap_strength = formation_cap_strength
+		formation.strata_strength = formation_strata
+		add_child(formation)
+		formation.build(regions[index], terrain, _run_seed)
+		faces += formation.face_count
+		shapes += formation.prism_count
+		seal_low += formation.seal_low
+		tallest = maxf(tallest, formation.tallest)
+	print("Rock formations: %d regions, %d faces, %d shapes, tallest=%.1f in %d ms" % [
+			regions.size(), faces, shapes, tallest, Time.get_ticks_msec() - started])
+	if seal_low > 0:
+		push_warning("Rock formations: %d boundary vertices under %.1f m — the mask seal is thin there"
+				% [seal_low, RockFormation.SEAL_MIN_HEIGHT])
 
 
-## How many metres of reach the WORST mask rock is missing, or 0 when the
-## lattice covers its cell. The farthest a point of the cell can sit from
-## the rock responsible for it is half the diagonal of one lattice square,
-## and the jitter can push that rock a full diagonal further away; a rock
-## covers everything within its own footprint plus the player capsule's
-## radius. Mask rocks are oversized so that footprint is the widest slice
-## of the hull all along the capsule's height, instead of a sphere that
-## thins out at the ankles.
-func _fill_budget_gap() -> float:
-	var reach := MASK_ROCK_HALF_WIDTH * mask_rock_scale_min + PLAYER_CAPSULE_RADIUS
-	var span := mask_cell_size / float(maxi(mask_rocks_per_side, 1))
-	var needed := span * DIAGONAL * 0.5 + mask_rock_jitter * DIAGONAL
-	return maxf(needed - reach, 0.0)
+## The blocked cells split into 4-connected regions, each one a set
+## (cell -> true) in the shape RockFormation.build() takes.
+func _blocked_regions() -> Array[Dictionary]:
+	var regions: Array[Dictionary] = []
+	var seen: Dictionary[Vector2i, bool] = {}
+	for start: Vector2i in _blocked:
+		if seen.has(start):
+			continue
+		var region: Dictionary[Vector2i, bool] = {start: true}
+		seen[start] = true
+		var frontier: Array[Vector2i] = [start]
+		while not frontier.is_empty():
+			var cell: Vector2i = frontier.pop_back()
+			for step: Vector2i in STEPS:
+				var next := cell + step
+				if _blocked.has(next) and not seen.has(next):
+					seen[next] = true
+					region[next] = true
+					frontier.append(next)
+		regions.append(region)
+	return regions
+
+
+## True when `center` and the eight points `radius` away around it are all
+## walkable: the cheap test for "no formation reaches here".
+func _clear_of_mask(center: Vector2, radius: float) -> bool:
+	if not is_walkable(center):
+		return false
+	if not mask_enabled or radius <= 0.0:
+		return true
+	for index in 8:
+		if not is_walkable(center + Vector2.from_angle(float(index) * TAU / 8.0) * radius):
+			return false
+	return true

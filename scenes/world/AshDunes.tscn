@@ -280,6 +280,11 @@ perimeter_step = 10.0
 perimeter_rock_every = 6
 mesa_platform_scene = ExtResource("12_mesaplatform")
 mesa_ramp_scene = ExtResource("11_mesaramp")
+formation_rock_color = Color(0.55, 0.3, 0.21, 1)
+formation_cap_color = Color(0.78, 0.62, 0.42, 1)
+formation_cap_strength = 0.55
+formation_strata = 0.1
+formation_terrace = 0.5
 
 [node name="Terrain" type="StaticBody3D" parent="."]
 script = ExtResource("90_terrain")

@@ -1,0 +1,8 @@
+[gd_resource type="ShaderMaterial" load_steps=2 format=3]
+
+[ext_resource type="Shader" path="res://assets/shaders/faceted_rock.gdshader" id="1_faceted"]
+
+[resource]
+shader = ExtResource("1_faceted")
+shader_parameter/albedo = Color(0.6, 0.33, 0.24, 1)
+shader_parameter/roughness = 0.95
