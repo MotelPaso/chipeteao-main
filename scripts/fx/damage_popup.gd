@@ -15,6 +15,10 @@ const FADE_TIME: float = 0.35
 ## scene's 16 px outline needs fading (and restoring) alongside `modulate`.
 const OUTLINE_COLOR: Color = Color(0.0, 0.0, 0.0, 1.0)
 
+const damage_text_color: Color = Color(1.0, 0.85, 0.25)
+const damage_text_crit: Color = Color(1.0, 0.3, 0.15)
+const dodge_popup_color := Color(0.5, 0.88, 1.0)
+
 var _tween: Tween = null
 
 
@@ -30,10 +34,10 @@ func pool_reset() -> void:
 
 
 ## Configures and plays one popup; the node releases itself when done.
-func show_popup(popup_text: String, popup_font_size: int, color: Color, at: Vector3) -> void:
+func show_popup(popup_text: String, popup_font_size: int, is_crit: bool, at: Vector3, is_dodge:bool = false) -> void:
 	text = popup_text
 	font_size = popup_font_size
-	modulate = color
+	modulate = dodge_popup_color if is_dodge else damage_text_crit if is_crit else damage_text_color
 	outline_modulate = OUTLINE_COLOR
 	global_position = at
 	_kill_tween()

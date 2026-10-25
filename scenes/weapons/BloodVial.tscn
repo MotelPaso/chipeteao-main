@@ -1,9 +1,11 @@
-[gd_scene load_steps=2 format=3]
+[gd_scene format=3 uid="uid://dto5ynx7gdqbr"]
 
-[ext_resource type="Script" path="res://scripts/weapons/blood_vial.gd" id="1_vial"]
+[ext_resource type="Script" uid="uid://ia3ds2abux2k" path="res://scripts/weapons/blood_vial.gd" id="1_vial"]
 
-[node name="BloodVial" type="Node3D"]
+[node name="BloodVial" type="Node3D" unique_id=1744899349]
 script = ExtResource("1_vial")
+lob_time = 0.435
+arc_height = 4.145
 damage = 4.0
-cooldown = 2.2
+cooldown = 1.705
 attack_range = 12.0

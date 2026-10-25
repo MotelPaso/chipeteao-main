@@ -35,7 +35,6 @@ size = Vector3(0.3, 0.08, 0.08)
 
 [node name="HealthOrb" type="Area3D" unique_id=1911301636]
 collision_layer = 0
-collision_mask = 1
 monitorable = false
 script = ExtResource("1_orb")
 

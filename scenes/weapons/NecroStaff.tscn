@@ -1,9 +1,11 @@
-[gd_scene load_steps=2 format=3 uid="uid://cnecrostaff1k2p"]
+[gd_scene format=3 uid="uid://cmv57kvsqujrh"]
 
-[ext_resource type="Script" path="res://scripts/weapons/necro_staff.gd" id="1_necro"]
+[ext_resource type="Script" uid="uid://dvx7c2g2cu3m4" path="res://scripts/weapons/necro_staff.gd" id="1_necro"]
 
-[node name="NecroStaff" type="Node3D"]
+[node name="NecroStaff" type="Node3D" unique_id=1336858352]
 script = ExtResource("1_necro")
-damage = 14.0
-cooldown = 1.4
+bolt_speed = 7.0
+bolt_lifetime = 3.7
+damage = 20.0
+cooldown = 3.0
 attack_range = 9.0

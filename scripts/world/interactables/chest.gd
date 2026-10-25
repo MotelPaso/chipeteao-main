@@ -137,7 +137,7 @@ func _refresh_price_prompt() -> void:
 	if purse >= cost:
 		set_prompt("[E] Abrir cofre %s — %d pts" % [shown, cost])
 	else:
-		set_prompt("Cofre %s — %d pts (tienes %d)" % [shown, cost, purse])
+		set_prompt("Te faltan %d puntos para abrir cofre %s" % [cost-purse, shown])
 
 
 ## Point balance of the raider standing CLOSEST to the chest — the one

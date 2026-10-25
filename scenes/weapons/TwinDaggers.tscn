@@ -1,9 +1,13 @@
-[gd_scene load_steps=2 format=3]
+[gd_scene format=3 uid="uid://o30sc6qkal7s"]
 
-[ext_resource type="Script" path="res://scripts/weapons/twin_daggers.gd" id="1_daggers"]
+[ext_resource type="Script" uid="uid://ckt043g8ohfnl" path="res://scripts/weapons/twin_daggers.gd" id="1_daggers"]
 
-[node name="TwinDaggers" type="Node3D"]
+[node name="TwinDaggers" type="Node3D" unique_id=749985561]
 script = ExtResource("1_daggers")
-damage = 4.0
-cooldown = 0.25
-attack_range = 2.2
+slash_time = 0.2
+slash_radius = 1.51
+slash_color = Color(0.991721, 0.64353454, 0.27002934, 1)
+damage = 3.0
+cooldown = 0.5
+attack_range = 3.5
+projectile_count = 2

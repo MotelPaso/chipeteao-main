@@ -1,56 +1,70 @@
-[gd_scene load_steps=4 format=3]
+[gd_scene format=3 uid="uid://ct62hsbsvrfj3"]
 
-[ext_resource type="Script" path="res://scripts/ui/meta/quest_log.gd" id="1_questlog"]
-[ext_resource type="Shader" path="res://assets/ui/menu_backdrop.gdshader" id="2_backdrop"]
+[ext_resource type="Script" uid="uid://dicopglygu0w8" path="res://scripts/ui/meta/quest_log.gd" id="1_questlog"]
+[ext_resource type="Shader" uid="uid://cnndc4w2t8jrk" path="res://assets/ui/menu_backdrop.gdshader" id="2_backdrop"]
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_backdrop"]
 shader = ExtResource("2_backdrop")
+shader_parameter/top_color = Color(0.07, 0.085, 0.135, 1)
+shader_parameter/bottom_color = Color(0.028, 0.032, 0.052, 1)
+shader_parameter/fog_color = Color(0.18, 0.26, 0.33, 1)
+shader_parameter/fog_strength = 0.2
+shader_parameter/drift_speed = 0.03
 
-[node name="QuestLog" type="Control"]
+[node name="QuestLog" type="Control" unique_id=356829787]
+layout_mode = 3
+anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
 script = ExtResource("1_questlog")
 
-[node name="Background" type="ColorRect" parent="."]
+[node name="Background" type="ColorRect" parent="." unique_id=1660240075]
 material = SubResource("ShaderMaterial_backdrop")
-anchor_right = 1.0
-anchor_bottom = 1.0
-color = Color(1, 1, 1, 1)
-
-[node name="Center" type="CenterContainer" parent="."]
+layout_mode = 0
 anchor_right = 1.0
 anchor_bottom = 1.0
 
-[node name="VBox" type="VBoxContainer" parent="Center"]
+[node name="Center" type="CenterContainer" parent="." unique_id=1537092562]
+layout_mode = 0
+anchor_right = 1.0
+anchor_bottom = 1.0
+
+[node name="VBox" type="VBoxContainer" parent="Center" unique_id=1423291058]
+layout_mode = 2
 theme_override_constants/separation = 12
 
-[node name="TitleLabel" type="Label" parent="Center/VBox"]
+[node name="TitleLabel" type="Label" parent="Center/VBox" unique_id=1022591225]
 unique_name_in_owner = true
+layout_mode = 2
 theme_override_colors/font_color = Color(0.96, 0.78, 0.3, 1)
 theme_override_font_sizes/font_size = 40
-horizontal_alignment = 1
 text = "REGISTRO DE MISIONES"
+horizontal_alignment = 1
 
-[node name="BadgeLabel" type="Label" parent="Center/VBox"]
+[node name="BadgeLabel" type="Label" parent="Center/VBox" unique_id=1563716046]
 unique_name_in_owner = true
+layout_mode = 2
 theme_override_colors/font_color = Color(0.55, 0.8, 0.92, 1)
 theme_override_font_sizes/font_size = 18
-horizontal_alignment = 1
 text = "Esquirlas: 0"
+horizontal_alignment = 1
 
-[node name="Scroll" type="ScrollContainer" parent="Center/VBox"]
+[node name="Scroll" type="ScrollContainer" parent="Center/VBox" unique_id=250876390]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(700, 420)
+layout_mode = 2
 horizontal_scroll_mode = 0
 
-[node name="List" type="VBoxContainer" parent="Center/VBox/Scroll"]
+[node name="List" type="VBoxContainer" parent="Center/VBox/Scroll" unique_id=579263302]
 unique_name_in_owner = true
+layout_mode = 2
 size_flags_horizontal = 3
 theme_override_constants/separation = 8
 
-[node name="BackButton" type="Button" parent="Center/VBox"]
+[node name="BackButton" type="Button" parent="Center/VBox" unique_id=841390589]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(200, 46)
+layout_mode = 2
 size_flags_horizontal = 4
 theme_override_font_sizes/font_size = 20
 text = "Volver"

@@ -1,9 +1,6 @@
-[gd_scene load_steps=2 format=3 uid="uid://bqw7e3f1xk2ma"]
+[gd_scene format=3 uid="uid://bqw7e3f1xk2ma"]
 
-[ext_resource type="Script" path="res://scripts/weapons/shortsword.gd" id="1_sword"]
+[ext_resource type="Script" uid="uid://730d55wyqdo3" path="res://scripts/weapons/shortsword.gd" id="1_sword"]
 
-[node name="Shortsword" type="Node3D"]
+[node name="Shortsword" type="Node3D" unique_id=1613949696]
 script = ExtResource("1_sword")
-damage = 10.0
-cooldown = 0.9
-attack_range = 3.0

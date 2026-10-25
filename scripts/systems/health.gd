@@ -41,7 +41,8 @@ signal died
 @export var armor: float = 0.0
 ## Floating text on a fully evaded hit (the player's evasion roll). An
 ## @export so it travels with the rest of the player-facing strings.
-@export var dodge_text: String = "¡Esquiva!"
+@export var dodge_text: String = "!"
+
 
 ## Set by PowerUps while Inmortalidad runs: every hit is refused outright
 ## (before armor, before the evasion roll) and counted. Deliberately NOT
@@ -57,7 +58,7 @@ var blocked_hits: int = 0
 ## reflecting means the horde kills itself while nothing touches you.
 var reflect_fraction: float = 0.0
 
-const DODGE_POPUP_COLOR := Color(0.5, 0.88, 1.0)
+
 ## Armor can never fully negate a hit: every landed blow chips this much,
 ## so a stacked-armor build still has to dodge instead of going immortal.
 const MIN_CHIP_DAMAGE: float = 1.0
@@ -106,7 +107,7 @@ func take_damage(amount: float, is_crit: bool = false, attacker: Node3D = null) 
 	var evade_chance := _evasion_chance()
 	if evade_chance > 0.0 and randf() < evade_chance:
 		if show_damage_popups:
-			_spawn_popup(dodge_text, 64, DODGE_POPUP_COLOR)
+			_spawn_popup(dodge_text, 64, false, true)
 		Sfx.play(&"dodge")
 		dodged.emit(attacker)
 		return 0.0
@@ -187,11 +188,10 @@ func _evasion_chance() -> float:
 
 
 func _spawn_damage_popup(amount: float, is_crit: bool) -> void:
-	_spawn_popup(str(roundi(amount)), 88 if is_crit else 64,
-			Color(1.0, 0.3, 0.15) if is_crit else Color(1.0, 0.85, 0.25))
+	_spawn_popup(str(roundi(amount)), 88 if is_crit else 64, is_crit)
 
 
-func _spawn_popup(popup_text: String, popup_font_size: int, color: Color) -> void:
+func _spawn_popup(popup_text: String, popup_font_size: int, is_crit: bool, is_dodge:bool = false) -> void:
 	var body := get_parent() as Node3D
 	if body == null:
 		return
@@ -200,5 +200,5 @@ func _spawn_popup(popup_text: String, popup_font_size: int, color: Color) -> voi
 	var popup := Pools.acquire_scene(Pools.DAMAGE_POPUP_SCENE) as DamagePopup
 	if popup == null:
 		return
-	popup.show_popup(popup_text, popup_font_size, color, body.global_position
-			+ Vector3(randf_range(-0.3, 0.3), 2.0, randf_range(-0.3, 0.3)))
+	popup.show_popup(popup_text, popup_font_size, is_crit, body.global_position
+			+ Vector3(randf_range(-0.3, 0.3), 2.0, randf_range(-0.3, 0.3)), is_dodge)

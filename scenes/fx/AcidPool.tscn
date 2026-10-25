@@ -1,6 +1,6 @@
-[gd_scene load_steps=2 format=3 uid="uid://cacidpool1k2p0"]
+[gd_scene format=3 uid="uid://cmkkop2cf46t0"]
 
-[ext_resource type="Script" path="res://scripts/fx/acid_pool.gd" id="1_acid"]
+[ext_resource type="Script" uid="uid://lpfy7aoex3j0" path="res://scripts/fx/acid_pool.gd" id="1_acid"]
 
-[node name="AcidPool" type="Node3D"]
+[node name="AcidPool" type="Node3D" unique_id=535470612]
 script = ExtResource("1_acid")

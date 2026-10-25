@@ -84,7 +84,7 @@ const CHARACTER_LIBRARY: Array[Dictionary] = [
 		"weapon_display_name": "Vara de brasas",
 		"passive_description": "+0.7% de área por nivel",
 		"passive_stat": "area", "passive_amount": 0.7,
-		"unlock_cost": 50,
+		"unlock_cost": 0, # 50
 		"tint": Color(0.89, 0.45, 0.18),
 	},
 	{
@@ -96,7 +96,7 @@ const CHARACTER_LIBRARY: Array[Dictionary] = [
 		"passive_description": "+0.6% de daño por cada 1% de velocidad extra",
 		"passive_stat": "damage", "passive_amount": 0.6,
 		"passive_kind": "speed_to_damage",
-		"unlock_cost": 80,
+		"unlock_cost": 0, # 80
 		"tint": Color(0.24, 0.55, 0.32),
 	},
 	{
@@ -107,7 +107,7 @@ const CHARACTER_LIBRARY: Array[Dictionary] = [
 		"weapon_display_name": "Látigo de espinas",
 		"passive_description": "+1 de espinas por nivel",
 		"passive_stat": "thorns", "passive_amount": 1.0,
-		"unlock_cost": 80,
+		"unlock_cost": 0, # 80
 		"unlock_boss": "grubthing",
 		"unlock_hint": "busca algo raro en el Bosque Hueco",
 		"tint": Color(0.5, 0.58, 0.28),
@@ -122,7 +122,7 @@ const CHARACTER_LIBRARY: Array[Dictionary] = [
 		"weapon_display_name": "Bumerán",
 		"passive_description": "+2 de HP máx. por nivel",
 		"passive_stat": "max_hp", "passive_amount": 2.0,
-		"unlock_cost": 100,
+		"unlock_cost": 0, # 100
 		"tint": Color(0.62, 0.44, 0.26),
 	},
 	{
@@ -134,7 +134,7 @@ const CHARACTER_LIBRARY: Array[Dictionary] = [
 		"passive_description": "+0.5% de evasión por nivel; al esquivar rematas a enemigos debilitados que no sean jefes",
 		"passive_stat": "evasion", "passive_amount": 0.5,
 		"passive_kind": "evasion_execute",
-		"unlock_cost": 150,
+		"unlock_cost": 0, # 150
 		"unlock_boss": "coffer_mimic",
 		"unlock_hint": "sigue un zumbido extraño en las Dunas de Ceniza",
 		"tint": Color(0.42, 0.3, 0.58),
@@ -147,7 +147,7 @@ const CHARACTER_LIBRARY: Array[Dictionary] = [
 		"weapon_display_name": "Orbes espirituales",
 		"passive_description": "+0.5% de velocidad de ataque por nivel",
 		"passive_stat": "cooldown", "passive_amount": 0.5,
-		"unlock_cost": 120,
+		"unlock_cost": 0, # 120
 		"tint": Color(0.55, 0.85, 0.95),
 	},
 	{
@@ -158,7 +158,7 @@ const CHARACTER_LIBRARY: Array[Dictionary] = [
 		"weapon_display_name": "Pararrayos",
 		"passive_description": "+1 de suerte por nivel (cartas más raras)",
 		"passive_stat": "luck", "passive_amount": 1.0,
-		"unlock_cost": 130,
+		"unlock_cost": 0, # 130
 		"tint": Color(0.35, 0.45, 0.85),
 	},
 	{
@@ -170,7 +170,7 @@ const CHARACTER_LIBRARY: Array[Dictionary] = [
 		"passive_description": "+1% de robo de vida por nivel (base +5%)",
 		"passive_stat": "lifesteal", "passive_amount": 1.0,
 		"passive_base": 5.0,
-		"unlock_cost": 150,
+		"unlock_cost": 0, # 150
 		"tint": Color(0.72, 0.16, 0.2),
 	},
 	# Iteration 43 roster: the slime, stench and beam starters.
@@ -222,12 +222,7 @@ const CHARACTER_LIBRARY: Array[Dictionary] = [
 		"passive_description": "+0.4% de prob. de crítico por nivel",
 		"passive_stat": "crit_chance", "passive_amount": 0.4,
 		"unlock_cost": 0,
-		# The two rows proving the per-character body swap: a placeholder
-		# wrapper with its own tint-prefix-named material, until real GLBs
-		# for these two exist. Everything else stays on the seal.
-		"model_scene": "res://assets/models/placeholder_character.tscn",
-		"tint_material_prefix": "Placeholder personaje",
-		"tint": Color(0.86, 0.74, 0.24),
+		"tint": Color(0.726, 0.299, 0.166, 1.0),
 	},
 	{
 		"id": "gucci_morty", "display_name": "PNG gucci morty",
