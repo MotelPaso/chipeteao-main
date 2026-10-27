@@ -33,7 +33,7 @@ extends EnemyBase
 @export_group("Chests")
 ## Chests dropped on death: this many always, plus one per demonic altar
 ## used this run (RunState.demonic_uses). Rolled Rare+ with luck tilt.
-@export var base_chest_drops: int = 0.10
+@export var base_chest_drops: int = 1
 ## Rarity floor for the ring ("" = none). Empty since iteration 47: boss
 ## chests are FREE and roll their tier when opened, with the demonic luck
 ## bonus below tilting them — a floor on top of that took the roll away.
