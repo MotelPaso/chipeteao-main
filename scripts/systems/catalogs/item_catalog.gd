@@ -102,12 +102,12 @@ const ITEM_LIBRARY: Array[Dictionary] = [
 		"description": "Tus bajas liberan arañas venenosas que cazan a otros enemigos",
 	},
 	{
-		"id": "electric_belt", "display_name": "Cinturón eléctrico", "rarity": "Rare",
+		"id": "electric_belt", "display_name": "Cinturón eléctrico", "rarity": "Legendary",
 		"glyph": "CL", "kind": "shock_dash",
 		"description": "Al derrapar, un rayo salta entre 4 enemigos (uno más por copia)",
 	},
 	{
-		"id": "saiyan_blood", "display_name": "Sangre sayayin", "rarity": "Epic",
+		"id": "saiyan_blood", "display_name": "Sangre sayayin", "rarity": "Legendary",
 		"glyph": "SS", "kind": "saiyan",
 		"description": "Cada 40 bajas te envuelve un aura: daño, velocidad de ataque y velocidad",
 	},
