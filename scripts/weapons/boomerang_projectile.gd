@@ -7,7 +7,10 @@ extends Area3D
 ## hit. Releases back to Pools on catch, on a lost player, or after
 ## max_lifetime; pool_reset() re-arms the legs and hit set for reuse.
 
-@export var speed: float = 14.0
+## Flight speed on both legs. 20 since iteration 66 (issue 4): at 14 the
+## team read the blade as slow; the out distance is unchanged, so a faster
+## blade only spends less time in the air.
+@export var speed: float = 20.0
 ## Radians/sec of the purely visual spin on the Spinner rig.
 @export var spin_speed: float = 14.0
 ## Distance to the player's catch point that counts as caught.

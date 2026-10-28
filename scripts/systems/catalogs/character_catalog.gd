@@ -79,9 +79,11 @@ const CHARACTER_LIBRARY: Array[Dictionary] = [
 	{
 		"id": "ash", "display_name": "Ash",
 		"blurb": "Un ermitaño cubierto de hollín cuyo fuego se abre más en cada nivel.",
-		"weapon_scene": "res://scenes/weapons/EmberWand.tscn",
-		"weapon_node_name": "EmberWand",
-		"weapon_display_name": "Vara de brasas",
+		# Iteration 66 cut the Ember Wand: his area passive is what widens
+		# the Aura's ring, so the blurb's spreading fire still reads true.
+		"weapon_scene": "res://scenes/weapons/Aura.tscn",
+		"weapon_node_name": "Aura",
+		"weapon_display_name": "Aura",
 		"passive_description": "+0.7% de área por nivel",
 		"passive_stat": "area", "passive_amount": 0.7,
 		"unlock_cost": 0, # 50
@@ -90,9 +92,11 @@ const CHARACTER_LIBRARY: Array[Dictionary] = [
 	{
 		"id": "juno", "display_name": "Juno",
 		"blurb": "Una acechadora de pies ligeros que convierte la velocidad en fuerza mortal.",
-		"weapon_scene": "res://scenes/weapons/HuntingBow.tscn",
-		"weapon_node_name": "HuntingBow",
-		"weapon_display_name": "Arco de caza",
+		# Iteration 66 cut the Hunting Bow; the boomerang is the hunter's
+		# other throw.
+		"weapon_scene": "res://scenes/weapons/Boomerang.tscn",
+		"weapon_node_name": "Boomerang",
+		"weapon_display_name": "Bumerán",
 		"passive_description": "+0.6% de daño por cada 1% de velocidad extra",
 		"passive_stat": "damage", "passive_amount": 0.6,
 		"passive_kind": "speed_to_damage",
@@ -102,9 +106,11 @@ const CHARACTER_LIBRARY: Array[Dictionary] = [
 	{
 		"id": "bramble", "display_name": "Bramble",
 		"blurb": "Un guardián erizado cuyo cuero castiga cada mordida descuidada.",
-		"weapon_scene": "res://scenes/weapons/ThornWhip.tscn",
-		"weapon_node_name": "ThornWhip",
-		"weapon_display_name": "Látigo de espinas",
+		# Iteration 66 cut the Thorn Whip; thorns pay off in melee, which
+		# is where the sword fights.
+		"weapon_scene": "res://scenes/weapons/Shortsword.tscn",
+		"weapon_node_name": "Shortsword",
+		"weapon_display_name": "Espada corta",
 		"passive_description": "+1 de espinas por nivel",
 		"passive_stat": "thorns", "passive_amount": 1.0,
 		"unlock_cost": 0, # 80
@@ -142,9 +148,11 @@ const CHARACTER_LIBRARY: Array[Dictionary] = [
 	{
 		"id": "wisp", "display_name": "Wisp",
 		"blurb": "Un espíritu a medias, rodeado de luces que solo le obedecen a él.",
-		"weapon_scene": "res://scenes/weapons/SpiritOrbs.tscn",
-		"weapon_node_name": "SpiritOrbs",
-		"weapon_display_name": "Orbes espirituales",
+		# Iteration 66 cut the Spirit Orbs; the Aura is the other ring of
+		# light around him, and attack speed tightens its pulse.
+		"weapon_scene": "res://scenes/weapons/Aura.tscn",
+		"weapon_node_name": "Aura",
+		"weapon_display_name": "Aura",
 		"passive_description": "+0.5% de velocidad de ataque por nivel",
 		"passive_stat": "cooldown", "passive_amount": 0.5,
 		"unlock_cost": 0, # 120
@@ -153,9 +161,11 @@ const CHARACTER_LIBRARY: Array[Dictionary] = [
 	{
 		"id": "torren", "display_name": "Torren",
 		"blurb": "Un cazatormentas cuya suerte se lee como un parte del clima.",
-		"weapon_scene": "res://scenes/weapons/StormRod.tscn",
-		"weapon_node_name": "StormRod",
-		"weapon_display_name": "Pararrayos",
+		# Iteration 66 cut the Storm Rod; the beam is the closest thing left
+		# to his lightning.
+		"weapon_scene": "res://scenes/weapons/Kamehameha.tscn",
+		"weapon_node_name": "Kamehameha",
+		"weapon_display_name": "Kamehameha",
 		"passive_description": "+1 de suerte por nivel (cartas más raras)",
 		"passive_stat": "luck", "passive_amount": 1.0,
 		"unlock_cost": 0, # 130
@@ -164,16 +174,19 @@ const CHARACTER_LIBRARY: Array[Dictionary] = [
 	{
 		"id": "doc", "display_name": "Doc",
 		"blurb": "Un cirujano de campaña muy alegre que le cobra a cada paciente en sangre.",
-		"weapon_scene": "res://scenes/weapons/BloodVial.tscn",
-		"weapon_node_name": "BloodVial",
-		"weapon_display_name": "Vial de sangre",
+		# Iteration 66 cut the Blood Vial; a field surgeon keeps his
+		# scalpels, and fast hits are what lifesteal feeds on.
+		"weapon_scene": "res://scenes/weapons/TwinDaggers.tscn",
+		"weapon_node_name": "TwinDaggers",
+		"weapon_display_name": "Dagas gemelas",
 		"passive_description": "+1% de robo de vida por nivel (base +5%)",
 		"passive_stat": "lifesteal", "passive_amount": 1.0,
 		"passive_base": 5.0,
 		"unlock_cost": 0, # 150
 		"tint": Color(0.72, 0.16, 0.2),
 	},
-	# Iteration 43 roster: the slime, stench and beam starters.
+	# Iteration 43 roster: the slime, stench and beam starters (the Stench
+	# went in the iteration 66 cut, so Bogg carries the slime too).
 	{
 		"id": "miro", "display_name": "Miro",
 		"blurb": "Una babosa babeante de raider que nunca está donde quedó el desastre.",
@@ -188,9 +201,11 @@ const CHARACTER_LIBRARY: Array[Dictionary] = [
 	{
 		"id": "bogg", "display_name": "Bogg",
 		"blurb": "Nadie se sienta al lado de Bogg. Tampoco nadie sobrevive cerca de Bogg.",
-		"weapon_scene": "res://scenes/weapons/Stench.tscn",
-		"weapon_node_name": "Stench",
-		"weapon_display_name": "Hedor",
+		# Toxic ground instead of a toxic cloud; his area passive widens
+		# the puddles the way it used to widen the gas.
+		"weapon_scene": "res://scenes/weapons/SlimeTrail.tscn",
+		"weapon_node_name": "SlimeTrail",
+		"weapon_display_name": "Rastro de baba",
 		"passive_description": "+1% de área de ataque por nivel",
 		"passive_stat": "area", "passive_amount": 1.0,
 		"unlock_cost": 120,

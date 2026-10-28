@@ -849,7 +849,7 @@ func _set_downed(down: bool) -> void:
 		remove_from_group("player")
 		add_to_group("downed_players")
 		# Purge BEFORE the mount stops ticking: a weapon that leaves timed
-		# fields behind (blood pools, slime puddles) advances them from its
+		# fields behind (the slime puddles) advances them from its
 		# own _physics_process, so freezing the mount strands them on the
 		# ground — still throbbing, still holding pooled visuals, dealing
 		# nothing — until a revive that may never come.

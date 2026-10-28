@@ -18,7 +18,6 @@ extends Node
 const XP_GEM_SCENE: PackedScene = preload("res://scenes/systems/XpGem.tscn")
 const HEALTH_ORB_SCENE: PackedScene = preload("res://scenes/systems/HealthOrb.tscn")
 const DART_SCENE: PackedScene = preload("res://scenes/weapons/Projectile.tscn")
-const ARROW_SCENE: PackedScene = preload("res://scenes/weapons/Arrow.tscn")
 const BOOMERANG_SCENE: PackedScene = preload("res://scenes/weapons/BoomerangProjectile.tscn")
 const ENEMY_BOLT_SCENE: PackedScene = preload("res://scenes/enemies/EnemyBolt.tscn")
 const DEATH_BURST_SCENE: PackedScene = preload("res://scenes/fx/DeathBurst.tscn")
@@ -26,9 +25,6 @@ const DAMAGE_POPUP_SCENE: PackedScene = preload("res://scenes/fx/DamagePopup.tsc
 const TELEGRAPH_DISC_SCENE: PackedScene = preload("res://scenes/fx/TelegraphDisc.tscn")
 const SLASH_ARC_SCENE: PackedScene = preload("res://scenes/fx/SlashArc.tscn")
 const MUZZLE_FLASH_SCENE: PackedScene = preload("res://scenes/fx/MuzzleFlash.tscn")
-const WHIP_CRACK_SCENE: PackedScene = preload("res://scenes/fx/WhipCrack.tscn")
-const EMBER_BURST_SCENE: PackedScene = preload("res://scenes/fx/EmberBurst.tscn")
-const BLOOD_POOL_SCENE: PackedScene = preload("res://scenes/fx/BloodPool.tscn")
 const ACID_POOL_SCENE: PackedScene = preload("res://scenes/fx/AcidPool.tscn")
 
 ## The pooled roster: name, scene, `warm` (instances built at boot so early
@@ -38,7 +34,6 @@ const POOLS: Array[Dictionary] = [
 	{"name": "gem", "scene": XP_GEM_SCENE, "warm": 48, "cap": 256},
 	{"name": "health_orb", "scene": HEALTH_ORB_SCENE, "warm": 4, "cap": 16},
 	{"name": "dart", "scene": DART_SCENE, "warm": 16, "cap": 96},
-	{"name": "arrow", "scene": ARROW_SCENE, "warm": 16, "cap": 96},
 	{"name": "boomerang", "scene": BOOMERANG_SCENE, "warm": 4, "cap": 24},
 	{"name": "enemy_bolt", "scene": ENEMY_BOLT_SCENE, "warm": 16, "cap": 96},
 	{"name": "death_burst", "scene": DEATH_BURST_SCENE, "warm": 12, "cap": 64},
@@ -46,9 +41,6 @@ const POOLS: Array[Dictionary] = [
 	{"name": "telegraph_disc", "scene": TELEGRAPH_DISC_SCENE, "warm": 6, "cap": 32},
 	{"name": "slash_arc", "scene": SLASH_ARC_SCENE, "warm": 8, "cap": 32},
 	{"name": "muzzle_flash", "scene": MUZZLE_FLASH_SCENE, "warm": 6, "cap": 24},
-	{"name": "whip_crack", "scene": WHIP_CRACK_SCENE, "warm": 4, "cap": 16},
-	{"name": "ember_burst", "scene": EMBER_BURST_SCENE, "warm": 4, "cap": 16},
-	{"name": "blood_pool", "scene": BLOOD_POOL_SCENE, "warm": 4, "cap": 16},
 	{"name": "acid_pool", "scene": ACID_POOL_SCENE, "warm": 8, "cap": 48},
 ]
 

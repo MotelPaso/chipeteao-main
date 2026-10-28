@@ -123,8 +123,10 @@ var _gravity: float = ProjectSettings.get_setting("physics/3d/default_gravity", 
 var _xp_multiplier: int = 1
 ## Map-tier XP gem value factor (see apply_tier_scaling); 1.0 = baseline.
 var _tier_xp_multiplier: float = 1.0
-# Timed slow (Thorn Whip etc.): a speed multiplier active while the timer
-# runs; expiry restores full speed. See apply_slow for the refresh rules.
+# Timed slow: a speed multiplier active while the timer runs; expiry
+# restores full speed. See apply_slow for the refresh rules. Nothing calls
+# it since iteration 66 cut its two sources (Thorn Whip, Stench); it stays
+# for the next one.
 var _slow_multiplier: float = 1.0
 var _slow_time_left: float = 0.0
 ## Poison (iteration 40): damage over time ticking every POISON_TICK
@@ -532,8 +534,8 @@ func active_slow_multiplier() -> float:
 	return _slow_multiplier if _slow_time_left > 0.0 else 1.0
 
 
-## Applies a poison of `dps` for `duration` seconds (Fart Bag, spiders,
-## Stench). Refresh rule: the stronger dps wins, the longer timer wins —
+## Applies a poison of `dps` for `duration` seconds (Fart Bag,
+## spiders). Refresh rule: the stronger dps wins, the longer timer wins —
 ## so spamming weak poison never overwrites a strong one.
 func apply_poison(dps: float, duration: float) -> void:
 	if dps <= 0.0 or duration <= 0.0 or _health.is_dead:

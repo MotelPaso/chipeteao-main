@@ -35,7 +35,13 @@ extends RefCounted
 const PET_LIBRARY: Array[Dictionary] = [
 	{
 		"id": "alien", "display_name": "Alienígena", "glyph": "AG",
-		"weapon_scene": "res://scenes/weapons/EmberWand.tscn", "weapon_damage_scale": 0.5,
+		# Iteration 66 cut the five weapons pets carried that the player no
+		# longer can (Ember Wand, Storm Rod, Hunting Bow, Thorn Whip, Spirit
+		# Orbs); each pet took one of the seven left. None carries the
+		# Kamehameha: every volley shakes the camera and every beam that
+		# lands hit-stops the run, and a companion firing on its own
+		# cadence would double both.
+		"weapon_scene": "res://scenes/weapons/DartPistol.tscn", "weapon_damage_scale": 0.5,
 		"stat": "luck", "amount_per_level": 1.0, "stat_label": "suerte +1 por nivel",
 		"shape": "sphere", "color": Color(0.55, 0.95, 0.5), "size": 0.45, "hover": 1.6,
 	},
@@ -53,7 +59,7 @@ const PET_LIBRARY: Array[Dictionary] = [
 	},
 	{
 		"id": "capybara", "display_name": "Capibara", "glyph": "CB",
-		"weapon_scene": "res://scenes/weapons/StormRod.tscn", "weapon_damage_scale": 0.5,
+		"weapon_scene": "res://scenes/weapons/TwinDaggers.tscn", "weapon_damage_scale": 0.55,
 		"stat": "cooldown", "amount_per_level": 0.4,
 		"stat_label": "velocidad de ataque +0.4% por nivel",
 		"shape": "box", "color": Color(0.6, 0.42, 0.25), "size": 0.5, "hover": 0.45,
@@ -67,29 +73,32 @@ const PET_LIBRARY: Array[Dictionary] = [
 	},
 	{
 		"id": "pony", "display_name": "Pony", "glyph": "PN",
-		"weapon_scene": "res://scenes/weapons/HuntingBow.tscn", "weapon_damage_scale": 0.5,
+		# The slime drops where the PET walks (SlimeTrail anchors on its
+		# carrier rig), so the pony paints a trail of its own.
+		"weapon_scene": "res://scenes/weapons/SlimeTrail.tscn", "weapon_damage_scale": 0.45,
 		# Under the band's top on purpose: move speed also feeds Juno's
-		# speed_to_damage passive, so it is worth more than it reads.
+		# speed_to_damage passive and the slime's speed bonus, so it is
+		# worth more than it reads.
 		"stat": "move_speed", "amount_per_level": 0.4, "stat_label": "velocidad +0.4% por nivel",
 		"shape": "box", "color": Color(0.85, 0.7, 0.45), "size": 0.6, "hover": 0.55,
 	},
 	{
 		"id": "cj7", "display_name": "Cj7", "glyph": "CJ",
-		# Always-on weapons (Aura, Orbes espirituales) sit at the bottom of
-		# the scale band: they never miss a window, so uptime pays the rest.
+		# Always-on weapons (Aura, Rastro de baba) sit at the bottom of the
+		# scale band: they never miss a window, so uptime pays the rest.
 		"weapon_scene": "res://scenes/weapons/Aura.tscn", "weapon_damage_scale": 0.45,
 		"stat": "lifesteal", "amount_per_level": 0.5, "stat_label": "robo de vida +0.5% por nivel",
 		"shape": "sphere", "color": Color(0.6, 0.9, 0.75), "size": 0.35, "hover": 1.5,
 	},
 	{
 		"id": "magic_pumpkin", "display_name": "Calabaza mágica", "glyph": "CM",
-		"weapon_scene": "res://scenes/weapons/ThornWhip.tscn", "weapon_damage_scale": 0.55,
+		"weapon_scene": "res://scenes/weapons/Aura.tscn", "weapon_damage_scale": 0.45,
 		"stat": "thorns", "amount_per_level": 1.0, "stat_label": "espinas +1 por nivel",
 		"shape": "sphere", "color": Color(0.95, 0.5, 0.12), "size": 0.5, "hover": 1.1,
 	},
 	{
 		"id": "pokemon", "display_name": "Pokemon", "glyph": "PK",
-		"weapon_scene": "res://scenes/weapons/SpiritOrbs.tscn", "weapon_damage_scale": 0.45,
+		"weapon_scene": "res://scenes/weapons/Boomerang.tscn", "weapon_damage_scale": 0.55,
 		"stat": "damage", "amount_per_level": 0.5, "stat_label": "daño +0.5% por nivel",
 		"shape": "capsule", "color": Color(0.95, 0.85, 0.25), "size": 0.45, "hover": 0.9,
 	},
@@ -116,7 +125,7 @@ static func ids() -> PackedStringArray:
 
 
 ## The pet's weapon under its CATALOG name. The scene file name is the
-## node_name the weapon library keys on (StormRod.tscn -> "StormRod"); the
+## node_name the weapon library keys on (Boomerang.tscn -> "Boomerang"); the
 ## live node is called "PetWeapon", so it cannot answer this.
 static func weapon_display_name(row: Dictionary) -> String:
 	var scene := String(row.get("weapon_scene", ""))

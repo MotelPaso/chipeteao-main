@@ -45,7 +45,7 @@ El acoplamiento cruzado va siempre por aquí. Lista actual:
 | `enemy_projectiles`           | bolts enemigos en vuelo                                                                              | el flag `frozen` de Tiempo detenido                                                                                                               |
 | `springs`                     | el manantial vivo (como máximo uno)                                                                  | el peso 0 de su fila de evento                                                                                                                    |
 | `acid_pools`                  | charcos ácidos vivos (iteración 55)                                                                  | el tope y la separación de la lluvia radiactiva                                                                                                   |
-| `possessed`                   | siervos del nigromante (iteración 56)                                                                | `Stage sweep: possessed=`, el cupo por portador y la limpieza de etapa                                                                            |
+| `possessed`                   | siervos del nigromante (iteración 56; vacío desde la 66, que cortó el báculo)                        | `Stage sweep: possessed=`, el cupo por portador y la limpieza de etapa                                                                            |
 | `lucky_blocks`                | bloques de la suerte vivos                                                                           | limpieza de etapa                                                                                                                                 |
 | `vendors`                     | los puestos vivos (máximo 2)                                                                         | el peso 0 de su fila y `Stage sweep: vendors=`                                                                                                    |
 | `pet_boxes`                   | las cajas de mascotas vivas                                                                          | limpieza de etapa y `Stage sweep: boxes=`                                                                                                         |
@@ -84,10 +84,11 @@ Helpers compartidos que ya existían pero **crecieron** en esta iteración (ver 
 - Contrato `WeaponBase`: exporta `damage/cooldown/attack_range/projectile_count/cooldown_scale`; la subclase sobreescribe `fire(target)` y canaliza **todo** golpe por `deal_damage(target_health)` (aplica multiplicador global, crit, lifesteal y los hooks de objetos del portador). Helpers de stats: `effective_damage()`, `effective_cooldown()`, `area_scale()` (radios/arcos, no `attack_range`), `effective_projectile_count()`, `duration_scale()`, `targeting_range()`.
 - **Barridos de área compartidos (iteración 45)**: `enemies_in_disc(centro, radio, ventana_y)`, `enemies_in_sphere(centro, radio)`, `enemies_in_lane(origen, dir, largo, ancho)`, `enemies_in_arc(centro, dir, alcance, ángulo)` y `damage_all(bodies)`. Cuatro armas repetían el mismo bucle con los mismos dos números mágicos; si tu arma golpea una forma, **úsala desde aquí** en vez de escribir un `get_nodes_in_group("enemies")` nuevo. Los helpers de aim (`aim_dir_or`, `flat_dir_or`, `safe_up`) son estáticos y cubren los casos degenerados (vector nulo, dirección colineal con Y).
 - Visual efímero: `spawn_fx_mesh(mesh)` construye el `MeshInstance3D` en la raíz de escena con la configuración correcta (lo que antes copiaban cuatro armas).
-- Pasos: (1) script `extends WeaponBase` + escena en `scenes/weapons/` (mira `shortsword.gd` melee, `dart_pistol.gd` proyectil, `ember_wand.gd` área); (2) una fila en `UpgradePool.WEAPON_LIBRARY` con `id`, `display_name` (**en español**, glosario «Armas»), `node_name` (== nombre de nodo al instanciarse, **en inglés**), `scene`, `flavor` y opcionalmente `extra_entries`. Con eso ya aparece como carta de arma nueva y genera sus cartas de daño/velocidad de ataque/alcance automáticamente.
+- Pasos: (1) script `extends WeaponBase` + escena en `scenes/weapons/` (mira `shortsword.gd` melee, `dart_pistol.gd` proyectil, `aura.gd` área); (2) una fila en `UpgradePool.WEAPON_LIBRARY` con `id`, `display_name` (**en español**, glosario «Armas»), `node_name` (== nombre de nodo al instanciarse, **en inglés**), `scene`, `flavor` y opcionalmente `extra_entries`. Con eso ya aparece como carta de arma nueva y genera sus cartas de daño/velocidad de ataque/alcance automáticamente.
 - `WEAPON_LIBRARY` está indexada por `node_name` (`CatalogIndex`) para el HUD y el banner de evolución: no hagas un bucle lineal nuevo, usa el accesor del catálogo.
 - Si dispara proyectiles: el proyectil es su propia escena con `pool_reset()`, se lanza con `Pools.acquire_scene(...)` y se registra con **una fila** en `Pools.POOLS` (ver Pools abajo). Ejemplo completo: `dart_pistol.gd` + `projectile.gd`.
-- Armas sin objetivo: un arma que actúa sola (Rastro de baba) sobreescribe `_physics_process` y devuelve `null` en `acquire_target()`; las de área alrededor del portador (Aura, Hedor) usan `attack_range * area_scale()` como radio y `fire()` ignora el objetivo.
+- Armas sin objetivo: un arma que actúa sola (Rastro de baba) sobreescribe `_physics_process` y devuelve `null` en `acquire_target()`; las de área alrededor del portador (Aura) usan `attack_range * area_scale()` como radio y `fire()` ignora el objetivo.
+- **Siete armas desde la iteración 66 (issue 4).** Quedan Espada corta, Dagas gemelas, Aura, Pistola de dardos, Bumerán, Rastro de baba y Kamehameha, cada una con su evolución. Se cortaron Vara de brasas, Arco de caza, Látigo de espinas, Orbes espirituales, Báculo de nigromante, Pararrayos, Vial de sangre y Hedor, con sus escenas, sus efectos exclusivos (flecha, chasquido del látigo, estallido de brasas, charco de sangre) y sus filas de `Pools`. Para traer una de vuelta: su fila en `WEAPON_LIBRARY`, su receta en `EvolutionCatalog` y sus archivos desde git. La posesión (`EnemyBase.make_possessed`) y la ralentización (`EnemyBase.apply_slow`) siguen en el código, pero ya nada las llama. En la misma iteración el Rastro de baba empezó a ganar daño con el movimiento: `SlimeTrail.motion_damage_scale()` suma `speed_damage_bonus` (1.0, o sea +1% por cada +1% de velocidad sobre la base) y `jump_damage_bonus` (0.2 por salto extra), leídos en vivo del `PlayerStats` del portador. Además la hoja del Bumerán pasó de 14 a 20 m/s (`BoomerangProjectile.speed`).
 - Al caer un raider (co-op), el Player avisa a sus armas **antes** de congelar el mount: un arma que deja objetos en el mundo (charcos) tiene que limpiarlos ahí, o quedan huérfanos.
 
 ### Multitud por arma (iteración 46)
@@ -97,18 +98,11 @@ Helpers compartidos que ya existían pero **crecieron** en esta iteración (ver 
 | Arma               | Forma                    | Qué hace el conteo extra                                                     |
 | ------------------ | ------------------------ | ---------------------------------------------------------------------------- |
 | Pistola de dardos  | proyectil                | más dardos por andanada (abanico), como siempre                              |
-| Arco de caza       | proyectil                | más flechas por andanada (abanico), como siempre                             |
-| Orbes espirituales | órbita                   | más orbes en el anillo, como siempre                                         |
 | Espada corta       | ataque único (arco)      | un arco completo más por extra, escalonado y abanicado                       |
 | Dagas gemelas      | ataque único (estocada)  | estocadas extra escalonadas; cada una re-adquiere objetivo                   |
-| Látigo de espinas  | ataque único (carril)    | latigazos extra escalonados y abanicados, cada uno su carril                 |
 | Kamehameha         | ataque único (rayo)      | rayos extra escalonados y abanicados; un rugido por andanada                 |
-| Pararrayos         | ataque único (cadena)    | descargas extra escalonadas, cada una con su propia bifurcación              |
 | Bumerán            | proyectil (ataque único) | hojas extra lanzadas una tras otra y abanicadas                              |
-| Vial de sangre     | ataque único (frasco)    | frascos extra escalonados, impacto rotado **alrededor del lanzador**         |
-| Vara de brasas     | ataque único (estallido) | detonaciones extra escalonadas, cada una re-adquiere su centro               |
 | Aura               | campo persistente        | **no** añade anillos: +12% de radio y −8% de intervalo por extra (suelo 60%) |
-| Hedor              | campo persistente        | igual que Aura: +12% de radio y −8% de intervalo por extra (suelo 60%)       |
 | Rastro de baba     | charco                   | un charco más por gota, en anillo a 1.2 radios del punto de caída            |
 
 Reglas que comparten las de ataque único: el escalonado es un `const` por archivo y se recorta para que **toda la cadena quepa en el 60% del `effective_cooldown()`**; los callbacks diferidos usan `get_tree().create_timer(delay, false, true)` (pausable y en paso de física) y abren con `if not is_inside_tree(): return`, porque un arma se libera con su raider. Todo golpe sigue pasando por `deal_damage()`.
@@ -139,21 +133,25 @@ jugador no puede deshacer.
   nadie llevó.
 - **La estadística** la aplica `PlayerStats._apply_pet_stat()` leyendo
   `Player.pet_id`: `amount_per_level × RunState.level`.
-- Las nueve filas tienen **arma distinta y estadística distinta**, y su
-  `stat_label` lo imprimen todas las cartas de la caja y del traficante:
-  un cambio irreversible nunca debe ser una adivinanza.
+- Las nueve filas tienen **estadística distinta**, y su `stat_label` lo
+  imprimen todas las cartas de la caja y del traficante: un cambio
+  irreversible nunca debe ser una adivinanza. Desde la iteración 66 quedan
+  siete armas, así que tres pares de mascotas comparten la suya. Ninguna
+  lleva el Kamehameha: cada andanada sacude la cámara y cada rayo que
+  acierta congela el golpe, y una mascota disparando a su propio ritmo
+  duplicaría las dos cosas.
 
 | id              | Nombre          | Arma               | Estadística         |
 | --------------- | --------------- | ------------------ | ------------------- |
-| `alien`         | Alienígena      | Varita de brasas   | suerte              |
+| `alien`         | Alienígena      | Pistola de dardos  | suerte              |
 | `dinosaur`      | Dinosaurio      | Espada corta       | HP máx.             |
 | `angry_bird`    | Pájaro furioso  | Pistola de dardos  | prob. de crítico    |
-| `capybara`      | Capibara        | Pararrayos         | velocidad de ataque |
+| `capybara`      | Capibara        | Dagas gemelas      | velocidad de ataque |
 | `doki`          | Doki            | Bumerán            | ganancia de XP      |
-| `pony`          | Pony            | Arco de caza       | velocidad           |
+| `pony`          | Pony            | Rastro de baba     | velocidad           |
 | `cj7`           | Cj7             | Aura               | robo de vida        |
-| `magic_pumpkin` | Calabaza mágica | Látigo de espinas  | espinas             |
-| `pokemon`       | Pokemon         | Orbes espirituales | daño                |
+| `magic_pumpkin` | Calabaza mágica | Aura               | espinas             |
+| `pokemon`       | Pokemon         | Bumerán            | daño                |
 
 ### Caja de mascotas
 
@@ -784,8 +782,7 @@ devuelve `price_discount` a 1.0.
   (`EnemyBase._drop_acid_pool` → `WorldDirector.spawn_acid_pool`), más uno
   extra cada 2 s cerca de un raider. `AcidPool` (`scripts/fx/acid_pool.gd`,
   fila `acid_pool` en `Pools`, grupo `acid_pools`) **tiene su propio tick de
-  daño**, a diferencia de `BloodPoolFx`, que es solo cosmético porque
-  `blood_vial.gd` lleva sus ticks: aquí no hay arma detrás, y un charco que
+  daño**: aquí no hay arma detrás, y un charco que
   necesitara un ticker externo obligaría al director a llevar una lista —
   y esa lista sería lo que se filtra en un cambio de etapa. **Solo daña
   raiders**: ácido que también derritiera a la horda haría del peor clima
@@ -836,6 +833,10 @@ La lee del director en vez de que el director la empuje: es una vista, y un
 push necesitaría una señal disparada desde tres grupos distintos.
 
 ## Poseídos (Báculo de nigromante)
+
+> **Sin arma desde la iteración 66.** El báculo se cortó (issue 4). El
+> sistema de abajo sigue entero en `EnemyBase` para cuando vuelva, pero hoy
+> nada llama a `make_possessed` y el grupo `possessed` queda vacío.
 
 Lo que mata el báculo **se levanta de tu lado** (iteración 56).
 

@@ -39,11 +39,14 @@ extends RefCounted
 
 ## Every equippable weapon: new_weapon cards and per-owned-weapon stat
 ## entries are generated from this, so adding a weapon is one new row.
+## Seven since iteration 66 (issue 4): the team kept the weapons that read
+## well in play and cut the eight that did little; a weapon that comes
+## back is its row here, its EvolutionCatalog recipe and its files from git.
 ## `glyph` is the 2-letter tile the HUD loadout strip draws while there is
 ## no sprite (same field ItemCatalog rows carry). It is DECLARED, never
 ## derived from display_name: Spanish weapon names nearly all read
-## "Sustantivo de Complemento", so initials collapse ("Vara de brasas" and
-## "Vial de sangre" both give "VD"). Keep every glyph unique across
+## "Sustantivo de Complemento", so initials collapse (the cut "Vara de
+## brasas" and "Vial de sangre" both gave "VD"). Keep every glyph unique across
 ## WEAPON_LIBRARY, EvolutionCatalog.EVOLUTION_LIBRARY, Tome.TOME_LIBRARY
 ## and ItemCatalog.ITEM_LIBRARY — the strip mixes all four.
 const WEAPON_LIBRARY: Array[Dictionary] = [
@@ -62,37 +65,6 @@ const WEAPON_LIBRARY: Array[Dictionary] = [
 				"description": "La Pistola de dardos dispara %d dardo(s) más",
 				"target": "weapon/DartPistol", "property": "projectile_count",
 				"op": "add", "amount": 1.0,
-			},
-		],
-	},
-	{
-		"id": "ember_wand", "display_name": "Vara de brasas", "glyph": "VB",
-		"node_name": "EmberWand", "scene": "res://scenes/weapons/EmberWand.tscn",
-		"flavor": "detona estallidos de fuego sobre grupos lejanos",
-	},
-	{
-		"id": "hunting_bow", "display_name": "Arco de caza", "glyph": "AR",
-		"node_name": "HuntingBow", "scene": "res://scenes/weapons/HuntingBow.tscn",
-		"flavor": "suelta flechas rectas que ensartan filas enteras",
-		"extra_entries": [
-			{
-				"id": "hunting_bow_pierce", "title": "Puntas con púas",
-				"description": "Las flechas del Arco de caza perforan %d enemigos más",
-				"target": "weapon/HuntingBow", "property": "pierce_count",
-				"op": "add", "amount": 1.0,
-			},
-		],
-	},
-	{
-		"id": "thorn_whip", "display_name": "Látigo de espinas", "glyph": "LE",
-		"node_name": "ThornWhip", "scene": "res://scenes/weapons/ThornWhip.tscn",
-		"flavor": "traza una línea de zarzas que engancha y ralentiza",
-		"extra_entries": [
-			{
-				"id": "thorn_whip_slow", "title": "Espinas aferradas",
-				"description": "La ralentización del Látigo de espinas es %d%% más fuerte",
-				"target": "weapon/ThornWhip", "property": "slow_percent",
-				"op": "add", "amount": 8.0,
 			},
 		],
 	},
@@ -124,65 +96,6 @@ const WEAPON_LIBRARY: Array[Dictionary] = [
 			},
 		],
 	},
-	{
-		"id": "spirit_orbs", "display_name": "Orbes espirituales", "glyph": "OE",
-		"node_name": "SpiritOrbs", "scene": "res://scenes/weapons/SpiritOrbs.tscn",
-		"flavor": "espíritus en órbita que queman todo lo que rozan",
-		"extra_entries": [
-			{
-				"id": "spirit_orbs_count", "title": "Otro espíritu",
-				"description": "Los Orbes espirituales suman %d orbe(s) más",
-				"target": "weapon/SpiritOrbs", "property": "projectile_count",
-				"op": "add", "amount": 1.0,
-			},
-		],
-	},
-	{
-		"id": "necro_staff", "display_name": "Báculo de nigromante", "glyph": "BN",
-		"node_name": "NecroStaff", "scene": "res://scenes/weapons/NecroStaff.tscn",
-		"flavor": "lo que mata se levanta de tu lado",
-		"extra_entries": [
-			{
-				"id": "necro_staff_duration", "title": "Posesión más larga",
-				"description": "Tus siervos duran %d%% más",
-				"target": "weapon/NecroStaff", "property": "possess_duration",
-				"op": "mul_percent", "amount": 25.0,
-			},
-			{
-				"id": "necro_staff_cap", "title": "Más siervos",
-				"description": "Puedes tener %d siervos más a la vez",
-				"target": "weapon/NecroStaff", "property": "max_possessed",
-				"op": "add", "amount": 3.0,
-			},
-		],
-	},
-	{
-		"id": "storm_rod", "display_name": "Pararrayos", "glyph": "PY",
-		"node_name": "StormRod", "scene": "res://scenes/weapons/StormRod.tscn",
-		"flavor": "rayos que se bifurcan entre enemigos apretados",
-		"extra_entries": [
-			{
-				"id": "storm_rod_chain", "title": "Cielo bifurcado",
-				"description": "El Pararrayos encadena a %d enemigos más",
-				"target": "weapon/StormRod", "property": "chain_count",
-				"op": "add", "amount": 1.0,
-			},
-		],
-	},
-	{
-		"id": "blood_vial", "display_name": "Vial de sangre", "glyph": "VS",
-		"node_name": "BloodVial", "scene": "res://scenes/weapons/BloodVial.tscn",
-		"flavor": "arroja frascos que encharcan sangre bajo los grupos más densos",
-		"extra_entries": [
-			{
-				# One extra pulse = one extra tick_interval of pool lifetime.
-				"id": "blood_vial_coagulate", "title": "Coagular",
-				"description": "Los charcos del Vial de sangre pulsan %d vez(ces) más",
-				"target": "weapon/BloodVial", "property": "pool_ticks",
-				"op": "add", "amount": 1.0,
-			},
-		],
-	},
 	# Iteration 43 wave.
 	{
 		"id": "slime_trail", "display_name": "Rastro de baba", "glyph": "RB",
@@ -201,19 +114,6 @@ const WEAPON_LIBRARY: Array[Dictionary] = [
 		"id": "aura", "display_name": "Aura", "glyph": "AU",
 		"node_name": "Aura", "scene": "res://scenes/weapons/Aura.tscn",
 		"flavor": "un anillo de luz que quema todo a tu alrededor",
-	},
-	{
-		"id": "stench", "display_name": "Hedor", "glyph": "HE",
-		"node_name": "Stench", "scene": "res://scenes/weapons/Stench.tscn",
-		"flavor": "pulsos flatulentos que envenenan y ralentizan a la jauría",
-		"extra_entries": [
-			{
-				"id": "stench_linger", "title": "Hedor más rancio",
-				"description": "El veneno del Hedor dura %d%% más",
-				"target": "weapon/Stench", "property": "poison_duration",
-				"op": "mul_percent", "amount": 30.0,
-			},
-		],
 	},
 	{
 		"id": "kamehameha", "display_name": "Kamehameha", "glyph": "KH",

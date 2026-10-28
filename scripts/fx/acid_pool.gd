@@ -3,9 +3,8 @@ extends Node3D
 ## Pooled acid puddle left by the radioactive rain (iteration 55): a green
 ## disc that hurts RAIDERS ONLY and fades out on its own.
 ##
-## Unlike BloodPoolFx — which is purely cosmetic because blood_vial.gd owns
-## its damage ticks — this one owns its own tick. There is no weapon behind
-## it: the weather drops it and walks away, so a pool that needed an
+## It owns its own damage tick. There is no weapon behind it: the
+## weather drops it and walks away, so a pool that needed an
 ## external ticker would need the director to keep a list of them, and that
 ## list would be the thing leaking across a stage swap.
 ##
