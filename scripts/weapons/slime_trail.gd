@@ -4,11 +4,17 @@ extends WeaponBase
 ## puddle takes a damage tick each tick_interval. No target needed — the
 ## weapon "fires" on its own cadence whenever the carrier has moved.
 ## Knob mapping onto the WeaponBase contract:
-##   damage        — per tick (through deal_damage)
+##   damage        — per tick (through deal_damage), times the motion bonus
 ##   cooldown      — seconds between puddle drops while moving
 ##   attack_range  — unused (Long Reach still widens puddles via area)
 ## Puddles are SlimePuddle records ticked here (no pooled scene): the visual
 ## is a flat emissive disc built per puddle and faded out on expiry.
+##
+## Motion bonus (iteration 66, issue 4): the trail is the weapon you feed by
+## moving, so it pays for movement stats. Every tick gains
+## speed_damage_bonus per point of move speed above base and
+## jump_damage_bonus per extra mid-air jump. Read live from the carrier's
+## PlayerStats, so a speed tome or the speed power-up shows on the next tick.
 
 @export var puddle_radius: float = 1.4
 ## Seconds a puddle lasts (Tome of Lingering / "Thicker Slime" stretch it).
@@ -22,6 +28,13 @@ extends WeaponBase
 ## How far above the carrier's feet the disc sits — just enough to clear
 ## the arena floor's top face without floating.
 @export var puddle_ground_offset: float = 0.05
+## Damage fraction gained per point of move_speed_multiplier above 1.0:
+## 1.0 is +1% damage per +1% speed, so +50% speed hits half again as hard.
+## A slow never pushes the trail under its base damage.
+@export var speed_damage_bonus: float = 1.0
+## Damage fraction gained per PlayerStats.extra_jumps. 0.2 doubles the
+## trail at MAX_EXTRA_JUMPS (5), as +100% move speed does.
+@export var jump_damage_bonus: float = 0.2
 
 ## Seconds a puddle takes to fade out once its life runs out.
 const FADE_TIME: float = 0.3
@@ -179,3 +192,19 @@ func _expire(puddle: SlimePuddle) -> void:
 ## Never targets: the trail drops wherever the carrier walks.
 func acquire_target() -> Node3D:
 	return null
+
+
+## Every puddle tick reads this through deal_damage, so the motion bonus
+## stacks on the usual damage multiplier and crits multiply both.
+func effective_damage() -> float:
+	return super() * motion_damage_scale()
+
+
+## 1.0 plus the speed and jump bonuses (see the header). Stats come from
+## carrier_player(), so a pet's trail pays for the raider's movement too.
+func motion_damage_scale() -> float:
+	var stats := _stats_or_null()
+	if stats == null:
+		return 1.0
+	return 1.0 + maxf(stats.move_speed_multiplier - 1.0, 0.0) * speed_damage_bonus \
+			+ float(stats.extra_jumps) * jump_damage_bonus

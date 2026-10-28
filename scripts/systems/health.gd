@@ -88,7 +88,7 @@ static func find_in(body: Node) -> Health:
 ## RETURNS the HP this hit actually removed: 0.0 when it was refused (dead
 ## body, non-positive amount) or fully evaded, the armor-reduced amount
 ## otherwise, and only the HP that was LEFT on a killing blow. Callers that
-## pay out on damage dealt (weapon lifesteal, the Blood Vial's drain) read
+## pay out on damage dealt (weapon lifesteal) read
 ## this instead of sampling current_hp before and after — sampling credited
 ## an overkill hit for the sliver it happened to find, and could not tell a
 ## dodge from a hit that landed for zero.

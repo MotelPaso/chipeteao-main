@@ -24,8 +24,8 @@ extends WeaponBase
 @export var first_range: float = 10.0
 @export var bounce_range: float = 8.0
 
-## Beam look, mirroring storm_rod.gd's fade (that one's _spawn_beam is
-## private, so the pattern is reproduced here rather than reached into).
+## Beam look (a copy of the fade the Storm Rod used before iteration 66
+## cut that weapon).
 @export var beam_radius: float = 0.05
 @export var beam_fade_time: float = 0.22
 @export var beam_fade_scale: float = 3.0

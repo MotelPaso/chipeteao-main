@@ -442,24 +442,6 @@ const FLIGHT_HOLD_PERIOD: float = 15.0
 const FLIGHT_HOLD_TIME: float = 5.0
 var _flight_holding: bool = false
 
-## The carrier's current servant cap, or 0 when nobody carries the staff.
-## Read off the weapon so an upgrade card or the evolution moves it, and
-## the soak's possessed=a/b can prove a never exceeds b.
-## Summed over the WHOLE party, not read off the leader: possessed= counts
-## every servant in the group, so comparing it against one carrier's cap
-## printed a > b in co-op while every per-carrier cap was being honoured.
-func _possession_cap() -> int:
-	var cap := 0
-	for body: Node3D in _party_bodies():
-		var mount := body.get_node_or_null("Weapons")
-		if mount == null:
-			continue
-		for child: Node in mount.get_children():
-			var staff := child as NecroStaff
-			if staff != null:
-				cap += staff.max_possessed
-	return cap
-
 
 ## BONK_ITEM_NOW: items to grant slot 0 once, at this run time.
 const ITEM_NOW_AT: float = 10.0
@@ -1092,13 +1074,15 @@ func _physics_process(delta: float) -> void:
 	_watch_blocked_cell(delta)
 	if _frames % 120 == 0:
 		# APPENDED to, never reordered: verificar.sh parses level= off the
-		# last one of these.
+		# last one of these. possessed= lost its "/cap" half with the
+		# Necromancer Staff (iteration 66): nothing possesses any more, so
+		# a count above 0 is now the anomaly worth seeing.
 		print(("frame %d paused=%s run_time=%.1f active=%s enemies=%d level=%d"
-				+ " airborne=%d explored=%.2f possessed=%d/%d") % [
+				+ " airborne=%d explored=%.2f possessed=%d") % [
 				_frames, get_tree().paused, RunState.run_time, RunState.run_active,
 				get_tree().get_node_count_in_group("enemies"), RunState.level,
 				_airborne_total, _explored_fraction(),
-				get_tree().get_node_count_in_group(&"possessed"), _possession_cap()])
+				get_tree().get_node_count_in_group(&"possessed")])
 		_sample_blocked_hits()
 		_bounty_chests_max = maxi(_bounty_chests_max,
 				EnemyBase.unopened_bounty_chests(get_tree()))

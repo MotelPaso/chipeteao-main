@@ -45,12 +45,14 @@ public reviews, the Steam page, and community wikis.
 |---|---|---|
 | Rook | Shortsword | +Damage per level |
 | Vex | Dart Pistol | +Crit Chance per level |
-| Ash | Ember Wand | +Burn radius per level |
-| Juno | Hunting Bow | +Move Speed → +Damage conversion |
-| Bramble | Thorn Whip | +Thorns/reflect per level |
+| Ash | Aura | +Burn radius per level |
+| Juno | Boomerang | +Move Speed → +Damage conversion |
+| Bramble | Shortsword | +Thorns/reflect per level |
 | Otto | Boomerang | Wall-climb unlocked, +HP per level |
 | Nyx | Twin Daggers | +Evasion per level, dodges can execute low-HP enemies |
-| Doc | Blood Vial | +Lifesteal per level |
+| Doc | Twin Daggers | +Lifesteal per level |
+
+Iteration 66 (issue 4) cut the weapon roster to seven (Shortsword, Twin Daggers, Aura, Dart Pistol, Boomerang, Slime Trail, Kamehameha): fewer, better weapons and fewer evolutions. Ash, Juno, Bramble and Doc started with a cut weapon (Ember Wand, Hunting Bow, Thorn Whip, Blood Vial) and now carry one of the seven; their passives are unchanged.
 
 Two characters (Rook, Vex) are unlocked from the start; the rest unlock via in-run challenges (defeat a hidden miniboss, reach map tier 2, etc.) — mirrors the genre's "skill unlocks, not purchases" philosophy.
 

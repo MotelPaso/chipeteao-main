@@ -49,6 +49,13 @@ Lo que NO se traduce nunca: los `id` de catálogo, los `node_name`, los nombres 
 
 ## Armas
 
+Desde la iteración 66 (issue 4) el juego trae siete armas: Espada corta,
+Dagas gemelas, Aura, Pistola de dardos, Bumerán, Rastro de baba y
+Kamehameha. Vara de brasas, Arco de caza, Látigo de espinas, Orbes
+espirituales, Pararrayos, Vial de sangre, Hedor y Báculo de nigromante se
+cortaron junto con sus evoluciones y sus cartas. Sus términos se quedan en
+este glosario por si vuelven.
+
 | Inglés | Español |
 |---|---|
 | Shortsword | Espada corta |

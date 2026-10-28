@@ -1,6 +1,6 @@
 class_name MuzzleFlash
 extends MeshInstance3D
-## Pooled point-flash sprite (Dart Pistol muzzle, Hunting Bow draw glint):
+## Pooled point-flash sprite (the Dart Pistol's muzzle):
 ## a small billboarded emissive quad that pops in scale and fades out. The
 ## quad and its material are per-instance, built once at _ready; play()
 ## only recolors and tweens.

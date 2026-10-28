@@ -77,7 +77,7 @@ func carrier_player() -> Node3D:
 
 ## The rig this weapon is mounted on: the Pet companion when one carries it,
 ## otherwise the raider. Carrier-anchored effects (the slime trail's drop
-## point, the spirit ring's center) follow THIS so a pet's weapon acts around
+## point) follow THIS so a pet's weapon acts around
 ## the pet; stats, lifesteal and item hooks keep reading carrier_player().
 func carrier_node() -> Node3D:
 	var node: Node = self
@@ -151,7 +151,7 @@ func duration_scale() -> float:
 
 ## Distance acquire_target() searches. Aimed weapons keep the raw
 ## attack_range; weapons whose hit area IS attack_range * area_scale()
-## (Aura, Stench) widen this to match, or the outer band of their own ring
+## (the Aura) widen this to match, or the outer band of their own ring
 ## becomes decorative and they never pulse at enemies standing in it.
 func targeting_range() -> float:
 	return attack_range
@@ -237,7 +237,7 @@ func _lifesteal_heal(amount: float) -> void:
 
 
 ## Damages every body in `bodies` through the funnel above; returns the
-## total damage actually applied (Blood Vial's innate drain reads it).
+## total damage actually applied.
 func damage_all(bodies: Array[Node3D]) -> float:
 	var total := 0.0
 	for body: Node3D in bodies:

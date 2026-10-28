@@ -8,12 +8,14 @@ extends Area3D
 ## max_distance, and pool_reset() re-arms pierce/hit-set/tracer for reuse.
 
 @export var speed: float = 26.0
-## Whether the flight bends toward the target at all (arrows fly straight).
+## Whether the flight bends toward the target at all (the Hunting Bow's
+## arrows flew straight until iteration 66 cut it; every live shot homes).
 @export var homing_enabled: bool = true
 ## Radians/sec the flight direction may bend toward the target; 0 disables homing.
 @export var homing_turn_speed: float = 3.5
 ## How many distinct enemies this projectile may damage before despawning.
-## The firing weapon can raise it per shot (Hunting Bow pierce upgrades).
+## The firing weapon can raise it per shot (the cut Hunting Bow's pierce
+## upgrades did).
 @export var pierce_remaining: int = 1
 ## Aim above the target's origin so bullets converge on body height, not feet.
 @export var aim_height: float = 0.8

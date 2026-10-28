@@ -1,9 +1,9 @@
 class_name FxMesh
 extends RefCounted
-## Mesh builders shared by the procedural FX (the slash crescent and the
-## whip lash). Both are the same triangle strip — pairs of inner/outer
-## vertices with vertex-alpha shaping — so only the vertex loop differs and
-## the ArrayMesh assembly lives here once.
+## Mesh builders for the procedural FX: the slash crescent, and the whip
+## lash until iteration 66 cut the Thorn Whip. Both were the same triangle
+## strip — pairs of inner/outer vertices with vertex-alpha shaping — so
+## only the vertex loop differed and the ArrayMesh assembly lives here once.
 
 ## Builds a triangle strip from `vertices`/`colors` given as consecutive
 ## pairs (inner, outer) along the strip. Needs at least two pairs.

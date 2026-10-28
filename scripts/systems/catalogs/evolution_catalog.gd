@@ -20,8 +20,8 @@ extends RefCounted
 ##   flavor: Collection line. evolved_name and flavor are player text.
 ##   glyph:  2-letter tile the HUD loadout strip draws for the evolved
 ##             weapon while there is no sprite. DECLARED, never derived from
-##             evolved_name: initials of Spanish names collapse ("Cáliz de
-##             peste" and "Corona de tempestad" would both give "CD"). Keep
+##             evolved_name: initials of Spanish names collapse (the cut
+##             "Cáliz de peste" and "Corona de tempestad" both gave "CD"). Keep
 ##             it unique across this library, WEAPON_LIBRARY, TOME_LIBRARY
 ##             and ITEM_LIBRARY — the strip mixes all four.
 ##   mults: {property: factor} multiplied onto the weapon node on evolve.
@@ -53,27 +53,6 @@ const EVOLUTION_LIBRARY: Array[Dictionary] = [
 		"flavor": "una granizada de dardos que no deja de caer",
 	},
 	{
-		"weapon_id": "ember_wand", "weapon_node": "EmberWand",
-		"evolved_name": "Lanza solar", "glyph": "LS",
-		"mults": {"damage": 1.8, "burst_radius": 1.6},
-		"adds": {},
-		"flavor": "detonaciones del tamaño de un claro",
-	},
-	{
-		"weapon_id": "hunting_bow", "weapon_node": "HuntingBow",
-		"evolved_name": "Perforacorazones", "glyph": "PC",
-		"mults": {"damage": 1.8},
-		"adds": {"pierce_count": 3},
-		"flavor": "flechas que enhebran columnas enteras de enemigos",
-	},
-	{
-		"weapon_id": "thorn_whip", "weapon_node": "ThornWhip",
-		"evolved_name": "Guirnalda sepulcral", "glyph": "GS",
-		"mults": {"damage": 1.7},
-		"adds": {"slow_percent": 25.0},
-		"flavor": "un zarzal que estrangula y casi detiene a la horda",
-	},
-	{
 		"weapon_id": "boomerang", "weapon_node": "Boomerang",
 		"evolved_name": "Sierra orbital", "glyph": "SO",
 		"mults": {"damage": 1.8, "travel_scale": 1.3},
@@ -86,34 +65,6 @@ const EVOLUTION_LIBRARY: Array[Dictionary] = [
 		"mults": {"damage": 1.5, "cooldown_scale": 0.6},
 		"adds": {},
 		"flavor": "estocadas más rápidas de lo que el ojo alcanza",
-	},
-	{
-		"weapon_id": "blood_vial", "weapon_node": "BloodVial",
-		"evolved_name": "Cáliz de peste", "glyph": "CP",
-		"mults": {"damage": 1.8},
-		"adds": {"pool_ticks": 2},
-		"flavor": "charcos que siguen pudriéndose mucho después de que el frasco revienta",
-	},
-	{
-		"weapon_id": "spirit_orbs", "weapon_node": "SpiritOrbs",
-		"evolved_name": "Anillo de cometas", "glyph": "AN",
-		"mults": {"damage": 1.8, "cooldown": 0.6},
-		"adds": {"projectile_count": 1},
-		"flavor": "un halo ardiente que nadie cruza y vive",
-	},
-	{
-		"weapon_id": "necro_staff", "weapon_node": "NecroStaff",
-		"evolved_name": "Corona del Rey Lich", "glyph": "CN",
-		"mults": {"damage": 1.6},
-		"adds": {"possess_duration": 4.0, "max_possessed": 6},
-		"flavor": "un ejército que ya no cabe en el campo",
-	},
-	{
-		"weapon_id": "storm_rod", "weapon_node": "StormRod",
-		"evolved_name": "Corona de tempestad", "glyph": "CT",
-		"mults": {"damage": 1.7},
-		"adds": {"chain_count": 3},
-		"flavor": "rayos que se bifurcan hasta que no queda nada en pie",
 	},
 	# Iteration 43 wave.
 	{
@@ -129,13 +80,6 @@ const EVOLUTION_LIBRARY: Array[Dictionary] = [
 		"mults": {"damage": 1.8, "attack_range": 1.35, "cooldown": 0.7},
 		"adds": {},
 		"flavor": "un sol adentro del cual nadie aguanta",
-	},
-	{
-		"weapon_id": "stench", "weapon_node": "Stench",
-		"evolved_name": "Miasma", "glyph": "MI",
-		"mults": {"damage": 1.6, "poison_duration": 1.8, "attack_range": 1.3},
-		"adds": {},
-		"flavor": "una nube de podredumbre que se queda en todo lo que toca",
 	},
 	{
 		"weapon_id": "kamehameha", "weapon_node": "Kamehameha",
