@@ -249,7 +249,7 @@ const CHARACTER_LIBRARY: Array[Dictionary] = [
 		"passive_description": "+0.8% de velocidad de movimiento por nivel",
 		"passive_stat": "move_speed", "passive_amount": 0.8,
 		"unlock_cost": 0,
-		"model_scene": "res://assets/models/placeholder_character.tscn",
+		"model_scene": "res://assets/models/tyrone_character.tscn",
 		"tint_material_prefix": "Placeholder personaje",
 		"tint": Color(0.14, 0.62, 0.6),
 	},

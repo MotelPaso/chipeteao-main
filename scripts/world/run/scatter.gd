@@ -407,12 +407,36 @@ func _build_mesas() -> void:
 		return
 	for site: Vector2 in _mesa_sites:
 		var scale := _rng.randf_range(mesa_scale_min, mesa_scale_max)
-		_spawn_prop(mesa_platform_scene, Vector3(site.x, 0.0, site.y), scale)
-		if mesa_ramp_scene == null:
+		var plat := mesa_platform_scene.instantiate() as Node3D
+		if plat == null:
 			continue
-		var angle := _rng.randf_range(0.0, TAU)
-		var ramp_at := site + Vector2(cos(angle), sin(angle)) * mesa_ramp_offset * scale
-		_spawn_prop(mesa_ramp_scene, Vector3(ramp_at.x, 0.0, ramp_at.y), scale)
+		add_child(plat)
+		var plat_angle := _rng.randf_range(0.0, TAU)
+		plat.position = Vector3(site.x, ground_height(site.x, site.y), site.y)
+		plat.rotation.y = plat_angle
+		plat.scale = Vector3.ONE * scale
+
+		if mesa_ramp_scene == null:
+			_keepouts_xz.append(site)
+			continue
+
+		var ramp := mesa_ramp_scene.instantiate() as Node3D
+		if ramp != null:
+			add_child(ramp)
+			# Alinear la rampa exactamente con una de las 4 caras planas de la plataforma
+			var side_idx := _rng.randi_range(0, 3)
+			var local_offsets := [
+				Vector3(4.95, 0.0, 0.0),
+				Vector3(0.0, 0.0, 4.95),
+				Vector3(-4.95, 0.0, 0.0),
+				Vector3(0.0, 0.0, -4.95)
+			]
+			var local_rot_y := [PI, PI * 0.5, 0.0, -PI * 0.5]
+			var world_pos := plat.transform * (local_offsets[side_idx] * scale)
+			ramp.position = Vector3(world_pos.x, ground_height(world_pos.x, world_pos.z), world_pos.z)
+			ramp.rotation.y = plat_angle + local_rot_y[side_idx]
+			ramp.scale = Vector3.ONE * scale
+
 		# The mesa counts as a keepout for the interior scatter, so trees
 		# do not grow through the platform it stands on.
 		_keepouts_xz.append(site)
