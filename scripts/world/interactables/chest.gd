@@ -51,7 +51,7 @@ const FREE_TINT: Color = Color(1.0, 0.93, 0.72)
 ## fail, so the line never has a "you can't afford it" variant.
 const FREE_PROMPT: String = "[E] Abrir cofre — gratis"
 
-@onready var _lid_pivot: Node3D = $Visual/LidPivot
+@onready var _lid_pivot: Node3D = get_node_or_null("Visual/LidPivot")
 
 ## The raider who opened this chest (co-op: the loot lands on THEM).
 var _opener: Node = null
@@ -170,8 +170,12 @@ func _interact(player: Node) -> void:
 	var rest_y := position.y
 	var tween := create_tween()
 	tween.set_parallel(true)
-	tween.tween_property(_lid_pivot, "rotation:x", lid_open_angle, open_duration) \
-			.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	if _lid_pivot != null:
+		tween.tween_property(_lid_pivot, "rotation:x", lid_open_angle, open_duration) \
+				.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	var ap := get_node_or_null("Visual/ChestModel/AnimationPlayer") as AnimationPlayer
+	if ap != null and ap.has_animation("open"):
+		ap.play("open")
 	tween.tween_property(self, "position:y", rest_y + OPEN_HOP_HEIGHT,
 			open_duration * OPEN_HOP_UP_SHARE) \
 			.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
@@ -247,6 +251,19 @@ func _tint_by_rarity() -> void:
 		var mesh_instance := get_node_or_null(path) as MeshInstance3D
 		if mesh_instance != null:
 			mesh_instance.material_override = material
+
+	var model := get_node_or_null("Visual/ChestModel")
+	if model != null:
+		var tex = load("res://assets/models/chest/Textures/colormap.png")
+		var chest_mat := StandardMaterial3D.new()
+		if tex:
+			chest_mat.albedo_texture = tex
+		chest_mat.emission_enabled = true
+		chest_mat.emission = color
+		chest_mat.emission_energy_multiplier = 0.2 if (not free_open and rarity == "Common") else (0.5 if rarity == "Rare" else 0.85)
+		for node: Node in model.find_children("*", "MeshInstance3D", true, false):
+			var mi := node as MeshInstance3D
+			mi.material_override = chest_mat
 	if free_open or rarity == "Epic" or rarity == "Legendary":
 		if _glow_light == null:
 			_glow_light = OmniLight3D.new()
