@@ -15,7 +15,8 @@ extends Node
 ## enough that the map reads as "where we walked".
 ##
 ## MapDraw composites this into the picture the minimap and the overlay
-## draw; nothing outside this node writes to the image.
+## draw; nothing outside this node writes to the image, which is what lets
+## `revision` stand in for its contents.
 
 ## Metres per fog pixel. 2 m gives 121x121 for a 240 m arena: coarse
 ## enough to paint cheaply, fine enough that a corridor between two mask
@@ -30,6 +31,15 @@ extends Node
 ## The authoritative state. FORMAT_L8: one byte per pixel, no alpha —
 ## MapDraw is what turns it into something drawable.
 var image: Image = null
+
+## Goes up every time `image` changes: a fresh image in _rebuild, or a
+## reveal_at that flipped at least one pixel. Never reset and never bumped
+## for anything else, so "same fog node, same revision" means "same
+## pixels". The minimap and the overlay key their MapDraw.composite() on it
+## (Minimap.composite_key): the fog paints at 5 Hz and most paints land on
+## ground the party has already seen, so without it their 10 Hz refresh
+## rebuilt an identical 14 400-pixel picture several times a second.
+var revision: int = 0
 
 var _pixels: int = 0
 ## Half-extent of the arena the current image covers, in metres.
@@ -75,6 +85,7 @@ func _rebuild(half_extent: float) -> void:
 	image.fill(Color(0.0, 0.0, 0.0))
 	_explored_pixels = 0
 	_paint_left = 0.0
+	revision += 1
 
 
 func _physics_process(delta: float) -> void:
@@ -101,6 +112,7 @@ func reveal_at(center_xz: Vector2) -> void:
 	var center_px := _to_pixel(center_xz)
 	var radius := int(ceil(reveal_radius / maxf(meters_per_pixel, 0.5)))
 	var radius_sq := radius * radius
+	var explored_before := _explored_pixels
 	for dy in range(-radius, radius + 1):
 		var py := center_px.y + dy
 		if py < 0 or py >= _pixels:
@@ -116,6 +128,11 @@ func reveal_at(center_xz: Vector2) -> void:
 			if image.get_pixel(px, py).r < 0.5:
 				_explored_pixels += 1
 				image.set_pixel(px, py, Color(1.0, 1.0, 1.0))
+	# Once per call, not per pixel: a consumer only needs "not what you
+	# last saw". The counter moves exactly when a set_pixel above ran, so a
+	# disc painted over ground that is already explored leaves it alone.
+	if _explored_pixels != explored_before:
+		revision += 1
 
 
 ## True when the party has been near this flat position.

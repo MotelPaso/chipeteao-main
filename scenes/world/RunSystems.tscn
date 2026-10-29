@@ -1,35 +1,36 @@
-[gd_scene load_steps=10 format=3 uid="uid://crunsy5te2m8a"]
+[gd_scene format=3 uid="uid://crunsy5te2m8a"]
 
-[ext_resource type="Script" path="res://scripts/world/run_systems.gd" id="1_runsys"]
-[ext_resource type="Script" path="res://scripts/world/world_director.gd" id="8_director"]
-[ext_resource type="Script" path="res://scripts/systems/fog_of_war.gd" id="9_fog"]
+[ext_resource type="Script" uid="uid://hrri6ikpae2l" path="res://scripts/world/run/run_systems.gd" id="1_runsys"]
 [ext_resource type="PackedScene" uid="uid://c8k2h1n3m5p0a" path="res://scenes/player/Player.tscn" id="2_player"]
-[ext_resource type="Script" path="res://scripts/systems/run_manager.gd" id="3_runmgr"]
-[ext_resource type="PackedScene" path="res://scenes/ui/UpgradeCardUI.tscn" id="4_cardui"]
-[ext_resource type="PackedScene" path="res://scenes/ui/HUD.tscn" id="5_hud"]
+[ext_resource type="Script" uid="uid://b87fxmckc8vhx" path="res://scripts/systems/run_manager.gd" id="3_runmgr"]
+[ext_resource type="PackedScene" uid="uid://c52x8kekju83l" path="res://scenes/ui/UpgradeCardUI.tscn" id="4_cardui"]
+[ext_resource type="PackedScene" uid="uid://ckyhkv0ex3x4" path="res://scenes/ui/HUD.tscn" id="5_hud"]
 [ext_resource type="PackedScene" path="res://scenes/ui/RunEndScreen.tscn" id="6_runend"]
 [ext_resource type="PackedScene" path="res://scenes/ui/PauseMenu.tscn" id="7_pausemenu"]
+[ext_resource type="Script" uid="uid://355twc54duoj" path="res://scripts/world/run/world_director.gd" id="8_director"]
+[ext_resource type="Script" uid="uid://dl7cxjlsx8uhj" path="res://scripts/systems/fog_of_war.gd" id="9_fog"]
 
-[node name="RunSystems" type="Node3D"]
+[node name="RunSystems" type="Node3D" unique_id=2086446746]
 script = ExtResource("1_runsys")
 
-[node name="Player" parent="." instance=ExtResource("2_player")]
+[node name="Player" parent="." unique_id=1511789428 instance=ExtResource("2_player")]
 
-[node name="RunManager" type="Node" parent="."]
+[node name="RunManager" type="Node" parent="." unique_id=164659691]
 script = ExtResource("3_runmgr")
 
-[node name="WorldDirector" type="Node" parent="."]
+[node name="WorldDirector" type="Node" parent="." unique_id=1873970074]
 script = ExtResource("8_director")
+first_event_at = 60.0
 
-[node name="UpgradeCardUI" parent="." instance=ExtResource("4_cardui")]
+[node name="UpgradeCardUI" parent="." unique_id=1865859061 instance=ExtResource("4_cardui")]
 
-[node name="HUD" parent="." instance=ExtResource("5_hud")]
+[node name="HUD" parent="." unique_id=1478304278 instance=ExtResource("5_hud")]
 
-[node name="RunEndScreen" parent="." instance=ExtResource("6_runend")]
+[node name="RunEndScreen" parent="." unique_id=903522905 instance=ExtResource("6_runend")]
 
-[node name="PauseMenu" parent="." instance=ExtResource("7_pausemenu")]
+[node name="PauseMenu" parent="." unique_id=1929351768 instance=ExtResource("7_pausemenu")]
+
+[node name="FogOfWar" type="Node" parent="." unique_id=329359295]
+script = ExtResource("9_fog")
 
 [connection signal="run_ended" from="RunManager" to="RunEndScreen" method="open"]
-
-[node name="FogOfWar" type="Node" parent="."]
-script = ExtResource("9_fog")

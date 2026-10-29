@@ -43,6 +43,7 @@ scale_curve = SubResource("CurveTexture_trail")
 [node name="BoomerangProjectile" type="Area3D" groups=["player_shots"]]
 collision_layer = 0
 collision_mask = 2
+monitorable = false
 script = ExtResource("1_blade")
 
 [node name="Spinner" type="Node3D" parent="."]

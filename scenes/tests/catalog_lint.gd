@@ -22,7 +22,7 @@ extends Node
 
 ## The director declares no class_name; its EVENT_LIBRARY and
 ## WEATHER_CATALOG are only reachable through the script resource.
-const WORLD_DIRECTOR := preload("res://scripts/world/world_director.gd")
+const WORLD_DIRECTOR := preload("res://scripts/world/run/world_director.gd")
 ## Scanned as TEXT for the `match stat:` arms of _apply_effect. There is no
 ## reflection for a match block, and hard-coding the list here would mean
 ## two copies of the same truth drifting apart on the next stat.
@@ -162,7 +162,8 @@ func _check_paths_exist() -> void:
 		["POWERUP_LIBRARY", PowerUpCatalog.POWERUP_LIBRARY, "id"],
 		["TOME_LIBRARY", Tome.TOME_LIBRARY, "id"],
 	]
-	var path_keys: Array[String] = ["scene", "weapon_scene", "scene_path", "icon"]
+	var path_keys: Array[String] = ["scene", "weapon_scene", "scene_path", "icon",
+			"model_scene"]
 	for entry: Array in sources:
 		var library_name := String(entry[0])
 		var library: Array[Dictionary] = entry[1]

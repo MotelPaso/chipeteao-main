@@ -3,7 +3,8 @@ extends CharacterBody3D
 ## Player controller: WASD movement relative to camera yaw, mouse-look,
 ## jump, and a Shift+move slide (speed burst + lowered collision).
 ## At spawn it applies the selected character's loadout (GameConfig ->
-## CharacterCatalog row): starting weapon, seal model tint, per-level passive.
+## CharacterCatalog row): starting weapon, body model with a tint
+## (optional per row, the seal by default), per-level passive.
 ## The visual body is the SealRig child (foca.glb); the gameplay capsule
 ## collision shape is unchanged and stays authoritative for physics.
 ## apply_root() (Sarcognath's Entomb) locks movement without touching the
@@ -710,7 +711,8 @@ func is_rooted() -> bool:
 
 
 ## Applies a CharacterCatalog row: instances the starting weapon under the
-## Weapons mount, tints the seal model, registers the passive.
+## Weapons mount, swaps in the row's body model (optional; the seal by
+## default), tints it, registers the passive.
 ## Test switch (ArenaProbe, BONK_WEAPON): the id of the weapon the raider
 ## starts with instead of the character's. Read here so the swap rides the
 ## SAME grant path — the node_name the upgrade pool counts on, and the
@@ -742,7 +744,13 @@ func _apply_character(character: Dictionary) -> void:
 		var weapon_id := UpgradePool.weapon_id_for_node(String(character.weapon_node_name))
 		if not weapon_id.is_empty():
 			SaveData.bump("used_weapon_" + weapon_id)
-	# SealRig duplicates the model's shared material once for this spawn.
+	# Cosmetic body swap: the row's optional model data, falling back to
+	# the default seal inside SealRig.setup. Tints AFTER the swap, because
+	# setup resets the rig's material to the new model's.
+	seal_rig.setup(String(character.get("model_scene", "")),
+			float(character.get("model_scale", 1.0)),
+			String(character.get("tint_material_prefix", "")))
+	# SealRig duplicates the model's shared character material once per spawn.
 	seal_rig.apply_tint(Color(character.tint))
 	_stats.set_character_passive(String(character.passive_stat),
 			float(character.passive_amount),

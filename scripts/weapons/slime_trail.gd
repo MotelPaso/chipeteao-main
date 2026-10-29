@@ -65,6 +65,10 @@ func _ready() -> void:
 	_puddle_mesh.top_radius = 1.0
 	_puddle_mesh.bottom_radius = 1.0
 	_puddle_mesh.height = 0.06
+	# Explicit tessellation: a 6 cm slab needs no height rings, and the
+	# engine's 64 sides were the bulk of every puddle's triangles.
+	_puddle_mesh.radial_segments = 24
+	_puddle_mesh.rings = 1
 	var material := StandardMaterial3D.new()
 	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA

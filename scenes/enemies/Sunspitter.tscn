@@ -23,23 +23,31 @@ emission_energy_multiplier = 2.4
 material = SubResource("StandardMaterial3D_shell")
 radius = 0.5
 height = 0.66
+radial_segments = 24
+rings = 12
 
 [sub_resource type="CylinderMesh" id="CylinderMesh_body"]
 material = SubResource("StandardMaterial3D_chitin")
 top_radius = 0.4
 bottom_radius = 0.34
 height = 0.3
+radial_segments = 16
+rings = 0
 
 [sub_resource type="CylinderMesh" id="CylinderMesh_leg"]
 material = SubResource("StandardMaterial3D_chitin")
 top_radius = 0.04
 bottom_radius = 0.06
 height = 0.34
+radial_segments = 8
+rings = 0
 
 [sub_resource type="SphereMesh" id="SphereMesh_eye"]
 material = SubResource("StandardMaterial3D_eye")
 radius = 0.11
 height = 0.22
+radial_segments = 8
+rings = 4
 
 [sub_resource type="CapsuleShape3D" id="CapsuleShape3D_sunspitter"]
 radius = 0.45

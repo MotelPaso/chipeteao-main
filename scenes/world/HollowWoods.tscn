@@ -1,13 +1,13 @@
 [gd_scene load_steps=30 format=3 uid="uid://dqv5m2x8rk1fj"]
 
-[ext_resource type="Script" path="res://scripts/world/arena.gd" id="1_arena"]
-[ext_resource type="Script" path="res://scripts/world/backdrop.gd" id="90_backdrop"]
+[ext_resource type="Script" path="res://scripts/world/run/arena.gd" id="1_arena"]
+[ext_resource type="Script" path="res://scripts/world/run/backdrop.gd" id="90_backdrop"]
 [ext_resource type="Script" path="res://scripts/systems/enemy_spawner.gd" id="3_spawner"]
 [ext_resource type="PackedScene" uid="uid://bqgr4nt0h3v2e" path="res://scenes/enemies/Grunt.tscn" id="4_grunt"]
 [ext_resource type="PackedScene" path="res://scenes/enemies/Skirmisher.tscn" id="15_skirmisher"]
 [ext_resource type="PackedScene" path="res://scenes/enemies/Tank.tscn" id="16_tank"]
 [ext_resource type="PackedScene" path="res://scenes/enemies/Rotking.tscn" id="17_boss"]
-[ext_resource type="Script" path="res://scripts/world/scatter.gd" id="9_scatter"]
+[ext_resource type="Script" path="res://scripts/world/run/scatter.gd" id="9_scatter"]
 [ext_resource type="PackedScene" uid="uid://ctree3hw7ka2f" path="res://scenes/world/props/Tree.tscn" id="10_tree"]
 [ext_resource type="PackedScene" uid="uid://brock5hw2mv8d" path="res://scenes/world/props/Rock.tscn" id="11_rock"]
 [ext_resource type="PackedScene" uid="uid://bstum8hw1tj5e" path="res://scenes/world/props/Stump.tscn" id="12_stump"]
@@ -20,7 +20,7 @@
 [ext_resource type="Script" path="res://scripts/systems/ambient_bed.gd" id="22_ambient"]
 [ext_resource type="AudioStream" path="res://assets/audio/ambient/forest_wind.wav" id="23_wind"]
 [ext_resource type="PackedScene" path="res://scenes/world/secrets/OddStump.tscn" id="24_oddstump"]
-[ext_resource type="Script" path="res://scripts/world/terrain.gd" id="90_terrain"]
+[ext_resource type="Script" path="res://scripts/world/run/terrain.gd" id="90_terrain"]
 
 [sub_resource type="Shader" id="Shader_grass"]
 code = "shader_type spatial;

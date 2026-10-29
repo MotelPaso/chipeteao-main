@@ -7,7 +7,7 @@ extends CharacterBody3D
 ## Subclasses shape behavior through the virtual hooks below.
 ## make_elite() upgrades any enemy into a glowing elite variant.
 
-@export var move_speed: float = 4.0
+@export var move_speed: float = 7.0
 @export var turn_speed: float = 10.0
 @export var separation_radius: float = 1.2
 @export var separation_strength: float = 1.5
@@ -63,6 +63,18 @@ const DEFAULT_POINTS_VALUE: int = 1
 const ARENA_CLAMP_MARGIN: float = 1.5
 ## Luck added to an elite's bounty chest per point of run-wide difficulty.
 const ELITE_CHEST_LUCK_PER_DIFFICULTY: float = 15.0
+## Elite bounty chests (iteration 64): the most UNOPENED ones the map may
+## hold at once. They never expired, and the drop rate grows with the
+## run's difficulty twice over (elite chance and chest chance): a 15-minute
+## soak ended with ~390 on the floor, 171 dropped in its 13th minute alone,
+## each one an Area3D, a solid box the horde climbs and a map marker. Past
+## the cap an elite kill drops no chest until one is opened or the stage
+## changes — the HealthOrb.at_soft_cap pattern. Boss rings go through
+## spawn_chest directly and never count.
+const BOUNTY_CHEST_CAP: int = 30
+const BOUNTY_CHEST_GROUP: StringName = &"bounty_chests"
+## Drops the cap swallowed this process; the log line is rate-limited by it.
+static var _capped_bounty_drops: int = 0
 
 var is_elite: bool = false
 ## Sky-event variant applied by the spawner ("" | "berserker" | "shade").
@@ -82,6 +94,31 @@ var _arena_limit: float = INF
 static var _enemies_snapshot: Array[Node] = []
 static var _enemies_snapshot_frame: int = -1
 
+## Separation neighbour grid: that snapshot bucketed into square cells on
+## the flat plane, so a separation scan visits its own cell and the ring
+## around it instead of the whole horde — O(n) per tick instead of O(n^2),
+## which is what stood between the horde and a few hundred bodies.
+## Built once per physics tick by the first scan, from LIVE positions, and
+## kept live for the rest of the tick (_follow_separation_grid). The scan
+## itself did not change: live positions, the same distance test, group
+## check, stacked nudge and falloff, so the neighbour set and every
+## contribution are what the full scan produced; only the order the
+## contributions are summed in differs (float rounding, ~1e-7).
+## Kept above every separation_radius in use (every scene keeps the 1.2 m
+## default; nothing sets it at runtime). A larger radius stays correct —
+## the scan just widens to as many rings as it needs.
+const SEPARATION_CELL_SIZE: float = 1.25
+## Cell (cx, cz) is packed as cx * STRIDE + cz. The packing is linear, so
+## a neighbour's key is a plain addition, and two cells could only alias
+## past 2^19 cells (~650 km) — where a scan would merely see EXTRA
+## candidates, which the exact distance test then rejects. Never fewer.
+const SEPARATION_KEY_STRIDE: int = 1 << 20
+static var _separation_grid: Dictionary = {}
+static var _separation_grid_frame: int = -1
+## The body whose movement this tick is not in the grid yet: the one whose
+## _physics_process ran last, if it was bucketed. At most one at a time.
+static var _separation_grid_pending: EnemyBase = null
+
 var _gravity: float = ProjectSettings.get_setting("physics/3d/default_gravity", 9.8)
 var _xp_multiplier: int = 1
 ## Map-tier XP gem value factor (see apply_tier_scaling); 1.0 = baseline.
@@ -99,6 +136,10 @@ var _poison_tick_timer: float = 0.0
 var _poison_overlay: StandardMaterial3D = null
 ## Last computed separation push, reused on this enemy's off ticks.
 var _separation_cache: Vector3 = Vector3.ZERO
+## This body's cell key in the separation grid, and the physics frame of
+## the grid it was bucketed into (-1: never bucketed).
+var _separation_key: int = 0
+var _separation_key_frame: int = -1
 ## Overlay slots in priority order: the elite glow outranks a sky variant,
 ## which outranks the poison tint. Every applier writes ITS OWN slot and
 ## calls _refresh_overlay(), so a temporary effect can never erase a
@@ -152,6 +193,10 @@ func _ready() -> void:
 
 
 func _physics_process(delta: float) -> void:
+	# First, before anything below can move this body: fold the previous
+	# body's movement into the separation grid and enrol this one.
+	if _separation_grid_frame == Engine.get_physics_frames():
+		_follow_separation_grid()
 	if _overlay_elite != null:
 		_tick_shiny(delta)
 	if not is_on_floor():
@@ -187,9 +232,14 @@ func _physics_process(delta: float) -> void:
 		steer = _movement_intent(seek, distance)
 		_combat_tick(player, distance)
 
-	# O(n^2) trim: each enemy recomputes separation every 2nd physics tick
-	# (staggered by instance id parity, so half the horde computes per tick)
-	# and reuses its cached push in between — indistinguishable at 60fps.
+	# Each enemy recomputes separation every 2nd physics tick (staggered by
+	# instance id parity, so half the horde computes per tick) and reuses
+	# its cached push in between — indistinguishable at 60fps.
+	# Bodies with no separation_strength (bosses, a burrowed Duneburrower)
+	# still compute on purpose: a Duneburrower that erupts on an off tick
+	# reads the push it cached while burrowed, now at full strength, so
+	# skipping them would change where it lands. On the grid the scan costs
+	# them a handful of neighbours, not the horde.
 	if (Engine.get_physics_frames() + get_instance_id()) & 1 == 0:
 		_separation_cache = _separation_push()
 	steer += _separation_cache * separation_strength
@@ -197,8 +247,9 @@ func _physics_process(delta: float) -> void:
 	if steer.length_squared() > 1.0:
 		steer = steer.normalized()
 	var slowed_speed := move_speed * active_slow_multiplier()
-	velocity.x = steer.x * slowed_speed
-	velocity.z = steer.z * slowed_speed
+	# One property write instead of two get/set round trips: `velocity.x =`
+	# reads the whole vector and writes it back. Same float32 values.
+	velocity = Vector3(steer.x * slowed_speed, velocity.y, steer.z * slowed_speed)
 
 	var face := _facing_direction(steer, seek)
 	if face.length_squared() > 0.0001:
@@ -210,8 +261,17 @@ func _physics_process(delta: float) -> void:
 	move_and_slide()
 	_clamp_solver_launch()
 	if _arena_limit != INF:
-		global_position.x = clampf(global_position.x, -_arena_limit, _arena_limit)
-		global_position.z = clampf(global_position.z, -_arena_limit, _arena_limit)
+		# Written only when the clamp actually bites (rarely: a climber on
+		# the perimeter). Each `global_position.x =` was a full global
+		# transform set, re-propagated through the rig and re-sent to the
+		# physics server, twice per enemy per tick even when it changed
+		# nothing. The enemy's parents carry no transform, so the old
+		# no-op writes stored exactly the value already there.
+		var at := global_position
+		var clamped_x := clampf(at.x, -_arena_limit, _arena_limit)
+		var clamped_z := clampf(at.z, -_arena_limit, _arena_limit)
+		if clamped_x != at.x or clamped_z != at.z:
+			global_position = Vector3(clamped_x, at.y, clamped_z)
 
 
 ## Who this body fights. The base answer is the nearest standing raider;
@@ -225,14 +285,18 @@ func _pick_target() -> Node3D:
 
 
 ## Nearest live enemy within POSSESSED_SEEK_RANGE, for a servant.
+## The LIVE group on purpose, not the per-tick snapshot: a body that joins
+## "enemies" mid-tick (a fresh spawn, a worm resurfacing) has to be a
+## target on this very tick, as it always was.
 func _nearest_enemy() -> Node3D:
 	var best: Node3D = null
 	var best_distance := POSSESSED_SEEK_RANGE * POSSESSED_SEEK_RANGE
-	for node: Node in get_tree().get_nodes_in_group("enemies"):
+	var here := global_position
+	for node: Node in get_tree().get_nodes_in_group(&"enemies"):
 		var body := node as Node3D
 		if body == null or not body.is_inside_tree():
 			continue
-		var distance := global_position.distance_squared_to(body.global_position)
+		var distance := here.distance_squared_to(body.global_position)
 		if distance <= best_distance:
 			best_distance = distance
 			best = body
@@ -742,31 +806,115 @@ func death_burst_color() -> Color:
 
 
 ## Sums push-away vectors from living "enemies" within separation_radius,
-## with falloff (strongest when overlapping, zero at the edge). O(n^2) over
-## the horde, halved by the caller's tick stagger and served from the
-## shared per-tick group snapshot.
+## with falloff (strongest when overlapping, zero at the edge). Only the
+## cells around this body are visited (see SEPARATION_CELL_SIZE); every
+## test below is the one the full-horde scan ran, on live positions.
 func _separation_push() -> Vector3:
+	var grid := _separation_grid_this_tick(get_tree(), self)
 	var push := Vector3.ZERO
-	for enemy: Node in _enemies_this_tick(get_tree()):
-		var other := enemy as Node3D
-		if other == null or other == self or not other.is_inside_tree():
-			continue
-		var away := global_position - other.global_position
-		away.y = 0.0
-		var dist := away.length()
-		if dist >= separation_radius:
-			continue
-		# Checked only for actual neighbours (the snapshot is taken once per
-		# tick, so a body that died EARLIER this tick is still in it and
-		# would keep shoving the horde around as a corpse).
-		if not other.is_in_group(&"enemies"):
-			continue
-		if dist < 0.01:
-			# Perfectly stacked bodies: nudge apart in a stable per-instance direction.
-			away = Vector3.RIGHT.rotated(Vector3.UP, float(get_instance_id() % 64) * TAU / 64.0)
-			dist = 0.01
-		push += (away / dist) * (1.0 - dist / separation_radius)
+	var here := global_position
+	# A neighbour passes the distance test only when it is closer than
+	# separation_radius on each flat axis, so one ring of cells covers any
+	# radius below the cell size (with ~4% to spare at 1.2 m, far above the
+	# float rounding of the cell index); a larger radius scans enough rings.
+	var rings := 1
+	if separation_radius >= SEPARATION_CELL_SIZE:
+		rings = ceili(separation_radius / SEPARATION_CELL_SIZE) + 1
+	var cell_x := floori(here.x / SEPARATION_CELL_SIZE)
+	var cell_z := floori(here.z / SEPARATION_CELL_SIZE)
+	for dx in range(-rings, rings + 1):
+		var column_key := (cell_x + dx) * SEPARATION_KEY_STRIDE + cell_z
+		for dz in range(-rings, rings + 1):
+			var cell: Variant = grid.get(column_key + dz)
+			if cell == null:
+				continue
+			# Typed loop: entries stay valid instances for the whole tick
+			# (frees are deferred), like the snapshot they came from.
+			for other: Node3D in cell:
+				if other == self or not other.is_inside_tree():
+					continue
+				var away := here - other.global_position
+				away.y = 0.0
+				var dist := away.length()
+				if dist >= separation_radius:
+					continue
+				# Checked only for actual neighbours (the snapshot is taken once
+				# per tick, so a body that died EARLIER this tick is still in it
+				# and would keep shoving the horde around as a corpse).
+				if not other.is_in_group(&"enemies"):
+					continue
+				if dist < 0.01:
+					# Perfectly stacked bodies: nudge apart in a stable per-instance direction.
+					away = Vector3.RIGHT.rotated(Vector3.UP, float(get_instance_id() % 64) * TAU / 64.0)
+					dist = 0.01
+				push += (away / dist) * (1.0 - dist / separation_radius)
 	return push
+
+
+## This tick's separation grid, built by the first scan that asks. Every
+## snapshot body is bucketed where it stands NOW: bodies that already ran
+## this tick have finished moving, and the rest are followed as they move
+## (_follow_separation_grid). `builder` is the scanning body, caught in
+## the middle of its own _physics_process with its move still ahead.
+static func _separation_grid_this_tick(tree: SceneTree, builder: EnemyBase) -> Dictionary:
+	var frame := Engine.get_physics_frames()
+	if frame == _separation_grid_frame:
+		return _separation_grid
+	_separation_grid_frame = frame
+	_separation_grid.clear()
+	for node: Node in _enemies_this_tick(tree):
+		var body := node as Node3D
+		# The scan skips off-tree bodies anyway, and they have no position.
+		if body == null or not body.is_inside_tree():
+			continue
+		var at := body.global_position
+		var key := floori(at.x / SEPARATION_CELL_SIZE) * SEPARATION_KEY_STRIDE \
+				+ floori(at.z / SEPARATION_CELL_SIZE)
+		var cell: Variant = _separation_grid.get(key)
+		if cell == null:
+			_separation_grid[key] = [body]
+		else:
+			(cell as Array).append(body)
+		var enemy := body as EnemyBase
+		if enemy != null:
+			enemy._separation_key = key
+			enemy._separation_key_frame = frame
+	_separation_grid_pending = builder if builder._separation_key_frame == frame else null
+	return _separation_grid
+
+
+## Keeps the grid true to live positions while bodies move during the
+## tick. A body moves only inside its own _physics_process (subclass work
+## included: BossBase clamps AFTER super()), and no scan can run between
+## the end of one body's _physics_process and the start of the next one's.
+## So re-bucketing the PREVIOUS body here, at the top of the next one, is
+## late enough to see all of its movement — a Fenwraith blink, a Grubthing
+## hop, the boss clamp — and early enough for every scan that follows.
+## Only called once this tick's grid exists.
+func _follow_separation_grid() -> void:
+	if is_instance_valid(_separation_grid_pending):
+		_rebucket_separation(_separation_grid_pending)
+	_separation_grid_pending = self if _separation_key_frame == _separation_grid_frame else null
+
+
+static func _rebucket_separation(body: EnemyBase) -> void:
+	# Off the tree its stale entry is harmless: the scan skips it.
+	if not body.is_inside_tree():
+		return
+	var at := body.global_position
+	var key := floori(at.x / SEPARATION_CELL_SIZE) * SEPARATION_KEY_STRIDE \
+			+ floori(at.z / SEPARATION_CELL_SIZE)
+	if key == body._separation_key:
+		return
+	var old_cell: Variant = _separation_grid.get(body._separation_key)
+	if old_cell != null:
+		(old_cell as Array).erase(body)
+	var cell: Variant = _separation_grid.get(key)
+	if cell == null:
+		_separation_grid[key] = [body]
+	else:
+		(cell as Array).append(body)
+	body._separation_key = key
 
 
 static func _enemies_this_tick(tree: SceneTree) -> Array[Node]:
@@ -894,15 +1042,40 @@ func _drop_powerup() -> void:
 
 
 ## Elite bounty chest (iteration 42): rarity rolled with a luck tilt that
-## grows with the run-wide difficulty.
+## grows with the run-wide difficulty. Skipped at BOUNTY_CHEST_CAP.
 func _drop_chest() -> void:
+	if bounty_chests_at_cap(get_tree()):
+		_capped_bounty_drops += 1
+		# One line per 25 swallowed drops: late in a run the cap can be hit
+		# several times a second, and the first line is what a soak greps.
+		if _capped_bounty_drops % 25 == 1:
+			print("Elite chest capped: %d unopened (x%d)" % [
+					BOUNTY_CHEST_CAP, _capped_bounty_drops])
+		return
 	var chest := spawn_chest(
 			global_position + Vector3(randf_range(-1.0, 1.0), 0.0, randf_range(-1.0, 1.0)),
 			ELITE_CHEST_LUCK_PER_DIFFICULTY * RunState.difficulty_bonus)
 	if chest != null:
+		chest.add_to_group(BOUNTY_CHEST_GROUP)
 		# A free chest has no rarity yet (it rolls when opened), so the log
 		# reports what it IS instead of an empty string.
 		print("Elite chest dropped: free")
+
+
+## Unopened bounty chests on the map. An opened one stays in the group
+## while it sinks (Chest._sink frees it at the end of its tween), so it is
+## `available` that decides, not membership.
+static func unopened_bounty_chests(tree: SceneTree) -> int:
+	var count := 0
+	for node: Node in tree.get_nodes_in_group(BOUNTY_CHEST_GROUP):
+		var chest := node as Interactable
+		if chest != null and chest.available:
+			count += 1
+	return count
+
+
+static func bounty_chests_at_cap(tree: SceneTree) -> bool:
+	return unopened_bounty_chests(tree) >= BOUNTY_CHEST_CAP
 
 
 ## Drops one chest at `at`, parented to the scene ROOT so it outlives the

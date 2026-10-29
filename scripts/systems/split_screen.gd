@@ -71,6 +71,11 @@ static func build(players: Array) -> SplitScreen:
 		# Shares the parent (root) viewport's World3D by default; only the
 		# camera is local to this view.
 		viewport.handle_input_locally = false
+		# The graphics preset's 3D scale lives on each viewport, and the
+		# root's never reaches a SubViewport: join the group Settings walks
+		# when the preset changes, and take the current one now.
+		viewport.add_to_group(Settings.WORLD_VIEW_GROUP)
+		Settings.apply_render_scale(viewport)
 		container.add_child(viewport)
 		var follow := Camera3D.new()
 		follow.fov = source.fov

@@ -1,6 +1,6 @@
 [gd_scene load_steps=3 format=3]
 
-[ext_resource type="Script" path="res://scripts/ui/pause_menu.gd" id="1_pausemenu"]
+[ext_resource type="Script" path="res://scripts/ui/game/pause_menu.gd" id="1_pausemenu"]
 [ext_resource type="PackedScene" path="res://scenes/ui/SettingsPanel.tscn" id="2_settingspanel"]
 
 [node name="PauseMenu" type="CanvasLayer"]

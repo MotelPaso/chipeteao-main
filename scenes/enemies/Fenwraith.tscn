@@ -26,11 +26,15 @@ material = SubResource("StandardMaterial3D_shroud")
 top_radius = 0.35
 bottom_radius = 1.5
 height = 2.6
+radial_segments = 32
+rings = 0
 
 [sub_resource type="SphereMesh" id="SphereMesh_hood"]
 material = SubResource("StandardMaterial3D_hood")
 radius = 0.75
 height = 1.5
+radial_segments = 24
+rings = 12
 
 [sub_resource type="BoxMesh" id="BoxMesh_eye"]
 material = SubResource("StandardMaterial3D_eye")

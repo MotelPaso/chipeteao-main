@@ -29,6 +29,8 @@ material = SubResource("StandardMaterial3D_stone_dark")
 top_radius = 0.85
 bottom_radius = 0.4
 height = 0.7
+radial_segments = 24
+rings = 0
 
 [sub_resource type="BoxMesh" id="BoxMesh_coffin"]
 material = SubResource("StandardMaterial3D_stone")
@@ -62,6 +64,8 @@ size = Vector3(0.14, 1.7, 0.1)
 material = SubResource("StandardMaterial3D_teal")
 radius = 0.09
 height = 0.18
+radial_segments = 8
+rings = 4
 
 [sub_resource type="CapsuleShape3D" id="CapsuleShape3D_boss"]
 radius = 1.05

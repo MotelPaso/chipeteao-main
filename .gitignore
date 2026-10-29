@@ -6,3 +6,8 @@ builds/
 .agents/
 .claude/skills/
 skills-lock.json
+graphify-out
+.opencode
+
+# builds
+chipeteao.exe

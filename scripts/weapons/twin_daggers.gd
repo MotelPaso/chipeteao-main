@@ -16,7 +16,7 @@ extends WeaponBase
 ## Seconds between the stabs a Tome of Multitude adds. Staggered, not
 ## simultaneous: this weapon is a rhythm of single cuts, and two stabs on
 ## the same body in the same frame read as one hit with a doubled number.
-const EXTRA_STAB_STAGGER: float = 0.07
+const EXTRA_STAB_STAGGER: float = 0.2
 ## The staggered chain has to end inside this fraction of one cooldown —
 ## with the daggers' very short cooldown this clamp is what keeps a big
 ## Multitude stack from queueing stabs into the next volley.

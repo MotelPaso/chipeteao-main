@@ -31,33 +31,45 @@ roughness = 1.0
 material = SubResource("StandardMaterial3D_larva")
 radius = 0.62
 height = 1.24
+radial_segments = 24
+rings = 12
 
 [sub_resource type="SphereMesh" id="SphereMesh_mid"]
 material = SubResource("StandardMaterial3D_larva")
 radius = 0.72
 height = 1.44
+radial_segments = 24
+rings = 12
 
 [sub_resource type="SphereMesh" id="SphereMesh_headg"]
 material = SubResource("StandardMaterial3D_larva")
 radius = 0.56
 height = 1.12
+radial_segments = 24
+rings = 12
 
 [sub_resource type="CylinderMesh" id="CylinderMesh_cap"]
 material = SubResource("StandardMaterial3D_cap")
 top_radius = 0.08
 bottom_radius = 0.5
 height = 0.3
+radial_segments = 16
+rings = 0
 
 [sub_resource type="CylinderMesh" id="CylinderMesh_capstem"]
 material = SubResource("StandardMaterial3D_stem")
 top_radius = 0.09
 bottom_radius = 0.11
 height = 0.18
+radial_segments = 8
+rings = 0
 
 [sub_resource type="SphereMesh" id="SphereMesh_eyeg"]
 material = SubResource("StandardMaterial3D_eye")
 radius = 0.09
 height = 0.18
+radial_segments = 8
+rings = 4
 
 [sub_resource type="BoxMesh" id="BoxMesh_brow"]
 material = SubResource("StandardMaterial3D_brow")
@@ -67,6 +79,8 @@ size = Vector3(0.2, 0.055, 0.08)
 material = SubResource("StandardMaterial3D_stem")
 radius = 0.09
 height = 0.36
+radial_segments = 8
+rings = 2
 
 [sub_resource type="CapsuleShape3D" id="CapsuleShape3D_grub"]
 radius = 0.78

@@ -71,6 +71,26 @@ fase_fin() {
 	printf '  (%d s)\n' "$(( SECONDS - FASE_INICIO ))"
 }
 
+# --- Tope de cofres de élite (iteración 64) ---------------------------------
+# Cada soak imprime `Probe bounty chests: max=N cap=M` al salir. Falla si la
+# línea falta o si hubo más cofres de élite SIN ABRIR que el tope a la vez.
+# El conteo no pasa por el tope (cuenta los cofres que hay), así que quitar
+# el tope se ve en cuanto un soak deja caer más de M — no en toda corrida:
+# de las dos que cerraron la iteración 64, el de etapa llegó a 30 en una y
+# a 6 en la otra.
+chequear_tope_cofres() {
+	local log="$1"
+	local tope
+	tope=$(sed -n 's/^Probe bounty chests: max=\([0-9]\{1,\}\) cap=\([0-9]\{1,\}\)$/\1 \2/p' "$log")
+	if [ -z "$tope" ]; then
+		echo "  FALLO: falta la línea 'Probe bounty chests:' del harness"
+		FALLOS=$((FALLOS + 1))
+	elif [ "${tope% *}" -gt "${tope#* }" ]; then
+		echo "  FALLO: max=${tope% *} cap=${tope#* } — más cofres de élite sin abrir que el tope"
+		FALLOS=$((FALLOS + 1))
+	fi
+}
+
 # --- Listas fijas de líneas esperadas ---------------------------------------
 # Se greppean UNA POR UNA, no por conteo: una comprobación que deja de
 # ejecutarse desaparece del log sin ruido, y un conteo la daría por buena
@@ -207,6 +227,8 @@ for ARENA in HollowWoods AshDunes Gloomfen; do
 	echo "  nivel=$NIVEL cofres=$CHESTS altares=$ALTARES portales=$PORTALES"
 	fase_fin
 
+	chequear_tope_cofres "$LOG"
+
 	# Cobertura: un soak que no sube de nivel ni toca un interactuable no
 	# probó gran cosa, aunque no haya reventado.
 	if [ "$NIVEL" -lt 3 ]; then
@@ -285,6 +307,7 @@ else
 	fi
 	# El director sobrevive al cambio de mapa: si no volviera a cachear
 	# el Sol de la arena nueva, este evento de cielo no saldría.
+	chequear_tope_cofres "$STAGE_LOG"
 	if [ "$CIELO_TRAS_AVANCE" -eq 0 ]; then
 		echo "  FALLO: ningún evento de cielo tras el cambio de etapa"
 		FALLOS=$((FALLOS + 1))
@@ -301,9 +324,12 @@ fi
 echo "== soak co-op (HollowWoods, 2 raiders, ${SECS}s de partida) =="
 fase
 COOP_LOG="$LOGDIR/soak_coop.log"
+# BONK_GRAPHICS=1 (iteración 64): el co-op corre en calidad Media porque
+# es el único soak con pantalla dividida, y el preset tiene que llegar a
+# las SubViewports además del sol de cada etapa.
 BONK_ARENA="res://scenes/world/HollowWoods.tscn" BONK_PLAYERS=2 BONK_STAGE_FAST=1 \
 	BONK_GODMODE=1 BONK_DOWN_NOW=45 BONK_SEED=4242 BONK_GAME_SEED=4242 \
-	BONK_SAVE_PATH="$(save_path_for coop)" \
+	BONK_GRAPHICS=1 BONK_SAVE_PATH="$(save_path_for coop)" \
 	godot --headless --fixed-fps 60 --quit-after "$FRAMES" \
 	res://scenes/tests/ArenaProbe.tscn >"$COOP_LOG" 2>&1
 
@@ -347,6 +373,13 @@ else
 	fi
 	if grep -q '^Probe fog: skipped' "$COOP_LOG"; then
 		echo "  FALLO: la partida godmode terminó sola"
+		FALLOS=$((FALLOS + 1))
+	fi
+	chequear_tope_cofres "$COOP_LOG"
+	# El preset Media aplicado a un sol real con las dos vistas ya armadas.
+	if ! grep -q '^Graphics: quality=1 scale=0.75 suns=1 views=2$' "$COOP_LOG"; then
+		echo "  FALLO: el preset gráfico no llegó al sol y a las dos vistas"
+		grep -n '^Graphics: ' "$COOP_LOG" | head -5
 		FALLOS=$((FALLOS + 1))
 	fi
 fi

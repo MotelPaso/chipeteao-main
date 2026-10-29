@@ -34,6 +34,11 @@ func _ready() -> void:
 	_shell_mesh = SphereMesh.new()
 	_shell_mesh.radius = 1.0
 	_shell_mesh.height = 2.0
+	# Explicit tessellation: a double-sided alpha shell can fill the whole
+	# screen around the carrier, and at the engine default (64 x 32) every
+	# pulse drew ~4.2k overlapping transparent triangles.
+	_shell_mesh.radial_segments = 24
+	_shell_mesh.rings = 12
 	var material := StandardMaterial3D.new()
 	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA

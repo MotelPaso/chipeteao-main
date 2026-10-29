@@ -15,8 +15,11 @@ emission_energy_multiplier = 1.2
 top_radius = 1.0
 bottom_radius = 1.0
 height = 0.05
+radial_segments = 64
+rings = 1
 
 [node name="TelegraphDisc" type="MeshInstance3D"]
 material_override = SubResource("StandardMaterial3D_disc")
+cast_shadow = 0
 mesh = SubResource("CylinderMesh_disc")
 script = ExtResource("1_disc")

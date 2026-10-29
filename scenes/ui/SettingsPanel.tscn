@@ -1,6 +1,6 @@
 [gd_scene load_steps=2 format=3]
 
-[ext_resource type="Script" path="res://scripts/ui/settings_panel.gd" id="1_settings"]
+[ext_resource type="Script" path="res://scripts/ui/meta/settings_panel.gd" id="1_settings"]
 
 [node name="SettingsPanel" type="Control"]
 anchor_right = 1.0
@@ -20,7 +20,7 @@ anchor_bottom = 1.0
 unique_name_in_owner = true
 
 [node name="VBox" type="VBoxContainer" parent="Center/Panel"]
-theme_override_constants/separation = 18
+theme_override_constants/separation = 12
 
 [node name="TitleLabel" type="Label" parent="Center/Panel/VBox"]
 unique_name_in_owner = true
@@ -33,46 +33,62 @@ text = "AJUSTES"
 theme_override_constants/separation = 16
 
 [node name="SfxLabel" type="Label" parent="Center/Panel/VBox/SfxRow"]
-custom_minimum_size = Vector2(180, 0)
+custom_minimum_size = Vector2(200, 0)
 theme_override_colors/font_color = Color(0.85, 0.87, 0.9, 1)
 theme_override_font_sizes/font_size = 16
 text = "Volumen de efectos"
 
 [node name="SfxSlider" type="HSlider" parent="Center/Panel/VBox/SfxRow"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(260, 0)
+custom_minimum_size = Vector2(240, 0)
 size_flags_vertical = 4
 max_value = 100.0
 value = 100.0
+
+[node name="SfxValue" type="Label" parent="Center/Panel/VBox/SfxRow"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(56, 0)
+theme_override_colors/font_color = Color(0.55, 0.8, 0.92, 1)
+theme_override_font_sizes/font_size = 16
+horizontal_alignment = 2
+text = "100%"
 
 [node name="AmbientRow" type="HBoxContainer" parent="Center/Panel/VBox"]
 theme_override_constants/separation = 16
 
 [node name="AmbientLabel" type="Label" parent="Center/Panel/VBox/AmbientRow"]
-custom_minimum_size = Vector2(180, 0)
+custom_minimum_size = Vector2(200, 0)
 theme_override_colors/font_color = Color(0.85, 0.87, 0.9, 1)
 theme_override_font_sizes/font_size = 16
 text = "Volumen ambiente"
 
 [node name="AmbientSlider" type="HSlider" parent="Center/Panel/VBox/AmbientRow"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(260, 0)
+custom_minimum_size = Vector2(240, 0)
 size_flags_vertical = 4
 max_value = 100.0
 value = 100.0
+
+[node name="AmbientValue" type="Label" parent="Center/Panel/VBox/AmbientRow"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(56, 0)
+theme_override_colors/font_color = Color(0.55, 0.8, 0.92, 1)
+theme_override_font_sizes/font_size = 16
+horizontal_alignment = 2
+text = "100%"
 
 [node name="SensitivityRow" type="HBoxContainer" parent="Center/Panel/VBox"]
 theme_override_constants/separation = 16
 
 [node name="SensitivityLabel" type="Label" parent="Center/Panel/VBox/SensitivityRow"]
-custom_minimum_size = Vector2(180, 0)
+custom_minimum_size = Vector2(200, 0)
 theme_override_colors/font_color = Color(0.85, 0.87, 0.9, 1)
 theme_override_font_sizes/font_size = 16
 text = "Sensibilidad del mouse"
 
 [node name="SensitivitySlider" type="HSlider" parent="Center/Panel/VBox/SensitivityRow"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(200, 0)
+custom_minimum_size = Vector2(240, 0)
 size_flags_vertical = 4
 min_value = 0.3
 max_value = 2.0
@@ -81,7 +97,7 @@ value = 1.0
 
 [node name="SensitivityValue" type="Label" parent="Center/Panel/VBox/SensitivityRow"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(52, 0)
+custom_minimum_size = Vector2(56, 0)
 theme_override_colors/font_color = Color(0.55, 0.8, 0.92, 1)
 theme_override_font_sizes/font_size = 16
 horizontal_alignment = 2
@@ -91,25 +107,60 @@ text = "1.00x"
 theme_override_constants/separation = 16
 
 [node name="FullscreenLabel" type="Label" parent="Center/Panel/VBox/FullscreenRow"]
-custom_minimum_size = Vector2(180, 0)
+custom_minimum_size = Vector2(200, 0)
 theme_override_colors/font_color = Color(0.85, 0.87, 0.9, 1)
 theme_override_font_sizes/font_size = 16
 text = "Pantalla completa"
 
 [node name="FullscreenCheck" type="CheckButton" parent="Center/Panel/VBox/FullscreenRow"]
 unique_name_in_owner = true
+size_flags_horizontal = 10
 
 [node name="FpsRow" type="HBoxContainer" parent="Center/Panel/VBox"]
 theme_override_constants/separation = 16
 
 [node name="FpsLabel" type="Label" parent="Center/Panel/VBox/FpsRow"]
-custom_minimum_size = Vector2(180, 0)
+custom_minimum_size = Vector2(200, 0)
 theme_override_colors/font_color = Color(0.85, 0.87, 0.9, 1)
 theme_override_font_sizes/font_size = 16
 text = "Mostrar FPS"
 
 [node name="FpsCheck" type="CheckButton" parent="Center/Panel/VBox/FpsRow"]
 unique_name_in_owner = true
+size_flags_horizontal = 10
+
+[node name="QualityRow" type="HBoxContainer" parent="Center/Panel/VBox"]
+theme_override_constants/separation = 16
+
+[node name="QualityLabel" type="Label" parent="Center/Panel/VBox/QualityRow"]
+custom_minimum_size = Vector2(180, 0)
+theme_override_colors/font_color = Color(0.85, 0.87, 0.9, 1)
+theme_override_font_sizes/font_size = 16
+text = "Calidad gráfica"
+
+[node name="QualityButtons" type="HBoxContainer" parent="Center/Panel/VBox/QualityRow"]
+theme_override_constants/separation = 8
+
+[node name="QualityHigh" type="Button" parent="Center/Panel/VBox/QualityRow/QualityButtons"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(82, 34)
+theme_override_font_sizes/font_size = 15
+toggle_mode = true
+text = "Alta"
+
+[node name="QualityMedium" type="Button" parent="Center/Panel/VBox/QualityRow/QualityButtons"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(82, 34)
+theme_override_font_sizes/font_size = 15
+toggle_mode = true
+text = "Media"
+
+[node name="QualityLow" type="Button" parent="Center/Panel/VBox/QualityRow/QualityButtons"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(82, 34)
+theme_override_font_sizes/font_size = 15
+toggle_mode = true
+text = "Baja"
 
 [node name="BackButton" type="Button" parent="Center/Panel/VBox"]
 unique_name_in_owner = true

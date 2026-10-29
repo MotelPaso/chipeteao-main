@@ -24,22 +24,30 @@ emission_energy_multiplier = 1.8
 material = SubResource("StandardMaterial3D_robe")
 radius = 0.28
 height = 1.1
+radial_segments = 24
+rings = 6
 
 [sub_resource type="CylinderMesh" id="CylinderMesh_hood"]
 material = SubResource("StandardMaterial3D_hood")
 top_radius = 0.0
 bottom_radius = 0.3
 height = 0.55
+radial_segments = 16
+rings = 0
 
 [sub_resource type="SphereMesh" id="SphereMesh_orb"]
 material = SubResource("StandardMaterial3D_glow")
 radius = 0.09
 height = 0.18
+radial_segments = 8
+rings = 4
 
 [sub_resource type="SphereMesh" id="SphereMesh_eye"]
 material = SubResource("StandardMaterial3D_glow")
 radius = 0.05
 height = 0.1
+radial_segments = 8
+rings = 4
 
 [sub_resource type="CapsuleShape3D" id="CapsuleShape3D_skirmisher"]
 radius = 0.32
@@ -69,10 +77,12 @@ mesh = SubResource("CylinderMesh_hood")
 
 [node name="EyeL" type="MeshInstance3D" parent="Visual"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.09, 1.16, -0.23)
+cast_shadow = 0
 mesh = SubResource("SphereMesh_eye")
 
 [node name="EyeR" type="MeshInstance3D" parent="Visual"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.09, 1.16, -0.23)
+cast_shadow = 0
 mesh = SubResource("SphereMesh_eye")
 
 [node name="Orb" type="MeshInstance3D" parent="Visual"]

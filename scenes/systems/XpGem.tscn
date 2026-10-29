@@ -1,6 +1,6 @@
 [gd_scene load_steps=5 format=3]
 
-[ext_resource type="Script" path="res://scripts/systems/xp_gem.gd" id="1_gem"]
+[ext_resource type="Script" path="res://scripts/systems/pickups/xp_gem.gd" id="1_gem"]
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_gem"]
 albedo_color = Color(0.35, 0.95, 0.6, 1)
@@ -23,6 +23,7 @@ radius = 0.5
 [node name="XpGem" type="Area3D" groups=["xp_gems"]]
 collision_layer = 0
 collision_mask = 1
+monitorable = false
 script = ExtResource("1_gem")
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="."]
@@ -32,4 +33,5 @@ shape = SubResource("SphereShape3D_pickup")
 
 [node name="Crystal" type="MeshInstance3D" parent="Visual"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.05, 0)
+cast_shadow = 0
 mesh = SubResource("SphereMesh_crystal")

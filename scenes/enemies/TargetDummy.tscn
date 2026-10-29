@@ -11,6 +11,8 @@ roughness = 0.85
 material = SubResource("StandardMaterial3D_dummy")
 radius = 0.45
 height = 1.7
+radial_segments = 24
+rings = 6
 
 [sub_resource type="CapsuleShape3D" id="CapsuleShape3D_dummy"]
 radius = 0.45
