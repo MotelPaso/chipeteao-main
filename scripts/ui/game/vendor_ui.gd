@@ -324,6 +324,11 @@ func _build_card(offer: Dictionary, index: int) -> Button:
 	card.custom_minimum_size = CARD_SIZE
 	UiTheme.style_card(card, tint)
 	card.pressed.connect(_on_buy.bind(index))
+	# Coming back up from Salir lands on the card the player left, not on
+	# whichever card happens to sit nearest the button's centre.
+	card.focus_entered.connect(func() -> void:
+		if _close_button != null:
+			_close_button.focus_neighbor_top = _close_button.get_path_to(card))
 	var box := CardFactory.card_box(card)
 	var title := CardFactory.label(String(offer.title), 16, UiTheme.TEXT_BRIGHT)
 	title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -384,6 +389,8 @@ func _build_buttons(box: VBoxContainer) -> void:
 	UiTheme.style_button(_close_button)
 	_close_button.pressed.connect(_close)
 	buttons.add_child(_close_button)
+	# Button prompts under the buttons; they follow the last device used.
+	box.add_child(InputHints.build([["ui_accept", "Comprar"], ["ui_cancel", "Salir"]]))
 
 
 ## With the tree paused and the mouse free, a pad or keyboard player still

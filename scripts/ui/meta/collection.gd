@@ -103,12 +103,12 @@ func _build_rows(list_node: VBoxContainer) -> void:
 
 
 func _section_header(title: String) -> Label:
-	var label := Label.new()
-	label.text = title
-	label.add_theme_font_override("font", UiTheme.spaced_font(3))
-	label.add_theme_font_size_override("font_size", 16)
-	label.add_theme_color_override("font_color", UiTheme.ACCENT_AMBER)
-	return label
+	var header := Label.new()
+	header.text = title
+	header.add_theme_font_override("font", UiTheme.spaced_font(3))
+	header.add_theme_font_size_override("font_size", 16)
+	header.add_theme_color_override("font_color", UiTheme.ACCENT_AMBER)
+	return header
 
 
 func _row(title: String, detail: String, accent: Color) -> PanelContainer:

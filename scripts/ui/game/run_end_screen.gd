@@ -69,6 +69,8 @@ func _ready() -> void:
 	# Re-centering on every resize keeps the scale-in anchored on the
 	# headline instead of sliding it across the screen.
 	_title_label.resized.connect(_center_title_pivot)
+	# Button prompt under the buttons; it follows the last device used.
+	_buttons_row.get_parent().add_child(InputHints.build([["ui_accept", "Elegir"]]))
 	_retry_button.pressed.connect(_on_retry_pressed)
 	_change_character_button.pressed.connect(_on_change_character_pressed)
 	_quit_button.pressed.connect(_on_quit_pressed)

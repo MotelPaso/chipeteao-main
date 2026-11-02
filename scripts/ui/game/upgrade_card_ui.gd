@@ -79,6 +79,8 @@ func _ready() -> void:
 	add_to_group("ui_blocking")
 	RunState.leveled_up.connect(_on_leveled_up)
 	UiTheme.style_title(_level_label, 34, Color(0.96, 0.93, 0.82), 4, 8)
+	# Button prompt under the cards; it follows the last device used.
+	_level_label.get_parent().add_child(InputHints.build([["ui_accept", "Elegir"]]))
 	for i in _cards.size():
 		_cards[i].pressed.connect(_on_card_pressed.bind(i))
 		UiTheme.attach_motion(_cards[i], 1.05, 0.97)

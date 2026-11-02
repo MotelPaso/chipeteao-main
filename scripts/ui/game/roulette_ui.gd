@@ -189,6 +189,8 @@ func _build_buttons(box: VBoxContainer) -> void:
 	UiTheme.style_button(_close_button)
 	_close_button.pressed.connect(_close)
 	buttons.add_child(_close_button)
+	# Button prompts under the buttons; they follow the last device used.
+	box.add_child(InputHints.build([["ui_accept", "Elegir"], ["ui_cancel", "Salir"]]))
 	_spin_button.grab_focus()
 
 
@@ -271,9 +273,9 @@ func _sweep_delays(steps: int) -> PackedFloat32Array:
 		var weight := lerpf(SWEEP_EASE_MIN, SWEEP_EASE_MAX, t * t)
 		delays.append(weight)
 		total += weight
-	var scale := maxf(sweep_time, 0.1) / maxf(total, 0.001)
+	var delay_scale := maxf(sweep_time, 0.1) / maxf(total, 0.001)
 	for i in delays.size():
-		delays[i] *= scale
+		delays[i] *= delay_scale
 	return delays
 
 

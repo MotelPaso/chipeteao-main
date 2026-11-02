@@ -26,11 +26,16 @@ const CARD_MARGIN_V := 10.0
 ## otherwise open as a slideshow.
 const ENTRANCE_ROWS := 8
 const COUNT_TIME := 0.4
+## Pixels one ui_up / ui_down press scrolls the list when there is no row
+## button to move the focus to (see _input).
+const SCROLL_STEP := 110
 
 @onready var _title_label: Label = %TitleLabel
 @onready var _badge_label: Label = %BadgeLabel
 @onready var _list: VBoxContainer = %List
 @onready var _back_button: Button = %BackButton
+## The list's ScrollContainer (every MetaScreen scene puts %List in one).
+@onready var _scroll: ScrollContainer = _list.get_parent() as ScrollContainer
 
 var _count_tween: Tween = null
 
@@ -43,6 +48,12 @@ func _ready() -> void:
 	_badge_label.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	UiTheme.style_button(_back_button, UiTheme.ACCENT, true)
 	_back_button.pressed.connect(_on_back_pressed)
+	# Button prompts under Volver; they follow the last device used.
+	_back_button.get_parent().add_child(InputHints.build([
+			["ui_accept", "Elegir"], ["ui_cancel", "Volver"]]))
+	if _scroll != null:
+		# A pad walking the row buttons must see the one it lands on.
+		_scroll.follow_focus = true
 	if _tracks_shards():
 		SaveData.shards_changed.connect(_on_shards_changed)
 		refresh_badge()
@@ -63,6 +74,43 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed("ui_cancel"):
 		_on_back_pressed()
 		get_viewport().set_input_as_handled()
+
+
+## Pad / arrow-key scrolling. Focus can only walk BUTTONS, and most rows
+## have none (the whole Collection, every quest not yet claimable), so a
+## pad player used to be stuck on the first screenful of the list. Up/down
+## now scroll the list whenever moving the focus would skip rows that are
+## still out of view:
+##   - a list with no buttons: always (Volver keeps the focus);
+##   - down from the LAST row button / up from the FIRST one: while there
+##     is list left in that direction, then on to Volver as usual.
+## Runs in _input, before the GUI moves the focus, so it can take the
+## press first.
+func _input(event: InputEvent) -> void:
+	if _scroll == null or not is_visible_in_tree():
+		return
+	var direction := 0
+	if event.is_action_pressed("ui_down", true):
+		direction = 1
+	elif event.is_action_pressed("ui_up", true):
+		direction = -1
+	if direction == 0 or not _can_scroll(direction):
+		return
+	var buttons := _row_buttons()
+	var focus_owner := get_viewport().gui_get_focus_owner()
+	var at_list_edge: bool = buttons.is_empty() \
+			or (direction == 1 and focus_owner == buttons.back()) \
+			or (direction == -1 and focus_owner == buttons.front())
+	if at_list_edge:
+		_scroll.scroll_vertical += direction * SCROLL_STEP
+		get_viewport().set_input_as_handled()
+
+
+func _can_scroll(direction: int) -> bool:
+	var bar := _scroll.get_v_scroll_bar()
+	if direction > 0:
+		return _scroll.scroll_vertical < int(bar.max_value - bar.page)
+	return _scroll.scroll_vertical > 0
 
 
 func _on_back_pressed() -> void:
@@ -146,11 +194,57 @@ func reject(row: Control) -> void:
 ## the container until the frame ends, so appending the new rows first
 ## would double the container's height for one frame and make the
 ## ScrollContainer jump away from the row the player just used.
+##
+## Focus survives the rebuild: the button a pad player just pressed (Buy,
+## Claim) is one of the rows being freed, and without this the focus died
+## with it — after one purchase the pad could not do anything else until
+## the mouse clicked something.
 func rebuild() -> void:
+	var focused_slot := -1
+	var focus_owner := get_viewport().gui_get_focus_owner()
+	if focus_owner is Button:
+		focused_slot = _row_buttons().find(focus_owner as Button)
 	for child: Node in _list.get_children():
 		_list.remove_child(child)
 		child.queue_free()
 	_build_rows(_list)
+	var buttons := _link_row_focus()
+	if focused_slot >= 0:
+		if buttons.is_empty():
+			_back_button.grab_focus()
+		else:
+			buttons[mini(focused_slot, buttons.size() - 1)].grab_focus()
+
+
+## Every button the rows hold (Buy, Claim), top to bottom.
+func _row_buttons() -> Array[Button]:
+	var buttons: Array[Button] = []
+	for node: Node in _list.find_children("*", "Button", true, false):
+		var button := node as Button
+		if button.focus_mode != Control.FOCUS_NONE:
+			buttons.append(button)
+	return buttons
+
+
+## Chains the row buttons and Volver into one loop for the pad: down walks
+## the rows in order and lands on Volver, up from Volver goes to the last
+## row. Left to Godot's nearest-control search, the last row (half hidden
+## under the list's bottom edge) lost to Volver, which sat closer on
+## screen, and could never be reached.
+func _link_row_focus() -> Array[Button]:
+	var buttons := _row_buttons()
+	if buttons.is_empty():
+		_back_button.focus_neighbor_top = NodePath()
+		_back_button.focus_neighbor_bottom = NodePath()
+		return buttons
+	var loop: Array[Control] = []
+	loop.append_array(buttons)
+	loop.append(_back_button)
+	for i in loop.size():
+		var here := loop[i]
+		here.focus_neighbor_top = here.get_path_to(loop[(i - 1 + loop.size()) % loop.size()])
+		here.focus_neighbor_bottom = here.get_path_to(loop[(i + 1) % loop.size()])
+	return buttons
 
 
 ## Staggered fade-in of the topmost rows. Bails out on an empty list: a

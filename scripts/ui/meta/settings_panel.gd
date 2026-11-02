@@ -53,6 +53,10 @@ func _ready() -> void:
 		button.button_group = quality_group
 		button.toggled.connect(_on_quality_toggled.bind(index))
 	_back_button.pressed.connect(close)
+	_link_focus()
+	# Button prompts under Volver; they follow the last device used.
+	_back_button.get_parent().add_child(InputHints.build([
+			["ui_accept", "Elegir"], ["ui_cancel", "Volver"]]))
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -105,6 +109,54 @@ func _refresh_controls() -> void:
 		_quality_buttons[index].set_pressed_no_signal(index == SaveData.graphics_quality)
 	_refresh_sensitivity_label(_sensitivity_slider.value)
 	_refresh_volume_labels()
+	_aim_at_chosen_quality()
+
+
+## Pad / keyboard navigation, wired by hand. Left to Godot's nearest-
+## control search, ui_up from Volver jumped to the character cards BEHIND
+## this panel on the select screen (they are focusable and, measured edge
+## to edge, closer than the rows above it), so a pad player could neither
+## reach a single setting nor get back. Each row now names its neighbours
+## explicitly and the column wraps, so focus can never leave the panel:
+##   Efectos ↕ Ambiente ↕ Sensibilidad ↕ Pantalla completa ↕ FPS
+##   ↕ Calidad (Alta ↔ Media ↔ Baja) ↕ Volver ↕ (back to Efectos)
+## Left/right on a slider moves its value (HSlider handles that itself);
+## on a single control it goes nowhere instead of out of the panel.
+func _link_focus() -> void:
+	var column: Array[Control] = [_sfx_slider, _ambient_slider,
+			_sensitivity_slider, _fullscreen_check, _fps_check,
+			_quality_buttons[0], _back_button]
+	for i in column.size():
+		var here := column[i]
+		var above := column[(i - 1 + column.size()) % column.size()]
+		var below := column[(i + 1) % column.size()]
+		here.focus_neighbor_top = here.get_path_to(above)
+		here.focus_neighbor_bottom = here.get_path_to(below)
+		here.focus_previous = here.get_path_to(above)
+		here.focus_next = here.get_path_to(below)
+		here.focus_neighbor_left = here.get_path_to(here)
+		here.focus_neighbor_right = here.get_path_to(here)
+	# The quality row: every button shares the rows above and below, and
+	# left/right walk the row without wrapping out of it.
+	for i in _quality_buttons.size():
+		var button := _quality_buttons[i]
+		button.focus_neighbor_top = button.get_path_to(_fps_check)
+		button.focus_neighbor_bottom = button.get_path_to(_back_button)
+		button.focus_neighbor_left = button.get_path_to(_quality_buttons[maxi(i - 1, 0)])
+		button.focus_neighbor_right = button.get_path_to(
+				_quality_buttons[mini(i + 1, _quality_buttons.size() - 1)])
+	_aim_at_chosen_quality()
+
+
+## Coming into the quality row from above or below lands on the preset
+## that is ON, not always on Alta.
+func _aim_at_chosen_quality() -> void:
+	var chosen := _quality_buttons[0]
+	for button in _quality_buttons:
+		if button.button_pressed:
+			chosen = button
+	_fps_check.focus_neighbor_bottom = _fps_check.get_path_to(chosen)
+	_back_button.focus_neighbor_top = _back_button.get_path_to(chosen)
 
 
 func _refresh_sensitivity_label(value: float) -> void:
@@ -146,6 +198,7 @@ func _on_fps_toggled(on: bool) -> void:
 func _on_quality_toggled(on: bool, index: int) -> void:
 	if on:
 		Settings.set_graphics_quality(index)
+		_aim_at_chosen_quality()
 
 
 ## Slider bounds come from the code that clamps the stored values, not

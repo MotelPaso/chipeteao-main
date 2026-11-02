@@ -31,7 +31,7 @@ extends Node
 ## It presses the REAL controls: buttons by unique name resolved against
 ## their own owner (%SettingsButton exists in both CharacterSelect.tscn
 ## and PauseMenu.tscn), by text only for the ones built in code, and
-## ui_cancel as a parsed InputEventAction with the release on a LATER
+## pause_game as a parsed InputEventAction with the release on a LATER
 ## frame. It never calls an underscore handler: a test that calls
 ## _on_card_pressed directly proves the method exists, not that the
 ## button reaches it.
@@ -313,12 +313,14 @@ class Driver extends Node:
 					return false
 				return RunState.run_time >= RUN_TIME_TARGET
 
-	## Esc opens the pause menu through its own _unhandled_input, which is
-	## the only path that exists: _open() is private.
+	## pause_game (Esc / Start) opens the pause menu through its own
+	## _unhandled_input, which is the only path that exists: _open() is
+	## private. It was ui_cancel until the pause moved to its own action
+	## for the gamepad; ui_cancel (B) no longer opens it, only closes it.
 	func _step_pause_open() -> bool:
 		match _phase:
 			0:
-				_send_action(&"ui_cancel", true)
+				_send_action(&"pause_game", true)
 				_phase = 1
 				return false
 			_:
