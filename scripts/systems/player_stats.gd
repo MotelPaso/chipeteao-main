@@ -9,7 +9,7 @@ extends Node
 ## Health, and UpgradePool reads luck when rolling card rarities.
 
 ## Crit damage multiplier before any Tome of Ruin bonuses.
-@export var base_crit_damage: float = 2.0
+@export var base_crit_damage: float = 5.0
 ## Baseline luck (rarity tilt points) before any bonuses.
 @export var base_luck: float = 0.0
 ## Stacked haste can never push the global cooldown multiplier below this.

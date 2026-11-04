@@ -1,7 +1,7 @@
-[gd_scene load_steps=2 format=3]
+[gd_scene format=3 uid="uid://5iacvm5rovc3"]
 
-[ext_resource type="Script" path="res://scenes/tests/terrain_shots.gd" id="1"]
+[ext_resource type="Script" uid="uid://baq60st52pepb" path="res://scenes/tests/terrain_shots.gd" id="1"]
 
-[node name="TerrainShots" type="Node"]
+[node name="TerrainShots" type="Node" unique_id=402503663]
 process_mode = 3
 script = ExtResource("1")

@@ -75,7 +75,7 @@ const ELITE_CHANCE_CAP: float = 0.6
 @export var tank_scene: PackedScene
 @export var sunspitter_scene: PackedScene
 @export var burrower_scene: PackedScene
-@export var max_active: int = 80
+@export var max_active: int = 240
 @export_group("Power-ups")
 ## Base chance ONE kill drops a temporary power-up. Tiny on purpose: a
 ## power-up has to read as an event. The raider's own powerup_drop_chance
@@ -86,6 +86,7 @@ const ELITE_CHANCE_CAP: float = 0.6
 @export_group("Spawn Ring")
 @export var min_radius: float = 18.0
 @export var max_radius: float = 25.0
+@export var spawn_count_multiplier: float = 6.0
 ## Half-size of the floor plate, minus arena_edge_margin, so ring spawns
 ## near an arena edge still land on the floor. Fallback only: re-derived
 ## at ready from the map's "arena_bounds" node (the scatter node's
@@ -148,7 +149,7 @@ const ELITE_CHANCE_CAP: float = 0.6
 @export var horde_waves: int = 4
 @export var horde_wave_gap: float = 1.6
 ## Hordes may push the live count this far past max_active.
-@export var horde_overflow: int = 40
+@export var horde_overflow: int = 120
 @export var horde_warning_text: String = "¡Se acerca una horda!"
 @export_group("Co-op Scaling")
 ## Extra pressure per player beyond the first: HP so shared firepower
@@ -226,7 +227,7 @@ const ELITE_CHANCE_CAP: float = 0.6
 ## a saturated late arena answers a charged altar (or an announced elite
 ## pack) with exactly zero enemies, so the promised threat — and its
 ## bounty — never shows up.
-@export var pressure_overflow: int = 8
+@export var pressure_overflow: int = 24
 @export_group("Sky Events")
 ## Eclipse: the stream arrives this many times faster and its spawns carry
 ## this much more HP. Blood moon: spawns hit this much harder.
@@ -525,7 +526,8 @@ func _tick_hordes(delta: float) -> void:
 	_hordes_fired += 1
 	var size := int((float(horde_base_size) + horde_size_per_minute * _minutes())
 			* (1.0 + RunState.difficulty_bonus) * (1.0 + 0.3 * _coop_extra_alive())
-			* (endless_horde_mult if RunState.stage_cleared else 1.0))
+			* (endless_horde_mult if RunState.stage_cleared else 1.0)
+			* spawn_count_multiplier)
 	_horde_wave_size = maxi(ceili(float(size) / float(maxi(horde_waves, 1))), 1)
 	_horde_waves_left = horde_waves
 	_horde_wave_timer = 0.0
@@ -538,7 +540,8 @@ func _tick_hordes(delta: float) -> void:
 
 
 func current_count_per_tick() -> int:
-	return base_count_per_tick + int(_minutes() * extra_count_per_minute)
+	var base := base_count_per_tick + int(_minutes() * extra_count_per_minute)
+	return maxi(roundi(float(base) * spawn_count_multiplier), 1)
 
 
 ## The phase table this arena's preset selects.

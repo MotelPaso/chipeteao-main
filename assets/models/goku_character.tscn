@@ -1,0 +1,10 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="PackedScene" path="res://assets/models/goku.glb" id="1_goku"]
+[ext_resource type="Script" path="res://assets/models/goku_walk_animation.gd" id="2_walk"]
+
+[node name="GokuCharacter" type="Node3D"]
+script = ExtResource("2_walk")
+
+[node name="Goku" parent="." instance=ExtResource("1_goku")]
+transform = Transform3D(-0.85, 0, 0, 0, 0.85, 0, 0, 0, -0.85, 0, 0, 0)

@@ -1,8 +1,8 @@
-[gd_scene load_steps=2 format=3]
+[gd_scene format=3 uid="uid://c3uaxsk406ug4"]
 
-[ext_resource type="Script" path="res://scripts/weapons/slime_trail.gd" id="1_slime_trail"]
+[ext_resource type="Script" uid="uid://pq7s6dopkrhv" path="res://scripts/weapons/slime_trail.gd" id="1_slime_trail"]
 
-[node name="SlimeTrail" type="Node3D"]
+[node name="SlimeTrail" type="Node3D" unique_id=1410248768]
 script = ExtResource("1_slime_trail")
 damage = 4.0
 cooldown = 0.35

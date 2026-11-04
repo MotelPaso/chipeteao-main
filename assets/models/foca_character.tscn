@@ -1,8 +1,8 @@
-[gd_scene format=3]
+[gd_scene format=3 uid="uid://bf5o4wkdk25mv"]
 
-[ext_resource type="PackedScene" path="res://assets/models/foca.glb" id="1_foca"]
+[ext_resource type="PackedScene" uid="uid://b3jsmj3hfxtud" path="res://assets/models/foca.glb" id="1_foca"]
 
-[node name="FocaCharacter" type="Node3D"]
+[node name="FocaCharacter" type="Node3D" unique_id=973484716]
 
-[node name="Foca" parent="." instance=ExtResource("1_foca")]
+[node name="Foca" parent="." unique_id=302452366 instance=ExtResource("1_foca")]
 transform = Transform3D(-0.6, 0, 0, 0, 0.6, 0, 0, 0, -0.6, 0, 0, 0)
