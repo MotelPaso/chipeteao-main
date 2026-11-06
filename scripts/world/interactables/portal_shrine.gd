@@ -1,10 +1,10 @@
 class_name PortalShrine
 extends Interactable
-## Altar portal: el WorldDirector pone portales por el mapa al inicio de
-## cada etapa y los une en PARES al azar. Con [E] dentro de uno, el jugador
-## aparece junto a su pareja; los dos se recargan `cooldown` segundos (las
-## copias del Gusano Cósmico del viajero lo acortan).
-## Se construye en código (anillo, pilar de luz y forma de detección).
+## Altar portal (PortalShrine.tscn): el WorldDirector pone portales por el
+## mapa al inicio de cada etapa y los une en PARES al azar. Con [E] dentro
+## de uno, el jugador aparece junto a su pareja; los dos se recargan
+## `cooldown` segundos (las copias del Gusano Cósmico del viajero lo
+## acortan). Su aspecto está en el nodo Visual de la escena.
 
 ## Segundos de recarga de los dos portales tras un viaje.
 @export var cooldown: float = 30.0
@@ -16,28 +16,33 @@ extends Interactable
 ## Cuánto más allá del anillo de la pareja aparece el viajero (metros),
 ## para no volver a activar el portal por el que acaba de salir.
 @export var exit_margin: float = 1.2
+## Cuánto más ancha que el anillo es la zona de detección (metros), para
+## que el aviso aparezca un paso antes.
+@export var detect_margin: float = 0.6
+## Altura (metros) de la zona de detección.
+@export var detect_height: float = 3.0
+## Colores de los portales. El director da a cada portal el índice de su
+## par de creación (pair_index) y el portal toma ese color de la lista;
+## si hay más pares que colores, la lista vuelve a empezar.
+@export var pair_colors: Array[Color] = [
+	Color(0.5, 0.9, 1.0), Color(0.95, 0.6, 1.0), Color(0.6, 1.0, 0.55), Color(1.0, 0.85, 0.4)]
 
-## Aspecto en reposo del anillo y el pilar.
-const RING_SPIN: float = 0.8
-const IDLE_PULSE_HZ: float = 3.0
-const IDLE_PULSE_AMOUNT: float = 0.05
-const PILLAR_HEIGHT: float = 6.0
-const PILLAR_TOP_RADIUS: float = 0.9
-## Cilindro de detección = anillo + esto (metros), para que el aviso
-## aparezca un paso antes.
-const DETECT_MARGIN: float = 0.6
+## Color que se usa si pair_colors queda vacío.
+const FALLBACK_COLOR: Color = Color(0.5, 0.9, 1.0)
 ## Ángulos de salida que se prueban alrededor de la pareja antes de
 ## aparecer encima de ella.
 const EXIT_ANGLE_TRIES: int = 8
 ## Altura (metros) a la que se pone al viajero, sobre el suelo.
 const EXIT_LIFT: float = 0.2
 
+## La pareja de este portal; la pone el director.
 var twin: PortalShrine = null
-var pair_color: Color = Color(0.5, 0.9, 1.0)
+## Índice del par de creación: elige el color de pair_colors. Lo pone el
+## director antes de añadir el portal.
+var pair_index: int = 0
 var _cooldown_left: float = 0.0
-var _pillar: MeshInstance3D = null
-var _ring: MeshInstance3D = null
-var _time: float = 0.0
+
+@onready var _visual: PortalVisual = $Visual
 
 
 func _init() -> void:
@@ -53,63 +58,23 @@ func _init() -> void:
 
 
 func _ready() -> void:
-	# El anillo de detección ANTES de super(), que conecta body_entered.
+	# La zona de detección ANTES de super(), que conecta body_entered.
 	var shape := CollisionShape3D.new()
 	var cylinder := CylinderShape3D.new()
-	cylinder.radius = ring_radius + DETECT_MARGIN
-	cylinder.height = 3.0
+	cylinder.radius = ring_radius + detect_margin
+	cylinder.height = detect_height
 	shape.shape = cylinder
-	shape.position.y = 1.5
+	shape.position.y = detect_height * 0.5
 	add_child(shape)
 	super()
-	_build_visual()
+	_visual.build(ring_radius, pair_color())
 
 
-func _build_visual() -> void:
-	_ring = MeshInstance3D.new()
-	var torus := TorusMesh.new()
-	torus.inner_radius = ring_radius - 0.12
-	torus.outer_radius = ring_radius + 0.12
-	# Teselado explícito (el del motor es 64 x 32): 32 cortes mantienen
-	# redondo un anillo de 1.6 m y 8 lados bastan para un tubo de 12 cm.
-	torus.rings = 32
-	torus.ring_segments = 8
-	_ring.mesh = torus
-	_ring.position.y = 0.06
-	_ring.material_override = _glow_material(0.9)
-	add_child(_ring)
-	_pillar = MeshInstance3D.new()
-	var mesh := CylinderMesh.new()
-	mesh.top_radius = PILLAR_TOP_RADIUS
-	mesh.bottom_radius = ring_radius
-	mesh.height = PILLAR_HEIGHT
-	# Teselado explícito: un cono recto no necesita anillos en altura.
-	mesh.radial_segments = 24
-	mesh.rings = 1
-	_pillar.mesh = mesh
-	_pillar.position.y = PILLAR_HEIGHT * 0.5
-	_pillar.material_override = _glow_material(0.28, true)
-	add_child(_pillar)
-	var light := OmniLight3D.new()
-	light.light_color = pair_color
-	light.light_energy = 1.8
-	light.omni_range = 7.0
-	light.position.y = 1.5
-	add_child(light)
-
-
-## Material propio de esta instancia: así el pulso no pasa a otro portal.
-func _glow_material(alpha: float, additive: bool = false) -> StandardMaterial3D:
-	var material := StandardMaterial3D.new()
-	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	if additive:
-		material.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
-	material.albedo_color = Color(pair_color, alpha)
-	material.emission_enabled = true
-	material.emission = pair_color
-	material.emission_energy_multiplier = 1.4
-	return material
+## Color de este portal según su par.
+func pair_color() -> Color:
+	if pair_colors.is_empty():
+		return FALLBACK_COLOR
+	return pair_colors[pair_index % pair_colors.size()]
 
 
 ## Verdadero si está recargado y tiene pareja.
@@ -118,19 +83,14 @@ func is_ready() -> bool:
 
 
 func _physics_process(delta: float) -> void:
-	_time += delta
-	if _ring != null:
-		_ring.rotate_y(delta * RING_SPIN)
 	if _cooldown_left > 0.0:
-		# Mientras recarga, el pilar se estrecha y vuelve a crecer.
 		_cooldown_left = maxf(_cooldown_left - delta, 0.0)
-		var fraction := 1.0 - _cooldown_left / maxf(cooldown, 0.01)
-		if _pillar != null:
-			_pillar.scale = Vector3(0.3 + 0.7 * fraction, 1.0, 0.3 + 0.7 * fraction)
+		# El visual estrecha el pilar mientras recarga.
+		_visual.recharge_fraction = 1.0 - _cooldown_left / maxf(cooldown, 0.01)
 		if player_in_range:
 			set_prompt(_recharging_text())
-	elif _pillar != null:
-		_pillar.scale = Vector3.ONE * (1.0 + sin(_time * IDLE_PULSE_HZ) * IDLE_PULSE_AMOUNT)
+	else:
+		_visual.recharge_fraction = -1.0
 
 
 func _recharging_text() -> String:

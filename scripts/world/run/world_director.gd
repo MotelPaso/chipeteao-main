@@ -29,7 +29,8 @@ const LUCKY_BLOCK_SCENE := preload("res://scenes/world/chests/LuckyBlock.tscn")
 const PET_BOX_SCENE := preload("res://scenes/world/PetBox.tscn")
 const VENDOR_SCENE := preload("res://scenes/world/Vendor.tscn")
 const SUPPLY_CHEST_SCENE := preload("res://scenes/world/director/SupplyChest.tscn")
-const PortalShrineScript := preload("res://scripts/world/interactables/portal_shrine.gd")
+const PORTAL_SHRINE_SCENE := preload("res://scenes/world/director/PortalShrine.tscn")
+const EXIT_PORTAL_SCENE := preload("res://scenes/world/director/ExitPortal.tscn")
 const BEACON_SCENE := preload("res://scenes/world/director/Beacon.tscn")
 const Beacon := preload("res://scripts/world/run/director/beacon.gd")
 
@@ -124,8 +125,6 @@ const GROUND_PROBE_HEIGHT: float = 20.0
 ## meseta sobre una loma) y termina esto bajo el más bajo (metros).
 const PROBE_HEADROOM: float = 30.0
 const PROBE_UNDERSHOOT: float = 2.0
-## Solo se usa si portal_pair_colors queda vacío en el Inspector.
-const DEFAULT_PORTAL_COLORS: Array[Color] = [Color(0.5, 0.9, 1.0)]
 
 
 ## Una baliza viva: el nodo del pilar, el POI que señala y los segundos
@@ -225,10 +224,6 @@ const POI_PLATFORM_Y: float = 0.5
 @export var portal_count: int = 4
 ## Ruletas al inicio de la etapa.
 @export var roulette_count: int = 1
-## Colores de los portales: los portales se crean de dos en dos y cada dos
-## toman el siguiente color de la lista.
-@export var portal_pair_colors: Array[Color] = [
-	Color(0.5, 0.9, 1.0), Color(0.95, 0.6, 1.0), Color(0.6, 1.0, 0.55), Color(1.0, 0.85, 0.4)]
 @export_group("Sky events (iteration 42)")
 ## Probabilidad (0-1) de luna en cada evento, pasada la pausa sky_event_min_gap.
 @export var sky_event_chance: float = 0.18
@@ -564,8 +559,7 @@ func _tick_exit_portal() -> void:
 	if _exit_portal_spawned or not RunState.stage_cleared:
 		return
 	_exit_portal_spawned = true
-	var portal := ExitPortal.new()
-	portal.name = "ExitPortal"
+	var portal := EXIT_PORTAL_SCENE.instantiate() as ExitPortal
 	_stage_parent().add_child(portal)
 	portal.global_position = _exit_portal_point()
 	# Su baliza arde hasta que el grupo lo cruza: poi_worth_showing() la
@@ -754,26 +748,24 @@ func _terrain_height(xz: Vector2) -> float:
 
 ## --- objetos de inicio ------------------------------------------------------
 
-## Portales en pares al azar. Los colores se asignan de dos en dos por
-## orden de creación y los pares se forman después de mezclar: el color
-## no indica cuál es la pareja.
+## Portales en pares al azar (PortalShrine.tscn). El color sale del índice
+## del par de creación (i / 2) y los pares se forman después de mezclar:
+## el color no indica cuál es la pareja.
 func _spawn_portals() -> void:
 	var count := portal_count - (portal_count % 2)
-	# Sin colores, el índice del par sería un módulo por cero.
-	var colors := portal_pair_colors if not portal_pair_colors.is_empty() \
-			else DEFAULT_PORTAL_COLORS
-	var portals: Array = []
+	var portals: Array[PortalShrine] = []
 	for i in count:
-		var portal: Interactable = PortalShrineScript.new()
+		var portal := PORTAL_SHRINE_SCENE.instantiate() as PortalShrine
+		# El nombre sale en el log "Portal used:".
 		portal.name = "Portal%d" % (i + 1)
-		portal.set("pair_color", colors[(i / 2) % colors.size()])
+		portal.pair_index = i / 2
 		_stage_parent().add_child(portal)
 		portal.global_position = _claim_clear_point()
 		portals.append(portal)
 	portals.shuffle()
 	for i in range(0, portals.size() - 1, 2):
-		portals[i].set("twin", portals[i + 1])
-		portals[i + 1].set("twin", portals[i])
+		portals[i].twin = portals[i + 1]
+		portals[i + 1].twin = portals[i]
 	if count > 0:
 		print("Portals placed: %d (%d pairs)" % [count, count / 2])
 
