@@ -10,53 +10,12 @@ extends Interactable
 ## (PlayerStats.add_altar_boon). Las Llaves maestras aceleran la carga y
 ## agrandan el don. Todo altar se hunde tras pagar (spent_lifetime).
 
-## Segundos dentro del anillo para completar la carga.
-@export var channel_time: float = 8.0
-## Segundos que espera un altar gastado antes de hundirse.
-@export var spent_lifetime: float = 8.0
-## Multiplicador del tamaño del don (el altar demoníaco paga más).
-@export var boon_scale: float = 1.0
-## Anuncio al recibir el don; %s es la etiqueta del don.
-@export var completed_text: String = "El altar zumba: %s para todos"
-## Título y etiqueta de la carta de la elección que abre este altar.
-@export var choice_title: String = "El altar te ofrece un don"
-@export var choice_tag: String = "Bendición"
-@export_group("Aspecto")
-## Color del anillo, del disco de progreso y de las cartas; tiñe los materiales de Ring y ProgressDisc de la escena.
-@export var accent_color: Color = Color(0.4, 0.8, 1.0)
-@export_group("Master Key")
-## Velocidad de carga extra por cada Llave maestra (0.2 = +20 % por copia).
-@export var key_speed_per_copy: float = 0.2
-## Tamaño extra del don por cada Llave maestra (0.2 = +20 % por copia).
-@export var key_boon_per_copy: float = 0.2
-
-## Loop de Sfx mientras se carga (con contador vía _hold_loop: el Cráneo
-## zumbante usa la misma voz a la vez).
-const CHANNEL_LOOP: StringName = &"shrine_channel"
-
-## Giro y vaivén del cristal en reposo, y su pulso más rápido al cargar.
-const CRYSTAL_SPIN: float = 1.4
-const CRYSTAL_BOB_HZ: float = 2.1
-const CRYSTAL_BOB_HEIGHT: float = 0.12
-const CRYSTAL_PULSE_HZ: float = 9.0
-const CRYSTAL_PULSE_AMOUNT: float = 0.12
+## Dones ofrecidos al completar (la UI de cartas tiene tres huecos).
+const ALTAR_CHOICE_COUNT: int = 3
 ## Radio de respaldo si la escena no trae una zona cilíndrica, en metros.
 const DEFAULT_ZONE_RADIUS: float = 9.3
-## Un raider a menos de estos radios de anillo marca el altar (más brillo, late).
-const APPROACH_BAND_SCALE: float = 2.0
-const MARK_PULSE_HZ: float = 3.4
-## Emisión del anillo y el disco en reposo, marcado y cargando.
-const RING_ENERGY_IDLE: float = 1.1
-const RING_ENERGY_MARKED: float = 3.0
-const RING_ENERGY_CHANNEL: float = 3.6
-const RING_ALPHA_IDLE: float = 0.55
-const RING_ALPHA_MARKED: float = 0.85
-const PROGRESS_DISC_ALPHA: float = 0.26
-## Dones ofrecidos al completar.
-const ALTAR_CHOICE_COUNT: int = 3
-## Aviso tras una carga interrumpida. El altar no tiene botón, así que la
-## línea manda de vuelta al anillo.
-const RESUME_TEXT: String = "Vuelve a entrar para reanudar (%d%%)"
+## Id del objeto que acelera la carga y agranda el don (ItemCatalog).
+const MASTER_KEY_ID: String = "master_key"
 
 ## Dones planos que puede dar un altar: {stat, amount, name, label}. `stat`
 ## es un id de PlayerStats; `name` titula la carta (caja baja tipo oración)
@@ -83,6 +42,64 @@ const ALTAR_BOONS: Array[Dictionary] = [
 	{"stat": "powerup_chance", "amount": 10.0, "name": "Fortuna menor",
 		"label": "prob. de power-up +%d%%"},
 ]
+
+@export_group("Carga")
+## Segundos dentro del anillo para completar la carga.
+@export var channel_time: float = 8.0
+## Segundos que espera un altar gastado antes de hundirse.
+@export var spent_lifetime: float = 8.0
+## Loop de Sfx mientras se carga; va con contador (_hold_loop) porque el Cráneo zumbante usa la misma voz.
+@export var channel_loop: StringName = &"shrine_channel"
+## Multiplicador del tamaño del don (el altar demoníaco paga más).
+@export var boon_scale: float = 1.0
+@export_group("Llave maestra")
+## Velocidad de carga extra por cada Llave maestra (0.2 = +20 % por copia).
+@export var key_speed_per_copy: float = 0.2
+## Tamaño extra del don por cada Llave maestra (0.2 = +20 % por copia).
+@export var key_boon_per_copy: float = 0.2
+@export_group("Textos")
+## Aviso mientras carga; %d%% es el porcentaje.
+@export var charging_prompt: String = "Cargando... %d%%"
+## Aviso tras salir a mitad de carga; %d%% es el porcentaje guardado (no hay botón: manda de vuelta al anillo).
+@export var resume_prompt: String = "Vuelve a entrar para reanudar (%d%%)"
+## Título de la elección que abre el altar en el selector de cartas.
+@export var choice_title: String = "El altar te ofrece un don"
+## Etiqueta (cinta) de las cartas de la elección.
+@export var choice_tag: String = "Bendición"
+## Descripción de cada carta de don; %s es la etiqueta del don.
+@export var boon_description: String = "%s para toda la party"
+## Anuncio al recibir el don; %s es la etiqueta del don.
+@export var completed_text: String = "El altar zumba: %s para todos"
+@export_group("Anillo")
+## Color del anillo, del disco de progreso y de las cartas; tiñe los materiales de Ring y ProgressDisc (el resto del material sale de la escena).
+@export var accent_color: Color = Color(0.4, 0.8, 1.0)
+## Un raider en pie a menos de estos radios de zona marca el altar (brilla y late).
+@export var approach_band_scale: float = 2.0
+## Velocidad del latido del anillo marcado, en radianes por segundo.
+@export var mark_pulse_speed: float = 3.4
+## Energía de emisión del anillo y del disco en reposo.
+@export var ring_energy_idle: float = 1.1
+## Energía máxima del latido con un raider cerca.
+@export var ring_energy_marked: float = 3.0
+## Energía mientras carga.
+@export var ring_energy_channel: float = 3.6
+## Opacidad del anillo en reposo (0-1).
+@export_range(0.0, 1.0) var ring_alpha_idle: float = 0.55
+## Opacidad máxima del anillo marcado o cargando (0-1).
+@export_range(0.0, 1.0) var ring_alpha_marked: float = 0.85
+## Opacidad del disco de progreso (0-1).
+@export_range(0.0, 1.0) var disc_alpha: float = 0.26
+@export_group("Cristal")
+## Giro del cristal, en radianes por segundo.
+@export var crystal_spin_speed: float = 1.4
+## Velocidad del vaivén del cristal, en radianes por segundo.
+@export var crystal_bob_speed: float = 2.1
+## Altura del vaivén del cristal, en metros.
+@export var crystal_bob_height: float = 0.12
+## Velocidad del pulso del cristal mientras carga, en radianes por segundo.
+@export var crystal_pulse_speed: float = 9.0
+## Cuánto crece el cristal en el pulso, como fracción de su tamaño.
+@export var crystal_pulse_amount: float = 0.12
 
 var channeling: bool = false
 var progress: float = 0.0
@@ -114,8 +131,8 @@ func _ready() -> void:
 	_zone_radius = _measure_zone_radius()
 	if _crystal != null:
 		_crystal_rest_y = _crystal.position.y
-	_ring_material = _own_material(_ring, RING_ALPHA_IDLE, RING_ENERGY_IDLE)
-	_disc_material = _own_material(_progress_disc, PROGRESS_DISC_ALPHA, RING_ENERGY_IDLE)
+	_ring_material = _own_material(_ring, ring_alpha_idle, ring_energy_idle)
+	_disc_material = _own_material(_progress_disc, disc_alpha, ring_energy_idle)
 
 
 ## Radio de la zona de carga, leído de la forma de la escena para que la
@@ -156,9 +173,9 @@ func _physics_process(delta: float) -> void:
 		return
 	_time += delta
 	if _crystal != null:
-		_crystal.rotate_y(delta * CRYSTAL_SPIN)
-		_crystal.position.y = _crystal_rest_y + sin(_time * CRYSTAL_BOB_HZ) * CRYSTAL_BOB_HEIGHT
-		var pulse := CRYSTAL_PULSE_AMOUNT * sin(_time * CRYSTAL_PULSE_HZ) if channeling else 0.0
+		_crystal.rotate_y(delta * crystal_spin_speed)
+		_crystal.position.y = _crystal_rest_y + sin(_time * crystal_bob_speed) * crystal_bob_height
+		var pulse := crystal_pulse_amount * sin(_time * crystal_pulse_speed) if channeling else 0.0
 		_crystal.scale = Vector3.ONE * (1.0 + pulse)
 	_tick_marking()
 	if not channeling:
@@ -179,7 +196,7 @@ func _physics_process(delta: float) -> void:
 	_progress_disc.visible = true
 	var fraction := clampf(progress / channel_time, 0.001, 1.0)
 	_progress_disc.scale = Vector3(fraction, 1.0, fraction)
-	set_prompt("Cargando... %d%%" % roundi(fraction * 100.0))
+	set_prompt(charging_prompt % roundi(fraction * 100.0))
 	if progress >= channel_time:
 		_complete()
 
@@ -189,15 +206,15 @@ func _physics_process(delta: float) -> void:
 func _tick_marking() -> void:
 	if _ring_material == null and _disc_material == null:
 		return
-	var energy := RING_ENERGY_IDLE
-	var alpha := RING_ALPHA_IDLE
+	var energy := ring_energy_idle
+	var alpha := ring_alpha_idle
 	if channeling:
-		energy = RING_ENERGY_CHANNEL
-		alpha = RING_ALPHA_MARKED
+		energy = ring_energy_channel
+		alpha = ring_alpha_marked
 	elif available and _player_near():
-		var beat := 0.5 + 0.5 * sin(_time * MARK_PULSE_HZ)
-		energy = lerpf(RING_ENERGY_IDLE, RING_ENERGY_MARKED, beat)
-		alpha = lerpf(RING_ALPHA_IDLE, RING_ALPHA_MARKED, beat)
+		var beat := 0.5 + 0.5 * sin(_time * mark_pulse_speed)
+		energy = lerpf(ring_energy_idle, ring_energy_marked, beat)
+		alpha = lerpf(ring_alpha_idle, ring_alpha_marked, beat)
 	if energy == _marked_energy and alpha == _marked_alpha:
 		return
 	_marked_energy = energy
@@ -212,7 +229,7 @@ func _tick_marking() -> void:
 ## Algún raider en pie dentro de la banda de acercamiento (un cuerpo caído
 ## en la banda no es alguien que se acerca).
 func _player_near() -> bool:
-	var band := _zone_radius * APPROACH_BAND_SCALE
+	var band := _zone_radius * approach_band_scale
 	var band_sq := band * band
 	# "Alguien dentro de la banda" equivale a "el más cercano está dentro".
 	var nearest := Coop.nearest_player(get_tree(), global_position)
@@ -222,7 +239,7 @@ func _player_near() -> bool:
 
 ## Llaves maestras de los raiders en pie del anillo: cuenta la mayor.
 func _keys_in_ring() -> int:
-	return best_item_count_in_range("master_key")
+	return best_item_count_in_range(MASTER_KEY_ID)
 
 
 func _charge_speed() -> float:
@@ -236,7 +253,7 @@ func _on_range_entered() -> void:
 	channeling = true
 	# Con contador: otro altar o el Cráneo zumbante pueden sostener la misma
 	# voz a la vez.
-	_hold_loop(CHANNEL_LOOP)
+	_hold_loop(channel_loop)
 	_emit_started()
 
 
@@ -248,7 +265,7 @@ func _on_range_exited() -> void:
 	channeling = false
 	_drop_loop()
 	_emit_cancelled()
-	set_prompt(RESUME_TEXT % roundi(clampf(progress / channel_time, 0.0, 1.0) * 100.0))
+	set_prompt(resume_prompt % roundi(clampf(progress / channel_time, 0.0, 1.0) * 100.0))
 
 
 func _interact(_player: Node) -> void:
@@ -302,7 +319,7 @@ func _reward_options(keys: int) -> Array[Dictionary]:
 		var label := String(boon.label) % roundi(amount)
 		options.append({
 			"title": String(boon.name),
-			"description": label + " para toda la party",
+			"description": boon_description % label,
 			"color": accent_color,
 			"label": label,
 			"stat": String(boon.stat),

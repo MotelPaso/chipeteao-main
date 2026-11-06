@@ -8,12 +8,8 @@ extends ChargeShrine
 ## Sangre de demonio agranda las dos mitades del trato. Los jefes sueltan un
 ## cofre extra por uso (BossBase lee RunState.demonic_uses).
 
-## Multiplica el costo de dificultad de cada pacto (1 = el número de PACT_LIBRARY, 2 = el doble).
-@export var difficulty_scale: float = 1.0
-## Sangre de demonio: cada copia de quien carga suma esta fracción al don Y al costo de dificultad.
-@export var demon_blood_per_copy: float = 0.25
-## Distancia en metros desde el obelisco a la que cae el cofre gratis del pacto.
-@export var chest_drop_distance: float = 2.4
+## Id del objeto que agranda las dos mitades del pacto (ItemCatalog).
+const DEMON_BLOOD_ID: String = "demon_blood"
 
 ## Pactos: cada fila es una carta. `benefit` y `cost` son filas {kind, ...}
 ## resueltas por los dos match de abajo: un pacto nuevo es una fila nueva y
@@ -74,13 +70,19 @@ const PACT_LIBRARY: Array[Dictionary] = [
 	},
 ]
 
-## Texto de la carta: beneficio arriba y costo abajo, siempre en dos líneas
-## (un costo metido en la misma frase no lo lee nadie).
-const PACT_TEXT: String = "Ganas: %s\nPagas: %s"
+@export_group("Pactos")
+## Multiplica el costo de dificultad de cada pacto (1 = el número de PACT_LIBRARY, 2 = el doble).
+@export var difficulty_scale: float = 1.0
+## Sangre de demonio: cada copia de quien carga suma esta fracción al don Y al costo de dificultad.
+@export var demon_blood_per_copy: float = 0.25
+## Distancia en metros desde el obelisco a la que cae el cofre gratis del pacto.
+@export var chest_drop_distance: float = 2.4
+## Texto de cada carta: beneficio (%s) arriba y costo (%s) abajo, en dos líneas para que el costo se lea.
+@export_multiline var pact_description: String = "Ganas: %s\nPagas: %s"
 
 
 func _demon_blood_in_ring() -> int:
-	return best_item_count_in_range("demon_blood")
+	return best_item_count_in_range(DEMON_BLOOD_ID)
 
 
 ## La Sangre de demonio agranda el don y el costo de dificultad; ambos la
@@ -103,7 +105,7 @@ func _reward_options(keys: int) -> Array[Dictionary]:
 		var pact: Dictionary = pool[i]
 		options.append({
 			"title": String(pact.name),
-			"description": PACT_TEXT % [_benefit_text(pact.benefit, keys),
+			"description": pact_description % [_benefit_text(pact.benefit, keys),
 					_cost_text(pact.cost)],
 			"color": accent_color,
 			"pact": pact,

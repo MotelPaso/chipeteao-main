@@ -6,21 +6,27 @@ extends SecretTrigger
 ## que al cumplir listen_time despierta al minijefe. El despertar vive en
 ## SecretTrigger.
 
-## Ritmo del brillo (Hz): lento en reposo, rápido mientras se escucha, y su vaivén (fracción).
-const GLOW_IDLE_HZ: float = 1.6
-const GLOW_LISTEN_HZ: float = 9.0
-const GLOW_SWING: float = 0.25
-
+@export_group("Escucha")
 ## Segundos de escucha quieto para despertarlo.
 @export var listen_time: float = 4.0
 ## Velocidad horizontal (m/s) por encima de la cual el raider cuenta como en movimiento.
 @export var still_speed_limit: float = 0.2
 ## Segundos iniciales en los que moverse no cancela (solo no suma), para apretar E mientras frenas.
 @export var start_grace: float = 0.4
-## Aviso tras cancelar la escucha por moverse.
-@export var cancel_prompt: String = "[E] El zumbido se apartó — no te muevas"
 ## Loop de Sfx compartido con los altares de carga (va con contador por _hold_loop/_drop_loop).
 @export var hum_loop: StringName = &"shrine_channel"
+@export_group("Textos")
+## Aviso mientras escucha; %d%% es el porcentaje.
+@export var listening_prompt: String = "Escuchando... %d%%"
+## Aviso tras cancelar la escucha por moverse.
+@export var cancel_prompt: String = "[E] El zumbido se apartó — no te muevas"
+@export_group("Brillo")
+## Velocidad del latido de la luz en reposo, en radianes por segundo.
+@export var glow_idle_speed: float = 1.6
+## Velocidad del latido mientras se escucha, en radianes por segundo.
+@export var glow_listen_speed: float = 9.0
+## Cuánto varía la luz al latir, como fracción de su energía (0-1).
+@export var glow_swing: float = 0.25
 
 ## true mientras corre la escucha (lo lee el harness).
 var listening: bool = false
@@ -46,8 +52,8 @@ func _ready() -> void:
 func _physics_process(delta: float) -> void:
 	_time += delta
 	# El brillo respira lento en reposo y aletea durante la escucha.
-	var rate := GLOW_LISTEN_HZ if listening else GLOW_IDLE_HZ
-	_glow_light.light_energy = _glow_base_energy * (1.0 + GLOW_SWING * sin(_time * rate))
+	var rate := glow_listen_speed if listening else glow_idle_speed
+	_glow_light.light_energy = _glow_base_energy * (1.0 + glow_swing * sin(_time * rate))
 	if not listening:
 		return
 	_listen_age += delta
@@ -66,7 +72,7 @@ func _physics_process(delta: float) -> void:
 			_cancel_listen()
 		return
 	progress += delta
-	set_prompt("Escuchando... %d%%" % roundi(clampf(progress / listen_time, 0.0, 1.0) * 100.0))
+	set_prompt(listening_prompt % roundi(clampf(progress / listen_time, 0.0, 1.0) * 100.0))
 	if progress >= listen_time:
 		_complete_listen()
 

@@ -14,8 +14,6 @@ extends Interactable
 ##
 ## Un solo uso: al pagar se hunde y se libera.
 
-## Aviso del cofre gratis: no hay precio, así que no hay variante "te faltan".
-const FREE_PROMPT: String = "[E] Abrir cofre — gratis"
 ## Escena que instancia spawn_free. Se carga al llamarla: un script no puede
 ## precargar la escena que lo usa.
 const SCENE_PATH: String = "res://scenes/world/chests/Chest.tscn"
@@ -52,6 +50,15 @@ const SCENE_PATH: String = "res://scenes/world/chests/Chest.tscn"
 @export var lit_rarities: Array[String] = ["Epic", "Legendary"]
 ## Textura del modelo que usa el material con brillo; se carga al aparecer.
 @export_file("*.png") var model_texture_path: String = "res://assets/models/chest/Textures/colormap.png"
+@export_group("Textos")
+## Aviso del cofre de pago cuando alcanza: %s es la rareza y %d el precio (el cofre no usa prompt_text).
+@export var paid_prompt: String = "[E] Abrir cofre %s — %d pts"
+## Aviso cuando no alcanza: %d son los puntos que faltan y %s la rareza.
+@export var short_prompt: String = "Te faltan %d puntos para abrir cofre %s"
+## Aviso del cofre gratis (no hay precio, así que no tiene variante "te faltan").
+@export var free_prompt: String = "[E] Abrir cofre — gratis"
+## Cartel al abrir (grupo "boss_ui"): rareza, nombre y descripción del objeto (%s cada uno).
+@export var opened_announce: String = "Cofre %s: %s — %s"
 
 ## Quien abrió el cofre (en co-op, el objeto le llega a ÉL).
 var _opener: Node = null
@@ -138,15 +145,15 @@ func _physics_process(_delta: float) -> void:
 
 func _refresh_price_prompt() -> void:
 	if free_open:
-		set_prompt(FREE_PROMPT)
+		set_prompt(free_prompt)
 		return
 	var cost := price()
 	var purse := _points_of_nearest()
 	var shown := UpgradePool.rarity_display(rarity)
 	if purse >= cost:
-		set_prompt("[E] Abrir cofre %s — %d pts" % [shown, cost])
+		set_prompt(paid_prompt % [shown, cost])
 	else:
-		set_prompt("Te faltan %d puntos para abrir cofre %s" % [cost-purse, shown])
+		set_prompt(short_prompt % [cost - purse, shown])
 
 
 ## Puntos del raider en pie MÁS CERCANO (el que va a apretar). _interact
@@ -210,7 +217,7 @@ func _pop_reward() -> void:
 		return
 	bag.add_item(item_id)
 	var row := ItemCatalog.by_id(item_id)
-	get_tree().call_group("boss_ui", "announce", "Cofre %s: %s — %s" % [
+	get_tree().call_group("boss_ui", "announce", opened_announce % [
 			UpgradePool.rarity_display(rarity), String(row.display_name),
 			String(row.description)])
 	# Línea de log para los soaks (verificar.sh cuenta "Chest opened:").

@@ -8,13 +8,6 @@ extends Interactable
 ## Gratis a propósito: el traficante vende una elección de tres por puntos;
 ## la caja es la que te encuentras, y su precio es caminar hasta ella.
 
-## Títulos de las cartas. La opción 0 es el CAMBIO: el harness siempre aprieta
-## la primera, así que la rama interesante tiene que ser esa.
-const SWAP_TITLE: String = "Cambiar por %s"
-const KEEP_TITLE: String = "Quedarme con %s"
-const CHOICE_TITLE: String = "La caja se abre sola"
-const NO_PET_LINE: String = "Sin mascota"
-
 @export_group("Caja")
 ## Color de la huella: tiñe la tapa (Visual/Lid) y el símbolo (Visual/Paw).
 @export var paw_color: Color = Color(0.7, 0.95, 0.6)
@@ -22,6 +15,17 @@ const NO_PET_LINE: String = "Sin mascota"
 @export var bob_speed: float = 2.2
 ## Altura del vaivén de la tapa, en metros.
 @export var bob_height: float = 0.05
+@export_group("Textos")
+## Título de la elección cuando ya hay compañero.
+@export var choice_title: String = "La caja se abre sola"
+## Carta 0, la del cambio (el harness siempre elige la primera); %s es la mascota nueva.
+@export var swap_title: String = "Cambiar por %s"
+## Carta 1, quedarse con la actual; %s es la mascota que ya sigue al raider.
+@export var keep_title: String = "Quedarme con %s"
+## Descripción de una carta sin datos de mascota.
+@export var no_pet_line: String = "Sin mascota"
+## Anuncio cuando no hay ninguna mascota distinta que ofrecer.
+@export var empty_announce: String = "La caja está vacía."
 
 var _spent: bool = false
 var _time: float = 0.0
@@ -53,7 +57,7 @@ func _interact(player: Node) -> void:
 	if pet_id.is_empty():
 		# Todas las mascotas del catálogo son la que ya lo sigue: no hay nada
 		# que ofrecer.
-		get_tree().call_group("hud", "announce", "La caja está vacía.")
+		get_tree().call_group("hud", "announce", empty_announce)
 		return
 	_spent = true
 	_emit_started()
@@ -68,19 +72,19 @@ func _interact(player: Node) -> void:
 	var held := PetCatalog.by_id(String(current))
 	var options: Array[Dictionary] = [
 		{
-			"title": SWAP_TITLE % String(offered.display_name),
+			"title": swap_title % String(offered.display_name),
 			"description": _pet_lines(offered),
 			"color": offered.get("color", Color.WHITE),
 			"pet_id": pet_id,
 		},
 		{
-			"title": KEEP_TITLE % String(held.display_name),
+			"title": keep_title % String(held.display_name),
 			"description": _pet_lines(held),
 			"color": held.get("color", Color.WHITE),
 			"pet_id": String(current),
 		},
 	]
-	get_tree().call_group("upgrade_ui", "open_choice", CHOICE_TITLE, options,
+	get_tree().call_group("upgrade_ui", "open_choice", choice_title, options,
 			player, _on_choice.bind(player), "pet_box")
 
 
@@ -101,9 +105,9 @@ func _grant(player: Node, pet_id: String) -> void:
 
 
 ## Arma y stat en dos líneas: lo que de verdad distingue a dos compañeros.
-static func _pet_lines(row: Dictionary) -> String:
+func _pet_lines(row: Dictionary) -> String:
 	if row.is_empty():
-		return NO_PET_LINE
+		return no_pet_line
 	return "%s\n%s" % [PetCatalog.weapon_display_name(row),
 			String(row.get("stat_label", ""))]
 

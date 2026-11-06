@@ -22,10 +22,6 @@ const LUCKY_REWARDS: Array[Dictionary] = [
 ## tres: la UI de cartas tiene tres huecos y descarta el sobrante sin avisar,
 ## y el que caería sería justo la opción de rechazar.
 const WELL_OFFERS: int = 2
-const WELL_TITLE: String = "El pozo pide una ofrenda"
-const WELL_NOTHING: String = "Nada"
-const WELL_NOTHING_LINE: String = "Te quedas con todo"
-const WELL_GIVE_LINE: String = "Lo cambias por algo mejor"
 
 @export_group("Bloque")
 ## Color del bloque: tiñe su material (Visual/Block), su luz (Visual/Glow) y las chispas de la explosión.
@@ -51,6 +47,15 @@ const WELL_GIVE_LINE: String = "Lo cambias por algo mejor"
 @export var free_chest_offset: Vector3 = Vector3(1.6, 0.0, 0.0)
 ## Probabilidad (0-1) de que el pozo pague un power-up en vez del objeto mejor.
 @export_range(0.0, 1.0) var well_powerup_chance: float = 0.3
+@export_group("Textos del pozo")
+## Título de la elección del pozo.
+@export var well_title: String = "El pozo pide una ofrenda"
+## Descripción de cada carta de objeto que se puede entregar.
+@export var well_give_line: String = "Lo cambias por algo mejor"
+## Título de la carta de rechazo.
+@export var well_keep_title: String = "Nada"
+## Descripción de la carta de rechazo.
+@export var well_keep_line: String = "Te quedas con todo"
 
 ## Cola del harness (ArenaProbe, BONK_LUCKY_REWARD): ids de premio que pagan
 ## los próximos bloques en vez de tirar. ESTÁTICA porque la tirada es
@@ -215,18 +220,18 @@ func _reward_well(player: Node) -> void:
 		var row := ItemCatalog.by_id(carried[i])
 		options.append({
 			"title": String(row.get("display_name", carried[i])),
-			"description": WELL_GIVE_LINE,
+			"description": well_give_line,
 			"color": ItemCatalog.rarity_color(String(row.get("rarity", "Common"))),
 			"item_id": carried[i],
 		})
 	# El rechazo siempre está, así que con un solo objeto hay elección real.
 	options.append({
-		"title": WELL_NOTHING,
-		"description": WELL_NOTHING_LINE,
+		"title": well_keep_title,
+		"description": well_keep_line,
 		"color": UiTheme.TEXT_DIM,
 		"item_id": "",
 	})
-	get_tree().call_group("upgrade_ui", "open_choice", WELL_TITLE, options,
+	get_tree().call_group("upgrade_ui", "open_choice", well_title, options,
 			player, _on_well_pick.bind(player), "lucky_well")
 
 

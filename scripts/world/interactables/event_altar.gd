@@ -12,9 +12,6 @@ extends Interactable
 ## Gratis a propósito: el precio es no elegir, y un desastre es una de las
 ## respuestas posibles.
 
-## Aviso mientras ya corre un clima: invocar funciona igual y lo REEMPLAZA.
-const BUSY_PROMPT: String = "[E] Invocar (reemplaza el evento actual)"
-const READY_PROMPT: String = "[E] Invocar un evento"
 @export_group("Cristal")
 ## Color del cristal y de su luz: tiñe Visual/Glass (conserva su transparencia) y Visual/Glow.
 @export var glass_color: Color = Color(0.7, 0.78, 1.0)
@@ -24,9 +21,14 @@ const READY_PROMPT: String = "[E] Invocar un evento"
 @export var swirl_z_speed: float = 1.7
 ## Cuánto se estira el cristal en el remolino, como fracción de su tamaño.
 @export var swirl_amount: float = 0.07
+@export_group("Textos")
+## Aviso mientras ya corre un clima: invocar funciona igual y lo REEMPLAZA (sin clima se usa prompt_text).
+@export var busy_prompt: String = "[E] Invocar (reemplaza el evento actual)"
 
 var _time: float = 0.0
 var _spent: bool = false
+## La línea sin clima (prompt_text de la escena), guardada para volver a ella.
+var _ready_prompt: String = ""
 
 ## El material del cristal es local a la escena: cada altar tiene el suyo.
 @onready var _glass: MeshInstance3D = $Visual/Glass
@@ -35,6 +37,7 @@ var _spent: bool = false
 
 func _ready() -> void:
 	super()
+	_ready_prompt = prompt_text
 	_paint()
 
 
@@ -47,7 +50,7 @@ func _physics_process(delta: float) -> void:
 	if available and player_in_range:
 		# Se recalcula en cada frame con alguien en rango: la respuesta cambia
 		# sola cuando un clima empieza o termina.
-		set_prompt(READY_PROMPT if _director_idle() else BUSY_PROMPT)
+		set_prompt(_ready_prompt if _director_idle() else busy_prompt)
 
 
 ## true cuando no corre ningún clima. Solo lo lee el AVISO: el altar siempre

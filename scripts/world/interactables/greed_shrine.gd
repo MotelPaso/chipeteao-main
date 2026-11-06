@@ -10,21 +10,24 @@ extends Interactable
 ## Un solo uso, luego se apaga. outcome_for() es un clasificador puro para
 ## que un harness pueda probar la distribución.
 
+@export_group("Peaje")
 ## Fracción de la vida máxima que cobra (0-1).
 @export_range(0.0, 1.0) var hp_cost_fraction: float = 0.25
 ## Vida mínima que deja el pago, en HP.
 @export var min_hp_left: float = 1.0
 ## Aviso cuando el raider no puede pagar el peaje completo.
 @export var too_hurt_text: String = "No te alcanza la vida."
-@export_group("Payout")
+@export_group("Premio")
 ## Probabilidad (0-1) de pagar gemas.
 @export_range(0.0, 1.0) var gem_chance: float = 0.6
 ## Probabilidad (0-1) de pagar una carta (el resto no paga nada).
 @export_range(0.0, 1.0) var card_chance: float = 0.3
-## Gemas del anillo y XP de cada una.
+## Gemas que suelta el premio de gemas.
 @export var gem_count: int = 12
+## XP de cada gema.
 @export var gem_value: int = 4
-@export var xp_gem_scene: PackedScene
+## Escena de gema (pasa por Pools).
+@export var xp_gem_scene: PackedScene = preload("res://scenes/systems/XpGem.tscn")
 ## Título de la carta gratis.
 @export var card_title: String = "El altar entrega un premio"
 ## Piso de rareza de la carta, como id en inglés (Rare = Raro o mejor).

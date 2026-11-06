@@ -7,14 +7,20 @@ extends Interactable
 ## No caduca, y solo hay UNO vivo a la vez (el WorldDirector baja a cero el
 ## peso de su evento mientras el grupo `springs` tenga a alguien).
 
+@export_group("Manantial")
 ## Precio base en puntos de partida (la lluvia dorada lo rebaja; ver current_price).
 @export var price: int = 40
-
-## Ondas del agua: dos frecuencias desafinadas (Hz) y su amplitud, para que
-## no lata como un metrónomo.
-const RIPPLE_X_HZ: float = 1.7
-const RIPPLE_Z_HZ: float = 1.3
-const RIPPLE_AMOUNT: float = 0.03
+## Velocidad de las ondas del agua en X, en radianes por segundo (desafinada con la de Z para que no lata como un metrónomo).
+@export var ripple_x_speed: float = 1.7
+## Velocidad de las ondas del agua en Z, en radianes por segundo.
+@export var ripple_z_speed: float = 1.3
+## Cuánto se estira el agua en las ondas, como fracción de su tamaño.
+@export var ripple_amount: float = 0.03
+@export_group("Textos")
+## Aviso con el precio; %d son los puntos (el manantial no usa prompt_text).
+@export var price_prompt: String = "[E] Beber — %d pts (cura + power-up al azar)"
+## Anuncio al beber.
+@export var used_announce: String = "El manantial te restaura y te potencia"
 
 var _time: float = 0.0
 var _water: MeshInstance3D = null
@@ -33,8 +39,8 @@ func _physics_process(delta: float) -> void:
 	_time += delta
 	if _water != null:
 		_water.scale = Vector3(
-				1.0 + sin(_time * RIPPLE_X_HZ) * RIPPLE_AMOUNT, 1.0,
-				1.0 + cos(_time * RIPPLE_Z_HZ) * RIPPLE_AMOUNT)
+				1.0 + sin(_time * ripple_x_speed) * ripple_amount, 1.0,
+				1.0 + cos(_time * ripple_z_speed) * ripple_amount)
 	if available and player_in_range:
 		_refresh_price_prompt()
 
@@ -46,7 +52,7 @@ func current_price() -> int:
 
 
 func _refresh_price_prompt() -> void:
-	set_prompt("[E] Beber — %d pts (cura + power-up al azar)" % current_price())
+	set_prompt(price_prompt % current_price())
 
 
 func _interact(player: Node) -> void:
@@ -65,7 +71,7 @@ func _interact(player: Node) -> void:
 	var powerups := PowerUps.find_in(player)
 	if powerups != null:
 		powerups.apply(powerup_id)
-	get_tree().call_group("hud", "announce", "El manantial te restaura y te potencia")
+	get_tree().call_group("hud", "announce", used_announce)
 	print("Spring used: heal + %s" % powerup_id)
 	_emit_completed()
 	sink_away()
