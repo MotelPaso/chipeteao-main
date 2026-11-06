@@ -13,7 +13,56 @@ extends CharacterBody3D
 ## modifica al derrapar; sin esa marca la comparten todas las instancias y
 ## el derrape encoge a toda la party.
 
-@export_group("Movement")
+## Puntos de la partida (por jugador, se reinician cada partida): se ganan
+## por baja y se gastan en cofres, ruletas y manantiales.
+signal points_changed(total: int)
+## Se emite al EMPEZAR un derrape, con su dirección; lo escucha el
+## Cinturón eléctrico (ItemBag).
+signal slide_started(direction: Vector3)
+
+## Modos de cámara que rota la acción "camera_mode" de cada jugador:
+## THIRD_PERSON (por defecto; la vista gira el cuerpo), FIRST_PERSON (brazo
+## en los ojos y la foca propia oculta) y FREE_ORBIT (la cámara orbita y el
+## cuerpo mira hacia donde camina; las armas apuntan solas).
+enum CameraMode { THIRD_PERSON, FIRST_PERSON, FREE_ORBIT }
+
+## Fracción de la velocidad efectiva que el cuerpo ya debe llevar para
+## empezar un derrape (no se derrapa desde quieto).
+const SLIDE_MIN_SPEED_RATIO: float = 0.5
+
+## Dónde queda un caído rescatado del vacío respecto de su compañero: al
+## lado y no encima, para que la física no empuje a ninguno de los dos.
+const RESCUE_MATE_OFFSET := Vector3(1.5, 0.5, 0.0)
+
+## Capa visual del rig por slot: RIG_LAYER_BASE + slot + 1 en vez de la
+## capa 1, para que la cámara en primera persona oculte solo su propio
+## cuerpo y los compañeros lo sigan viendo.
+const RIG_LAYER_BASE: int = 10
+
+## Cartel de rescate: las medidas del cartel de los interactuables
+## (interactable.gd), más arriba del cuerpo caído.
+const PROMPT_FONT_SIZE: int = 52
+const PROMPT_OUTLINE_SIZE: int = 14
+const PROMPT_HEIGHT: float = 2.6
+## Centinela de "el cartel nunca se pintó", distinto de "nadie lo revive" (-1).
+const PROMPT_PCT_UNSET: int = -2
+
+## Textos del toast de mascota; los dos llevan el nombre (%s) para que un
+## cambio se lea como cambio y no como regalo.
+const PET_JOINS: String = "%s se une"
+const PET_LEAVES: String = "%s se despide"
+
+## Puntos caminables que se prueban al terminar Vuelo sobre una celda
+## bloqueada; gana el más cercano. Cada uno saca números del RNG de la
+## arena: cambiar la cantidad cambia las partidas con semilla.
+const FLIGHT_LANDING_SAMPLES: int = 24
+## Altura sobre el terreno, en metros, desde la que cae el raider al
+## aterrizar, para que se asiente sin empezar dentro del suelo.
+const FLIGHT_LANDING_CLEARANCE: float = 1.2
+## Margen respecto del borde de la arena mientras vuela, en metros.
+const FLIGHT_EDGE_MARGIN: float = 2.0
+
+@export_group("Movimiento")
 ## Velocidad base al caminar, en metros por segundo; tomos y objetos la multiplican.
 @export var move_speed: float = 6.6
 ## Aceleración en el suelo, en metros por segundo cada segundo.
@@ -22,7 +71,7 @@ extends CharacterBody3D
 @export var air_acceleration: float = 4.0
 ## Velocidad vertical al saltar, en metros por segundo.
 @export var jump_velocity: float = 8.0
-@export_group("Flight (power-up)")
+@export_group("Vuelo (power-up)")
 ## Vuelo: velocidad de subida mientras se mantiene saltar, en metros por segundo.
 @export var flight_rise_speed: float = 9.0
 ## Vuelo: techo sobre el terreno bajo el raider, en metros (pasa mesetas y rocas, la cámara aún ve el suelo).
@@ -30,7 +79,7 @@ extends CharacterBody3D
 ## Vuelo: velocidad de descenso al soltar saltar, en metros por segundo (un planeo, no una caída).
 @export var flight_fall_speed: float = 4.0
 
-@export_group("Slide")
+@export_group("Derrape")
 ## Multiplicador de la velocidad efectiva durante el derrape.
 @export var slide_speed_multiplier: float = 1.8
 ## Duración del derrape, en segundos.
@@ -40,25 +89,17 @@ extends CharacterBody3D
 ## Altura de la cápsula durante el derrape, en metros.
 @export var slide_collision_height: float = 0.9
 
-## Fracción de la velocidad efectiva que el cuerpo ya debe llevar para
-## empezar un derrape (no se derrapa desde quieto).
-const SLIDE_MIN_SPEED_RATIO: float = 0.5
-
-@export_group("Combat")
+@export_group("Inventario")
 ## Tope de armas simultáneas; al llegar, el pool deja de ofrecer armas nuevas (upgrade_pool.gd lo lee por nombre).
 @export var max_weapons: int = 5
 ## Tope de tomos distintos; al llegar, el pool solo ofrece más niveles de los que ya tiene (upgrade_pool.gd lo lee por nombre).
 @export var max_tomes: int = 5
 
-@export_group("Safety")
+@export_group("Seguridad")
 ## Altura del mundo (Y, en metros) bajo la cual el raider vuelve a suelo seguro sin daño.
 @export var void_rescue_y: float = -10.0
 
-## Dónde queda un caído rescatado del vacío respecto de su compañero: al
-## lado y no encima, para que la física no empuje a ninguno de los dos.
-const RESCUE_MATE_OFFSET := Vector3(1.5, 0.5, 0.0)
-
-@export_group("Camera")
+@export_group("Cámara")
 ## Sensibilidad base del mouse, en radianes por píxel; el ajuste de opciones la multiplica.
 @export var mouse_sensitivity: float = 0.003
 ## Inclinación inicial de la cámara, en grados (negativo mira hacia abajo).
@@ -80,21 +121,9 @@ const RESCUE_MATE_OFFSET := Vector3(1.5, 0.5, 0.0)
 ## Rapidez con que el cuerpo gira hacia donde camina en órbita libre, por segundo.
 @export var free_orbit_turn_speed: float = 10.0
 
-## Modos de cámara que rota la acción "camera_mode" de cada jugador:
-## THIRD_PERSON (por defecto; la vista gira el cuerpo), FIRST_PERSON (brazo
-## en los ojos y la foca propia oculta) y FREE_ORBIT (la cámara orbita y el
-## cuerpo mira hacia donde camina; las armas apuntan solas).
-enum CameraMode { THIRD_PERSON, FIRST_PERSON, FREE_ORBIT }
-
-## Capa visual del rig por slot: RIG_LAYER_BASE + slot + 1 en vez de la
-## capa 1, para que la cámara en primera persona oculte solo su propio
-## cuerpo y los compañeros lo sigan viendo.
-const RIG_LAYER_BASE: int = 10
-
 @export_group("Co-op")
 ## Slot del jugador (0-3): decide qué dispositivo lo controla; RunSystems asigna 1+ a los cuerpos extra.
 @export var player_index: int = 0
-
 ## Radio de rescate, en metros; arena_probe.gd se acerca a 2 m para revivir.
 @export var revive_radius: float = 3.0
 ## Segundos que un compañero debe mantener Interactuar para revivir.
@@ -104,13 +133,18 @@ const RIG_LAYER_BASE: int = 10
 ## Progreso de rescate que se pierde por segundo sin nadie ayudando (0-1 por segundo).
 @export var revive_decay_rate: float = 0.5
 
-## Cartel de rescate: las medidas del cartel de los interactuables
-## (interactable.gd), más arriba del cuerpo caído.
-const PROMPT_FONT_SIZE: int = 52
-const PROMPT_OUTLINE_SIZE: int = 14
-const PROMPT_HEIGHT: float = 2.6
-## Centinela de "el cartel nunca se pintó", distinto de "nadie lo revive" (-1).
-const PROMPT_PCT_UNSET: int = -2
+## Interruptor de prueba (ArenaProbe, BONK_WEAPON): id del arma con que
+## empieza el raider en vez de la de su personaje. Pasa por el mismo camino
+## de entrega (el node_name que cuenta el pool y el contador used_weapon_).
+static var starting_weapon_override: String = ""
+
+## Puntos actuales de la partida; otros scripts los leen con get("points").
+var points: int = 0
+
+## Mascota que sigue al raider ("" = ninguna). Hay un solo espacio: una
+## nueva reemplaza a la anterior, arma y stat incluidos. Solo la dan la caja
+## de mascotas y el traficante de animales, nunca un cofre ni la ruleta.
+var pet_id: String = ""
 
 @onready var spring_arm: SpringArm3D = $SpringArm3D
 @onready var collision_shape: CollisionShape3D = $CollisionShape3D
@@ -120,123 +154,9 @@ const PROMPT_PCT_UNSET: int = -2
 @onready var _stats: PlayerStats = $Stats
 @onready var item_bag: ItemBag = $ItemBag
 
-## Puntos de la partida (por jugador, se reinician cada partida): se ganan
-## por baja y se gastan en cofres, ruletas y manantiales.
-signal points_changed(total: int)
-## Se emite al EMPEZAR un derrape, con su dirección; lo escucha el
-## Cinturón eléctrico (ItemBag).
-signal slide_started(direction: Vector3)
-var points: int = 0
-
-
-# --- Mascota -----------------------------------------------------------------
-
-## Mascota que sigue al raider ("" = ninguna). Hay un solo espacio: una
-## nueva reemplaza a la anterior, arma y stat incluidos. Solo la dan la caja
-## de mascotas y el traficante de animales, nunca un cofre ni la ruleta.
-var pet_id: String = ""
-
-
-## Cambia la mascota: libera el nodo Pet anterior, crea el nuevo, avisa los
-## dos cambios con el toast de botín y recalcula los stats, que leen
-## `pet_id`. Con "" solo vacía el espacio.
-func set_pet(new_pet_id: String) -> void:
-	if new_pet_id == pet_id:
-		return
-	var leaving := PetCatalog.by_id(pet_id)
-	# Por TIPO y no por nombre: queue_free deja el nodo como hijo hasta el
-	# final del frame, y con dos set_pet en el mismo frame add_child
-	# renombraría la mascota nueva y quedarían dos siguiendo al raider.
-	for child: Node in get_children():
-		var old_pet := child as Pet
-		if old_pet != null:
-			old_pet.queue_free()
-	pet_id = new_pet_id
-	if not leaving.is_empty():
-		_announce_pet(PET_LEAVES % String(leaving.display_name),
-				PetCatalog.weapon_display_name(leaving), leaving)
-	if not pet_id.is_empty():
-		var row := PetCatalog.by_id(pet_id)
-		if row.is_empty():
-			push_warning("Player: unknown pet '%s'" % pet_id)
-			pet_id = ""
-		else:
-			var pet := Pet.new()
-			pet.setup(row)
-			add_child(pet)
-			_announce_pet(PET_JOINS % String(row.display_name),
-					String(row.get("stat_label", "")), row)
-			# Log de una línea. Va aquí y no en los vendedores: es la única
-			# puerta de entrada de una mascota.
-			print("Pet joined: %s" % pet_id)
-	var stats := PlayerStats.find_in(self)
-	if stats != null:
-		stats.recompute()
-
-
-func _announce_pet(title: String, description: String, row: Dictionary) -> void:
-	get_tree().call_group("hud", "show_loot", title, description,
-			row.get("color", Color.WHITE) as Color, player_index)
-
-
 ## Multiplicadores de puntos con nombre (Fiebre del oro, Lluvia dorada): el
 ## total es su PRODUCTO, así dos fuentes activas a la vez se componen.
 var _points_sources: Dictionary[String, float] = {}
-
-
-## Multiplicador total de puntos: producto de todas las fuentes activas.
-func points_multiplier() -> float:
-	var factor := 1.0
-	for source_id: String in _points_sources:
-		factor *= _points_sources[source_id]
-	return factor
-
-
-## Activa o actualiza una fuente de multiplicador (PowerUps y WorldDirector la llaman por nombre).
-func set_points_source(source_id: String, multiplier: float) -> void:
-	_points_sources[source_id] = multiplier
-
-
-## Quita una fuente de multiplicador.
-func clear_points_source(source_id: String) -> void:
-	_points_sources.erase(source_id)
-
-
-## Suma puntos con el multiplicador actual.
-func add_points(amount: int) -> void:
-	if amount <= 0:
-		return
-	# Redondea hacia arriba: un x1.5 sobre una baja de 1 punto paga 2, no 1.
-	points += ceili(float(amount) * points_multiplier())
-	points_changed.emit(points)
-
-
-## Descuenta si alcanza y devuelve true; si no alcanza, false sin cambiar nada.
-func spend_points(amount: int) -> bool:
-	if amount <= 0:
-		# Precio 0 es gratis (true). Un precio negativo es un error del
-		# llamador y se rechaza: si no, PAGARÍA al jugador.
-		return amount == 0
-	if amount > points:
-		return false
-	points -= amount
-	points_changed.emit(points)
-	return true
-
-## Textos del toast de mascota; los dos llevan el nombre (%s) para que un
-## cambio se lea como cambio y no como regalo.
-const PET_JOINS: String = "%s se une"
-const PET_LEAVES: String = "%s se despide"
-
-## Puntos caminables que se prueban al terminar Vuelo sobre una celda
-## bloqueada; gana el más cercano. Cada uno saca números del RNG de la
-## arena: cambiar la cantidad cambia las partidas con semilla.
-const FLIGHT_LANDING_SAMPLES: int = 24
-## Altura sobre el terreno, en metros, desde la que cae el raider al
-## aterrizar, para que se asiente sin empezar dentro del suelo.
-const FLIGHT_LANDING_CLEARANCE: float = 1.2
-## Margen respecto del borde de la arena mientras vuela, en metros.
-const FLIGHT_EDGE_MARGIN: float = 2.0
 
 var _gravity: float = ProjectSettings.get_setting("physics/3d/default_gravity", 9.8)
 var _default_collision_height: float = 1.8
@@ -283,6 +203,88 @@ var _last_prompt_pct: int = PROMPT_PCT_UNSET
 
 ## Punto de inicio de la etapa: el rescate del vacío devuelve aquí al raider.
 var _spawn_position: Vector3 = Vector3.ZERO
+
+
+## Cambia la mascota: libera el nodo Pet anterior, crea el nuevo, avisa los
+## dos cambios con el toast de botín y recalcula los stats, que leen
+## `pet_id`. Con "" solo vacía el espacio.
+func set_pet(new_pet_id: String) -> void:
+	if new_pet_id == pet_id:
+		return
+	var leaving := PetCatalog.by_id(pet_id)
+	# Por TIPO y no por nombre: queue_free deja el nodo como hijo hasta el
+	# final del frame, y con dos set_pet en el mismo frame add_child
+	# renombraría la mascota nueva y quedarían dos siguiendo al raider.
+	for child: Node in get_children():
+		var old_pet := child as Pet
+		if old_pet != null:
+			old_pet.queue_free()
+	pet_id = new_pet_id
+	if not leaving.is_empty():
+		_announce_pet(PET_LEAVES % String(leaving.display_name),
+				PetCatalog.weapon_display_name(leaving), leaving)
+	if not pet_id.is_empty():
+		var row := PetCatalog.by_id(pet_id)
+		if row.is_empty():
+			push_warning("Player: unknown pet '%s'" % pet_id)
+			pet_id = ""
+		else:
+			var pet := Pet.new()
+			pet.setup(row)
+			add_child(pet)
+			_announce_pet(PET_JOINS % String(row.display_name),
+					String(row.get("stat_label", "")), row)
+			# Log de una línea. Va aquí y no en los vendedores: es la única
+			# puerta de entrada de una mascota.
+			print("Pet joined: %s" % pet_id)
+	var stats := PlayerStats.find_in(self)
+	if stats != null:
+		stats.recompute()
+
+
+func _announce_pet(title: String, description: String, row: Dictionary) -> void:
+	get_tree().call_group("hud", "show_loot", title, description,
+			row.get("color", Color.WHITE) as Color, player_index)
+
+
+## Multiplicador total de puntos: producto de todas las fuentes activas.
+func points_multiplier() -> float:
+	var factor := 1.0
+	for source_id: String in _points_sources:
+		factor *= _points_sources[source_id]
+	return factor
+
+
+## Activa o actualiza una fuente de multiplicador (PowerUps y WorldDirector la llaman por nombre).
+func set_points_source(source_id: String, multiplier: float) -> void:
+	_points_sources[source_id] = multiplier
+
+
+## Quita una fuente de multiplicador.
+func clear_points_source(source_id: String) -> void:
+	_points_sources.erase(source_id)
+
+
+## Suma puntos con el multiplicador actual.
+func add_points(amount: int) -> void:
+	if amount <= 0:
+		return
+	# Redondea hacia arriba: un x1.5 sobre una baja de 1 punto paga 2, no 1.
+	points += ceili(float(amount) * points_multiplier())
+	points_changed.emit(points)
+
+
+## Descuenta si alcanza y devuelve true; si no alcanza, false sin cambiar nada.
+func spend_points(amount: int) -> bool:
+	if amount <= 0:
+		# Precio 0 es gratis (true). Un precio negativo es un error del
+		# llamador y se rechaza: si no, PAGARÍA al jugador.
+		return amount == 0
+	if amount > points:
+		return false
+	points -= amount
+	points_changed.emit(points)
+	return true
 
 
 func _ready() -> void:
@@ -673,11 +675,6 @@ func apply_root(duration: float) -> void:
 func is_rooted() -> bool:
 	return _root_timer > 0.0
 
-
-## Interruptor de prueba (ArenaProbe, BONK_WEAPON): id del arma con que
-## empieza el raider en vez de la de su personaje. Pasa por el mismo camino
-## de entrega (el node_name que cuenta el pool y el contador used_weapon_).
-static var starting_weapon_override: String = ""
 
 ## Aplica una fila de CharacterCatalog: crea el arma inicial bajo el montaje
 ## Weapons, cambia el modelo del cuerpo (la foca por defecto), lo tiñe y
