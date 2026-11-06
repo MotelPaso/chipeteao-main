@@ -13,6 +13,29 @@ extends CanvasLayer
 
 const CHARACTER_SELECT_SCENE_PATH := "res://scenes/ui/CharacterSelect.tscn"
 
+@export_group("Panel")
+## Margen interior del panel, en píxeles (horizontal, vertical).
+@export var panel_margin: Vector2 = Vector2(40.0, 26.0)
+## Espaciado extra entre letras del título, en píxeles. Tamaño, color y contorno
+## del título están en el nodo TitleLabel de PauseMenu.tscn.
+@export var title_letter_spacing: int = 8
+
+@export_group("Entrada")
+## Segundos que tarda en subir el fondo oscuro al abrir.
+@export var dim_fade_time: float = 0.15
+## Segundos que tarda el panel en aparecer al abrir.
+@export var panel_fade_time: float = 0.14
+## Escala desde la que crece el panel al abrir.
+@export var panel_start_scale: float = 0.94
+## Segundos que tarda el panel en llegar a su tamaño, con un rebote al final.
+@export var panel_grow_time: float = 0.2
+
+@export_group("Textos")
+## Indicación del botón de aceptar bajo los botones.
+@export var accept_hint_text: String = "Elegir"
+## Indicación del botón de volver bajo los botones.
+@export var cancel_hint_text: String = "Continuar"
+
 @onready var _root: Control = %Root
 @onready var _dim: ColorRect = %Dim
 @onready var _menu_panel: PanelContainer = %MenuPanel
@@ -42,7 +65,7 @@ func _ready() -> void:
 	_settings_panel.closed.connect(_on_settings_closed)
 	# Indicaciones de botón bajo los botones; siguen al último dispositivo usado.
 	_resume_button.get_parent().add_child(InputHints.build([
-			["ui_accept", "Elegir"], ["ui_cancel", "Continuar"]]))
+			["ui_accept", accept_hint_text], ["ui_cancel", cancel_hint_text]]))
 
 
 ## pause_game (Esc / Start) abre y cierra el menú. ui_cancel (B en un control)
@@ -87,13 +110,13 @@ func _open() -> void:
 	_kill_open_tween()
 	_dim.modulate.a = 0.0
 	_menu_panel.pivot_offset = _menu_panel.size * 0.5
-	_menu_panel.scale = Vector2(0.94, 0.94)
+	_menu_panel.scale = Vector2.ONE * panel_start_scale
 	_menu_panel.modulate.a = 0.0
 	_open_tween = create_tween().set_parallel()
 	_open_tween.set_ignore_time_scale(true)
-	_open_tween.tween_property(_dim, "modulate:a", 1.0, 0.15)
-	_open_tween.tween_property(_menu_panel, "modulate:a", 1.0, 0.14)
-	_open_tween.tween_property(_menu_panel, "scale", Vector2.ONE, 0.2) \
+	_open_tween.tween_property(_dim, "modulate:a", 1.0, dim_fade_time)
+	_open_tween.tween_property(_menu_panel, "modulate:a", 1.0, panel_fade_time)
+	_open_tween.tween_property(_menu_panel, "scale", Vector2.ONE, panel_grow_time) \
 			.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 
 
@@ -159,8 +182,8 @@ func _on_quit_pressed() -> void:
 ## verde azulado como acción principal.
 func _apply_styles() -> void:
 	_menu_panel.add_theme_stylebox_override("panel",
-			UiTheme.panel(UiTheme.PANEL_BG, UiTheme.BORDER_DIM, 40.0, 26.0))
-	UiTheme.style_title(_title_label, 44, UiTheme.TEXT_BRIGHT, 8, 10)
+			UiTheme.panel(UiTheme.PANEL_BG, UiTheme.BORDER_DIM, panel_margin.x, panel_margin.y))
+	_title_label.add_theme_font_override("font", UiTheme.spaced_font(title_letter_spacing))
 	UiTheme.style_button(_resume_button, UiTheme.ACCENT, true)
 	UiTheme.style_button(_settings_button)
 	UiTheme.style_button(_extract_button, UiTheme.ACCENT_AMBER)
