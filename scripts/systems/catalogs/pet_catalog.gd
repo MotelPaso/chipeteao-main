@@ -126,4 +126,4 @@ static func weapon_display_name(row: Dictionary) -> String:
 	var scene := String(row.get("weapon_scene", ""))
 	if scene.is_empty():
 		return ""
-	return UpgradePool.weapon_display_name(scene.get_file().get_basename())
+	return WeaponCatalog.display_name_for_node(scene.get_file().get_basename())

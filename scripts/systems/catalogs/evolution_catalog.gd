@@ -197,7 +197,7 @@ static func try_advance_by_level(weapon: WeaponBase, player: Node) -> bool:
 	_celebrate(player)
 	_announce("¡%s asciende!" % weapon_display(weapon))
 	print("Weapon ascended: %s tier %d"
-			% [UpgradePool.weapon_id_for_node(weapon.name), tier])
+			% [WeaponCatalog.id_for_node(weapon.name), tier])
 	return true
 
 
@@ -206,18 +206,18 @@ static func try_advance_by_level(weapon: WeaponBase, player: Node) -> bool:
 static func weapon_display(weapon: WeaponBase) -> String:
 	if weapon.evolved and not weapon.evolved_name.is_empty():
 		return weapon.evolved_name
-	return UpgradePool.weapon_display_name(weapon.name)
+	return WeaponCatalog.display_name_for_node(weapon.name)
 
 
 ## Celebración común de evoluciones y ascensos: fanfarria, destello sobre
 ## quien lleva el arma y sacudida de cámara. Los autoloads se buscan con
-## UpgradePool.autoload_node: un harness `-s` no los tiene y debe seguir sin
-## ellos en vez de abortar.
+## AutoloadLookup: un harness `-s` no los tiene y debe seguir sin ellos en
+## vez de abortar.
 static func _celebrate(player: Node) -> void:
-	var sfx := UpgradePool.autoload_node(&"Sfx")
+	var sfx := AutoloadLookup.find(&"Sfx")
 	if sfx != null:
 		sfx.play(&"secret_fanfare")
-	var juice := UpgradePool.autoload_node(&"Juice")
+	var juice := AutoloadLookup.find(&"Juice")
 	if juice != null:
 		if player is Node3D:
 			juice.sparkle((player as Node3D).global_position + Vector3.UP * 1.2)
@@ -235,7 +235,7 @@ static func _announce(message: String) -> void:
 ## Contadores de Colección y misiones de una evolución (los ascensos no
 ## tienen contadores propios).
 static func _record_evolution(weapon_id: String) -> void:
-	var save_data := UpgradePool.autoload_node(&"SaveData")
+	var save_data := AutoloadLookup.find(&"SaveData")
 	if save_data != null:
 		save_data.bump("evo_" + weapon_id)
 		save_data.bump("evolutions_total")

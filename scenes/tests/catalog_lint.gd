@@ -98,7 +98,7 @@ func _check_ids_unique() -> void:
 ## nombre, biblioteca, llave del id.
 func _id_libraries() -> Array[Array]:
 	return [
-		["WEAPON_LIBRARY", UpgradePool.WEAPON_LIBRARY, "id"],
+		["WEAPON_LIBRARY", WeaponCatalog.WEAPON_LIBRARY, "id"],
 		["EVOLUTION_LIBRARY", EvolutionCatalog.EVOLUTION_LIBRARY, "weapon_id"],
 		["TOME_LIBRARY", Tome.TOME_LIBRARY, "id"],
 		["ITEM_LIBRARY", ItemCatalog.ITEM_LIBRARY, "id"],
@@ -122,7 +122,7 @@ func _check_glyphs_unique() -> void:
 	var rows := 0
 	var seen: Dictionary[String, String] = {}
 	var sources: Array[Array] = [
-		["WEAPON_LIBRARY", UpgradePool.WEAPON_LIBRARY, "id"],
+		["WEAPON_LIBRARY", WeaponCatalog.WEAPON_LIBRARY, "id"],
 		["EVOLUTION_LIBRARY", EvolutionCatalog.EVOLUTION_LIBRARY, "weapon_id"],
 		["TOME_LIBRARY", Tome.TOME_LIBRARY, "id"],
 		["ITEM_LIBRARY", ItemCatalog.ITEM_LIBRARY, "id"],
@@ -152,7 +152,7 @@ func _check_paths_exist() -> void:
 	var failures: Array[String] = []
 	var rows := 0
 	var sources: Array[Array] = [
-		["WEAPON_LIBRARY", UpgradePool.WEAPON_LIBRARY, "id"],
+		["WEAPON_LIBRARY", WeaponCatalog.WEAPON_LIBRARY, "id"],
 		["PET_LIBRARY", PetCatalog.PET_LIBRARY, "id"],
 		["CHARACTER_LIBRARY", CharacterCatalog.CHARACTER_LIBRARY, "id"],
 		["MAP_LIBRARY", MapCatalog.MAP_LIBRARY, "id"],
@@ -272,7 +272,7 @@ func _check_character_weapons() -> void:
 	var failures: Array[String] = []
 	var rows := 0
 	var node_names: Dictionary[String, bool] = {}
-	for row: Dictionary in UpgradePool.WEAPON_LIBRARY:
+	for row: Dictionary in WeaponCatalog.WEAPON_LIBRARY:
 		node_names[String(row.get("node_name", ""))] = true
 	for row: Dictionary in CharacterCatalog.CHARACTER_LIBRARY:
 		rows += 1
@@ -322,12 +322,12 @@ func _check_weapon_properties() -> void:
 	var failures: Array[String] = []
 	var rows := 0
 	var by_node: Dictionary[String, Dictionary] = {}
-	for row: Dictionary in UpgradePool.WEAPON_LIBRARY:
+	for row: Dictionary in WeaponCatalog.WEAPON_LIBRARY:
 		by_node[String(row.get("node_name", ""))] = row
 	var properties: Dictionary[String, Dictionary] = {}
 	for node_name: String in by_node:
 		properties[node_name] = _weapon_properties(String(by_node[node_name].get("scene", "")))
-	for row: Dictionary in UpgradePool.WEAPON_LIBRARY:
+	for row: Dictionary in WeaponCatalog.WEAPON_LIBRARY:
 		for extra: Dictionary in (row.get("extra_entries", []) as Array):
 			var target := String(extra.get("target", ""))
 			if not target.begins_with("weapon/"):
