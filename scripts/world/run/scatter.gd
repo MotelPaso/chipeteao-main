@@ -8,15 +8,6 @@ extends Node3D
 ## (sin navmesh) siempre tenga pasillos anchos. Las copas no tienen
 ## colisión: solo bloquean troncos y rocas.
 
-## Los cuatro pasos de la vecindad-4 de la máscara: crecimiento, relleno de
-## muescas, flood fill y división en regiones usan la misma.
-const STEPS: Array[Vector2i] = [Vector2i.LEFT, Vector2i.RIGHT, Vector2i.UP, Vector2i.DOWN]
-## "Ninguna celda", para el selector de semillas de formación.
-const NO_CELL := Vector2i(-1, -1)
-## Atracción hacia celdas ya rodeadas por dos o más lados mientras la
-## formación crece: da masas sólidas en vez de brazos de una celda.
-const FORMATION_COMPACTNESS: float = 1.0
-
 ## Semilla fija del reparto. Solo se usa con randomize_per_run apagado.
 @export var scatter_seed: int = 71382
 
@@ -77,14 +68,6 @@ const FORMATION_COMPACTNESS: float = 1.0
 ## Si la fracción abierta (0-1) queda bajo esto, la máscara se reconstruye
 ## con menos formaciones.
 @export var mask_min_open_fraction: float = 0.84
-
-## Celdas bloqueadas (coordenadas de cuadrícula -> true) y celdas por lado.
-var _blocked: Dictionary[Vector2i, bool] = {}
-var _mask_cells_per_side: int = 0
-## Se fija en _enter_tree (ver run_seed).
-var _run_seed: int = 0
-## Centros planos de las mesetas de esta etapa (ver mesa_sites).
-var _mesa_sites: PackedVector2Array = PackedVector2Array()
 
 @export_group("Mesas (iteration 51)")
 ## Mesetas (plataforma + rampa) por etapa; el Terrain aplana un claro bajo
@@ -162,12 +145,19 @@ var _mesa_sites: PackedVector2Array = PackedVector2Array()
 @export var perimeter_step: float = 9.0
 @export var perimeter_rock_every: int = 5
 
-var _rng := RandomNumberGenerator.new()
-var _placed_xz: PackedVector2Array = PackedVector2Array()
-var _keepouts_xz: PackedVector2Array = PackedVector2Array()
-
 ## Colocaciones interiores que agotaron sus intentos de muestreo.
 var failed_placements: int = 0
+
+## RNG del reparto. La máscara saca números de este mismo objeto.
+var _rng := RandomNumberGenerator.new()
+## Máscara de celdas caminables (arena_mask.gd); se arma en _enter_tree.
+var _mask: ArenaMask = null
+## Se fija en _enter_tree (ver run_seed).
+var _run_seed: int = 0
+## Centros planos de las mesetas de esta etapa (ver mesa_sites).
+var _mesa_sites: PackedVector2Array = PackedVector2Array()
+var _placed_xz: PackedVector2Array = PackedVector2Array()
+var _keepouts_xz: PackedVector2Array = PackedVector2Array()
 
 
 func _enter_tree() -> void:
@@ -190,8 +180,9 @@ func _enter_tree() -> void:
 	_run_seed = int(_rng.seed)
 	# La máscara debe existir antes del _ready del Terrain y antes de que el
 	# WorldDirector baraje los interactuables (desde Arena._ready).
+	_mask = _new_mask()
 	if mask_enabled:
-		_build_mask()
+		_mask.build(_protected_seeds())
 	# Sitios de meseta justo después de la máscara: el Terrain los lee como
 	# claros planos en su _ready, y place_props() construye cada meseta.
 	_pick_mesa_sites()
@@ -269,7 +260,7 @@ func _is_clear(pos: Vector3) -> bool:
 	var flat := Vector2(pos.x, pos.z)
 	if flat.length() < spawn_clear_radius:
 		return false
-	if not _clear_of_mask(flat, formation_clearance):
+	if not _mask.clear_of(flat, formation_clearance):
 		return false
 	for keepout in _keepouts_xz:
 		if keepout.distance_to(flat) < keepout_radius:
@@ -365,8 +356,8 @@ func _pick_mesa_sites() -> void:
 				_rng.randf_range(-mesa_half_extent, mesa_half_extent))
 		if candidate.length() < mesa_min_spacing:
 			continue
-		if mask_enabled and not (_clear_of_mask(candidate, mesa_clearance)
-				and _clear_of_mask(candidate, mesa_clearance * 0.5)):
+		if mask_enabled and not (_mask.clear_of(candidate, mesa_clearance)
+				and _mask.clear_of(candidate, mesa_clearance * 0.5)):
 			continue
 		var clear := true
 		for other: Vector2 in authored:
@@ -425,45 +416,22 @@ func _build_mesas() -> void:
 		_keepouts_xz.append(site)
 
 
-## --- máscara de la arena --------------------------------------------------
-
-func _cell_of(xz: Vector2) -> Vector2i:
-	return Vector2i(
-			floori((xz.x + arena_half_extent) / mask_cell_size),
-			floori((xz.y + arena_half_extent) / mask_cell_size))
-
-
-func _cell_center(cell: Vector2i) -> Vector2:
-	return Vector2(
-			-arena_half_extent + (float(cell.x) + 0.5) * mask_cell_size,
-			-arena_half_extent + (float(cell.y) + 0.5) * mask_cell_size)
-
-
-func _in_grid(cell: Vector2i) -> bool:
-	return cell.x >= 0 and cell.y >= 0 \
-			and cell.x < _mask_cells_per_side and cell.y < _mask_cells_per_side
-
+## --- máscara de la arena (fachada) ----------------------------------------
+## Estos métodos los llaman otros nodos por el grupo "arena_bounds" (spawner,
+## director, jefes, jugador, mapa, harness): conservar nombres y firmas.
 
 ## True si una posición plana está dentro de la arena y no cae en una celda
 ## bloqueada. Todo lo que coloca cuerpos o POIs pregunta esto primero.
 func is_walkable(xz: Vector2) -> bool:
-	if absf(xz.x) > arena_half_extent or absf(xz.y) > arena_half_extent:
-		return false
-	if not mask_enabled or _mask_cells_per_side == 0:
-		return true
-	# La cuadrícula, no solo el cuadrado: un punto en exactamente
-	# +-half_extent cae una celda FUERA de la última fila, y una celda fuera
-	# de la cuadrícula nunca está en _blocked.
-	var cell := _cell_of(xz)
-	return _in_grid(cell) and not _blocked.has(cell)
+	return _mask.is_walkable(xz)
 
 
 func blocked_cell_count() -> int:
-	return _blocked.size()
+	return _mask.blocked_cell_count()
 
 
 func open_cell_count() -> int:
-	return _mask_cells_per_side * _mask_cells_per_side - _blocked.size()
+	return _mask.open_cell_count()
 
 
 func cell_size() -> float:
@@ -474,274 +442,56 @@ func cell_size() -> float:
 ## del harness, que recorre el borde de cada celda bloqueada buscando un
 ## hueco por donde quepa la cápsula del jugador.
 func blocked_cells() -> Array[Vector2i]:
-	var cells: Array[Vector2i] = []
-	for cell: Vector2i in _blocked:
-		cells.append(cell)
-	return cells
+	return _mask.blocked_cells()
 
 
 ## Centro plano de una celda. Público junto a blocked_cells() para que el
-## harness use la misma aritmética que el scatter y nunca discrepen sobre
+## harness use la misma aritmética que la máscara y nunca discrepen sobre
 ## dónde está un borde.
 func cell_center(cell: Vector2i) -> Vector2:
-	return _cell_center(cell)
+	return _mask.cell_center(cell)
 
 
 ## Celda donde cae una posición plana. Pública para que un aviso nombre la
 ## celda y no solo los metros.
 func cell_of(xz: Vector2) -> Vector2i:
-	return _cell_of(xz)
+	return _mask.cell_of(xz)
 
 
 ## Un punto plano caminable al azar (uniforme sobre el área abierta), o el
-## origen si 64 intentos fallan.
+## origen si 64 intentos fallan. Saca números del RNG del reparto.
 func random_walkable_point(margin: float = 4.0) -> Vector2:
-	for attempt in 64:
-		var candidate := Vector2(
-				_rng.randf_range(-arena_half_extent + margin, arena_half_extent - margin),
-				_rng.randf_range(-arena_half_extent + margin, arena_half_extent - margin))
-		if is_walkable(candidate):
-			return candidate
-	return Vector2.ZERO
+	return _mask.random_walkable_point(margin)
 
 
-## Celdas que deben quedar abiertas: toda celda a menos de
-## mask_protect_radius del spawn o de un keepout de autor (spots de
-## verticalidad, grupos de rocas).
-func _protected_cells() -> Dictionary[Vector2i, bool]:
-	var protected: Dictionary[Vector2i, bool] = {}
+## Arma la máscara con los exports de este nodo y el RNG del reparto.
+func _new_mask() -> ArenaMask:
+	var mask := ArenaMask.new(_rng)
+	mask.enabled = mask_enabled
+	mask.half_extent = arena_half_extent
+	mask.cell_size = mask_cell_size
+	mask.blobs_min = mask_blobs_min
+	mask.blobs_max = mask_blobs_max
+	mask.blob_cells_min = mask_blob_cells_min
+	mask.blob_cells_max = mask_blob_cells_max
+	mask.ridge_bias = mask_ridge_bias
+	mask.blob_spacing = mask_blob_spacing
+	mask.formation_gap = mask_formation_gap
+	mask.border_cells = mask_border_cells
+	mask.protect_radius = mask_protect_radius
+	mask.min_open_fraction = mask_min_open_fraction
+	return mask
+
+
+## Puntos planos donde nunca hay roca: el spawn y cada keepout de autor
+## (spots de verticalidad, grupos de rocas), en orden de grupo.
+func _protected_seeds() -> Array[Vector2]:
 	var seeds: Array[Vector2] = [Vector2.ZERO]
 	for node: Node in get_tree().get_nodes_in_group("scatter_keepout"):
 		var spot := node as Node3D
 		if spot != null and not (spot is Interactable):
 			seeds.append(Vector2(spot.global_position.x, spot.global_position.z))
-	var reach := ceili(mask_protect_radius / mask_cell_size) + 1
-	var half := mask_cell_size * 0.5
-	for seed_xz: Vector2 in seeds:
-		var home := _cell_of(seed_xz)
-		for dx in range(-reach, reach + 1):
-			for dy in range(-reach, reach + 1):
-				var cell := home + Vector2i(dx, dy)
-				# Distancia de la semilla al CUADRADO de la celda, no a su
-				# centro: una celda que el círculo apenas toca sigue siendo
-				# suelo que el spot necesita.
-				var center := _cell_center(cell)
-				var gap := Vector2(maxf(absf(seed_xz.x - center.x) - half, 0.0),
-						maxf(absf(seed_xz.y - center.y) - half, 0.0))
-				if gap.length() <= mask_protect_radius:
-					protected[cell] = true
-	return protected
-
-
-func _build_mask() -> void:
-	_mask_cells_per_side = maxi(ceili(arena_half_extent * 2.0 / mask_cell_size), 3)
-	var protected := _protected_cells()
-	var formations := _rng.randi_range(mask_blobs_min, mask_blobs_max)
-	for attempt in 4:
-		_blocked.clear()
-		var seeds: Array[Vector2i] = []
-		# Qué formación creció cada celda bloqueada, para que la siguiente
-		# guarde mask_formation_gap respecto de ella.
-		var owners: Dictionary[Vector2i, int] = {}
-		for formation in formations:
-			var seed_cell := _pick_formation_seed(seeds, protected, owners)
-			if seed_cell == NO_CELL:
-				continue
-			seeds.append(seed_cell)
-			_grow_formation(seed_cell,
-					_rng.randi_range(mask_blob_cells_min, mask_blob_cells_max),
-					protected, owners, seeds.size())
-		_fill_notches(protected)
-		_seal_unreachable(protected)
-		if float(open_cell_count()) / float(_mask_cells_per_side * _mask_cells_per_side) \
-				>= mask_min_open_fraction:
-			break
-		formations = maxi(formations - 1, 1)
-	var cells := _mask_cells_per_side * _mask_cells_per_side
-	# El log da la FRACCIÓN ABIERTA, la cifra que persigue el bucle de
-	# reconstrucción de arriba (mask_min_open_fraction).
-	print("Arena mask: %d/%d cells blocked, open=%.2f" % [
-			_blocked.size(), cells, float(open_cell_count()) / float(maxi(cells, 1))])
-
-
-## True donde la roca puede sembrar o crecer: dentro de la cuadrícula,
-## fuera del anillo de borde abierto y fuera de las celdas protegidas
-## (spawn, verticalidad de autor).
-func _rock_may_grow(cell: Vector2i, protected: Dictionary[Vector2i, bool]) -> bool:
-	var last := _mask_cells_per_side - 1 - mask_border_cells
-	return cell.x >= mask_border_cells and cell.y >= mask_border_cells \
-			and cell.x <= last and cell.y <= last and not protected.has(cell)
-
-
-## Celda semilla para la siguiente formación: a mask_blob_spacing celdas o
-## más (Chebyshev) de cada semilla previa y libre de las formaciones ya
-## crecidas, o NO_CELL si la etapa está llena.
-func _pick_formation_seed(seeds: Array[Vector2i], protected: Dictionary[Vector2i, bool],
-		owners: Dictionary[Vector2i, int]) -> Vector2i:
-	for attempt in 32:
-		var cell := Vector2i(
-				_rng.randi_range(mask_border_cells, _mask_cells_per_side - 1 - mask_border_cells),
-				_rng.randi_range(mask_border_cells, _mask_cells_per_side - 1 - mask_border_cells))
-		if _blocked.has(cell) or not _rock_may_grow(cell, protected):
-			continue
-		if _crowds_formation(cell, -1, owners):
-			continue
-		var crowded := false
-		for other: Vector2i in seeds:
-			if maxi(absi(other.x - cell.x), absi(other.y - cell.y)) < mask_blob_spacing:
-				crowded = true
-				break
-		if not crowded:
-			return cell
-	return NO_CELL
-
-
-## True si `cell` está a mask_formation_gap celdas o menos (Chebyshev) de
-## una celda crecida por cualquier formación distinta de `index`.
-func _crowds_formation(cell: Vector2i, index: int, owners: Dictionary[Vector2i, int]) -> bool:
-	for dx in range(-mask_formation_gap, mask_formation_gap + 1):
-		for dy in range(-mask_formation_gap, mask_formation_gap + 1):
-			var owner_index: int = owners.get(cell + Vector2i(dx, dy), index)
-			if owner_index != index:
-				return true
-	return false
-
-
-## Hace crecer una formación desde `start` hasta `size` celdas por
-## acreción: cada paso añade una celda de la frontera (los vecinos-4 libres
-## de lo ya crecido), con peso hacia el eje propio de la formación (crestas)
-## y hacia celdas ya rodeadas por dos o más lados (masas sólidas).
-func _grow_formation(start: Vector2i, size: int, protected: Dictionary[Vector2i, bool],
-		owners: Dictionary[Vector2i, int], index: int) -> void:
-	var axis := Vector2.from_angle(_rng.randf_range(0.0, TAU))
-	var stretch := _rng.randf_range(0.0, mask_ridge_bias)
-	var grown: Dictionary[Vector2i, bool] = {}
-	var frontier: Dictionary[Vector2i, bool] = {}
-	var next_cell := start
-	while true:
-		grown[next_cell] = true
-		frontier.erase(next_cell)
-		_blocked[next_cell] = true
-		owners[next_cell] = index
-		if grown.size() >= size:
-			return
-		for step: Vector2i in STEPS:
-			var next := next_cell + step
-			if not grown.has(next) and _rock_may_grow(next, protected) \
-					and not _crowds_formation(next, index, owners):
-				frontier[next] = true
-		if frontier.is_empty():
-			return
-		var options: Array[Vector2i] = []
-		var weights: Array[float] = []
-		var total := 0.0
-		for cell: Vector2i in frontier:
-			var along := absf(Vector2(cell - start).normalized().dot(axis))
-			var walls := 0
-			for side: Vector2i in STEPS:
-				if grown.has(cell + side):
-					walls += 1
-			var weight := 1.0 + stretch * along * along \
-					+ FORMATION_COMPACTNESS * float(walls - 1)
-			options.append(cell)
-			weights.append(weight)
-			total += weight
-		var pick := _rng.randf() * total
-		next_cell = options[options.size() - 1]
-		for option in options.size():
-			pick -= weights[option]
-			if pick <= 0.0:
-				next_cell = options[option]
-				break
-
-
-## Las celdas abiertas rodeadas de roca por tres o cuatro lados se vuelven
-## roca: una muesca cerrada por tres lados no sirve para pelear, y su
-## contorno cuadrado es lo único que el margen de la formación no esconde.
-func _fill_notches(protected: Dictionary[Vector2i, bool]) -> void:
-	for sweep in 3:
-		var notches: Array[Vector2i] = []
-		for x in _mask_cells_per_side:
-			for y in _mask_cells_per_side:
-				var cell := Vector2i(x, y)
-				if _blocked.has(cell) or not _rock_may_grow(cell, protected):
-					continue
-				var walls := 0
-				for step: Vector2i in STEPS:
-					if _blocked.has(cell + step):
-						walls += 1
-				if walls >= 3:
-					notches.append(cell)
-		if notches.is_empty():
-			return
-		for cell: Vector2i in notches:
-			_blocked[cell] = true
-
-
-## Flood fill desde la celda del spawn; las celdas abiertas que no alcanza
-## se sellan, así toda celda abierta que queda se alcanza a pie. Las celdas
-## PROTEGIDAS (spawn y spots de verticalidad) nunca se sellan: si una quedó
-## aislada, se abre un pasillo hasta suelo alcanzado y se repite el relleno.
-## Así se cumplen las dos cosas: todo lo abierto es alcanzable y ningún spot
-## de autor queda bajo una formación.
-func _seal_unreachable(protected: Dictionary[Vector2i, bool]) -> void:
-	var reached := _reachable_cells()
-	var carved := false
-	for cell: Vector2i in protected:
-		if not _in_grid(cell) or reached.has(cell):
-			continue
-		if _carve_corridor(cell, reached):
-			carved = true
-	if carved:
-		reached = _reachable_cells()
-	for x in _mask_cells_per_side:
-		for y in _mask_cells_per_side:
-			var cell := Vector2i(x, y)
-			if not reached.has(cell):
-				_blocked[cell] = true
-
-
-## Flood fill vecindad-4 desde la celda del spawn sobre las celdas abiertas.
-func _reachable_cells() -> Dictionary[Vector2i, bool]:
-	var start := _cell_of(Vector2.ZERO)
-	var reached: Dictionary[Vector2i, bool] = {start: true}
-	var frontier: Array[Vector2i] = [start]
-	while not frontier.is_empty():
-		var cell: Vector2i = frontier.pop_back()
-		for step: Vector2i in STEPS:
-			var next := cell + step
-			if not _in_grid(next) or reached.has(next) or _blocked.has(next):
-				continue
-			reached[next] = true
-			frontier.append(next)
-	return reached
-
-
-## Desbloquea una escalera de celdas desde `from` hasta la celda alcanzada
-## más cercana. Conexa-4 a propósito (un eje por paso), para que el pasillo
-## se camine con la misma vecindad del flood fill. True si abrió algo.
-func _carve_corridor(from: Vector2i, reached: Dictionary[Vector2i, bool]) -> bool:
-	var target := from
-	var best := INF
-	for cell: Vector2i in reached:
-		var distance := Vector2(cell - from).length_squared()
-		if distance < best:
-			best = distance
-			target = cell
-	if target == from:
-		return false
-	var carved := false
-	var cursor := from
-	_blocked.erase(cursor)
-	while cursor != target:
-		var delta := target - cursor
-		if absi(delta.x) >= absi(delta.y):
-			cursor.x += signi(delta.x)
-		else:
-			cursor.y += signi(delta.y)
-		if _blocked.erase(cursor):
-			carved = true
-	return carved
+	return seeds
 
 
 ## Cada región conexa de celdas bloqueadas se vuelve UNA RockFormation que
@@ -751,13 +501,13 @@ func _carve_corridor(from: Vector2i, reached: Dictionary[Vector2i, bool]) -> boo
 ## caminar su cresta, y sobre una región hueca caería a suelo que la máscara
 ## llama inalcanzable y quedaría atrapado.
 func _raise_formations() -> void:
-	if _blocked.is_empty():
+	if _mask.blocked_cell_count() == 0:
 		return
 	var started := Time.get_ticks_msec()
 	var terrain := Terrain.find(get_tree())
 	if terrain != null:
 		terrain.ensure_built()
-	var regions := _blocked_regions()
+	var regions := _mask.blocked_regions()
 	var faces := 0
 	var shapes := 0
 	var seal_low := 0
@@ -786,39 +536,3 @@ func _raise_formations() -> void:
 	if seal_low > 0:
 		push_warning("Rock formations: %d boundary vertices under %.1f m — the mask seal is thin there"
 				% [seal_low, RockFormation.SEAL_MIN_HEIGHT])
-
-
-## Las celdas bloqueadas divididas en regiones conexas-4, cada una un
-## conjunto (celda -> true) con la forma que recibe RockFormation.build().
-func _blocked_regions() -> Array[Dictionary]:
-	var regions: Array[Dictionary] = []
-	var seen: Dictionary[Vector2i, bool] = {}
-	for start: Vector2i in _blocked:
-		if seen.has(start):
-			continue
-		var region: Dictionary[Vector2i, bool] = {start: true}
-		seen[start] = true
-		var frontier: Array[Vector2i] = [start]
-		while not frontier.is_empty():
-			var cell: Vector2i = frontier.pop_back()
-			for step: Vector2i in STEPS:
-				var next := cell + step
-				if _blocked.has(next) and not seen.has(next):
-					seen[next] = true
-					region[next] = true
-					frontier.append(next)
-		regions.append(region)
-	return regions
-
-
-## True si `center` y los ocho puntos a `radius` a su alrededor son
-## caminables: la prueba barata de "ninguna formación llega aquí".
-func _clear_of_mask(center: Vector2, radius: float) -> bool:
-	if not is_walkable(center):
-		return false
-	if not mask_enabled or radius <= 0.0:
-		return true
-	for index in 8:
-		if not is_walkable(center + Vector2.from_angle(float(index) * TAU / 8.0) * radius):
-			return false
-	return true
