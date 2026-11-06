@@ -111,14 +111,6 @@ static func by_id(pet_id: String) -> Dictionary:
 	return _by_id.get(pet_id, {})
 
 
-## Ids en el orden del catálogo.
-static func ids() -> PackedStringArray:
-	var out := PackedStringArray()
-	for row: Dictionary in PET_LIBRARY:
-		out.append(String(row.id))
-	return out
-
-
 ## Nombre del arma de la mascota según el catálogo de armas. Sale del nombre
 ## del archivo de la escena, que es el node_name de WEAPON_LIBRARY
 ## (StormRod.tscn -> "StormRod"); el nodo vivo se llama "PetWeapon" y no sirve.

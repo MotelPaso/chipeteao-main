@@ -38,6 +38,11 @@ extends Node
 signal shards_changed(balance: int)
 
 const DEFAULT_SAVE_PATH := "user://save.json"
+## Variable de entorno solo para pruebas: BONK_SAVE_PATH apunta el libro a
+## otro archivo antes de la primera lectura, así cualquier arranque headless
+## corre sin tocar el guardado real del jugador. El harness de soak además
+## redirige por su cuenta, antes, porque arranca la incursión él mismo.
+const SAVE_PATH_ENV: String = "BONK_SAVE_PATH"
 const SAVE_VERSION := 1
 ## save() escribe primero aquí y solo renombra si salió bien, así una
 ## escritura interrumpida nunca trunca el archivo real...
@@ -90,11 +95,6 @@ var purchased_character_ids: Array[String] = []
 ## aquí los créditos que sobrevivieron al final de una incursión (o que
 ## ocurrieron fuera de una); es el diccionario que save() escribe.
 var counters: Dictionary[String, int] = {}
-## Búfer de la incursión: bump() suma aquí (como delta) y raise_to() en
-## _run_highs (como máximo absoluto); los dos llegan a `counters` solo cuando
-## fold_run_results los mezcla. Abandonar los descarta.
-var _run_counters: Dictionary[String, int] = {}
-var _run_highs: Dictionary[String, int] = {}
 ## Misiones que llegaron a su meta; se pueden reclamar hasta pasar a claimed.
 var completed_quest_ids: Array[String] = []
 var claimed_quest_ids: Array[String] = []
@@ -105,11 +105,6 @@ var last_new_quest_ids: Array[String] = []
 var last_reward_shards: int = 0
 ## Rangos de la Armería comprados por id de reliquia (ver RelicCatalog).
 var relic_ranks: Dictionary[String, int] = {}
-
-## True cuando el archivo en disco lo escribió una versión MÁS NUEVA: su
-## esquema es desconocido aquí, así que esta versión juega con lo que pudo
-## leer y nunca escribe, para no degradar progreso real en silencio.
-var _read_only: bool = false
 
 # --- Ajustes (valores guardados; el autoload Settings los aplica a los buses
 # y a la ventana y es el único que los escribe, ver settings_apply.gd) ------
@@ -124,12 +119,16 @@ var show_fps: bool = false
 ## Índice del preset gráfico, 0..MAX_GRAPHICS_QUALITY (ver la const de arriba).
 var graphics_quality: int = DEFAULT_GRAPHICS_QUALITY
 
+## Búfer de la incursión: bump() suma aquí (como delta) y raise_to() en
+## _run_highs (como máximo absoluto); los dos llegan a `counters` solo cuando
+## fold_run_results los mezcla. Abandonar los descarta.
+var _run_counters: Dictionary[String, int] = {}
+var _run_highs: Dictionary[String, int] = {}
 
-## Variable de entorno solo para pruebas: BONK_SAVE_PATH apunta el libro a
-## otro archivo antes de la primera lectura, así cualquier arranque headless
-## corre sin tocar el guardado real del jugador. El harness de soak además
-## redirige por su cuenta, antes, porque arranca la incursión él mismo.
-const SAVE_PATH_ENV: String = "BONK_SAVE_PATH"
+## True cuando el archivo en disco lo escribió una versión MÁS NUEVA: su
+## esquema es desconocido aquí, así que esta versión juega con lo que pudo
+## leer y nunca escribe, para no degradar progreso real en silencio.
+var _read_only: bool = false
 
 
 func _ready() -> void:
