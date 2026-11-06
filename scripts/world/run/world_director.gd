@@ -115,16 +115,6 @@ const EVENT_LIBRARY: Array[Dictionary] = [
 	},
 ]
 
-## Intentos de muestreo para un punto libre de POI, y para el anillo de un
-## punto de evento antes de recurrir al muestreo de inicio.
-const CLEAR_POINT_ATTEMPTS: int = 60
-const EVENT_POINT_ATTEMPTS: int = 24
-## Altura de la sonda de suelo cuando no hay terreno contra el que medir.
-const GROUND_PROBE_HEIGHT: float = 20.0
-## Con terreno, la sonda empieza esto sobre su punto más alto (cabe una
-## meseta sobre una loma) y termina esto bajo el más bajo (metros).
-const PROBE_HEADROOM: float = 30.0
-const PROBE_UNDERSHOOT: float = 2.0
 
 
 ## Una baliza viva: el nodo del pilar, el POI que señala y los segundos
@@ -157,10 +147,6 @@ class TimedBeacon:
 		var available: Variant = poi.get("available")
 		return not (available is bool) or bool(available)
 
-
-## Un POI del reparto puesto por encima de esta altura (metros) está sobre
-## una plataforma y conserva su y; el resto se apoya en el relieve.
-const POI_PLATFORM_Y: float = 0.5
 
 @export_group("Layout Shuffle")
 ## Mueve los POI de suelo a puntos al azar en cada etapa.
@@ -295,25 +281,12 @@ const POI_PLATFORM_Y: float = 0.5
 ## Multiplicador del daño del impacto a los enemigos.
 @export var meteor_enemy_scale: float = 3.0
 
-## Semiancho BRUTO de la arena, publicado por el nodo "arena_bounds" (el
-## scatter); bounds_margin se resta en cada uso, así que no puede venir ya
-## con el margen descontado.
-var _arena_half_extent: float = 80.0
-## El nodo de límites de la arena: tamaño y máscara caminable.
-var _bounds: Node3D = null
-## Arena de la etapa actual; todo lo que pone el director cuelga de ella
-## (ver _stage_parent).
-var _arena: Node3D = null
+## Reparto de la etapa actual: arena, máscara, puntos ocupados y
+## muestreos. Uno nuevo por etapa; entre etapas, uno vacío.
+var _layout: StageLayout = null
 ## Un portal de salida por etapa.
 var _exit_portal_spawned: bool = false
 var _event_timer: float = 0.0
-## Puntos ya ocupados por un POI (movido o creado), para que lo siguiente
-## guarde su distancia.
-var _placed_points: Array[Vector2] = []
-var _anchor_points: Array[Vector2] = []
-## Los POI movidos, en el mismo orden que _placed_points, para liberar el
-## punto de los que el inicio irregular quita.
-var _placed_pois: Array[Node3D] = []
 ## Balizas vivas (cofres de suministros, altares, manantiales, grietas...).
 var _beacons: Array[TimedBeacon] = []
 ## El clima activo, o vacío: {id, group, time_left}. Uno solo a la vez
@@ -335,6 +308,7 @@ var _sky_tween: Tween = null
 
 
 func _ready() -> void:
+	_layout = _new_layout(null)
 	add_to_group("world_director")
 
 
@@ -347,7 +321,6 @@ func _ready() -> void:
 ## vedadas ven así las posiciones nuevas.
 func on_stage_started(arena: Node3D) -> void:
 	set_physics_process(true)
-	_arena = arena
 	# Vuelve a buscar las luces de la arena nueva. _cache_lights() no hace
 	# nada mientras _sun tenga valor: sin estas líneas la etapa 2 teñiría
 	# el sol ya liberado de la etapa 1 y ningún evento de cielo se vería.
@@ -361,16 +334,7 @@ func on_stage_started(arena: Node3D) -> void:
 	active_weather = {}
 	_weather_state = {}
 	_sky_gap_left = 0.0
-	_bounds = null
-	for node: Node in get_tree().get_nodes_in_group("arena_bounds"):
-		var bounds := node as Node3D
-		if bounds != null and arena.is_ancestor_of(bounds):
-			_bounds = bounds
-			_arena_half_extent = float(bounds.get("arena_half_extent"))
-			break
-	_placed_points.clear()
-	_anchor_points.clear()
-	_placed_pois.clear()
+	_layout = _new_layout(arena)
 	_beacons.clear()
 	_event_timer = first_event_at
 	# La niebla y el mapa son por etapa. Se reinician aquí y no con la
@@ -381,7 +345,7 @@ func on_stage_started(arena: Node3D) -> void:
 	get_tree().call_group("hud", "on_stage_started", arena)
 	_exit_portal_spawned = false
 	if shuffle_layout:
-		_shuffle_ground_interactables()
+		_layout.shuffle_ground_interactables()
 	# El inicio irregular va ANTES de los objetos de inicio: quita POI de
 	# la escena y sus puntos tienen que quedar libres para los portales y
 	# la ruleta.
@@ -401,7 +365,7 @@ func on_stage_started(arena: Node3D) -> void:
 func _spawn_start_pet_boxes() -> void:
 	if start_pet_box_chance <= 0.0 or randf() >= start_pet_box_chance:
 		return
-	_spawn_at(PET_BOX_SCENE, _claim_clear_point())
+	_spawn_at(PET_BOX_SCENE, _layout.claim_clear_point())
 
 
 ## 0-1 altares de evento al inicio de la etapa, como la caja de mascota.
@@ -410,7 +374,7 @@ func _spawn_start_event_altars() -> void:
 	# cambiaría dónde caen los portales, las ruletas y los POI movidos.
 	if start_event_altar_chance <= 0.0 or randf() >= start_event_altar_chance:
 		return
-	_spawn_at(EVENT_ALTAR_SCENE, _claim_clear_point())
+	_spawn_at(EVENT_ALTAR_SCENE, _layout.claim_clear_point())
 
 
 ## 0-1 bloques de la suerte al inicio de la etapa; con probabilidad 0 no
@@ -418,7 +382,7 @@ func _spawn_start_event_altars() -> void:
 func _spawn_start_lucky_blocks() -> void:
 	if lucky_block_start_chance <= 0.0 or randf() >= lucky_block_start_chance:
 		return
-	_spawn_at(LUCKY_BLOCK_SCENE, _claim_clear_point())
+	_spawn_at(LUCKY_BLOCK_SCENE, _layout.claim_clear_point())
 
 
 ## Fin de etapa: RunRoot lo llama antes de liberar la arena. Para el
@@ -436,11 +400,7 @@ func on_stage_ended() -> void:
 	for entry: TimedBeacon in _beacons:
 		_free_beacon(entry.node)
 	_beacons.clear()
-	_placed_points.clear()
-	_anchor_points.clear()
-	_placed_pois.clear()
-	_arena = null
-	_bounds = null
+	_layout = _new_layout(null)
 
 
 ## Balizas vivas, para el barrido de etapa (RunRoot).
@@ -448,18 +408,14 @@ func beacon_count() -> int:
 	return _beacons.size()
 
 
-## Padre de todo lo que pone el director: la arena actual, así un cambio
-## de etapa se lo lleva todo. Sin arena (carreras en el cambio) usa la de
-## RunRoot, y en último caso este nodo, para no fallar.
-func _stage_parent() -> Node:
-	if _arena != null and is_instance_valid(_arena):
-		return _arena
-	var root := get_tree().get_first_node_in_group("run_root")
-	if root != null and root.has_method("arena_root"):
-		var arena: Variant = root.call("arena_root")
-		if arena is Node3D and is_instance_valid(arena):
-			return arena
-	return self
+## Un StageLayout para `arena` (null = vacío) con las distancias del reparto.
+func _new_layout(arena: Node3D) -> StageLayout:
+	var layout := StageLayout.new(self, arena)
+	layout.bounds_margin = bounds_margin
+	layout.min_distance_from_spawn = min_distance_from_spawn
+	layout.min_distance_between = min_distance_between
+	layout.min_distance_from_keepouts = min_distance_from_keepouts
+	return layout
 
 
 ## La partida puede terminar en medio de un clima: se detiene y el cielo
@@ -510,7 +466,7 @@ func _randomize_starting_pois() -> void:
 				chests_kept += 1
 				if _make_start_chest_free(node as Chest):
 					freebies += 1
-	_refresh_placed_points()
+	_layout.refresh_placed_points()
 	var extra := randi_range(extra_start_chests_min, extra_start_chests_max)
 	for i in extra:
 		var chest := CHEST_SCENE.instantiate() as Chest
@@ -518,8 +474,8 @@ func _randomize_starting_pois() -> void:
 		if randf() < free_start_chest_chance:
 			chest.free_open = true
 			freebies += 1
-		_stage_parent().add_child(chest)
-		chest.global_position = _claim_clear_point()
+		_layout.stage_parent().add_child(chest)
+		chest.global_position = _layout.claim_clear_point()
 	print("Start layout: %d POI(s) skipped, %d extra chest(s), %d free" % [
 			removed, extra, freebies])
 
@@ -560,8 +516,8 @@ func _tick_exit_portal() -> void:
 		return
 	_exit_portal_spawned = true
 	var portal := EXIT_PORTAL_SCENE.instantiate() as ExitPortal
-	_stage_parent().add_child(portal)
-	portal.global_position = _exit_portal_point()
+	_layout.stage_parent().add_child(portal)
+	portal.global_position = _layout.exit_portal_point(exit_portal_min_distance)
 	# Su baliza arde hasta que el grupo lo cruza: poi_worth_showing() la
 	# apaga cuando el portal se consume.
 	_raise_beacon(portal.global_position, portal.portal_color, portal, INF)
@@ -569,43 +525,6 @@ func _tick_exit_portal() -> void:
 	_announce(exit_portal_announce)
 	# Línea de log para los soaks headless.
 	print("Exit portal opened at %.1fs" % RunState.run_time)
-
-
-## Un punto libre y caminable, al menos a exit_portal_min_distance de todo
-## jugador: la salida es un destino, no algo que se pisa al terminar.
-## Muestrea el cuadrado de la arena (no un anillo) y se queda con el punto
-## más lejano.
-func _exit_portal_point() -> Vector3:
-	var limit := _arena_half_extent - bounds_margin
-	var best := Vector3.ZERO
-	var best_distance := -1.0
-	for attempt in CLEAR_POINT_ATTEMPTS:
-		var candidate := Vector3(randf_range(-limit, limit), 0.0, randf_range(-limit, limit))
-		if not _walkable(candidate):
-			continue
-		var nearest := _distance_to_nearest_player(candidate)
-		if nearest > best_distance:
-			best_distance = nearest
-			best = candidate
-		if nearest >= exit_portal_min_distance:
-			break
-	if best_distance < 0.0:
-		# Todas las muestras cayeron en una pared de la máscara: se usa el
-		# muestreo que sabe dónde están las celdas abiertas.
-		var point := _random_walkable_point()
-		best = Vector3(point.x, 0.0, point.y)
-	best.y = _ground_height(best)
-	return best
-
-
-## Distancia (metros) al jugador vivo más cercano; 0 si no hay ninguno.
-func _distance_to_nearest_player(at: Vector3) -> float:
-	var nearest := INF
-	for node: Node in Coop.alive_players(get_tree()):
-		var body := node as Node3D
-		if body != null:
-			nearest = minf(nearest, at.distance_to(body.global_position))
-	return 0.0 if nearest == INF else nearest
 
 
 ## Minutos de partida; los usan la cadencia de altares y la pausa entre eventos.
@@ -636,116 +555,6 @@ func _altar_cap() -> int:
 	return altar_cap_base + floori(_minutes() / maxf(altar_cap_minutes, 0.001))
 
 
-## --- máscara de la arena ----------------------------------------------------
-
-func _walkable_xz(xz: Vector2) -> bool:
-	if _bounds == null or not _bounds.has_method("is_walkable"):
-		return true
-	return bool(_bounds.call("is_walkable", xz))
-
-
-func _walkable(pos: Vector3) -> bool:
-	return _walkable_xz(Vector2(pos.x, pos.z))
-
-
-## Último recurso cuando el muestreo no encuentra nada: el muestreo de la
-## propia máscara, que sabe dónde están las celdas abiertas.
-func _random_walkable_point() -> Vector2:
-	if _bounds != null and _bounds.has_method("random_walkable_point"):
-		var point: Variant = _bounds.call("random_walkable_point", bounds_margin)
-		if point is Vector2:
-			return point
-	return Vector2.ZERO
-
-
-## Altura del suelo (capa 1) bajo un punto: un POI bajo una meseta
-## quedaría enterrado y su Area3D no vería al jugador que subió.
-func _ground_height(pos: Vector3) -> float:
-	var space := get_tree().root.world_3d.direct_space_state
-	# El rayo cubre TODO el relieve: desde sobre la meseta más alta hasta
-	# bajo la hondonada más honda.
-	var terrain := Terrain.find(get_tree())
-	var top := GROUND_PROBE_HEIGHT
-	var bottom := -1.0
-	if terrain != null:
-		top = terrain.max_height + PROBE_HEADROOM
-		bottom = terrain.min_height - PROBE_UNDERSHOOT
-	var ray := PhysicsRayQueryParameters3D.create(
-			Vector3(pos.x, top, pos.z), Vector3(pos.x, bottom, pos.z), 1)
-	# Los jugadores comparten la capa 1 con el mundo: una cabeza no es suelo.
-	var excluded: Array[RID] = []
-	for node: Node in Coop.alive_players(get_tree()):
-		var body := node as CollisionObject3D
-		if body != null:
-			excluded.append(body.get_rid())
-	ray.exclude = excluded
-	var hit := space.intersect_ray(ray)
-	if hit.is_empty():
-		# Nada bajo el punto: la altura del TERRENO, no 0 (0 también es una
-		# altura real del relieve y enterraría o haría flotar el POI).
-		return terrain.height_at(pos.x, pos.z) if terrain != null else 0.0
-	var hit_position: Vector3 = hit["position"]
-	return hit_position.y
-
-
-## --- reparto ----------------------------------------------------------------
-
-## Mueve cada interactuable de "scatter_keepout" a un punto libre; el resto
-## del grupo (plataformas, rocas) queda como obstáculo fijo.
-func _shuffle_ground_interactables() -> void:
-	var movable: Array[Node3D] = []
-	var anchors: Array[Vector2] = []
-	for node: Node in get_tree().get_nodes_in_group("scatter_keepout"):
-		var spot := node as Node3D
-		if spot == null:
-			continue
-		if spot is Interactable:
-			movable.append(spot)
-		else:
-			# Plataformas y grupos de rocas: obstáculos fijos que evitar.
-			anchors.append(Vector2(spot.global_position.x, spot.global_position.z))
-	var placed: Array[Vector2] = []
-	var limit := _arena_half_extent - bounds_margin
-	for poi: Node3D in movable:
-		var spot_xz := _find_clear_point(limit, placed, anchors)
-		placed.append(spot_xz)
-		# Los POI de suelo se apoyan en el relieve del punto nuevo; los que
-		# están sobre una plataforma (y > POI_PLATFORM_Y) conservan su
-		# altura, porque la plataforma no se mueve y el terreno bajo ella
-		# es plano.
-		var authored_y := poi.global_position.y
-		var new_y := authored_y if authored_y > POI_PLATFORM_Y else _terrain_height(spot_xz)
-		poi.global_position = Vector3(spot_xz.x, new_y, spot_xz.y)
-	_placed_points = placed
-	_placed_pois = movable
-	_anchor_points = anchors
-
-
-## Rehace _placed_points con los POI que siguen en pie, para que un punto
-## liberado por el inicio irregular no reserve espacio alrededor de nada.
-func _refresh_placed_points() -> void:
-	var points: Array[Vector2] = []
-	for poi: Node3D in _placed_pois:
-		if is_instance_valid(poi) and not poi.is_queued_for_deletion():
-			points.append(Vector2(poi.global_position.x, poi.global_position.z))
-	_placed_points = points
-
-
-## Un punto libre nuevo para algo que se crea durante la etapa; queda
-## anotado para los siguientes.
-func _claim_clear_point() -> Vector3:
-	var spot := _find_clear_point(_arena_half_extent - bounds_margin, _placed_points, _anchor_points)
-	_placed_points.append(spot)
-	return Vector3(spot.x, _terrain_height(spot), spot.y)
-
-
-## Altura del terreno en un punto, o 0 sin terreno. Para colocar algo en
-## el suelo sin el rayo, que también vería los props encima.
-func _terrain_height(xz: Vector2) -> float:
-	var terrain := Terrain.find(get_tree())
-	return terrain.height_at(xz.x, xz.y) if terrain != null else 0.0
-
-
 ## --- objetos de inicio ------------------------------------------------------
 
 ## Portales en pares al azar (PortalShrine.tscn). El color sale del índice
@@ -759,8 +568,8 @@ func _spawn_portals() -> void:
 		# El nombre sale en el log "Portal used:".
 		portal.name = "Portal%d" % (i + 1)
 		portal.pair_index = i / 2
-		_stage_parent().add_child(portal)
-		portal.global_position = _claim_clear_point()
+		_layout.stage_parent().add_child(portal)
+		portal.global_position = _layout.claim_clear_point()
 		portals.append(portal)
 	portals.shuffle()
 	for i in range(0, portals.size() - 1, 2):
@@ -772,46 +581,16 @@ func _spawn_portals() -> void:
 
 func _spawn_roulettes() -> void:
 	for i in roulette_count:
-		_spawn_at(ROULETTE_SHRINE_SCENE, _claim_clear_point())
+		_spawn_at(ROULETTE_SHRINE_SCENE, _layout.claim_clear_point())
 
 
 ## Crea `scene` en la arena y la pone en `at` (ya calculado: el punto se
 ## sortea antes de crear el nodo).
 func _spawn_at(scene: PackedScene, at: Vector3) -> Node3D:
 	var node := scene.instantiate() as Node3D
-	_stage_parent().add_child(node)
+	_layout.stage_parent().add_child(node)
 	node.global_position = at
 	return node
-
-
-## Busca al azar un punto dentro de +-limit que cumpla todas las
-## distancias; si se acaban los intentos devuelve el mejor candidato visto,
-## así un mapa lleno empeora en vez de colgarse.
-func _find_clear_point(limit: float, placed: Array[Vector2],
-		anchors: Array[Vector2]) -> Vector2:
-	var best := Vector2.ZERO
-	var best_score := -INF
-	for attempt in CLEAR_POINT_ATTEMPTS:
-		var candidate := Vector2(randf_range(-limit, limit), randf_range(-limit, limit))
-		# Nunca en una celda bloqueada de la máscara.
-		if not _walkable_xz(candidate):
-			continue
-		var clearance := candidate.length() - min_distance_from_spawn
-		for other: Vector2 in placed:
-			clearance = minf(clearance, candidate.distance_to(other) - min_distance_between)
-		for anchor: Vector2 in anchors:
-			clearance = minf(clearance,
-					candidate.distance_to(anchor) - min_distance_from_keepouts)
-		if clearance >= 0.0:
-			return candidate
-		if clearance > best_score:
-			best_score = clearance
-			best = candidate
-	if best_score == -INF:
-		# Ningún candidato era caminable y `best` sigue en (0,0), el punto
-		# de aparición: se pide a la máscara una celda abierta de verdad.
-		return _random_walkable_point()
-	return best
 
 
 ## --- eventos ----------------------------------------------------------------
@@ -879,7 +658,7 @@ func _event_vendor(row: Dictionary) -> void:
 	# ANTES de entrar al árbol: Vendor._ready lo lee para elegir su texto,
 	# su color y la figura tras el mostrador.
 	vendor.set("kind", String(kind.id))
-	_stage_parent().add_child(vendor)
+	_layout.stage_parent().add_child(vendor)
 	vendor.global_position = _event_point()
 	_raise_beacon(vendor.global_position, kind.get("color", Color.WHITE), vendor,
 			float(row["beacon_time"]))
@@ -901,39 +680,13 @@ func _event_star(row: Dictionary) -> void:
 	_announce(String(row["announce"]))
 
 
-## Un punto lejos de un jugador vivo al azar: dentro de la franja de la
-## arena, en una celda CAMINABLE y apoyado en lo que haya. Un evento dentro
-## de una pared de la máscara gastaría su ventana sin que nadie llegue.
-func _event_point() -> Vector3:
-	var anchor := Coop.random_player(get_tree())
-	var origin := anchor.global_position if anchor != null else Vector3.ZERO
-	var limit := _arena_half_extent - bounds_margin
-	var pos := Vector3.ZERO
-	var found := false
-	for attempt in EVENT_POINT_ATTEMPTS:
-		var angle := randf() * TAU
-		pos = origin + Vector3(cos(angle), 0.0, sin(angle)) \
-				* randf_range(event_min_distance, event_max_distance)
-		pos.x = clampf(pos.x, -limit, limit)
-		pos.z = clampf(pos.z, -limit, limit)
-		if _walkable(pos):
-			found = true
-			break
-	if not found:
-		# Todo el anillo alrededor del jugador está tapado: se usa el
-		# muestreo de inicio, que respeta la máscara.
-		pos = _claim_clear_point()
-	pos.y = _ground_height(pos)
-	return pos
-
-
 ## Cofre de suministros (SupplyChest.tscn): se hunde si nadie lo abre
 ## antes de que se apague su baliza.
 func _event_supply_chest(row: Dictionary) -> void:
 	var chest := (row["scene"] as PackedScene).instantiate() as Chest
 	# add_child ANTES de buscar el punto: Chest._ready sortea la rareza con
 	# el RNG de la partida, y ese orden es parte del sorteo.
-	_stage_parent().add_child(chest)
+	_layout.stage_parent().add_child(chest)
 	chest.global_position = _event_point()
 	_raise_beacon(chest.global_position, row["beacon_color"], chest,
 			float(row["beacon_time"]), true)
@@ -974,6 +727,12 @@ func _event_essence_rift(row: Dictionary) -> void:
 			orb.global_position = center + Vector3.UP * 0.6
 	_raise_beacon(center, row["beacon_color"], null, float(row["beacon_time"]))
 	_announce(String(row["announce"]))
+
+
+## Un punto para un evento: lejos de un jugador vivo al azar, caminable y
+## apoyado en el suelo (ver StageLayout.event_point).
+func _event_point() -> Vector3:
+	return _layout.event_point(event_min_distance, event_max_distance)
 
 
 ## Levanta una baliza sobre `at` y la anota. `poi` es lo que señala (null
@@ -1022,7 +781,7 @@ func _despawn_chest(chest: Chest) -> void:
 func _spawn_beacon(at: Vector3, color: Color) -> Node3D:
 	var beacon := BEACON_SCENE.instantiate() as Beacon
 	beacon.color = color
-	_stage_parent().add_child(beacon)
+	_layout.stage_parent().add_child(beacon)
 	beacon.global_position = at
 	return beacon
 
@@ -1342,7 +1101,7 @@ func _weather_tick_enemy_rain(delta: float) -> void:
 	var wanted := randi_range(enemy_rain_min_drops, enemy_rain_max_drops)
 	var points: Array[Vector3] = []
 	for i in wanted:
-		var point := _rain_point(anchor_body.global_position,
+		var point := _layout.rain_point(anchor_body.global_position,
 				enemy_rain_min_distance, enemy_rain_max_distance)
 		if point == Vector3.INF:
 			continue
@@ -1370,7 +1129,7 @@ func _weather_tick_radioactive_rain(delta: float) -> void:
 	var anchor_body := Coop.random_player(get_tree())
 	if anchor_body == null:
 		return
-	var point := _rain_point(anchor_body.global_position, 2.0, acid_pool_spawn_range)
+	var point := _layout.rain_point(anchor_body.global_position, 2.0, acid_pool_spawn_range)
 	if point != Vector3.INF:
 		spawn_acid_pool(point)
 
@@ -1439,23 +1198,6 @@ func _all_raiders() -> Array[Node3D]:
 	return bodies
 
 
-## Un punto caminable y apoyado en el suelo en un anillo alrededor de
-## `origin`, o Vector3.INF si la máscara no ofrece ninguno. La lluvia y los
-## meteoritos caen por aquí, así nada del clima termina dentro de una roca.
-func _rain_point(origin: Vector3, min_distance: float, max_distance: float) -> Vector3:
-	for attempt in EVENT_POINT_ATTEMPTS:
-		var angle := randf() * TAU
-		var pos := origin + Vector3(cos(angle), 0.0, sin(angle)) \
-				* randf_range(min_distance, max_distance)
-		var limit := _arena_half_extent - bounds_margin
-		pos.x = clampf(pos.x, -limit, limit)
-		pos.z = clampf(pos.z, -limit, limit)
-		if _walkable(pos):
-			pos.y = _ground_height(pos)
-			return pos
-	return Vector3.INF
-
-
 ## --- desastres --------------------------------------------------------------
 
 func _weather_start_tsunami() -> void:
@@ -1486,12 +1228,8 @@ func _weather_tick_tsunami(_delta: float) -> void:
 		# Un arco de un solo lado: un tsunami es un muro que viene de un
 		# lugar, no un anillo que se cierra (eso es una horda).
 		var spread := angle + randf_range(-TSUNAMI_ARC_SPREAD, TSUNAMI_ARC_SPREAD)
-		var pos := origin + Vector3(cos(spread), 0.0, sin(spread)) \
-				* randf_range(tsunami_arc_min, tsunami_arc_max)
-		var limit := _arena_half_extent - bounds_margin
-		pos.x = clampf(pos.x, -limit, limit)
-		pos.z = clampf(pos.z, -limit, limit)
-		if _walkable(pos):
+		var pos := _layout.ring_sample(origin, spread, tsunami_arc_min, tsunami_arc_max)
+		if _layout.walkable(pos):
 			points.append(pos)
 	if not points.is_empty():
 		get_tree().call_group("enemy_spawner", "spawn_at_points", points, true)
@@ -1559,7 +1297,7 @@ func _weather_tick_meteors(delta: float) -> void:
 	var anchor_body := Coop.random_player(get_tree())
 	if anchor_body == null:
 		return
-	var at := _rain_point(anchor_body.global_position, 3.0, meteor_range)
+	var at := _layout.rain_point(anchor_body.global_position, 3.0, meteor_range)
 	if at == Vector3.INF:
 		return
 	Telegraph.spawn_disc(self, at, meteor_radius, meteor_telegraph,
@@ -1619,8 +1357,8 @@ func _cache_lights() -> void:
 		return
 	# La ARENA, no current_scene: current_scene es la raíz de la partida y
 	# sus luces son las de la arena que tenga debajo.
-	var scene := _stage_parent()
-	if scene == null or scene == self:
+	var scene := _layout.current_arena()
+	if scene == null:
 		return
 	for node: Node in scene.find_children("*", "DirectionalLight3D", true, false):
 		_sun = node as DirectionalLight3D
