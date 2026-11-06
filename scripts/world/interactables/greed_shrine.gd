@@ -1,36 +1,40 @@
 class_name GreedShrine
 extends Interactable
-## Greed Shrine (GDD 4): a skull-adorned altar that takes an HP gamble.
-## Interacting pays hp_cost_fraction of MAX HP (via Health.pay — armor
-## ignored, never lethal, at least min_hp_left stays) and rolls the payout:
-## gem_chance -> a ring of high-value XP gems, card_chance -> a free
-## rarity-floored card pick, remainder -> nothing but a flavor line.
-## The price is charged on the maximum, not on what is left in the bar:
-## a fraction of CURRENT HP tends to zero as the bar empties, so walking
-## in at 1 HP used to buy a Rare+ card for nothing and made "arrive hurt"
-## the optimal play — the exact opposite of a gamble.
-## One use, then the altar dims. outcome_for() is a pure classifier so a
-## test harness can drive the roll and prove the distribution.
+## Altar de codicia: un altar con calaveras que cobra una apuesta de HP. Al
+## interactuar paga hp_cost_fraction de la vida MÁXIMA (por Health.pay: sin
+## armadura, nunca letal, deja al menos min_hp_left) y tira el premio:
+## gem_chance -> un anillo de gemas de XP valiosas, card_chance -> una carta
+## gratis con piso de rareza, el resto -> solo una frase. El precio se cobra
+## sobre el máximo, no sobre lo que queda: una fracción de la vida ACTUAL
+## tiende a cero con la barra vacía y haría gratis entrar herido.
+## Un solo uso, luego se apaga. outcome_for() es un clasificador puro para
+## que un harness pueda probar la distribución.
 
+## Fracción de la vida máxima que cobra (0-1).
 @export_range(0.0, 1.0) var hp_cost_fraction: float = 0.25
-## The payment can never drop the player below this much HP.
+## Vida mínima que deja el pago, en HP.
 @export var min_hp_left: float = 1.0
-## Shown when the raider cannot cover the full toll.
+## Aviso cuando el raider no puede pagar el peaje completo.
 @export var too_hurt_text: String = "No te alcanza la vida."
 @export_group("Payout")
+## Probabilidad (0-1) de pagar gemas.
 @export_range(0.0, 1.0) var gem_chance: float = 0.6
+## Probabilidad (0-1) de pagar una carta (el resto no paga nada).
 @export_range(0.0, 1.0) var card_chance: float = 0.3
+## Gemas del anillo y XP de cada una.
 @export var gem_count: int = 12
 @export var gem_value: int = 4
 @export var xp_gem_scene: PackedScene
+## Título de la carta gratis.
 @export var card_title: String = "El altar entrega un premio"
-## Every rolled card rarity is floored to this tier ("Rare+" payout).
+## Piso de rareza de la carta, como id en inglés (Rare = Raro o mejor).
 @export var card_min_rarity: String = "Rare"
+## Anuncio cuando no paga nada.
 @export var flavor_text: String = "El altar queda complacido."
 
 
-## The offer line, kept so a refused toll can be re-armed (same pattern as
-## the Humming Skull's cancel prompt).
+## La línea de oferta, guardada para volver a mostrarla tras un peaje
+## rechazado (como el aviso de cancelar del Cráneo zumbante).
 var _idle_prompt: String
 
 
@@ -45,8 +49,8 @@ func _ready() -> void:
 	_idle_prompt = prompt_text
 
 
-## The altar stays unspent after a refused toll, so walking back in with
-## a fuller bar has to show the offer again.
+## Tras un peaje rechazado el altar sigue sin gastar: volver con más vida
+## tiene que mostrar la oferta otra vez.
 func _on_range_entered() -> void:
 	if available:
 		set_prompt(_idle_prompt)
@@ -57,9 +61,8 @@ func _interact(player: Node) -> void:
 	if health == null:
 		return
 	var toll := health.max_hp * hp_cost_fraction
-	# Health.pay clips at min_hp_left instead of killing, so a short pay
-	# is exactly the "too hurt to bleed" case: refuse it and leave the
-	# altar unspent rather than handing out a free Rare+ card.
+	# Health.pay recorta en min_hp_left en vez de matar, así que un pago corto
+	# es el caso "demasiado herido": se rechaza y el altar queda sin gastar.
 	if health.current_hp - min_hp_left < toll:
 		Sfx.play(&"dodge")
 		set_prompt(too_hurt_text)
@@ -70,14 +73,13 @@ func _interact(player: Node) -> void:
 	dim_visuals()
 	var outcome := outcome_for(randf())
 	_grant(outcome, player)
-	# One-line log (shrine convention: "Altar charged:", "Spring used:"…)
-	# so headless soaks can see this altar resolve at all.
+	# Línea de log para los soaks.
 	print("Greed shrine: paid %.0f HP -> %s" % [toll, outcome])
 	_emit_completed()
 
 
-## Pure payout classifier for a uniform [0,1) roll: "gems" | "card" |
-## "nothing", split gem_chance / card_chance / remainder.
+## Clasificador puro para una tirada uniforme en [0,1): "gems" | "card" |
+## "nothing", repartido gem_chance / card_chance / resto.
 func outcome_for(roll: float) -> String:
 	if roll < gem_chance:
 		return "gems"
@@ -91,24 +93,22 @@ func _grant(outcome: String, player: Node) -> void:
 		"gems":
 			_burst_gems()
 		"card":
-			# The card goes to the raider who bled for it: without a
-			# recipient the picker rotates round-robin through the party
-			# and the prize lands on whoever happens to be next.
+			# La carta es para quien sangró: sin destinatario el selector rota
+			# por la party.
 			get_tree().call_group(
 					"upgrade_ui", "open_bonus_pick", card_title, 0.0, card_min_rarity, player)
 		_:
 			get_tree().call_group("hud", "announce", flavor_text)
 
 
-## Ring of high-value gems around the altar; the magnet does the rest.
+## Anillo de gemas valiosas alrededor del altar; el imán hace el resto.
 func _burst_gems() -> void:
 	if xp_gem_scene == null:
 		return
 	var placed := 0
 	for i in gem_count:
 		var gem := Pools.acquire_scene(xp_gem_scene) as XpGem
-		# One gem the pool could not hand over is not a reason to swallow
-		# the other eleven the raider just paid blood for.
+		# Una gema que el pool no entregó no anula las demás.
 		if gem == null:
 			continue
 		gem.xp_value = gem_value

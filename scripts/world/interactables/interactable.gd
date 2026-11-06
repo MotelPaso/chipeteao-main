@@ -1,66 +1,48 @@
 class_name Interactable
 extends Area3D
-## Base for world interactables (shrines, chests — GDD 4). The Area3D is
-## the detection ring: while the player stands inside and the interactable
-## is still available, a floating world-space prompt (Label3D, the one
-## prompt scheme for every interactable — with the button written as
-## INTERACT_TOKEN and resolved per raider) shows, and pressing the
-## "interact" action calls the _interact() override. Subclasses emit the
-## lifecycle signals through the _emit_* helpers and call consume() once spent
-## (one-use pattern: prompt gone, further input ignored). Loose coupling:
-## the player is found via its group, rewards go out via call_group.
+## Base de los interactuables del mundo (altares, cofres, secretos). El
+## Area3D es el anillo de detección: mientras un raider está dentro y el
+## interactuable sigue disponible, se ve un aviso flotante (Label3D) y la
+## acción "interact" llama a _interact(). Las subclases emiten las señales
+## con los _emit_* y llaman a consume() al gastarse. El jugador se encuentra
+## por su grupo y los premios salen por call_group.
 
 signal interaction_started
 signal interaction_completed
 signal interaction_cancelled
 
-## Line shown on the floating prompt while the player is in range. Write
-## the interact button as INTERACT_TOKEN: the label resolves it per raider.
+## Línea del aviso mientras un raider está en el anillo; el botón se escribe [E] y se cambia por el del raider.
 @export var prompt_text: String = "[E] Interactuar"
-## Height of the prompt label above the interactable's origin.
+## Altura del aviso sobre el origen del interactuable, en metros.
 @export var prompt_height: float = 3.4
-## SaveData counter bumped when this interactable is consumed ("" records
-## nothing). Lets the quest log count shrine/chest usage without the
-## subclasses knowing anything about persistence (subclasses set a default
-## in _init; scenes may still override per instance).
+## Contador de SaveData que sube al gastarse ("" = ninguno); lo leen las misiones.
 @export var meta_stat_id: String = ""
-## Sfx id played on completion; the two resolution chimes are inversions
-## of the same chord, so subclasses just pick their voicing (chests swap
-## in &"chest_open" in _init).
+## Sonido (id de Sfx) que suena al completarse.
 @export var complete_sound: StringName = &"shrine_done"
 
-## Placeholder every prompt line carries for the interact button. The
-## action is bound to E *and* to a pad face button (project.godot,
-## Coop.PAD_INTERACT_BUTTON), and co-op slots 1-3 only ever hold a
-## control, so the label resolves the token against the raider actually
-## standing in the ring instead of promising a key they cannot press.
+## Marcador del botón en cada línea de aviso. "interact" está en E y en un
+## botón del control (Coop.PAD_INTERACT_BUTTON): la etiqueta lo cambia según
+## el raider que está en el anillo.
 const INTERACT_TOKEN: String = "[E]"
-## What the token becomes for a control-driven slot (Coop.PAD_INTERACT_BUTTON).
+## Lo que muestra el marcador para un slot que juega con control.
 const PAD_INTERACT_GLYPH: String = "[Y]"
 
-## Cleared by consume(); a spent interactable ignores the interact action.
+## Lo apaga consume(); un interactuable gastado ignora "interact".
 var available: bool = true
 var player_in_range: bool = false
 
-## Player bodies currently inside the ring (co-op: several at once); the
-## legacy player_in_range bool mirrors "any of them" for subclasses.
-## A DOWNED raider stays in here (the body never leaves the tree, so
-## body_exited never fires) — ask live_players_in_range() for the raiders
-## that can actually hold a ritual.
+## Raiders dentro del anillo (en co-op, varios); player_in_range dice si hay
+## alguno. Un raider caído sigue en la lista (su cuerpo no sale del área):
+## para saber quién puede sostener un ritual, usa live_players_in_range().
 var _players_in_range: Array[Node3D] = []
 
-## Ref-counted channel loop currently held by this interactable (&"" =
-## none). See _hold_loop().
+## Loop de Sfx con contador de referencias que retiene este nodo (&"" = ninguno).
 var _held_loop: StringName = &""
 
 var _prompt: Label3D
 
 
-## Map marker (iteration 52): which dot this thing draws as on the
-## minimap and the Tab map. Empty means IT NEVER APPEARS — which is what
-## secret_trigger.gd keeps, on purpose: a secret you can read off the map
-## is not a secret. Subclasses set their default in _init; the style table
-## lives in MapDraw.MARKER_STYLES.
+## Punto que dibuja en el minimapa y el mapa (Tab); vacío = no aparece (los secretos lo dejan vacío a propósito).
 @export var marker_kind: StringName = &""
 
 
@@ -80,10 +62,9 @@ func _ready() -> void:
 	_refresh_prompt()
 
 
-## Sfx loops shared by several emitters (the channel hum runs on both the
-## altars and the Humming Skull) are ref-counted: acquire on start,
-## exactly one release on stop, and one more from _exit_tree so a
-## retry/quit mid-channel can never leave the voice droning.
+## Los loops compartidos (el zumbido lo usan los altares y el Cráneo
+## zumbante) llevan contador: una liberación por cada toma, y otra aquí para
+## que salir a mitad de un canal no deje la voz sonando.
 func _exit_tree() -> void:
 	_drop_loop()
 
@@ -91,29 +72,26 @@ func _exit_tree() -> void:
 func _unhandled_input(event: InputEvent) -> void:
 	if not available or not player_in_range:
 		return
-	# Each in-range player answers only to THEIR interact action (solo:
-	# the plain project action; co-op: the per-slot clone), so a shrine
-	# resolves for the raider who actually pressed the button.
+	# Cada raider responde solo a SU acción (solo: la del proyecto; co-op: la
+	# copia de su slot), así el altar se resuelve para quien apretó.
 	for body: Node3D in live_players_in_range():
 		var interact_name: StringName = &"interact"
 		if body.has_method(&"interact_action"):
 			interact_name = body.call(&"interact_action")
 		if event.is_action_pressed(interact_name):
 			_interact(body)
-			# One press resolves ONE interactable: overlapping rings
-			# (a director spring dropped on a scene altar) used to charge
-			# the raider for both in the same frame.
+			# Una pulsación resuelve UN interactuable aunque los anillos se
+			# solapen.
 			get_viewport().set_input_as_handled()
 			return
 
 
-## Virtual: the actual effect. `player` is the node from the "player" group.
+## Virtual: el efecto. `player` es el nodo del grupo "player" que apretó.
 func _interact(_player: Node) -> void:
 	pass
 
 
-## Virtual hooks for range changes (the Charge Shrine cancels its channel
-## when the player steps out).
+## Virtuales para cuando alguien entra o sale del anillo.
 func _on_range_entered() -> void:
 	pass
 
@@ -122,7 +100,7 @@ func _on_range_exited() -> void:
 	pass
 
 
-## Marks this interactable spent: prompt gone, further input ignored.
+## Marca el interactuable como gastado: sin aviso y sin más interacciones.
 func consume() -> void:
 	if available and meta_stat_id != "":
 		SaveData.bump(meta_stat_id)
@@ -130,17 +108,16 @@ func consume() -> void:
 	_refresh_prompt()
 
 
-## Swaps the prompt line (e.g. "resume" text after a cancelled channel).
+## Cambia la línea del aviso (por ejemplo, el texto de "reanudar").
 func set_prompt(text: String) -> void:
 	prompt_text = text
 	_refresh_prompt()
 
 
-## Raiders standing in the ring that are still ON THEIR FEET. A downed
-## body never leaves the Area3D (Player only drops the "player" group),
-## so every "is anybody holding this ritual / who pays / whose stats
-## count" question has to come through here. Freed bodies are dropped
-## from the backing array on the way past.
+## Raiders del anillo que siguen EN PIE. Un caído no sale del Area3D (solo
+## deja el grupo "player"), así que toda pregunta de "quién sostiene el
+## ritual / quién paga / de quién cuentan los stats" pasa por aquí. Los
+## cuerpos liberados se descartan de la lista al pasar.
 func live_players_in_range() -> Array[Node3D]:
 	var live: Array[Node3D] = []
 	var kept: Array[Node3D] = []
@@ -156,8 +133,8 @@ func live_players_in_range() -> Array[Node3D]:
 	return live
 
 
-## Closest raider still standing in the ring (null when nobody is), used
-## for the per-raider parts of the prompt.
+## Raider en pie más cercano del anillo (null si no hay ninguno); decide las
+## partes del aviso que dependen del raider.
 func nearest_live_player() -> Node3D:
 	var best: Node3D = null
 	var best_distance := INF
@@ -169,8 +146,8 @@ func nearest_live_player() -> Node3D:
 	return best
 
 
-## Highest copy count of `item_id` among the raiders in the ring (the
-## party pools its keys/blood: the best holder carries the ritual).
+## Mayor cantidad de copias de `item_id` entre los raiders del anillo (la
+## party junta sus llaves y su sangre: manda el que más tiene).
 func best_item_count_in_range(item_id: String) -> int:
 	var best := 0
 	for body: Node3D in live_players_in_range():
@@ -180,8 +157,8 @@ func best_item_count_in_range(item_id: String) -> int:
 	return best
 
 
-## Starts (or swaps to) a ref-counted Sfx loop owned by this interactable.
-## Exactly one release per acquire — the flag is what guarantees it.
+## Empieza (o cambia a) un loop de Sfx con contador que retiene este nodo.
+## Una liberación por cada toma: el campo _held_loop lo garantiza.
 func _hold_loop(id: StringName) -> void:
 	if _held_loop == id:
 		return
@@ -197,13 +174,13 @@ func _drop_loop() -> void:
 	_held_loop = &""
 
 
-## True while the [E] prompt is actually showing (range + availability).
+## true mientras el aviso se ve (raider en rango y disponible).
 func prompt_visible() -> bool:
 	return _prompt != null and _prompt.visible
 
 
-## Gray-out for spent shrines: every mesh gets a flat stone override and
-## any glow lights go dark, so "used" reads at a distance.
+## Gris de "usado": toda malla recibe un material de piedra plano y las luces
+## se apagan, para que se lea gastado desde lejos.
 func dim_visuals() -> void:
 	var dim := StandardMaterial3D.new()
 	dim.albedo_color = Color(0.34, 0.34, 0.37)
@@ -247,7 +224,7 @@ func _on_body_exited(body: Node3D) -> void:
 		return
 	_players_in_range.erase(body)
 	if not _players_in_range.is_empty():
-		return  # someone else still stands in the ring: no range-exit event
+		return  # sigue habiendo alguien en el anillo: no hay salida de rango
 	player_in_range = false
 	_refresh_prompt()
 	_on_range_exited()
@@ -260,9 +237,8 @@ func _refresh_prompt() -> void:
 	_prompt.visible = available and player_in_range
 
 
-## Button glyph for the raider closest to the ring: the keyboard slot (and
-## every solo run) reads "[E]", a control-driven co-op slot reads its face
-## button instead of a key it does not have.
+## Glifo del botón para el raider más cercano: el slot de teclado (y toda
+## partida solo) ve "[E]"; un slot con control ve su botón.
 func _interact_glyph() -> String:
 	var body := nearest_live_player()
 	if body == null:
@@ -273,6 +249,6 @@ func _interact_glyph() -> String:
 	return PAD_INTERACT_GLYPH
 
 
-## Map marker contract (group "map_markers").
+## Contrato de marcadores de mapa (grupo "map_markers").
 func map_marker_kind() -> StringName:
 	return marker_kind

@@ -1,21 +1,19 @@
 class_name PetBox
 extends Interactable
-## A crate with a paw on it (iteration 54): free, one use, and the first
-## of the two doors a companion comes through (the other is the animal
-## trafficker). Rolls ONE pet that is not the one already following the
-## raider, and either hands it over or — when there is already a
-## companion — asks, because a pet slot holds exactly one and taking the
-## new one throws away the old.
+## Caja con una huella: gratis, un solo uso, y una de las dos puertas por las
+## que llega un compañero (la otra es el traficante de animales). Tira UNA
+## mascota distinta de la que ya sigue al raider y la entrega, o pregunta si
+## ya hay compañero, porque el hueco de mascota es uno solo.
 ##
-## Free on purpose. The trafficker sells a CHOICE of three for points; the
-## box is the version you find, so its price is having walked to it.
+## Gratis a propósito: el traficante vende una elección de tres por puntos;
+## la caja es la que te encuentras, y su precio es caminar hasta ella.
 
-## Sink-out after use, same shape as a spent altar.
+## Segundos que tarda en encogerse y desaparecer tras usarse.
 @export var sink_time: float = 0.55
 @export var paw_color: Color = Color(0.7, 0.95, 0.6)
 
-## Card titles. Option 0 is the SWAP: the soak harness always presses the
-## first option, so the interesting branch has to be the one it exercises.
+## Títulos de las cartas. La opción 0 es el CAMBIO: el harness siempre aprieta
+## la primera, así que la rama interesante tiene que ser esa.
 const SWAP_TITLE: String = "Cambiar por %s"
 const KEEP_TITLE: String = "Quedarme con %s"
 const CHOICE_TITLE: String = "La caja se abre sola"
@@ -30,15 +28,15 @@ func _init() -> void:
 	prompt_text = "[E] Abrir la caja"
 	marker_kind = &"pet_box"
 	prompt_height = 2.6
-	# No meta counter of its own: what the quests count is the companion,
-	# and that is bumped where the pet actually changes hands.
+	# Sin contador propio: las misiones cuentan el compañero, y eso sube donde
+	# la mascota cambia de manos.
 	meta_stat_id = ""
 	collision_layer = 0
 	collision_mask = 1
 
 
 func _ready() -> void:
-	# Detection ring BEFORE super(), which wires body_entered on this Area3D.
+	# El anillo de detección va ANTES de super(), que conecta body_entered.
 	var shape := CollisionShape3D.new()
 	var cylinder := CylinderShape3D.new()
 	cylinder.radius = 2.0
@@ -95,8 +93,8 @@ func _interact(player: Node) -> void:
 		return
 	var pet_id := _roll_pet(player)
 	if pet_id.is_empty():
-		# Every pet in the catalog is already the one following: nothing to
-		# offer, and a box that swapped a pet for itself would read as broken.
+		# Todas las mascotas del catálogo son la que ya lo sigue: no hay nada
+		# que ofrecer.
 		get_tree().call_group("hud", "announce", "La caja está vacía.")
 		return
 	_spent = true
@@ -106,9 +104,8 @@ func _interact(player: Node) -> void:
 	if current == null or String(current).is_empty():
 		_grant(player, pet_id)
 		return
-	# A companion already follows: this is a TRADE, so it is asked, not
-	# done. open_choice is the one blocking-pick contract in the project,
-	# and the soak answers it by pressing option 0.
+	# Ya hay compañero: es un CAMBIO, así que se pregunta. open_choice es el
+	# único contrato de elección bloqueante y el soak responde la opción 0.
 	var offered := PetCatalog.by_id(pet_id)
 	var held := PetCatalog.by_id(String(current))
 	var options: Array[Dictionary] = [
@@ -133,11 +130,10 @@ func _on_choice(option: Dictionary, player: Node) -> void:
 	_grant(player, String(option.get("pet_id", "")))
 
 
-## Hands the companion over. Player.set_pet owns the swap, the toasts and
-## the "Pet joined:" line, so this only reports the box.
+## Entrega el compañero. Player.set_pet se encarga del cambio, los avisos y
+## la línea "Pet joined:", así que aquí solo se informa la caja.
 func _grant(player: Node, pet_id: String) -> void:
-	# Logged BEFORE the grant so the soak reads cause then effect: this
-	# line, then the "Pet joined:" that set_pet prints.
+	# Se imprime ANTES de entregar para que el soak lea causa y luego efecto.
 	print("Pet box opened: %s" % pet_id)
 	if not pet_id.is_empty() and player.has_method("set_pet"):
 		player.call("set_pet", pet_id)
@@ -146,8 +142,7 @@ func _grant(player: Node, pet_id: String) -> void:
 	_sink()
 
 
-## Weapon and stat on two lines: the two things that actually differ
-## between companions, and the whole basis for the trade.
+## Arma y stat en dos líneas: lo que de verdad distingue a dos compañeros.
 static func _pet_lines(row: Dictionary) -> String:
 	if row.is_empty():
 		return NO_PET_LINE
@@ -155,7 +150,7 @@ static func _pet_lines(row: Dictionary) -> String:
 			String(row.get("stat_label", ""))]
 
 
-## A catalog pet that is not the one already following `player`.
+## Una mascota del catálogo que no es la que ya sigue a `player`.
 func _roll_pet(player: Node) -> String:
 	var current: Variant = player.get("pet_id")
 	var held := String(current) if current != null else ""

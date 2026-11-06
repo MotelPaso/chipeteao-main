@@ -1,25 +1,24 @@
 class_name EventAltar
 extends Interactable
-## Storm glass on a pedestal (iteration 55): free, one use, and it summons
-## a random WEATHER through the same forced entry the probe and
-## BONK_WEATHER_NOW use — so an altar can interrupt whatever is running and
-## does not care about the cadence gap.
+## Cristal de tormenta sobre un pedestal: gratis, un solo uso, invoca un
+## CLIMA al azar por la misma entrada forzada que usan el harness y
+## BONK_WEATHER_NOW, así que interrumpe lo que esté corriendo y no respeta la
+## pausa entre eventos.
 ##
-## It refuses the two REWARD rows (golden rain, full moon). Those are what
-## surviving a bad one pays out; an altar that could hand one over directly
-## would make the rains and dark moons that earn them pointless.
+## Nunca invoca las dos filas de PREMIO (lluvia dorada, luna llena): son lo
+## que paga sobrevivir a una mala, y un altar que las regalara dejaría sin
+## sentido a las lluvias y lunas que las ganan.
 ##
-## Free on purpose: the price is that you do not get to choose, and a
-## disaster is one of the possible answers.
+## Gratis a propósito: el precio es no elegir, y un desastre es una de las
+## respuestas posibles.
 
 @export var sink_time: float = 0.55
 @export var glass_color: Color = Color(0.7, 0.78, 1.0)
 
-## Shown while something is already running: the summon still works and
-## REPLACES it, which is what the forced entry does.
+## Aviso mientras ya corre un clima: invocar funciona igual y lo REEMPLAZA.
 const BUSY_PROMPT: String = "[E] Invocar (reemplaza el evento actual)"
 const READY_PROMPT: String = "[E] Invocar un evento"
-## Two detuned frequencies so the glass never pulses on a metronome.
+## Dos frecuencias desafinadas (Hz) para que el cristal no lata como un metrónomo.
 const SWIRL_X_HZ: float = 1.3
 const SWIRL_Z_HZ: float = 1.7
 
@@ -38,7 +37,7 @@ func _init() -> void:
 
 
 func _ready() -> void:
-	# Detection ring BEFORE super(), which wires body_entered on this Area3D.
+	# El anillo de detección va ANTES de super(), que conecta body_entered.
 	var shape := CollisionShape3D.new()
 	var cylinder := CylinderShape3D.new()
 	cylinder.radius = 2.2
@@ -65,12 +64,11 @@ func _build_visual() -> void:
 	var orb := SphereMesh.new()
 	orb.radius = 0.45
 	orb.height = 0.9
-	# Explicit tessellation (engine default 64 x 32, ~4.2k tris).
+	# Teselado explícito (el del motor es 64 x 32, ~4.2k triángulos).
 	orb.radial_segments = 16
 	orb.rings = 8
 	_glass.mesh = orb
-	# Per-instance material: the swirl writes emission energy, and a shared
-	# resource would pulse every other altar on the map with it.
+	# Material propio de cada altar.
 	var glass := StandardMaterial3D.new()
 	glass.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	glass.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
@@ -96,19 +94,15 @@ func _physics_process(delta: float) -> void:
 				1.0 + sin(_time * SWIRL_X_HZ) * 0.07, 1.0,
 				1.0 + cos(_time * SWIRL_Z_HZ) * 0.07)
 	if available and player_in_range:
-		# Re-rendered every frame while somebody stands here, the way the
-		# chest and the spring re-render their prices: the answer changes
-		# on its own as weather starts and ends.
+		# Se recalcula en cada frame con alguien en rango: la respuesta cambia
+		# sola cuando un clima empieza o termina.
 		set_prompt(READY_PROMPT if _director_idle() else BUSY_PROMPT)
 
 
-## True when no weather is running. Only the PROMPT reads this: the altar
-## always works. Refusing while busy made it a POI that never resolved —
-## it stayed `available`, so the tour kept walking back to it every
-## REVISIT_COOLDOWN and the soak measured half the map coverage it used to.
-## Summoning over a running row is also what the forced entry is FOR, and
-## the player opted in by pressing the button; the busy prompt is there so
-## they know what they are trading away.
+## true cuando no corre ningún clima. Solo lo lee el AVISO: el altar siempre
+## funciona (si rechazara, quedaría `available` para siempre y el recorrido
+## del harness volvería a él una y otra vez). El aviso de ocupado le dice al
+## jugador qué está cambiando.
 func _director_idle() -> bool:
 	var director := get_tree().get_first_node_in_group("world_director")
 	if director == null:
@@ -129,9 +123,8 @@ func _interact(_player: Node) -> void:
 	_spent = true
 	_emit_started()
 	consume()
-	# Through start_sky_event, the ONE forced entry: it stops what is
-	# running and ignores the cadence gap, which is exactly what a summon
-	# has to do.
+	# Por start_sky_event, la ÚNICA entrada forzada: detiene lo que corre e
+	# ignora la pausa entre eventos.
 	director.call("start_sky_event", summoned)
 	print("Event altar used: %s" % summoned)
 	Juice.sparkle(global_position + Vector3.UP * 1.5)

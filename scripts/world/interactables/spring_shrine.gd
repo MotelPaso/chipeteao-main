@@ -1,30 +1,25 @@
 class_name SpringShrine
 extends Interactable
-## Spring altar (iteration 41, reworked in 53): a pool of clear water
-## that, for a FIXED price in run points, heals the raider to full and
-## hands them ONE RANDOM POWER-UP. Vanishes after one use.
+## Manantial: un estanque de agua clara que, por un precio FIJO en puntos,
+## cura por completo al raider y le da UN POWER-UP AL AZAR (nunca la
+## estrella, que solo se encuentra rondando). Desaparece tras un uso.
 ##
-## It no longer rolls its own little bundle of boons: since iteration 53
-## there is a power-up roster, and a spring that granted +30% damage while
-## a Furia pickup granted +100% would have been two systems for one idea.
-## The star is excluded — it is found roaming, never bought.
-##
-## It never times out, and only ONE is alive at a time (the WorldDirector
-## weights its event row to zero while group `springs` is occupied): a
-## spring the party never walked to is a promise, not litter.
+## No caduca, y solo hay UNO vivo a la vez (el WorldDirector baja a cero el
+## peso de su evento mientras el grupo `springs` tenga a alguien).
 
+## Precio base en puntos de partida (la lluvia dorada lo rebaja; ver current_price).
 @export var price: int = 40
 
-## Surface ripple: the water plate breathes on two slightly detuned
-## frequencies so the pool never looks like it is pulsing on a metronome.
+## Ondas del agua: dos frecuencias desafinadas (Hz) y su amplitud, para que
+## no lata como un metrónomo.
 const RIPPLE_X_HZ: float = 1.7
 const RIPPLE_Z_HZ: float = 1.3
 const RIPPLE_AMOUNT: float = 0.03
 
 var _time: float = 0.0
 var _water: MeshInstance3D = null
-## Set by _dry_up: without it a second exit path (timeout racing a use)
-## would stack two scale tweens and queue_free the node twice.
+## Lo enciende _dry_up para que dos salidas el mismo frame no apilen dos
+## tweens ni liberen el nodo dos veces.
 var _drying: bool = false
 
 
@@ -36,8 +31,8 @@ func _init() -> void:
 
 func _ready() -> void:
 	super()
-	# The director counts live springs through this group to keep exactly
-	# one on the field; RunRoot frees them with the rest of the stage.
+	# El director cuenta los manantiales vivos por este grupo para dejar uno
+	# solo; RunRoot los libera con el resto de la etapa.
 	add_to_group(&"springs")
 	_water = get_node_or_null("Visual/Water") as MeshInstance3D
 	_refresh_price_prompt()
@@ -53,9 +48,8 @@ func _physics_process(delta: float) -> void:
 		_refresh_price_prompt()
 
 
-## The golden rain halves what the party pays, and the prompt is rebuilt
-## every physics frame while a raider stands in the ring, so the number on
-## the label follows the weather without any wiring of its own.
+## Precio con el descuento de la lluvia dorada. El aviso se rearma en cada
+## frame con un raider en el anillo, así que sigue al clima solo.
 func current_price() -> int:
 	return ceili(float(price) * RunState.price_discount)
 
@@ -74,9 +68,8 @@ func _interact(player: Node) -> void:
 	var health := Health.find_in(player)
 	if health != null:
 		health.heal_full()
-	# One random power-up, never the star: PowerUps owns the toast, the
-	# announce and the "Power-up picked:" line, so the spring says only
-	# what the spring does.
+	# Un power-up al azar, nunca la estrella. PowerUps se encarga del aviso,
+	# el anuncio y la línea "Power-up picked:".
 	var powerup_id := PowerUpCatalog.roll_id(true)
 	var powerups := PowerUps.find_in(player)
 	if powerups != null:
@@ -87,9 +80,8 @@ func _interact(player: Node) -> void:
 	_dry_up()
 
 
-## Sink-and-free exit. Only one path reaches it now that springs never
-## time out, but the guard stays: two raiders drinking on the same frame
-## would otherwise stack two tweens and queue_free the node twice.
+## Se encoge y se libera. El guardia evita que dos raiders bebiendo el mismo
+## frame apilen dos tweens y liberen el nodo dos veces.
 func _dry_up() -> void:
 	if _drying:
 		return

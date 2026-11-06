@@ -1,62 +1,53 @@
 class_name Chest
 extends Interactable
-## Treasure chest (iteration 40 economy, iteration 47 free mode): a lockbox
-## that pays out ONE ItemCatalog item (never cards, never weapons).
+## Cofre del tesoro: paga UN objeto de ItemCatalog (nunca cartas ni armas).
 ##
-## PAID chests seal their rarity when they appear: it is rolled at _ready
-## with the card-rarity weights tilted by luck_bonus and floored by
-## min_rarity, the band/lock/trim glow in that rarity color so a Legendary
-## chest reads from across the field, and the price comes from RunState
-## (base per rarity x a global multiplier that grows with every chest
-## anyone opens). Each one taxes the rest.
+## Los cofres DE PAGO sellan su rareza al aparecer: se tira en _ready con los
+## pesos de rareza de las cartas, inclinados por luck_bonus y con piso en
+## min_rarity, y el precio sale de RunState (base por rareza × un
+## multiplicador global que crece con cada cofre que se abre).
 ##
-## FREE chests (iteration 47: every boss and shiny drop, a share of the
-## run-start chests, the demonic "free chest" pact) cost nothing, do NOT
-## inflate the paid ones, and roll their rarity WHEN OPENED, with the
-## opener's luck — so any tier is possible and luck actually tilts it.
-## Having no sealed rarity, they carry their own white-gold tint instead
-## of a rarity color, which is what makes "gratis" read at a distance.
+## Los cofres GRATIS (jefes, shinies, parte de los cofres de inicio, el
+## pacto del cofre) no cuestan nada, NO encarecen los de pago y tiran su
+## rareza AL ABRIRSE, con la suerte de quien los abre. Sin rareza sellada,
+## llevan su propio tinte blanco dorado.
 ##
-## One use. Since iteration 47 EVERY chest sinks and frees itself once it
-## has paid out, instead of leaving an open box on the field forever.
+## Un solo uso: al pagar se hunde y se libera.
 
-## Free mode: no price, no price inflation, rarity rolled at open time.
-## Named free_open, not `free`: `free` is Object.free() and shadowing it
-## with a property is how a node stops being able to delete itself.
+## Modo gratis: sin precio, sin encarecer y con la rareza tirada al abrir. Se
+## llama free_open y no `free`, que es Object.free().
 @export var free_open: bool = false
-## Fixed rarity name ("" = rolled at ready, or at open time when free).
+## Rareza fija como id en inglés ("" = se tira al aparecer, o al abrir si es gratis).
 @export var rarity: String = ""
-## Rarity-tilt luck for the ready-time roll (WorldDirector supply chests).
+## Suerte extra que inclina la tirada de rareza (la ponen los cofres de suministros del WorldDirector).
 @export var luck_bonus: float = 0.0
-## Rolled rarities are floored to this tier ("" = no floor).
+## Piso de rareza de la tirada al aparecer, como id en inglés ("" = sin piso).
 @export var min_rarity: String = ""
-## Seconds the lid swing takes; the item lands once it finishes.
+## Segundos que dura el salto de apertura; el objeto se entrega al terminar.
 @export var open_duration: float = 0.45
-## Lid pivot X rotation when fully open (hinged at the back edge).
+## Rotación X de la tapa abierta (no hace nada: la escena no tiene LidPivot).
 @export var lid_open_angle: float = -1.75
-## Seconds a paid-out chest stays on screen before sinking away.
+## Segundos que sigue vivo el cofre tras pagar antes de liberarse.
 @export var reward_linger: float = 1.4
 
-## Lid-swing choreography: the chest hops this high, spending this share
-## of open_duration going up and the rest bouncing back down.
+## Salto al abrir: altura en metros y fracción de open_duration que dura la
+## subida (el resto es el rebote de bajada).
 const OPEN_HOP_HEIGHT: float = 0.3
 const OPEN_HOP_UP_SHARE: float = 0.4
-## Sink-and-shrink exit, shared by every chest once it has paid.
+## Hundimiento al pagar: segundos y metros.
 const SINK_TIME: float = 0.5
 const SINK_DEPTH: float = 1.8
-## Free chests have no rarity to wear at rest, so they wear this instead:
-## warm white-gold, deliberately outside the four rarity colors.
+## Tinte de los cofres gratis (fuera de los cuatro colores de rareza).
 const FREE_TINT: Color = Color(1.0, 0.93, 0.72)
-## Prompt of a free chest. No price, no purse check — there is nothing to
-## fail, so the line never has a "you can't afford it" variant.
+## Aviso del cofre gratis: no hay precio, así que no hay variante "te faltan".
 const FREE_PROMPT: String = "[E] Abrir cofre — gratis"
 
 @onready var _lid_pivot: Node3D = get_node_or_null("Visual/LidPivot")
 
-## The raider who opened this chest (co-op: the loot lands on THEM).
+## Quien abrió el cofre (en co-op, el objeto le llega a ÉL).
 var _opener: Node = null
-## The rarity glow, kept so a re-tint (make_free) moves it instead of
-## stacking a second light on the same box.
+## La luz del brillo, guardada para que make_free la recolore en vez de
+## añadir otra.
 var _glow_light: OmniLight3D = null
 
 
@@ -69,27 +60,21 @@ func _init() -> void:
 
 func _ready() -> void:
 	super()
-	# A fixed rarity needs no roll; `rarity` is the single source every
-	# reader (price, tint, prompt, loot roll) already goes through, so the
-	# rolled tier is stored back into it and nothing else is kept.
-	# A free chest rolls at OPEN time instead (see _pop_reward): its tier is
-	# the opener's luck at that moment, not the party's luck when it landed.
+	# `rarity` es la única fuente que leen precio, tinte, aviso y botín: la
+	# rareza tirada se guarda ahí. Un cofre gratis tira al ABRIR (ver
+	# _pop_reward), con la suerte de quien abre.
 	if rarity.is_empty() and not free_open:
 		var floor_index := UpgradePool.rarity_index(min_rarity)
-		# Luck tilts the rarity of an item the same way it tilts a card —
-		# that is what Tome of Fortune, Lucky Coin and Gilded Whisker
-		# promise. A chest seals its rarity when it appears, so the party's
-		# luck AT THAT MOMENT is what counts: relic luck for the chests an
-		# arena ships with, the run's accumulated luck for the supply
-		# chests the WorldDirector drops mid-run.
+		# La suerte inclina la rareza como en las cartas. Cuenta la suerte de
+		# la party en el momento en que el cofre aparece.
 		var row := UpgradePool.roll_rarity(luck_bonus + _party_luck(), floor_index)
 		rarity = String(row.name)
 	_tint_by_rarity()
 	_refresh_price_prompt()
 
 
-## Best luck in the party at roll time (the party shares one field of
-## chests, so the luckiest raider sets the tilt).
+## Mejor suerte de la party al tirar (la party comparte los cofres del mapa,
+## así que inclina el raider con más suerte).
 func _party_luck() -> float:
 	var best := 0.0
 	for node: Node in get_tree().get_nodes_in_group("player"):
@@ -99,10 +84,9 @@ func _party_luck() -> float:
 	return best
 
 
-## Turns an ALREADY READY chest free (the WorldDirector makes a share of
-## the run-start chests free, and those are ready before it runs). Clears
-## the sealed rarity so it rolls at open time, and repaints the box, which
-## _ready had already given the paid look.
+## Vuelve gratis un cofre que YA pasó por _ready (el WorldDirector regala una
+## parte de los cofres de inicio). Borra la rareza sellada para que se tire
+## al abrir y repinta la caja.
 func make_free() -> void:
 	if free_open:
 		return
@@ -121,8 +105,8 @@ func price() -> int:
 
 
 func _physics_process(_delta: float) -> void:
-	# Prices move with every chest opened anywhere, and the raider's
-	# points move with every kill: keep the prompt honest while in range.
+	# El precio cambia con cada cofre abierto y los puntos con cada muerte:
+	# el aviso se recalcula mientras alguien está en rango.
 	if available and player_in_range:
 		_refresh_price_prompt()
 
@@ -140,11 +124,9 @@ func _refresh_price_prompt() -> void:
 		set_prompt("Te faltan %d puntos para abrir cofre %s" % [cost-purse, shown])
 
 
-## Point balance of the raider standing CLOSEST to the chest — the one
-## about to press. The prompt used to quote the richest body in the ring
-## while _interact charged whoever actually pressed, so in co-op it
-## promised an open to a raider who could not pay for it. Downed bodies
-## are skipped: they cannot press anything.
+## Puntos del raider en pie MÁS CERCANO (el que va a apretar). _interact
+## cobra a quien aprieta, así que el aviso cotiza su bolsa y no la del más
+## rico del anillo.
 func _points_of_nearest() -> int:
 	var body := nearest_live_player()
 	if body == null:
@@ -157,12 +139,11 @@ func _interact(player: Node) -> void:
 	if not free_open:
 		var cost := price()
 		if not player.has_method("spend_points") or not bool(player.call("spend_points", cost)):
-			# Can't afford: a dull thunk and the prompt already says why.
+			# No alcanza: un golpe sordo; el aviso ya dice por qué.
 			Sfx.play(&"dodge")
 			return
-		# Free chests deliberately do NOT tax the paid ones: bosses and
-		# shinies drop them by the handful, and letting each one raise the
-		# global price would price the paid chests out of the run.
+		# Solo los de pago encarecen los siguientes: los gratis caen de a
+		# montones y sacarían a los de pago de la partida.
 		RunState.register_chest_opened()
 	_opener = player
 	_emit_started()
@@ -186,17 +167,16 @@ func _interact(player: Node) -> void:
 
 
 func _pop_reward() -> void:
-	# The lid swing runs for open_duration before the loot lands: by then
-	# the opener may be gone (a co-op slot dropped, a respawn by
-	# reinstantiation). ItemBag.find_in only guards against null, and a
-	# freed Object is not null.
+	# Durante el salto quien abrió puede haberse ido (un slot co-op que se
+	# suelta, un respawn): ItemBag.find_in solo descarta null y un Object
+	# liberado no es null.
 	if _opener == null or not is_instance_valid(_opener):
 		_emit_completed()
 		_sink()
 		return
 	if free_open:
-		# Rolled here, not at _ready: a free chest has no floor and no
-		# sealed tier, so the opener's own luck decides what is inside.
+		# Se tira aquí: un cofre gratis no tiene piso ni rareza sellada, así
+		# que decide la suerte de quien abre.
 		var stats := PlayerStats.find_in(_opener)
 		var luck := (stats.luck if stats != null else 0.0) + luck_bonus
 		rarity = String(UpgradePool.roll_rarity(luck).name)
@@ -212,7 +192,7 @@ func _pop_reward() -> void:
 	get_tree().call_group("boss_ui", "announce", "Cofre %s: %s — %s" % [
 			UpgradePool.rarity_display(rarity), String(row.display_name),
 			String(row.description)])
-	# One-line log (RunManager convention) for headless soaks.
+	# Línea de log para los soaks (verificar.sh cuenta "Chest opened:").
 	print("Chest opened: %s -> %s (next prices x%.2f)%s" % [
 			rarity, item_id, RunState.chest_price_multiplier,
 			" (free)" if free_open else ""])
@@ -220,10 +200,8 @@ func _pop_reward() -> void:
 	_sink()
 
 
-## A spent chest leaves the field (iteration 47). Nothing else may act on
-## it from here: the WorldDirector's beacon tick reads `available`, which
-## consume() already cleared, so a chest that sinks on its own can never be
-## despawned a second time.
+## El cofre gastado se va del campo. consume() ya apagó `available`, que es
+## lo que lee la baliza del WorldDirector, así que nadie lo retira dos veces.
 func _sink() -> void:
 	set_physics_process(false)
 	var tween := create_tween()
@@ -236,8 +214,8 @@ func _sink() -> void:
 	tween.chain().tween_callback(queue_free)
 
 
-## Band, lock and lid trim take the rarity color (emissive so it reads at
-## night); the wood stays wood.
+## Pinta el cofre con el color de su rareza (o el tinte gratis), con
+## emisión para que se lea de noche.
 func _tint_by_rarity() -> void:
 	var color := FREE_TINT if free_open else ItemCatalog.rarity_color(rarity)
 	var material := StandardMaterial3D.new()
@@ -274,7 +252,7 @@ func _tint_by_rarity() -> void:
 		_glow_light.light_color = color
 
 
-## A free chest reads as its own marker: on a 240 m map, "worth the walk
-## even with no points" is the single most useful thing the icon can say.
+## El cofre gratis tiene su propio marcador: en un mapa de 240 m, "vale la
+## pena aunque no tengas puntos" es lo más útil que puede decir el ícono.
 func map_marker_kind() -> StringName:
 	return &"chest_free" if free_open else marker_kind
