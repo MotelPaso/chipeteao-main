@@ -33,3 +33,12 @@ func _combat_tick(player: Node3D, distance: float) -> void:
 
 func _apply_elite_damage(multiplier: float) -> void:
 	contact_damage *= multiplier
+
+
+## Un siervo levantado de este cadáver pega como él (una mole poseída sigue
+## pegando como mole).
+func _copy_combat_stats_to(servant: EnemyBase) -> void:
+	var grunt := servant as Grunt
+	if grunt != null:
+		grunt.contact_damage = contact_damage
+	super(servant)

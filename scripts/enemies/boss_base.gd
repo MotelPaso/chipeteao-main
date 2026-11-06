@@ -326,7 +326,7 @@ func _drop_xp_gem() -> void:
 func _drop_health_orbs() -> void:
 	for i in health_orb_count:
 		var orb_angle := TAU * (float(i) + 0.5) / float(maxi(health_orb_count, 1))
-		_spawn_health_orb(global_position + Vector3.UP * 0.6
+		EnemyLoot.spawn_health_orb(get_tree(), global_position + Vector3.UP * 0.6
 				+ Vector3(cos(orb_angle), 0.0, sin(orb_angle)) * ORB_RING_RADIUS)
 
 
