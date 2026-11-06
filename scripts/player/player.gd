@@ -1,20 +1,25 @@
 class_name Player
 extends CharacterBody3D
-## Raider de un jugador: movimiento WASD relativo a la cámara, vista con
-## mouse o stick, salto con multisalto y derrape (Shift + moverse).
+## Raider de un jugador: movimiento relativo a la cámara, salto con
+## multisalto, derrape (Shift + moverse), enraizamiento y rescate del vacío.
 ## Al aparecer aplica la fila de su personaje (CharacterCatalog): arma
 ## inicial, modelo del cuerpo con su tinte y pasiva por nivel.
-## El cuerpo visible es el hijo SealRig; la física la manda la cápsula.
-## apply_root() (el Entomb de Sarcognato) bloquea el movimiento sin tocar
-## la cámara ni las armas.
+##
+## Cada parte vive en su nodo hijo de Player.tscn, con sus propios valores:
+## SealRig (cuerpo visible), CameraRig (cámara y vista), Revive (caído y
+## rescate en co-op, con el cartel RevivePrompt), Flight (power-up Vuelo),
+## PetSlot (mascota), Wallet (puntos), además de Health, Stats, ItemBag,
+## PowerUps y el montaje Weapons. Player decide el orden de cada tick y
+## conserva los nombres que otros scripts llaman (add_points, set_pet,
+## view_camera, end_flight…).
 ##
 ## Contrato de escena: la CapsuleShape3D de CollisionShape3D lleva
 ## `resource_local_to_scene` en Player.tscn porque _set_body_height() la
 ## modifica al derrapar; sin esa marca la comparten todas las instancias y
 ## el derrape encoge a toda la party.
 
-## Puntos de la partida (por jugador, se reinician cada partida): se ganan
-## por baja y se gastan en cofres, ruletas y manantiales.
+## Cambiaron los puntos de la partida (la emite el nodo Wallet); el HUD la
+## conecta por nombre.
 signal points_changed(total: int)
 ## Se emite al EMPEZAR un derrape, con su dirección; lo escucha el
 ## Cinturón eléctrico (ItemBag).
@@ -23,7 +28,6 @@ signal slide_started(direction: Vector3)
 ## Fracción de la velocidad efectiva que el cuerpo ya debe llevar para
 ## empezar un derrape (no se derrapa desde quieto).
 const SLIDE_MIN_SPEED_RATIO: float = 0.5
-
 ## Dónde queda un caído rescatado del vacío respecto de su compañero: al
 ## lado y no encima, para que la física no empuje a ninguno de los dos.
 const RESCUE_MATE_OFFSET := Vector3(1.5, 0.5, 0.0)
@@ -37,6 +41,7 @@ const RESCUE_MATE_OFFSET := Vector3(1.5, 0.5, 0.0)
 @export var air_acceleration: float = 12.0
 ## Velocidad vertical al saltar, en metros por segundo.
 @export var jump_velocity: float = 8.7
+
 @export_group("Derrape")
 ## Multiplicador de la velocidad efectiva durante el derrape.
 @export var slide_speed_multiplier: float = 2.21
@@ -60,6 +65,7 @@ const RESCUE_MATE_OFFSET := Vector3(1.5, 0.5, 0.0)
 @export_group("Co-op")
 ## Slot del jugador (0-3): decide qué dispositivo lo controla; RunSystems asigna 1+ a los cuerpos extra.
 @export var player_index: int = 0
+
 ## Interruptor de prueba (ArenaProbe, BONK_WEAPON): id del arma con que
 ## empieza el raider en vez de la de su personaje. Pasa por el mismo camino
 ## de entrega (el node_name que cuenta el pool y el contador used_weapon_).
@@ -70,18 +76,16 @@ static var starting_weapon_override: String = ""
 var points: int:
 	get:
 		return _wallet.points if _wallet != null else 0
-
-## Mascota que sigue al raider ("" = ninguna); la guarda el nodo PetSlot.
-## Antes del _ready de Player vale "" (PlayerStats ya la lee en el suyo).
+## Mascota que sigue al raider ("" = ninguna; la guarda el nodo PetSlot).
+## Antes del _ready de Player vale "": PlayerStats ya la lee en el suyo.
 var pet_id: String:
 	get:
 		return _pet_slot.pet_id if _pet_slot != null else ""
-
-## Radio de rescate en metros (lectura; se edita en el nodo Revive).
+## Radio de rescate en metros (solo lectura; se edita en el nodo Revive).
 var revive_radius: float:
 	get:
 		return _revive.revive_radius
-## Segundos de Interactuar para revivir (lectura; se edita en el nodo Revive).
+## Segundos de Interactuar para revivir (solo lectura; se edita en el nodo Revive).
 var revive_time: float:
 	get:
 		return _revive.revive_time
@@ -96,7 +100,6 @@ var revive_time: float:
 @onready var _flight: PlayerFlight = $Flight
 @onready var _pet_slot: PetSlot = $PetSlot
 @onready var _wallet: PlayerWallet = $Wallet
-@onready var item_bag: ItemBag = $ItemBag
 
 var _gravity: float = ProjectSettings.get_setting("physics/3d/default_gravity", 9.8)
 var _default_collision_height: float = 1.8
@@ -112,7 +115,7 @@ var _slide_timer: float = 0.0
 var _slide_cooldown_timer: float = 0.0
 var _slide_direction: Vector3 = Vector3.ZERO
 
-# Tiempo restante de un enraizamiento externo (Entomb): sin moverse, saltar ni derrapar.
+## Tiempo restante de un enraizamiento externo (Entomb): sin moverse, saltar ni derrapar.
 var _root_timer: float = 0.0
 ## Saltos que quedan antes de volver a pisar suelo: 1 más
 ## PlayerStats.extra_jumps, recargados cada frame en el suelo. Empieza en 1
@@ -125,36 +128,6 @@ var _is_dead: bool = false
 var _spawn_position: Vector3 = Vector3.ZERO
 
 
-## Cambia la mascota (caja de mascotas y vendedor la llaman por nombre; ver
-## PetSlot.set_pet).
-func set_pet(new_pet_id: String) -> void:
-	_pet_slot.set_pet(new_pet_id)
-
-
-# --- Puntos (nodo Wallet) ---------------------------------------------------
-# Enemigos, cofres, santuarios, vendedores, PowerUps y WorldDirector llaman
-# a estos métodos por nombre (has_method/call).
-
-func points_multiplier() -> float:
-	return _wallet.points_multiplier()
-
-
-func set_points_source(source_id: String, multiplier: float) -> void:
-	_wallet.set_points_source(source_id, multiplier)
-
-
-func clear_points_source(source_id: String) -> void:
-	_wallet.clear_points_source(source_id)
-
-
-func add_points(amount: int) -> void:
-	_wallet.add_points(amount)
-
-
-func spend_points(amount: int) -> bool:
-	return _wallet.spend_points(amount)
-
-
 func _ready() -> void:
 	# Marcador de mapa: los raiders siempre se ven en el mapa, con niebla o
 	# sin ella.
@@ -163,28 +136,13 @@ func _ready() -> void:
 	_cache_slot_actions()
 	_apply_character(CharacterCatalog.by_id_or_default(Coop.character_for_slot(player_index)))
 	health.died.connect(_on_health_died)
+	# Después de _apply_character: la cámara pasa el modelo nuevo del rig a
+	# la capa visual del slot.
 	_camera.setup()
 	var capsule := collision_shape.shape as CapsuleShape3D
 	if capsule != null:
 		_default_collision_height = capsule.height
 		_default_collision_radius = capsule.radius
-
-
-## Resuelve una vez los nombres de acción de este slot (ver _actions).
-func _cache_slot_actions() -> void:
-	for base: StringName in Coop.BASE_ACTIONS:
-		_actions[base] = Coop.action(player_index, base)
-
-
-## Nombre de una acción base para este slot ("interact" -> "p2_interact" en
-## co-op); también lo usan los componentes del raider.
-func slot_action(base: StringName) -> StringName:
-	return _actions.get(base, base)
-
-
-## Acción de interactuar de este slot; los interactuables la piden por nombre.
-func interact_action() -> StringName:
-	return slot_action(&"interact")
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -232,12 +190,15 @@ func _physics_process(delta: float) -> void:
 	move_and_slide()
 
 
-## Temporizadores que bajan en TODO estado. Sobre todo el enraizamiento:
-## Sarcognato enraíza y daña en la misma llamada, y si se congelara al caer,
-## el revivido volvería con 3 s de enraizamiento nuevos.
-func _tick_timers(delta: float) -> void:
-	_root_timer = maxf(_root_timer - delta, 0.0)
-	_slide_cooldown_timer = maxf(_slide_cooldown_timer - delta, 0.0)
+## Nombre de una acción base para este slot ("interact" -> "p2_interact" en
+## co-op); también lo usan los componentes del raider.
+func slot_action(base: StringName) -> StringName:
+	return _actions.get(base, base)
+
+
+## Acción de interactuar de este slot; los interactuables la piden por nombre.
+func interact_action() -> StringName:
+	return slot_action(&"interact")
 
 
 ## Guarda la posición actual como punto de rescate del vacío.
@@ -245,6 +206,97 @@ func _tick_timers(delta: float) -> void:
 ## tomó en _ready pertenece a un mapa que ya no existe.
 func anchor_here() -> void:
 	_spawn_position = global_position
+
+
+## Enraizamiento externo (el Entomb de Sarcognato): bloquea movimiento,
+## salto y derrape por `duration` segundos; las armas siguen disparando y la
+## cámara queda libre. Reaplicarlo extiende el bloqueo, nunca lo acorta.
+func apply_root(duration: float) -> void:
+	if _is_dead or duration <= 0.0:
+		return
+	if _is_sliding:
+		_end_slide()
+	_root_timer = maxf(_root_timer, duration)
+
+
+func is_rooted() -> bool:
+	return _root_timer > 0.0
+
+
+## Caído en co-op (lo lleva el nodo Revive).
+func is_downed() -> bool:
+	return _revive.is_downed()
+
+
+func camera_mode() -> PlayerCamera.CameraMode:
+	return _camera.camera_mode()
+
+
+## Camera3D propia de este raider. En co-op ninguna es la cámara activa del
+## viewport (SplitScreen pinta cada una en su SubViewport), así que lo que
+## actúa sobre una cámara (FOV, sacudida) debe recibir esta.
+func view_camera() -> Camera3D:
+	return _camera.view_camera()
+
+
+## Capa visual del cuerpo propio de este slot (ver PlayerCamera.RIG_LAYER_BASE).
+func rig_visual_layer() -> int:
+	return _camera.rig_visual_layer()
+
+
+## Cambia la mascota (la caja de mascotas y el vendedor la llaman por
+## nombre; ver PetSlot.set_pet).
+func set_pet(new_pet_id: String) -> void:
+	_pet_slot.set_pet(new_pet_id)
+
+
+## PowerUps la llama por nombre cuando termina Vuelo (ver PlayerFlight.end_flight).
+func end_flight() -> void:
+	_flight.end_flight()
+
+
+# --- Puntos (nodo Wallet) ---------------------------------------------------
+# Enemigos, cofres, santuarios, vendedores, PowerUps y WorldDirector llaman
+# a estos métodos por nombre (has_method/call).
+
+func points_multiplier() -> float:
+	return _wallet.points_multiplier()
+
+
+func set_points_source(source_id: String, multiplier: float) -> void:
+	_wallet.set_points_source(source_id, multiplier)
+
+
+func clear_points_source(source_id: String) -> void:
+	_wallet.clear_points_source(source_id)
+
+
+func add_points(amount: int) -> void:
+	_wallet.add_points(amount)
+
+
+func spend_points(amount: int) -> bool:
+	return _wallet.spend_points(amount)
+
+
+## Contrato de marcador de mapa (grupo "map_markers"): la flecha usa el giro
+## de este cuerpo, que es hacia donde mira el raider.
+func map_marker_kind() -> StringName:
+	return &"player"
+
+
+## Resuelve una vez los nombres de acción de este slot (ver _actions).
+func _cache_slot_actions() -> void:
+	for base: StringName in Coop.BASE_ACTIONS:
+		_actions[base] = Coop.action(player_index, base)
+
+
+## Temporizadores que bajan en TODO estado. Sobre todo el enraizamiento:
+## Sarcognato enraíza y daña en la misma llamada, y si se congelara al caer,
+## el revivido volvería con 3 s de enraizamiento nuevos.
+func _tick_timers(delta: float) -> void:
+	_root_timer = maxf(_root_timer - delta, 0.0)
+	_slide_cooldown_timer = maxf(_slide_cooldown_timer - delta, 0.0)
 
 
 ## Rescate del vacío, además de los muros del perímetro: un cuerpo que se
@@ -319,30 +371,10 @@ func _try_jump() -> void:
 	velocity.y = jump_velocity
 
 
-## PowerUps la llama por nombre cuando termina Vuelo (ver PlayerFlight.end_flight).
-func end_flight() -> void:
-	_flight.end_flight()
-
-
 ## Saltos disponibles desde el suelo: el del suelo más los que dan los stats.
 func _max_jumps() -> int:
 	var stats := PlayerStats.find_in(self)
 	return 1 + (stats.extra_jumps if stats != null else 0)
-
-
-## Enraizamiento externo (el Entomb de Sarcognato): bloquea movimiento,
-## salto y derrape por `duration` segundos; las armas siguen disparando y la
-## cámara queda libre. Reaplicarlo extiende el bloqueo, nunca lo acorta.
-func apply_root(duration: float) -> void:
-	if _is_dead or duration <= 0.0:
-		return
-	if _is_sliding:
-		_end_slide()
-	_root_timer = maxf(_root_timer, duration)
-
-
-func is_rooted() -> bool:
-	return _root_timer > 0.0
 
 
 ## Aplica una fila de CharacterCatalog: crea el arma inicial bajo el montaje
@@ -404,35 +436,11 @@ func _on_health_died() -> void:
 	seal_rig.play_death()
 
 
-# --- Cámara (nodo CameraRig) --------------------------------------------------
-
-func camera_mode() -> PlayerCamera.CameraMode:
-	return _camera.camera_mode()
-
-
-## Camera3D propia de este raider. En co-op ninguna es la cámara activa del
-## viewport (SplitScreen pinta cada una en su SubViewport), así que lo que
-## actúa sobre una cámara (FOV, sacudida) debe recibir esta.
-func view_camera() -> Camera3D:
-	return _camera.view_camera()
-
-
-## Capa visual del cuerpo propio de este slot (ver PlayerCamera.RIG_LAYER_BASE).
-func rig_visual_layer() -> int:
-	return _camera.rig_visual_layer()
-
-
-# --- Co-op: caído y rescate (nodo Revive) -------------------------------------
-
 func _enter_downed() -> void:
 	# Un Entomb que llegó con el golpe final (Sarcognato enraíza y daña a la
 	# vez) no dura más que la caída: el revivido vuelve pudiendo moverse.
 	_root_timer = 0.0
 	_revive.set_downed(true)
-
-
-func is_downed() -> bool:
-	return _revive.is_downed()
 
 
 func _can_start_slide(wish_dir: Vector3, effective_speed: float) -> bool:
@@ -473,9 +481,3 @@ func _set_body_height(height: float) -> void:
 	collision_shape.position.y = height * 0.5
 	# La foca se aplasta y baja la nariz junto con la cápsula.
 	seal_rig.set_slide_ratio(height / _default_collision_height)
-
-
-## Contrato de marcador de mapa (grupo "map_markers"): la flecha usa el giro
-## de este cuerpo, que es hacia donde mira el raider.
-func map_marker_kind() -> StringName:
-	return &"player"
