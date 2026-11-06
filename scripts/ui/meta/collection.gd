@@ -1,29 +1,36 @@
 extends MetaScreen
-## Collection screen (iteration 35): the completionist wall — every raider,
-## weapon, evolution, and bestiary entry as discovered/undiscovered rows,
-## with an overall completion percentage up top. Opened from the character
-## select's Collection button. Undiscovered entries show as "???" teasers
-## (evolutions include a vague recipe hint) so the screen doubles as the
-## discovery map that pulls players back run after run.
+## Colección: el muro del completista. Cada raider, arma, evolución y entrada
+## del bestiario como fila descubierta o por descubrir, con el porcentaje
+## total arriba. Se abre desde el botón Colección del selector. Lo no
+## descubierto se muestra como "???" (las evoluciones con una pista vaga de
+## la receta).
 ##
-## Chrome, Esc/Back and the staggered entrance come from MetaScreen; the
-## badge here is a completion percentage, not a Shard balance.
+## Cromo, Esc/Volver y la entrada escalonada vienen de MetaScreen; aquí la
+## insignia es un porcentaje de completado, no un saldo de esquirlas.
 ##
-## Discovery sources (SaveData counters, persisted at the run-end fold):
-##   raiders:    SaveData.is_unlocked (the roster gate itself)
-##   weapons:    used_weapon_<id>  (bumped on carry — spawn or card)
-##   evolutions: evo_<weapon_id>   (bumped by the chest ceremony)
-##   bestiary:   kills_<script>    (bumped by EnemyBase on death)
+## Fuentes de descubrimiento (contadores de SaveData, guardados al cerrar la
+## partida):
+##   raiders:     SaveData.is_unlocked (el mismo candado del plantel)
+##   armas:       used_weapon_<id>  (suma al llevarla: al aparecer o por carta)
+##   evoluciones: evo_<weapon_id>   (suma en la ceremonia del cofre)
+##   bestiario:   kills_<script>    (suma EnemyBase al morir)
 
-## Indent marker for evolution rows. Layout, not copy: it stays out of the
-## translated strings so no locale ever has to carry the glyph.
+## Sangría de las filas de evolución. Es diseño, no texto: queda fuera de las
+## cadenas traducidas.
 const EVO_PREFIX := "⤷ "
 const UNKNOWN := "???"
 
-## Bestiary rows: script-file id -> display name + flavor. The id is the
-## enemy's script file name (a SaveData key), so it stays in English; the
-## name and flavor are what the player reads. Order is the reveal order on
-## screen.
+## Filas del bestiario, en el orden en que aparecen en pantalla. Edita aquí.
+##
+## | campo        | regla                                                  |
+## |--------------|--------------------------------------------------------|
+## | id           | nombre del archivo del script del enemigo, sin ".gd"   |
+## |              | (scripts/enemies/<id>.gd): EnemyBase suma kills_<id> al |
+## |              | morir. Un id que no calce nunca se descubre.           |
+## | display_name | nombre en pantalla; en los jefes copia el boss_title de |
+## |              | su escena (Rotking, Sarcognath, Fenwraith, Grubthing,  |
+## |              | CofferMimic .tscn): si cambias uno, cambia el otro.     |
+## | flavor       | texto corto bajo el nombre.                            |
 const BESTIARY: Array[Dictionary] = [
 	{"id": "grunt", "display_name": "Esbirro", "flavor": "la marea misma"},
 	{"id": "skirmisher", "display_name": "Hostigador", "flavor": "guarda distancia y lanza saetas"},
@@ -38,7 +45,7 @@ const BESTIARY: Array[Dictionary] = [
 ]
 
 
-## Teal badge: this screen counts discoveries, not Shards.
+## Insignia turquesa: esta pantalla cuenta descubrimientos, no esquirlas.
 func _badge_color() -> Color:
 	return UiTheme.ACCENT
 
@@ -61,7 +68,7 @@ func _build_rows(list_node: VBoxContainer) -> void:
 			list_node.add_child(_hidden_row("Un raider que sigue allá afuera..."))
 	list_node.add_child(_section_header("ARSENAL"))
 	for weapon: Dictionary in UpgradePool.WEAPON_LIBRARY:
-		total += 2  # the weapon and its evolution each count
+		total += 2  # el arma y su evolución cuentan por separado
 		var weapon_id := String(weapon.id)
 		var carried := SaveData.stat("used_weapon_" + weapon_id) > 0
 		if carried:
@@ -72,7 +79,7 @@ func _build_rows(list_node: VBoxContainer) -> void:
 			list_node.add_child(_hidden_row("Un arma sin reclamar..."))
 		var recipe := EvolutionCatalog.by_weapon_id(weapon_id)
 		if recipe.is_empty():
-			total -= 1  # no evolution authored for this weapon
+			total -= 1  # esta arma no tiene evolución
 			continue
 		if SaveData.stat("evo_" + weapon_id) > 0:
 			found += 1
@@ -119,8 +126,8 @@ func _hidden_row(tease: String) -> PanelContainer:
 	return _build_row(UNKNOWN, tease, UiTheme.BORDER_LOCKED, false)
 
 
-## Evolution rows sit indented under their weapon; discovered ones glow
-## (the only rows on this screen that do — they are the rare find).
+## Las filas de evolución van con sangría bajo su arma; las descubiertas
+## brillan (las únicas de la pantalla: son el hallazgo raro).
 func _evo_row(title: String, detail: String, discovered: bool) -> PanelContainer:
 	return _build_row(EVO_PREFIX + title, detail,
 			UiTheme.ACCENT_AMBER if discovered else UiTheme.BORDER_LOCKED,

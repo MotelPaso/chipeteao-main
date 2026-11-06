@@ -1,11 +1,11 @@
 extends MetaScreen
-## Armory screen (iteration 36): spend Shards on permanent Relic ranks
-## (RelicCatalog rows; SaveData persists the ranks and PlayerStats applies
-## them every run). One row per relic: name, effect line, rank pips, and a
-## buy button with the next rank's price — or MÁX once capped. Buying
-## flashes the row and counts the balance down (MetaScreen.payoff),
-## mirroring the quest log's claim so spending feels as good as earning;
-## an unaffordable rank gets the shared reject wobble.
+## Armería: gasta esquirlas en rangos permanentes de reliquias (filas de
+## RelicCatalog; SaveData guarda los rangos y PlayerStats los aplica en cada
+## partida). Una fila por reliquia: nombre, línea de efecto, rombos de rango y
+## un botón de compra con el precio del rango siguiente, o MÁX al llegar al
+## tope. Comprar hace destellar la fila y descuenta el saldo
+## (MetaScreen.payoff), igual que reclamar una misión; un rango que no
+## alcanza recibe el vaivén de rechazo compartido.
 
 
 func _build_rows(list_node: VBoxContainer) -> void:
@@ -40,7 +40,7 @@ func _build_row(relic: Dictionary) -> PanelContainer:
 	columns.add_child(info)
 	info.add_child(MetaScreen.label(String(relic.display_name), 16, UiTheme.TEXT_BRIGHT))
 	info.add_child(MetaScreen.label(_effect_line(relic), 12, UiTheme.TEXT_DIM))
-	# Rank pips: filled diamonds for owned ranks, hollow for the rest.
+	# Rombos de rango: llenos los comprados, huecos los que faltan.
 	var pips := ""
 	for i in max_ranks:
 		pips += "◆" if i < rank else "◇"
@@ -67,10 +67,10 @@ func _build_row(relic: Dictionary) -> PanelContainer:
 	return row
 
 
-## The effect line is a catalog template ("Todo el daño %s por rango.")
-## filled with the per-rank amount text. Guarded: a translated row that
-## drops the %s would otherwise raise a formatting error at runtime and
-## leave that single row blank while its five neighbours look fine.
+## La línea de efecto es una plantilla del catálogo ("Todo el daño %s por
+## rango.") rellenada con el texto del monto por rango. Protegida: una fila
+## traducida que pierde el %s daría un error de formato en tiempo de
+## ejecución y dejaría esa fila en blanco.
 func _effect_line(relic: Dictionary) -> String:
 	var template := String(relic.description)
 	if not template.contains("%s"):

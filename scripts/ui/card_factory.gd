@@ -1,24 +1,21 @@
 class_name CardFactory
 extends RefCounted
-## Stateless builders for the select screen's card chrome (iteration 46):
-## the labels, content boxes, swatches and lock glyph every card in
-## CharacterSelect is made of. Split out of character_select.gd because
-## none of it needs the screen's state — it only ever reads its arguments —
-## so the screen script is left with selection logic and catalog wiring.
+## Constructores sin estado de las piezas de una carta armada en código:
+## etiquetas, cajas de contenido, muestras de color y el candado de las
+## cartas de CharacterSelect. Solo leen sus argumentos.
 ##
-## CONTENTS only: the card's own state styleboxes (normal/hover/pressed/
-## focus) are UiTheme.style_card, the single card look every "pick one of
-## these" surface shares. Colors and radii come from UiTheme too — this is
-## the "how a card is assembled" layer, not a second design system.
+## Solo el CONTENIDO: los styleboxes de estado de la carta (normal/hover/
+## pressed/focus) son UiTheme.style_card, el único aspecto de carta de toda
+## superficie de "elige una". Colores y radios también salen de UiTheme.
 
 
-## Shared height of the portrait frame and the padlock that replaces it,
-## so locked and unlocked cards line up row by row.
+## Alto (píxeles) del marco del retrato y del candado que lo reemplaza, para
+## que las cartas bloqueadas y las desbloqueadas se alineen fila por fila.
 const PORTRAIT_HEIGHT := 56.0
 
 
-## Centered card label. Callers add autowrap/line caps themselves — the
-## grid cards trim, the wide rows don't.
+## Etiqueta centrada. El llamador agrega el ajuste de línea y el tope de
+## líneas: las cartas de la cuadrícula recortan, las filas anchas no.
 static func label(label_text: String, font_size: int, color: Color) -> Label:
 	var made := Label.new()
 	made.text = label_text
@@ -28,15 +25,14 @@ static func label(label_text: String, font_size: int, color: Color) -> Label:
 	return made
 
 
-## Full-rect content VBox inside a card button (UpgradeCardUI convention).
+## VBox de contenido que llena el botón de la carta, con márgenes.
 static func card_box(card: Button) -> VBoxContainer:
 	var box := _full_rect_box(card, 12.0, 12.0)
 	box.add_theme_constant_override("separation", 8)
 	return box
 
 
-## Compact variant for the short map cards (the character card margins are
-## too deep for a 54px card).
+## Variante compacta de card_box para cartas bajas.
 static func map_card_box(card: Button) -> VBoxContainer:
 	var box := _full_rect_box(card, 10.0, 6.0)
 	box.add_theme_constant_override("separation", 4)
@@ -55,7 +51,7 @@ static func _full_rect_box(card: Button, margin_h: float, margin_v: float) -> VB
 	return box
 
 
-## Tiny biome mood strip: the catalog palette as flat color chips.
+## Tira de color de un bioma: la paleta del catálogo como chips planos.
 static func palette_strip(palette: Array) -> HBoxContainer:
 	var strip := HBoxContainer.new()
 	strip.alignment = BoxContainer.ALIGNMENT_CENTER
@@ -68,13 +64,13 @@ static func palette_strip(palette: Array) -> HBoxContainer:
 	return strip
 
 
-## Tinted stand-in for character art in the body color.
+## Muestra teñida que reemplaza el arte del personaje, en su color.
 static func portrait_swatch(tint: Color, monogram: String = "") -> Panel:
 	var swatch := Panel.new()
 	swatch.custom_minimum_size = Vector2(0.0, PORTRAIT_HEIGHT)
 	swatch.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	# Dark-to-tint body with a bright rim: reads as a portrait frame
-	# instead of a flat paint chip.
+	# Cuerpo oscuro del tinte con borde claro: se lee como marco de retrato
+	# y no como un chip de pintura plano.
 	var style := UiTheme.flat(tint.darkened(0.35), 10)
 	style.border_color = tint.lightened(0.3)
 	style.set_border_width_all(2)
@@ -82,8 +78,8 @@ static func portrait_swatch(tint: Color, monogram: String = "") -> Panel:
 	UiTheme.add_glow(style, tint, 6, 0.35)
 	swatch.add_theme_stylebox_override("panel", style)
 	if not monogram.is_empty():
-		# The raider's initial, big and outlined, so every card has a face
-		# until real portrait art lands.
+		# La inicial del raider, grande y con contorno, para que cada carta
+		# tenga cara mientras no haya arte de retrato.
 		var letter := label(monogram.left(1).to_upper(), 30, UiTheme.TEXT_BRIGHT)
 		letter.set_anchors_preset(Control.PRESET_FULL_RECT)
 		letter.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
@@ -94,8 +90,8 @@ static func portrait_swatch(tint: Color, monogram: String = "") -> Panel:
 	return swatch
 
 
-## Small code-drawn padlock (shackle arch over a body box) standing where
-## the portrait swatch would be, so "locked" reads without any glyph font.
+## Candado dibujado en código (arco sobre un cuerpo) en el lugar del
+## retrato, para que "bloqueado" se lea sin una fuente de glifos.
 static func lock_glyph() -> Control:
 	var glyph := Control.new()
 	glyph.custom_minimum_size = Vector2(0.0, PORTRAIT_HEIGHT)

@@ -1,78 +1,66 @@
 extends Control
-## Character-and-map select screen (GDD 5/7), the game's entry scene:
-## pick a raider and a hunting ground, then Start Run loads the selected
-## map's arena (which recaptures the mouse itself). Character cards are
-## built from CharacterCatalog and the map row from MapCatalog at
-## runtime, so new content is one catalog row each; both picks land in
-## the GameConfig autoload.
+## Selector de personaje (GDD 5/7), la escena de entrada del juego: elige un
+## raider (y en co-op local, el grupo) e Iniciar incursión carga Run.tscn.
+## Las cartas salen de CharacterCatalog en tiempo de ejecución, así que un
+## personaje nuevo es una fila del catálogo; la elección queda en el autoload
+## GameConfig.
 ##
-## Meta-progression (GDD 8): SaveData gates the roster and the maps.
-## Locked characters show grayed with a lock glyph and their Shard price;
-## clicking one with enough Shards flips the card into an inline "Unlock
-## for N? [Yes]" confirm (second click cancels), while a short balance
-## earns a red-flash shake instead. There is no map or difficulty picker
-## any more (iteration 50): every run opens in Bosque Hueco and walks the
-## whole map list, so the choices left here are the raider, the party and
-## the Daily Hunt. The Shard balance sits top-right and the Quests button
-## opens the quest log.
+## Meta-progresión (GDD 8): SaveData controla el plantel. Las cartas
+## bloqueadas se ven grises con un candado y su precio en esquirlas; con saldo
+## suficiente, un clic convierte la carta en la confirmación "¿Desbloquear por
+## N esquirlas? [Sí]" (un segundo clic cancela), y sin saldo la carta destella
+## en rojo y se sacude. Toda partida empieza en el Bosque Hueco y recorre la
+## lista de mapas, así que aquí solo se eligen el raider, el grupo y la
+## Cacería diaria. El saldo de esquirlas va arriba a la derecha.
 ##
-## Look (iteration 29): everything styles through UiTheme — animated fog
-## backdrop shader, letter-spaced pulsing title, cards with tinted glow
-## selection states (selected lifts, others dim), hero Start CTA,
-## staggered entrance, and ScreenFade around
-## every scene change. Card contents are built by CardFactory; the cards'
-## state styleboxes are UiTheme.style_card — the same look the upgrade
-## cards wear, so the two screens can never drift apart.
+## Aspecto: todo sale de UiTheme (fondo de niebla animado, título espaciado
+## que pulsa, cartas con brillo según su estado, botón principal destacado,
+## entrada escalonada y ScreenFade en cada cambio de escena). El contenido de
+## las cartas lo arma CardFactory; sus styleboxes de estado son
+## UiTheme.style_card, el mismo aspecto que las cartas de mejora.
 ##
-## Layout (iteration 46): the roster grows by catalog rows, so nothing is
-## sized for "today's" 13 raiders. Title/subtitle stay pinned at the top
-## and the button row at the bottom — the CTA is reachable at any window
-## size — while the middle (maps, tier, co-op, card grid) scrolls, and the
-## grid derives its column count from the window width and the roster
-## size instead of hardcoding four.
+## Layout: título y subtítulo fijos arriba y la fila de botones abajo (el
+## botón principal se alcanza con cualquier tamaño de ventana); el medio
+## (co-op y cuadrícula) se desplaza, y la cuadrícula calcula sus columnas
+## según el ancho de la ventana y el tamaño del plantel.
 
 const QUEST_LOG_SCENE_PATH := "res://scenes/ui/QuestLog.tscn"
 const COLLECTION_SCENE_PATH := "res://scenes/ui/Collection.tscn"
 const RELIC_SHOP_SCENE_PATH := "res://scenes/ui/RelicShop.tscn"
 
-## Tall enough for the longest catalog passive plus two blurb lines in
-## Spanish; the grid scrolls, so height is no longer a screen-fit budget.
+## Tamaño (píxeles) de cada carta: alcanza para la pasiva más larga del
+## catálogo más dos líneas de descripción; la cuadrícula se desplaza.
 const CARD_SIZE := Vector2(184, 244)
-## Line caps keep a card's content BOUNDED: every text block trims with an
-## ellipsis instead of wrapping past the bottom edge (Spanish runs ~30%
-## longer than the English these cards were first measured against). The
-## locked card gets the tighter passive cap because it also carries the
-## price chip and the unlock hint.
-##
-## The passive is the line that changes how a raider plays, so it gets room
-## for four lines (Nyx's needs all four; with three it was cut mid-sentence
-## and the card still overflowed its bottom margin by 5 px). The flavor
-## blurb has no fixed cap: it takes whatever height is LEFT and trims there,
-## so a one-line passive leaves room for the whole blurb and a long one
-## squeezes it instead of pushing it out of the card. The full text of both
-## is always in the card's tooltip.
+## Topes de líneas: cada bloque de texto de la carta se recorta con puntos
+## suspensivos en vez de pasarse del borde. La pasiva cambia cómo se juega,
+## así que tiene hasta cuatro líneas; la carta bloqueada usa un tope menor
+## porque también lleva el precio y la pista. La descripción no tiene tope
+## fijo: usa la altura que SOBRA y se recorta allí. El texto completo de ambas
+## está siempre en el tooltip de la carta.
 const PASSIVE_MAX_LINES := 4
 const LOCKED_PASSIVE_MAX_LINES := 2
 const UNLOCK_HINT_MAX_LINES := 2
+## Destello (modulate) de "no alcanza".
 const REJECT_FLASH_COLOR := Color(1.0, 0.42, 0.42)
-## Segmented button size, shared by the co-op player-count row (it was
-## the tier picker's size before iteration 50 removed that row).
+## Tamaño (píxeles) de los botones de cantidad de jugadores del co-op.
 const SEGMENT_BUTTON_SIZE := Vector2(64, 36)
-## Non-selected cards sit slightly dimmed so the pick reads at a glance.
+## Las cartas no elegidas quedan algo atenuadas para que la elegida se lea de
+## un vistazo.
 const UNSELECTED_DIM := Color(0.8, 0.82, 0.86)
-## Side margin of the scene's Layout MarginContainer, so the column math
-## measures the width the grid actually gets.
+## Margen lateral (píxeles) del MarginContainer Layout de la escena, para que
+## el cálculo de columnas mida el ancho real de la cuadrícula. Debe coincidir
+## con margin_left/margin_right de Layout en CharacterSelect.tscn.
 const LAYOUT_SIDE_MARGIN := 24.0
-## The grid never drops below this, and aims to stay within this many rows
-## before it widens (a taller grid just scrolls).
+## La cuadrícula nunca baja de estas columnas y apunta a no pasar de estas
+## filas antes de ensancharse (una más alta se desplaza).
 const GRID_MIN_COLUMNS := 4
 const GRID_TARGET_ROWS := 3
 
 @onready var _title_label: Label = %TitleLabel
 @onready var _subtitle_label: Label = %SubtitleLabel
 @onready var _cards_grid: GridContainer = %CardsGrid
-## HFlowContainer: the meta buttons wrap to a second line rather than
-## running off a narrow window (Spanish labels are wider than the English).
+## HFlowContainer: los botones bajan a una segunda línea en una ventana
+## angosta en vez de salirse.
 @onready var _button_row: HFlowContainer = %ButtonRow
 @onready var _start_button: Button = %StartButton
 @onready var _quests_button: Button = %QuestsButton
@@ -81,23 +69,25 @@ const GRID_TARGET_ROWS := 3
 @onready var _shards_label: Label = %ShardsLabel
 @onready var _version_label: Label = %VersionLabel
 
-## Card button per playable character id, for selection restyling.
+## Botón de carta por id de personaje jugable, para restilizar la selección.
 var _cards_by_id: Dictionary[String, Button] = {}
-## Character id whose card currently shows the inline unlock confirm.
+## Id del personaje cuya carta muestra la confirmación de desbloqueo.
 var _pending_unlock_id: String = ""
 var _title_tween: Tween = null
 var _entrance_tween: Tween = null
-## Autoload/Input subscriptions kept as fields so _exit_tree can drop them
-## explicitly (they outlive this scene; node-to-node ones do not).
+## Suscripciones a autoloads e Input guardadas como campos para que
+## _exit_tree las suelte a mano (sobreviven a esta escena; las de nodo a
+## nodo no).
 var _on_shards_changed: Callable
 var _on_pads_changed: Callable
 
-## --- Co-op lobby state (GDD extension: local co-op, 1-4 players) --------
-## Selected party size; 1 = the unchanged solo flow.
+## --- Estado del lobby co-op (co-op local, 1-4 jugadores) -----------------
+## Tamaño del grupo elegido; 1 = el flujo solo.
 var _coop_count: int = 1
-## Character id per slot (index 0 mirrors GameConfig.selected_character_id).
+## Id de personaje por slot (el índice 0 refleja
+## GameConfig.selected_character_id).
 var _coop_characters: Array[String] = []
-## Slot the next character-card click assigns to (auto-advances).
+## Slot al que asigna el próximo clic en una carta (avanza solo).
 var _editing_slot: int = 0
 var _coop_buttons: Array[Button] = []
 var _slot_buttons: Array[Button] = []
@@ -121,9 +111,9 @@ func _ready() -> void:
 	_update_grid_columns()
 	resized.connect(_update_grid_columns)
 	_apply_chrome()
-	# attach_motion is idempotent (first call wins), so the hero CTA has to
-	# claim its stronger grow/squash BEFORE style_button attaches the
-	# default one — the other order silently ships the defaults.
+	# attach_motion es idempotente (gana la primera llamada): el botón
+	# principal reclama su crecer/aplastar más fuerte ANTES de que
+	# style_button ponga el de por defecto.
 	UiTheme.attach_motion(_start_button, 1.05, 0.93)
 	UiTheme.style_button(_start_button, UiTheme.ACCENT, true)
 	UiTheme.style_button(_quests_button)
@@ -131,15 +121,15 @@ func _ready() -> void:
 	_start_button.pressed.connect(_on_start_pressed)
 	_quests_button.pressed.connect(_on_quests_pressed)
 	_build_extra_buttons()
-	# Button prompt in the free bottom-left corner (the row of buttons is
-	# centred and the version sits bottom-right). Added BEFORE the settings
-	# panel in the tree order so the panel's dim still covers it.
+	# Indicación de botones en la esquina inferior izquierda, que está libre
+	# (la fila de botones va centrada y la versión abajo a la derecha). Va
+	# ANTES del panel de ajustes en el árbol para que su atenuado la cubra.
 	var hints := InputHints.build([["ui_accept", "Elegir"]])
 	add_child(hints)
 	move_child(hints, _settings_panel.get_index())
 	hints.pin_bottom_left()
-	# The shared SettingsPanel (same scene the pause menu embeds) overlays
-	# this whole screen; on close, focus returns to Start.
+	# El SettingsPanel compartido (la misma escena que usa la pausa) cubre
+	# toda la pantalla; al cerrarse, el foco vuelve a Iniciar.
 	_settings_button.pressed.connect(_settings_panel.open)
 	_settings_panel.closed.connect(func() -> void: _start_button.grab_focus())
 	_on_shards_changed = func(_balance: int) -> void: _refresh_shards()
@@ -147,23 +137,22 @@ func _ready() -> void:
 	_refresh_shards()
 	_version_label.text = "v%s" % String(
 			ProjectSettings.get_setting("application/config/version", "0.0.0"))
-	# Reopening mid-session keeps the previous picks; unknown ids fall
-	# back, and a locked id (stale selection) falls back to the default —
-	# so Change Character after a run keeps the map that was just played.
+	# Reabrir en la misma sesión conserva la elección anterior; un id
+	# desconocido o bloqueado vuelve al personaje por defecto.
 	var remembered := String(
 			CharacterCatalog.by_id_or_default(GameConfig.selected_character_id).id)
 	if not SaveData.is_unlocked(remembered):
 		remembered = CharacterCatalog.DEFAULT_ID
 	_select(remembered)
-	# Remember the last party (Retry / back from a run replays it); pads
-	# may have (dis)connected since, so the count re-validates itself.
+	# Recuerda el último grupo; los controles pueden haberse conectado o
+	# desconectado desde entonces, así que la cantidad se vuelve a validar.
 	_restore_coop_session()
 	_start_button.grab_focus()
 	_play_entrance()
 
 
-## Subscriptions to autoloads and Input outlive this scene, so they are
-## dropped by hand; everything else dies with the node tree.
+## Las suscripciones a autoloads y a Input sobreviven a esta escena, así que
+## se sueltan a mano; lo demás muere con el árbol de nodos.
 func _exit_tree() -> void:
 	if _on_shards_changed.is_valid() \
 			and SaveData.shards_changed.is_connected(_on_shards_changed):
@@ -173,11 +162,11 @@ func _exit_tree() -> void:
 		Input.joy_connection_changed.disconnect(_on_pads_changed)
 
 
-## --- Card grid sizing (the roster grows by catalog rows) ----------------
+## --- Tamaño de la cuadrícula (el plantel crece con filas del catálogo) ---
 
-## Columns come from the roster size (aim for GRID_TARGET_ROWS rows) capped
-## by what the window can actually show, so adding a raider widens the grid
-## instead of pushing rows — and the CTA — out of the screen.
+## Las columnas salen del tamaño del plantel (apuntando a GRID_TARGET_ROWS
+## filas), acotadas por lo que cabe en la ventana: agregar un raider ensancha
+## la cuadrícula en vez de empujar filas (y el botón principal) fuera.
 func _update_grid_columns() -> void:
 	var separation := float(_cards_grid.get_theme_constant(&"h_separation"))
 	var available := get_viewport_rect().size.x - LAYOUT_SIDE_MARGIN * 2.0
@@ -190,15 +179,15 @@ func _update_grid_columns() -> void:
 	_link_focus()
 
 
-## Cards scale from their center, but their size is only known after the
-## first layout pass; following `resized` keeps the pivot centered instead
-## of sampling it once at build time, when it is still zero.
+## Las cartas escalan desde su centro, pero su tamaño solo se conoce después
+## del primer layout; seguir `resized` mantiene el pivote centrado en vez de
+## tomarlo una vez al construir, cuando todavía es cero.
 func _keep_pivot_centered(control: Control) -> void:
 	control.resized.connect(func() -> void:
 		control.pivot_offset = control.size * 0.5)
 
 
-## --- Co-op lobby (players row + per-slot character assignment) ----------
+## --- Lobby co-op (fila de jugadores y personaje por slot) ----------------
 
 func _build_coop_rows() -> void:
 	var vbox := _cards_grid.get_parent()
@@ -239,8 +228,8 @@ func _restore_coop_session() -> void:
 	_set_coop_count(mini(Coop.player_count, _max_supported_players()), true)
 
 
-## J1 plays keyboard+mouse (or any pad in solo); each extra player needs
-## their own connected joypad.
+## J1 juega con teclado y mouse (o con cualquier control en solo); cada
+## jugador extra necesita su propio control conectado.
 func _max_supported_players() -> int:
 	return mini(Input.get_connected_joypads().size() + 1, Coop.MAX_PLAYERS)
 
@@ -248,8 +237,8 @@ func _max_supported_players() -> int:
 func _on_coop_count_pressed(count: int) -> void:
 	if count > _max_supported_players():
 		_reject_card(_coop_buttons[count - 1])
-		# The number is what is still MISSING, not the party total: with one
-		# pad already plugged in, a 4-player party needs two more, not three.
+		# El número es lo que FALTA, no el total del grupo: con un control ya
+		# conectado, un grupo de 4 necesita dos más, no tres.
 		var missing := maxi(count - 1 - Input.get_connected_joypads().size(), 1)
 		_coop_hint.text = "Conecta %d control(es) para %d jugadores" % [missing, count]
 		_coop_hint.add_theme_color_override("font_color", UiTheme.TEXT_FAINT)
@@ -259,12 +248,13 @@ func _on_coop_count_pressed(count: int) -> void:
 
 func _set_coop_count(count: int, silent: bool = false) -> void:
 	_coop_count = clampi(count, 1, Coop.MAX_PLAYERS)
-	# Fill fresh slots with the current solo pick; sanitize stale/locked ids.
+	# Llena los slots nuevos con la elección solo actual y limpia ids viejos
+	# o bloqueados.
 	_coop_characters.resize(_coop_count)
 	for i in _coop_count:
-		# by_id, never by_id_or_default: an id that left the catalog has to
-		# be REPLACED here, and the fallback row would report the DEFAULT
-		# character's unlock state and let the junk id ride into Coop.
+		# by_id, nunca by_id_or_default: un id que salió del catálogo hay que
+		# REEMPLAZARLO aquí, y la fila de respaldo reportaría el desbloqueo
+		# del personaje por DEFECTO y dejaría pasar el id basura a Coop.
 		var row := CharacterCatalog.by_id(_coop_characters[i])
 		if row.is_empty() or not SaveData.is_unlocked(String(row.id)):
 			_coop_characters[i] = String(CharacterCatalog.by_id_or_default(
@@ -280,7 +270,7 @@ func _set_coop_count(count: int, silent: bool = false) -> void:
 func _refresh_coop_rows() -> void:
 	var supported := _max_supported_players()
 	if _coop_count > supported:
-		# A pad was unplugged mid-lobby: fold back to what still works.
+		# Se desconectó un control en el lobby: vuelve a lo que funciona.
 		_set_coop_count(supported, true)
 		return
 	for i in _coop_buttons.size():
@@ -299,8 +289,8 @@ func _refresh_coop_rows() -> void:
 		_coop_hint.text = "J1 teclado+mouse · J2-J%d control · %d control(es)" \
 				% [_coop_count, pads]
 	elif _coop_count == 2:
-		# "J2-J2" reads as an empty range, so the two-player party names its
-		# single pad slot outright instead of spelling a range.
+		# "J2-J2" se lee como un rango vacío: con dos jugadores se nombra el
+		# único slot de control.
 		_coop_hint.text = "J1 teclado+mouse · J2 control · %d control(es)" % pads
 	else:
 		_coop_hint.text = ("%d control(es) conectado(s)" % pads) if pads > 0 \
@@ -309,15 +299,15 @@ func _refresh_coop_rows() -> void:
 	_refresh_slot_row()
 
 
-## One button per party slot showing its assigned raider; the highlighted
-## one is the slot the next card click configures.
+## Un botón por slot del grupo con su raider asignado; el resaltado es el
+## slot que configura el próximo clic en una carta.
 func _refresh_slot_row() -> void:
 	_slot_row.visible = _coop_count > 1
-	# A slot button rebuilds this row from its own `pressed`, so the focus
-	# owner is usually one of the buttons about to die: remember it and hand
-	# the focus to the rebuilt row, or pad/keyboard navigation dead-ends
-	# here. remove_child before queue_free because the free is deferred —
-	# otherwise the old buttons keep laying out for the rest of the frame.
+	# Un botón de slot reconstruye esta fila desde su propio `pressed`, así
+	# que el dueño del foco suele ser uno de los botones por morir: se
+	# recuerda y el foco pasa a la fila nueva, o la navegación con control
+	# quedaría sin salida. remove_child antes de queue_free porque liberar es
+	# diferido: si no, los botones viejos ocupan lugar el resto del frame.
 	var focus_owner := get_viewport().gui_get_focus_owner()
 	var had_focus := focus_owner != null and _slot_buttons.has(focus_owner)
 	for button: Button in _slot_buttons:
@@ -360,8 +350,8 @@ func _refresh_start_button() -> void:
 		_start_button.text = "Iniciar incursión — %s" % String(picked.display_name)
 
 
-## Title/subtitle/shard typography plus the slow title glow pulse (this
-## screen is the game's face; the motion says "alive", never "busy").
+## Tipografía del título, el subtítulo y las esquirlas, y el pulso lento de
+## brillo del título (el movimiento dice "vivo", nunca "ocupado").
 func _apply_chrome() -> void:
 	UiTheme.style_title(_title_label, 52, UiTheme.ACCENT_AMBER, 10, 12)
 	_subtitle_label.add_theme_font_override("font", UiTheme.spaced_font(2))
@@ -377,16 +367,16 @@ func _apply_chrome() -> void:
 			Color.WHITE, 1.6).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 
 
-## Staggered section fade/scale-in on open (~0.4s total). Sections tween
-## their own modulate, cards tween theirs separately, so the selection
-## restyle never fights the entrance.
+## Aparición escalonada de las secciones al abrir (~0.4 s). Las secciones
+## animan su propio modulate y las cartas el suyo, así que restilizar la
+## selección nunca pelea con la entrada.
 func _play_entrance() -> void:
 	if _entrance_tween != null and _entrance_tween.is_valid():
 		_entrance_tween.kill()
 	var sections: Array[Control] = [_title_label, _subtitle_label,
 			_coop_row, _slot_row, _cards_grid, _button_row]
-	# Hide instantly, but wait a frame for the first layout pass so pivots
-	# center on real sizes before the scale-in.
+	# Oculta al instante, pero espera un frame al primer layout para que los
+	# pivotes se centren en tamaños reales antes de escalar.
 	for section: Control in sections:
 		section.modulate.a = 0.0
 	await get_tree().process_frame
@@ -408,10 +398,10 @@ func _refresh_shards() -> void:
 	UiTheme.pop(_shards_label, 1.12, 0.22)
 
 
-## Selection is only ever offered for unlocked characters (_on_card_pressed
-## routes locked clicks into the unlock flow instead). In co-op the click
-## assigns the raider to the highlighted slot and auto-advances to the
-## next one, so "click 4 cards" configures a full party.
+## La selección solo se ofrece para personajes desbloqueados
+## (_on_card_pressed manda los clics bloqueados al flujo de desbloqueo). En
+## co-op el clic asigna el raider al slot resaltado y avanza al siguiente,
+## así cuatro clics arman un grupo completo.
 func _select(character_id: String) -> void:
 	if _coop_count > 1:
 		_coop_characters[_editing_slot] = character_id
@@ -431,7 +421,7 @@ func _on_card_pressed(character_id: String) -> void:
 		_select(character_id)
 		return
 	if _pending_unlock_id == character_id:
-		# Second click on the confirm card backs out.
+		# Un segundo clic en la carta de confirmación cancela.
 		_cancel_pending_unlock()
 		_refresh_all_cards()
 		return
@@ -447,13 +437,12 @@ func _on_card_pressed(character_id: String) -> void:
 func _on_unlock_confirmed(character_id: String) -> void:
 	_pending_unlock_id = ""
 	if SaveData.purchase_character(character_id):
-		Sfx.play(&"chest_open")  # unlock fanfare: reuse the payoff sound
-		_select(character_id)  # also refreshes every card
+		Sfx.play(&"chest_open")  # fanfarria de desbloqueo: el sonido del cofre
+		_select(character_id)  # también refresca todas las cartas
 	else:
 		_refresh_all_cards()
-	# The «Sí» that was just pressed is freed by the refresh, and the focus
-	# went with it: a pad player was left with nothing focused. Hand it to
-	# the card the button lived on.
+	# El «Sí» recién presionado se libera con el refresco y el foco se va con
+	# él: se le pasa a la carta donde estaba el botón.
 	var card := _cards_by_id.get(character_id) as Button
 	if card != null:
 		card.grab_focus()
@@ -464,16 +453,16 @@ func _cancel_pending_unlock() -> void:
 
 
 func _on_start_pressed() -> void:
-	# A normal start is never the daily (the Daily Hunt button sets it).
+	# Un inicio normal nunca es la Cacería diaria (la marca su propio botón).
 	GameConfig.daily_mode = false
-	# Freeze the party into the Coop autoload: slot 0 keyboard+mouse, the
-	# rest one connected joypad each (in system order). Solo re-configures
-	# to 1 so a previous co-op session never leaks into a solo run.
+	# Congela el grupo en el autoload Coop: slot 0 con teclado y mouse, el
+	# resto un control conectado cada uno (en el orden del sistema). En solo
+	# se configura 1, así una sesión co-op anterior no se cuela.
 	var pads := Input.get_connected_joypads()
-	# joy_connection_changed is what normally folds the party back, but a
-	# pad can die between that signal and this click: re-check the list
-	# HERE rather than indexing it blind, and let the player see the
-	# smaller party before committing to it.
+	# Normalmente joy_connection_changed achica el grupo, pero un control
+	# puede morir entre esa señal y este clic: se revisa la lista AQUÍ en vez
+	# de indexarla a ciegas, y el jugador ve el grupo más chico antes de
+	# confirmarlo.
 	var usable := mini(_coop_count, pads.size() + 1)
 	if usable < _coop_count:
 		_set_coop_count(usable, true)
@@ -491,18 +480,18 @@ func _on_start_pressed() -> void:
 	else:
 		slot_characters.append(GameConfig.selected_character_id)
 	Coop.configure(_coop_count, slot_devices, slot_characters)
-	# One scene for every run (iteration 49): Run.tscn owns the persistent
-	# run block and swaps the arena per stage. Every run opens in the
-	# forest and walks the map list from there, so there is no map to pick.
+	# Una sola escena para toda partida: Run.tscn es dueña del bloque
+	# persistente y cambia la arena por etapa. Toda partida abre en el
+	# bosque, así que no hay mapa que elegir.
 	GameConfig.start_map_id = MapCatalog.DEFAULT_ID
 	ScreenFade.transition(func() -> void:
-		# RunState keeps ticking while this unpaused screen is up, so a
-		# fresh run starts from a clean slate (mirrors the run-end Retry).
+		# RunState sigue corriendo mientras esta pantalla sin pausa está
+		# arriba: la partida nueva parte de cero (igual que Reintentar).
 		RunState.reset()
 		get_tree().change_scene_to_file(RUN_SCENE_PATH))
 
 
-## The one scene a run boots into (iteration 49).
+## La única escena en la que arranca una partida.
 const RUN_SCENE_PATH: String = "res://scenes/world/Run.tscn"
 
 
@@ -511,9 +500,8 @@ func _on_quests_pressed() -> void:
 		get_tree().change_scene_to_file(QUEST_LOG_SCENE_PATH))
 
 
-## Meta-screen buttons added in code beside the scene's Quests/Settings
-## pair (same pattern as the code-built co-op rows), so the .tscn stays
-## untouched as screens accumulate: Collection (35), Armory + Daily (36).
+## Botones de las pantallas meta agregados en código junto a Misiones:
+## Colección, Armería y Cacería diaria (con la mejor marca del día).
 func _build_extra_buttons() -> void:
 	var collection_button := _extra_button("Colección", func() -> void:
 		ScreenFade.transition(func() -> void:
@@ -542,16 +530,16 @@ func _extra_button(label_text: String, on_pressed: Callable) -> Button:
 	return button
 
 
-## --- Daily Hunt (iteration 36) ------------------------------------------
+## --- Cacería diaria -------------------------------------------------------
 
 func _today_id() -> String:
 	return Time.get_date_string_from_system()
 
 
-## Launches the seeded daily: character, map, and world layout are the same
-## for everyone playing that date (picked deterministically from THIS
-## player's unlocked pools), tier 1, solo. Retries are allowed — the best
-## score of the day is what sticks.
+## Lanza la Cacería diaria con semilla: el personaje sale de la fecha (de
+## forma determinista, entre los desbloqueados de ESTE jugador) y la semilla
+## hace iguales el mundo, las cartas y las apariciones para todos ese día.
+## Siempre solo. Se puede reintentar: queda la mejor marca del día.
 func _on_daily_pressed() -> void:
 	var date_id := _today_id()
 	var rng := RandomNumberGenerator.new()
@@ -566,9 +554,8 @@ func _on_daily_pressed() -> void:
 	GameConfig.daily_seed = int(hash(date_id))
 	GameConfig.daily_date = date_id
 	GameConfig.selected_character_id = characters[rng.randi() % characters.size()]
-	# The daily starts in the forest like every other run (iteration 49);
-	# its seed is what makes the layout, cards and spawns identical for
-	# everyone that day, not the map.
+	# La diaria empieza en el bosque como toda partida; lo que la hace igual
+	# para todos ese día es la semilla, no el mapa.
 	GameConfig.selected_map_id = MapCatalog.DEFAULT_ID
 	GameConfig.start_map_id = MapCatalog.DEFAULT_ID
 	Coop.configure(1, [Coop.KEYBOARD_DEVICE] as Array[int],
@@ -578,7 +565,7 @@ func _on_daily_pressed() -> void:
 		get_tree().change_scene_to_file(RUN_SCENE_PATH))
 
 
-## --- Card content (rebuilt whenever lock/selection state changes) ------
+## --- Contenido de las cartas (se rehace al cambiar bloqueo o selección) --
 
 func _refresh_all_cards() -> void:
 	for id: String in _cards_by_id:
@@ -586,20 +573,20 @@ func _refresh_all_cards() -> void:
 	_link_focus()
 
 
-## --- Pad / keyboard navigation -------------------------------------------
+## --- Navegación con control y teclado -------------------------------------
 
-## Focus neighbours for the card grid and the bottom button row, wired by
-## hand. Left to Godot's nearest-control search, ui_down from any card in
-## columns 3+ fell into "Cacería diaria" / "Misiones" (they sit under those
-## columns; Iniciar sits under columns 1-2), and down from there stuck on
-## "Armería": a pad player who picked one of ten raiders could not reach
-## Iniciar at all. Now:
-##   - down from a card goes to the card below it, or to Iniciar when the
-##     column ends (through the inline «Sí» while a card asks to unlock);
-##   - up from the top row goes to the party row above the grid;
-##   - the button row walks left/right, never down, and up returns to the
-##     raider that is selected.
-## Re-run after anything that rebuilds cards, slots or the grid's columns.
+## Vecinos de foco de la cuadrícula y de la fila de botones, cableados a
+## mano. Con la búsqueda automática de Godot, ui_down desde una carta de las
+## columnas 3+ cae en "Cacería diaria" o "Misiones" (quedan bajo esas
+## columnas; Iniciar queda bajo las columnas 1-2) y desde ahí se atasca en
+## "Armería": con control no se llegaría a Iniciar. Por eso:
+##   - abajo desde una carta va a la carta de abajo, o a Iniciar al final de
+##     la columna (pasando por el «Sí» si la carta pide desbloquear);
+##   - arriba desde la fila superior va a la fila del grupo, sobre la
+##     cuadrícula;
+##   - la fila de botones va a izquierda y derecha, nunca abajo, y arriba
+##     vuelve al raider elegido.
+## Se vuelve a correr tras todo lo que rehace cartas, slots o columnas.
 func _link_focus() -> void:
 	var cards: Array[Button] = []
 	for child: Node in _cards_grid.get_children():
@@ -638,8 +625,8 @@ func _link_focus() -> void:
 		button.focus_neighbor_right = button.get_path_to(row[mini(j + 1, row.size() - 1)])
 
 
-## What "up" from the top row of cards should reach: the slot being edited
-## in co-op, else the selected player-count button.
+## A dónde va "arriba" desde la fila superior de cartas: el slot en edición
+## en co-op; si no, el botón de cantidad de jugadores elegido.
 func _party_focus_target() -> Control:
 	if _slot_row != null and _slot_row.visible and not _slot_buttons.is_empty():
 		return _slot_buttons[clampi(_editing_slot, 0, _slot_buttons.size() - 1)]
@@ -648,15 +635,15 @@ func _party_focus_target() -> Control:
 	return _coop_buttons[clampi(_coop_count - 1, 0, _coop_buttons.size() - 1)]
 
 
-## The «Sí» a card shows while it asks to unlock, or null.
+## El «Sí» que muestra una carta mientras pide desbloquear, o null.
 func _inline_button(card: Button) -> Button:
 	for node: Node in card.find_children("*", "Button", true, false):
 		return node as Button
 	return null
 
 
-## The card's whole text on mouse hover: the grid card trims the passive and
-## the blurb to fit its fixed size, the tooltip never does.
+## El texto completo de la carta al pasar el mouse: la carta recorta la
+## pasiva y la descripción para caber, el tooltip nunca.
 func _card_tooltip(character: Dictionary) -> String:
 	var lines: Array[String] = [
 		"%s — %s" % [String(character.display_name), String(character.weapon_display_name)],
@@ -672,9 +659,9 @@ func _card_tooltip(character: Dictionary) -> String:
 	return "\n".join(lines)
 
 
-## queue_free is deferred, so the outgoing content box would keep laying
-## out (stacked under the new one) for the rest of the frame; removing it
-## first makes every rebuild a clean swap even under fast clicking.
+## queue_free es diferido, así que la caja de contenido saliente seguiría
+## ocupando lugar (apilada bajo la nueva) el resto del frame; sacarla antes
+## hace de cada reconstrucción un cambio limpio aunque se haga clic rápido.
 func _clear_card(card: Button) -> void:
 	for child: Node in card.get_children():
 		card.remove_child(child)
@@ -695,18 +682,17 @@ func _populate_card(card: Button, character: Dictionary) -> void:
 	var box := CardFactory.card_box(card)
 	box.add_child(CardFactory.portrait_swatch(Color(character.tint),
 			String(character.display_name)))
-	# Wrapped, never trimmed: a raider's name is untranslatable AND
-	# unshortenable (GLOSARIO rule 5), and the roster now holds one long
-	# enough to run past the card edge ("PNG gucci morty" against a 7-letter
-	# previous longest). Two lines beat an ellipsis eating a proper noun.
+	# Se envuelve, nunca se recorta: el nombre de un raider no se traduce ni
+	# se acorta (GLOSARIO, regla 5). Dos líneas son mejor que puntos
+	# suspensivos comiéndose un nombre propio.
 	var name_label := CardFactory.label(
 			String(character.display_name), 20, UiTheme.TEXT_BRIGHT)
 	name_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	box.add_child(name_label)
 	box.add_child(CardFactory.label(
 			String(character.weapon_display_name), 12, UiTheme.TEXT_DIM))
-	# Both text blocks are capped: a long translated passive used to wrap
-	# without limit and shove the blurb out through the bottom of the card.
+	# Los dos bloques de texto tienen tope: sin él, una pasiva larga empuja
+	# la descripción fuera de la carta.
 	var passive := CardFactory.label(
 			String(character.passive_description), 12, Color(0.85, 0.78, 0.5))
 	passive.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -715,16 +701,15 @@ func _populate_card(card: Button, character: Dictionary) -> void:
 	box.add_child(passive)
 	var blurb := CardFactory.label(String(character.blurb), 11, Color(0.6, 0.62, 0.68))
 	blurb.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	# The passive line takes priority in the compact grid card; the flavor
-	# blurb takes the leftover space and trims there rather than overflowing
-	# (no max_lines_visible: with trimming on, an autowrapped Label shows the
-	# lines that fit its height and asks for none, see PASSIVE_MAX_LINES).
+	# La pasiva tiene prioridad; la descripción usa el espacio que sobra y se
+	# recorta allí en vez de desbordar (sin max_lines_visible: con recorte, un
+	# Label con ajuste de línea muestra las líneas que caben en su alto).
 	blurb.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	blurb.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	blurb.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	box.add_child(blurb)
-	# Co-op: a card reads selected when ANY slot picked it, and shows which
-	# ones ("J1 · J3") so the party composition is visible at a glance.
+	# Co-op: una carta se ve elegida si CUALQUIER slot la eligió, y muestra
+	# cuáles ("J1 · J3") para ver el grupo de un vistazo.
 	var selected := _card_selected(character_id)
 	if _coop_count > 1 and selected:
 		var owners: Array[String] = []
@@ -738,8 +723,8 @@ func _populate_card(card: Button, character: Dictionary) -> void:
 	_settle_card(card, selected)
 
 
-## The one answer to "does this card read as picked?", shared by the
-## repaint and by the hover motion that has to restore the rest pose.
+## La única respuesta a "¿esta carta se ve elegida?", compartida por el
+## repintado y por el movimiento de hover que restaura la pose de reposo.
 func _card_selected(character_id: String) -> bool:
 	if not SaveData.is_unlocked(character_id):
 		return _pending_unlock_id == character_id
@@ -752,10 +737,11 @@ func _rest_modulate(selected: bool) -> Color:
 	return Color.WHITE if selected else UNSELECTED_DIM
 
 
-## Selection motion: the picked card lifts slightly and brightens while
-## the rest dim a step. Tween per card, parked in meta so rapid clicking
-## never stacks animations — and it is the single owner of a card's rest
-## pose, so it also cancels (and straightens) a running reject wobble.
+## Movimiento de selección: la carta elegida sube un poco y se aclara
+## mientras las demás se atenúan. Un tween por carta guardado en la
+## metadata, para que los clics rápidos no apilen animaciones; es el único
+## dueño de la pose de reposo, así que también cancela (y endereza) un
+## vaivén de rechazo en curso.
 func _settle_card(card: Button, selected: bool) -> void:
 	card.pivot_offset = card.size * 0.5
 	UiTheme.kill_meta_tween(card, &"ui_settle_tween")
@@ -770,10 +756,10 @@ func _settle_card(card: Button, selected: bool) -> void:
 	card.set_meta(&"ui_settle_tween", tween)
 
 
-## UiTheme's shared hover motion always returns a button to scale 1.0,
-## which would wipe the selected card's lift on mouse-out. Re-settling
-## after killing the hover tween keeps one winner instead of two tweens
-## racing on the same property.
+## El movimiento de hover compartido de UiTheme siempre devuelve un botón a
+## escala 1.0, lo que borraría la elevación de la carta elegida al salir el
+## mouse. Reasentarla después de matar el tween de hover deja un solo
+## ganador en vez de dos tweens compitiendo por la misma propiedad.
 func _resettle_card(character_id: String) -> void:
 	var card: Button = _cards_by_id.get(character_id)
 	if card == null:
@@ -782,8 +768,8 @@ func _resettle_card(character_id: String) -> void:
 	_settle_card(card, _card_selected(character_id))
 
 
-## Grayed roster slot: lock glyph in place of the portrait, dimmed
-## identity lines, and the Shard price as the call to action.
+## Carta bloqueada: candado en lugar del retrato, nombre y arma atenuados, y
+## el precio en esquirlas como llamada a la acción.
 func _populate_locked_card(card: Button, character: Dictionary) -> void:
 	var box := CardFactory.card_box(card)
 	box.add_child(CardFactory.lock_glyph())
@@ -791,13 +777,11 @@ func _populate_locked_card(card: Button, character: Dictionary) -> void:
 			String(character.display_name), 20, UiTheme.TEXT_FAINT))
 	box.add_child(CardFactory.label(String(character.weapon_display_name), 12,
 			UiTheme.TEXT_FAINT.darkened(0.15)))
-	# Price chip: a small shard-blue pill so the cost reads as a button.
-	# It goes right under the identity lines, which are one line each on
-	# every card, so the price sits at the same height across a whole row
-	# no matter how far the passive or the hint below it wrap. (At the
-	# bottom of the card it could not: a two-line passive plus a two-line
-	# hint does not fit in CARD_SIZE, and the chip slid down on some cards.)
-	# SHRINK_CENTER keeps the pill its own size instead of a tall box.
+	# Chip de precio: una píldora azul de esquirla para que el costo se lea
+	# como un botón. Va justo bajo el nombre y el arma, que ocupan una línea
+	# en toda carta, así el precio queda a la misma altura en toda la fila sin
+	# importar cuánto se envuelvan la pasiva o la pista. SHRINK_CENTER
+	# mantiene la píldora de su propio tamaño.
 	var cost := CardFactory.label("%d esquirlas" % int(character.get("unlock_cost", 0)),
 			13, UiTheme.SHARD_BLUE)
 	cost.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
@@ -806,9 +790,9 @@ func _populate_locked_card(card: Button, character: Dictionary) -> void:
 	box.add_child(cost)
 	var hint_text := String(character.get("unlock_hint", ""))
 	if not hint_text.is_empty():
-		# Boss-unlockable characters advertise both paths: the Shard price
-		# and, right under it, the catalog's vague clue toward the
-		# hidden-boss unlock.
+		# Los personajes que también se desbloquean con un jefe muestran los
+		# dos caminos: el precio y, justo debajo, la pista vaga del catálogo
+		# hacia el jefe oculto.
 		var hint := CardFactory.label(
 				"o %s" % hint_text, 10, UiTheme.SHARD_BLUE.darkened(0.25))
 		hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -824,7 +808,8 @@ func _populate_locked_card(card: Button, character: Dictionary) -> void:
 	UiTheme.style_card(card, UiTheme.BORDER_LOCKED, 2, false)
 
 
-## The inline purchase prompt the locked card flips into when affordable.
+## La confirmación de compra en la que se convierte la carta bloqueada
+## cuando alcanza el saldo.
 func _populate_confirm_card(card: Button, character: Dictionary) -> void:
 	var box := CardFactory.card_box(card)
 	box.add_child(CardFactory.portrait_swatch(Color(character.tint),
@@ -849,11 +834,12 @@ func _populate_confirm_card(card: Button, character: Dictionary) -> void:
 	UiTheme.style_card(card, UiTheme.SHARD_BLUE, 3)
 
 
-## Can't-afford feedback: quick red flash plus a rotation wobble (rotation
-## doesn't fight the GridContainer's layout the way position would). The
-## flash returns to the card's REST modulate — an unselected card is dim,
-## and landing it on white would leave it brighter than its neighbours —
-## and shares _settle_card's meta so the two never animate at once.
+## Respuesta de "no alcanza": destello rojo rápido y un vaivén de rotación
+## (la rotación no pelea con el layout del GridContainer como lo haría la
+## posición). El destello vuelve al modulate de REPOSO de la carta (una carta
+## no elegida está atenuada, y terminar en blanco la dejaría más clara que
+## sus vecinas) y comparte la metadata de _settle_card para que los dos
+## nunca animen a la vez.
 func _reject_card(card: Button, rest_modulate: Color = Color.WHITE) -> void:
 	card.pivot_offset = card.size / 2.0
 	UiTheme.kill_meta_tween(card, &"ui_settle_tween")

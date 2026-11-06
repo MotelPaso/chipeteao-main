@@ -1,20 +1,20 @@
 class_name SettingsPanel
 extends Control
-## The ONE settings surface, instanced in two hosts: as the PauseMenu's
-## swappable sub-panel (under a paused tree — works because the pause
-## layer processes always) and as an overlay on the character select
-## screen (gear button). Sliders and the fullscreen toggle write through
-## the Settings autoload, which applies live and debounces the SaveData
-## write; close() flushes any pending save and emits closed so the host
-## can restore its own UI. Esc while visible closes it too. Styling
-## matches the run UI: code-built dark StyleBoxFlat.
+## La ÚNICA superficie de ajustes, instanciada en dos anfitriones: como
+## subpanel del PauseMenu (bajo un árbol en pausa; funciona porque la capa de
+## pausa procesa siempre) y como capa sobre el selector de personaje (botón
+## Ajustes). Los sliders y los interruptores escriben a través del autoload
+## Settings, que aplica en vivo y agrupa la escritura en SaveData; close()
+## vacía el guardado pendiente y emite closed para que el anfitrión restaure
+## su propia UI. Esc también lo cierra mientras está visible.
 
 signal closed
 
+## Color del canal de los sliders.
 const SLIDER_TRACK_COLOR := Color(0.05, 0.06, 0.09, 0.9)
-## Volume is a 0-100 percentage everywhere (SettingsApply converts it to
-## dB); sensitivity's range is SaveData's, which is also what clamps the
-## stored value.
+## El volumen es un porcentaje 0-100 en todo el juego (SettingsApply lo pasa
+## a dB); el rango de la sensibilidad es el de SaveData, que también acota el
+## valor guardado.
 const VOLUME_MIN := 0.0
 const VOLUME_MAX := 100.0
 
@@ -28,10 +28,10 @@ const VOLUME_MAX := 100.0
 @onready var _ambient_value: Label = %AmbientValue
 @onready var _fullscreen_check: CheckButton = %FullscreenCheck
 @onready var _fps_check: CheckButton = %FpsCheck
-## Graphics preset (iteration 64), one toggle per SaveData.graphics_quality
-## index — Alta, Media, Baja, in that order. Three buttons in a ButtonGroup
-## instead of an OptionButton: the panel has no popup anywhere else, and a
-## popup list is one more surface to style and to navigate with a pad.
+## Preset gráfico: un botón por índice de SaveData.graphics_quality (Alta,
+## Media, Baja, en ese orden), en un ButtonGroup. No es un OptionButton: el
+## panel no tiene ningún popup, y una lista desplegable sería una superficie
+## más que estilizar y recorrer con control.
 @onready var _quality_buttons: Array[Button] = [%QualityHigh as Button,
 		%QualityMedium as Button, %QualityLow as Button]
 @onready var _back_button: Button = %BackButton
@@ -54,7 +54,7 @@ func _ready() -> void:
 		button.toggled.connect(_on_quality_toggled.bind(index))
 	_back_button.pressed.connect(close)
 	_link_focus()
-	# Button prompts under Volver; they follow the last device used.
+	# Indicaciones de botones bajo Volver; siguen al último dispositivo usado.
 	_back_button.get_parent().add_child(InputHints.build([
 			["ui_accept", "Elegir"], ["ui_cancel", "Volver"]]))
 
@@ -65,8 +65,8 @@ func _unhandled_input(event: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 
 
-## Host entry point: sync every control to the persisted values, show
-## with a quick pop-in (interruptible; close snaps the final state).
+## Entrada del anfitrión: sincroniza cada control con lo guardado y aparece
+## con un pop rápido (interrumpible; close fija el estado final).
 func open() -> void:
 	_refresh_controls()
 	visible = true
@@ -95,10 +95,9 @@ func close() -> void:
 	closed.emit()
 
 
-## set_value_no_signal so refreshing never re-applies (or re-saves). The
-## label reads the slider back, not SaveData: Range snaps the assignment
-## to its step, and a grabber sitting on 0.35 under a label that reads
-## "0.37x" is a bug report waiting to happen.
+## set_value_no_signal para que refrescar nunca vuelva a aplicar (ni a
+## guardar). La etiqueta lee el slider, no SaveData: Range ajusta lo asignado
+## a su paso, y la etiqueta debe decir lo mismo que muestra el agarrador.
 func _refresh_controls() -> void:
 	_sfx_slider.set_value_no_signal(SaveData.sfx_volume)
 	_ambient_slider.set_value_no_signal(SaveData.ambient_volume)
@@ -112,16 +111,15 @@ func _refresh_controls() -> void:
 	_aim_at_chosen_quality()
 
 
-## Pad / keyboard navigation, wired by hand. Left to Godot's nearest-
-## control search, ui_up from Volver jumped to the character cards BEHIND
-## this panel on the select screen (they are focusable and, measured edge
-## to edge, closer than the rows above it), so a pad player could neither
-## reach a single setting nor get back. Each row now names its neighbours
-## explicitly and the column wraps, so focus can never leave the panel:
+## Navegación con control y teclado, cableada a mano. Con la búsqueda
+## automática de Godot, ui_up desde Volver salta a las cartas del selector
+## que quedan DETRÁS de este panel (son enfocables y, medidas borde a borde,
+## quedan más cerca que las filas de arriba). Cada fila nombra a sus vecinos
+## y la columna da la vuelta, así que el foco nunca sale del panel:
 ##   Efectos ↕ Ambiente ↕ Sensibilidad ↕ Pantalla completa ↕ FPS
-##   ↕ Calidad (Alta ↔ Media ↔ Baja) ↕ Volver ↕ (back to Efectos)
-## Left/right on a slider moves its value (HSlider handles that itself);
-## on a single control it goes nowhere instead of out of the panel.
+##   ↕ Calidad (Alta ↔ Media ↔ Baja) ↕ Volver ↕ (de vuelta a Efectos)
+## Izquierda/derecha sobre un slider mueve su valor (lo hace HSlider); sobre
+## un control simple no va a ningún lado en vez de salir del panel.
 func _link_focus() -> void:
 	var column: Array[Control] = [_sfx_slider, _ambient_slider,
 			_sensitivity_slider, _fullscreen_check, _fps_check,
@@ -136,8 +134,8 @@ func _link_focus() -> void:
 		here.focus_next = here.get_path_to(below)
 		here.focus_neighbor_left = here.get_path_to(here)
 		here.focus_neighbor_right = here.get_path_to(here)
-	# The quality row: every button shares the rows above and below, and
-	# left/right walk the row without wrapping out of it.
+	# La fila de calidad: todos sus botones comparten las filas de arriba y de
+	# abajo, e izquierda/derecha recorren la fila sin salirse de ella.
 	for i in _quality_buttons.size():
 		var button := _quality_buttons[i]
 		button.focus_neighbor_top = button.get_path_to(_fps_check)
@@ -148,8 +146,8 @@ func _link_focus() -> void:
 	_aim_at_chosen_quality()
 
 
-## Coming into the quality row from above or below lands on the preset
-## that is ON, not always on Alta.
+## Entrar a la fila de calidad desde arriba o abajo cae en el preset que
+## está ENCENDIDO, no siempre en Alta.
 func _aim_at_chosen_quality() -> void:
 	var chosen := _quality_buttons[0]
 	for button in _quality_buttons:
@@ -173,8 +171,8 @@ func _on_ambient_changed(value: float) -> void:
 	_refresh_volume_labels()
 
 
-## Volumes read as a percentage next to their slider, like the
-## sensitivity multiplier does, so all three rows end in a number.
+## Los volúmenes se leen como porcentaje junto a su slider, igual que el
+## multiplicador de sensibilidad: las tres filas terminan en un número.
 func _refresh_volume_labels() -> void:
 	_sfx_value.text = "%d%%" % roundi(_sfx_slider.value)
 	_ambient_value.text = "%d%%" % roundi(_ambient_slider.value)
@@ -193,16 +191,17 @@ func _on_fps_toggled(on: bool) -> void:
 	Settings.set_show_fps(on)
 
 
-## A ButtonGroup toggles the old choice OFF as well; only the button that
-## turned on carries a decision.
+## Un ButtonGroup también APAGA la opción anterior; solo el botón que se
+## encendió trae una decisión.
 func _on_quality_toggled(on: bool, index: int) -> void:
 	if on:
 		Settings.set_graphics_quality(index)
 		_aim_at_chosen_quality()
 
 
-## Slider bounds come from the code that clamps the stored values, not
-## from the scene: two copies of 0.3-2.0 drift the day one of them moves.
+## Los límites de los sliders salen del código que acota los valores
+## guardados, no de la escena: dos copias de 0.3-2.0 se separan el día que
+## una cambia.
 func _apply_ranges() -> void:
 	for slider: HSlider in [_sfx_slider, _ambient_slider]:
 		slider.min_value = VOLUME_MIN
@@ -211,8 +210,8 @@ func _apply_ranges() -> void:
 	_sensitivity_slider.max_value = SaveData.MAX_MOUSE_SENSITIVITY
 
 
-## UiTheme design system: shared panel + headline, filled-track sliders
-## with a round teal grabber, teal Back button.
+## Sistema de diseño UiTheme: panel y titular compartidos, sliders con canal
+## lleno y agarrador redondo turquesa, botón Volver turquesa.
 func _apply_styles() -> void:
 	_apply_ranges()
 	_panel.add_theme_stylebox_override("panel",
@@ -249,9 +248,9 @@ func _apply_styles() -> void:
 	UiTheme.style_button(_back_button, UiTheme.ACCENT, true)
 
 
-## Small spaced headers that group the rows (sound / controls / screen),
-## each with a faint rule, so the panel reads as sections instead of a
-## flat list.
+## Encabezados chicos y espaciados que agrupan las filas (sonido / controles
+## / pantalla), cada uno con una línea tenue, para que el panel se lea por
+## secciones y no como una lista plana.
 func _add_section_headers() -> void:
 	var vbox := _title_label.get_parent()
 	var sections: Array = [
