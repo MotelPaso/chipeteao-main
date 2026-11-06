@@ -154,11 +154,12 @@ func _build_outcome_grid(box: VBoxContainer) -> void:
 	box.add_child(grid)
 	for outcome: Dictionary in RouletteShrine.OUTCOMES:
 		var row := Label.new()
-		row.text = "  " + String(outcome.label)
+		row.text = "  " + RouletteShrine.outcome_label(outcome)
 		row.custom_minimum_size = ROW_SIZE
-		var tint := (outcome.color as Color).lightened(0.15)
+		var color := RouletteShrine.outcome_color(outcome)
+		var tint := color.lightened(0.15)
 		row.add_theme_color_override("font_color", tint)
-		UiTheme.style_badge(row, tint, ROW_BG, Color(outcome.color as Color, 0.4))
+		UiTheme.style_badge(row, tint, ROW_BG, Color(color, 0.4))
 		grid.add_child(row)
 		_rows.append(row)
 
@@ -288,8 +289,9 @@ func _highlight(index: int) -> void:
 
 func _land(outcome: Dictionary) -> void:
 	_spinning = false
-	_result_label.text = "▶ %s" % String(outcome.label)
-	_result_label.add_theme_color_override("font_color", (outcome.color as Color).lightened(0.2))
+	_result_label.text = "▶ %s" % RouletteShrine.outcome_label(outcome)
+	_result_label.add_theme_color_override("font_color",
+			RouletteShrine.outcome_color(outcome).lightened(0.2))
 	UiTheme.pop(_result_label, 1.3, 0.3)
 	Sfx.play(&"shrine_done")
 	_close_button.disabled = false
