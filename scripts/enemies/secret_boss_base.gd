@@ -14,13 +14,6 @@ extends BossBase
 @export var secret_boss_id: String = ""
 
 
-func _init() -> void:
-	# No poseíble: es un jefe y su muerte desbloquea un raider.
-	possessable = false
-	# Definir _init aquí oculta el de BossBase; se llama a mano.
-	super()
-
-
 func _ready() -> void:
 	super()
 	_health.died.connect(_on_secret_boss_died)

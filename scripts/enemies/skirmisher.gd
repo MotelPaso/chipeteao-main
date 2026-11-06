@@ -22,12 +22,6 @@ extends EnemyBase
 var _fire_timer: float = 1.0
 
 
-func _init() -> void:
-	# No poseíble: dispara EnemyBolts que solo dañan al grupo "player", así
-	# que poseído seguiría atacando al equipo al que ahora pertenece.
-	possessable = false
-
-
 func _behavior_tick(delta: float) -> void:
 	_fire_timer = maxf(_fire_timer - delta, 0.0)
 

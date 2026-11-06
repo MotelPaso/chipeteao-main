@@ -53,13 +53,6 @@ var _tunneled_players: Array[PhysicsBody3D] = []
 @onready var _mound: Node3D = $Mound
 
 
-func _init() -> void:
-	# No poseíble: guarda y restaura sus propias capas y grupo en cada ciclo
-	# de enterrarse, así que poseído seguiría atacando al equipo al que ahora
-	# pertenece.
-	possessable = false
-
-
 func _ready() -> void:
 	super()
 	_state_timer = surface_duration

@@ -7,14 +7,21 @@ extends CharacterBody3D
 ## subclases cambian el comportamiento con los hooks virtuales de abajo.
 ## make_elite() vuelve shiny a cualquier enemigo.
 
+## Velocidad de persecución en m/s. Valor de respaldo: cada enemigo fija el
+## suyo en su escena.
 @export var move_speed: float = 7.0
+## Rapidez de giro hacia su dirección (por segundo). Valor de respaldo: cada
+## enemigo fija el suyo en su escena.
 @export var turn_speed: float = 10.0
+## Radio en metros en el que aparta a los vecinos. Igual para toda la horda.
 @export var separation_radius: float = 1.2
+## Fuerza con la que se aparta de los vecinos (0 = no se aparta). Valor de
+## respaldo: cada enemigo fija el suyo en su escena.
 @export var separation_strength: float = 1.5
 @export var xp_gem_scene: PackedScene
-## Puntos de partida que paga al raider más cercano al morir; los shiny lo
-## multiplican como la XP y los jefes fijan el suyo.
-@export var points_value: int = DEFAULT_POINTS_VALUE
+## Puntos de partida que paga al raider más cercano al morir. Los shiny lo
+## multiplican como la XP; los jefes guardan el suyo (25) en su escena.
+@export var points_value: int = 1
 ## Brillo shiny: vueltas de la rueda de matiz por segundo, pulsos de brillo
 ## por vuelta, y los límites de energía y alfa. Lento a propósito, para que
 ## se lea como un reflejo y no como un estrobo.
@@ -53,9 +60,6 @@ const SHINY_PHASE_BUCKETS: int = 997
 @export var max_climb_height: float = 10.0
 
 const CHEST_SCENE := preload("res://scenes/world/chests/Chest.tscn")
-## Recompensa base de EnemyBase; BossBase solo cambia points_value cuando la
-## escena lo dejó en este valor.
-const DEFAULT_POINTS_VALUE: int = 1
 ## Margen entre un trepador y el borde de la arena, para que el recorte
 ## nunca lo meta dentro del muro. Los jefes usan su propio margen, más ancho
 ## (BossBase.arena_clamp_margin).
@@ -153,8 +157,10 @@ var _meshes: Array[MeshInstance3D] = []
 ## limitan cada trepada a max_climb_height.
 var _climb_start_y: float = 0.0
 var _climbing: bool = false
-## Posesión: un siervo del equipo. Pelea contra los enemigos, ellos lo
-## ignoran y no paga nada al morir.
+## Si el bastón nigromante puede levantarlo como siervo. Solo los que pelean
+## por contacto (su _combat_tick daña cualquier Health que reciba); los que
+## disparan o golpean en área lo tienen apagado en su escena, porque poseídos
+## seguirían atacando al equipo.
 @export var possessable: bool = true
 const POSSESSED_GROUP: StringName = &"possessed"
 ## Capa de colisión propia, fuera de la de enemigos (2) y de mundo/jugadores (1).

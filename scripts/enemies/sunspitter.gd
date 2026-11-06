@@ -51,12 +51,6 @@ var _sight_query: PhysicsRayQueryParameters3D = \
 		PhysicsRayQueryParameters3D.create(Vector3.ZERO, Vector3.ZERO, 1)
 
 
-func _init() -> void:
-	# No poseíble: su rayo solo daña al grupo "player", así que poseído
-	# seguiría atacando al equipo al que ahora pertenece.
-	possessable = false
-
-
 func _ready() -> void:
 	super()
 	_aim_line = BeamVisual.create(self, AIM_COLOR, 0.05)

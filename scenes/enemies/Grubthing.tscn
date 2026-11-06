@@ -99,6 +99,8 @@ move_speed = 2.6
 turn_speed = 6.0
 separation_strength = 0.0
 xp_gem_scene = ExtResource("3_gem")
+points_value = 25
+possessable = false
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.8, 0)

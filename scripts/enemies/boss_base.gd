@@ -9,12 +9,8 @@ extends EnemyBase
 ## nunca se vuelve shiny (make_elite no hace nada).
 
 @export var boss_title: String = "Jefe"
-## Media arena menos arena_clamp_margin; la posición se recorta para que el
-## jefe (y sus ataques de suelo) nunca salgan del campo. Solo es respaldo:
-## en _ready se recalcula desde el nodo "arena_bounds" del mapa.
-@export var arena_half_extent: float = 76.0
-## Distancia que el jefe guarda del muro, para que sus ataques de suelo
-## caigan en el piso.
+## Distancia en metros que el jefe guarda del muro, para que sus ataques de
+## suelo caigan en el piso.
 @export var arena_clamp_margin: float = 4.0
 
 @export_group("Reward")
@@ -37,10 +33,6 @@ extends EnemyBase
 ## demoníaca; un piso encima les quitaría la tirada.
 @export var chest_min_rarity: String = ""
 
-
-## Puntos de partida que paga el jefe (una escena puede fijar los suyos).
-@export var boss_points_value: int = 25
-
 ## Llegada compartida: anillo en el suelo y la silueta que crece hasta su tamaño.
 const ENTRANCE_RING_DURATION: float = 0.45
 const ENTRANCE_POP_DURATION: float = 0.55
@@ -54,6 +46,10 @@ const CHEST_LUCK_PER_DEMONIC: float = 20.0
 const GEM_RING_RADIUS: float = 1.2
 const ORB_RING_RADIUS: float = 2.2
 
+## Media arena menos arena_clamp_margin: la posición se recorta para que el
+## jefe (y sus ataques de suelo) nunca salgan del campo. _ready la recalcula
+## desde el nodo "arena_bounds" del mapa; 76 queda si el mapa no tiene uno.
+var arena_half_extent: float = 76.0
 ## Un único slot de tween para toda señal de ataque o de llegada: una señal
 ## nueva siempre mata a la que reemplaza, así nunca se pelean entre ellas (ni
 ## con la caída al morir) por _visual.
@@ -66,20 +62,10 @@ var _bounds: Node3D = null
 var _tier_stacks: int = 0
 
 
-func _init() -> void:
-	# No poseíble: los jefes llegan al equipo con damage_players_in_disc /
-	# Coop.alive_players, así que poseído seguiría atacando al equipo al que
-	# ahora pertenece.
-	possessable = false
-
-
 func _ready() -> void:
 	# Marcador de mapa: el jefe es el único enemigo que muestra el mapa.
 	add_to_group(&"map_markers")
 	super()
-	# Un valor fijado en la escena gana; boss_points_value solo llena el de fábrica.
-	if points_value == DEFAULT_POINTS_VALUE:
-		points_value = boss_points_value
 	_bounds = get_tree().get_first_node_in_group("arena_bounds") as Node3D
 	if _bounds != null:
 		var extent: Variant = _bounds.get("arena_half_extent")
