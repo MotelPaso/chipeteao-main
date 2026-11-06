@@ -1,11 +1,11 @@
 extends Node
-## Autoload "Juice": the game-feel layer (GDD 1: kinetic, satisfying
-## spectacle). Central, cheap helpers every system calls directly —
-## trauma-based camera shake, guarded hit-stop, shared-material hit
-## flashes, death particle bursts, a damage vignette, the level-up ring
-## pulse, and the slide FOV kick. Everything is pause-safe (this node
-## always processes; restores run under a paused tree) and headless-safe
-## (camera/scene lookups are guarded, so no-window runs never crash).
+## Autoload "Juice": la capa de sensación de juego. Ayudantes centrales y
+## baratos que todo sistema llama directo: sacudida de cámara por trauma,
+## hit-stop con resguardo, destellos de golpe con material compartido,
+## ráfagas de partículas de muerte, viñeta de daño, anillo de subida de
+## nivel y el empujón de FOV al derrapar. Todo sigue andando en pausa (este
+## nodo procesa siempre; las restauraciones corren con el árbol pausado) y
+## sin ventana (las búsquedas de cámara y escena están resguardadas).
 
 const VIGNETTE_SHADER: String = """
 shader_type canvas_item;
@@ -20,13 +20,13 @@ void fragment() {
 """
 
 @export_group("Camera Shake")
-## Peak camera offset (meters) at full trauma.
+## Desplazamiento máximo de la cámara, en metros, con trauma completo.
 @export var shake_max_offset: float = 0.4
-## How fast the shake noise is sampled; higher = jitterier.
+## Velocidad de muestreo del ruido de la sacudida; más alto = más nervioso.
 @export var shake_noise_speed: float = 10.0
 @export var kill_shake_strength: float = 0.05
-## Horde deaths pool trauma only up to this cap, so a mass wipe reads as a
-## rumble instead of an earthquake.
+## Las muertes de la horda acumulan trauma solo hasta este techo (0-1),
+## así una matanza se siente como un retumbe y no como un terremoto.
 @export var kill_shake_cap: float = 0.18
 @export var hurt_shake_strength: float = 0.08
 @export var hurt_shake_cap: float = 0.3
@@ -36,8 +36,8 @@ void fragment() {
 @export var crit_stop_scale: float = 0.3
 @export var crit_stop_duration: float = 0.05
 @export var crit_shake_strength: float = 0.1
-## Minimum seconds between crit punches: rapid-fire crit builds must not
-## chain the game into permanent slow motion.
+## Segundos mínimos entre golpes de crítico: una build de críticos rápidos
+## no debe encadenar el juego en cámara lenta permanente.
 @export var crit_punch_cooldown: float = 0.35
 @export var boss_death_stop_scale: float = 0.4
 @export var boss_death_stop_duration: float = 0.5
@@ -57,8 +57,8 @@ void fragment() {
 @export_group("Bursts")
 @export var death_burst_min: int = 4
 @export var death_burst_max: int = 6
-## Never raise this above DeathBurst.tscn's authored `amount` (24): the
-## burst clamps to its buffer instead of reallocating it mid-death.
+## No lo subas por encima del `amount` de DeathBurst.tscn (24): la ráfaga
+## se recorta a su buffer en vez de reasignarlo a mitad de la muerte.
 @export var boss_burst_amount: int = 24
 @export var sparkle_amount: int = 6
 @export var sparkle_color: Color = Color(1.0, 0.84, 0.3)
@@ -68,28 +68,28 @@ void fragment() {
 @export var level_pulse_duration: float = 0.5
 
 
-## Cameras the feel layer drives. Split-screen registers each player's own
-## (source) camera here, because that is the one SplitScreen mirrors into
-## the SubViewport that actually renders; with the group empty (solo) the
-## root viewport's active camera is used, exactly as before.
+## Cámaras que mueve la capa de sensación. La pantalla dividida registra
+## aquí la cámara propia (origen) de cada jugador, que es la que SplitScreen
+## copia en la SubViewport que dibuja; con el grupo vacío (solo) se usa la
+## cámara activa del viewport raíz.
 const FEEL_CAMERA_GROUP: StringName = &"feel_camera"
 
 
-## Per-owner hit-flash bookkeeping: the meshes touched and the overlays to
-## put back. One entry per body; repeat hits only refresh the timer.
+## Registro de destello por dueño: las mallas tocadas y los overlays a
+## devolver. Una entrada por cuerpo; golpes repetidos solo renuevan el tiempo.
 class FlashState:
 	extends RefCounted
 	var meshes: Array[MeshInstance3D] = []
 	var prev: Array[Material] = []
-	## Node that owns the COMPOSED overlay (EnemyBase.current_overlay), when
-	## there is one: asking it beats putting `prev` back, which resurrects an
-	## overlay the body dropped during the flash window.
+	## Nodo dueño del overlay COMPUESTO (EnemyBase.current_overlay), si lo hay:
+	## preguntarle es mejor que devolver `prev`, que resucitaría un overlay
+	## que el cuerpo soltó durante el destello.
 	var overlay_owner: Node = null
 	var time_left: float = 0.0
 
 
-## One live slide FOV kick. Keyed per camera so co-op raiders sliding at
-## the same time do not fight over a single base FOV.
+## Un empujón de FOV vivo. Uno por cámara, para que raiders de co-op que
+## derrapan a la vez no se peleen por un solo FOV base.
 class FovKick:
 	extends RefCounted
 	var camera: Camera3D = null
@@ -97,57 +97,57 @@ class FovKick:
 	var tween: Tween = null
 
 
-# --- shake state ---
+# --- Estado de la sacudida ---
 var _trauma: float = 0.0
 var _trauma_decay: float = 0.0
 var _shake_time: float = 0.0
-## Cameras currently displaced, with the h/v offset each rested at.
+## Cámaras desplazadas ahora, con el desplazamiento h/v en que reposaba cada una.
 var _shake_cameras: Array[Camera3D] = []
 var _shake_rest: Dictionary[int, Vector2] = {}
 var _noise_x: FastNoiseLite = FastNoiseLite.new()
 var _noise_y: FastNoiseLite = FastNoiseLite.new()
-## Per-process-frame cache of _feel_cameras() (the shake asks every tick).
+## Caché por frame de proceso de _feel_cameras() (la sacudida pregunta en
+## cada tick).
 var _feel_cameras_cache: Array[Camera3D] = []
 var _feel_cameras_frame: int = -1
 
-# --- hit-stop state (single accumulator: overlaps extend, never stack) ---
+# --- Estado del hit-stop (un solo acumulador: se extiende, nunca se apila) ---
 var _stop_left: float = 0.0
 var _crit_cd_left: float = 0.0
 
-# --- flash state ---
+# --- Estado del destello ---
 var _flash_material: StandardMaterial3D
 var _flashes: Dictionary[int, FlashState] = {}
 var _expired_flash_keys: Array[int] = []
 
-# --- vignette state ---
+# --- Estado de la viñeta ---
 var _vignette_material: ShaderMaterial
 var _vignette_tween: Tween
 
-# --- FOV kick state (one entry per camera currently kicked) ---
+# --- Estado del empujón de FOV (una entrada por cámara empujada) ---
 var _fov_kicks: Dictionary[int, FovKick] = {}
-## Reused scratch for the per-tick sweep, like _expired_flash_keys: a
-## dictionary cannot be erased from while it is being iterated.
+## Lista reusada para el barrido por tick, como _expired_flash_keys: no se
+## puede borrar de un diccionario mientras se recorre.
 var _expired_fov_keys: Array[int] = []
 
-# --- level pulse state ---
-## Process frame the last level ring/sting fired on: RunState emits
-## leveled_up once PER LEVEL, so one fat gem can fire it three times in a
-## single frame.
+# --- Estado del pulso de nivel ---
+## Frame de proceso del último anillo/sonido de nivel: RunState emite
+## leveled_up una vez POR NIVEL, y una gema gorda puede dispararlo tres veces
+## en un mismo frame.
 var _level_pulse_frame: int = -1
-## The level ring's mesh, built on the first level-up and shared by every
-## ring after it: each ring used to mint its own TorusMesh (engine default
-## 64 x 32, 4k triangles regenerated per level-up). The material stays one
-## per ring, duplicated from _level_ring_material, because the fade writes
-## its alpha — GeometryInstance3D.transparency would avoid the copy but
-## only works on Forward+, and a PC without Vulkan/D3D12 falls back to the
-## Compatibility renderer, where the ring would stop fading.
+## Malla del anillo de nivel, armada en la primera subida y compartida por
+## todos los anillos siguientes. El material sí es uno por anillo
+## (duplicado de _level_ring_material) porque el desvanecimiento escribe su
+## alfa: GeometryInstance3D.transparency evitaría la copia, pero solo
+## funciona en Forward+, y en el renderer Compatibility el anillo dejaría de
+## desvanecerse.
 var _level_ring_mesh: TorusMesh = null
 var _level_ring_material: StandardMaterial3D = null
 
 
 func _ready() -> void:
-	# Restores (time_scale, shake, vignette fade) must keep running while
-	# the card UI or run-end screen has the tree paused.
+	# Las restauraciones (time_scale, sacudida, viñeta) deben seguir corriendo
+	# mientras la UI de cartas o la pantalla final pausan el árbol.
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	_noise_x.seed = 1337
 	_noise_y.seed = 7331
@@ -165,8 +165,9 @@ func _ready() -> void:
 
 
 func _process(delta: float) -> void:
-	# Hit-stop scales _process delta too; divide it back out so the stop
-	# window and the crit cooldown count real (unscaled) time.
+	# El hit-stop también escala el delta de _process; se divide de vuelta
+	# para que la ventana del stop y el enfriamiento de crítico cuenten tiempo
+	# real (sin escalar).
 	var unscaled := delta / maxf(Engine.time_scale, 0.001)
 	_crit_cd_left = maxf(_crit_cd_left - unscaled, 0.0)
 	if _stop_left > 0.0:
@@ -179,19 +180,19 @@ func _process(delta: float) -> void:
 	_tick_fov_kicks()
 
 
-# --- camera shake -----------------------------------------------------------
+# --- Sacudida de cámara -----------------------------------------------------
 
-## Adds `strength` trauma that fully decays over roughly `duration`
-## seconds. trauma_cap < 1 limits how much THIS kind of shake can pool
-## (spammy sources); bigger uncapped shakes can still push past it.
+## Suma `strength` de trauma, que se disipa del todo en unos `duration`
+## segundos. trauma_cap < 1 limita cuánto puede acumular ESTE tipo de
+## sacudida (fuentes repetitivas); sacudidas mayores sin techo igual pasan.
 func shake(strength: float, duration: float = 0.3, trauma_cap: float = 1.0) -> void:
 	if strength <= 0.0 or duration <= 0.0:
 		return
 	if _trauma >= trauma_cap:
 		return
-	# Decay is carried as "time left to drain", not as a sticky maximum
-	# rate: a fast shake used to clamp every later one to its own rate, so
-	# one boss death silenced the horde rumble for the rest of the fight.
+	# La disipación se lleva como "tiempo que falta para vaciarse", no como
+	# una tasa máxima pegajosa: si no, una sacudida rápida (la muerte de un
+	# jefe) recortaría todas las siguientes a su tasa.
 	var time_left := _trauma / _trauma_decay if _trauma_decay > 0.0 else 0.0
 	_trauma = minf(_trauma + strength, clampf(trauma_cap, 0.0, 1.0))
 	_trauma_decay = _trauma / maxf(time_left, duration)
@@ -202,8 +203,8 @@ func _tick_shake(delta: float) -> void:
 		return
 	_shake_time += delta * shake_noise_speed
 	_sync_shake_cameras(_feel_cameras())
-	# h/v_offset survive the SpringArm3D (which overwrites the child
-	# transform every frame) and never rotate the rig.
+	# h/v_offset sobreviven al SpringArm3D (que reescribe el transform del
+	# hijo cada frame) y nunca rotan el rig.
 	var amount := pow(_trauma, 1.5) * shake_max_offset
 	var offset_h := _noise_x.get_noise_1d(_shake_time) * amount
 	var offset_v := _noise_y.get_noise_1d(_shake_time) * amount
@@ -219,8 +220,9 @@ func _tick_shake(delta: float) -> void:
 		_release_shake_cameras()
 
 
-## Starts displacing cameras that just joined the set and puts back the
-## ones that left it (a view closing mid-shake must not stay offset).
+## Empieza a mover las cámaras que se acaban de sumar y devuelve las que
+## salieron (una vista que se cierra a mitad de sacudida no debe quedar
+## desplazada).
 func _sync_shake_cameras(cameras: Array[Camera3D]) -> void:
 	for i in range(_shake_cameras.size() - 1, -1, -1):
 		var tracked := _shake_cameras[i]
@@ -246,11 +248,10 @@ func _rest_camera(camera: Camera3D) -> void:
 	if camera == null:
 		return
 	if not is_instance_valid(camera):
-		# A camera freed mid-shake takes its instance id with it (asking a
-		# freed object for anything is an error), so its rest entry is found
-		# by resolving the ids instead. The bookkeeping HAS to go: this is an
-		# autoload, and a stage swap or a co-op slot leaving retires a camera
-		# per view, every time.
+		# Una cámara liberada a mitad de sacudida se lleva su id (preguntarle
+		# algo a un objeto liberado es un error), así que su entrada se busca
+		# resolviendo los ids. El registro TIENE que irse: esto es un autoload,
+		# y cada cambio de etapa o salida de co-op retira una cámara por vista.
 		for key: int in _shake_rest.keys():
 			if not is_instance_id_valid(key):
 				_shake_rest.erase(key)
@@ -262,11 +263,11 @@ func _rest_camera(camera: Camera3D) -> void:
 	_shake_rest.erase(key)
 
 
-# --- hit stop ---------------------------------------------------------------
+# --- Hit-stop -----------------------------------------------------------------
 
-## Brief Engine.time_scale dip. Overlapping calls take the slowest scale
-## and the furthest end time on ONE accumulator, and _process always
-## restores exactly 1.0 — the game can never stick slow.
+## Baja breve de Engine.time_scale. Llamadas que se solapan toman la escala
+## más lenta y el final más lejano en UN acumulador, y _process siempre
+## restaura exactamente 1.0: el juego nunca queda lento.
 func hit_stop(scale: float, duration: float) -> void:
 	if duration <= 0.0:
 		return
@@ -279,18 +280,18 @@ func hit_stop(scale: float, duration: float) -> void:
 		_stop_left = duration
 
 
-# --- hit flash --------------------------------------------------------------
+# --- Destello de golpe ---------------------------------------------------------
 
-## White flash on every mesh under mesh_owner (pass the enemy's visual
-## rig). One shared overlay material — never duplicated per hit; previous
-## overlays (e.g. the elite glow) are restored when the flash ends.
+## Destello blanco en cada malla bajo mesh_owner (pasa el rig visual del
+## enemigo). Un solo material de overlay compartido — nunca duplicado por
+## golpe; los overlays previos (el brillo de élite) vuelven al terminar.
 func flash(mesh_owner: Node3D) -> void:
 	if mesh_owner == null or not is_instance_valid(mesh_owner):
 		return
 	var key := mesh_owner.get_instance_id()
 	if _flashes.has(key):
 		var active: FlashState = _flashes[key]
-		active.time_left = flash_duration  # refresh only: no rescan, no alloc
+		active.time_left = flash_duration  # solo renueva: sin rebuscar ni reservar
 		return
 	var entry := FlashState.new()
 	var owner_mesh := mesh_owner as MeshInstance3D
@@ -310,9 +311,9 @@ func flash(mesh_owner: Node3D) -> void:
 	_flashes[key] = entry
 
 
-## The node that owns the composed overlay for `mesh_owner`, or null when
-## nobody claims the slot. EnemyBase exposes current_overlay() on the body
-## while callers hand us its Visual child, so look one level up too.
+## El nodo dueño del overlay compuesto de `mesh_owner`, o null si nadie lo
+## reclama. EnemyBase expone current_overlay() en el cuerpo y los
+## llamadores pasan su hijo Visual, así que también se mira un nivel arriba.
 static func _overlay_owner(mesh_owner: Node3D) -> Node:
 	if mesh_owner.has_method(&"current_overlay"):
 		return mesh_owner
@@ -336,10 +337,10 @@ func _tick_flashes(delta: float) -> void:
 		_flashes.erase(key)
 
 
-## Ends a flash. When the body composes its own overlay (poison tint, elite
-## glow) it is asked for the CURRENT answer instead of replaying the one
-## captured 0.08 s ago — poison wearing off inside the flash window used to
-## be undone by the restore, leaving the body green until it died.
+## Termina un destello. Si el cuerpo compone su propio overlay (tinte de
+## veneno, brillo de élite) se le pide la respuesta ACTUAL en vez de repetir
+## la capturada al empezar: un veneno que termina durante el destello no
+## debe volver con la restauración.
 func _restore_flash(entry: FlashState) -> void:
 	var composed: Material = null
 	var owned := entry.overlay_owner != null and is_instance_valid(entry.overlay_owner)
@@ -351,10 +352,10 @@ func _restore_flash(entry: FlashState) -> void:
 			mesh.material_overlay = composed if owned else entry.prev[i]
 
 
-# --- particle bursts --------------------------------------------------------
+# --- Ráfagas de partículas ----------------------------------------------------
 
-## Plays a one-shot DeathBurst at `at`, tinted `color`. Pooled: the burst
-## releases itself back to Pools when done.
+## Reproduce un DeathBurst de un disparo en `at`, teñido `color`. Va en pool:
+## la ráfaga se devuelve sola a Pools al terminar.
 func burst(at: Vector3, color: Color, amount: int) -> void:
 	var fx := Pools.acquire_scene(Pools.DEATH_BURST_SCENE) as DeathBurst
 	if fx == null:
@@ -363,7 +364,7 @@ func burst(at: Vector3, color: Color, amount: int) -> void:
 	fx.fire(color, maxi(amount, 1))
 
 
-# --- semantic feel moments (tunables above; call sites stay one-liners) -----
+# --- Momentos de sensación (ajustes arriba; las llamadas son de una línea) --
 
 func enemy_died(at: Vector3, color: Color) -> void:
 	shake(kill_shake_strength, 0.25, kill_shake_cap)
@@ -378,8 +379,8 @@ func boss_died(at: Vector3, color: Color) -> void:
 	Sfx.play(&"boss_die")
 
 
-## Crit landed: micro hit-stop + a slightly bigger shake, rate-limited so
-## high-crit builds punctuate instead of drone.
+## Crítico: micro hit-stop y una sacudida algo mayor, con límite de ritmo
+## para que una build de muchos críticos puntúe en vez de zumbar.
 func crit_punch() -> void:
 	if _crit_cd_left > 0.0:
 		return
@@ -394,18 +395,18 @@ func player_hurt() -> void:
 	Sfx.play(&"player_hurt")
 
 
-## Gold completion sparkle for chests and shrines.
+## Destello dorado de completado para cofres y santuarios.
 func sparkle(at: Vector3) -> void:
 	burst(at, sparkle_color, sparkle_amount)
 
 
-# --- slide FOV kick ---------------------------------------------------------
+# --- Empujón de FOV al derrapar ------------------------------------------------
 
-## Widens `camera` while a slide lasts. Pass the slider's OWN camera: in
-## split-screen there is no active camera on the root viewport, so the
-## no-argument form has nothing to kick (and kicking every view would flare
-## the FOV of raiders who are not sliding). SplitScreen mirrors the source
-## camera's fov into the view that renders, so the kick propagates for free.
+## Abre `camera` mientras dura un derrape. Pasa la cámara PROPIA de quien
+## derrapa: en pantalla dividida no hay cámara activa en el viewport raíz,
+## así que la forma sin argumento no tiene qué empujar (y empujar todas las
+## vistas abriría el FOV de quien no derrapa). SplitScreen copia el fov de
+## la cámara origen a la vista que dibuja.
 func fov_kick_begin(camera: Camera3D = null) -> void:
 	var target := camera if camera != null else _active_camera()
 	if target == null or not is_instance_valid(target):
@@ -413,9 +414,9 @@ func fov_kick_begin(camera: Camera3D = null) -> void:
 	var key := target.get_instance_id()
 	var kick: FovKick = _fov_kicks.get(key, null)
 	if kick == null:
-		# First kick on this camera: record its rest FOV. While the restore
-		# tween of the SAME camera is still mid-flight the recorded base
-		# stays valid — never re-read a moving fov.
+		# Primer empujón en esta cámara: se guarda su FOV de reposo. Mientras
+		# el tween de vuelta de la MISMA cámara sigue en curso, la base
+		# guardada sigue valiendo: nunca se relee un fov en movimiento.
 		kick = FovKick.new()
 		kick.camera = target
 		kick.base_fov = target.fov
@@ -447,12 +448,11 @@ func fov_kick_end(camera: Camera3D = null) -> void:
 	kick.tween.tween_callback(_on_fov_restored.bind(key))
 
 
-## Entries only ever leave on the normal paths (the restore tween finishing,
-## or fov_kick_end finding the camera already gone), and a raider whose
-## camera dies MID-SLIDE reaches neither: the kick would sit in this
-## autoload holding a dead Camera3D for the rest of the process, one per
-## view per run in split-screen. Swept here instead — the dictionary is
-## empty except during a slide, so this costs a branch.
+## Las entradas solo salen por los caminos normales (termina el tween de
+## vuelta, o fov_kick_end encuentra la cámara ya liberada), y un raider cuya
+## cámara muere A MITAD de un derrape no pasa por ninguno: la entrada
+## quedaría en este autoload con una Camera3D muerta. Se barren aquí; el
+## diccionario está vacío salvo durante un derrape, así que cuesta un if.
 func _tick_fov_kicks() -> void:
 	if _fov_kicks.is_empty():
 		return
@@ -476,11 +476,11 @@ func _kill_fov_tween(kick: FovKick) -> void:
 		kick.tween.kill()
 
 
-# --- damage vignette --------------------------------------------------------
+# --- Viñeta de daño -------------------------------------------------------------
 
 func _build_vignette() -> void:
 	var layer := CanvasLayer.new()
-	layer.layer = 4  # above the 3D scene, below the HUD (5)
+	layer.layer = 4  # sobre la escena 3D y bajo el HUD (capa 5 en HUD.tscn)
 	add_child(layer)
 	var shader := Shader.new()
 	shader.code = VIGNETTE_SHADER
@@ -506,27 +506,27 @@ func _pulse_vignette() -> void:
 			0.0, vignette_fade_time).set_delay(0.05)
 
 
-# --- level-up pulse ---------------------------------------------------------
+# --- Pulso de subida de nivel ---------------------------------------------------
 
 func _on_leveled_up(_new_level: int) -> void:
-	# RunState emits once PER LEVEL, so a rift gem worth three levels fired
-	# this three times in one frame: three copies of the same wav stacking
-	# on the bus and three rings drawn pixel on pixel. One per frame.
+	# RunState emite una vez POR NIVEL: una gema que vale tres niveles
+	# dispararía esto tres veces en un frame (tres sonidos apilados y tres
+	# anillos encimados). Uno por frame.
 	var frame := Engine.get_process_frames()
 	if frame == _level_pulse_frame:
 		return
 	_level_pulse_frame = frame
 	Sfx.play(&"level_up")
-	# Shared party level: the ring pulses at EVERY standing raider's feet
-	# (one node in solo — identical to the old single-ring behavior).
+	# Nivel compartido por la party: el anillo late a los pies de CADA
+	# raider en pie (uno solo en solitario).
 	for node: Node in get_tree().get_nodes_in_group(&"player"):
 		var player := node as Node3D
 		if player != null and player.is_inside_tree():
 			_spawn_level_ring(player.global_position + Vector3.UP * 0.15)
 
 
-## Expanding emissive ring at the player's feet. Its tween ignores pause so
-## the pulse plays under the card UI's freeze-frame.
+## Anillo emisivo que se expande a los pies del jugador. Su tween ignora la
+## pausa para que el pulso se vea bajo la UI de cartas.
 func _spawn_level_ring(at: Vector3) -> void:
 	var scene_root := RunRoot.stage_parent(get_tree())
 	if scene_root == null:
@@ -537,15 +537,15 @@ func _spawn_level_ring(at: Vector3) -> void:
 	ring.mesh = _level_ring_mesh
 	var material := _level_ring_material.duplicate() as StandardMaterial3D
 	ring.material_override = material
-	# An alpha material never reaches the shadow pass anyway; saying so
-	# keeps the ring out of the shadow cull as well.
+	# Un material con alfa nunca llega a la pasada de sombras; decirlo
+	# también lo saca del descarte de sombras.
 	ring.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	scene_root.add_child(ring)
 	ring.global_position = at
 	ring.scale = Vector3(0.4, 0.55, 0.4)
-	# Bound to the RING, not to this autoload: the ring dies with the scene,
-	# and a tween owned by Juice would outlive it (quitting to menu inside
-	# the half-second pulse tweened a freed object).
+	# Atado al ANILLO, no a este autoload: el anillo muere con la escena, y un
+	# tween de Juice lo sobreviviría (salir al menú durante el pulso
+	# animaría un objeto liberado).
 	var tween := ring.create_tween()
 	tween.set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
 	tween.set_parallel(true)
@@ -556,16 +556,15 @@ func _spawn_level_ring(at: Vector3) -> void:
 	tween.chain().tween_callback(ring.queue_free)
 
 
-## Builds the shared level-ring mesh and the material every ring copies
-## (see _level_ring_mesh).
-## Lazy, so the material reads level_pulse_color where the old per-ring
-## build did: at the first level-up, after any inspector override.
+## Arma la malla compartida del anillo de nivel y el material que copia cada
+## anillo (ver _level_ring_mesh). Perezoso: se arma en la primera subida de
+## nivel.
 func _build_level_ring_assets() -> void:
 	_level_ring_mesh = TorusMesh.new()
 	_level_ring_mesh.inner_radius = 0.42
 	_level_ring_mesh.outer_radius = 0.55
-	# Explicit tessellation: the ring swells to ~2.5 m, where 32 slices
-	# still read round; 8 sides are plenty for the thin tube.
+	# Teselado explícito: el anillo crece a ~2.5 m, donde 32 cortes aún se
+	# ven redondos; 8 lados alcanzan para el tubo delgado.
 	_level_ring_mesh.rings = 32
 	_level_ring_mesh.ring_segments = 8
 	_level_ring_material = StandardMaterial3D.new()
@@ -578,26 +577,23 @@ func _build_level_ring_assets() -> void:
 	_level_ring_material.emission_energy_multiplier = 2.4
 
 
-# --- shared math ------------------------------------------------------------
+# --- Matemática compartida -----------------------------------------------------
 
-## Framerate-independent smoothing weight for `lerp(a, b, Juice.damp(r, d))`.
-## The obvious `rate * delta` is the Euler approximation of this: its error
-## grows with delta, so a smoothed value's response time drifts with the
-## framerate (and below 10 fps it saturates at 1.0 and stops smoothing).
-## Lives on the feel layer so the seal rig, the pets and the camera all
-## settle at the same real speed whatever the frame time is.
+## Peso de suavizado independiente del framerate para
+## `lerp(a, b, Juice.damp(r, d))`. El obvio `rate * delta` es su aproximación
+## de Euler: su error crece con delta y el tiempo de respuesta cambiaría con
+## el framerate (bajo 10 fps se satura en 1.0 y deja de suavizar).
 static func damp(rate: float, delta: float) -> float:
 	return 1.0 - exp(-rate * delta)
 
 
-# --- shared lookups ---------------------------------------------------------
+# --- Búsquedas compartidas -----------------------------------------------------
 
-## Every camera the feel layer should displace. In split-screen the root
-## viewport has NO active camera (each player's own camera is deactivated
-## in favour of a follow camera inside a SubViewport), which is why the
-## plain lookup below returned null and shake died in co-op; SplitScreen
-## registers the source cameras it mirrors in FEEL_CAMERA_GROUP instead.
-## Cached per process frame: the shake asks for this every tick.
+## Cada cámara que la capa de sensación debe mover. En pantalla dividida el
+## viewport raíz NO tiene cámara activa (la de cada jugador se desactiva a
+## favor de una cámara seguidora dentro de una SubViewport), así que
+## SplitScreen registra en FEEL_CAMERA_GROUP las cámaras origen que copia.
+## Con caché por frame de proceso: la sacudida pregunta en cada tick.
 func _feel_cameras() -> Array[Camera3D]:
 	var frame := Engine.get_process_frames()
 	if frame == _feel_cameras_frame:

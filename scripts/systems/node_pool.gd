@@ -1,52 +1,48 @@
 class_name NodePool
 extends Node
-## Reusable instance pool for ONE PackedScene whose root extends Node3D.
-## Contract (kept tiny on purpose): pooled scene scripts implement
-## pool_reset(), called on every acquire AFTER the node is (re)parented, to
-## restore just-spawned state (flight counters, hit sets, stale tweens).
-## Parked nodes are held OUT of the tree — no processing, no physics
-## presence, and they survive scene changes for free — while in-flight
-## nodes are children of the current scene and simply die with it; the
-## deferred release path guards that race. Owned and configured by the
-## Pools autoload; not meant to be scattered through gameplay scenes.
+## Pool de instancias reusables para UNA PackedScene cuya raíz extiende
+## Node3D. Contrato (chico a propósito): los scripts en pool implementan
+## pool_reset(), que se llama en cada acquire DESPUÉS de (re)colgar el nodo,
+## para restaurar el estado de recién creado (contadores, golpes, tweens).
+## Los nodos guardados viven FUERA del árbol — sin proceso ni física, y
+## sobreviven a los cambios de escena —, mientras los que están en vuelo son
+## hijos de la escena actual y mueren con ella; el camino diferido de
+## liberación cubre esa carrera. Lo crea y configura el autoload Pools; no
+## va suelto en escenas de juego.
 ##
-## release()/acquire() are strictly symmetric: whatever release() switches
-## off it first RECORDS on the node, and acquire() puts that exact value
-## back. The pool never invents state (it used to force processing on
-## every node, waking up FX scenes that define neither callback) and it
-## never leaves a parked Area3D listening (a spent projectile kept
-## reporting overlaps until its deferred reparent landed).
+## release()/acquire() son estrictamente simétricos: lo que release() apaga
+## primero lo ANOTA en el nodo, y acquire() devuelve ese mismo valor. El pool
+## nunca inventa estado (no fuerza el proceso de nodos que no lo usan) y
+## nunca deja un Area3D guardado escuchando.
 
 const META_OWNER: StringName = &"_node_pool_owner"
-## Per-node snapshot of what release() switched off; presence of the first
-## one is what tells acquire() this node has been parked before.
+## Foto por nodo de lo que apagó release(); que exista la primera le dice a
+## acquire() que el nodo ya estuvo guardado.
 const META_PROCESS: StringName = &"_node_pool_process"
 const META_PHYSICS_PROCESS: StringName = &"_node_pool_physics_process"
 const META_MONITORING: StringName = &"_node_pool_monitoring"
 const META_MONITORABLE: StringName = &"_node_pool_monitorable"
 
-## Scene this pool instantiates; its root must be a Node3D.
+## Escena que instancia este pool; su raíz debe ser un Node3D.
 @export var scene: PackedScene
-## Instances created up front so early-run spawns never hitch.
+## Instancias creadas por adelantado para que los primeros spawns no tironeen.
 @export var preload_count: int = 0
-## Soft cap: released nodes beyond this many parked are freed instead of
-## kept, bounding worst-case memory after a spike.
+## Tope suave: pasada esta cantidad de guardados, lo que se libera se borra
+## en vez de guardarse, y así se acota la memoria tras un pico.
 @export var max_free: int = 64
 
-## Instances ever created (monotonic): the churn metric — in steady state
-## it stops growing because every spawn is served from the parked list.
+## Instancias creadas en total (solo sube): la medida de recambio; en
+## régimen deja de crecer porque todo spawn sale de los guardados.
 var total_created: int = 0
-## Most nodes ever parked at once (post-spike high-water mark).
+## Máximo de nodos guardados a la vez (marca tras un pico).
 var peak_parked: int = 0
 
 var _parked: Array[Node3D] = []
-## Instance ids released this frame but not yet reparented (see release()).
+## Ids liberados en este frame pero aún no descolgados (ver release()).
 var _pending_release: Dictionary[int, bool] = {}
-## Instances currently OUT in the world (acquired and not yet parked).
-## Tracked since iteration 49 because a stage swap has to reclaim them:
-## before, an in-flight dart simply died with the scene, which is exactly
-## the leak a persistent pool cannot afford — the node would be freed
-## while the pool still counted it as created and never parked again.
+## Instancias que están AFUERA en el mundo (adquiridas y no guardadas). Un
+## cambio de etapa tiene que recuperarlas: si un dardo en vuelo muriera con
+## la escena, el pool lo seguiría contando como creado sin guardarlo nunca.
 var _live: Dictionary[int, Node3D] = {}
 
 
@@ -60,8 +56,8 @@ func _ready() -> void:
 
 
 func _notification(what: int) -> void:
-	# Parked nodes live outside the tree, so nothing frees them implicitly;
-	# do it when the pool itself is destroyed (app shutdown) to exit clean.
+	# Los guardados viven fuera del árbol y nada los libera solo; se liberan
+	# cuando se destruye el pool (al cerrar la app) para salir limpio.
 	if what == NOTIFICATION_PREDELETE:
 		for node: Node3D in _parked:
 			if is_instance_valid(node):
@@ -69,8 +65,8 @@ func _notification(what: int) -> void:
 		_parked.clear()
 
 
-## Hands out a pooled instance under `parent` (reusing a parked one when
-## available, growing the pool otherwise), re-enabled and pool_reset().
+## Entrega una instancia bajo `parent` (reusa una guardada si hay; si no, el
+## pool crece), reactivada y con pool_reset().
 func acquire(parent: Node) -> Node3D:
 	if parent == null:
 		return null
@@ -82,17 +78,17 @@ func acquire(parent: Node) -> Node3D:
 	else:
 		node = _parked.pop_back()
 	parent.add_child(node)
-	# Put back exactly what release() recorded; script state is pool_reset's
-	# job. A never-parked node keeps whatever entering the tree derived for
-	# it, so FX scenes with no _process stay out of the process lists.
+	# Devuelve exactamente lo que anotó release(); el estado del script es
+	# trabajo de pool_reset. Un nodo nunca guardado conserva lo que derivó al
+	# entrar al árbol, así los FX sin _process no entran a la lista de proceso.
 	node.visible = true
 	if node.has_meta(META_PROCESS):
 		node.set_process(node.get_meta(META_PROCESS))
 		node.set_physics_process(node.get_meta(META_PHYSICS_PROCESS))
 	var area := node as Area3D
 	if area != null and node.has_meta(META_MONITORING):
-		# Deferred to mirror release(): both sides land in call order, so a
-		# same-frame release/acquire round trip ends up monitoring again.
+		# Diferido como en release(): ambos lados se aplican en orden de
+		# llamada, así un release/acquire en el mismo frame termina escuchando.
 		area.set_deferred(&"monitoring", node.get_meta(META_MONITORING))
 		area.set_deferred(&"monitorable", node.get_meta(META_MONITORABLE))
 	if node.has_method(&"pool_reset"):
@@ -101,15 +97,15 @@ func acquire(parent: Node) -> Node3D:
 	return node
 
 
-## Returns a node to the pool. Safe against double release (repeat calls
-## are no-ops) and safe from inside physics callbacks: the node goes inert
-## immediately, but the reparent is deferred because remove_child during an
-## Area3D in/out signal flush is not allowed.
+## Devuelve un nodo al pool. Seguro ante doble liberación (repetir no hace
+## nada) y desde callbacks de física: el nodo queda inerte de inmediato, pero
+## se descuelga diferido porque remove_child durante el despacho de señales
+## de un Area3D no está permitido.
 func release(node: Node3D) -> void:
 	if node == null or not is_instance_valid(node) or node.is_queued_for_deletion():
 		return
 	var id := node.get_instance_id()
-	# Already pending, or already parked (parked nodes have no parent).
+	# Ya pendiente, o ya guardado (los guardados no tienen padre).
 	if _pending_release.has(id) or node.get_parent() == null:
 		return
 	_pending_release[id] = true
@@ -120,9 +116,8 @@ func release(node: Node3D) -> void:
 	node.set_process(false)
 	var area := node as Area3D
 	if area != null:
-		# A released Area3D used to keep its shapes live until the deferred
-		# reparent, so it still collected overlaps for the rest of the frame.
-		# Deferred because monitoring cannot be touched during a signal flush.
+		# Un Area3D liberado deja de detectar ya, no al descolgarse. Diferido
+		# porque monitoring no se puede tocar durante un despacho de señales.
 		node.set_meta(META_MONITORING, area.monitoring)
 		node.set_meta(META_MONITORABLE, area.monitorable)
 		area.set_deferred(&"monitoring", false)
@@ -130,19 +125,18 @@ func release(node: Node3D) -> void:
 	_finish_release.call_deferred(node, id)
 
 
-## Reclaims every instance still out in the world, immediately (no
-## deferred hop): a stage swap frees the arena those nodes are parented
-## to, and anything left there would be freed behind the pool's back.
-## Safe to call at any time — it is a no-op when nothing is out.
+## Recupera ya (sin salto diferido) cada instancia que sigue en el mundo: un
+## cambio de etapa libera la arena de la que cuelgan, y lo que quedara ahí
+## se borraría a espaldas del pool. Se puede llamar siempre; sin nada afuera
+## no hace nada.
 func release_all_live() -> void:
 	for id: int in _live.keys():
 		var node: Node3D = _live[id]
 		_live.erase(id)
 		if not is_instance_valid(node) or node.is_queued_for_deletion():
 			continue
-		# A release is already in flight for this one; its deferred
-		# _finish_release will park it. Touching it here would park it
-		# twice.
+		# Ya hay una liberación en curso; su _finish_release diferido lo
+		# guardará. Tocarlo aquí lo guardaría dos veces.
 		if _pending_release.has(id):
 			continue
 		var parent := node.get_parent()
@@ -167,7 +161,7 @@ func release_all_live() -> void:
 		peak_parked = maxi(peak_parked, _parked.size())
 
 
-## Counters for the perf probe and soak harnesses.
+## Contadores para la sonda de rendimiento y los soaks.
 func stats() -> Dictionary[String, int]:
 	return {
 		"created": total_created,
@@ -184,21 +178,21 @@ func parked_count() -> int:
 func _finish_release(node: Node3D, id: int) -> void:
 	_pending_release.erase(id)
 	_live.erase(id)
-	# The node's scene may have been torn down between release() and this
-	# deferred call (quit-to-menu with shots in flight); it died with it.
+	# La escena del nodo puede haberse desarmado entre release() y esta
+	# llamada diferida (salir al menú con tiros en vuelo); murió con ella.
 	if not is_instance_valid(node):
 		return
-	# Already parked (a stage swap reclaimed it synchronously between the
-	# release and this deferred call): parking it twice would put the same
-	# instance in _parked twice and hand it out to two callers at once.
+	# Ya guardado (un cambio de etapa lo recuperó entre el release y esta
+	# llamada): guardarlo dos veces pondría la misma instancia dos veces en
+	# _parked y se la entregaría a dos llamadores a la vez.
 	var parent := node.get_parent()
 	if parent == null:
 		return
 	parent.remove_child(node)
 	if _parked.size() >= max_free:
-		# queue_free, not free: Pools.release hands over ownership, but a
-		# caller that still holds the reference this frame must not be left
-		# with a dangling pointer mid deferred-call flush.
+		# queue_free y no free: Pools.release cede el nodo, pero un llamador
+		# que aún tiene la referencia en este frame no debe quedarse con un
+		# puntero colgando a mitad de las llamadas diferidas.
 		node.queue_free()
 		return
 	_parked.append(node)

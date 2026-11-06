@@ -1,41 +1,41 @@
 extends Node
-## Autoload "GameConfig": configuration chosen outside a run that must
-## survive scene changes and RunState.reset() — kept separate from the
-## run-scoped RunState so per-run resets can never wipe it. No disk
-## persistence yet; defaults apply once per app launch.
+## Autoload "GameConfig": la configuración elegida fuera de una partida que
+## debe sobrevivir a cambios de escena y a RunState.reset(); vive aparte de
+## RunState para que reiniciar una partida nunca la borre. No se guarda a
+## disco: los valores por defecto rigen en cada apertura de la app.
 
-## CharacterCatalog id the next run spawns with. Set by the character
-## select screen; an arena booted directly (headless soaks) keeps the
-## default.
+## Id de CharacterCatalog con que aparece la próxima partida. Lo pone la
+## pantalla de selección; un soak sin ventana usa el valor por defecto.
 var selected_character_id: String = CharacterCatalog.DEFAULT_ID
 
-## MapCatalog id of the map CURRENTLY being played. Written by RunRoot on
-## every stage change, read by the meta fold and the end screen. It is no
-## longer a choice — a run walks the whole map list.
+## Id de MapCatalog del mapa que se juega AHORA. Lo escribe RunRoot en cada
+## cambio de etapa; lo leen el registro meta y la pantalla final. No es una
+## elección: una partida recorre toda la lista de mapas.
 var selected_map_id: String = MapCatalog.DEFAULT_ID
 
-## MapCatalog id of the biome stage 1 starts on. Always the default in
-## normal play and in the daily (every run opens in the forest); the soak
-## harness points it at a biome so BONK_ARENA still means "soak this map",
-## and a start past the first stage simply wraps to lap 1 sooner.
+## Id de MapCatalog del bioma de la etapa 1. Siempre el de por defecto en
+## juego normal y en la diaria (toda partida abre en el bosque); el harness
+## de soak lo apunta a un bioma para que BONK_ARENA siga significando
+## "prueba este mapa", y empezar más adelante solo llega antes a la vuelta 1.
 var start_map_id: String = MapCatalog.DEFAULT_ID
 
-## --- Daily Hunt (iteration 36) ------------------------------------------
-## True while the next/current run is the seeded daily challenge: fixed
-## character/map for everyone that day, deterministic RNG (RunState seeds
-## the global stream, the scatter adopts daily_seed), and a score recorded
-## under daily_date. Cleared by a normal Start Run; Retry keeps it.
+## --- Cacería diaria -------------------------------------------------------
+## True mientras la partida próxima/actual es el desafío diario con semilla:
+## personaje y mapa fijos para todos ese día, RNG determinista (RunState
+## siembra el flujo global y el scatter adopta daily_seed) y un puntaje
+## guardado bajo daily_date. Lo apaga un Empezar normal; Reintentar lo deja.
 var daily_mode: bool = false
-## Seed derived from today's date; also the scatter/global RNG seed.
+## Semilla derivada de la fecha de hoy; también la del scatter y del RNG global.
 var daily_seed: int = 0
-## "YYYY-MM-DD" the daily was launched for (keys the best-score counter).
+## "AAAA-MM-DD" para la que se lanzó la diaria (nombra el contador del mejor
+## puntaje).
 var daily_date: String = ""
-## Score of the most recently ended daily run (RunManager writes it; the
-## run-end screen reads it).
+## Puntaje de la última diaria terminada (lo escribe RunManager; lo lee la
+## pantalla final).
 var last_daily_score: int = 0
 
 
-## One deterministic score formula so every player's daily is comparable:
-## kills weigh 1, levels 25, and each survived second 1.
+## Una sola fórmula determinista para que toda diaria sea comparable: cada
+## baja vale 1, cada nivel 25 y cada segundo sobrevivido 1.
 static func daily_score(kills: int, level: int, run_seconds: float) -> int:
 	return kills + level * 25 + int(run_seconds)

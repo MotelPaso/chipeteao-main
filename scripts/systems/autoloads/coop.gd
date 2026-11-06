@@ -1,28 +1,31 @@
 extends Node
-## Autoload "Coop": local co-op session config plus every helper the rest
-## of the game needs to stop assuming "the player" is one node.
+## Autoload "Coop": configuración de la sesión de co-op local y cada ayudante
+## que el resto del juego necesita para no suponer que "el jugador" es un
+## solo nodo.
 ##
-## - Session: player_count (1-4), one input device per slot (slot 0 is
-##   keyboard+mouse by default; other slots are joypad ids) and one
-##   CharacterCatalog id per slot. Configured by the select screen's
-##   lobby; survives scene changes and RunState.reset() exactly like
-##   GameConfig (Retry replays the same party).
-## - Input: in co-op each slot gets its own InputMap action set
-##   ("p<slot>_move_left" etc.) bound ONLY to that slot's device, so four
-##   people can hold directions at once without clobbering each other.
-##   Solo keeps the plain project actions (which also carry all-device
-##   gamepad bindings, so one player can pick pad OR keyboard freely).
-## - Queries: nearest/random alive player, alive count, per-tick group
-##   snapshot (same allocation-avoidance pattern EnemyBase uses for the
-##   horde). "Alive" means "in the player group": a downed co-op player
-##   leaves the group until revived, so every existing group-based system
-##   (enemy seek, gem homing, interactables) ignores downed bodies for free.
+## - Sesión: player_count (1-4), un dispositivo por espacio (el espacio 0 es
+##   teclado+mouse por defecto; los demás son ids de control) y un id de
+##   CharacterCatalog por espacio. Lo configura el lobby de la pantalla de
+##   selección; sobrevive a cambios de escena y a RunState.reset() igual que
+##   GameConfig (Reintentar repite la misma party).
+## - Entrada: en co-op cada espacio tiene su propio set de acciones del
+##   InputMap ("p<slot>_move_left", etc.) atado SOLO a su dispositivo, así
+##   cuatro personas pueden moverse a la vez sin pisarse. En solitario se
+##   usan las acciones del proyecto (que además aceptan cualquier control,
+##   así una persona puede jugar con control O teclado).
+## - Consultas: jugador vivo más cercano o al azar, cantidad de vivos y una
+##   foto del grupo por tick (el mismo truco para no reservar memoria que usa
+##   EnemyBase con la horda). "Vivo" es "en el grupo player": un jugador
+##   derribado sale del grupo hasta que lo reanimen, así todo sistema que
+##   usa grupos (persecución enemiga, imán de gemas, interactuables) ignora
+##   los cuerpos derribados sin hacer nada.
 
 const MAX_PLAYERS: int = 4
-## Sentinel device for the keyboard+mouse slot.
+## Dispositivo centinela del espacio de teclado+mouse.
 const KEYBOARD_DEVICE: int = -1
 
-## Base action names cloned per slot in co-op (must exist in project.godot).
+## Acciones base que se clonan por espacio en co-op (deben existir en
+## project.godot).
 const BASE_ACTIONS: Array[StringName] = [
 	&"move_forward", &"move_back", &"move_left", &"move_right",
 	&"jump", &"sprint", &"interact",
@@ -30,27 +33,31 @@ const BASE_ACTIONS: Array[StringName] = [
 	&"map_overlay",
 ]
 
-## Right-stick look tuning shared by every pad-driven camera.
+## Zona muerta del stick derecho (0-1), compartida por toda cámara con control.
 const LOOK_DEADZONE: float = 0.18
-## Radians/second of yaw at full stick deflection (before user sensitivity).
+## Radianes por segundo de giro con el stick a fondo (antes de la
+## sensibilidad del usuario).
 const LOOK_SPEED: float = 2.6
 
-## Gamepad button layout (Xbox naming): A jump, X sprint/slide, Y interact.
+## Botones del control (nombres de Xbox): A salta, X corre/derrapa,
+## Y interactúa.
 const PAD_JUMP_BUTTON := JOY_BUTTON_A
 const PAD_SPRINT_BUTTON := JOY_BUTTON_X
 const PAD_INTERACT_BUTTON := JOY_BUTTON_Y
-## Tab's pad equivalent: Back/Select, the button every game puts the map on.
+## El equivalente de Tab en el control: Back/Select, donde todo juego pone
+## el mapa.
 const PAD_MAP_BUTTON := JOY_BUTTON_BACK
 
 var player_count: int = 1
-## Input device per slot: KEYBOARD_DEVICE or a joypad device id.
+## Dispositivo por espacio: KEYBOARD_DEVICE o un id de control.
 var devices: Array[int] = [KEYBOARD_DEVICE]
-## CharacterCatalog id per slot; slot 0 mirrors GameConfig.selected_character_id.
+## Id de CharacterCatalog por espacio; el espacio 0 copia
+## GameConfig.selected_character_id.
 var character_ids: Array[String] = []
 
-## Per-physics-tick snapshot of the "player" group (see EnemyBase's
-## enemies snapshot): a 200-enemy horde asks for the nearest player every
-## tick, so the group array is built once per tick, not once per enemy.
+## Foto del grupo "player" por tick de física (ver la de enemigos en
+## EnemyBase): una horda de 200 pregunta por el jugador más cercano en cada
+## tick, así el array del grupo se arma una vez por tick y no por enemigo.
 var _players_snapshot: Array[Node3D] = []
 var _players_snapshot_frame: int = -1
 
@@ -59,14 +66,13 @@ func is_coop() -> bool:
 	return player_count > 1
 
 
-## Called by the select screen's lobby right before starting a run (and
-## once with count 1 to return to solo). Rebuilds the per-slot actions.
+## La llama el lobby de selección justo antes de empezar una partida (y una
+## vez con count 1 para volver a solitario). Rearma las acciones por espacio.
 func configure(count: int, slot_devices: Array[int], slot_characters: Array[String]) -> void:
 	player_count = clampi(count, 1, MAX_PLAYERS)
-	# Built slot by slot, NOT with resize(): an Array[int] pads with 0, and
-	# 0 is the id of the FIRST connected joypad, not the keyboard sentinel.
-	# A party asked for more slots than devices ended up with two raiders
-	# sharing one pad instead of one of them falling back to the keyboard.
+	# Se arma espacio por espacio, NO con resize(): un Array[int] rellena con
+	# 0, y 0 es el id del PRIMER control conectado, no el centinela del
+	# teclado; un espacio sin dispositivo debe caer al teclado.
 	var resolved: Array[int] = []
 	resolved.resize(player_count)
 	for slot: int in player_count:
@@ -80,8 +86,8 @@ func configure(count: int, slot_devices: Array[int], slot_characters: Array[Stri
 	_rebuild_slot_actions()
 
 
-## Character id a given slot spawns with; empty slots fall back to the
-## solo selection (slot 0) or the catalog default.
+## Id de personaje con que aparece un espacio; los vacíos usan la selección
+## de solitario (espacio 0) o el valor por defecto del catálogo.
 func character_for_slot(slot: int) -> String:
 	if slot < character_ids.size() and not character_ids[slot].is_empty():
 		return character_ids[slot]
@@ -92,24 +98,25 @@ func device_for_slot(slot: int) -> int:
 	return devices[slot] if slot < devices.size() else KEYBOARD_DEVICE
 
 
-## Action name a player slot should poll. Solo (and any out-of-range
-## slot) uses the plain project action so the existing bindings — and the
-## all-device gamepad events added for solo pad play — keep working.
+## Nombre de acción que debe leer un espacio. En solitario (y para un
+## espacio fuera de rango) se usa la acción del proyecto, así siguen
+## funcionando los atajos existentes y los eventos de cualquier control.
 func action(slot: int, base: StringName) -> StringName:
 	if not is_coop() or slot >= player_count:
 		return base
 	return StringName("p%d_%s" % [slot, base])
 
 
-## Right-stick look vector for a slot's device, deadzone applied, in
-## [-1, 1] per axis. The keyboard slot (and solo) also accepts ANY
-## connected pad, so a solo player can play entirely on a controller.
+## Vector de mirada del stick derecho para el dispositivo de un espacio, con
+## zona muerta, en [-1, 1] por eje. El espacio de teclado (y el solitario)
+## acepta también CUALQUIER control conectado.
 func look_vector(slot: int) -> Vector2:
 	var device := device_for_slot(slot)
 	if device != KEYBOARD_DEVICE:
 		return _pad_look(device)
 	if is_coop():
-		# In co-op the keyboard slot owns the mouse; pads belong to others.
+		# En co-op el espacio de teclado es dueño del mouse; los controles son
+		# de los demás.
 		return Vector2.ZERO
 	var best := Vector2.ZERO
 	for pad: int in Input.get_connected_joypads():
@@ -125,15 +132,15 @@ func _pad_look(device: int) -> Vector2:
 			Input.get_joy_axis(device, JOY_AXIS_RIGHT_Y))
 	if raw.length() < LOOK_DEADZONE:
 		return Vector2.ZERO
-	# Rescale so movement starts at zero right past the deadzone edge.
+	# Reescala para que el movimiento empiece en cero justo pasada la zona muerta.
 	return raw.normalized() * minf((raw.length() - LOOK_DEADZONE) / (1.0 - LOOK_DEADZONE), 1.0)
 
 
-# --- party queries (the "which player?" answer for every system) ------------
+# --- Consultas de party (la respuesta a "¿qué jugador?" de todo sistema) -----
 
-## Nearest ALIVE player to `from`, or null with nobody standing. This is
-## the drop-in replacement for get_first_node_in_group("player") at every
-## positional call site (enemy seek, gem homing, spawn rings).
+## Jugador VIVO más cercano a `from`, o null si nadie está en pie. Reemplaza
+## a get_first_node_in_group("player") en todo uso por posición
+## (persecución enemiga, imán de gemas, anillos de spawn).
 func nearest_player(tree: SceneTree, from: Vector3) -> Node3D:
 	var nearest: Node3D = null
 	var best := INF
@@ -147,7 +154,8 @@ func nearest_player(tree: SceneTree, from: Vector3) -> Node3D:
 	return nearest
 
 
-## A uniformly random alive player (spawn-ring anchors), or null.
+## Un jugador vivo al azar, uniforme (anclas de anillo de spawn), o null.
+## Orden del RNG: un pick_random por llamada.
 func random_player(tree: SceneTree) -> Node3D:
 	var alive: Array[Node3D] = alive_players(tree)
 	return alive.pick_random() if not alive.is_empty() else null
@@ -165,18 +173,16 @@ func alive_player_count(tree: SceneTree) -> int:
 	return alive_players(tree).size()
 
 
-## Drops the per-tick snapshot. Call it whenever the party membership
-## changes outside the normal tick boundary (a slot going down or being
-## revived, a new session being configured).
+## Tira la foto por tick. Llámala cuando la party cambie fuera del borde
+## normal del tick (un espacio derribado o reanimado, una sesión nueva).
 func invalidate_players() -> void:
 	_players_snapshot_frame = -1
 	_players_snapshot.clear()
 
 
-## Snapshot readers re-check the group instead of trusting the cache: this
-## file promises that a downed raider leaves the group and every
-## group-based system ignores it "for free", and a stale tick would have
-## broken that promise exactly in the frame where somebody goes down.
+## Quien lee la foto vuelve a revisar el grupo en vez de confiar en la
+## caché: este archivo promete que un raider derribado sale del grupo, y una
+## foto vieja rompería esa promesa justo en el frame en que alguien cae.
 static func _is_standing(player: Node3D) -> bool:
 	return is_instance_valid(player) and player.is_inside_tree() \
 			and player.is_in_group(&"player")
@@ -194,12 +200,12 @@ func _players_this_tick(tree: SceneTree) -> Array[Node3D]:
 	return _players_snapshot
 
 
-# --- per-slot InputMap actions ----------------------------------------------
+# --- Acciones del InputMap por espacio --------------------------------------
 
-## (Re)creates "p<slot>_<action>" for every co-op slot, bound only to that
-## slot's device: keyboard slots clone the project keyboard events, pad
-## slots get a stick+buttons layout pinned to their joypad id. Old slot
-## actions are dropped first, so device reshuffles between runs are clean.
+## (Re)crea "p<slot>_<acción>" para cada espacio de co-op, atada solo a su
+## dispositivo: los de teclado clonan los eventos de teclado del proyecto y
+## los de control reciben stick+botones fijados a su id. Primero se borran
+## las acciones viejas, así cambiar dispositivos entre partidas queda limpio.
 func _rebuild_slot_actions() -> void:
 	_clear_slot_actions()
 	if not is_coop():
@@ -226,9 +232,9 @@ func _clear_slot_actions() -> void:
 				InputMap.erase_action(slot_action)
 
 
-## Joypad events for one base action pinned to `device`: left stick for
-## movement, face buttons for the rest (mirrors the all-device solo
-## bindings in project.godot).
+## Eventos de control para una acción base, fijados a `device`: stick
+## izquierdo para moverse y botones para el resto (como los atajos de
+## cualquier control de project.godot).
 func _pad_events_for(base: StringName, device: int) -> Array[InputEvent]:
 	var events: Array[InputEvent] = []
 	match base:

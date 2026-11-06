@@ -1,35 +1,35 @@
 class_name ItemCatalog
 extends RefCounted
-## Static catalog of run items (iteration 40): the loot chests pay out.
-## Items are independent of weapons and tomes — a raider can hold any
-## number of copies of any item — and every item has a FIXED rarity (the
-## chest's rarity decides which pool it rolls from; luck tilts chest
-## rarity, never the item itself). Data-driven like every other catalog:
-## a new item is one row here (plus an ItemBag branch only for a new
-## behavioral `kind`).
-## Row fields:
-##   id:       identifier (English, keys SaveData counters) — never shown.
-##   display_name/description: the HUD/announce text, in player language.
-##   rarity:   "Common" | "Rare" | "Epic" | "Legendary" (UpgradePool names).
-##             An IDENTIFIER, not display text — screens translate it with
+## Catálogo estático de objetos de partida: lo que pagan los cofres. Los
+## objetos son independientes de armas y tomos — un raider puede llevar
+## cualquier cantidad de copias de cualquiera — y cada uno tiene una rareza
+## FIJA (la rareza del cofre decide de qué grupo sale; la suerte inclina la
+## rareza del cofre, nunca la del objeto). Un objeto nuevo es una fila aquí
+## (más una rama en ItemBag solo si trae un `kind` de comportamiento nuevo).
+##
+## Edita aquí: una fila por objeto.
+## Se puede cambiar sin romper nada:
+##   display_name, description: texto para el jugador (HUD, avisos, cofres).
+##   glyph:    1-2 letras de la casilla del HUD mientras no hay sprite. Se
+##             DECLARA (no sale del nombre) y debe ser único entre armas,
+##             evoluciones, tomos, objetos y power-ups: la franja los mezcla.
+##   icon:     OPCIONAL, ruta res:// de una textura; si está, el HUD la
+##             muestra en vez del glifo.
+##   effects:  OPCIONAL, [{stat, amount}] de PlayerStats POR COPIA, por el
+##             mismo canal que los tomos (recompute).
+## Llave interna (la lee el código; cambiarla rompe algo):
+##   id:       identificador en inglés, nunca se muestra; nombra los
+##             contadores de SaveData. Los objetos `hook` además se buscan
+##             por id en los santuarios: renombrar su id los apaga.
+##   rarity:   "Common" | "Rare" | "Epic" | "Legendary" (nombres de
+##             UpgradePool); la pantalla lo traduce con
 ##             UpgradePool.rarity_display().
-##   glyph:    1-2 letters drawn on the HUD slot while there is no sprite.
-##             Initials of the DISPLAYED name, so the tile and the tooltip
-##             agree ("Piedra de afilar" -> "PA").
-##   icon:     OPTIONAL res:// texture path; when set the HUD shows it
-##             instead of the glyph (drop the 2D sprites here later).
-##   effects:  OPTIONAL [{stat, amount}] PlayerStats effects PER COPY,
-##             applied through the same channel as tomes (recompute).
-##   kind:     OPTIONAL behavior handled by ItemBag: "magnet",
-##             "poison_on_hit", "titan", "spiders", or "hook" (a counter
-##             other systems read — altars, portals). ItemBag resolves
-##             behavior by kind, so a row's id can be renamed without
-##             silently switching its behavior off.
-## There is no "pet" kind any more (iteration 54). Pets became a single
-## companion slot on the Player, filled only by the pet box and the animal
-## trafficker, so a chest or a roulette can no longer hand one out — and
-## must not be able to: a companion arriving unasked would throw away the
-## one the player chose.
+##   kind:     OPCIONAL, comportamiento que maneja ItemBag: "magnet",
+##             "poison_on_hit", "titan", "spiders", "shock_dash", "saiyan",
+##             "zenkai" o "hook" (un contador que leen altares y portales).
+## No hay kind "pet": la mascota es un espacio único del Player que solo
+## llenan la caja de mascota y el traficante, así que un cofre o la ruleta
+## nunca pueden repartir una (tirarían la que el jugador eligió).
 
 const ITEM_LIBRARY: Array[Dictionary] = [
 	# --- Common ---------------------------------------------------------
@@ -55,9 +55,8 @@ const ITEM_LIBRARY: Array[Dictionary] = [
 	},
 	# --- Rare -----------------------------------------------------------
 	{
-		# Iteration 48: the multi-jump item. PlayerStats caps the stat
-		# (MAX_EXTRA_JUMPS), so extra copies past the cap are inert by
-		# design rather than by accident.
+		# PlayerStats pone techo a los saltos (MAX_EXTRA_JUMPS): las copias
+		# por encima del techo no hacen nada, a propósito.
 		"id": "spring_boots", "display_name": "Botas de resorte", "rarity": "Rare",
 		"glyph": "RS", "description": "+1 salto en el aire por copia",
 		"effects": [{"stat": "jumps", "amount": 1.0}],
@@ -123,10 +122,12 @@ const ITEM_LIBRARY: Array[Dictionary] = [
 	},
 ]
 
-## Lazily built id -> row index (see CatalogIndex): PlayerStats.recompute()
-## resolves one row per carried item on every stat change.
+## Índice id -> fila, construido al primer uso (ver CatalogIndex):
+## PlayerStats.recompute() resuelve una fila por objeto llevado en cada
+## cambio de stats.
 static var _by_id: Dictionary[String, Dictionary] = {}
-## Lazily built kind -> ids index: ItemBag asks per physics frame.
+## Índice kind -> ids, construido al primer uso: ItemBag pregunta en cada
+## frame de física.
 static var _ids_by_kind: Dictionary[String, PackedStringArray] = {}
 
 
@@ -140,9 +141,9 @@ static func ids_of_rarity(rarity_name: String) -> Array[String]:
 	return CatalogIndex.values_where(ITEM_LIBRARY, "rarity", rarity_name)
 
 
-## Every item id with the given behavioral `kind`. ItemBag counts copies by
-## kind instead of by hardcoded id, so renaming a row cannot quietly turn
-## its behavior off while the item still shows in the HUD.
+## Cada id de objeto con el `kind` de comportamiento dado. ItemBag cuenta
+## copias por tipo y no por id fijo, para que renombrar una fila no apague su
+## comportamiento mientras el objeto sigue en el HUD.
 static func ids_of_kind(kind: String) -> PackedStringArray:
 	if not _ids_by_kind.has(kind):
 		var ids := PackedStringArray()
@@ -152,8 +153,8 @@ static func ids_of_kind(kind: String) -> PackedStringArray:
 	return _ids_by_kind[kind]
 
 
-## A random item id of the given rarity; a rarity with no items falls
-## back one tier at a time, so a chest always pays something.
+## Un id al azar de la rareza dada; una rareza sin objetos baja un escalón
+## por vez, así un cofre siempre paga algo.
 static func roll_id(rarity_name: String) -> String:
 	var index := UpgradePool.rarity_index(rarity_name)
 	while index >= 0:

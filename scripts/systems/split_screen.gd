@@ -1,20 +1,20 @@
 class_name SplitScreen
 extends Control
-## Local co-op split-screen (2-4 players), built in code by RunSystems.
-## One SubViewportContainer per player, each with a SubViewport sharing
-## the main 3D world and a follow Camera3D that mirrors that player's own
-## (deactivated) SpringArm camera every frame — the player scene keeps
-## owning look/arm collision exactly as in solo, and this layer is pure
-## presentation. Layouts: 2 players stack top/bottom (keeps the wide
-## aspect), 3-4 use a 2x2 grid (the empty 3-player cell shows a quiet
-## filler panel). Sits in the default canvas layer, so every CanvasLayer
-## UI (HUD 5, card UI, pause 30) draws above it untouched.
-## The mirrored (source) cameras also join Juice.FEEL_CAMERA_GROUP, which
-## is how camera shake and the slide FOV kick reach a split screen at all:
-## the root viewport has no active camera once these views exist.
+## Pantalla dividida del co-op local (2-4 jugadores), armada en código por
+## RunSystems. Un SubViewportContainer por jugador, cada uno con una
+## SubViewport que comparte el mundo 3D y una Camera3D seguidora que copia
+## cada frame la cámara (desactivada) del SpringArm de ese jugador: la escena
+## del jugador sigue manejando la mirada y la colisión del brazo igual que
+## en solitario, y esta capa solo presenta. Distribución: 2 jugadores arriba
+## y abajo (conserva lo ancho), 3-4 en grilla de 2x2 (la celda vacía con 3
+## muestra un panel de relleno). Va en la capa de canvas por defecto, así
+## toda UI en CanvasLayer (HUD 5, cartas, pausa 30) se dibuja encima.
+## Las cámaras origen también entran a Juice.FEEL_CAMERA_GROUP: así la
+## sacudida y el empujón de FOV llegan a la pantalla dividida, donde el
+## viewport raíz no tiene cámara activa.
 
-## One player's view: the camera that renders into its SubViewport and the
-## player-owned camera it mirrors every frame.
+## La vista de un jugador: la cámara que dibuja en su SubViewport y la
+## cámara del jugador que copia cada frame.
 class CameraPair:
 	extends RefCounted
 	var follow: Camera3D = null
@@ -23,24 +23,25 @@ class CameraPair:
 	func is_live() -> bool:
 		return is_instance_valid(follow) and is_instance_valid(source)
 
-	## Everything the view must inherit from the player's own camera. The
-	## h/v offsets matter as much as the transform: Juice writes the whole
-	## camera shake into them (they survive the SpringArm3D rewriting the
-	## child transform), so a view that skipped them never trembled.
+	## Todo lo que la vista hereda de la cámara del jugador. Los
+	## desplazamientos h/v importan tanto como el transform: Juice escribe en
+	## ellos toda la sacudida (sobreviven a que el SpringArm3D reescriba el
+	## transform del hijo).
 	func sync() -> void:
 		follow.global_transform = source.global_transform
 		follow.fov = source.fov
 		follow.h_offset = source.h_offset
 		follow.v_offset = source.v_offset
-		# First person culls the own seal via the source camera's mask.
+		# La primera persona oculta al propio sello con la máscara de la cámara
+		# origen.
 		follow.cull_mask = source.cull_mask
 
 
 var _pairs: Array[CameraPair] = []
 
 
-## Builds the whole layout for `players` (Array of Player bodies, slot
-## order). Call once from RunSystems after the party has spawned.
+## Arma toda la distribución para `players` (Array de cuerpos Player, en
+## orden de espacio). Se llama una vez desde RunSystems tras crear la party.
 static func build(players: Array) -> SplitScreen:
 	var split := SplitScreen.new()
 	split.name = "SplitScreen"
@@ -48,10 +49,10 @@ static func build(players: Array) -> SplitScreen:
 	split.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var count := players.size()
 	for i in count:
-		# Typed as Player, not Node3D: view_camera() is Player's contract, and
-		# an untyped `:=` off a Node3D cannot infer its return type at all —
-		# that is a PARSE error, which would take down every script that
-		# preloads this one (run_systems.gd) and leave RunSystems unscripted.
+		# Tipado como Player, no Node3D: view_camera() es contrato de Player, y
+		# un `:=` sobre un Node3D no puede inferir su tipo de retorno — eso es
+		# un error de PARSEO que tumbaría todo script que precarga este
+		# (run_systems.gd).
 		var player := players[i] as Player
 		if player == null:
 			push_error("SplitScreen: slot %d is not a Player body." % i)
@@ -68,12 +69,12 @@ static func build(players: Array) -> SplitScreen:
 		_apply_rect(container, rect)
 		split.add_child(container)
 		var viewport := SubViewport.new()
-		# Shares the parent (root) viewport's World3D by default; only the
-		# camera is local to this view.
+		# Comparte el World3D del viewport padre (raíz) por defecto; solo la
+		# cámara es local a esta vista.
 		viewport.handle_input_locally = false
-		# The graphics preset's 3D scale lives on each viewport, and the
-		# root's never reaches a SubViewport: join the group Settings walks
-		# when the preset changes, and take the current one now.
+		# La escala 3D de la calidad gráfica vive en cada viewport, y la del
+		# raíz no llega a una SubViewport: entra al grupo que recorre Settings
+		# cuando cambia la calidad, y toma la actual ahora.
 		viewport.add_to_group(Settings.WORLD_VIEW_GROUP)
 		Settings.apply_render_scale(viewport)
 		container.add_child(viewport)
@@ -84,9 +85,9 @@ static func build(players: Array) -> SplitScreen:
 		follow.keep_aspect = source.keep_aspect
 		viewport.add_child(follow)
 		follow.current = true
-		# The feel layer (shake, FOV kick) drives the SOURCE cameras and
-		# sync() carries the result into this view; without the group Juice
-		# would look for an active camera on the root viewport and find none.
+		# La capa de sensación (sacudida, FOV) mueve las cámaras ORIGEN y
+		# sync() lleva el resultado a esta vista; sin el grupo, Juice buscaría
+		# una cámara activa en el viewport raíz y no encontraría ninguna.
 		source.add_to_group(Juice.FEEL_CAMERA_GROUP)
 		var pair := CameraPair.new()
 		pair.follow = follow
@@ -98,19 +99,20 @@ static func build(players: Array) -> SplitScreen:
 
 
 func _process(_delta: float) -> void:
-	# After physics, before draw: no added latency versus a child camera.
+	# Después de la física y antes de dibujar: sin latencia extra frente a
+	# una cámara hija.
 	for pair: CameraPair in _pairs:
-		# Validity BEFORE any use: the pair holds a camera owned by another
-		# scene, and casting a freed one is already an error.
+		# Validez ANTES de cualquier uso: el par tiene una cámara de otra
+		# escena, y convertir una liberada ya es un error.
 		if not pair.is_live():
 			continue
 		pair.sync()
 
 
-## Anchor rect (in 0-1 space) for player cell `index` of `count`. Public
-## since iteration 52: the HUD anchors one minimap and one map overlay per
-## player, and both have to land in exactly the cell that player's camera
-## renders into. Solo (count <= 1) is the whole window.
+## Rect de anclas (en espacio 0-1) de la celda `index` de `count`. Pública:
+## el HUD ancla un minimapa y un mapa por jugador, y ambos tienen que caer
+## justo en la celda donde dibuja la cámara de ese jugador. En solitario
+## (count <= 1) es toda la ventana.
 static func cell_rect(index: int, count: int) -> Rect2:
 	match count:
 		2:
@@ -132,7 +134,8 @@ static func _apply_rect(control: Control, rect: Rect2) -> void:
 	control.offset_bottom = 0.0
 
 
-## Quiet dark panel over the unused 3-player quadrant (bottom-right).
+## Panel oscuro y quieto sobre el cuadrante libre con 3 jugadores (abajo a
+## la derecha).
 static func _filler_panel() -> Control:
 	var panel := PanelContainer.new()
 	panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
