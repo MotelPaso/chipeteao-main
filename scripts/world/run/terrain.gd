@@ -26,33 +26,6 @@ extends StaticBody3D
 ## LA regla de colocación del proyecto: nada va a y = 0. Toda colocación en
 ## el mundo pasa por height_at().
 
-## Escala del ruido de cima a fondo, en metros, por bioma (bosque 2.5,
-## dunas 3.0, ciénaga 1.5). Cada escena de arena pone la suya.
-@export var amplitude: float = 2.5
-## Longitud de onda del rasgo principal del ruido, en metros: cuán
-## separadas están las lomas. Más grande = relieve más ancho y suave.
-@export var feature_size: float = 45.0
-@export var octaves: int = 3
-## Paso en metros de la retícula donde se muestrea el ruido, que luego se
-## interpola a la cuadrícula del colisionador. Muestrear los 241x241 puntos
-## con FastNoiseLite desde GDScript es el costo dominante del nodo; a 2 m
-## cuesta un cuarto y a esta amplitud no se nota la diferencia.
-@export var noise_step: float = 2.0
-## Radio en metros del disco plano bajo el spawn del equipo, para que nadie caiga en una pendiente.
-@export var spawn_flat_radius: float = 14.0
-## Radio en metros del claro plano bajo cada grupo de verticalidad de
-## autor y cada meseta: una rampa tiene que tocar suelo parejo o flota en un extremo.
-@export var pad_radius: float = 8.0
-## El ruido baja a cero dentro de estos metros desde el borde, para que
-## los muros del perímetro y el disco del backdrop encuentren un borde plano.
-@export var rim_flat_band: float = 10.0
-## Paso en metros de la malla de render. Más grueso que el colisionador a
-## propósito: a esta amplitud la silueta es igual con un cuarto de triángulos.
-@export var mesh_step: float = 2.0
-## Material del suelo del bioma. Los shaders de suelo leen el XZ de MUNDO,
-## y la malla lleva UVs en XZ de mundo.
-@export var surface_material: Material
-
 ## Lado del terreno en metros cuando no hay scatter en la escena (una escena
 ## de prueba); en una arena el lado sale de arena_half_extent del scatter.
 const FALLBACK_SIZE: float = 240.0
@@ -62,8 +35,46 @@ const SAMPLE_METERS: float = 1.0
 ## Franja de mezcla en metros alrededor de un claro: el claro es plano
 ## dentro de su radio y vuelve al ruido en esta franja.
 const PAD_BLEND: float = 6.0
-## Sin uso: map_image() reparte el sombreado entre min_height y max_height.
-const MAP_SHADE_RANGE: float = 6.0
+## Tinte del minimapa cuando no se encuentra el nodo de backdrop_path.
+const FALLBACK_MAP_TINT := Color(0.25, 0.27, 0.3)
+
+@export_group("Relieve")
+## Escala del ruido de cima a fondo, en metros, por bioma (bosque 2.5,
+## dunas 3.0, ciénaga 1.5). Cada escena de arena pone la suya.
+@export var amplitude: float = 2.5
+## Longitud de onda del rasgo principal del ruido, en metros: cuán
+## separadas están las lomas. Más grande = relieve más ancho y suave.
+@export var feature_size: float = 45.0
+## Octavas del ruido fractal: más octavas, más detalle chico sobre las lomas.
+@export var octaves: int = 3
+## Paso en metros de la retícula donde se muestrea el ruido, que luego se
+## interpola a la cuadrícula del colisionador. Muestrear los 241x241 puntos
+## con FastNoiseLite desde GDScript es el costo dominante del nodo; a 2 m
+## cuesta un cuarto y a esta amplitud no se nota la diferencia.
+@export var noise_step: float = 2.0
+
+@export_group("Claros planos")
+## Radio en metros del disco plano bajo el spawn del equipo, para que nadie caiga en una pendiente.
+@export var spawn_flat_radius: float = 14.0
+## Radio en metros del claro plano bajo cada grupo de verticalidad de
+## autor y cada meseta: una rampa tiene que tocar suelo parejo o flota en un extremo.
+@export var pad_radius: float = 8.0
+## El ruido baja a cero dentro de estos metros desde el borde, para que
+## los muros del perímetro y el disco del backdrop encuentren un borde plano.
+@export var rim_flat_band: float = 10.0
+
+@export_group("Malla")
+## Paso en metros de la malla de render. Más grueso que el colisionador a
+## propósito: a esta amplitud la silueta es igual con un cuarto de triángulos.
+@export var mesh_step: float = 2.0
+## Material del suelo del bioma. Los shaders de suelo leen el XZ de MUNDO,
+## y la malla lleva UVs en XZ de mundo.
+@export var surface_material: Material
+
+@export_group("Minimapa")
+## Nodo cuyo ground_color tiñe el minimapa: el Backdrop de la arena. Si lo
+## renombras o lo mueves, actualiza esta ruta; sin él, el mapa sale gris.
+@export_node_path("Node3D") var backdrop_path: NodePath = ^"../Backdrop"
 
 ## Lado del terreno en metros: el doble de arena_half_extent del scatter, que
 ## se lee al construir. Lo leen el mapa y TerrainShots.
@@ -83,13 +94,6 @@ var _mesh_instance: MeshInstance3D = null
 var _collision: CollisionShape3D = null
 
 
-## EL acceso. Nunca por ruta de nodo: la arena cambia en cada etapa.
-static func find(tree: SceneTree) -> Terrain:
-	if tree == null:
-		return null
-	return tree.get_first_node_in_group(&"terrain") as Terrain
-
-
 func _enter_tree() -> void:
 	# Se une aquí y no en _ready: quien llama a ensure_built() desde su propio
 	# _ready tiene que poder ENCONTRAR este nodo antes.
@@ -98,6 +102,13 @@ func _enter_tree() -> void:
 
 func _ready() -> void:
 	ensure_built()
+
+
+## EL acceso. Nunca por ruta de nodo: la arena cambia en cada etapa.
+static func find(tree: SceneTree) -> Terrain:
+	if tree == null:
+		return null
+	return tree.get_first_node_in_group(&"terrain") as Terrain
 
 
 ## Construye el terreno una sola vez. Público e idempotente porque ningún
@@ -174,13 +185,27 @@ func map_image(px_per_meter: float) -> Image:
 	return image
 
 
-## Registra un claro plano más. Sin uso: _collect_pads() lee los sitios de
-## meseta del scatter por su cuenta.
-func add_pad(center_xz: Vector2, radius: float) -> void:
-	_pads.append({"center": center_xz, "radius": radius})
+## Lado de la arena en metros según el scatter (grupo "arena_bounds"): el
+## doble de su arena_half_extent, la fuente única del tamaño.
+func _arena_size() -> float:
+	var bounds := get_tree().get_first_node_in_group(&"arena_bounds")
+	if bounds != null:
+		var value: Variant = bounds.get("arena_half_extent")
+		if value != null:
+			return float(value) * 2.0
+	return FALLBACK_SIZE
 
 
-## --- construcción --------------------------------------------------------
+## La semilla de partida del scatter, para que el relieve coincida con los
+## props bajo BONK_SEED, BONK_GAME_SEED o la Cacería diaria. Sin scatter usa
+## un número fijo y no uno al azar: un terreno que cambiara entre dos
+## corridas iguales arruinaría toda comparación de soaks.
+func _run_seed() -> int:
+	var bounds := get_tree().get_first_node_in_group(&"arena_bounds")
+	if bounds != null and bounds.has_method(&"run_seed"):
+		return int(bounds.call(&"run_seed"))
+	return 0
+
 
 ## El disco del spawn, un claro por grupo de verticalidad de autor y uno por
 ## sitio de meseta. NO los POIs barajables: el WorldDirector los mueve a otro
@@ -312,7 +337,25 @@ func _apply_pads(x: float, z: float, h: float) -> float:
 ## tarda segundos; esto es una sola add_surface_from_arrays.
 func _build_mesh() -> void:
 	var cells := maxi(int(round(size / maxf(mesh_step, 0.5))), 2)
-	var verts := cells + 1
+	var arrays := _grid_arrays(cells + 1)
+	var indices := _grid_indices(cells)
+	_assert_winding(arrays[Mesh.ARRAY_VERTEX], indices)
+	arrays[Mesh.ARRAY_INDEX] = indices
+	var mesh := ArrayMesh.new()
+	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
+	_mesh_instance = get_node_or_null("MeshInstance3D") as MeshInstance3D
+	if _mesh_instance == null:
+		_mesh_instance = MeshInstance3D.new()
+		_mesh_instance.name = "MeshInstance3D"
+		add_child(_mesh_instance)
+	_mesh_instance.mesh = mesh
+	if surface_material != null:
+		_mesh_instance.material_override = surface_material
+
+
+## Vértices, normales y UVs de una cuadrícula de `verts` x `verts` puntos a
+## mesh_step metros, sobre la altura del colisionador.
+func _grid_arrays(verts: int) -> Array:
 	var vertices := PackedVector3Array()
 	var normals := PackedVector3Array()
 	var uvs := PackedVector2Array()
@@ -335,15 +378,26 @@ func _build_mesh() -> void:
 			# UVs en XZ de mundo: los shaders de suelo del bioma leen la
 			# posición de mundo.
 			uvs[index] = Vector2(x, z)
+	var arrays := []
+	arrays.resize(Mesh.ARRAY_MAX)
+	arrays[Mesh.ARRAY_VERTEX] = vertices
+	arrays[Mesh.ARRAY_NORMAL] = normals
+	arrays[Mesh.ARRAY_TEX_UV] = uvs
+	return arrays
+
+
+## Dos triángulos por celda de una cuadrícula de `cells` x `cells`.
+## ORIENTACIÓN. La cara frontal en Godot es la HORARIA vista de frente, así
+## que un suelo para caminar debe ser horario visto desde +Y, o sea
+## cross(v1 - v0, v2 - v0) apunta hacia ABAJO. Al revés, todo el terreno se
+## descarta por cara trasera desde cualquier cámara de arriba y ningún log lo
+## dice: los soaks corren headless y no rasterizan nada. _assert_winding hace
+## que ese error falle un soak headless.
+func _grid_indices(cells: int) -> PackedInt32Array:
+	var verts := cells + 1
 	var indices := PackedInt32Array()
 	indices.resize(cells * cells * 6)
 	var cursor := 0
-	# ORIENTACIÓN. La cara frontal en Godot es la HORARIA vista de frente,
-	# así que un suelo para caminar debe ser horario visto desde +Y, o sea
-	# cross(v1 - v0, v2 - v0) apunta hacia ABAJO. Al revés, todo el terreno
-	# se descarta por cara trasera desde cualquier cámara de arriba y ningún
-	# log lo dice: los soaks corren headless y no rasterizan nada.
-	# _assert_winding hace que ese error falle un soak headless.
 	for iz in cells:
 		for ix in cells:
 			var top_left := iz * verts + ix
@@ -357,23 +411,7 @@ func _build_mesh() -> void:
 			indices[cursor + 4] = bottom_right
 			indices[cursor + 5] = bottom_left
 			cursor += 6
-	_assert_winding(vertices, indices)
-	var arrays := []
-	arrays.resize(Mesh.ARRAY_MAX)
-	arrays[Mesh.ARRAY_VERTEX] = vertices
-	arrays[Mesh.ARRAY_NORMAL] = normals
-	arrays[Mesh.ARRAY_TEX_UV] = uvs
-	arrays[Mesh.ARRAY_INDEX] = indices
-	var mesh := ArrayMesh.new()
-	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
-	_mesh_instance = get_node_or_null("MeshInstance3D") as MeshInstance3D
-	if _mesh_instance == null:
-		_mesh_instance = MeshInstance3D.new()
-		_mesh_instance.name = "MeshInstance3D"
-		add_child(_mesh_instance)
-	_mesh_instance.mesh = mesh
-	if surface_material != null:
-		_mesh_instance.material_override = surface_material
+	return indices
 
 
 ## Comprueba hacia dónde miran los triángulos, lo único de esta malla que
@@ -410,43 +448,15 @@ func _build_collider() -> void:
 	_collision.shape = shape
 
 
-## Lado de la arena en metros según el scatter (grupo "arena_bounds"): el
-## doble de su arena_half_extent, la fuente única del tamaño.
-func _arena_size() -> float:
-	var bounds := get_tree().get_first_node_in_group(&"arena_bounds")
-	if bounds != null:
-		var value: Variant = bounds.get("arena_half_extent")
-		if value != null:
-			return float(value) * 2.0
-	return FALLBACK_SIZE
-
-
-## La semilla de partida del scatter, para que el relieve coincida con los
-## props bajo BONK_SEED, BONK_GAME_SEED o la Cacería diaria. Sin scatter usa
-## un número fijo y no uno al azar: un terreno que cambiara entre dos
-## corridas iguales arruinaría toda comparación de soaks.
-func _run_seed() -> int:
-	var bounds := get_tree().get_first_node_in_group(&"arena_bounds")
-	if bounds != null and bounds.has_method(&"run_seed"):
-		return int(bounds.call(&"run_seed"))
-	return 0
-
-
-## Tinte del suelo para map_image(), tomado del ground_color del nodo
-## hermano llamado "Backdrop" para que el mapa se lea como el mismo lugar.
-## Sin él, un gris pizarra neutro.
+## Tinte del suelo para map_image(): el ground_color del nodo de
+## backdrop_path, para que el mapa se lea como el mismo lugar.
 func _biome_tint() -> Color:
-	var backdrop := _find_backdrop()
+	var backdrop := get_node_or_null(backdrop_path) if not backdrop_path.is_empty() else null
 	if backdrop != null:
 		var value: Variant = backdrop.get("ground_color")
 		if value is Color:
 			return value
-	return Color(0.25, 0.27, 0.3)
-
-
-func _find_backdrop() -> Node:
-	var arena := _own_arena()
-	return arena.get_node_or_null("Backdrop") if arena != null else null
+	return FALLBACK_MAP_TINT
 
 
 ## Nombre de la arena de este terreno, para el log de construcción.
