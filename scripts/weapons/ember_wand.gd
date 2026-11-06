@@ -6,35 +6,20 @@ extends WeaponBase
 
 @export var burst_radius: float = 2.5
 
-## Segundos entre las detonaciones que agrega el Tomo de Multitud.
-## Escalonadas, no simultáneas: dos estallidos sobre el mismo cuerpo en el
-## mismo frame son una explosión que tira el daño dos veces.
-const EXTRA_BURST_STAGGER: float = 0.1
-## La cadena escalonada entera termina dentro de esta fracción de un
-## enfriamiento, o la cola de una ráfaga se montaría sobre la siguiente.
-const BURST_CHAIN_WINDOW: float = 0.6
+@export_group("Multitud")
+## Segundos entre las detonaciones extra del Tomo de Multitud; dos en el mismo frame serían una explosión que tira el daño dos veces.
+@export var extra_stagger: float = 0.1
 
 
 func fire(target: Node3D) -> void:
-	var count := maxi(effective_projectile_count(), 1)
-	var step := minf(EXTRA_BURST_STAGGER,
-			effective_cooldown() * BURST_CHAIN_WINDOW / float(maxi(count - 1, 1)))
-	_detonate(target.global_position)
-	for i: int in range(1, count):
-		# Temporizador pausable y en paso de física: un estallido extra no sale
-		# con la pantalla de mejoras abierta, y el daño cae en el mismo tick que
-		# el resto del combate.
-		get_tree().create_timer(step * float(i), false, true).timeout \
-				.connect(_rekindle)
+	fire_volley_retarget(maxi(effective_projectile_count(), 1),
+			_detonate.bind(target.global_position), _rekindle, extra_stagger)
 
 
 ## Una detonación extra del Tomo de Multitud. Elige su PROPIO centro en vez de
 ## reusar el de la ráfaga: el primer estallido pudo haber vaciado ese punto, y
-## volver a buscar reparte los extras por la horda. Llega un poco después de
-## fire(), cuando el arma puede haber salido del árbol con un raider quitado.
+## volver a buscar reparte los extras por la horda.
 func _rekindle() -> void:
-	if not is_inside_tree():
-		return
 	var target := acquire_target()
 	if target != null:
 		_detonate(target.global_position)

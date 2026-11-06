@@ -31,21 +31,17 @@ extends WeaponBase
 ## superior del piso; más abajo el disco y el borde quedan enterrados.
 @export var pool_ground_offset: float = 0.03
 
+@export_group("Multitud")
+## Segundos entre los frascos extra del Tomo de Multitud; lanzados juntos caerían en el mismo charco.
+@export var extra_stagger: float = 0.12
+## Grados entre frascos vecinos, girados alrededor de QUIEN LANZA para que los charcos extra caigan junto al grupo.
+@export var extra_fan_deg: float = 22.0
+
 ## Piso de tick_interval al avanzar un charco. Con cero (puesto a mano o por
 ## una fila de evolución, que WeaponBase.evolve aplica por nombre),
 ## _tick_pools gastaría todo su presupuesto de pulsos en un frame.
 const MIN_TICK_INTERVAL: float = 0.01
 
-## Segundos entre los frascos que agrega el Tomo de Multitud. Se lanzan uno
-## tras otro: frascos lanzados juntos comparten arco y caen en el mismo
-## suelo, que es un solo charco que pulsa dos veces y no un suelo más ancho.
-const EXTRA_FLASK_STAGGER: float = 0.12
-## Giro entre frascos vecinos, alrededor de QUIEN LANZA, así los charcos
-## extra caen al lado del grupo y no dentro del primero.
-const EXTRA_FLASK_FAN_DEG: float = 22.0
-## La cadena escalonada entera termina dentro de esta fracción de un
-## enfriamiento, o una ráfaga seguiría saliendo de la mano en el siguiente lanzamiento.
-const FLASK_CHAIN_WINDOW: float = 0.6
 
 
 ## Un charco vivo. Un registro en vez de un Dictionary suelto porque su
@@ -150,32 +146,16 @@ func acquire_target() -> Node3D:
 
 
 func fire(target: Node3D) -> void:
-	var impact := target.global_position
-	var count := maxi(effective_projectile_count(), 1)
-	var step := minf(EXTRA_FLASK_STAGGER,
-			effective_cooldown() * FLASK_CHAIN_WINDOW / float(maxi(count - 1, 1)))
-	for i: int in count:
-		var yaw := deg_to_rad(EXTRA_FLASK_FAN_DEG) * (float(i) - float(count - 1) * 0.5)
-		# Abanico alrededor de quien lanza: la separación lateral crece con la
-		# distancia del tiro y los charcos quedan en fila y no apilados.
-		var spot := global_position + (impact - global_position).rotated(Vector3.UP, yaw)
-		if i == 0:
-			_throw_at(spot)
-		else:
-			# Temporizador pausable y en paso de física: un frasco extra no sale
-			# con la pantalla de mejoras abierta, y el lanzamiento cae en el
-			# mismo tick que el resto del combate.
-			get_tree().create_timer(step * float(i), false, true).timeout \
-					.connect(_throw_at.bind(spot))
+	# Abanico alrededor de quien lanza: se gira el tramo lanzador -> impacto, así
+	# la separación lateral crece con la distancia y los charcos quedan en fila.
+	var origin := global_position
+	fire_volley(maxi(effective_projectile_count(), 1), target.global_position - origin,
+			_throw_from.bind(origin), extra_stagger, extra_fan_deg)
 
 
-## Lanza un frasco a `impact`. Los extras escalonados llegan aquí un poco
-## después, cuando el arma puede haber salido del árbol con un raider quitado;
-## fuera del árbol no hay mano desde donde lanzar.
-func _throw_at(impact: Vector3) -> void:
-	if not is_inside_tree():
-		return
-	_lob_flask(impact)
+## Lanza un frasco a `origin + offset`; ambos se fijan al disparar la ráfaga.
+func _throw_from(offset: Vector3, origin: Vector3) -> void:
+	_lob_flask(origin + offset)
 
 
 ## Lanza el visual del frasco en un arco parabólico; el charco aparece donde

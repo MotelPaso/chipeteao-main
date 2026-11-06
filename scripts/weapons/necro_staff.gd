@@ -22,9 +22,10 @@ extends WeaponBase
 @export var bolt_speed: float = 7.0
 @export var bolt_lifetime: float = 3.7
 @export var bolt_radius: float = 0.28
-## Segundos entre los rayos extra que agrega el Tomo de Multitud. Escalonados:
-## rayos lanzados en el mismo frame comparten trayectoria y golpean dos veces el mismo cuerpo.
-@export var extra_bolt_stagger: float = 0.1
+
+@export_group("Multitud")
+## Segundos entre los rayos extra del Tomo de Multitud (sin comprimir en VOLLEY_WINDOW); juntos compartirían trayectoria.
+@export var extra_stagger: float = 0.1
 
 const BOLT_COLOR := Color(0.65, 0.35, 0.95)
 ## Qué tan cerca tiene que llegar un rayo para contar como golpe, en metros.
@@ -61,20 +62,13 @@ func _ready() -> void:
 
 
 func fire(target: Node3D) -> void:
-	var shots := effective_projectile_count()
-	_launch(target)
-	for i in range(1, shots):
-		# Escalonados, y cada uno vuelve a buscar blanco: cuando sale el
-		# tercero, el primero puede haber matado al suyo.
-		var delay := extra_bolt_stagger * float(i)
-		# En paso de física, como las demás armas de ráfaga: el daño cae en el
-		# mismo tick que el resto del combate.
-		get_tree().create_timer(delay, false, true).timeout.connect(_launch_at_fresh_target)
+	# Escalonados y cada extra vuelve a buscar blanco: cuando sale el tercero,
+	# el primero puede haber matado al suyo.
+	fire_volley_retarget(effective_projectile_count(), _launch.bind(target),
+			_launch_at_fresh_target, extra_stagger, false)
 
 
 func _launch_at_fresh_target() -> void:
-	if not is_inside_tree():
-		return
 	_launch(acquire_target())
 
 

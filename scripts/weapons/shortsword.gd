@@ -11,43 +11,23 @@ extends WeaponBase
 ## Color de la chispa en cada enemigo alcanzado.
 @export var spark_color: Color = Color(0.7, 0.8, 1.0)
 
-## Segundos entre los tajos que agrega el Tomo de Multitud. Escalonados y no
-## simultáneos: dos arcos desde el mismo hombro en el mismo frame son un arco
-## que golpea dos veces.
-const EXTRA_SWING_STAGGER: float = 0.09
-## Giro entre tajos vecinos, así los extras cubren su propio terreno.
-const EXTRA_SWING_FAN_DEG: float = 25.0
-## La cadena escalonada entera termina dentro de esta fracción de un
-## enfriamiento, o una ráfaga larga seguiría tajeando al empezar la siguiente.
-const SWING_CHAIN_WINDOW: float = 0.6
+@export_group("Multitud")
+## Segundos entre los tajos extra del Tomo de Multitud; dos arcos en el mismo frame serían uno que golpea dos veces.
+@export var extra_stagger: float = 0.09
+## Grados entre tajos vecinos de una ráfaga, para que cada extra cubra su propio terreno.
+@export var extra_fan_deg: float = 25.0
 
 
 func fire(target: Node3D) -> void:
 	# Caso degenerado (blanco justo arriba o abajo): se tajea hacia donde miramos.
 	var center_dir := flat_dir_or(target.global_position - global_position,
 			-global_transform.basis.z)
-	var count := maxi(effective_projectile_count(), 1)
-	var step := minf(EXTRA_SWING_STAGGER,
-			effective_cooldown() * SWING_CHAIN_WINDOW / float(maxi(count - 1, 1)))
-	for i: int in count:
-		var yaw := deg_to_rad(EXTRA_SWING_FAN_DEG) * (float(i) - float(count - 1) * 0.5)
-		var swing_dir := center_dir.rotated(Vector3.UP, yaw)
-		if i == 0:
-			_swing(swing_dir)
-		else:
-			# Temporizador pausable y en paso de física: un tajo extra no sale
-			# con la pantalla de mejoras abierta, y el daño cae en el mismo tick
-			# que el resto del combate.
-			get_tree().create_timer(step * float(i), false, true).timeout \
-					.connect(_swing.bind(swing_dir))
+	fire_volley(maxi(effective_projectile_count(), 1), center_dir, _swing,
+			extra_stagger, extra_fan_deg)
 
 
-## Un tajo completo: la pasada de daño más su medialuna. Los extras
-## escalonados llegan aquí un poco después, cuando el arma puede haber
-## salido del árbol con un raider quitado.
+## Un tajo completo: la pasada de daño más su medialuna.
 func _swing(center_dir: Vector3) -> void:
-	if not is_inside_tree():
-		return
 	_hit_enemies_in_arc(center_dir)
 	_play_swing(center_dir)
 

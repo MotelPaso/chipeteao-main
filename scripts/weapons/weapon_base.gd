@@ -16,6 +16,10 @@ const DEGENERATE_LENGTH_SQ: float = 0.0001
 ## Pasado este |dot| con UP una dirección es colineal con el eje vertical, y
 ## look_at / Basis.looking_at no pueden construir una base con UP.
 const UP_COLINEAR_DOT: float = 0.99
+## Fracción del enfriamiento en la que cabe una ráfaga entera del Tomo de
+## Multitud: el escalonado se comprime para que la cola de una ráfaga no se
+## monte sobre la siguiente.
+const VOLLEY_WINDOW: float = 0.6
 
 @export_group("Estadísticas")
 ## Daño por golpe. Valor de respaldo; cada arma fija el suyo en su escena. Lo suben «Afilado», «Temple», «Ritmo de batalla», evoluciones y ascensos.
@@ -181,6 +185,55 @@ func acquire_target() -> Node3D:
 ## Virtual: el ataque contra el blanco adquirido.
 func fire(_target: Node3D) -> void:
 	push_warning("%s: fire() not implemented" % name)
+
+
+# --- ráfagas del Tomo de Multitud ------------------------------------------
+
+## Ráfaga en abanico: `count` disparos, el del medio hacia `center_dir` y los
+## demás girados `fan_deg` grados entre vecinos alrededor de UP. El primero
+## sale ya y los demás escalonados (ver volley_step()); `shot` recibe la
+## dirección de cada disparo, calculada al disparar.
+func fire_volley(count: int, center_dir: Vector3, shot: Callable, stagger: float,
+		fan_deg: float) -> void:
+	var step := volley_step(count, stagger)
+	for i: int in count:
+		var yaw := deg_to_rad(fan_deg) * (float(i) - float(count - 1) * 0.5)
+		var direction := center_dir.rotated(Vector3.UP, yaw)
+		if i == 0:
+			shot.call(direction)
+		else:
+			_schedule_shot(step * float(i), shot.bind(direction))
+
+
+## Ráfaga sin abanico: `first` sale ya y cada extra llama a `extra`, que
+## elige su propio blanco (el primer disparo pudo haber matado al suyo). Con
+## `fit_window` en false el escalonado es `stagger` tal cual, sin comprimir.
+func fire_volley_retarget(count: int, first: Callable, extra: Callable, stagger: float,
+		fit_window: bool = true) -> void:
+	var step := volley_step(count, stagger) if fit_window else stagger
+	first.call()
+	for i: int in range(1, count):
+		_schedule_shot(step * float(i), extra)
+
+
+## Segundos entre disparos de una ráfaga de `count`: `stagger`, comprimido
+## para que la ráfaga entera quepa en VOLLEY_WINDOW del enfriamiento efectivo.
+func volley_step(count: int, stagger: float) -> float:
+	return minf(stagger, effective_cooldown() * VOLLEY_WINDOW / float(maxi(count - 1, 1)))
+
+
+## Programa un disparo extra. Temporizador pausable y en paso de física: un
+## extra no sale con la pantalla de mejoras abierta, y el daño cae en el mismo
+## tick que el resto del combate.
+func _schedule_shot(delay: float, shot: Callable) -> void:
+	get_tree().create_timer(delay, false, true).timeout.connect(_fire_late.bind(shot))
+
+
+## Un disparo extra llega un poco después de fire(), cuando el arma puede
+## haber salido del árbol con un raider quitado: fuera del árbol no dispara.
+func _fire_late(shot: Callable) -> void:
+	if is_inside_tree():
+		shot.call()
 
 
 # --- embudo de daño --------------------------------------------------------

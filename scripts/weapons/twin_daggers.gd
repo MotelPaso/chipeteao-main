@@ -14,40 +14,23 @@ extends WeaponBase
 ## Color de la medialuna del corte.
 @export var slash_color: Color = Color(0.991721, 0.64353454, 0.27002934, 1)
 
-## Segundos entre las estocadas que agrega el Tomo de Multitud. Escalonadas,
-## no simultáneas: esta arma es un ritmo de cortes sueltos, y dos estocadas en
-## el mismo cuerpo y el mismo frame se leen como un golpe con número doble.
-const EXTRA_STAB_STAGGER: float = 0.2
-## La cadena escalonada termina dentro de esta fracción de un enfriamiento:
-## con el enfriamiento cortísimo de las dagas, este recorte evita que una pila
-## grande del tomo meta estocadas en la ráfaga siguiente.
-const STAB_CHAIN_WINDOW: float = 0.6
+@export_group("Multitud")
+## Segundos entre las estocadas extra (projectile_count y Tomo de Multitud); con el enfriamiento corto, VOLLEY_WINDOW las comprime.
+@export var extra_stagger: float = 0.2
 
 ## True cuando la PRÓXIMA estocada es el corte de la mano izquierda (alterna por golpe).
 var _stab_left: bool = true
 
 
 func fire(target: Node3D) -> void:
-	var count := maxi(effective_projectile_count(), 1)
-	var step := minf(EXTRA_STAB_STAGGER,
-			effective_cooldown() * STAB_CHAIN_WINDOW / float(maxi(count - 1, 1)))
-	_stab(target)
-	for i: int in range(1, count):
-		# Temporizador pausable y en paso de física: una estocada extra no sale
-		# con la pantalla de mejoras abierta, y el daño cae en el mismo tick que
-		# el resto del combate.
-		get_tree().create_timer(step * float(i), false, true).timeout \
-				.connect(_restab)
+	fire_volley_retarget(maxi(effective_projectile_count(), 1), _stab.bind(target),
+			_restab, extra_stagger)
 
 
-## Una estocada extra del Tomo de Multitud. Elige su PROPIO blanco en vez de
-## usar el de la ráfaga: el primer corte pudo haberlo matado, y una cadena
-## larga dura más que el cadáver (que se libera un tercio de segundo después
-## de morir). Llega un poco después de fire(), cuando el arma puede haber
-## salido del árbol con un raider quitado.
+## Una estocada extra. Elige su PROPIO blanco en vez de usar el de la ráfaga:
+## el primer corte pudo haberlo matado, y una cadena larga dura más que el
+## cadáver (que se libera un tercio de segundo después de morir).
 func _restab() -> void:
-	if not is_inside_tree():
-		return
 	var target := acquire_target()
 	if target != null:
 		_stab(target)

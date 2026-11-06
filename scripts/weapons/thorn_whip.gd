@@ -14,15 +14,11 @@ extends WeaponBase
 ## Color de la franja del latigazo.
 @export var crack_color: Color = Color(0.5, 0.85, 0.3)
 
-## Segundos entre los latigazos que agrega el Tomo de Multitud. Un látigo no
-## puede estar en dos lugares a la vez, así que los extras restallan uno tras otro.
-const EXTRA_LASH_STAGGER: float = 0.09
-## Giro entre latigazos vecinos: la franja es angosta, así que un abanico
-## chico basta para que cada extra barra su propio carril.
-const EXTRA_LASH_FAN_DEG: float = 18.0
-## La cadena escalonada entera termina dentro de esta fracción de un
-## enfriamiento, o la cola de una ráfaga se montaría sobre la siguiente.
-const LASH_CHAIN_WINDOW: float = 0.6
+@export_group("Multitud")
+## Segundos entre los latigazos extra del Tomo de Multitud; un látigo no puede estar en dos lugares a la vez.
+@export var extra_stagger: float = 0.09
+## Grados entre latigazos vecinos; la franja es angosta, así que un abanico chico ya separa los carriles.
+@export var extra_fan_deg: float = 18.0
 
 
 func fire(target: Node3D) -> void:
@@ -30,29 +26,14 @@ func fire(target: Node3D) -> void:
 	# miramos, y hacia FORWARD si nuestro frente también es vertical.
 	var center_dir := flat_dir_or(target.global_position - global_position,
 			flat_dir_or(-global_transform.basis.z, Vector3.FORWARD))
+	# El largo se fija al disparar: los extras de la ráfaga usan el mismo.
 	var length := attack_range * area_scale()
-	var count := maxi(effective_projectile_count(), 1)
-	var step := minf(EXTRA_LASH_STAGGER,
-			effective_cooldown() * LASH_CHAIN_WINDOW / float(maxi(count - 1, 1)))
-	for i: int in count:
-		var yaw := deg_to_rad(EXTRA_LASH_FAN_DEG) * (float(i) - float(count - 1) * 0.5)
-		var lash_dir := center_dir.rotated(Vector3.UP, yaw)
-		if i == 0:
-			_lash(lash_dir, length)
-		else:
-			# Temporizador pausable y en paso de física: un latigazo extra no
-			# sale con la pantalla de mejoras abierta, y el daño cae en el mismo
-			# tick que el resto del combate.
-			get_tree().create_timer(step * float(i), false, true).timeout \
-					.connect(_lash.bind(lash_dir, length))
+	fire_volley(maxi(effective_projectile_count(), 1), center_dir, _lash.bind(length),
+			extra_stagger, extra_fan_deg)
 
 
-## Un latigazo: la pasada de daño más su visual. Los extras escalonados
-## llegan aquí un poco después, cuando el arma puede haber salido del árbol
-## con un raider quitado.
+## Un latigazo: la pasada de daño más su visual.
 func _lash(lash_dir: Vector3, length: float) -> void:
-	if not is_inside_tree():
-		return
 	_lash_strip(lash_dir, length)
 	_spawn_crack_visual(lash_dir, length)
 

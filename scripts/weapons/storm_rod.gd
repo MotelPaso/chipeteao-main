@@ -22,18 +22,15 @@ extends WeaponBase
 ## Por debajo de este largo un eslabón no se dibuja (dos cuerpos en el mismo punto).
 @export var min_beam_length: float = 0.05
 
+@export_group("Multitud")
+## Segundos entre los rayos extra del Tomo de Multitud; dos en el mismo frame saltarían por los mismos cuerpos.
+@export var extra_stagger: float = 0.1
+
 const BEAM_COLOR := Color(0.55, 0.75, 1.0)
 ## Lados del cilindro del rayo: es una raya fina que se ve un quinto de
 ## segundo, seis alcanzan.
 const BEAM_SEGMENTS: int = 6
 
-## Segundos entre los rayos que agrega el Tomo de Multitud. Escalonados y no
-## simultáneos: dos lanzamientos en el mismo frame saltarían por los mismos
-## cuerpos y dibujarían las dos cadenas una encima de la otra.
-const EXTRA_BOLT_STAGGER: float = 0.1
-## La cadena escalonada entera termina dentro de esta fracción de un
-## enfriamiento, o el último rayo de una ráfaga caería después del siguiente.
-const BOLT_CHAIN_WINDOW: float = 0.6
 
 ## Una malla y un material para todos los rayos: construir un cilindro y un
 ## material por eslabón es el gasto por efecto que Pools existe para evitar.
@@ -61,25 +58,14 @@ func _ready() -> void:
 
 
 func fire(target: Node3D) -> void:
-	var count := maxi(effective_projectile_count(), 1)
-	var step := minf(EXTRA_BOLT_STAGGER,
-			effective_cooldown() * BOLT_CHAIN_WINDOW / float(maxi(count - 1, 1)))
-	_zap(target)
-	for i: int in range(1, count):
-		# Temporizador pausable y en paso de física: un rayo extra no sale con
-		# la pantalla de mejoras abierta, y el daño cae en el mismo tick que el
-		# resto del combate.
-		get_tree().create_timer(step * float(i), false, true).timeout \
-				.connect(_refork)
+	fire_volley_retarget(maxi(effective_projectile_count(), 1), _zap.bind(target),
+			_refork, extra_stagger)
 
 
 ## Un rayo extra del Tomo de Multitud. Elige su PROPIO primer blanco en vez
 ## de reusar el de la ráfaga: la cadena inicial pudo haberlo matado, y así el
-## rayo extra salta por otra parte de la horda. Llega un poco después de
-## fire(), cuando el arma puede haber salido del árbol con un raider quitado.
+## rayo extra salta por otra parte de la horda.
 func _refork() -> void:
-	if not is_inside_tree():
-		return
 	var target := acquire_target()
 	if target != null:
 		_zap(target)
