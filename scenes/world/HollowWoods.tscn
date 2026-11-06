@@ -88,6 +88,7 @@ script = ExtResource("90_backdrop")
 ground_color = Color(0.2, 0.31, 0.19, 1)
 hill_color = Color(0.16, 0.26, 0.17, 1)
 far_hill_color = Color(0.13, 0.21, 0.15, 1)
+hill_height_max = 20.0
 
 [node name="Sun" type="DirectionalLight3D" parent="."]
 transform = Transform3D(0.866025, 0.383022, -0.321394, 0, 0.642788, 0.766044, 0.5, -0.663414, 0.55667, 0, 12, 0)
@@ -215,6 +216,14 @@ script = ExtResource("9_scatter")
 tree_scene = ExtResource("10_tree")
 rock_scene = ExtResource("11_rock")
 stump_scene = ExtResource("12_stump")
+tree_count = 128
+rock_count = 54
+stump_count = 34
+min_prop_spacing = 5.0
+perimeter_scene = ExtResource("10_tree")
+perimeter_accent_scene = ExtResource("11_rock")
+perimeter_step = 9.0
+perimeter_rock_every = 5
 mesa_platform_scene = ExtResource("14_platform")
 mesa_ramp_scene = ExtResource("13_ramp")
 formation_style = ExtResource("91_rockstyle")
