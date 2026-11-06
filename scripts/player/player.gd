@@ -64,13 +64,13 @@ const FLIGHT_EDGE_MARGIN: float = 2.0
 
 @export_group("Movimiento")
 ## Velocidad base al caminar, en metros por segundo; tomos y objetos la multiplican.
-@export var move_speed: float = 6.6
+@export var move_speed: float = 8.6
 ## Aceleración en el suelo, en metros por segundo cada segundo.
-@export var acceleration: float = 12.0
+@export var acceleration: float = 40.0
 ## Aceleración en el aire, en metros por segundo cada segundo.
-@export var air_acceleration: float = 4.0
+@export var air_acceleration: float = 12.0
 ## Velocidad vertical al saltar, en metros por segundo.
-@export var jump_velocity: float = 8.0
+@export var jump_velocity: float = 8.7
 @export_group("Vuelo (power-up)")
 ## Vuelo: velocidad de subida mientras se mantiene saltar, en metros por segundo.
 @export var flight_rise_speed: float = 9.0
@@ -81,9 +81,9 @@ const FLIGHT_EDGE_MARGIN: float = 2.0
 
 @export_group("Derrape")
 ## Multiplicador de la velocidad efectiva durante el derrape.
-@export var slide_speed_multiplier: float = 1.8
+@export var slide_speed_multiplier: float = 2.21
 ## Duración del derrape, en segundos.
-@export var slide_duration: float = 0.6
+@export var slide_duration: float = 0.3
 ## Espera entre un derrape y el siguiente, en segundos.
 @export var slide_cooldown: float = 0.8
 ## Altura de la cápsula durante el derrape, en metros.
@@ -91,9 +91,9 @@ const FLIGHT_EDGE_MARGIN: float = 2.0
 
 @export_group("Inventario")
 ## Tope de armas simultáneas; al llegar, el pool deja de ofrecer armas nuevas (upgrade_pool.gd lo lee por nombre).
-@export var max_weapons: int = 5
+@export var max_weapons: int = 3
 ## Tope de tomos distintos; al llegar, el pool solo ofrece más niveles de los que ya tiene (upgrade_pool.gd lo lee por nombre).
-@export var max_tomes: int = 5
+@export var max_tomes: int = 3
 
 @export_group("Seguridad")
 ## Altura del mundo (Y, en metros) bajo la cual el raider vuelve a suelo seguro sin daño.
