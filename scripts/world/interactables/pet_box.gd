@@ -88,6 +88,15 @@ func _interact(player: Node) -> void:
 			player, _on_choice.bind(player), "pet_box")
 
 
+## Pinta la tapa y el símbolo de la huella con paw_color.
+func _paint() -> void:
+	var material := _lid.material_override as StandardMaterial3D
+	if material != null:
+		material.albedo_color = paw_color
+		material.emission = paw_color
+	_paw.modulate = paw_color
+
+
 func _on_choice(option: Dictionary, player: Node) -> void:
 	_grant(player, String(option.get("pet_id", "")))
 
@@ -123,12 +132,3 @@ func _roll_pet(player: Node) -> String:
 	if candidates.is_empty():
 		return ""
 	return candidates[randi() % candidates.size()]
-
-
-## Pinta la tapa y el símbolo de la huella con paw_color.
-func _paint() -> void:
-	var material := _lid.material_override as StandardMaterial3D
-	if material != null:
-		material.albedo_color = paw_color
-		material.emission = paw_color
-	_paw.modulate = paw_color

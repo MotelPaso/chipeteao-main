@@ -19,14 +19,13 @@ extends Interactable
 const SCENE_PATH: String = "res://scenes/world/chests/Chest.tscn"
 
 @export_group("Cofre")
-## Modo gratis: sin precio, sin encarecer y con la rareza tirada al abrir. Se
-## llama free_open y no `free`, que es Object.free().
+## Cofre gratis: sin precio, no encarece los de pago y tira la rareza al abrir (no se llama `free`: es Object.free()).
 @export var free_open: bool = false
 ## Rareza fija como id en inglés ("" = se tira al aparecer, o al abrir si es gratis).
 @export var rarity: String = ""
-## Suerte extra que inclina la tirada de rareza (la ponen los cofres de suministros del WorldDirector).
+## Suerte extra que inclina la tirada de rareza (al aparecer, o al abrir si es gratis).
 @export var luck_bonus: float = 0.0
-## Piso de rareza de la tirada al aparecer, como id en inglés ("" = sin piso).
+## Piso de rareza de la tirada al aparecer, como id en inglés ("" = sin piso); los cofres gratis no lo usan.
 @export var min_rarity: String = ""
 @export_group("Apertura")
 ## Segundos que dura el salto de apertura; el objeto se entrega al terminar.
@@ -66,30 +65,6 @@ var _opener: Node = null
 @onready var _glow_light: OmniLight3D = $Visual/GlowLight
 
 
-## Deja un cofre GRATIS en `at`, colgado de la arena (RunRoot.stage_parent)
-## y no de quien lo suelta, para que siga ahí aunque ese nodo se libere.
-## `bonus_luck` y `rarity_floor` se guardan en luck_bonus y min_rarity antes
-## de que entre al árbol. Devuelve null si no hay arena.
-static func spawn_free(tree: SceneTree, at: Vector3, bonus_luck: float = 0.0,
-		rarity_floor: String = "") -> Chest:
-	var parent := RunRoot.stage_parent(tree)
-	if parent == null:
-		return null
-	var node := (load(SCENE_PATH) as PackedScene).instantiate()
-	var chest := node as Chest
-	if chest == null:
-		node.free()
-		push_warning("Chest: %s root is not a Chest." % SCENE_PATH)
-		return null
-	chest.free_open = true
-	chest.luck_bonus = bonus_luck
-	if not rarity_floor.is_empty():
-		chest.min_rarity = rarity_floor
-	parent.add_child(chest)
-	chest.global_position = at
-	return chest
-
-
 func _ready() -> void:
 	super()
 	# `rarity` es la única fuente que leen precio, tinte, aviso y botín: la
@@ -105,15 +80,32 @@ func _ready() -> void:
 	_refresh_price_prompt()
 
 
-## Mejor suerte de la party al tirar (la party comparte los cofres del mapa,
-## así que inclina el raider con más suerte).
-func _party_luck() -> float:
-	var best := 0.0
-	for node: Node in get_tree().get_nodes_in_group("player"):
-		var stats := PlayerStats.find_in(node)
-		if stats != null:
-			best = maxf(best, stats.luck)
-	return best
+func _physics_process(_delta: float) -> void:
+	# El precio cambia con cada cofre abierto y los puntos con cada muerte:
+	# el aviso se recalcula mientras alguien está en rango.
+	if available and player_in_range:
+		_refresh_price_prompt()
+
+
+## Deja un cofre GRATIS en `at`, colgado de la arena (RunRoot.stage_parent)
+## y no de quien lo suelta, para que siga ahí aunque ese nodo se libere.
+## `bonus_luck` va a luck_bonus antes de que entre al árbol. Devuelve null si
+## no hay arena.
+static func spawn_free(tree: SceneTree, at: Vector3, bonus_luck: float = 0.0) -> Chest:
+	var parent := RunRoot.stage_parent(tree)
+	if parent == null:
+		return null
+	var node := (load(SCENE_PATH) as PackedScene).instantiate()
+	var chest := node as Chest
+	if chest == null:
+		node.free()
+		push_warning("Chest: %s root is not a Chest." % SCENE_PATH)
+		return null
+	chest.free_open = true
+	chest.luck_bonus = bonus_luck
+	parent.add_child(chest)
+	chest.global_position = at
+	return chest
 
 
 ## Vuelve gratis un cofre que YA pasó por _ready (el WorldDirector regala una
@@ -136,35 +128,10 @@ func price() -> int:
 	return 0 if free_open else RunState.chest_price(rarity)
 
 
-func _physics_process(_delta: float) -> void:
-	# El precio cambia con cada cofre abierto y los puntos con cada muerte:
-	# el aviso se recalcula mientras alguien está en rango.
-	if available and player_in_range:
-		_refresh_price_prompt()
-
-
-func _refresh_price_prompt() -> void:
-	if free_open:
-		set_prompt(free_prompt)
-		return
-	var cost := price()
-	var purse := _points_of_nearest()
-	var shown := UpgradePool.rarity_display(rarity)
-	if purse >= cost:
-		set_prompt(paid_prompt % [shown, cost])
-	else:
-		set_prompt(short_prompt % [cost - purse, shown])
-
-
-## Puntos del raider en pie MÁS CERCANO (el que va a apretar). _interact
-## cobra a quien aprieta, así que el aviso cotiza su bolsa y no la del más
-## rico del anillo.
-func _points_of_nearest() -> int:
-	var body := nearest_live_player()
-	if body == null:
-		return 0
-	var purse: Variant = body.get("points")
-	return int(purse) if purse != null else 0
+## El cofre gratis tiene su propio marcador: en un mapa de 240 m, "vale la
+## pena aunque no tengas puntos" es lo más útil que puede decir el ícono.
+func map_marker_kind() -> StringName:
+	return &"chest_free" if free_open else marker_kind
 
 
 func _interact(player: Node) -> void:
@@ -203,8 +170,8 @@ func _pop_reward() -> void:
 		sink_away(reward_linger)
 		return
 	if free_open:
-		# Se tira aquí: un cofre gratis no tiene piso ni rareza sellada, así
-		# que decide la suerte de quien abre.
+		# Se tira aquí, sin piso (min_rarity no cuenta): decide la suerte de
+		# quien abre más luck_bonus.
 		var stats := PlayerStats.find_in(_opener)
 		var luck := (stats.luck if stats != null else 0.0) + luck_bonus
 		rarity = String(UpgradePool.roll_rarity(luck).name)
@@ -228,6 +195,41 @@ func _pop_reward() -> void:
 	# consume() ya apagó `available`, que es lo que lee la baliza del
 	# WorldDirector: nadie retira este cofre por segunda vez.
 	sink_away(reward_linger)
+
+
+## Mejor suerte de la party al tirar (la party comparte los cofres del mapa,
+## así que inclina el raider con más suerte).
+func _party_luck() -> float:
+	var best := 0.0
+	for node: Node in get_tree().get_nodes_in_group("player"):
+		var stats := PlayerStats.find_in(node)
+		if stats != null:
+			best = maxf(best, stats.luck)
+	return best
+
+
+func _refresh_price_prompt() -> void:
+	if free_open:
+		set_prompt(free_prompt)
+		return
+	var cost := price()
+	var purse := _points_of_nearest()
+	var shown := UpgradePool.rarity_display(rarity)
+	if purse >= cost:
+		set_prompt(paid_prompt % [shown, cost])
+	else:
+		set_prompt(short_prompt % [cost - purse, shown])
+
+
+## Puntos del raider en pie MÁS CERCANO (el que va a apretar). _interact
+## cobra a quien aprieta, así que el aviso cotiza su bolsa y no la del más
+## rico del anillo.
+func _points_of_nearest() -> int:
+	var body := nearest_live_player()
+	if body == null:
+		return 0
+	var purse: Variant = body.get("points")
+	return int(purse) if purse != null else 0
 
 
 ## Pinta el modelo con el color de su rareza (o free_tint), con emisión para
@@ -257,9 +259,3 @@ func _glow_energy() -> float:
 	if free_open and rarity.is_empty():
 		return free_glow_energy
 	return float(glow_energy_by_rarity.get(rarity, free_glow_energy))
-
-
-## El cofre gratis tiene su propio marcador: en un mapa de 240 m, "vale la
-## pena aunque no tengas puntos" es lo más útil que puede decir el ícono.
-func map_marker_kind() -> StringName:
-	return &"chest_free" if free_open else marker_kind

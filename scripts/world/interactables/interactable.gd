@@ -104,20 +104,6 @@ func _unhandled_input(event: InputEvent) -> void:
 			return
 
 
-## Virtual: el efecto. `player` es el nodo del grupo "player" que apretó.
-func _interact(_player: Node) -> void:
-	pass
-
-
-## Virtuales para cuando alguien entra o sale del anillo.
-func _on_range_entered() -> void:
-	pass
-
-
-func _on_range_exited() -> void:
-	pass
-
-
 ## Marca el interactuable como gastado: sin aviso y sin más interacciones.
 func consume() -> void:
 	if available and meta_stat_id != "":
@@ -130,6 +116,43 @@ func consume() -> void:
 func set_prompt(text: String) -> void:
 	prompt_text = text
 	_refresh_prompt()
+
+
+## Hunde y encoge el interactuable (sink_duration, sink_depth, sink_end_scale) y
+## lo libera al terminar; detiene _physics_process. Con `keep_alive` el nodo
+## sigue vivo hasta esos segundos aunque el hundimiento ya haya terminado.
+## Una sola vez: las llamadas siguientes no hacen nada.
+func sink_away(keep_alive: float = 0.0) -> void:
+	if _sinking:
+		return
+	_sinking = true
+	set_physics_process(false)
+	var tween := create_tween()
+	tween.set_parallel(true)
+	if keep_alive > 0.0:
+		tween.tween_interval(keep_alive)
+	if not is_zero_approx(sink_depth):
+		tween.tween_property(self, "position:y", position.y - sink_depth, sink_duration) \
+				.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	tween.tween_property(self, "scale", Vector3.ONE * sink_end_scale, sink_duration) \
+			.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_IN)
+	tween.chain().tween_callback(queue_free)
+
+
+## Gris de "usado": toda malla recibe un material plano de spent_color y las
+## luces se apagan, para que se lea gastado desde lejos.
+func dim_visuals() -> void:
+	var dim := StandardMaterial3D.new()
+	dim.albedo_color = spent_color
+	dim.roughness = 1.0
+	for node: Node in find_children("*", "MeshInstance3D", true, false):
+		var mesh_instance := node as MeshInstance3D
+		if mesh_instance != null:
+			mesh_instance.material_override = dim
+	for node: Node in find_children("*", "OmniLight3D", true, false):
+		var light := node as OmniLight3D
+		if light != null:
+			light.visible = false
 
 
 ## Raiders del anillo que siguen EN PIE. Un caído no sale del Area3D (solo
@@ -175,6 +198,44 @@ func best_item_count_in_range(item_id: String) -> int:
 	return best
 
 
+## true mientras el aviso se ve (raider en rango y disponible).
+func prompt_visible() -> bool:
+	return _prompt != null and _prompt.visible
+
+
+## Contrato de marcadores de mapa (grupo "map_markers").
+func map_marker_kind() -> StringName:
+	return marker_kind
+
+
+## Virtual: el efecto. `player` es el nodo del grupo "player" que apretó.
+func _interact(_player: Node) -> void:
+	pass
+
+
+## Virtuales para cuando alguien entra o sale del anillo.
+func _on_range_entered() -> void:
+	pass
+
+
+func _on_range_exited() -> void:
+	pass
+
+
+func _emit_started() -> void:
+	interaction_started.emit()
+
+
+func _emit_completed() -> void:
+	Juice.sparkle(global_position + Vector3.UP * 1.2)
+	Sfx.play(complete_sound)
+	interaction_completed.emit()
+
+
+func _emit_cancelled() -> void:
+	interaction_cancelled.emit()
+
+
 ## Empieza (o cambia a) un loop de Sfx con contador que retiene este nodo.
 ## Una liberación por cada toma: el campo _held_loop lo garantiza.
 func _hold_loop(id: StringName) -> void:
@@ -190,62 +251,6 @@ func _drop_loop() -> void:
 		return
 	Sfx.release_loop(_held_loop)
 	_held_loop = &""
-
-
-## true mientras el aviso se ve (raider en rango y disponible).
-func prompt_visible() -> bool:
-	return _prompt != null and _prompt.visible
-
-
-## Gris de "usado": toda malla recibe un material plano de spent_color y las
-## luces se apagan, para que se lea gastado desde lejos.
-func dim_visuals() -> void:
-	var dim := StandardMaterial3D.new()
-	dim.albedo_color = spent_color
-	dim.roughness = 1.0
-	for node: Node in find_children("*", "MeshInstance3D", true, false):
-		var mesh_instance := node as MeshInstance3D
-		if mesh_instance != null:
-			mesh_instance.material_override = dim
-	for node: Node in find_children("*", "OmniLight3D", true, false):
-		var light := node as OmniLight3D
-		if light != null:
-			light.visible = false
-
-
-## Hunde y encoge el interactuable (sink_duration, sink_depth, sink_end_scale) y
-## lo libera al terminar; detiene _physics_process. Con `keep_alive` el nodo
-## sigue vivo hasta esos segundos aunque el hundimiento ya haya terminado.
-## Una sola vez: las llamadas siguientes no hacen nada.
-func sink_away(keep_alive: float = 0.0) -> void:
-	if _sinking:
-		return
-	_sinking = true
-	set_physics_process(false)
-	var tween := create_tween()
-	tween.set_parallel(true)
-	if keep_alive > 0.0:
-		tween.tween_interval(keep_alive)
-	if not is_zero_approx(sink_depth):
-		tween.tween_property(self, "position:y", position.y - sink_depth, sink_duration) \
-				.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
-	tween.tween_property(self, "scale", Vector3.ONE * sink_end_scale, sink_duration) \
-			.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_IN)
-	tween.chain().tween_callback(queue_free)
-
-
-func _emit_started() -> void:
-	interaction_started.emit()
-
-
-func _emit_completed() -> void:
-	Juice.sparkle(global_position + Vector3.UP * 1.2)
-	Sfx.play(complete_sound)
-	interaction_completed.emit()
-
-
-func _emit_cancelled() -> void:
-	interaction_cancelled.emit()
 
 
 func _on_body_entered(body: Node3D) -> void:
@@ -286,8 +291,3 @@ func _interact_glyph() -> String:
 	if slot == null or Coop.device_for_slot(int(slot)) == Coop.KEYBOARD_DEVICE:
 		return INTERACT_TOKEN
 	return PAD_INTERACT_GLYPH
-
-
-## Contrato de marcadores de mapa (grupo "map_markers").
-func map_marker_kind() -> StringName:
-	return marker_kind

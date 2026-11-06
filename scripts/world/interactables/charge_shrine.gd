@@ -2,8 +2,8 @@ class_name ChargeShrine
 extends Interactable
 ## Altar de carga: se carga SOLO mientras algún raider está dentro del anillo,
 ## sin botón. Salir del anillo pausa la carga y volver a entrar la reanuda;
-## un altar que nadie toca espera para siempre. Cerca del anillo (dos radios)
-## el anillo brilla y late para invitar desde lejos.
+## un altar que nadie toca espera para siempre. Con un raider cerca
+## (approach_band_scale radios) el anillo brilla y late para invitar desde lejos.
 ##
 ## Al completar abre una elección de tres dones en el selector de cartas: la
 ## elige el raider que sostuvo el anillo y el don llega a toda la party
@@ -135,39 +135,6 @@ func _ready() -> void:
 	_disc_material = _own_material(_progress_disc, disc_alpha, ring_energy_idle)
 
 
-## Radio de la zona de carga, leído de la forma de la escena para que la
-## banda de acercamiento coincida con el área real.
-func _measure_zone_radius() -> float:
-	for child: Node in get_children():
-		var shape_node := child as CollisionShape3D
-		if shape_node == null:
-			continue
-		var cylinder := shape_node.shape as CylinderShape3D
-		if cylinder != null:
-			return cylinder.radius
-	return DEFAULT_ZONE_RADIUS
-
-
-## Copia propia del material de la escena de `target`, teñida con
-## accent_color (el resto del material sale de la escena). Cada altar
-## necesita la suya: el anillo y el disco laten por instancia, y un
-## [sub_resource] de la escena lo comparten todas las instancias.
-func _own_material(target: MeshInstance3D, alpha: float,
-		energy: float) -> StandardMaterial3D:
-	if target == null:
-		return null
-	var source := target.get_active_material(0) as StandardMaterial3D
-	if source == null:
-		push_warning("ChargeShrine: %s has no StandardMaterial3D to tint" % target.name)
-		return null
-	var material := source.duplicate() as StandardMaterial3D
-	material.albedo_color = Color(accent_color, alpha)
-	material.emission = accent_color
-	material.emission_energy_multiplier = energy
-	target.material_override = material
-	return material
-
-
 func _physics_process(delta: float) -> void:
 	if _leaving:
 		return
@@ -199,6 +166,82 @@ func _physics_process(delta: float) -> void:
 	set_prompt(charging_prompt % roundi(fraction * 100.0))
 	if progress >= channel_time:
 		_complete()
+
+
+## Tamaño de un don: la cantidad base, la escala de este altar y las Llaves
+## maestras de quien carga. Nunca menos de 1.
+func boon_amount(base: float, keys: int) -> float:
+	var amount := base * _effective_boon_scale() * (1.0 + key_boon_per_copy * float(keys))
+	return maxf(roundf(amount), 1.0)
+
+
+## Don plano para toda la party. Los caídos también cuentan (dejan el grupo
+## "player" al caer, pero el don es para toda la partida).
+func grant_boon(stat: String, amount: float) -> void:
+	for group: String in ["player", "downed_players"]:
+		for node: Node in get_tree().get_nodes_in_group(group):
+			var stats := PlayerStats.find_in(node)
+			if stats != null:
+				stats.add_altar_boon(stat, amount)
+
+
+func _interact(_player: Node) -> void:
+	pass  # la cercanía hace todo; el botón no hace nada
+
+
+## Sin botón: entrar empieza (o reanuda) la carga.
+func _on_range_entered() -> void:
+	if not available or channeling or _leaving:
+		return
+	channeling = true
+	# Con contador: otro altar o el Cráneo zumbante pueden sostener la misma
+	# voz a la vez.
+	_hold_loop(channel_loop)
+	_emit_started()
+
+
+## Salir a mitad de carga solo la PAUSA: el progreso se guarda y volver a
+## entrar la reanuda.
+func _on_range_exited() -> void:
+	if not channeling:
+		return
+	channeling = false
+	_drop_loop()
+	_emit_cancelled()
+	set_prompt(resume_prompt % roundi(clampf(progress / channel_time, 0.0, 1.0) * 100.0))
+
+
+## Radio de la zona de carga, leído de la forma de la escena para que la
+## banda de acercamiento coincida con el área real.
+func _measure_zone_radius() -> float:
+	for child: Node in get_children():
+		var shape_node := child as CollisionShape3D
+		if shape_node == null:
+			continue
+		var cylinder := shape_node.shape as CylinderShape3D
+		if cylinder != null:
+			return cylinder.radius
+	return DEFAULT_ZONE_RADIUS
+
+
+## Copia propia del material de la escena de `target`, teñida con
+## accent_color (el resto del material sale de la escena). Cada altar
+## necesita la suya: el anillo y el disco laten por instancia, y un
+## [sub_resource] de la escena lo comparten todas las instancias.
+func _own_material(target: MeshInstance3D, alpha: float,
+		energy: float) -> StandardMaterial3D:
+	if target == null:
+		return null
+	var source := target.get_active_material(0) as StandardMaterial3D
+	if source == null:
+		push_warning("ChargeShrine: %s has no StandardMaterial3D to tint" % target.name)
+		return null
+	var material := source.duplicate() as StandardMaterial3D
+	material.albedo_color = Color(accent_color, alpha)
+	material.emission = accent_color
+	material.emission_energy_multiplier = energy
+	target.material_override = material
+	return material
 
 
 ## El anillo se lee a tres distancias: tenue en reposo, brillante y latiendo
@@ -244,32 +287,6 @@ func _keys_in_ring() -> int:
 
 func _charge_speed() -> float:
 	return 1.0 + key_speed_per_copy * float(_keys_in_ring())
-
-
-## Sin botón: entrar empieza (o reanuda) la carga.
-func _on_range_entered() -> void:
-	if not available or channeling or _leaving:
-		return
-	channeling = true
-	# Con contador: otro altar o el Cráneo zumbante pueden sostener la misma
-	# voz a la vez.
-	_hold_loop(channel_loop)
-	_emit_started()
-
-
-## Salir a mitad de carga solo la PAUSA: el progreso se guarda y volver a
-## entrar la reanuda.
-func _on_range_exited() -> void:
-	if not channeling:
-		return
-	channeling = false
-	_drop_loop()
-	_emit_cancelled()
-	set_prompt(resume_prompt % roundi(clampf(progress / channel_time, 0.0, 1.0) * 100.0))
-
-
-func _interact(_player: Node) -> void:
-	pass  # la cercanía hace todo; el botón no hace nada
 
 
 func _complete() -> void:
@@ -347,27 +364,10 @@ func _grant_choice(option: Dictionary, _keys: int, _recipient: Node) -> String:
 	return String(option.label)
 
 
-## Tamaño de un don: la cantidad base, la escala de este altar y las Llaves
-## maestras de quien carga. Nunca menos de 1.
-func boon_amount(base: float, keys: int) -> float:
-	var amount := base * _effective_boon_scale() * (1.0 + key_boon_per_copy * float(keys))
-	return maxf(roundf(amount), 1.0)
-
-
 ## Escala del don al entregarlo. Virtual para que el altar demoníaco sume la
 ## Sangre de demonio sin escribir en el export.
 func _effective_boon_scale() -> float:
 	return boon_scale
-
-
-## Don plano para toda la party. Los caídos también cuentan (dejan el grupo
-## "player" al caer, pero el don es para toda la partida).
-func grant_boon(stat: String, amount: float) -> void:
-	for group: String in ["player", "downed_players"]:
-		for node: Node in get_tree().get_nodes_in_group(group):
-			var stats := PlayerStats.find_in(node)
-			if stats != null:
-				stats.add_altar_boon(stat, amount)
 
 
 ## Se hunde, se encoge y se libera (sink_away). Solo lo toma un altar gastado.

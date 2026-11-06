@@ -46,6 +46,16 @@ func _ready() -> void:
 	_idle_prompt = prompt_text
 
 
+## Clasificador puro para una tirada uniforme en [0,1): "gems" | "card" |
+## "nothing", repartido gem_chance / card_chance / resto.
+func outcome_for(roll: float) -> String:
+	if roll < gem_chance:
+		return "gems"
+	if roll < gem_chance + card_chance:
+		return "card"
+	return "nothing"
+
+
 ## Tras un peaje rechazado el altar sigue sin gastar: volver con más vida
 ## tiene que mostrar la oferta otra vez.
 func _on_range_entered() -> void:
@@ -73,16 +83,6 @@ func _interact(player: Node) -> void:
 	# Línea de log para los soaks.
 	print("Greed shrine: paid %.0f HP -> %s" % [toll, outcome])
 	_emit_completed()
-
-
-## Clasificador puro para una tirada uniforme en [0,1): "gems" | "card" |
-## "nothing", repartido gem_chance / card_chance / resto.
-func outcome_for(roll: float) -> String:
-	if roll < gem_chance:
-		return "gems"
-	if roll < gem_chance + card_chance:
-		return "card"
-	return "nothing"
 
 
 func _grant(outcome: String, player: Node) -> void:

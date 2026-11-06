@@ -53,18 +53,6 @@ func _physics_process(delta: float) -> void:
 		set_prompt(_ready_prompt if _director_idle() else busy_prompt)
 
 
-## true cuando no corre ningún clima. Solo lo lee el AVISO: el altar siempre
-## funciona (si rechazara, quedaría `available` para siempre y el recorrido
-## del harness volvería a él una y otra vez). El aviso de ocupado le dice al
-## jugador qué está cambiando.
-func _director_idle() -> bool:
-	var director := get_tree().get_first_node_in_group("world_director")
-	if director == null:
-		return true
-	var live: Variant = director.get("active_weather")
-	return live == null or (live is Dictionary and (live as Dictionary).is_empty())
-
-
 func _interact(_player: Node) -> void:
 	if _spent or not available:
 		return
@@ -93,3 +81,15 @@ func _paint() -> void:
 		material.albedo_color = Color(glass_color, material.albedo_color.a)
 		material.emission = glass_color
 	_glow.light_color = glass_color
+
+
+## true cuando no corre ningún clima. Solo lo lee el AVISO: el altar siempre
+## funciona (si rechazara, quedaría `available` para siempre y el recorrido
+## del harness volvería a él una y otra vez). El aviso de ocupado le dice al
+## jugador qué está cambiando.
+func _director_idle() -> bool:
+	var director := get_tree().get_first_node_in_group("world_director")
+	if director == null:
+		return true
+	var live: Variant = director.get("active_weather")
+	return live == null or (live is Dictionary and (live as Dictionary).is_empty())

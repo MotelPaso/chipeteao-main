@@ -38,6 +38,28 @@ extends Interactable
 var spawned_boss: BossBase = null
 
 
+## Frase flotante corta sobre el disparador. Va colgada de la arena para que
+## sobreviva a los cambios de estado del disparador.
+func show_flavor(line: String) -> void:
+	var scene_root := RunRoot.stage_parent(get_tree())
+	if scene_root == null:
+		return
+	var label := Label3D.new()
+	label.text = line
+	label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	label.no_depth_test = true
+	label.font_size = flavor_font_size
+	label.outline_size = flavor_outline_size
+	label.modulate = flavor_color
+	scene_root.add_child(label)
+	label.global_position = global_position + Vector3.UP * flavor_height
+	var tween := label.create_tween()
+	tween.set_parallel(true)
+	tween.tween_property(label, "position:y", label.position.y + flavor_rise, flavor_time)
+	tween.tween_property(label, "modulate:a", 0.0, flavor_fade_time).set_delay(flavor_fade_delay)
+	tween.chain().tween_callback(label.queue_free)
+
+
 ## Gasta el disparador y saca al minijefe. El guardia sobre `available`
 ## impide que una subclase lo despierte dos veces.
 func _awaken() -> void:
@@ -69,25 +91,3 @@ func _spawn_miniboss() -> void:
 	boss.global_position = global_position + spawn_offset
 	# Línea de log para las corridas headless.
 	print("Secret miniboss awakened: %s" % boss.boss_title)
-
-
-## Frase flotante corta sobre el disparador. Va colgada de la arena para que
-## sobreviva a los cambios de estado del disparador.
-func show_flavor(line: String) -> void:
-	var scene_root := RunRoot.stage_parent(get_tree())
-	if scene_root == null:
-		return
-	var label := Label3D.new()
-	label.text = line
-	label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
-	label.no_depth_test = true
-	label.font_size = flavor_font_size
-	label.outline_size = flavor_outline_size
-	label.modulate = flavor_color
-	scene_root.add_child(label)
-	label.global_position = global_position + Vector3.UP * flavor_height
-	var tween := label.create_tween()
-	tween.set_parallel(true)
-	tween.tween_property(label, "position:y", label.position.y + flavor_rise, flavor_time)
-	tween.tween_property(label, "modulate:a", 0.0, flavor_fade_time).set_delay(flavor_fade_delay)
-	tween.chain().tween_callback(label.queue_free)

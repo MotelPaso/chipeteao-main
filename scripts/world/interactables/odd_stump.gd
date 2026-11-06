@@ -16,8 +16,9 @@ extends SecretTrigger
 ]
 ## Sonido (id de Sfx) de cada gruñido.
 @export var grumble_sound: StringName = &"burrow_pop"
-## Volumen del primer gruñido en dB; cada interacción siguiente suma el paso.
+## Volumen del primer gruñido, en dB.
 @export var grumble_volume_start_db: float = -10.0
+## dB que suma cada interacción siguiente, para que gruña más fuerte cada vez.
 @export var grumble_volume_step_db: float = 5.0
 @export_group("Sacudida")
 ## Cuánto crece la sacudida con cada interacción, como fracción del tamaño.
@@ -30,9 +31,9 @@ extends SecretTrigger
 ## Interacciones hechas hasta ahora (lo lee el harness).
 var interact_count: int = 0
 
-@onready var _visual: Node3D = $Visual
-
 var _shudder_tween: Tween
+
+@onready var _visual: Node3D = $Visual
 
 
 func _interact(_player: Node) -> void:

@@ -87,6 +87,21 @@ func _physics_process(delta: float) -> void:
 		_block.rotate_y(delta * spin_speed)
 
 
+## Encola los ids que pagan los próximos bloques (solo el harness). Un id
+## desconocido es push_error y se descarta: un soak que cree probar el pozo
+## mientras la tabla tira puntos daría verde sobre una rama que no corrió.
+static func force_rewards(ids: Array[String]) -> void:
+	var known: Dictionary[String, bool] = {}
+	for row: Dictionary in LUCKY_REWARDS:
+		known[String(row.id)] = true
+	_forced_rewards.clear()
+	for id: String in ids:
+		if known.has(id):
+			_forced_rewards.append(id)
+		else:
+			push_error("LuckyBlock: unknown forced reward '%s'" % id)
+
+
 func _interact(player: Node) -> void:
 	if _spent or not available:
 		return
@@ -115,25 +130,19 @@ func _interact(player: Node) -> void:
 	_finish()
 
 
+## Pinta el material del bloque y su luz con block_color.
+func _paint() -> void:
+	var material := _block.material_override as StandardMaterial3D
+	if material != null:
+		material.albedo_color = block_color
+		material.emission = block_color
+	_glow.light_color = block_color
+
+
 func _finish() -> void:
 	Juice.sparkle(global_position + Vector3.UP * 1.0)
 	_emit_completed()
 	sink_away()
-
-
-## Encola los ids que pagan los próximos bloques (solo el harness). Un id
-## desconocido es push_error y se descarta: un soak que cree probar el pozo
-## mientras la tabla tira puntos daría verde sobre una rama que no corrió.
-static func force_rewards(ids: Array[String]) -> void:
-	var known: Dictionary[String, bool] = {}
-	for row: Dictionary in LUCKY_REWARDS:
-		known[String(row.id)] = true
-	_forced_rewards.clear()
-	for id: String in ids:
-		if known.has(id):
-			_forced_rewards.append(id)
-		else:
-			push_error("LuckyBlock: unknown forced reward '%s'" % id)
 
 
 static func _roll_reward() -> String:
@@ -263,12 +272,3 @@ static func _next_rarity_item(rarity_name: String) -> String:
 	var index := UpgradePool.rarity_index(rarity_name)
 	var better := mini(index + 1, UpgradePool.RARITIES.size() - 1)
 	return ItemCatalog.roll_id(String(UpgradePool.RARITIES[better].name))
-
-
-## Pinta el material del bloque y su luz con block_color.
-func _paint() -> void:
-	var material := _block.material_override as StandardMaterial3D
-	if material != null:
-		material.albedo_color = block_color
-		material.emission = block_color
-	_glow.light_color = block_color
