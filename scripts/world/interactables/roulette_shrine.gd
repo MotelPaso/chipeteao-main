@@ -41,7 +41,8 @@ const OUTCOMES: Array[Dictionary] = [
 ## Campos que pueden llenar el %d de un `label`, en orden de búsqueda.
 const LABEL_NUMBER_FIELDS: Array[String] = ["amount", "seconds", "levels"]
 
-const RouletteUiScript := preload("res://scripts/ui/game/roulette_ui.gd")
+## El menú que abre el altar (RouletteUi).
+const ROULETTE_PANEL_SCENE := preload("res://scenes/ui/modal/RoulettePanel.tscn")
 
 @export_group("Precio")
 ## Precio base de un giro, en puntos, antes del multiplicador de la partida.
@@ -58,7 +59,7 @@ const RouletteUiScript := preload("res://scripts/ui/game/roulette_ui.gd")
 @export var broke_prompt_template: String = "Girar cuesta %d pts (tienes %d)"
 
 var _wheel: MeshInstance3D = null
-var _ui: CanvasLayer = null
+var _ui: RouletteUi = null
 
 
 func _init() -> void:
@@ -99,7 +100,7 @@ func _interact(player: Node) -> void:
 	# menú de Esc.
 	if BlockingUi.any_open(get_tree()):
 		return
-	_ui = RouletteUiScript.new()
+	_ui = ROULETTE_PANEL_SCENE.instantiate() as RouletteUi
 	_ui.setup(self, player)
 	# Bajo la ESCENA ACTUAL, nunca bajo /root: esta capa tiene todo el árbol
 	# pausado, y un CanvasLayer colgado de root sobrevive a
