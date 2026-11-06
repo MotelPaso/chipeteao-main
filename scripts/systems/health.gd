@@ -3,6 +3,7 @@ extends Node
 ## Componente de vida reutilizable: va como hijo de cualquier cuerpo. Los
 ## cuerpos del grupo "enemies" con un Health hijo reciben daño de las armas.
 ## Emite died una sola vez al llegar a cero; heal_full() y revive() lo rearman.
+## Los números flotantes los dibuja DamagePopup: aquí solo se dice qué pasó.
 
 signal damaged(amount: float, current: float)
 ## Se emite junto con `damaged` cuando el golpe nombra a su atacante (el daño
@@ -17,6 +18,11 @@ signal dodged(attacker: Node3D)
 signal hp_changed(current: float, max_hp: float)
 signal died
 
+## La armadura nunca anula un golpe: todo golpe que entra quita al menos esto,
+## así un build de armadura apilada tiene que seguir esquivando.
+const MIN_CHIP_DAMAGE: float = 1.0
+
+@export_group("Vida")
 ## Vida máxima, en puntos de vida.
 @export var max_hp: float = 50.0:
 	set(value):
@@ -31,13 +37,10 @@ signal died
 			return
 		current_hp = max_hp if was_full else minf(current_hp, max_hp)
 		hp_changed.emit(current_hp, max_hp)
-## Muestra los números de daño flotantes sobre este cuerpo.
+## Muestra los números de daño flotantes sobre este cuerpo (su aspecto está en DamagePopup.tscn).
 @export var show_damage_popups: bool = true
 ## Reducción plana de daño por golpe; en el jugador la escribe PlayerStats (Tomo de Piedra).
 @export var armor: float = 0.0
-## Texto flotante al esquivar un golpe entero (tirada de evasión del jugador).
-@export var dodge_text: String = "!"
-
 
 ## Lo activa PowerUps durante Inmortalidad: rechaza todo golpe (antes de la
 ## armadura y de la evasión) y lo cuenta. El godmode del soak no lo usa: sube
@@ -50,14 +53,9 @@ var blocked_hits: int = 0
 ## Reflejo). Se evalúa ANTES del rechazo por invulnerable: inmortal y
 ## reflejando a la vez devuelve todo sin recibir nada.
 var reflect_fraction: float = 0.0
-
-
-## La armadura nunca anula un golpe: todo golpe que entra quita al menos esto,
-## así un build de armadura apilada tiene que seguir esquivando.
-const MIN_CHIP_DAMAGE: float = 1.0
-
 var current_hp: float
 var is_dead: bool = false
+
 ## True cuando _ready ya fijó current_hp; antes, el setter de max_hp no tiene
 ## invariante que cuidar.
 var _initialized: bool = false
@@ -95,7 +93,7 @@ func take_damage(amount: float, is_crit: bool = false, attacker: Node3D = null) 
 	var evade_chance := _evasion_chance()
 	if evade_chance > 0.0 and randf() < evade_chance:
 		if show_damage_popups:
-			_spawn_popup(dodge_text, 64, false, true)
+			_show_popup(DamagePopup.Kind.DODGE)
 		Sfx.play(&"dodge")
 		dodged.emit(attacker)
 		return 0.0
@@ -105,7 +103,8 @@ func take_damage(amount: float, is_crit: bool = false, attacker: Node3D = null) 
 	var applied := minf(final_amount, current_hp)
 	current_hp = maxf(current_hp - final_amount, 0.0)
 	if show_damage_popups:
-		_spawn_damage_popup(final_amount, is_crit)
+		_show_popup(DamagePopup.Kind.CRIT if is_crit else DamagePopup.Kind.DAMAGE,
+				final_amount)
 	damaged.emit(final_amount, current_hp)
 	# Antes de la comprobación de muerte, así hasta el golpe letal se devuelve.
 	if attacker != null:
@@ -176,11 +175,9 @@ func _evasion_chance() -> float:
 	return stats.evasion if stats != null else 0.0
 
 
-func _spawn_damage_popup(amount: float, is_crit: bool) -> void:
-	_spawn_popup(str(roundi(amount)), 88 if is_crit else 64, is_crit)
-
-
-func _spawn_popup(popup_text: String, popup_font_size: int, is_crit: bool, is_dodge:bool = false) -> void:
+## Pide un número flotante sobre este cuerpo. Health solo dice qué pasó;
+## colores, tamaños, texto de esquiva y movimiento son de DamagePopup.
+func _show_popup(kind: DamagePopup.Kind, amount: float = 0.0) -> void:
 	var body := get_parent() as Node3D
 	if body == null:
 		return
@@ -189,5 +186,4 @@ func _spawn_popup(popup_text: String, popup_font_size: int, is_crit: bool, is_do
 	var popup := Pools.acquire_scene(Pools.DAMAGE_POPUP_SCENE) as DamagePopup
 	if popup == null:
 		return
-	popup.show_popup(popup_text, popup_font_size, is_crit, body.global_position
-			+ Vector3(randf_range(-0.3, 0.3), 2.0, randf_range(-0.3, 0.3)), is_dodge)
+	popup.show_hit(kind, body.global_position, amount)
