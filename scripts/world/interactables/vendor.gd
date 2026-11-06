@@ -10,17 +10,19 @@ extends Interactable
 ## y una baliza que nombrara el tipo respondería la pregunta desde el otro lado
 ## del mapa.
 ##
-## El puesto es dueño de la ECONOMÍA (qué se cobra, qué se entrega, el registro y
-## la regla de una sola venta); VendorUi es dueño del momento (qué hay en el
-## estante, qué dice una carta y qué pasa entre el clic y la despedida).
+## El puesto es dueño de la ECONOMÍA: qué hay en el estante y a qué precio
+## (roll_offers), qué se cobra y qué se entrega (buy), el registro y la regla de
+## una sola venta. VendorUi (VendorPanel.tscn) solo dibuja las ofertas y le
+## devuelve la elegida.
 ##
 ## Se queda hasta vender algo: un vendedor que se fuera por tiempo sería una
 ## caminata larga que el grupo puede perder por llegar tarde.
 
-## Campos de fila: id (identificador, también `kind`), display_name y prompt
-## (texto del jugador), color (baliza, acento del panel y marcador). Un cuarto
-## tipo es una fila aquí más una rama en VendorUi._build_offers y otra en
-## buy(), nunca un caso especial por id en otro lado.
+## Tipos de puesto, edita aquí. Campos de fila: id (identificador, también
+## `kind`), display_name y prompt (texto del jugador), color (baliza, figura,
+## toldo, luz, acento del panel y marcador). Un cuarto tipo es una fila aquí,
+## una rama en roll_offers() y otra en buy(), nunca un caso especial por id en
+## otro lado.
 const VENDOR_LIBRARY: Array[Dictionary] = [
 	{
 		"id": "animals", "display_name": "Traficante de animales",
@@ -39,38 +41,65 @@ const VENDOR_LIBRARY: Array[Dictionary] = [
 	},
 ]
 
+## Ids de fila de VENDOR_LIBRARY con rama propia en roll_offers() y buy().
+const KIND_ANIMALS: String = "animals"
+const KIND_POWERUPS: String = "powerups"
+const KIND_ITEMS: String = "items"
+
+## El menú que abre el puesto (VendorUi).
+const VENDOR_PANEL_SCENE := preload("res://scenes/ui/modal/VendorPanel.tscn")
+
 ## Qué puesto es (id de fila de VENDOR_LIBRARY); lo fija el WorldDirector antes
 ## de que entre al árbol.
 @export var kind: String = "items"
+
+@export_group("Precios")
 ## Precio fijo de cualquier mascota en el traficante, en puntos. A propósito no
 ## es un precio de cofre: una mascota es un espacio, no una rareza, y ponerle
 ## precio por rareza daría a entender que una es la buena.
 @export var pet_price: int = 120
+## Multiplicador del precio del power-up tras cada venta, para toda la partida.
+## El precio inicial es RunState.POWERUP_VENDOR_BASE_PRICE.
+@export var powerup_price_growth: float = 1.5
+
+@export_group("Estante")
+## Mascotas que ofrece el traficante (una elección entre varias).
+@export var pet_offers: int = 3
+## Objetos que ofrece el vendedor de objetos, cada uno con su rareza sorteada.
+## El de power-ups siempre ofrece uno solo: su precio es el de la partida y
+## ofrecer más sería el mismo precio repetido.
+@export var item_offers: int = 4
+## Re-tiradas cuando un objeto cae en un hueco que ya lo tiene: el mismo nombre
+## dos veces con dos precios parece un bug. Es acotado porque una rareza puede
+## tener menos objetos que huecos el estante (Legendario tiene dos).
+@export var item_rerolls: int = 4
+
+@export_group("Espera y salida")
 ## Segundos que el puesto ignora `interact` tras cerrarse un menú sin venta. El
 ## soak vuelve a interactuar cada 0.75 s mientras se queda cerca, y sin esto el
 ## panel se reabriría apenas se cierra, para siempre.
 @export var retry_cooldown: float = 20.0
 ## Segundos que tarda el puesto en encogerse y desaparecer tras la venta.
 @export var sink_time: float = 0.6
+## Escala final del puesto al encogerse (0-1).
+@export var sink_scale: float = 0.05
 
-const VENDOR_UI_SCRIPT := preload("res://scripts/ui/game/vendor_ui.gd")
-
-## Línea que se muestra EN LUGAR de la del puesto mientras corre la espera. Sin
-## el prefijo "[E] " de los demás prompts: el token promete un botón que hace
-## algo, y durante la espera no hay nada que presionar, así que se lee como un
-## estado (como el cofre que cita un precio que no puedes pagar en vez de
-## ofrecer abrirse).
-const COOLDOWN_PROMPT_TEMPLATE: String = "Atiende de nuevo en %d s"
-## Prompt para una fila que no tiene uno (un `kind` mal escrito).
-const DEFAULT_PROMPT: String = "[E] Comerciar"
-
-## El precio del power-up se multiplica por esto con cada compra, en toda la
-## partida.
-const POWERUP_PRICE_GROWTH: float = 1.5
+@export_group("Textos")
+## Línea que se muestra EN LUGAR de la del puesto mientras corre la espera; %d
+## son los segundos que faltan. Sin el prefijo "[E] " de los demás prompts: el
+## token promete un botón que hace algo, y durante la espera no hay nada que
+## presionar, así que se lee como un estado.
+@export var cooldown_prompt_template: String = "Atiende de nuevo en %d s"
+## Prompt para una fila que no trae uno (un `kind` mal escrito).
+@export var default_prompt: String = "[E] Comerciar"
+## Etiqueta de duración en la carta del power-up; %d son los segundos.
+@export var duration_tag_template: String = "%d s"
+## Aviso del HUD cuando el puesto se va tras la venta.
+@export var leave_announcement: String = "El vendedor recoge el puesto."
 
 var _sold: bool = false
 var _cooldown_left: float = 0.0
-var _ui: CanvasLayer = null
+var _ui: VendorUi = null
 var _time: float = 0.0
 var _sign: MeshInstance3D = null
 
@@ -78,9 +107,6 @@ var _sign: MeshInstance3D = null
 func _init() -> void:
 	marker_kind = &"vendor"
 	prompt_height = 3.0
-	meta_stat_id = ""
-	collision_layer = 0
-	collision_mask = 1
 
 
 func _ready() -> void:
@@ -107,6 +133,23 @@ func row() -> Dictionary:
 			return entry
 	push_warning("Vendor: unknown kind '%s'" % kind)
 	return VENDOR_LIBRARY[0]
+
+
+## El estante para `player`, sorteado UNA vez al abrir el menú: el panel se
+## redibuja tras cada clic y cada cambio de puntos, y un estante rearmado ahí
+## cambiaría la mercancía bajo el cursor. Cada oferta es una fila lista para
+## mostrar Y el argumento que consume buy(): kind, price, title, tag, lines,
+## color y la carga (pet_id / powerup_id / item_id).
+func roll_offers(player: Node) -> Array[Dictionary]:
+	match kind:
+		KIND_ANIMALS:
+			return _animal_offers(player)
+		KIND_POWERUPS:
+			return _powerup_offers()
+		KIND_ITEMS:
+			return _item_offers(player)
+	push_warning("VendorUi: unknown vendor kind '%s'" % kind)
+	return []
 
 
 func _build_visual() -> void:
@@ -169,7 +212,7 @@ func _physics_process(delta: float) -> void:
 
 ## La línea propia del puesto, de su fila de VENDOR_LIBRARY.
 func _row_prompt() -> String:
-	return String(row().get("prompt", DEFAULT_PROMPT))
+	return String(row().get("prompt", default_prompt))
 
 
 ## Cuenta la espera en el prompt y devuelve la línea propia del puesto apenas
@@ -179,7 +222,7 @@ func _row_prompt() -> String:
 ## línea igual tiene que volver.
 func _refresh_cooldown_prompt() -> void:
 	var line: String = _row_prompt() if _cooldown_left <= 0.0 \
-			else COOLDOWN_PROMPT_TEMPLATE % ceili(_cooldown_left)
+			else cooldown_prompt_template % ceili(_cooldown_left)
 	# Solo ante un cambio real: set_prompt reescribe el Label3D (que rearma su
 	# malla de texto), y esta línea cambia una vez por segundo, no por frame.
 	if line == prompt_text:
@@ -199,8 +242,9 @@ func _interact(player: Node) -> void:
 	# interact cada 0.75 s mientras se queda cerca.
 	if BlockingUi.any_open(get_tree()):
 		return
-	var ui := VENDOR_UI_SCRIPT.new() as CanvasLayer
-	ui.call("setup", self, player)
+	var offers := roll_offers(player)
+	var ui := VENDOR_PANEL_SCENE.instantiate() as VendorUi
+	ui.setup(self, player, offers)
 	# Cuelga de la etapa como todo lo que aparece, así un cambio de etapa se
 	# lleva el panel junto con el puesto en vez de dejar un árbol pausado.
 	RunRoot.stage_parent(get_tree()).add_child(ui)
@@ -240,18 +284,18 @@ func buy(offer: Dictionary, player: Node) -> bool:
 	var buyer: Variant = player.get("player_index")
 	print("Vendor buyer: p%d" % (int(buyer) if buyer != null else -1))
 	match String(offer.get("kind", "")):
-		"animals":
+		KIND_ANIMALS:
 			if player.has_method("set_pet"):
 				player.call("set_pet", String(offer.get("pet_id", "")))
-		"powerups":
+		KIND_POWERUPS:
 			var powerups := PowerUps.find_in(player)
 			if powerups != null:
 				powerups.apply(String(offer.get("powerup_id", "")))
 			# Para toda la partida, y solo con una VENTA: un estante que alguien
 			# miró y dejó no debe encarecer el siguiente.
 			RunState.powerup_vendor_price = roundi(
-					float(RunState.powerup_vendor_price) * POWERUP_PRICE_GROWTH)
-		"items":
+					float(RunState.powerup_vendor_price) * powerup_price_growth)
+		KIND_ITEMS:
 			var bag := ItemBag.find_in(player)
 			if bag != null:
 				bag.add_item(String(offer.get("item_id", "")))
@@ -272,6 +316,103 @@ func map_marker_color() -> Color:
 	return row().get("color", Color.WHITE)
 
 
+## Mascotas que el comprador no lleva: venderle la que ya tiene le cobraría por
+## cambiarla por sí misma.
+func _animal_offers(player: Node) -> Array[Dictionary]:
+	var current: Variant = player.get("pet_id")
+	var held := String(current) if current != null else ""
+	var rows: Array[Dictionary] = []
+	for pet: Dictionary in PetCatalog.PET_LIBRARY:
+		if String(pet.id) != held:
+			rows.append(pet)
+	rows.shuffle()
+	var offers: Array[Dictionary] = []
+	for i in mini(pet_offers, rows.size()):
+		var pet: Dictionary = rows[i]
+		offers.append({
+			"kind": KIND_ANIMALS,
+			"pet_id": String(pet.id),
+			"price": pet_price,
+			"title": String(pet.display_name),
+			# El arma y la stat son lo único que cambia entre mascotas, así que
+			# ambas van en cada carta: un cambio que no se puede deshacer nunca
+			# debe ser una apuesta.
+			"tag": PetCatalog.weapon_display_name(pet),
+			"lines": PackedStringArray([String(pet.get("stat_label", ""))]),
+			"color": pet.get("color", UiTheme.TEXT_BRIGHT),
+		})
+	return offers
+
+
+## Un power-up, nunca la estrella: esa se encuentra recorriendo el mapa, y por
+## eso PowerUpCatalog.roll_id la excluye también para toda otra fuente.
+func _powerup_offers() -> Array[Dictionary]:
+	var offers: Array[Dictionary] = []
+	var powerup_id := PowerUpCatalog.roll_id(true)
+	if powerup_id.is_empty():
+		return offers
+	var powerup := PowerUpCatalog.by_id(powerup_id)
+	offers.append({
+		"kind": KIND_POWERUPS,
+		"powerup_id": powerup_id,
+		# Se lee aquí y no se guarda: el precio sube con cada power-up comprado
+		# en cualquier puesto de la partida, así que la carta cotiza lo que dejó
+		# el último comprador.
+		"price": RunState.powerup_vendor_price,
+		"title": String(powerup.display_name),
+		# La duración del catálogo, antes de que la stat de duración del
+		# comprador la estire: el puesto vende la fila, no el equipo del raider.
+		"tag": duration_tag_template % int(powerup.get("duration", 0.0)),
+		"lines": PackedStringArray([String(powerup.get("description", ""))]),
+		"color": powerup.get("color", UiTheme.TEXT_BRIGHT),
+	})
+	return offers
+
+
+## Objetos, cada uno con su propia tirada de rareza inclinada por la suerte del
+## comprador. Un objeto de un estante y uno de un cofre son la misma compra, así
+## que una sola curva les pone precio a ambos, inflación de cofres incluida.
+func _item_offers(player: Node) -> Array[Dictionary]:
+	var offers: Array[Dictionary] = []
+	var luck := _buyer_luck(player)
+	var taken := PackedStringArray()
+	for _slot in item_offers:
+		var rarity := UpgradePool.roll_rarity(luck, 0)
+		var rarity_name := String(rarity.name)
+		var item_id := _roll_unused_item(rarity_name, taken)
+		if item_id.is_empty():
+			continue
+		taken.append(item_id)
+		var item := ItemCatalog.by_id(item_id)
+		offers.append({
+			"kind": KIND_ITEMS,
+			"item_id": item_id,
+			"rarity": rarity_name,
+			"price": RunState.chest_price(rarity_name),
+			"title": String(item.display_name),
+			"tag": UpgradePool.rarity_display(rarity_name),
+			"lines": PackedStringArray([String(item.get("description", ""))]),
+			"color": ItemCatalog.rarity_color(rarity_name),
+		})
+	return offers
+
+
+## Un objeto de `rarity_name` que todavía no está en el estante. Los reintentos
+## son acotados (item_rerolls), y un hueco vacío es peor que uno repetido.
+func _roll_unused_item(rarity_name: String, taken: PackedStringArray) -> String:
+	var item_id := ItemCatalog.roll_id(rarity_name)
+	var tries := 0
+	while tries < item_rerolls and taken.has(item_id):
+		item_id = ItemCatalog.roll_id(rarity_name)
+		tries += 1
+	return item_id
+
+
+static func _buyer_luck(player: Node) -> float:
+	var stats := PlayerStats.find_in(player)
+	return stats.luck if stats != null else 0.0
+
+
 ## Lo que la oferta entregó de verdad, para el registro.
 static func _payload_id(offer: Dictionary) -> String:
 	for key: String in ["pet_id", "powerup_id", "item_id"]:
@@ -282,9 +423,9 @@ static func _payload_id(offer: Dictionary) -> String:
 
 
 func _leave() -> void:
-	get_tree().call_group("hud", "announce", "El vendedor recoge el puesto.")
+	get_tree().call_group("hud", "announce", leave_announcement)
 	set_physics_process(false)
 	var tween := create_tween()
-	tween.tween_property(self, "scale", Vector3.ONE * 0.05, sink_time) \
+	tween.tween_property(self, "scale", Vector3.ONE * sink_scale, sink_time) \
 			.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_IN)
 	tween.tween_callback(queue_free)
