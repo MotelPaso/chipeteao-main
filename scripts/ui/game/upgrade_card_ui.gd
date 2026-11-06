@@ -11,33 +11,82 @@ extends CanvasLayer
 ## selector abierto se encola (primero los niveles pendientes, después el resto)
 ## y se sirve en tandas seguidas antes de quitar la pausa.
 ##
-## Todo el movimiento corre en esta capa ALWAYS e ignora la escala de tiempo, así
-## que ni la pausa ni el hit-stop lo frenan. Cada reparto enfoca la primera carta
-## y enlaza las vecinas izquierda/derecha: con el árbol pausado y Esc bloqueado,
-## un selector que no se puede contestar con control o teclado congela la partida.
-
-## Segundos entre pausar el árbol y mostrar las cartas: un respiro para que se
-## lea el pulso de subida de nivel. Mantenlo bajo ~0.25.
-const REVEAL_DELAY := 0.2
-
-## Segundos del golpe de la carta elegida y la caída de las demás, antes de
-## servir la siguiente elección.
-const PICK_ANIM_TIME := 0.16
-
-## Sufijo del título en co-op. Es una plantilla para cambiar el separador o el
-## orden en una sola línea.
-const RECIPIENT_TITLE_TEMPLATE := "%s  ·  Jugador %d"
-
-## Título de una elección por nivel: número de nivel y el lado que ofrece.
-const LEVEL_TITLE_TEMPLATE := "Nivel %d — elige: %s"
+## Cada carta es una instancia de UpgradeCard.tscn: este script decide qué
+## mostrar y la coreografía (reparto, elección, cola); la carta decide cómo se
+## ve. Todo el movimiento corre en esta capa ALWAYS e ignora la escala de
+## tiempo, así que ni la pausa ni el hit-stop lo frenan. Cada reparto enfoca la
+## primera carta y enlaza las vecinas izquierda/derecha: con el árbol pausado y
+## Esc bloqueado, un selector que no se puede contestar con control o teclado
+## congela la partida.
 
 ## Tipos de pedido en la cola (ver _open_request).
 const KIND_BONUS := "bonus"
 const KIND_CHOICE := "choice"
 
+@export_group("Título")
+## Espaciado extra entre letras del título, en píxeles. Tamaño, color y contorno
+## del título están en el nodo LevelLabel de UpgradeCardUI.tscn.
+@export var title_letter_spacing: int = 4
+
+@export_group("Apertura")
+## Segundos entre pausar el árbol y mostrar las cartas: un respiro para que se
+## lea el pulso de subida de nivel. Mantenlo bajo ~0.25.
+@export var reveal_delay: float = 0.2
+## Segundos que tarda en subir el fondo oscuro.
+@export var dim_fade_time: float = 0.15
+## Escala desde la que crece el título al abrir.
+@export var title_start_scale: float = 0.9
+## Segundos que tarda el título en llegar a su tamaño, con un rebote al final.
+@export var title_grow_time: float = 0.22
+
+@export_group("Reparto")
+## Escala desde la que crece cada carta al repartirse.
+@export var deal_start_scale: float = 0.8
+## Segundos que tarda cada carta en llegar a su tamaño, con un rebote al final.
+@export var deal_time: float = 0.22
+## Segundos entre la entrada de una carta y la siguiente.
+@export var deal_stagger: float = 0.06
+## Parte del tiempo de entrada en la que la carta pasa de invisible a opaca (0-1).
+@export var deal_fade_share: float = 0.7
+
+@export_group("Reparto encadenado")
+## Escala inicial de cada carta cuando la oferta cambia con el selector ya
+## abierto (elecciones seguidas).
+@export var quick_deal_start_scale: float = 0.92
+## Segundos que tarda cada carta en llegar a su tamaño en ese cambio rápido.
+@export var quick_deal_time: float = 0.14
+## Segundos entre una carta y la siguiente en ese cambio rápido.
+@export var quick_deal_stagger: float = 0.03
+
+@export_group("Elección")
+## Segundos del golpe de la carta elegida y la caída de las demás, antes de
+## servir la siguiente elección.
+@export var pick_time: float = 0.16
+## Escala a la que sube la carta elegida.
+@export var pick_scale: float = 1.12
+## Escala a la que bajan las cartas no elegidas.
+@export var loser_scale: float = 0.9
+## Opacidad final de las cartas no elegidas (0-1).
+@export var loser_alpha: float = 0.2
+
+@export_group("Aviso del Tomo del Azar")
+## Título del aviso de botín que lista las stats que movió el Tomo del Azar.
+@export var gamble_toast_title: String = "Azar"
+## Color de ese aviso.
+@export var gamble_toast_color: Color = UiTheme.ACCENT_AMBER
+
+@export_group("Textos")
+## Título de una elección por nivel: número de nivel y el lado que ofrece.
+@export var level_title_template: String = "Nivel %d — elige: %s"
+## Título en co-op: el título de la elección y el número del jugador dueño.
+@export var recipient_title_template: String = "%s  ·  Jugador %d"
+## Indicación del botón de aceptar bajo las cartas.
+@export var accept_hint_text: String = "Elegir"
+
 @onready var _dim: ColorRect = %Dim
 @onready var _level_label: Label = %LevelLabel
-@onready var _cards: Array[Button] = [%Card1 as Button, %Card2 as Button, %Card3 as Button]
+@onready var _cards: Array[UpgradeCard] = [%Card1 as UpgradeCard, %Card2 as UpgradeCard,
+		%Card3 as UpgradeCard]
 
 var _offer: Array[Dictionary] = []
 ## true desde la pausa hasta que aparecen las cartas: lo que llega en esa
@@ -65,8 +114,6 @@ var _recipient: Node = null
 var _recipient_rotation: int = 0
 var _deal_tween: Tween = null
 var _pick_tween: Tween = null
-## Brillos en bucle de las cartas legendarias; se matan en cada nueva tirada.
-var _shine_tweens: Array[Tween] = []
 
 
 func _ready() -> void:
@@ -74,12 +121,11 @@ func _ready() -> void:
 	add_to_group("upgrade_ui")
 	add_to_group(BlockingUi.GROUP)
 	RunState.leveled_up.connect(_on_leveled_up)
-	UiTheme.style_title(_level_label, 34, Color(0.96, 0.93, 0.82), 4, 8)
+	_level_label.add_theme_font_override("font", UiTheme.spaced_font(title_letter_spacing))
 	# Indicación de botón bajo las cartas; sigue al último dispositivo usado.
-	_level_label.get_parent().add_child(InputHints.build([["ui_accept", "Elegir"]]))
+	_level_label.get_parent().add_child(InputHints.build([["ui_accept", accept_hint_text]]))
 	for i in _cards.size():
 		_cards[i].pressed.connect(_on_card_pressed.bind(i))
-		UiTheme.attach_motion(_cards[i], 1.05, 0.97)
 
 
 ## Contrato de PauseMenu ("ui_blocking"): true mientras esta capa es dueña de la
@@ -164,7 +210,7 @@ func _open_level_pick(new_level: int) -> bool:
 	if recipient == null:
 		return false
 	_side = UpgradePool.roll_side(recipient)
-	return _open(LEVEL_TITLE_TEMPLATE % [new_level, UpgradePool.side_label(_side)],
+	return _open(level_title_template % [new_level, UpgradePool.side_label(_side)],
 			recipient)
 
 
@@ -198,7 +244,7 @@ func _open(title: String, requested_recipient: Node = null) -> bool:
 	get_tree().paused = true
 	_recipient = recipient
 	if Coop.is_coop():
-		title = RECIPIENT_TITLE_TEMPLATE % [title, int(_recipient.get("player_index")) + 1]
+		title = recipient_title_template % [title, int(_recipient.get("player_index")) + 1]
 	_level_label.text = title
 	_roll()
 	if visible:
@@ -210,7 +256,7 @@ func _open(title: String, requested_recipient: Node = null) -> bool:
 	# las cartas aparecen tras un respiro para que se lea el pulso de nivel. El
 	# temporizador corre en pausa e ignora la escala de tiempo del hit-stop.
 	_opening = true
-	var timer := get_tree().create_timer(REVEAL_DELAY, true, false, true)
+	var timer := get_tree().create_timer(reveal_delay, true, false, true)
 	timer.timeout.connect(_reveal, CONNECT_ONE_SHOT)
 	return true
 
@@ -240,15 +286,16 @@ func _deal(quick: bool) -> void:
 	_deal_tween.set_ignore_time_scale(true)
 	if not quick:
 		_dim.modulate.a = 0.0
-		_deal_tween.tween_property(_dim, "modulate:a", 1.0, 0.15)
+		_deal_tween.tween_property(_dim, "modulate:a", 1.0, dim_fade_time)
 		_level_label.pivot_offset = _level_label.size * 0.5
-		_level_label.scale = Vector2(0.9, 0.9)
-		_deal_tween.tween_property(_level_label, "scale", Vector2.ONE, 0.22) \
+		_level_label.scale = Vector2.ONE * title_start_scale
+		_deal_tween.tween_property(_level_label, "scale", Vector2.ONE, title_grow_time) \
 				.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 	else:
 		_dim.modulate.a = 1.0
-	var start_scale := 0.92 if quick else 0.8
-	var duration := 0.14 if quick else 0.22
+	var start_scale := quick_deal_start_scale if quick else deal_start_scale
+	var duration := quick_deal_time if quick else deal_time
+	var stagger := quick_deal_stagger if quick else deal_stagger
 	for i in _cards.size():
 		var card := _cards[i]
 		if not card.visible:
@@ -256,8 +303,8 @@ func _deal(quick: bool) -> void:
 		card.pivot_offset = card.size * 0.5
 		card.scale = Vector2.ONE * start_scale
 		card.modulate = Color(1.0, 1.0, 1.0, 0.0)
-		var delay := (0.03 if quick else 0.06) * i
-		_deal_tween.tween_property(card, "modulate:a", 1.0, duration * 0.7) \
+		var delay := stagger * i
+		_deal_tween.tween_property(card, "modulate:a", 1.0, duration * deal_fade_share) \
 				.set_delay(delay)
 		_deal_tween.tween_property(card, "scale", Vector2.ONE, duration) \
 				.set_delay(delay).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
@@ -296,7 +343,7 @@ func _roll() -> void:
 		for i in _cards.size():
 			_cards[i].visible = i < options.size()
 			if i < options.size():
-				_populate_choice_card(_cards[i], options[i], tag)
+				_cards[i].show_choice(options[i], tag)
 		return
 	# El grupo necesita al destinatario para ofrecer solo mejoras de SUS armas
 	# y cartas de armas nuevas (se recalcula en cada tirada).
@@ -305,85 +352,7 @@ func _roll() -> void:
 	for i in _cards.size():
 		_cards[i].visible = i < _offer.size()
 		if i < _offer.size():
-			_populate_card(_cards[i], _offer[i])
-
-
-## Una opción del llamador, dibujada con la misma carta que una tirada: la cinta
-## lleva la etiqueta del llamador en vez de una rareza, y el color de la opción
-## pinta el borde y el brillo.
-func _populate_choice_card(card: Button, option: Dictionary, tag: String) -> void:
-	var color: Color = option.get("color", UiTheme.ACCENT_AMBER)
-	var rarity_label: Label = card.get_node("CardBox/RarityLabel")
-	rarity_label.text = tag.to_upper()
-	rarity_label.visible = not tag.is_empty()
-	rarity_label.add_theme_font_override("font", UiTheme.spaced_font(3))
-	UiTheme.style_badge(rarity_label, Color(0.07, 0.075, 0.1), color, color.lightened(0.2))
-	rarity_label.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-	var title_label := card.get_node("CardBox/TitleLabel") as Label
-	title_label.text = String(option.get("title", ""))
-	title_label.add_theme_color_override("font_color", UiTheme.TEXT_BRIGHT)
-	var desc_label := card.get_node("CardBox/DescLabel") as Label
-	desc_label.text = String(option.get("description", ""))
-	desc_label.add_theme_color_override("font_color", UiTheme.TEXT_DIM)
-	# Las opciones del llamador no apuntan a un arma: se oculta la etiqueta para
-	# que el nombre de arma de una carta sorteada no quede en una de elección.
-	var weap_label := card.get_node("CardBox/WeapLabel") as Label
-	weap_label.visible = false
-	UiTheme.style_card(card, color)
-	card.self_modulate = Color.WHITE
-
-
-func _populate_card(card: Button, item: Dictionary) -> void:
-	var rarity: Dictionary = item.rarity
-	var rarity_color := rarity.color as Color
-	var rarity_label: Label = card.get_node("CardBox/RarityLabel")
-	# Una carta de elección puede haber ocultado la cinta (opción sin etiqueta);
-	# una carta sorteada siempre muestra ahí su rareza.
-	rarity_label.visible = true
-	# rarity.name es un id (precios de cofre, filas de objetos y pisos de
-	# min_rarity dependen de él): solo se traduce aquí, camino a la pantalla.
-	rarity_label.text = UpgradePool.rarity_display(String(rarity.name)).to_upper()
-	# Cinta superior: píldora del color de la rareza con texto oscuro, espaciada
-	# como un sello.
-	rarity_label.add_theme_font_override("font", UiTheme.spaced_font(3))
-	UiTheme.style_badge(rarity_label, Color(0.07, 0.075, 0.1),
-			rarity_color, rarity_color.lightened(0.2))
-	rarity_label.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-
-	var title_label := card.get_node("CardBox/TitleLabel") as Label
-	title_label.text = item.title
-	title_label.add_theme_color_override("font_color", UiTheme.TEXT_BRIGHT)
-
-	var desc_label := card.get_node("CardBox/DescLabel") as Label
-	desc_label.text = item.description
-	desc_label.add_theme_color_override("font_color", UiTheme.TEXT_DIM)
-	# Etiqueta de arma: toda carta sorteada que invierte en un arma (su target es
-	# "weapon/<NodeName>": cartas de stat por arma y extras del catálogo) nombra
-	# aquí el arma que mejora. Las cartas de arma nueva, tomo y stat genérica no
-	# tienen ese target, y la etiqueta queda oculta.
-	var weap_label := card.get_node("CardBox/WeapLabel") as Label
-	var weapon_target := String(item.entry.get("target", ""))
-	if weapon_target.begins_with("weapon/"):
-		weap_label.text = UpgradePool.weapon_display_name(
-				weapon_target.get_slice("/", 1))
-		weap_label.add_theme_color_override("font_color", UiTheme.TEXT_DIM)
-		weap_label.visible = true
-	else:
-		weap_label.visible = false
-
-	UiTheme.style_card(card, rarity_color)
-	if String(rarity.name) == "Legendary":
-		# Brillo lento: toda la carta respira más clara (el brillo de sombra del
-		# stylebox la acompaña).
-		var shine := create_tween().set_loops()
-		shine.set_ignore_time_scale(true)
-		shine.tween_property(card, "self_modulate", Color(1.25, 1.18, 1.0), 0.7) \
-				.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
-		shine.tween_property(card, "self_modulate", Color.WHITE, 0.7) \
-				.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
-		_shine_tweens.append(shine)
-	else:
-		card.self_modulate = Color.WHITE
+			_cards[i].show_rolled(_offer[i])
 
 
 func _on_card_pressed(index: int) -> void:
@@ -430,8 +399,8 @@ func _pick_choice(index: int) -> void:
 ## Muestra la tirada del Tomo del Azar en el aviso de botín del HUD.
 func _toast_gamble(boons: Array[Dictionary], player: Node) -> void:
 	var index: Variant = player.get("player_index")
-	get_tree().call_group("hud", "show_loot", "Azar", Tome.boon_text(boons),
-			UiTheme.ACCENT_AMBER, int(index) if index != null else 0)
+	get_tree().call_group("hud", "show_loot", gamble_toast_title, Tome.boon_text(boons),
+			gamble_toast_color, int(index) if index != null else 0)
 
 
 ## La carta elegida da un golpe hacia arriba y las demás caen y se apagan; tras
@@ -451,11 +420,11 @@ func _animate_pick(index: int) -> void:
 		UiTheme.kill_meta_tween(card, &"ui_motion_tween")
 		card.pivot_offset = card.size * 0.5
 		if i == index:
-			_pick_tween.tween_property(card, "scale", Vector2(1.12, 1.12),
-					PICK_ANIM_TIME).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+			_pick_tween.tween_property(card, "scale", Vector2.ONE * pick_scale,
+					pick_time).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 		else:
-			_pick_tween.tween_property(card, "scale", Vector2(0.9, 0.9), PICK_ANIM_TIME)
-			_pick_tween.tween_property(card, "modulate:a", 0.2, PICK_ANIM_TIME)
+			_pick_tween.tween_property(card, "scale", Vector2.ONE * loser_scale, pick_time)
+			_pick_tween.tween_property(card, "modulate:a", loser_alpha, pick_time)
 	_pick_tween.chain().tween_callback(_after_pick)
 
 
@@ -520,14 +489,10 @@ func _resolve_recipient() -> Node:
 	return best
 
 
-## Mata los brillos en bucle de las legendarias. Usan set_loops() e ignoran la
-## escala de tiempo en una capa ALWAYS: uno que quede corriendo sigue escribiendo
-## self_modulate en un botón oculto el resto de la partida.
+## Mata los brillos en bucle de las cartas legendarias (ver UpgradeCard.stop_shine).
 func _kill_shines() -> void:
-	for tween: Tween in _shine_tweens:
-		if tween.is_valid():
-			tween.kill()
-	_shine_tweens.clear()
+	for card: UpgradeCard in _cards:
+		card.stop_shine()
 
 
 ## Pliega el selector sin tocar la pausa ni el mouse: para cuando la partida
