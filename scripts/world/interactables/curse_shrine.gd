@@ -81,10 +81,6 @@ const PACT_LIBRARY: Array[Dictionary] = [
 const PACT_TEXT: String = "Ganas: %s\nPagas: %s"
 
 
-func _accent_color() -> Color:
-	return Color(1.0, 0.3, 0.25)
-
-
 func _demon_blood_in_ring() -> int:
 	return best_item_count_in_range("demon_blood")
 
@@ -111,7 +107,7 @@ func _reward_options(keys: int) -> Array[Dictionary]:
 			"title": String(pact.name),
 			"description": PACT_TEXT % [_benefit_text(pact.benefit, keys),
 					_cost_text(pact.cost)],
-			"color": _accent_color(),
+			"color": accent_color,
 			"pact": pact,
 		})
 	return options

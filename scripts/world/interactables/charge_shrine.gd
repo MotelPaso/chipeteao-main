@@ -21,6 +21,9 @@ extends Interactable
 ## Título y etiqueta de la carta de la elección que abre este altar.
 @export var choice_title: String = "El altar te ofrece un don"
 @export var choice_tag: String = "Bendición"
+@export_group("Aspecto")
+## Color del anillo, del disco de progreso y de las cartas; tiñe los materiales de Ring y ProgressDisc de la escena.
+@export var accent_color: Color = Color(0.4, 0.8, 1.0)
 @export_group("Master Key")
 ## Velocidad de carga extra por cada Llave maestra (0.2 = +20 % por copia).
 @export var key_speed_per_copy: float = 0.2
@@ -37,12 +40,8 @@ const CRYSTAL_BOB_HZ: float = 2.1
 const CRYSTAL_BOB_HEIGHT: float = 0.12
 const CRYSTAL_PULSE_HZ: float = 9.0
 const CRYSTAL_PULSE_AMOUNT: float = 0.12
-## Radio de respaldo si la escena no trae una zona cilíndrica (el de
-## ChargeShrine.tscn).
+## Radio de respaldo si la escena no trae una zona cilíndrica, en metros.
 const DEFAULT_ZONE_RADIUS: float = 9.3
-## El disco de progreso construido en código ocupa esta fracción del radio
-## de la zona.
-const PROGRESS_DISC_SHARE: float = 0.97
 ## Un raider a menos de estos radios de anillo marca el altar (más brillo, late).
 const APPROACH_BAND_SCALE: float = 2.0
 const MARK_PULSE_HZ: float = 3.4
@@ -89,12 +88,8 @@ var channeling: bool = false
 var progress: float = 0.0
 var _time: float = 0.0
 var _leaving: bool = false
-var _crystal: MeshInstance3D = null
-var _progress_disc: MeshInstance3D = null
-var _ring: MeshInstance3D = null
 var _crystal_rest_y: float = 0.0
-## Radio de la zona de este altar; de él salen la banda de acercamiento y el
-## disco construido en código.
+## Radio de la zona de este altar; de él sale la banda de acercamiento.
 var _zone_radius: float = DEFAULT_ZONE_RADIUS
 ## Materiales propios del anillo y el disco (ver _own_material).
 var _ring_material: StandardMaterial3D = null
@@ -105,6 +100,11 @@ var _disc_material: StandardMaterial3D = null
 var _marked_energy: float = NAN
 var _marked_alpha: float = NAN
 
+## El altar demoníaco no tiene cristal ni anillo; el disco está en las dos escenas.
+@onready var _crystal: MeshInstance3D = get_node_or_null("Visual/Crystal") as MeshInstance3D
+@onready var _ring: MeshInstance3D = get_node_or_null("Visual/Ring") as MeshInstance3D
+@onready var _progress_disc: MeshInstance3D = $Visual/ProgressDisc
+
 
 func _ready() -> void:
 	super()
@@ -112,14 +112,9 @@ func _ready() -> void:
 	# de la arena por este grupo.
 	add_to_group("altars")
 	_zone_radius = _measure_zone_radius()
-	_crystal = get_node_or_null("Visual/Crystal") as MeshInstance3D
 	if _crystal != null:
 		_crystal_rest_y = _crystal.position.y
-	_ring = get_node_or_null("Visual/Ring") as MeshInstance3D
 	_ring_material = _own_material(_ring, RING_ALPHA_IDLE, RING_ENERGY_IDLE)
-	_progress_disc = get_node_or_null("Visual/ProgressDisc") as MeshInstance3D
-	if _progress_disc == null:
-		_progress_disc = _build_progress_disc()
 	_disc_material = _own_material(_progress_disc, PROGRESS_DISC_ALPHA, RING_ENERGY_IDLE)
 
 
@@ -136,48 +131,24 @@ func _measure_zone_radius() -> float:
 	return DEFAULT_ZONE_RADIUS
 
 
-## Material propio para el anillo o el disco. Laten en cada frame, y un
-## [sub_resource] de la escena es UN objeto compartido por todas las
-## instancias: escribir en él haría latir todos los altares a la vez.
+## Copia propia del material de la escena de `target`, teñida con
+## accent_color (el resto del material sale de la escena). Cada altar
+## necesita la suya: el anillo y el disco laten por instancia, y un
+## [sub_resource] de la escena lo comparten todas las instancias.
 func _own_material(target: MeshInstance3D, alpha: float,
 		energy: float) -> StandardMaterial3D:
 	if target == null:
 		return null
-	var material := StandardMaterial3D.new()
-	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	material.albedo_color = Color(_accent_color(), alpha)
-	material.emission_enabled = true
-	material.emission = _accent_color()
+	var source := target.get_active_material(0) as StandardMaterial3D
+	if source == null:
+		push_warning("ChargeShrine: %s has no StandardMaterial3D to tint" % target.name)
+		return null
+	var material := source.duplicate() as StandardMaterial3D
+	material.albedo_color = Color(accent_color, alpha)
+	material.emission = accent_color
 	material.emission_energy_multiplier = energy
 	target.material_override = material
 	return material
-
-
-## Disco plano que crece con la carga, para escenas que no traen uno (el
-## obelisco demoníaco).
-func _build_progress_disc() -> MeshInstance3D:
-	var disc := MeshInstance3D.new()
-	var mesh := CylinderMesh.new()
-	var radius := _zone_radius * PROGRESS_DISC_SHARE
-	mesh.top_radius = radius
-	mesh.bottom_radius = radius
-	mesh.height = 0.04
-	# 64 lados como el ProgressDisc de la escena: un disco de 9 m tiene que
-	# verse redondo junto a su anillo.
-	mesh.radial_segments = 64
-	mesh.rings = 1
-	disc.mesh = mesh
-	disc.position.y = 0.06
-	disc.scale = Vector3(0.001, 1.0, 0.001)
-	disc.visible = false
-	add_child(disc)
-	return disc
-
-
-## Color del anillo, el disco y las cartas; el altar demoníaco lo cambia a rojo.
-func _accent_color() -> Color:
-	return Color(0.4, 0.8, 1.0)
 
 
 func _physics_process(delta: float) -> void:
@@ -332,7 +303,7 @@ func _reward_options(keys: int) -> Array[Dictionary]:
 		options.append({
 			"title": String(boon.name),
 			"description": label + " para toda la party",
-			"color": _accent_color(),
+			"color": accent_color,
 			"label": label,
 			"stat": String(boon.stat),
 			"amount": amount,
