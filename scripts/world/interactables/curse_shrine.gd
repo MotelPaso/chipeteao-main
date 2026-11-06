@@ -8,8 +8,6 @@ extends ChargeShrine
 ## Sangre de demonio agranda las dos mitades del trato. Los jefes sueltan un
 ## cofre extra por uso (BossBase lee RunState.demonic_uses).
 
-const CHEST_SCENE := preload("res://scenes/world/chests/Chest.tscn")
-
 ## Multiplica el costo de dificultad de cada pacto (1 = el número de PACT_LIBRARY, 2 = el doble).
 @export var difficulty_scale: float = 1.0
 ## Sangre de demonio: cada copia de quien carga suma esta fracción al don Y al costo de dificultad.
@@ -198,20 +196,10 @@ func _pay_cost(cost: Dictionary) -> float:
 
 
 ## El beneficio "cofre gratis": un cofre sin precio que tira su rareza al
-## abrirse, junto al obelisco. Va colgado de la arena, no del altar: el
-## obelisco se libera unos segundos después de pagar y se llevaría el premio.
+## abrirse, a chest_drop_distance del obelisco en una dirección al azar.
+## Chest.spawn_free lo cuelga de la arena: el obelisco se libera unos
+## segundos después de pagar y no se lleva el premio.
 func _drop_free_chest() -> void:
-	var parent := RunRoot.stage_parent(get_tree())
-	if parent == null:
-		parent = get_parent()
-	if parent == null:
-		return
-	var chest := CHEST_SCENE.instantiate() as Chest
-	if chest == null:
-		push_warning("CurseShrine: Chest scene root is not a Chest.")
-		return
-	chest.free_open = true
-	parent.add_child(chest)
 	var angle := randf() * TAU
-	chest.global_position = global_position \
-			+ Vector3(cos(angle), 0.0, sin(angle)) * chest_drop_distance
+	Chest.spawn_free(get_tree(), global_position
+			+ Vector3(cos(angle), 0.0, sin(angle)) * chest_drop_distance)

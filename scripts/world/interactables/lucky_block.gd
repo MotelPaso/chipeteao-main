@@ -26,7 +26,6 @@ const LUCKY_REWARDS: Array[Dictionary] = [
 	{"id": "well", "weight": 0.7},
 ]
 
-const CHEST_SCENE: PackedScene = preload("res://scenes/world/chests/Chest.tscn")
 ## Probabilidad (0-1) de que el pozo pague un power-up en vez del objeto mejor.
 const WELL_POWERUP_CHANCE: float = 0.3
 ## Objetos que ofrece el pozo, más la carta de "quedarse con todo". DOS, no
@@ -210,15 +209,7 @@ func _reward_points(player: Node) -> void:
 
 ## Un cofre gratis junto al bloque.
 func _reward_chest() -> void:
-	var chest := CHEST_SCENE.instantiate() as Chest
-	if chest == null:
-		return
-	chest.free_open = true
-	var parent := RunRoot.stage_parent(get_tree())
-	if parent == null:
-		return
-	parent.add_child(chest)
-	chest.global_position = global_position + Vector3(1.6, 0.0, 0.0)
+	Chest.spawn_free(get_tree(), global_position + Vector3(1.6, 0.0, 0.0))
 
 
 func _reward_powerup(player: Node) -> void:

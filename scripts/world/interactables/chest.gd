@@ -16,6 +16,9 @@ extends Interactable
 
 ## Aviso del cofre gratis: no hay precio, así que no hay variante "te faltan".
 const FREE_PROMPT: String = "[E] Abrir cofre — gratis"
+## Escena que instancia spawn_free. Se carga al llamarla: un script no puede
+## precargar la escena que lo usa.
+const SCENE_PATH: String = "res://scenes/world/chests/Chest.tscn"
 
 @export_group("Cofre")
 ## Modo gratis: sin precio, sin encarecer y con la rareza tirada al abrir. Se
@@ -54,6 +57,30 @@ const FREE_PROMPT: String = "[E] Abrir cofre — gratis"
 var _opener: Node = null
 
 @onready var _glow_light: OmniLight3D = $Visual/GlowLight
+
+
+## Deja un cofre GRATIS en `at`, colgado de la arena (RunRoot.stage_parent)
+## y no de quien lo suelta, para que siga ahí aunque ese nodo se libere.
+## `bonus_luck` y `rarity_floor` se guardan en luck_bonus y min_rarity antes
+## de que entre al árbol. Devuelve null si no hay arena.
+static func spawn_free(tree: SceneTree, at: Vector3, bonus_luck: float = 0.0,
+		rarity_floor: String = "") -> Chest:
+	var parent := RunRoot.stage_parent(tree)
+	if parent == null:
+		return null
+	var node := (load(SCENE_PATH) as PackedScene).instantiate()
+	var chest := node as Chest
+	if chest == null:
+		node.free()
+		push_warning("Chest: %s root is not a Chest." % SCENE_PATH)
+		return null
+	chest.free_open = true
+	chest.luck_bonus = bonus_luck
+	if not rarity_floor.is_empty():
+		chest.min_rarity = rarity_floor
+	parent.add_child(chest)
+	chest.global_position = at
+	return chest
 
 
 func _ready() -> void:
