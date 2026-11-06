@@ -425,14 +425,14 @@ func _build_mesas() -> void:
 			add_child(ramp)
 			# Alinear la rampa exactamente con una de las 4 caras planas de la plataforma
 			var side_idx := _rng.randi_range(0, 3)
-			var local_offsets := [
+			var local_offsets: Array[Vector3] = [
 				Vector3(4.95, 0.0, 0.0),
 				Vector3(0.0, 0.0, 4.95),
 				Vector3(-4.95, 0.0, 0.0),
 				Vector3(0.0, 0.0, -4.95)
 			]
-			var local_rot_y := [PI, PI * 0.5, 0.0, -PI * 0.5]
-			var world_pos := plat.transform * (local_offsets[side_idx] * scale)
+			var local_rot_y: Array[float] = [PI, PI * 0.5, 0.0, -PI * 0.5]
+			var world_pos: Vector3 = plat.transform * (local_offsets[side_idx] * scale)
 			ramp.position = Vector3(world_pos.x, ground_height(world_pos.x, world_pos.z), world_pos.z)
 			ramp.rotation.y = plat_angle + local_rot_y[side_idx]
 			ramp.scale = Vector3.ONE * scale
