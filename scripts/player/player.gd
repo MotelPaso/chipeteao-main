@@ -28,11 +28,6 @@ const SLIDE_MIN_SPEED_RATIO: float = 0.5
 ## lado y no encima, para que la física no empuje a ninguno de los dos.
 const RESCUE_MATE_OFFSET := Vector3(1.5, 0.5, 0.0)
 
-## Textos del toast de mascota; los dos llevan el nombre (%s) para que un
-## cambio se lea como cambio y no como regalo.
-const PET_JOINS: String = "%s se une"
-const PET_LEAVES: String = "%s se despide"
-
 @export_group("Movimiento")
 ## Velocidad base al caminar, en metros por segundo; tomos y objetos la multiplican.
 @export var move_speed: float = 8.6
@@ -70,13 +65,17 @@ const PET_LEAVES: String = "%s se despide"
 ## de entrega (el node_name que cuenta el pool y el contador used_weapon_).
 static var starting_weapon_override: String = ""
 
-## Puntos actuales de la partida; otros scripts los leen con get("points").
-var points: int = 0
+## Puntos actuales de la partida (los guarda el nodo Wallet); otros scripts
+## los leen con get("points").
+var points: int:
+	get:
+		return _wallet.points if _wallet != null else 0
 
-## Mascota que sigue al raider ("" = ninguna). Hay un solo espacio: una
-## nueva reemplaza a la anterior, arma y stat incluidos. Solo la dan la caja
-## de mascotas y el traficante de animales, nunca un cofre ni la ruleta.
-var pet_id: String = ""
+## Mascota que sigue al raider ("" = ninguna); la guarda el nodo PetSlot.
+## Antes del _ready de Player vale "" (PlayerStats ya la lee en el suyo).
+var pet_id: String:
+	get:
+		return _pet_slot.pet_id if _pet_slot != null else ""
 
 ## Radio de rescate en metros (lectura; se edita en el nodo Revive).
 var revive_radius: float:
@@ -95,11 +94,9 @@ var revive_time: float:
 @onready var _camera: PlayerCamera = $CameraRig
 @onready var _revive: PlayerRevive = $Revive
 @onready var _flight: PlayerFlight = $Flight
+@onready var _pet_slot: PetSlot = $PetSlot
+@onready var _wallet: PlayerWallet = $Wallet
 @onready var item_bag: ItemBag = $ItemBag
-
-## Multiplicadores de puntos con nombre (Fiebre del oro, Lluvia dorada): el
-## total es su PRODUCTO, así dos fuentes activas a la vez se componen.
-var _points_sources: Dictionary[String, float] = {}
 
 var _gravity: float = ProjectSettings.get_setting("physics/3d/default_gravity", 9.8)
 var _default_collision_height: float = 1.8
@@ -128,86 +125,34 @@ var _is_dead: bool = false
 var _spawn_position: Vector3 = Vector3.ZERO
 
 
-## Cambia la mascota: libera el nodo Pet anterior, crea el nuevo, avisa los
-## dos cambios con el toast de botín y recalcula los stats, que leen
-## `pet_id`. Con "" solo vacía el espacio.
+## Cambia la mascota (caja de mascotas y vendedor la llaman por nombre; ver
+## PetSlot.set_pet).
 func set_pet(new_pet_id: String) -> void:
-	if new_pet_id == pet_id:
-		return
-	var leaving := PetCatalog.by_id(pet_id)
-	# Por TIPO y no por nombre: queue_free deja el nodo como hijo hasta el
-	# final del frame, y con dos set_pet en el mismo frame add_child
-	# renombraría la mascota nueva y quedarían dos siguiendo al raider.
-	for child: Node in get_children():
-		var old_pet := child as Pet
-		if old_pet != null:
-			old_pet.queue_free()
-	pet_id = new_pet_id
-	if not leaving.is_empty():
-		_announce_pet(PET_LEAVES % String(leaving.display_name),
-				PetCatalog.weapon_display_name(leaving), leaving)
-	if not pet_id.is_empty():
-		var row := PetCatalog.by_id(pet_id)
-		if row.is_empty():
-			push_warning("Player: unknown pet '%s'" % pet_id)
-			pet_id = ""
-		else:
-			var pet := Pet.new()
-			pet.setup(row)
-			add_child(pet)
-			_announce_pet(PET_JOINS % String(row.display_name),
-					String(row.get("stat_label", "")), row)
-			# Log de una línea. Va aquí y no en los vendedores: es la única
-			# puerta de entrada de una mascota.
-			print("Pet joined: %s" % pet_id)
-	var stats := PlayerStats.find_in(self)
-	if stats != null:
-		stats.recompute()
+	_pet_slot.set_pet(new_pet_id)
 
 
-func _announce_pet(title: String, description: String, row: Dictionary) -> void:
-	get_tree().call_group("hud", "show_loot", title, description,
-			row.get("color", Color.WHITE) as Color, player_index)
+# --- Puntos (nodo Wallet) ---------------------------------------------------
+# Enemigos, cofres, santuarios, vendedores, PowerUps y WorldDirector llaman
+# a estos métodos por nombre (has_method/call).
 
-
-## Multiplicador total de puntos: producto de todas las fuentes activas.
 func points_multiplier() -> float:
-	var factor := 1.0
-	for source_id: String in _points_sources:
-		factor *= _points_sources[source_id]
-	return factor
+	return _wallet.points_multiplier()
 
 
-## Activa o actualiza una fuente de multiplicador (PowerUps y WorldDirector la llaman por nombre).
 func set_points_source(source_id: String, multiplier: float) -> void:
-	_points_sources[source_id] = multiplier
+	_wallet.set_points_source(source_id, multiplier)
 
 
-## Quita una fuente de multiplicador.
 func clear_points_source(source_id: String) -> void:
-	_points_sources.erase(source_id)
+	_wallet.clear_points_source(source_id)
 
 
-## Suma puntos con el multiplicador actual.
 func add_points(amount: int) -> void:
-	if amount <= 0:
-		return
-	# Redondea hacia arriba: un x1.5 sobre una baja de 1 punto paga 2, no 1.
-	points += ceili(float(amount) * points_multiplier())
-	points_changed.emit(points)
+	_wallet.add_points(amount)
 
 
-## Descuenta si alcanza y devuelve true; si no alcanza, false sin cambiar nada.
 func spend_points(amount: int) -> bool:
-	if amount <= 0:
-		# Precio 0 es gratis (true). Un precio negativo es un error del
-		# llamador y se rechaza: si no, PAGARÍA al jugador.
-		return amount == 0
-	if amount > points:
-		return false
-	points -= amount
-	points_changed.emit(points)
-	return true
+	return _wallet.spend_points(amount)
 
 
 func _ready() -> void:
