@@ -24,6 +24,13 @@ const ARENA_HOST_NAME: String = "ArenaHost"
 ## Cuadros de espera tras liberar los objetos de la etapa, para que el motor
 ## los recupere de verdad antes de que el barrido los cuente.
 const SWAP_SETTLE_FRAMES: int = 1
+## Grupos de objetos de etapa que el cambio libera antes del barrido, en
+## este orden. Cada uno tiene su campo en la línea `Stage sweep:` salvo
+## lucky_blocks: ese formato es fijo (tools/verificar.sh compara la línea
+## entera), así que un grupo nuevo se libera aquí sin tocar la línea.
+const STAGE_PROP_GROUPS: Array[StringName] = [&"altars", XpGem.LIVE_GROUP,
+		HealthOrb.LIVE_GROUP, &"powerup_pickups", &"pet_boxes", &"vendors", &"possessed",
+		&"lucky_blocks"]
 
 @onready var _arena_host: Node3D = get_node(ARENA_HOST_NAME)
 
@@ -82,6 +89,34 @@ static func stage_parent(tree: SceneTree) -> Node:
 	return tree.current_scene if tree.current_scene != null else tree.root
 
 
+## Si un cambio de etapa puede EMPEZAR ahora. Síncrono a propósito: quien
+## se gasta para tomar el portal tiene que saberlo ANTES, y advance_stage es
+## una corrutina cuya respuesta llega recién tras todo el cambio, cuando el
+## portal ya se liberó con su arena.
+func can_advance_stage() -> bool:
+	return not _swapping and RunState.run_active and not ScreenFade.is_busy()
+
+
+## Público (portal de salida, por el grupo "run_root"): desarma la etapa
+## actual y construye la siguiente tras un fundido. No hace nada si ya hay
+## un cambio en curso.
+func advance_stage() -> void:
+	# Una partida que ya terminó no construye otra etapa: el cierre ya leyó
+	# stages_cleared_total, laps_completed y visited_map_ids, y un cambio
+	# posterior movería los tres a espaldas del registro y correría los
+	# objetos de la etapa siguiente bajo la pantalla de fin.
+	if _swapping or not RunState.run_active:
+		return
+	_swapping = true
+	# Con await, este método también es corrutina: quien lo llama lo dispara
+	# y se olvida (el portal lo hace), y la bandera es lo que vuelve inútil
+	# una segunda pulsación durante el fundido.
+	if not await ScreenFade.transition_async(_swap_stage):
+		# Ya había un fundido (una partida terminando, un menú saliendo): la
+		# etapa sigue y el portal se puede volver a pulsar.
+		_swapping = false
+
+
 ## Construye la etapa a la que apunta RunState.stage_index: instancia,
 ## publica el id del mapa, coloca al equipo y lo anuncia. El _ready de la
 ## arena maneja el acuerdo director/scatter (ver arena.gd).
@@ -118,84 +153,90 @@ func _place_party() -> void:
 	get_tree().call_group("run_systems", "place_party", origin)
 
 
-## Si un cambio de etapa puede EMPEZAR ahora. Síncrono a propósito: quien
-## se gasta para tomar el portal tiene que saberlo ANTES, y advance_stage es
-## una corrutina cuya respuesta llega recién tras todo el cambio, cuando el
-## portal ya se liberó con su arena.
-func can_advance_stage() -> bool:
-	return not _swapping and RunState.run_active and not ScreenFade.is_busy()
-
-
-## Público (portal de salida, por el grupo "run_root"): desarma la etapa
-## actual y construye la siguiente tras un fundido. No hace nada si ya hay
-## un cambio en curso.
-func advance_stage() -> void:
-	# Una partida que ya terminó no construye otra etapa: el cierre ya leyó
-	# stages_cleared_total, laps_completed y visited_map_ids, y un cambio
-	# posterior movería los tres a espaldas del registro y correría los
-	# objetos de la etapa siguiente bajo la pantalla de fin.
-	if _swapping or not RunState.run_active:
-		return
-	_swapping = true
-	# Con await, este método también es corrutina: quien lo llama lo dispara
-	# y se olvida (el portal lo hace), y la bandera es lo que vuelve inútil
-	# una segunda pulsación durante el fundido.
-	if not await ScreenFade.transition_async(_swap_stage):
-		# Ya había un fundido (una partida terminando, un menú saliendo): la
-		# etapa sigue y el portal se puede volver a pulsar.
-		_swapping = false
-
-
 ## El cambio en sí, que ScreenFade espera entre el fundido de entrada y el
-## de salida. Cada paso va en este orden a propósito; ver los comentarios.
+## de salida. Cada paso va en este orden a propósito; ver cada función.
 func _swap_stage() -> void:
 	var from_index := RunState.stage_index
 	var from_id := String(MapCatalog.MAP_LIBRARY[from_index % MapCatalog.MAP_LIBRARY.size()].id)
-	# 1. Cierra todo menú bloqueante que SE PUEDA cerrar, antes de leer la
-	#    pausa. VendorUi y RouletteUi cuelgan de la ARENA: el paso 6 los
-	#    libera sin correr su _close(), lo único que devuelve la pausa, y con
-	#    uno abierto `was_paused` saldría true y el paso 8 no quitaría la
-	#    pausa: el árbol quedaría pausado sin nada vivo que lo despause.
-	#    `dismiss()` es el gancho del grupo "blocking_ui_closable". Los menús
-	#    que NO se cierran (las cartas) conservan su pausa y los revisa
-	#    _other_blocking_ui_open() al final.
+	var was_paused := _freeze_world()
+	# Lo que lleva el equipo, leído de los nodos vivos (la otra mitad del par
+	# se imprime al final).
+	_print_carry()
+	_tear_down_stage()
+	# Deja que el motor asiente las liberaciones antes de contarlas.
+	for i in SWAP_SETTLE_FRAMES:
+		await get_tree().process_frame
+	_print_sweep()
+	_free_arena()
+	var next_index := _advance_counters(from_index)
+	_load_stage()
+	_announce_stage(from_index, next_index)
+	_print_carry()
+	if not was_paused and not _other_blocking_ui_open():
+		get_tree().paused = false
+	_swapping = false
+	# from_id solo lo lee la narración de depuración de abajo.
+	if OS.get_environment("BONK_PROBE_DEBUG") == "1":
+		print("RunRoot: left %s" % from_id)
+
+
+## Cierra los menús que se pueden cerrar y congela el mundo. Devuelve si el
+## árbol ya estaba pausado ANTES del cambio.
+func _freeze_world() -> bool:
+	# Primero los menús, antes de leer la pausa: VendorUi y RouletteUi
+	# cuelgan de la ARENA, _free_arena() los libera sin correr su _close()
+	# (lo único que devuelve la pausa), y con uno abierto `was_paused` saldría
+	# true y el árbol quedaría pausado sin nada vivo que lo despause.
+	# `dismiss()` es el gancho del grupo "blocking_ui_closable". Los menús
+	# que NO se cierran (las cartas) conservan su pausa y los revisa
+	# _other_blocking_ui_open() al final.
 	get_tree().call_group(&"blocking_ui_closable", "dismiss")
-	# 2. Congela el mundo. La pausa también corta la entrada del jugador, así
-	#    ningún raider camina hacia una escena que se está liberando.
+	# La pausa también corta la entrada del jugador, así ningún raider camina
+	# hacia una escena que se está liberando.
 	var was_paused := get_tree().paused
 	get_tree().paused = true
 	# La pausa sola NO basta: process_mode se HEREDA, y el harness cuelga
 	# toda la partida de un nodo que siempre procesa, así que ahí el spawner
 	# seguiría metiendo enemigos en el barrido. Se detiene explícitamente;
-	# el director se detiene con on_stage_ended, más abajo.
+	# el director se detiene con on_stage_ended (_tear_down_stage).
 	get_tree().call_group("enemy_spawner", "set_physics_process", false)
-	# 3. Lo que lleva el equipo, leído de los nodos vivos.
-	_print_carry()
-	# 4. Desarma la etapa.
+	return was_paused
+
+
+## Desarma la etapa: enemigos, objetos de pool, lo del director y los
+## objetos de etapa sueltos.
+func _tear_down_stage() -> void:
 	_free_enemies()
 	Pools.release_all_live()
 	get_tree().call_group("world_director", "on_stage_ended")
 	_free_stage_props()
-	# 5. Deja que el motor asiente las liberaciones antes de contarlas.
-	for i in SWAP_SETTLE_FRAMES:
-		await get_tree().process_frame
-	_print_sweep()
-	# 6. Libera la arena. free() y no queue_free(): la etapa siguiente se
-	#    construye enseguida y dos arenas vivas responderían a los grupos
-	#    "arena_bounds" y "enemy_spawner".
+
+
+## Libera la arena. free() y no queue_free(): la etapa siguiente se construye
+## enseguida y dos arenas vivas responderían a los grupos "arena_bounds" y
+## "enemy_spawner".
+func _free_arena() -> void:
 	if _arena != null and is_instance_valid(_arena):
 		_arena_host.remove_child(_arena)
 		_arena.free()
 	_arena = null
-	# 7. Avanza los contadores y construye la etapa siguiente.
+
+
+## Avanza los contadores de etapa (y de vuelta al pasar del último mapa al
+## primero). Devuelve el índice de la etapa siguiente.
+func _advance_counters(from_index: int) -> int:
 	var next_index := (from_index + 1) % MapCatalog.MAP_LIBRARY.size()
 	if next_index == 0:
 		RunState.lap += 1
 		RunState.laps_completed += 1
 	RunState.stage_index = next_index
 	RunState.begin_stage()
-	_load_stage()
-	# 8. Anuncia. Numeración desde 1 en todo lo que ve el jugador (o un log de soak).
+	return next_index
+
+
+## Anuncia la etapa nueva. Numeración desde 1 en todo lo que ve el jugador
+## (o un log de soak).
+func _announce_stage(from_index: int, next_index: int) -> void:
 	var to_id := String(MapCatalog.MAP_LIBRARY[next_index].id)
 	get_tree().call_group("boss_ui", "announce_major", "Etapa %d — %s" % [
 			RunState.stage_index + 1,
@@ -204,13 +245,6 @@ func _swap_stage() -> void:
 	# Log de una línea para los soaks headless.
 	print("Stage advanced: %d -> %d (%s) at %.1fs" % [
 			from_index + 1, next_index + 1, to_id, RunState.run_time])
-	_print_carry()
-	if not was_paused and not _other_blocking_ui_open():
-		get_tree().paused = false
-	_swapping = false
-	# from_id solo lo lee la narración de depuración de abajo.
-	if OS.get_environment("BONK_PROBE_DEBUG") == "1":
-		print("RunRoot: left %s" % from_id)
 
 
 ## Balizas todavía en pie. on_stage_ended LIBERA sus balizas, así que un
@@ -239,9 +273,7 @@ func _free_enemies() -> void:
 ## pero el barrido corre ANTES de liberar la arena, y una etapa que filtra
 ## uno de estos es justo lo que el barrido detecta.
 func _free_stage_props() -> void:
-	var kinds: Array[StringName] = [&"altars", XpGem.LIVE_GROUP, HealthOrb.LIVE_GROUP,
-			&"powerup_pickups", &"pet_boxes", &"vendors", &"possessed", &"lucky_blocks"]
-	for group: StringName in kinds:
+	for group: StringName in STAGE_PROP_GROUPS:
 		for node: Node in get_tree().get_nodes_in_group(group):
 			if is_instance_valid(node) and not node.is_queued_for_deletion():
 				var parent := node.get_parent()
