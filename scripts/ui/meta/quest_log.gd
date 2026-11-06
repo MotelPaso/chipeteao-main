@@ -81,7 +81,7 @@ func _build_side(quest: Dictionary, state: RowState,
 	var side := VBoxContainer.new()
 	side.alignment = BoxContainer.ALIGNMENT_CENTER
 	side.add_theme_constant_override("separation", 4)
-	var reward := MetaScreen.label("+%d esquirlas" % int(quest.reward), 14,
+	var reward := MetaScreen.label(UiTheme.SHARDS_GAIN % int(quest.reward), 14,
 			UiTheme.SHARD_BLUE)
 	reward.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	side.add_child(reward)

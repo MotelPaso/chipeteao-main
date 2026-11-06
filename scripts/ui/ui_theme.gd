@@ -25,7 +25,16 @@ const SHARD_BLUE := Color(0.55, 0.8, 0.92)
 const TEXT_BRIGHT := Color(0.96, 0.97, 0.99)
 const TEXT_DIM := Color(0.66, 0.69, 0.75)
 const TEXT_FAINT := Color(0.47, 0.5, 0.56)
+## Texto normal sobre paneles oscuros (etiquetas de ajustes, botones de co-op).
+const TEXT_NORMAL := Color(0.85, 0.87, 0.9)
 const OUTLINE_DARK := Color(0.03, 0.035, 0.06, 0.92)
+## Fondo oscuro de chips y filas del HUD y de los modales, opaco: cada uso le
+## pone su alfa con Color(UiTheme.TILE_BG, alfa).
+const TILE_BG := Color(0.07, 0.075, 0.11)
+## Atenuado de pantalla detrás de un panel modal.
+const DIM := Color(0.03, 0.03, 0.05, 0.75)
+## Destello (modulate) de "no alcanza" (ver reject).
+const REJECT_FLASH := Color(1.0, 0.42, 0.42)
 
 ## Radio de las esquinas (píxeles): paneles y cartas, chips y botones.
 const RADIUS := 10
@@ -52,6 +61,20 @@ const MOTION_TIME := 0.12
 ## cambiar la palabra llega a todas las pantallas a la vez.
 const LEVEL_ABBREV := "Nv %d"
 const WEAPON_LEVEL_ABBREV := "N%d"
+## Saldo de esquirlas ("Esquirlas: 120"): selector y pantallas meta.
+const SHARDS_BALANCE := "Esquirlas: %d"
+## Cantidad de esquirlas ("120 esquirlas"): precios de raiders y de la Armería.
+const SHARDS_AMOUNT := "%d esquirlas"
+## Esquirlas ganadas ("+20 esquirlas"): recompensa de una misión.
+const SHARDS_GAIN := "+%d esquirlas"
+## Puntos de la partida ("35 pts"): HUD y precios del vendedor.
+const POINTS_AMOUNT := "%d pts"
+## Saldo de puntos en los paneles modales ("Tienes 35 pts").
+const POINTS_BALANCE := "Tienes %d pts"
+## Aviso de puntos insuficientes en los paneles modales.
+const POINTS_SHORT := "No te alcanzan los puntos."
+## Etiqueta de un jugador en co-op ("J2").
+const PLAYER_TAG := "J%d"
 
 
 # --- styleboxes ------------------------------------------------------------

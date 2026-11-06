@@ -24,10 +24,6 @@ extends Control
 ## (co-op y cuadrícula) se desplaza, y la cuadrícula calcula sus columnas
 ## según el ancho de la ventana y el tamaño del plantel.
 
-const QUEST_LOG_SCENE_PATH := "res://scenes/ui/QuestLog.tscn"
-const COLLECTION_SCENE_PATH := "res://scenes/ui/Collection.tscn"
-const RELIC_SHOP_SCENE_PATH := "res://scenes/ui/RelicShop.tscn"
-
 ## Tamaño (píxeles) de cada carta: alcanza para la pasiva más larga del
 ## catálogo más dos líneas de descripción; la cuadrícula se desplaza.
 const CARD_SIZE := Vector2(184, 244)
@@ -40,8 +36,7 @@ const CARD_SIZE := Vector2(184, 244)
 const PASSIVE_MAX_LINES := 4
 const LOCKED_PASSIVE_MAX_LINES := 2
 const UNLOCK_HINT_MAX_LINES := 2
-## Destello (modulate) de "no alcanza".
-const REJECT_FLASH_COLOR := Color(1.0, 0.42, 0.42)
+
 ## Tamaño (píxeles) de los botones de cantidad de jugadores del co-op.
 const SEGMENT_BUTTON_SIZE := Vector2(64, 36)
 ## Las cartas no elegidas quedan algo atenuadas para que la elegida se lea de
@@ -279,7 +274,7 @@ func _refresh_coop_rows() -> void:
 		var usable := count <= supported
 		_coop_buttons[i].add_theme_color_override("font_color",
 				UiTheme.ACCENT_AMBER if selected
-				else (Color(0.85, 0.87, 0.9) if usable else UiTheme.TEXT_FAINT))
+				else (UiTheme.TEXT_NORMAL if usable else UiTheme.TEXT_FAINT))
 		UiTheme.style_card(_coop_buttons[i],
 				UiTheme.ACCENT_AMBER if selected
 				else (UiTheme.BORDER_DIM if usable else UiTheme.BORDER_LOCKED),
@@ -332,7 +327,7 @@ func _refresh_slot_row() -> void:
 		var tint := Color(character.tint)
 		var editing := slot == _editing_slot
 		slot_button.add_theme_color_override("font_color",
-				tint.lightened(0.35) if editing else Color(0.85, 0.87, 0.9))
+				tint.lightened(0.35) if editing else UiTheme.TEXT_NORMAL)
 		UiTheme.style_card(slot_button, tint if editing else UiTheme.BORDER_DIM,
 				3 if editing else 2, editing)
 		_slot_row.add_child(slot_button)
@@ -394,7 +389,7 @@ func _play_entrance() -> void:
 
 
 func _refresh_shards() -> void:
-	_shards_label.text = "Esquirlas: %d" % SaveData.shards
+	_shards_label.text = UiTheme.SHARDS_BALANCE % SaveData.shards
 	UiTheme.pop(_shards_label, 1.12, 0.22)
 
 
@@ -488,16 +483,12 @@ func _on_start_pressed() -> void:
 		# RunState sigue corriendo mientras esta pantalla sin pausa está
 		# arriba: la partida nueva parte de cero (igual que Reintentar).
 		RunState.reset()
-		get_tree().change_scene_to_file(RUN_SCENE_PATH))
-
-
-## La única escena en la que arranca una partida.
-const RUN_SCENE_PATH: String = "res://scenes/world/Run.tscn"
+		get_tree().change_scene_to_file(ScenePaths.RUN))
 
 
 func _on_quests_pressed() -> void:
 	ScreenFade.transition(func() -> void:
-		get_tree().change_scene_to_file(QUEST_LOG_SCENE_PATH))
+		get_tree().change_scene_to_file(ScenePaths.QUEST_LOG))
 
 
 ## Botones de las pantallas meta agregados en código junto a Misiones:
@@ -505,11 +496,11 @@ func _on_quests_pressed() -> void:
 func _build_extra_buttons() -> void:
 	var collection_button := _extra_button("Colección", func() -> void:
 		ScreenFade.transition(func() -> void:
-			get_tree().change_scene_to_file(COLLECTION_SCENE_PATH)))
+			get_tree().change_scene_to_file(ScenePaths.COLLECTION)))
 	_button_row.move_child(collection_button, _quests_button.get_index() + 1)
 	var armory_button := _extra_button("Armería", func() -> void:
 		ScreenFade.transition(func() -> void:
-			get_tree().change_scene_to_file(RELIC_SHOP_SCENE_PATH)))
+			get_tree().change_scene_to_file(ScenePaths.RELIC_SHOP)))
 	_button_row.move_child(armory_button, collection_button.get_index() + 1)
 	var best := SaveData.stat("daily_best_" + _today_id())
 	var daily_button := _extra_button(
@@ -562,7 +553,7 @@ func _on_daily_pressed() -> void:
 			[GameConfig.selected_character_id] as Array[String])
 	ScreenFade.transition(func() -> void:
 		RunState.reset()
-		get_tree().change_scene_to_file(RUN_SCENE_PATH))
+		get_tree().change_scene_to_file(ScenePaths.RUN))
 
 
 ## --- Contenido de las cartas (se rehace al cambiar bloqueo o selección) --
@@ -653,7 +644,7 @@ func _card_tooltip(character: Dictionary) -> String:
 	if not blurb.is_empty():
 		lines.append_array(["", blurb])
 	if not SaveData.is_unlocked(String(character.id)):
-		var price := "%d esquirlas" % int(character.get("unlock_cost", 0))
+		var price := UiTheme.SHARDS_AMOUNT % int(character.get("unlock_cost", 0))
 		var hint := String(character.get("unlock_hint", ""))
 		lines.append_array(["", price if hint.is_empty() else "%s, o %s" % [price, hint]])
 	return "\n".join(lines)
@@ -715,7 +706,7 @@ func _populate_card(card: Button, character: Dictionary) -> void:
 		var owners: Array[String] = []
 		for slot in _coop_count:
 			if _coop_characters[slot] == character_id:
-				owners.append("J%d" % (slot + 1))
+				owners.append(UiTheme.PLAYER_TAG % (slot + 1))
 		box.add_child(CardFactory.label(" · ".join(owners), 11, UiTheme.ACCENT_AMBER))
 	var tint := Color(character.tint)
 	UiTheme.style_card(card, tint if selected else UiTheme.BORDER_DIM,
@@ -782,7 +773,7 @@ func _populate_locked_card(card: Button, character: Dictionary) -> void:
 	# en toda carta, así el precio queda a la misma altura en toda la fila sin
 	# importar cuánto se envuelvan la pasiva o la pista. SHRINK_CENTER
 	# mantiene la píldora de su propio tamaño.
-	var cost := CardFactory.label("%d esquirlas" % int(character.get("unlock_cost", 0)),
+	var cost := CardFactory.label(UiTheme.SHARDS_AMOUNT % int(character.get("unlock_cost", 0)),
 			13, UiTheme.SHARD_BLUE)
 	cost.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	UiTheme.style_badge(cost, UiTheme.SHARD_BLUE,
@@ -845,7 +836,7 @@ func _reject_card(card: Button, rest_modulate: Color = Color.WHITE) -> void:
 	UiTheme.kill_meta_tween(card, &"ui_settle_tween")
 	var tween := card.create_tween()
 	tween.set_ignore_time_scale(true)
-	tween.tween_property(card, "modulate", REJECT_FLASH_COLOR, 0.06)
+	tween.tween_property(card, "modulate", UiTheme.REJECT_FLASH, 0.06)
 	tween.parallel().tween_property(card, "rotation_degrees", -4.0, 0.05)
 	tween.tween_property(card, "rotation_degrees", 4.0, 0.08)
 	tween.tween_property(card, "rotation_degrees", -2.0, 0.07)

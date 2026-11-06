@@ -3,10 +3,10 @@ extends CanvasLayer
 ## cada cambio de escena (selector → partida, partida → selector, reintentar,
 ## pantallas meta). transition(action) funde a negro un rect de pantalla
 ## completa, ejecuta el callable (el change_scene/reload y su limpieza) y
-## vuelve a fundir. Dibuja encima de todo (capa 100), procesa siempre e
-## ignora la escala de tiempo, así que funciona desde la pantalla de fin en
-## pausa y en pleno hit-stop. Es seguro en headless: solo es un tween de un
-## ColorRect.
+## vuelve a fundir. Dibuja encima de todo (UiLayers.SCREEN_FADE), procesa
+## siempre e ignora la escala de tiempo, así que funciona desde la pantalla de
+## fin en pausa y en pleno hit-stop. Es seguro en headless: solo es un tween de
+## un ColorRect.
 ##
 ## transition_async() es la variante que espera, para trabajo que dura varios
 ## frames (el cambio de etapa). Mientras hay un fundido en curso, las
@@ -22,6 +22,8 @@ extends CanvasLayer
 ## Duración (segundos) del fundido a negro y del regreso.
 const FADE_IN_TIME := 0.22
 const FADE_OUT_TIME := 0.26
+## Color del rect del fundido.
+const FADE_COLOR := Color(0.015, 0.018, 0.03)
 
 var _rect: ColorRect
 var _tween: Tween = null
@@ -29,10 +31,10 @@ var _busy: bool = false
 
 
 func _ready() -> void:
-	layer = 100
+	layer = UiLayers.SCREEN_FADE
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	_rect = ColorRect.new()
-	_rect.color = Color(0.015, 0.018, 0.03)
+	_rect.color = FADE_COLOR
 	_rect.modulate.a = 0.0
 	_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_rect.set_anchors_preset(Control.PRESET_FULL_RECT)

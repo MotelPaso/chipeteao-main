@@ -15,11 +15,8 @@ extends Control
 ## _build_rows(list). Momentos compartidos que llama una subclase: payoff()
 ## (reclamar / comprar), reject() (no alcanza) y rebuild().
 
-const CHARACTER_SELECT_SCENE_PATH := "res://scenes/ui/CharacterSelect.tscn"
-
-## Destello de la fila (modulate) al pagar y al no alcanzar.
+## Destello de la fila (modulate) al pagar.
 const PAYOFF_FLASH := Color(1.7, 1.45, 0.85)
-const REJECT_FLASH := Color(1.0, 0.42, 0.42)
 ## Margen interno (píxeles) de la tarjeta de cada fila: lados y arriba/abajo.
 const CARD_MARGIN_H := 16.0
 const CARD_MARGIN_V := 10.0
@@ -116,7 +113,7 @@ func _can_scroll(direction: int) -> bool:
 
 func _on_back_pressed() -> void:
 	ScreenFade.transition(func() -> void:
-		get_tree().change_scene_to_file(CHARACTER_SELECT_SCENE_PATH))
+		get_tree().change_scene_to_file(ScenePaths.CHARACTER_SELECT))
 
 
 # --- insignia ---------------------------------------------------------
@@ -126,7 +123,7 @@ func refresh_badge() -> void:
 
 
 func set_badge_count(value: int) -> void:
-	_badge_label.text = "Esquirlas: %d" % value
+	_badge_label.text = UiTheme.SHARDS_BALANCE % value
 
 
 ## El aviso de saldo llega en forma síncrona desde claim_quest /
@@ -183,7 +180,7 @@ func reject(row: Control) -> void:
 	row.modulate = Color.WHITE
 	var tween := create_tween()
 	tween.set_ignore_time_scale(true)
-	tween.tween_property(row, "modulate", REJECT_FLASH, 0.06)
+	tween.tween_property(row, "modulate", UiTheme.REJECT_FLASH, 0.06)
 	tween.parallel().tween_property(row, "rotation_degrees", -2.0, 0.05)
 	tween.tween_property(row, "rotation_degrees", 2.0, 0.08)
 	tween.tween_property(row, "rotation_degrees", 0.0, 0.07)

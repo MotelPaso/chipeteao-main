@@ -59,7 +59,7 @@ func _build_row(relic: Dictionary) -> PanelContainer:
 	else:
 		var cost := RelicCatalog.next_rank_cost(relic_id, rank)
 		var buy := Button.new()
-		buy.text = "%d esquirlas" % cost
+		buy.text = UiTheme.SHARDS_AMOUNT % cost
 		buy.custom_minimum_size = Vector2(130.0, 34.0)
 		buy.pressed.connect(_on_buy_pressed.bind(relic_id, row))
 		UiTheme.style_button(buy, UiTheme.SHARD_BLUE, SaveData.can_afford(cost))

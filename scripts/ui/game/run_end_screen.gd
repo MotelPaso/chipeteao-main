@@ -1,10 +1,10 @@
 extends CanvasLayer
 ## Pantalla de fin de partida (GDD 9.6): la abre RunManager.run_ended con las
-## estadísticas de RunState. La capa 20 dibuja sobre las cartas de mejora
-## (10) y process_mode ALWAYS mantiene la animación y los botones vivos con
-## el árbol en pausa. Reintentar recarga la partida (el _ready del jugador
-## recaptura el mouse), Cambiar raider hace la misma limpieza pero vuelve al
-## selector y Salir cierra el juego.
+## estadísticas de RunState. Su capa (UiLayers.RUN_END) dibuja sobre las
+## cartas de mejora y process_mode ALWAYS mantiene la animación y los botones
+## vivos con el árbol en pausa. Reintentar recarga la partida (el _ready del
+## jugador recaptura el mouse), Cambiar raider hace la misma limpieza pero
+## vuelve al selector y Salir cierra el juego.
 ##
 ## Los cuatro finales (cumplió la meta o no × murió o se extrajo) son filas de
 ## ENDINGS: texto, color del título y adorno viajan juntos, así que un quinto
@@ -21,7 +21,6 @@ extends CanvasLayer
 ## Color del título en las derrotas y en las victorias.
 const DEFEAT_TITLE_COLOR := Color(0.9, 0.25, 0.2)
 const VICTORY_TITLE_COLOR := Color(0.96, 0.78, 0.3)
-const CHARACTER_SELECT_SCENE_PATH := "res://scenes/ui/CharacterSelect.tscn"
 
 ## Una fila por final. `shake` es el golpe de la derrota y `shimmer` el
 ## brillo dorado en bucle del título.
@@ -59,6 +58,11 @@ const ENDINGS: Dictionary[String, Dictionary] = {
 
 var _entrance_tween: Tween = null
 var _shimmer_tween: Tween = null
+
+
+## La capa sale de la tabla de UiLayers; la escena no guarda una propia.
+func _init() -> void:
+	layer = UiLayers.RUN_END
 
 
 func _ready() -> void:
@@ -207,7 +211,7 @@ func _on_retry_pressed() -> void:
 ## raider (la elección en GameConfig sobrevive, así que el selector reabre
 ## en lo último elegido).
 func _on_change_character_pressed() -> void:
-	if not ScreenFade.leave_run(CHARACTER_SELECT_SCENE_PATH):
+	if not ScreenFade.leave_run(ScenePaths.CHARACTER_SELECT):
 		return
 
 
