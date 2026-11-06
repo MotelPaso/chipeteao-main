@@ -1,3 +1,4 @@
+class_name BossArrow
 extends Node2D
 ## Indicador de objetivo en el borde de la pantalla: mientras un cuerpo del
 ## grupo "boss" vive fuera de la pantalla (o detrás de la cámara), una flecha
@@ -12,7 +13,17 @@ extends Node2D
 ## cada celda con bind_view(camera, carrier); mientras no lo haga, en co-op
 ## apunta con la primera cámara de pantalla dividida que encuentra y desplaza
 ## el resultado por la esquina de esa celda.
+## El HUD le reenvía track_objective desde el grupo "boss_ui".
 
+## Segundos entre intentos de encontrar una cámara de pantalla dividida
+## mientras no hay ninguna. La búsqueda recorre el árbol, así que nunca corre
+## cada cuadro, y en solo no corre nunca (el viewport raíz tiene su cámara).
+const CAMERA_RESCAN := 0.5
+
+## Barra de la que la flecha toma su color de relleno (Fill), para que el
+## ámbar del jefe tenga un solo dueño: BossBar.fill_color.
+@export var color_source: BossBar
+@export_group("Posición")
 ## Distancia (px) que la punta de la flecha guarda de los bordes de la pantalla.
 @export var edge_margin: float = 56.0
 ## Margen (px) dentro del viewport que aún cuenta como "en pantalla": evita
@@ -20,11 +31,6 @@ extends Node2D
 @export var on_screen_inset: float = 24.0
 ## Altura (metros) sobre el origen del jefe a la que se apunta (pecho, no pies).
 @export var aim_height: float = 1.2
-
-## Segundos entre intentos de encontrar una cámara de pantalla dividida
-## mientras no hay ninguna. La búsqueda recorre el árbol, así que nunca corre
-## cada cuadro, y en solo no corre nunca (el viewport raíz tiene su cámara).
-const CAMERA_RESCAN := 0.5
 
 ## Vista inyectada (ver bind_view): la cámara por la que apunta esta flecha y
 ## el jugador desde el que mide distancias. Ambos nulos = respaldos de solo.
@@ -39,6 +45,8 @@ var _objective: Node3D = null
 
 func _ready() -> void:
 	visible = false
+	if color_source != null:
+		($Fill as Polygon2D).color = color_source.fill_color
 
 
 ## Entrada para pantalla dividida: una flecha por vista, cada una apunta con
@@ -130,17 +138,7 @@ func _resolve_reference() -> Node3D:
 	var tree := get_tree()
 	if tree == null:
 		return null
-	var best: Node3D = null
-	var best_slot := Coop.MAX_PLAYERS
-	for node: Node in tree.get_nodes_in_group(&"player"):
-		var body := node as Node3D
-		if body == null:
-			continue
-		var slot := int(body.get("player_index"))
-		if slot < best_slot:
-			best_slot = slot
-			best = body
-	return best
+	return PartySlots.lowest_standing(tree)
 
 
 ## Matemática de pantalla pura, aparte para que un arnés headless la

@@ -1,0 +1,39 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" uid="uid://bafv6iro15cx8" path="res://scripts/ui/game/hud/loot_toast.gd" id="1_toast"]
+
+[node name="LootToast" type="PanelContainer" unique_id=698167204]
+visible = false
+anchors_preset = 7
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = -170.0
+offset_top = -172.0
+offset_right = 170.0
+offset_bottom = -108.0
+grow_vertical = 0
+mouse_filter = 2
+script = ExtResource("1_toast")
+
+[node name="Column" type="VBoxContainer" parent="." unique_id=1993137150]
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/separation = 2
+
+[node name="Title" type="Label" parent="Column" unique_id=1538724680]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 17
+text = "Título del premio"
+horizontal_alignment = 1
+
+[node name="Description" type="Label" parent="Column" unique_id=124921288]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.66, 0.69, 0.75, 1)
+theme_override_font_sizes/font_size = 13
+text = "Descripción del premio"
+horizontal_alignment = 1
+autowrap_mode = 3

@@ -13,13 +13,21 @@ extends Control
 ## Se reconstruye desde WorldDirector.on_stage_started (reenviado por el HUD),
 ## no desde la señal stage_changed: esa llamada también ocurre en la etapa 0,
 ## así que la primera etapa no necesita caso especial.
+##
+## Posición y tamaño los pone quien lo crea: ViewWidgets, con el rectángulo de
+## HUD.tscn > ViewWidgets > MinimapSlot.
 
-## Lado del widget, en píxeles.
-const SIZE: float = 150.0
+# --- Edita aquí: se crea con .new(), así que no tiene Inspector. -----------
 ## Margen del mapa dentro de su marco, en píxeles.
 const FRAME_PAD: float = 3.0
-## Los marcadores se dibujan más chicos aquí que en el mapa de Tab.
+## Escala de los marcadores respecto del mapa de Tab (más chicos aquí).
 const MARKER_SCALE: float = 0.75
+## Color de fondo del marco.
+const BACKGROUND_COLOR := Color(0.05, 0.055, 0.08, 0.85)
+## Grosor del borde, en píxeles.
+const BORDER_WIDTH: float = 2.0
+## Cuánto se oscurece el turquesa de UiTheme.ACCENT para el borde (0-1).
+const BORDER_DARKEN: float = 0.2
 ## Segundos entre recolecciones de marcadores y revisiones de la composición.
 ## La niebla pinta en su propio tick, más lento; esto la convierte en imagen
 ## cuando cambió (ver _composite_if_changed).
@@ -33,8 +41,6 @@ var _composited: Array = []
 
 
 func _ready() -> void:
-	custom_minimum_size = Vector2(SIZE, SIZE)
-	size = Vector2(SIZE, SIZE)
 	# Nunca se come un clic destinado al mundo ni toma el foco (Tab tiene que
 	# llegar al mapa grande, no recorrer la cadena de foco).
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -107,8 +113,8 @@ func _draw() -> void:
 	if _map == null:
 		return
 	var frame := Rect2(Vector2.ZERO, size)
-	draw_rect(frame, Color(0.05, 0.055, 0.08, 0.85), true)
+	draw_rect(frame, BACKGROUND_COLOR, true)
 	var inner := Rect2(Vector2(FRAME_PAD, FRAME_PAD),
 			size - Vector2(FRAME_PAD, FRAME_PAD) * 2.0)
 	_map.draw_into(self, inner, MARKER_SCALE)
-	draw_rect(frame, UiTheme.ACCENT.darkened(0.2), false, 2.0)
+	draw_rect(frame, UiTheme.ACCENT.darkened(BORDER_DARKEN), false, BORDER_WIDTH)

@@ -1,0 +1,62 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" uid="uid://bww48dy5jpj72" path="res://scripts/ui/game/hud/loadout_tile.gd" id="1_tile"]
+
+[node name="LoadoutTile" type="PanelContainer" unique_id=1493084744]
+custom_minimum_size = Vector2(44, 44)
+mouse_filter = 1
+script = ExtResource("1_tile")
+
+[node name="Inner" type="Control" parent="." unique_id=203789186]
+layout_mode = 2
+mouse_filter = 2
+
+[node name="Icon" type="TextureRect" parent="Inner" unique_id=289711547]
+unique_name_in_owner = true
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+expand_mode = 1
+stretch_mode = 5
+
+[node name="Glyph" type="Label" parent="Inner" unique_id=386867677]
+unique_name_in_owner = true
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_colors/font_outline_color = Color(0.03, 0.035, 0.06, 0.92)
+text = "EC"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="Corner" type="Label" parent="Inner" unique_id=604830887]
+unique_name_in_owner = true
+visible = false
+layout_mode = 1
+anchors_preset = 3
+anchor_left = 1.0
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -3.0
+offset_top = -3.0
+offset_right = -3.0
+offset_bottom = -3.0
+grow_horizontal = 0
+grow_vertical = 0
+theme_override_colors/font_color = Color(0.96, 0.97, 0.99, 1)
+theme_override_colors/font_outline_color = Color(0.03, 0.035, 0.06, 0.92)
+theme_override_constants/outline_size = 4
+theme_override_font_sizes/font_size = 10
+text = "N1"
+horizontal_alignment = 2
+vertical_alignment = 2
