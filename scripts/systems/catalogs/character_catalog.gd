@@ -85,6 +85,7 @@ const CHARACTER_LIBRARY: Array[Dictionary] = [
 		"passive_description": "+0.7% de área por nivel",
 		"passive_stat": "area", "passive_amount": 0.7,
 		"unlock_cost": 0, # 50
+		"model_scene": "res://assets/models/fuego_character.tscn",
 		"tint": Color(0.89, 0.45, 0.18),
 	},
 	{
