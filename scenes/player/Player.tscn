@@ -6,6 +6,7 @@
 [ext_resource type="Script" uid="uid://0p2186xko3pi" path="res://scripts/systems/player_stats.gd" id="4_stats"]
 [ext_resource type="Script" uid="uid://bj6h07uuf8ckk" path="res://scripts/systems/item_bag.gd" id="5_bag"]
 [ext_resource type="Script" uid="uid://cmnn3k6k76em8" path="res://scripts/systems/power_ups.gd" id="6_powerups"]
+[ext_resource type="Script" uid="uid://ginwod0otqua" path="res://scripts/player/components/player_camera.gd" id="7_camera"]
 
 [sub_resource type="CapsuleShape3D" id="CapsuleShape3D_1"]
 resource_local_to_scene = true
@@ -25,12 +26,13 @@ shape = SubResource("CapsuleShape3D_1")
 
 [node name="SealRig" parent="." unique_id=1718191975 instance=ExtResource("2_rig")]
 
-[node name="SpringArm3D" type="SpringArm3D" parent="." unique_id=1407797706]
+[node name="CameraRig" type="SpringArm3D" parent="." unique_id=1407797706]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.75, 0)
 shape = SubResource("SphereShape3D_1")
 spring_length = 5.0
+script = ExtResource("7_camera")
 
-[node name="Camera3D" type="Camera3D" parent="SpringArm3D" unique_id=977713088]
+[node name="Camera3D" type="Camera3D" parent="CameraRig" unique_id=977713088]
 current = true
 fov = 70.0
 

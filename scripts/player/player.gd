@@ -20,12 +20,6 @@ signal points_changed(total: int)
 ## Cinturón eléctrico (ItemBag).
 signal slide_started(direction: Vector3)
 
-## Modos de cámara que rota la acción "camera_mode" de cada jugador:
-## THIRD_PERSON (por defecto; la vista gira el cuerpo), FIRST_PERSON (brazo
-## en los ojos y la foca propia oculta) y FREE_ORBIT (la cámara orbita y el
-## cuerpo mira hacia donde camina; las armas apuntan solas).
-enum CameraMode { THIRD_PERSON, FIRST_PERSON, FREE_ORBIT }
-
 ## Fracción de la velocidad efectiva que el cuerpo ya debe llevar para
 ## empezar un derrape (no se derrapa desde quieto).
 const SLIDE_MIN_SPEED_RATIO: float = 0.5
@@ -33,11 +27,6 @@ const SLIDE_MIN_SPEED_RATIO: float = 0.5
 ## Dónde queda un caído rescatado del vacío respecto de su compañero: al
 ## lado y no encima, para que la física no empuje a ninguno de los dos.
 const RESCUE_MATE_OFFSET := Vector3(1.5, 0.5, 0.0)
-
-## Capa visual del rig por slot: RIG_LAYER_BASE + slot + 1 en vez de la
-## capa 1, para que la cámara en primera persona oculte solo su propio
-## cuerpo y los compañeros lo sigan viendo.
-const RIG_LAYER_BASE: int = 10
 
 ## Cartel de rescate: las medidas del cartel de los interactuables
 ## (interactable.gd), más arriba del cuerpo caído.
@@ -99,28 +88,6 @@ const FLIGHT_EDGE_MARGIN: float = 2.0
 ## Altura del mundo (Y, en metros) bajo la cual el raider vuelve a suelo seguro sin daño.
 @export var void_rescue_y: float = -10.0
 
-@export_group("Cámara")
-## Sensibilidad base del mouse, en radianes por píxel; el ajuste de opciones la multiplica.
-@export var mouse_sensitivity: float = 0.003
-## Inclinación inicial de la cámara, en grados (negativo mira hacia abajo).
-@export var initial_pitch_deg: float = -20.0
-## Inclinación mínima en tercera persona y órbita libre, en grados.
-@export var min_pitch_deg: float = -80.0
-## Inclinación máxima en tercera persona y órbita libre, en grados.
-@export var max_pitch_deg: float = 10.0
-## Inclinación mínima en primera persona, en grados.
-@export var first_person_min_pitch_deg: float = -85.0
-## Inclinación máxima en primera persona, en grados.
-@export var first_person_max_pitch_deg: float = 85.0
-## Distancia mínima de la cámara en órbita libre, en metros.
-@export var free_orbit_min_distance: float = 2.5
-## Distancia máxima de la cámara en órbita libre, en metros.
-@export var free_orbit_max_distance: float = 11.0
-## Cuánto acerca o aleja cada paso de zoom en órbita libre (rueda o cruceta), en metros.
-@export var free_orbit_zoom_step: float = 1.0
-## Rapidez con que el cuerpo gira hacia donde camina en órbita libre, por segundo.
-@export var free_orbit_turn_speed: float = 10.0
-
 @export_group("Co-op")
 ## Slot del jugador (0-3): decide qué dispositivo lo controla; RunSystems asigna 1+ a los cuerpos extra.
 @export var player_index: int = 0
@@ -146,12 +113,12 @@ var points: int = 0
 ## de mascotas y el traficante de animales, nunca un cofre ni la ruleta.
 var pet_id: String = ""
 
-@onready var spring_arm: SpringArm3D = $SpringArm3D
 @onready var collision_shape: CollisionShape3D = $CollisionShape3D
 @onready var seal_rig: SealRig = $SealRig
 @onready var weapons_mount: Node3D = $Weapons
 @onready var health: Health = $Health
 @onready var _stats: PlayerStats = $Stats
+@onready var _camera: PlayerCamera = $CameraRig
 @onready var item_bag: ItemBag = $ItemBag
 
 ## Multiplicadores de puntos con nombre (Fiebre del oro, Lluvia dorada): el
@@ -161,17 +128,6 @@ var _points_sources: Dictionary[String, float] = {}
 var _gravity: float = ProjectSettings.get_setting("physics/3d/default_gravity", 9.8)
 var _default_collision_height: float = 1.8
 var _default_collision_radius: float = 0.4
-
-var _yaw: float = 0.0
-var _pitch: float = 0.0
-
-var _camera_mode: CameraMode = CameraMode.THIRD_PERSON
-## Órbita libre: giro de la cámara en el mundo (separado del cuerpo) y
-## distancia actual (_ready la toma del largo del brazo en la escena).
-var _orbit_yaw: float = 0.0
-var _orbit_distance: float = 0.0
-## Largo del brazo en tercera persona según la escena; se restaura al volver a ese modo.
-var _third_person_arm_length: float = 5.0
 
 ## Nombres de las acciones de este slot, resueltos una vez en _ready:
 ## Coop.action() arma un String por llamada, y esto se lee varias veces por
@@ -295,32 +251,11 @@ func _ready() -> void:
 	_cache_slot_actions()
 	_apply_character(CharacterCatalog.by_id_or_default(Coop.character_for_slot(player_index)))
 	health.died.connect(_on_health_died)
-	Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
-	# El brazo de la cámara ignora la cápsula propia; si no, acerca la cámara.
-	spring_arm.add_excluded_object(get_rid())
-	# ...y la de cada compañero: los raiders comparten la capa 1 con el mundo.
-	# Diferido porque RunSystems crea los slots 1+ después de este _ready.
-	_exclude_party_from_spring_arm.call_deferred()
-	if Coop.is_coop():
-		# En pantalla dividida pintan las cámaras de cada viewport; esta solo
-		# les presta su transformación.
-		($SpringArm3D/Camera3D as Camera3D).current = false
+	_camera.setup()
 	var capsule := collision_shape.shape as CapsuleShape3D
 	if capsule != null:
 		_default_collision_height = capsule.height
 		_default_collision_radius = capsule.radius
-	_yaw = rotation.y
-	_pitch = deg_to_rad(clamp(initial_pitch_deg, min_pitch_deg, max_pitch_deg))
-	spring_arm.rotation.x = _pitch
-	_third_person_arm_length = spring_arm.spring_length
-	_orbit_distance = clampf(_third_person_arm_length,
-			free_orbit_min_distance, free_orbit_max_distance)
-	# Cada malla del rig pasa de la capa 1 a la capa visual del slot (ver
-	# RIG_LAYER_BASE), que todas las cámaras ven salvo la propia en primera persona.
-	_apply_rig_layer(seal_rig)
-	# Lo que se cuelgue del rig después (efectos, accesorios) también recibe
-	# la capa; si no, su dueño lo vería flotando en primera persona.
-	seal_rig.child_entered_tree.connect(_apply_rig_layer)
 
 
 ## Resuelve una vez los nombres de acción de este slot (ver _actions).
@@ -329,92 +264,21 @@ func _cache_slot_actions() -> void:
 		_actions[base] = Coop.action(player_index, base)
 
 
-## Las cápsulas de los compañeros no bloquean el brazo de la cámara.
-func _exclude_party_from_spring_arm() -> void:
-	for node: Node in get_tree().get_nodes_in_group("player"):
-		var mate := node as Player
-		if mate != null and mate != self:
-			spring_arm.add_excluded_object(mate.get_rid())
-
-
-## Capa visual del cuerpo propio de este slot (ver RIG_LAYER_BASE).
-func rig_visual_layer() -> int:
-	return 1 << (RIG_LAYER_BASE + player_index)
-
-
-## Pasa `root` y todo lo que cuelga de él a la capa visual de este slot.
-func _apply_rig_layer(root: Node) -> void:
-	var layer := rig_visual_layer()
-	var self_visual := root as VisualInstance3D
-	if self_visual != null:
-		self_visual.layers = layer
-	for node: Node in root.find_children("*", "VisualInstance3D", true, false):
-		(node as VisualInstance3D).layers = layer
-
-
-## Nombre de una acción base para este slot ("interact" -> "p2_interact" en co-op).
-func _act(base: StringName) -> StringName:
+## Nombre de una acción base para este slot ("interact" -> "p2_interact" en
+## co-op); también lo usan los componentes del raider.
+func slot_action(base: StringName) -> StringName:
 	return _actions.get(base, base)
 
 
 ## Acción de interactuar de este slot; los interactuables la piden por nombre.
 func interact_action() -> StringName:
-	return _act(&"interact")
-
-
-## True si este cuerpo usa el mouse: siempre en solo; en co-op, solo el
-## slot del teclado.
-func _owns_mouse() -> bool:
-	return not Coop.is_coop() or Coop.device_for_slot(player_index) == Coop.KEYBOARD_DEVICE
+	return slot_action(&"interact")
 
 
 func _unhandled_input(event: InputEvent) -> void:
 	if _is_dead:
 		return
-	# Caído conserva la vista (mirar la pelea y ver llegar al rescatador),
-	# pero no el cambio de modo ni el zoom: cambiar de modo gira el cuerpo.
-	if not _is_downed:
-		# Por eventos, así la rueda del mouse y los botones del pad entran
-		# igual, ya filtrados por slot en el set de acciones.
-		if event.is_action_pressed(_act(&"camera_mode")):
-			_cycle_camera_mode()
-			return
-		if _camera_mode == CameraMode.FREE_ORBIT:
-			if event.is_action_pressed(_act(&"camera_zoom_in")):
-				_set_orbit_distance(_orbit_distance - free_orbit_zoom_step)
-				return
-			if event.is_action_pressed(_act(&"camera_zoom_out")):
-				_set_orbit_distance(_orbit_distance + free_orbit_zoom_step)
-				return
-	if not _owns_mouse():
-		return
-	# Esc es del PauseMenu (este nodo se pausa con el árbol). Un clic vuelve
-	# a capturar el mouse si quedó libre durante la partida.
-	if event is InputEventMouseMotion and Input.get_mouse_mode() == Input.MOUSE_MODE_CAPTURED:
-		_apply_look(event.relative)
-	elif event is InputEventMouseButton and event.pressed \
-			and Input.get_mouse_mode() != Input.MOUSE_MODE_CAPTURED:
-		Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
-
-
-## Vista con mouse: la sensibilidad de opciones (SaveData.mouse_sensitivity,
-## multiplicador 0.3-2.0) escala la base exportada en cada evento. En
-## primera y tercera persona el giro mueve el cuerpo; en órbita libre, solo
-## la cámara.
-func _apply_look(relative: Vector2) -> void:
-	var sensitivity: float = mouse_sensitivity * SaveData.mouse_sensitivity
-	var wide := _camera_mode == CameraMode.FIRST_PERSON
-	_pitch = clamp(_pitch - relative.y * sensitivity,
-			deg_to_rad(first_person_min_pitch_deg if wide else min_pitch_deg),
-			deg_to_rad(first_person_max_pitch_deg if wide else max_pitch_deg))
-	spring_arm.rotation.x = _pitch
-	if _camera_mode == CameraMode.FREE_ORBIT:
-		_orbit_yaw = wrapf(_orbit_yaw - relative.x * sensitivity, -PI, PI)
-	else:
-		# Se envuelve igual que la órbita: sin esto el ángulo crece sin límite
-		# y la precisión de float32 vuelve escalonado el giro lento.
-		_yaw = wrapf(_yaw - relative.x * sensitivity, -PI, PI)
-		rotation.y = _yaw
+	_camera.handle_input(event, _is_downed)
 
 
 ## Un tick de física en pasos con nombre. El orden importa: temporizadores
@@ -435,13 +299,13 @@ func _physics_process(delta: float) -> void:
 		# para que quien cae de un borde conserve sus saltos en el aire.
 		_jumps_left = _max_jumps()
 
-	_apply_stick_look(delta)
+	_camera.apply_stick_look(delta)
 
 	if _is_downed:
 		# Caído: solo gravedad y la cuenta del rescate.
 		velocity.x = 0.0
 		velocity.z = 0.0
-		_pin_orbit_arm()
+		_camera.pin_orbit_arm()
 		move_and_slide()
 		_tick_downed(delta)
 		return
@@ -449,8 +313,8 @@ func _physics_process(delta: float) -> void:
 	# Tomos y objetos escalan la velocidad base exportada.
 	var effective_speed: float = move_speed * _stats.move_speed_multiplier
 	var wish_dir := _read_wish_dir()
-	_face_movement(wish_dir, delta)
-	_pin_orbit_arm()
+	_camera.face_movement(wish_dir, delta)
+	_camera.pin_orbit_arm()
 	_update_slide(delta, wish_dir, effective_speed)
 	_apply_horizontal_velocity(delta, wish_dir, effective_speed)
 	_try_jump()
@@ -493,46 +357,16 @@ func _rescue_from_void() -> void:
 	print("Void rescue: p%d at %.1fs" % [player_index, RunState.run_time])
 
 
-## Stick derecho (el pad asignado en co-op; cualquiera en solo) por el
-## mismo camino que el mouse. Dividir por la sensibilidad base pasa de
-## radianes por segundo a las unidades de _apply_look, así el ajuste de
-## sensibilidad escala igual al pad.
-func _apply_stick_look(delta: float) -> void:
-	var stick := Coop.look_vector(player_index)
-	if stick == Vector2.ZERO:
-		return
-	_apply_look(stick * Coop.LOOK_SPEED * delta / maxf(mouse_sensitivity, 0.0001))
-
-
-## Dirección deseada de este tick, plana y normalizada. En primera y
-## tercera persona es relativa al cuerpo (su giro es el de la vista); en
-## órbita libre es relativa a la CÁMARA y el cuerpo gira hacia donde camina.
+## Dirección deseada de este tick, plana y normalizada, relativa a la base
+## que da la cámara (el cuerpo, o la cámara en órbita libre).
 func _read_wish_dir() -> Vector3:
 	if is_rooted():
 		return Vector3.ZERO
-	var input_dir: Vector2 = Input.get_vector(_act(&"move_left"), _act(&"move_right"),
-			_act(&"move_forward"), _act(&"move_back"))
-	var move_basis := Basis(Vector3.UP, _orbit_yaw) \
-			if _camera_mode == CameraMode.FREE_ORBIT else transform.basis
-	var wish_dir: Vector3 = move_basis * Vector3(input_dir.x, 0.0, input_dir.y)
+	var input_dir: Vector2 = Input.get_vector(slot_action(&"move_left"), slot_action(&"move_right"),
+			slot_action(&"move_forward"), slot_action(&"move_back"))
+	var wish_dir: Vector3 = _camera.move_basis() * Vector3(input_dir.x, 0.0, input_dir.y)
 	wish_dir.y = 0.0
 	return wish_dir.normalized() if wish_dir.length_squared() > 0.0 else Vector3.ZERO
-
-
-## Solo órbita libre: el cuerpo gira hacia su dirección de movimiento.
-func _face_movement(wish_dir: Vector3, delta: float) -> void:
-	if _camera_mode != CameraMode.FREE_ORBIT or wish_dir == Vector3.ZERO:
-		return
-	rotation.y = lerp_angle(rotation.y, atan2(-wish_dir.x, -wish_dir.z),
-			minf(free_orbit_turn_speed * delta, 1.0))
-
-
-## Mantiene el giro del brazo en el MUNDO igual al de la órbita aunque el
-## cuerpo gire (el giro del brazo es relativo al cuerpo). También corre
-## caído, para que la vista siga moviendo la cámara en órbita libre.
-func _pin_orbit_arm() -> void:
-	if _camera_mode == CameraMode.FREE_ORBIT:
-		spring_arm.rotation.y = wrapf(_orbit_yaw - rotation.y, -PI, PI)
 
 
 func _update_slide(delta: float, wish_dir: Vector3, effective_speed: float) -> void:
@@ -562,7 +396,7 @@ func _apply_horizontal_velocity(delta: float, wish_dir: Vector3,
 
 
 func _try_jump() -> void:
-	if not Input.is_action_just_pressed(_act(&"jump")) or is_rooted():
+	if not Input.is_action_just_pressed(slot_action(&"jump")) or is_rooted():
 		return
 	# Multisalto: el del suelo más PlayerStats.extra_jumps en el aire; se
 	# recargan al pisar suelo (ver _physics_process).
@@ -588,7 +422,7 @@ func _tick_flight(delta: float) -> bool:
 	if is_on_floor():
 		_jumps_left = _max_jumps()
 	var ceiling := _ground_height() + flight_ceiling
-	if Input.is_action_pressed(_act(&"jump")) and global_position.y < ceiling:
+	if Input.is_action_pressed(slot_action(&"jump")) and global_position.y < ceiling:
 		velocity.y = flight_rise_speed
 	elif global_position.y >= ceiling:
 		# Se queda en el techo en vez de rebotar.
@@ -735,59 +569,22 @@ func _on_health_died() -> void:
 	seal_rig.play_death()
 
 
-# --- Modos de cámara ---------------------------------------------------------
+# --- Cámara (nodo CameraRig) --------------------------------------------------
 
-func _cycle_camera_mode() -> void:
-	var was_free := _camera_mode == CameraMode.FREE_ORBIT
-	_camera_mode = ((int(_camera_mode) + 1) % CameraMode.size()) as CameraMode
-	_apply_camera_mode(was_free)
-
-
-func camera_mode() -> CameraMode:
-	return _camera_mode
+func camera_mode() -> PlayerCamera.CameraMode:
+	return _camera.camera_mode()
 
 
 ## Camera3D propia de este raider. En co-op ninguna es la cámara activa del
 ## viewport (SplitScreen pinta cada una en su SubViewport), así que lo que
 ## actúa sobre una cámara (FOV, sacudida) debe recibir esta.
 func view_camera() -> Camera3D:
-	return spring_arm.get_node_or_null("Camera3D") as Camera3D
+	return _camera.view_camera()
 
 
-func _apply_camera_mode(was_free: bool = false) -> void:
-	var camera := view_camera()
-	var rig_bit := rig_visual_layer()
-	# Cada cambio de modo reinicia el estado transitorio; luego el modo pone el suyo.
-	camera.cull_mask |= rig_bit
-	spring_arm.rotation.y = 0.0
-	if was_free:
-		# De órbita libre a un modo atado al cuerpo: el giro de la cámara pasa
-		# a ser el del cuerpo, así la vista no salta.
-		_yaw = wrapf(_orbit_yaw, -PI, PI)
-		rotation.y = _yaw
-	match _camera_mode:
-		CameraMode.THIRD_PERSON:
-			spring_arm.spring_length = _third_person_arm_length
-		CameraMode.FIRST_PERSON:
-			# Brazo en los ojos; la foca propia se oculta SOLO para esta
-			# cámara (el rig está en la capa visual del slot).
-			spring_arm.spring_length = 0.05
-			camera.cull_mask &= ~rig_bit
-		CameraMode.FREE_ORBIT:
-			_orbit_yaw = _yaw
-			spring_arm.spring_length = _orbit_distance
-	# Vuelve a acotar la inclinación al rango del modo (primera persona permite más).
-	var wide := _camera_mode == CameraMode.FIRST_PERSON
-	_pitch = clamp(_pitch,
-			deg_to_rad(first_person_min_pitch_deg if wide else min_pitch_deg),
-			deg_to_rad(first_person_max_pitch_deg if wide else max_pitch_deg))
-	spring_arm.rotation.x = _pitch
-
-
-func _set_orbit_distance(distance: float) -> void:
-	_orbit_distance = clampf(distance, free_orbit_min_distance, free_orbit_max_distance)
-	if _camera_mode == CameraMode.FREE_ORBIT:
-		spring_arm.spring_length = _orbit_distance
+## Capa visual del cuerpo propio de este slot (ver PlayerCamera.RIG_LAYER_BASE).
+func rig_visual_layer() -> int:
+	return _camera.rig_visual_layer()
 
 
 # --- Co-op: caído y rescate --------------------------------------------------
@@ -932,7 +729,7 @@ func _hide_revive_prompt() -> void:
 
 
 func _can_start_slide(wish_dir: Vector3, effective_speed: float) -> bool:
-	if not Input.is_action_pressed(_act(&"sprint")) or wish_dir == Vector3.ZERO:
+	if not Input.is_action_pressed(slot_action(&"sprint")) or wish_dir == Vector3.ZERO:
 		return false
 	if not is_on_floor() or _slide_cooldown_timer > 0.0:
 		return false
