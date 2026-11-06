@@ -197,7 +197,7 @@ func _interact(player: Node) -> void:
 	# El soak cuelga toda la partida de un nodo que procesa siempre, así que
 	# Interactable._unhandled_input sigue disparando en pausa y el probe presiona
 	# interact cada 0.75 s mientras se queda cerca.
-	if _blocking_ui_open():
+	if BlockingUi.any_open(get_tree()):
 		return
 	var ui := VENDOR_UI_SCRIPT.new() as CanvasLayer
 	ui.call("setup", self, player)
@@ -206,20 +206,6 @@ func _interact(player: Node) -> void:
 	RunRoot.stage_parent(get_tree()).add_child(ui)
 	_ui = ui
 	ui.tree_exited.connect(_on_menu_closed)
-
-
-## ¿Hay alguna capa "ui_blocking" arriba ahora? Mismo contrato (y misma forma)
-## que pause_menu.gd: un miembro sin is_blocking() CUENTA como bloqueante; si
-## alguien olvida el contrato, falla del lado SEGURO.
-func _blocking_ui_open() -> bool:
-	for node: Node in get_tree().get_nodes_in_group("ui_blocking"):
-		if not node.has_method(&"is_blocking"):
-			push_warning("ui_blocking member without is_blocking(): %s" % node.name)
-			return true
-		var blocking: Variant = node.call(&"is_blocking")
-		if blocking == true:
-			return true
-	return false
 
 
 ## El menú se fue. Si no hubo compra el puesto sigue, pero se calla un rato: si

@@ -76,15 +76,9 @@ func _interact(player: Node) -> void:
 		return
 	# Nunca sobre otra capa que pausa el árbol: el panel de la ruleta suelta la
 	# pausa al cerrarse, y esa pausa podría ser del selector de cartas o del
-	# menú de Esc. Mismo contrato (y misma forma) que el de pause_menu.gd, donde
-	# un miembro sin is_blocking() cuenta como bloqueante: la regla solo sirve si
-	# olvidarla falla del lado SEGURO.
-	for node: Node in get_tree().get_nodes_in_group("ui_blocking"):
-		if not node.has_method(&"is_blocking"):
-			push_warning("ui_blocking member without is_blocking(): %s" % node.name)
-			return
-		if node.call(&"is_blocking") == true:
-			return
+	# menú de Esc.
+	if BlockingUi.any_open(get_tree()):
+		return
 	_ui = RouletteUiScript.new()
 	_ui.setup(self, player)
 	# Bajo la ESCENA ACTUAL, nunca bajo /root: esta capa tiene todo el árbol

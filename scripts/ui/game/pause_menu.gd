@@ -33,7 +33,7 @@ func _ready() -> void:
 	# Este menú es dueño de la pausa mientras está arriba, y las demás capas que
 	# bloquean deciden si sueltan una pausa preguntándole a este grupo: fuera de
 	# él, una tienda abierta sobre el menú devolvería el mundo al cerrarse.
-	add_to_group("ui_blocking")
+	add_to_group(BlockingUi.GROUP)
 	_apply_styles()
 	_resume_button.pressed.connect(_close)
 	_settings_button.pressed.connect(_on_settings_pressed)
@@ -59,33 +59,18 @@ func _unhandled_input(event: InputEvent) -> void:
 		_close()
 		get_viewport().set_input_as_handled()
 		return
-	if not RunState.run_active or _blocking_ui_open():
+	if not RunState.run_active or BlockingUi.any_open(get_tree()):
 		return
 	_open()
 	get_viewport().set_input_as_handled()
 
 
-## Contrato "ui_blocking": true mientras este menú es dueño de la pausa. Su
-## propio _blocking_ui_open() no se salta a sí mismo, así que esto debe
-## contestar con la verdad, y lo hace: con el menú visible, Esc lo cierra antes
-## de llegar a esa comprobación.
+## Contrato "ui_blocking" (BlockingUi): true mientras este menú es dueño de la
+## pausa. La comprobación de Esc (BlockingUi.any_open) no se salta a este menú,
+## así que esto debe contestar con la verdad, y lo hace: con el menú visible, Esc
+## lo cierra antes de llegar a esa comprobación.
 func is_blocking() -> bool:
 	return visible
-
-
-## ¿Alguna capa es dueña de la pausa (o está por serlo) ahora? Acople flojo: los
-## miembros de "ui_blocking" exponen is_blocking() -> bool. Un miembro sin el
-## método cuenta como bloqueante: suponer lo contrario dejaría que Esc abra este
-## menú sobre el modal de otro y después suelte una pausa que no tomamos.
-func _blocking_ui_open() -> bool:
-	for node: Node in get_tree().get_nodes_in_group("ui_blocking"):
-		if not node.has_method(&"is_blocking"):
-			push_warning("ui_blocking member without is_blocking(): %s" % node.name)
-			return true
-		var blocking: Variant = node.call(&"is_blocking")
-		if blocking == true:
-			return true
-	return false
 
 
 func _open() -> void:

@@ -72,7 +72,7 @@ var _shine_tweens: Array[Tween] = []
 func _ready() -> void:
 	visible = false
 	add_to_group("upgrade_ui")
-	add_to_group("ui_blocking")
+	add_to_group(BlockingUi.GROUP)
 	RunState.leveled_up.connect(_on_leveled_up)
 	UiTheme.style_title(_level_label, 34, Color(0.96, 0.93, 0.82), 4, 8)
 	# Indicación de botón bajo las cartas; sigue al último dispositivo usado.
@@ -554,17 +554,7 @@ func _close() -> void:
 	# partida terminó debajo del selector, u otra capa que bloquea está arriba,
 	# quitar la pausa aquí reanudaría el mundo detrás de la pantalla de fin y le
 	# quitaría el mouse a sus botones.
-	if not RunState.run_active or _other_blocking_ui_open():
+	if not RunState.run_active or BlockingUi.other_open(get_tree(), self):
 		return
 	get_tree().paused = false
 	Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
-
-
-## ¿Algún OTRO miembro de "ui_blocking" tiene la pausa ahora?
-func _other_blocking_ui_open() -> bool:
-	for node: Node in get_tree().get_nodes_in_group("ui_blocking"):
-		if node == self or not node.has_method(&"is_blocking"):
-			continue
-		if node.call(&"is_blocking") == true:
-			return true
-	return false

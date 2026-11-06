@@ -68,8 +68,8 @@ func _ready() -> void:
 		push_error("RouletteUi: setup() must run before add_child()")
 		queue_free()
 		return
-	add_to_group("ui_blocking")
-	add_to_group("blocking_ui_closable")
+	add_to_group(BlockingUi.GROUP)
+	add_to_group(BlockingUi.CLOSABLE_GROUP)
 	_build()
 	get_tree().paused = true
 	_pause_held = true
@@ -329,20 +329,10 @@ func _release_pause() -> void:
 	if not _pause_held:
 		return
 	_pause_held = false
-	if not RunState.run_active or _other_blocking_ui_open():
+	if not RunState.run_active or BlockingUi.other_open(get_tree(), self):
 		return
 	get_tree().paused = false
 	Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
-
-
-## ¿Algún OTRO miembro de "ui_blocking" tiene la pausa ahora?
-func _other_blocking_ui_open() -> bool:
-	for node: Node in get_tree().get_nodes_in_group("ui_blocking"):
-		if node == self or not node.has_method(&"is_blocking"):
-			continue
-		if node.call(&"is_blocking") == true:
-			return true
-	return false
 
 
 ## _close() es el único camino que quita la pausa, así que un panel LIBERADO en
