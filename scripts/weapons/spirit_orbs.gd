@@ -11,7 +11,7 @@ extends WeaponBase
 ##   projectile_count — number of orbs (+1 orb card; evolution adds one)
 
 ## Contact distance from an orb's center to an enemy body.
-@export var hit_radius: float = 1.1
+@export var hit_radius: float = 3.1
 ## Ring angular speed, radians per second.
 @export var orbit_speed: float = 2.6
 ## Height of the ring above the carrier's feet.
@@ -19,7 +19,7 @@ extends WeaponBase
 
 ## Vertical wobble that keeps the ring from reading as a flat decal.
 const BOB_HEIGHT: float = 0.15
-const ORB_RADIUS: float = 0.22
+const ORB_RADIUS: float = 0.40
 
 var _angle: float = 0.0
 var _orbs: Array[MeshInstance3D] = []

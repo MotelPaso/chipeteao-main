@@ -35,7 +35,11 @@ extends RefCounted
 ##   tint:     the character's body identity colour (also the card swatch).
 ##   model_scene (optional): cosmetic body for THIS character — a model
 ##             wrapper scene (like foca_character.tscn) or a raw .glb.
-##             Absent = the seal.
+##             Absent = the seal. Wrapper scenes may carry a walk-animator
+##             script on their root (goku_walk_animation.gd,
+##             yandere_walk_animation.gd, storm_cat_walk.gd): it measures how
+##             far its own node moves each physics tick, so the limbs follow
+##             the player's real movement with no per-character code here.
 ##   model_scale (optional): uniform scale multiplier applied on top of the
 ##             model scene's own transform — raw .glb rows declare their
 ##             sizing (the seal needs 0.6), wrapper scenes carry their own.
@@ -66,17 +70,6 @@ const CHARACTER_LIBRARY: Array[Dictionary] = [
 		"tint": Color(0.35, 0.51, 0.74),
 	},
 	{
-		"id": "vex", "display_name": "Vex",
-		"blurb": "Un tirador nervioso que siempre encuentra el punto blando.",
-		"weapon_scene": "res://scenes/weapons/DartPistol.tscn",
-		"weapon_node_name": "DartPistol",
-		"weapon_display_name": "Pistola de dardos",
-		"passive_description": "+0.5% de prob. de crítico por nivel",
-		"passive_stat": "crit_chance", "passive_amount": 0.5,
-		"unlock_cost": 0,
-		"tint": Color(0.58, 0.38, 0.82),
-	},
-	{
 		"id": "ash", "display_name": "Ash",
 		"blurb": "Un ermitaño cubierto de hollín cuyo fuego se abre más en cada nivel.",
 		"weapon_scene": "res://scenes/weapons/EmberWand.tscn",
@@ -89,56 +82,17 @@ const CHARACTER_LIBRARY: Array[Dictionary] = [
 		"tint": Color(0.89, 0.45, 0.18),
 	},
 	{
-		"id": "juno", "display_name": "Juno",
-		"blurb": "Una acechadora de pies ligeros que convierte la velocidad en fuerza mortal.",
+		"id": "Yandere-chan", "display_name": "Yandere-chan",
+		"blurb": "Termina tu juego yandere-dev.",
 		"weapon_scene": "res://scenes/weapons/HuntingBow.tscn",
 		"weapon_node_name": "HuntingBow",
 		"weapon_display_name": "Arco de caza",
 		"passive_description": "+0.6% de daño por cada 1% de velocidad extra",
 		"passive_stat": "damage", "passive_amount": 0.6,
+		"model_scene": "res://assets/models/yandere_character.tscn",
 		"passive_kind": "speed_to_damage",
 		"unlock_cost": 0, # 80
 		"tint": Color(0.24, 0.55, 0.32),
-	},
-	{
-		"id": "bramble", "display_name": "Bramble",
-		"blurb": "Un guardián erizado cuyo cuero castiga cada mordida descuidada.",
-		"weapon_scene": "res://scenes/weapons/ThornWhip.tscn",
-		"weapon_node_name": "ThornWhip",
-		"weapon_display_name": "Látigo de espinas",
-		"passive_description": "+1 de espinas por nivel",
-		"passive_stat": "thorns", "passive_amount": 1.0,
-		"unlock_cost": 0, # 80
-		"unlock_boss": "grubthing",
-		"unlock_hint": "busca algo raro en el Bosque Hueco",
-		"tint": Color(0.5, 0.58, 0.28),
-	},
-	{
-		# GDD 5 also gives Otto wall-climb; that traversal mechanic is
-		# deferred until a climbing system exists — HP growth ships now.
-		"id": "otto", "display_name": "Otto",
-		"blurb": "Un errante recio al que cada vez cuesta más tumbar.",
-		"weapon_scene": "res://scenes/weapons/Boomerang.tscn",
-		"weapon_node_name": "Boomerang",
-		"weapon_display_name": "Bumerán",
-		"passive_description": "+2 de HP máx. por nivel",
-		"passive_stat": "max_hp", "passive_amount": 2.0,
-		"unlock_cost": 0, # 100
-		"tint": Color(0.62, 0.44, 0.26),
-	},
-	{
-		"id": "nyx", "display_name": "Nyx",
-		"blurb": "Un borrón crepuscular que responde con acero a cada golpe fallado.",
-		"weapon_scene": "res://scenes/weapons/TwinDaggers.tscn",
-		"weapon_node_name": "TwinDaggers",
-		"weapon_display_name": "Dagas gemelas",
-		"passive_description": "+0.5% de evasión por nivel; al esquivar rematas a enemigos debilitados que no sean jefes",
-		"passive_stat": "evasion", "passive_amount": 0.5,
-		"passive_kind": "evasion_execute",
-		"unlock_cost": 0, # 150
-		"unlock_boss": "coffer_mimic",
-		"unlock_hint": "sigue un zumbido extraño en las Dunas de Ceniza",
-		"tint": Color(0.42, 0.3, 0.58),
 	},
 	{
 		"id": "wisp", "display_name": "Wisp",
@@ -146,19 +100,20 @@ const CHARACTER_LIBRARY: Array[Dictionary] = [
 		"weapon_scene": "res://scenes/weapons/SpiritOrbs.tscn",
 		"weapon_node_name": "SpiritOrbs",
 		"weapon_display_name": "Orbes espirituales",
-		"passive_description": "+0.5% de velocidad de ataque por nivel",
-		"passive_stat": "cooldown", "passive_amount": 0.5,
+		"passive_description": "+1.0% de xp por nivel",
+		"passive_stat": "xp", "passive_amount": 1.0,
 		"unlock_cost": 0, # 120
 		"tint": Color(0.55, 0.85, 0.95),
 	},
 	{
-		"id": "torren", "display_name": "Torren",
+		"id": "Electro Gato", "display_name": "Electro Gato",
 		"blurb": "Un cazatormentas cuya suerte se lee como un parte del clima.",
 		"weapon_scene": "res://scenes/weapons/StormRod.tscn",
 		"weapon_node_name": "StormRod",
 		"weapon_display_name": "Pararrayos",
 		"passive_description": "+1 de suerte por nivel (cartas más raras)",
 		"passive_stat": "luck", "passive_amount": 1.0,
+		"model_scene": "res://assets/models/storm_cat_character.tscn",
 		"unlock_cost": 0, # 130
 		"tint": Color(0.35, 0.45, 0.85),
 	},
@@ -176,15 +131,15 @@ const CHARACTER_LIBRARY: Array[Dictionary] = [
 	},
 	# Iteration 43 roster: the slime, stench and beam starters.
 	{
-		"id": "miro", "display_name": "Miro",
-		"blurb": "Una babosa babeante de raider que nunca está donde quedó el desastre.",
+		"id": "Moka", "display_name": "Moka",
+		"blurb": "Una foca muy watona.",
 		"weapon_scene": "res://scenes/weapons/SlimeTrail.tscn",
 		"weapon_node_name": "SlimeTrail",
 		"weapon_display_name": "Rastro de baba",
 		"passive_description": "+2% de duración de efectos por nivel",
 		"passive_stat": "duration", "passive_amount": 2.0,
 		"unlock_cost": 120,
-		"tint": Color(0.45, 0.85, 0.35),
+		"tint": Color(0.35, 0.45, 0.85),
 	},
 	{
 		"id": "bogg", "display_name": "Bogg",
@@ -198,14 +153,15 @@ const CHARACTER_LIBRARY: Array[Dictionary] = [
 		"tint": Color(0.6, 0.7, 0.3),
 	},
 	{
-		"id": "kael", "display_name": "Kael",
+		"id": "Goku", "display_name": "Goku",
 		"blurb": "Carga seis segundos y después reescribe el mapa.",
 		"weapon_scene": "res://scenes/weapons/Kamehameha.tscn",
 		"weapon_node_name": "Kamehameha",
 		"weapon_display_name": "Kamehameha",
 		"passive_description": "+1% de daño por nivel",
 		"passive_stat": "damage", "passive_amount": 1.0,
-		"unlock_cost": 180,
+		"model_scene": "res://assets/models/goku_character.tscn",
+		"unlock_cost": 0,
 		"tint": Color(0.4, 0.7, 1.0),
 	},
 	# Iteration 54 roster: the team's three picks. The display names are
