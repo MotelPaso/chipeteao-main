@@ -47,8 +47,8 @@ class_name ControllerIconTexture
 ## remain the same. The path to use is the path to an icon file, minus the base
 ## path and extension.
 ## [codeblock]
-## # res://addons/controller_icons/assets/steam/gyro.png
-## path = "steam/gyro"
+## # res://addons/controller_icons/assets/ps5/touch_pad.png
+## path = "ps5/touch_pad"
 ## [/codeblock]
 @export var path: String = "":
 	set(_path):

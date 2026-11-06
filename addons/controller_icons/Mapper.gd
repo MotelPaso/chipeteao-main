@@ -1,37 +1,22 @@
-extends RefCounted
-class_name ControllerMapper
-
 func _convert_joypad_path(path: String, device: int, fallback: ControllerSettings.Devices, force_controller_icon_style = ControllerSettings.Devices.NONE) -> String:
 	match _get_joypad_type(device, fallback, force_controller_icon_style):
-		ControllerSettings.Devices.LUNA:
-			return _convert_joypad_to_luna(path)
-		ControllerSettings.Devices.PS3:
-			return _convert_joypad_to_ps3(path)
 		ControllerSettings.Devices.PS4:
 			return _convert_joypad_to_ps4(path)
 		ControllerSettings.Devices.PS5:
 			return _convert_joypad_to_ps5(path)
-		ControllerSettings.Devices.STADIA:
-			return _convert_joypad_to_stadia(path)
-		ControllerSettings.Devices.STEAM:
-			return _convert_joypad_to_steam(path)
 		ControllerSettings.Devices.SWITCH:
 			return _convert_joypad_to_switch(path)
-		ControllerSettings.Devices.JOYCON:
-			return _convert_joypad_to_joycon(path)
 		ControllerSettings.Devices.XBOX360:
 			return _convert_joypad_to_xbox360(path)
 		ControllerSettings.Devices.XBOXONE:
 			return _convert_joypad_to_xboxone(path)
-		ControllerSettings.Devices.XBOXSERIES:
-			return _convert_joypad_to_xboxseries(path)
-		ControllerSettings.Devices.STEAM_DECK:
-			return _convert_joypad_to_steamdeck(path)
-		ControllerSettings.Devices.OUYA:
-			return _convert_joypad_to_ouya(path)
 		_:
 			return ""
 
+## Only five icon sets ship with the game, so similar pads share one:
+## a PS3 pad shows the PS4 art (same symbols), Joy-Cons show the
+## Switch art and any newer Xbox pad the Xbox One art. Anything else (Steam,
+## Stadia, generic pads...) falls back to settings.joypad_fallback.
 func _get_joypad_type(device, fallback, force_controller_icon_style):
 	if force_controller_icon_style != ControllerSettings.Devices.NONE:
 		return force_controller_icon_style
@@ -46,52 +31,26 @@ func _get_joypad_type(device, fallback, force_controller_icon_style):
 		device = available.front()
 
 	var controller_name = Input.get_joy_name(device).to_lower()
-	if "luna controller" in controller_name:
-		return ControllerSettings.Devices.LUNA
-	elif "ps3 controller" in controller_name:
-		return ControllerSettings.Devices.PS3
-	elif "ps4 controller" in controller_name or \
-		"dualshock 4" in controller_name:
+	if "ps3 controller" in controller_name or \
+		"ps4 controller" in controller_name or \
+		"dualshock" in controller_name:
 		return ControllerSettings.Devices.PS4
 	elif "ps5 controller" in controller_name or \
 		"dualsense" in controller_name:
 		return ControllerSettings.Devices.PS5
-	elif "stadia controller" in controller_name:
-		return ControllerSettings.Devices.STADIA
-	elif "steam controller" in controller_name:
-		return ControllerSettings.Devices.STEAM
 	elif "switch controller" in controller_name or \
-		"switch pro controller" in controller_name:
+		"switch pro controller" in controller_name or \
+		"joy-con" in controller_name:
 		return ControllerSettings.Devices.SWITCH
-	elif "joy-con" in controller_name:
-		return ControllerSettings.Devices.JOYCON
 	elif "xbox 360 controller" in controller_name:
 		return ControllerSettings.Devices.XBOX360
 	elif "xbox one" in controller_name or \
 		"x-box one" in controller_name or \
-		"xbox wireless controller" in controller_name:
+		"xbox wireless controller" in controller_name or \
+		"xbox series" in controller_name:
 		return ControllerSettings.Devices.XBOXONE
-	elif "xbox series" in controller_name:
-		return ControllerSettings.Devices.XBOXSERIES
-	elif "steam deck" in controller_name or \
-		"steam virtual gamepad" in controller_name:
-		return ControllerSettings.Devices.STEAM_DECK
-	elif "ouya controller" in controller_name:
-		return ControllerSettings.Devices.OUYA
 	else:
 		return fallback
-
-func _convert_joypad_to_luna(path: String):
-	path = path.replace("joypad", "luna")
-	match path.substr(path.find("/") + 1):
-		"select":
-			return path.replace("/select", "/circle")
-		"start":
-			return path.replace("/start", "/menu")
-		"share":
-			return path.replace("/share", "/microphone")
-		_:
-			return path
 
 func _convert_joypad_to_playstation(path: String):
 	match path.substr(path.find("/") + 1):
@@ -113,9 +72,6 @@ func _convert_joypad_to_playstation(path: String):
 			return path.replace("/rt", "/r2")
 		_:
 			return path
-
-func _convert_joypad_to_ps3(path: String):
-	return _convert_joypad_to_playstation(path.replace("joypad", "ps3"))
 
 func _convert_joypad_to_ps4(path: String):
 	path = _convert_joypad_to_playstation(path.replace("joypad", "ps4"))
@@ -140,52 +96,6 @@ func _convert_joypad_to_ps5(path: String):
 			return path.replace("/home", "/assistant")
 		"share":
 			return path.replace("/share", "/microphone")
-		_:
-			return path
-
-func _convert_joypad_to_stadia(path: String):
-	path = path.replace("joypad", "stadia")
-	match path.substr(path.find("/") + 1):
-		"lb":
-			return path.replace("/lb", "/l1")
-		"rb":
-			return path.replace("/rb", "/r1")
-		"lt":
-			return path.replace("/lt", "/l2")
-		"rt":
-			return path.replace("/rt", "/r2")
-		"select":
-			return path.replace("/select", "/dots")
-		"start":
-			return path.replace("/start", "/menu")
-		"share":
-			return path.replace("/share", "/select")
-		_:
-			return path
-
-func _convert_joypad_to_steam(path: String):
-	path = path.replace("joypad", "steam")
-	match path.substr(path.find("/") + 1):
-		"r_stick_click":
-			return path.replace("/r_stick_click", "/right_track_center")
-		"select":
-			return path.replace("/select", "/back")
-		"home":
-			return path.replace("/home", "/system")
-		"dpad":
-			return path.replace("/dpad", "/left_track")
-		"dpad_up":
-			return path.replace("/dpad_up", "/left_track_up")
-		"dpad_down":
-			return path.replace("/dpad_down", "/left_track_down")
-		"dpad_left":
-			return path.replace("/dpad_left", "/left_track_left")
-		"dpad_right":
-			return path.replace("/dpad_right", "/left_track_right")
-		"l_stick":
-			return path.replace("/l_stick", "/stick")
-		"r_stick":
-			return path.replace("/r_stick", "/right_track")
 		_:
 			return path
 
@@ -214,20 +124,11 @@ func _convert_joypad_to_switch(path: String):
 			return path.replace("/start", "/plus")
 		"share":
 			return path.replace("/share", "/square")
-		_:
-			return path
-
-func _convert_joypad_to_joycon(path: String):
-	path = _convert_joypad_to_switch(path)
-	match path.substr(path.find("/") + 1):
-		"dpad_up":
-			return path.replace("/dpad_up", "/up")
-		"dpad_down":
-			return path.replace("/dpad_down", "/down")
-		"dpad_left":
-			return path.replace("/dpad_left", "/left")
-		"dpad_right":
-			return path.replace("/dpad_right", "/right")
+		# The Switch art has no stick-click icons; show the stick itself.
+		"l_stick_click":
+			return path.replace("/l_stick_click", "/l_stick")
+		"r_stick_click":
+			return path.replace("/r_stick_click", "/r_stick")
 		_:
 			return path
 
@@ -250,52 +151,3 @@ func _convert_joypad_to_xbox_modern(path: String):
 
 func _convert_joypad_to_xboxone(path: String):
 	return _convert_joypad_to_xbox_modern(path.replace("joypad", "xboxone"))
-
-func _convert_joypad_to_xboxseries(path: String):
-	return _convert_joypad_to_xbox_modern(path.replace("joypad", "xboxseries"))
-
-func _convert_joypad_to_steamdeck(path: String):
-	path = path.replace("joypad", "steamdeck")
-	match path.substr(path.find("/") + 1):
-		"lb":
-			return path.replace("/lb", "/l1")
-		"rb":
-			return path.replace("/rb", "/r1")
-		"lt":
-			return path.replace("/lt", "/l2")
-		"rt":
-			return path.replace("/rt", "/r2")
-		"select":
-			return path.replace("/select", "/inventory")
-		"start":
-			return path.replace("/start", "/menu")
-		"home":
-			return path.replace("/home", "/steam")
-		"share":
-			return path.replace("/share", "/dots")
-		_:
-			return path
-
-func _convert_joypad_to_ouya(path: String):
-	path = path.replace("joypad", "ouya")
-	match path.substr(path.find("/") + 1):
-		"a":
-			return path.replace("/a", "/o")
-		"x":
-			return path.replace("/x", "/u")
-		"b":
-			return path.replace("/b", "/a")
-		"lb":
-			return path.replace("/lb", "/l1")
-		"rb":
-			return path.replace("/rb", "/r1")
-		"lt":
-			return path.replace("/lt", "/l2")
-		"rt":
-			return path.replace("/rt", "/r2")
-		"start":
-			return path.replace("/start", "/menu")
-		"share":
-			return path.replace("/share", "/microphone")
-		_:
-			return path

@@ -2,21 +2,16 @@
 extends Resource
 class_name ControllerSettings
 
+## Bonkraiders keeps only the icon sets it ships: PS4, PS5, Switch,
+## Xbox 360 and Xbox One, plus keyboard and mouse. The numbers are the
+## ones upstream uses, so saved settings (settings.tres) keep their meaning.
 enum Devices {
 	NONE = -1,
-	LUNA,
-	OUYA,
-	PS3,
-	PS4,
-	PS5,
-	STADIA,
-	STEAM,
-	SWITCH,
-	JOYCON,
-	XBOX360,
-	XBOXONE,
-	XBOXSERIES,
-	STEAM_DECK
+	PS4 = 3,
+	PS5 = 4,
+	SWITCH = 7,
+	XBOX360 = 9,
+	XBOXONE = 10,
 }
 
 ## General addon settings
