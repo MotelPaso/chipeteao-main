@@ -21,6 +21,7 @@
 [ext_resource type="AudioStream" path="res://assets/audio/ambient/forest_wind.wav" id="23_wind"]
 [ext_resource type="PackedScene" path="res://scenes/world/secrets/OddStump.tscn" id="24_oddstump"]
 [ext_resource type="Script" path="res://scripts/world/run/terrain.gd" id="90_terrain"]
+[ext_resource type="Resource" path="res://assets/world/rock_style_hollow_woods.tres" id="91_rockstyle"]
 
 [sub_resource type="Shader" id="Shader_grass"]
 code = "shader_type spatial;
@@ -216,6 +217,7 @@ rock_scene = ExtResource("11_rock")
 stump_scene = ExtResource("12_stump")
 mesa_platform_scene = ExtResource("14_platform")
 mesa_ramp_scene = ExtResource("13_ramp")
+formation_style = ExtResource("91_rockstyle")
 
 [node name="Terrain" type="StaticBody3D" parent="."]
 script = ExtResource("90_terrain")

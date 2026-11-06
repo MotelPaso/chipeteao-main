@@ -55,8 +55,8 @@ extends Node3D
 ## para que sigan siendo hitos distintos y no se fundan en una placa.
 @export var mask_blob_spacing: int = 10
 ## Celdas abiertas que siempre quedan entre dos formaciones distintas. Cada
-## una llega hasta RockFormation.margin_max más allá de sus celdas, así que
-## un hueco de una celda se cerraría a una ranura apenas más ancha que un raider.
+## una llega hasta margin_max (de formation_style) más allá de sus celdas, así
+## que un hueco de una celda se cerraría a una ranura apenas más ancha que un raider.
 @export var mask_formation_gap: int = 2
 ## Ancho, en celdas, del anillo exterior donde la roca nunca siembra ni
 ## crece. Con el borde siempre abierto una formación no corta una esquina
@@ -92,27 +92,14 @@ extends Node3D
 @export var mesa_clearance: float = 12.0
 
 @export_group("Rock Formations (iteration 63)")
-## Cada región conexa de celdas bloqueadas se vuelve UNA RockFormation
-## (rock_formation.gd): un macizo facetado cuya colisión es su propia malla.
-## Colores en sRGB, como cualquier albedo del inspector.
-@export var formation_rock_color: Color = Color(0.31, 0.32, 0.35)
-@export var formation_cap_color: Color = Color(0.25, 0.39, 0.2)
-## Cuánto tinte de cima toman las partes casi planas (0 = roca desnuda).
-@export var formation_cap_strength: float = 0.65
-## Variación de brillo +- de las bandas de estratos (0 = sin bandas).
-@export var formation_strata: float = 0.05
-## Cuánto se ajustan las alturas a escalones (0 = riscos, 1 = mesetas escalonadas).
-@export var formation_terrace: float = 0.0
-## Altura del acantilado y altura extra hacia la cresta, en metros. Juntas
-## (más el ruido) quedan bajo RockFormation.max_height, que queda bajo lo
-## que un enemigo trepa de una vez.
-@export var formation_cliff_height: float = 2.6
-@export var formation_peak_height: float = 4.0
-## Tamaño de faceta en metros (se redondea para que divida mask_cell_size).
-@export var formation_step: float = 2.0
+## Aspecto de las formaciones de roca de este bioma (un .tres en
+## assets/world/). Cada región conexa de celdas bloqueadas se vuelve UNA
+## RockFormation: un macizo facetado cuya colisión es su propia malla. Vacío,
+## usa los valores por defecto de RockFormationStyle.
+@export var formation_style: RockFormationStyle
 ## Distancia en metros que los props interiores guardan a cualquier celda
-## bloqueada: una formación llega hasta RockFormation.margin_max más allá
-## de sus celdas, y un árbol saliendo de un acantilado parece un error.
+## bloqueada: una formación llega hasta margin_max (del estilo) más allá de
+## sus celdas, y un árbol saliendo de un acantilado parece un error.
 @export var formation_clearance: float = 2.5
 
 @export_group("Interior Scatter")
@@ -517,14 +504,7 @@ func _raise_formations() -> void:
 		formation.name = "RockFormation%d" % index
 		formation.cell_size = mask_cell_size
 		formation.half_extent = arena_half_extent
-		formation.mesh_step = formation_step
-		formation.cliff_height = formation_cliff_height
-		formation.peak_height = formation_peak_height
-		formation.terrace_strength = formation_terrace
-		formation.rock_color = formation_rock_color
-		formation.cap_color = formation_cap_color
-		formation.cap_strength = formation_cap_strength
-		formation.strata_strength = formation_strata
+		formation.style = formation_style
 		add_child(formation)
 		formation.build(regions[index], terrain, _run_seed)
 		faces += formation.face_count

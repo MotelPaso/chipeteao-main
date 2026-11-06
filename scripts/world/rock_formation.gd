@@ -28,7 +28,7 @@ extends StaticBody3D
 ## vuelven estructural y no probable: el paso de faceta divide exacto el
 ## tamaño de celda, así cada borde de celda es una fila de aristas (un
 ## vértice sobre un borde solo se mueve A LO LARGO de él); y la huella
-## empieza al menos margin_min fuera del borde, donde el acantilado ya está
+## empieza al menos style.margin_min fuera del borde, donde el acantilado ya está
 ## bien sobre el suelo. build() mide lo segundo en cada vértice de borde y
 ## avisa bajo SEAL_MIN_HEIGHT, lo que hace fallar tools/verificar.sh.
 ##
@@ -36,7 +36,7 @@ extends StaticBody3D
 ## altura aquí es relativa a Terrain.height_at, así la formación se apoya en
 ## el relieve en vez de flotar sobre una hondonada.
 
-## Material de las caras si el scatter no entrega otro: albedo blanco
+## Material de las caras si el estilo no trae otro: albedo blanco
 ## multiplicado por los colores de vértice por faceta que se arman abajo.
 const DEFAULT_MATERIAL: Material = preload("res://assets/materials/rock_formation.tres")
 ## Profundidad en metros a la que se hunden los vértices exteriores de la
@@ -58,7 +58,7 @@ const INTERIOR_CAP: float = 24.0
 ## terreno. El peor caso del perfil por defecto (margin_min, lift y crag en
 ## su mínimo) es ~0.95 m.
 const SEAL_MIN_HEIGHT: float = 0.75
-## Bandas de estratos por metro de altura (argumento del seno), para strata_strength.
+## Bandas de estratos por metro de altura (argumento del seno), para style.strata_strength.
 const STRATA_FREQUENCY: float = 3.1
 ## Bajo esta normal Y una faceta es toda roca; sobre CAP_TO toma el tinte
 ## de cima completo: los flancos de la cresta suben a 20-35 grados (normal
@@ -72,49 +72,16 @@ const FOOT_SHADE: float = 0.78
 const FOOT_HEIGHT: float = 2.5
 ## Grano de brillo +- por faceta.
 const GRAIN: float = 0.07
-## Fracción de max_height donde el techo suave empieza a doblar las alturas.
+## Fracción de style.max_height donde el techo suave empieza a doblar las alturas.
 const KNEE: float = 0.75
 
-## Geometría de la máscara en metros, copiada del scatter antes de build().
-var cell_size: float = 10.0
-var half_extent: float = 120.0
-## Tamaño de faceta deseado en metros; build() lo redondea para que divida cell_size.
-var mesh_step: float = 2.0
-## Distancia ruidosa, en metros, que la huella llega más allá de las celdas bloqueadas.
-var margin_min: float = 1.0
-var margin_max: float = 2.0
-## El acantilado: altura en metros alcanzada a cliff_run metros hacia
-## dentro del borde de la huella, más empinado en el pie.
-var cliff_height: float = 2.6
-var cliff_run: float = 2.0
-## Altura extra hacia la cresta: 1 - e^(-d / peak_run) de ella, con d la
-## profundidad pasado el acantilado. La profundidad es la distancia al
-## contorno de la región, así la cresta sigue el espinazo de la formación.
-var peak_height: float = 4.0
-var peak_run: float = 7.0
-## Cumbres: un ruido ridged que solo crece donde la roca ya es profunda,
-## para que los picos rompan la cresta y no el acantilado.
-var spire_height: float = 2.4
-## Techo sobre el suelo, en metros. EnemyBase.max_climb_height (10 m) limita
-## una trepada y la horda abandona una cara más alta a medio camino, así que
-## esto queda bajo eso. Se alcanza con una rodilla suave desde KNEE de él: un
-## corte duro dejaría cada cumbre como una mesa plana a esta altura.
-var max_height: float = 8.0
-## Fracción +- en que todo el perfil se hincha o se hunde a lo largo de la formación.
-var lift_variation: float = 0.35
-## Amplitud en metros del ruido a escala de faceta que vuelve rugosa la superficie.
-var crag_height: float = 0.6
-## Escalones: su altura en metros y cuánto se ajustan las alturas a ellos (0 = sin escalones).
-var terrace_step: float = 1.6
-var terrace_strength: float = 0.0
-var rock_color: Color = Color(0.31, 0.32, 0.35)
-var cap_color: Color = Color(0.25, 0.39, 0.2)
-## Cuánto tinte de cima toma una cima plana (0 = roca desnuda en todas partes).
-var cap_strength: float = 0.65
-## Variación de brillo +- de las bandas horizontales (0 = sin bandas).
-var strata_strength: float = 0.05
-## Vacío, se usa DEFAULT_MATERIAL.
-var surface_material: Material = null
+## Geometría de la máscara en metros; la pone el scatter antes de build().
+var cell_size: float
+var half_extent: float
+## Aspecto del bioma (colores, acantilado, cresta, escalones). Lo pone el
+## scatter antes de build(); vacío, build() usa los valores por defecto de
+## RockFormationStyle.
+var style: RockFormationStyle = null
 
 ## Estadísticas para el log de una línea del scatter, válidas tras build().
 var face_count: int = 0
@@ -142,11 +109,13 @@ var _spire_noise := FastNoiseLite.new()
 ## la máscara del scatter). `noise_seed` es la semilla de la partida, así
 ## BONK_GAME_SEED y la Cacería diaria reproducen la misma roca y la misma máscara.
 func build(cells: Dictionary[Vector2i, bool], terrain: Terrain, noise_seed: int) -> void:
+	if style == null:
+		style = RockFormationStyle.new()
 	_cells = cells
 	_terrain = terrain
 	_seed = noise_seed
 	_setup_noise(noise_seed)
-	var per_cell := maxi(int(round(cell_size / maxf(mesh_step, 0.5))), 1)
+	var per_cell := maxi(int(round(cell_size / maxf(style.mesh_step, 0.5))), 1)
 	_step = cell_size / float(per_cell)
 	# Límites de la huella, con el margen máximo más un paso, ajustados hacia
 	# fuera a la cuadrícula global de facetas (comparte origen con la de
@@ -156,7 +125,7 @@ func build(cells: Dictionary[Vector2i, bool], terrain: Terrain, noise_seed: int)
 	for cell: Vector2i in _cells:
 		low = Vector2i(mini(low.x, cell.x), mini(low.y, cell.y))
 		high = Vector2i(maxi(high.x, cell.x), maxi(high.y, cell.y))
-	var pad := margin_max + _step
+	var pad := style.margin_max + _step
 	var first := Vector2i(
 			floori((float(low.x) * cell_size - pad) / _step),
 			floori((float(low.y) * cell_size - pad) / _step))
@@ -227,7 +196,8 @@ func build(cells: Dictionary[Vector2i, bool], terrain: Terrain, noise_seed: int)
 	var view := MeshInstance3D.new()
 	view.name = "Mesh"
 	view.mesh = mesh
-	view.material_override = surface_material if surface_material != null else DEFAULT_MATERIAL
+	view.material_override = style.surface_material if style.surface_material != null \
+			else DEFAULT_MATERIAL
 	add_child(view)
 	# Los búferes de construcción sobran cuando la malla ya tiene su copia.
 	_vertices = PackedVector3Array()
@@ -313,7 +283,7 @@ func _distance_to_cell(at: Vector2, cell: Vector2i) -> float:
 func _margin(at: Vector2) -> float:
 	# El FBM simplex rara vez sale de +-0.7; se estira para usar todo el rango.
 	var wobble := clampf(_edge_noise.get_noise_2d(at.x, at.y) * 0.7 + 0.5, 0.0, 1.0)
-	return lerpf(margin_min, margin_max, wobble)
+	return lerpf(style.margin_min, style.margin_max, wobble)
 
 
 ## Altura de la roca sobre el suelo a `depth` metros hacia dentro del borde
@@ -321,19 +291,22 @@ func _margin(at: Vector2) -> float:
 func _profile(depth: float, at: Vector2) -> float:
 	if depth <= 0.0:
 		return -BURY_DEPTH
+	var cliff_run := style.cliff_run
 	var rise := 1.0 - minf(depth / cliff_run, 1.0)
-	var cliff := cliff_height * (1.0 - rise * rise)
-	var crest := peak_height * (1.0 - exp(-maxf(depth - cliff_run, 0.0) / peak_run))
-	var lift := 1.0 + lift_variation * _lift_noise.get_noise_2d(at.x, at.y)
+	var cliff := style.cliff_height * (1.0 - rise * rise)
+	var crest := style.peak_height * (1.0 - exp(-maxf(depth - cliff_run, 0.0) / style.peak_run))
+	var lift := 1.0 + style.lift_variation * _lift_noise.get_noise_2d(at.x, at.y)
 	var height := (cliff + crest) * lift
 	var ridge := 1.0 - absf(_spire_noise.get_noise_2d(at.x, at.y))
-	height += spire_height * ridge * ridge * ridge * smoothstep(3.0, 9.0, depth)
-	height += crag_height * _crag_noise.get_noise_2d(at.x, at.y) \
+	height += style.spire_height * ridge * ridge * ridge * smoothstep(3.0, 9.0, depth)
+	height += style.crag_height * _crag_noise.get_noise_2d(at.x, at.y) \
 			* smoothstep(0.0, cliff_run, depth)
-	if terrace_strength > 0.0 and terrace_step > 0.0:
+	var terrace_step := style.terrace_step
+	if style.terrace_strength > 0.0 and terrace_step > 0.0:
 		var level := height / terrace_step
 		var ledge := (floorf(level) + smoothstep(0.3, 0.7, level - floorf(level))) * terrace_step
-		height = lerpf(height, ledge, terrace_strength)
+		height = lerpf(height, ledge, style.terrace_strength)
+	var max_height := style.max_height
 	var knee := max_height * KNEE
 	if height > knee:
 		var room := max_height - knee
@@ -371,11 +344,11 @@ func _emit(v0: Vector3, v1: Vector3, v2: Vector3, height_sum: float, key: int) -
 ## cielo claro y la niebla de las arenas el sol solo apenas separa un
 ## acantilado de una cresta, y la roca se leería como una maqueta de papel.
 func _facet_color(normal: Vector3, height: float, key: int) -> Color:
-	var cap := smoothstep(CAP_FROM, CAP_TO, normal.y) * cap_strength
-	var base := rock_color.lerp(cap_color, cap)
+	var cap := smoothstep(CAP_FROM, CAP_TO, normal.y) * style.cap_strength
+	var base := style.rock_color.lerp(style.cap_color, cap)
 	var slope := lerpf(1.1, STEEP_SHADE, smoothstep(0.35, 0.95, 1.0 - normal.y))
 	var foot := lerpf(FOOT_SHADE, 1.0, clampf(height / FOOT_HEIGHT, 0.0, 1.0))
-	var band := 1.0 + strata_strength * sin(height * STRATA_FREQUENCY)
+	var band := 1.0 + style.strata_strength * sin(height * STRATA_FREQUENCY)
 	var grain := 1.0 + (_hash01(key, 7, _seed) - 0.5) * 2.0 * GRAIN
 	var value := slope * foot * band * grain
 	return Color(base.r * value, base.g * value, base.b * value, 1.0)
