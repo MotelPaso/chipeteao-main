@@ -28,14 +28,6 @@ const SLIDE_MIN_SPEED_RATIO: float = 0.5
 ## lado y no encima, para que la física no empuje a ninguno de los dos.
 const RESCUE_MATE_OFFSET := Vector3(1.5, 0.5, 0.0)
 
-## Cartel de rescate: las medidas del cartel de los interactuables
-## (interactable.gd), más arriba del cuerpo caído.
-const PROMPT_FONT_SIZE: int = 52
-const PROMPT_OUTLINE_SIZE: int = 14
-const PROMPT_HEIGHT: float = 2.6
-## Centinela de "el cartel nunca se pintó", distinto de "nadie lo revive" (-1).
-const PROMPT_PCT_UNSET: int = -2
-
 ## Textos del toast de mascota; los dos llevan el nombre (%s) para que un
 ## cambio se lea como cambio y no como regalo.
 const PET_JOINS: String = "%s se une"
@@ -91,15 +83,6 @@ const FLIGHT_EDGE_MARGIN: float = 2.0
 @export_group("Co-op")
 ## Slot del jugador (0-3): decide qué dispositivo lo controla; RunSystems asigna 1+ a los cuerpos extra.
 @export var player_index: int = 0
-## Radio de rescate, en metros; arena_probe.gd se acerca a 2 m para revivir.
-@export var revive_radius: float = 3.0
-## Segundos que un compañero debe mantener Interactuar para revivir.
-@export var revive_time: float = 3.0
-## Fracción de la vida máxima con que vuelve el revivido (0-1).
-@export var revive_heal_fraction: float = 0.5
-## Progreso de rescate que se pierde por segundo sin nadie ayudando (0-1 por segundo).
-@export var revive_decay_rate: float = 0.5
-
 ## Interruptor de prueba (ArenaProbe, BONK_WEAPON): id del arma con que
 ## empieza el raider en vez de la de su personaje. Pasa por el mismo camino
 ## de entrega (el node_name que cuenta el pool y el contador used_weapon_).
@@ -113,12 +96,22 @@ var points: int = 0
 ## de mascotas y el traficante de animales, nunca un cofre ni la ruleta.
 var pet_id: String = ""
 
+## Radio de rescate en metros (lectura; se edita en el nodo Revive).
+var revive_radius: float:
+	get:
+		return _revive.revive_radius
+## Segundos de Interactuar para revivir (lectura; se edita en el nodo Revive).
+var revive_time: float:
+	get:
+		return _revive.revive_time
+
 @onready var collision_shape: CollisionShape3D = $CollisionShape3D
 @onready var seal_rig: SealRig = $SealRig
 @onready var weapons_mount: Node3D = $Weapons
 @onready var health: Health = $Health
 @onready var _stats: PlayerStats = $Stats
 @onready var _camera: PlayerCamera = $CameraRig
+@onready var _revive: PlayerRevive = $Revive
 @onready var item_bag: ItemBag = $ItemBag
 
 ## Multiplicadores de puntos con nombre (Fiebre del oro, Lluvia dorada): el
@@ -147,15 +140,6 @@ var _root_timer: float = 0.0
 var _jumps_left: int = 1
 
 var _is_dead: bool = false
-
-## Co-op: el cuerpo queda en el suelo sin control ni armas hasta que un
-## compañero lo revive (ver _tick_downed). Nunca es true en solo.
-var _is_downed: bool = false
-var _revive_progress: float = 0.0
-var _revive_prompt: Label3D = null
-var _saved_collision_layer: int = 0
-## Último porcentaje entero pintado en el cartel (ver _update_revive_prompt).
-var _last_prompt_pct: int = PROMPT_PCT_UNSET
 
 ## Punto de inicio de la etapa: el rescate del vacío devuelve aquí al raider.
 var _spawn_position: Vector3 = Vector3.ZERO
@@ -278,7 +262,7 @@ func interact_action() -> StringName:
 func _unhandled_input(event: InputEvent) -> void:
 	if _is_dead:
 		return
-	_camera.handle_input(event, _is_downed)
+	_camera.handle_input(event, is_downed())
 
 
 ## Un tick de física en pasos con nombre. El orden importa: temporizadores
@@ -301,13 +285,13 @@ func _physics_process(delta: float) -> void:
 
 	_camera.apply_stick_look(delta)
 
-	if _is_downed:
+	if is_downed():
 		# Caído: solo gravedad y la cuenta del rescate.
 		velocity.x = 0.0
 		velocity.z = 0.0
 		_camera.pin_orbit_arm()
 		move_and_slide()
-		_tick_downed(delta)
+		_revive.tick(delta)
 		return
 
 	# Tomos y objetos escalan la velocidad base exportada.
@@ -344,7 +328,7 @@ func _rescue_from_void() -> void:
 	if global_position.y >= void_rescue_y:
 		return
 	var destination := _spawn_position
-	if _is_downed:
+	if is_downed():
 		var mate := Coop.nearest_player(get_tree(), global_position)
 		if mate != null:
 			destination = mate.global_position + RESCUE_MATE_OFFSET
@@ -417,7 +401,7 @@ func _try_jump() -> void:
 ## suelo sigue recargando los saltos.
 func _tick_flight(delta: float) -> bool:
 	var powerups := PowerUps.find_in(self)
-	if powerups == null or not powerups.has("flight") or _is_downed:
+	if powerups == null or not powerups.has("flight") or is_downed():
 		return false
 	if is_on_floor():
 		_jumps_left = _max_jumps()
@@ -552,7 +536,7 @@ func _apply_character(character: Dictionary) -> void:
 
 
 func _on_health_died() -> void:
-	if _is_dead or _is_downed:
+	if _is_dead or is_downed():
 		return
 	if _is_sliding:
 		_end_slide()
@@ -587,145 +571,17 @@ func rig_visual_layer() -> int:
 	return _camera.rig_visual_layer()
 
 
-# --- Co-op: caído y rescate --------------------------------------------------
-
-## Las cinco cosas que cambian juntas al caer o levantarse: grupo (todo el
-## targeting usa "player"), colisión fantasma, armas, la caída del rig y el
-## cartel flotante. Juntas aquí para que los dos caminos no se separen.
-func _set_downed(down: bool) -> void:
-	_is_downed = down
-	_revive_progress = 0.0
-	if down:
-		# Fuera del grupo "player", todo sistema que apunta (enemigos, imán
-		# de gemas, interactuables, el conteo de vivos de RunManager) ignora
-		# este cuerpo sin chequeos extra; revivir lo devuelve.
-		remove_from_group("player")
-		add_to_group("downed_players")
-		# Limpiar ANTES de detener el montaje: un arma que deja campos con
-		# tiempo (charcos de sangre o de baba) los avanza en su propio
-		# _physics_process, y congelada los dejaría en el suelo sin fin.
-		_clear_weapon_fields()
-		# Las armas dejan de disparar con el cuerpo (los hijos del montaje
-		# procesan física).
-		weapons_mount.process_mode = Node.PROCESS_MODE_DISABLED
-		# Colisión fantasma: el cuerpo no bloquea a compañeros ni a la horda.
-		_saved_collision_layer = collision_layer
-		collision_layer = 0
-		seal_rig.play_death()
-		# Si cayó toda la party, RunManager termina la partida en este mismo
-		# frame y pausa el árbol: un cartel mostrado ahora quedaría encima de
-		# la pantalla de fin (es no_depth_test).
-		if not get_tree().get_nodes_in_group("player").is_empty():
-			_show_revive_prompt()
-	else:
-		remove_from_group("downed_players")
-		add_to_group("player")
-		weapons_mount.process_mode = Node.PROCESS_MODE_INHERIT
-		collision_layer = _saved_collision_layer
-		seal_rig.reset_death()
-		_hide_revive_prompt()
-
-
-## Pide a cada arma con campos en el suelo que los suelte. Parte opcional
-## del contrato: el arma que deja campos expone clear_weapon_fields().
-func _clear_weapon_fields() -> void:
-	for weapon: Node in weapons_mount.get_children():
-		if weapon.has_method("clear_weapon_fields"):
-			weapon.call("clear_weapon_fields")
-
+# --- Co-op: caído y rescate (nodo Revive) -------------------------------------
 
 func _enter_downed() -> void:
 	# Un Entomb que llegó con el golpe final (Sarcognato enraíza y daña a la
 	# vez) no dura más que la caída: el revivido vuelve pudiendo moverse.
 	_root_timer = 0.0
-	_set_downed(true)
+	_revive.set_downed(true)
 
 
 func is_downed() -> bool:
-	return _is_downed
-
-
-## Mientras está caído: un compañero en pie dentro de revive_radius que
-## mantiene SU acción de interactuar llena la barra; soltar la vacía despacio.
-func _tick_downed(delta: float) -> void:
-	if not RunState.run_active:
-		# La partida terminó (derrota total, extracción): se quita el cartel
-		# para que no flote sobre la pantalla de fin.
-		_hide_revive_prompt()
-		return
-	var rescuing := false
-	# Se guarda QUIÉN rescata: el log lo nombra, y así el soak distingue un
-	# rescate real de un raider que volvió solo.
-	var rescuer: Player = null
-	for node: Node in get_tree().get_nodes_in_group("player"):
-		var mate := node as Player
-		if mate == null or not mate.is_inside_tree():
-			continue
-		if global_position.distance_to(mate.global_position) > revive_radius:
-			continue
-		if Input.is_action_pressed(mate.interact_action()):
-			rescuing = true
-			rescuer = mate
-			break
-	if rescuing:
-		# Protegido: con revive_time = 0 todo caído se levantaría en el
-		# primer frame de contacto.
-		_revive_progress += delta / maxf(revive_time, 0.01)
-		if _revive_progress >= 1.0:
-			_revive(rescuer)
-			return
-	else:
-		_revive_progress = maxf(_revive_progress - revive_decay_rate * delta, 0.0)
-	_update_revive_prompt(rescuing)
-
-
-func _revive(rescuer: Player = null) -> void:
-	_set_downed(false)
-	health.revive(revive_heal_fraction)
-	Juice.sparkle(global_position + Vector3.UP * 1.0)
-	Sfx.play(&"heal")
-	# Log de una línea: ningún soak en solo llega a caer y revivir, y
-	# tools/verificar.sh cuenta las líneas "Player revived:".
-	print("Player revived: p%d by p%d" % [
-			player_index, rescuer.player_index if rescuer != null else -1])
-
-
-## Cartel flotante sobre el caído (el mismo esquema Label3D de los
-## interactuables), que también muestra el progreso del rescate.
-func _show_revive_prompt() -> void:
-	if _revive_prompt == null:
-		_revive_prompt = Label3D.new()
-		_revive_prompt.billboard = BaseMaterial3D.BILLBOARD_ENABLED
-		_revive_prompt.no_depth_test = true
-		_revive_prompt.font_size = PROMPT_FONT_SIZE
-		_revive_prompt.outline_size = PROMPT_OUTLINE_SIZE
-		_revive_prompt.position = Vector3.UP * PROMPT_HEIGHT
-		add_child(_revive_prompt)
-	_revive_prompt.visible = true
-	_last_prompt_pct = PROMPT_PCT_UNSET
-	_update_revive_prompt(false)
-
-
-func _update_revive_prompt(rescuing: bool) -> void:
-	if _revive_prompt == null:
-		return
-	# El texto solo cambia por porcentaje entero (~33 pasos en todo el
-	# rescate): los demás ticks no arman el String.
-	var pct := roundi(_revive_progress * 100.0) if rescuing else -1
-	if pct == _last_prompt_pct:
-		return
-	_last_prompt_pct = pct
-	if rescuing:
-		_revive_prompt.text = "Reviviendo... %d%%" % pct
-		_revive_prompt.modulate = Color(0.5, 0.95, 0.6)
-	else:
-		_revive_prompt.text = "CAÍDO — mantén [Interactuar] cerca"
-		_revive_prompt.modulate = Color(1.0, 0.42, 0.35)
-
-
-func _hide_revive_prompt() -> void:
-	if _revive_prompt != null:
-		_revive_prompt.visible = false
+	return _revive.is_downed()
 
 
 func _can_start_slide(wish_dir: Vector3, effective_speed: float) -> bool:

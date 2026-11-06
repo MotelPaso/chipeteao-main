@@ -7,6 +7,8 @@
 [ext_resource type="Script" uid="uid://bj6h07uuf8ckk" path="res://scripts/systems/item_bag.gd" id="5_bag"]
 [ext_resource type="Script" uid="uid://cmnn3k6k76em8" path="res://scripts/systems/power_ups.gd" id="6_powerups"]
 [ext_resource type="Script" uid="uid://ginwod0otqua" path="res://scripts/player/components/player_camera.gd" id="7_camera"]
+[ext_resource type="Script" uid="uid://bqqg08luk7lph" path="res://scripts/player/components/player_revive.gd" id="8_revive"]
+[ext_resource type="Script" uid="uid://qcqf8asw7qkj" path="res://scripts/player/components/revive_prompt.gd" id="9_prompt"]
 
 [sub_resource type="CapsuleShape3D" id="CapsuleShape3D_1"]
 resource_local_to_scene = true
@@ -51,3 +53,15 @@ script = ExtResource("5_bag")
 
 [node name="PowerUps" type="Node" parent="." unique_id=751190086]
 script = ExtResource("6_powerups")
+
+[node name="Revive" type="Node3D" parent="."]
+script = ExtResource("8_revive")
+
+[node name="RevivePrompt" type="Label3D" parent="Revive"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.6, 0)
+visible = false
+billboard = 1
+no_depth_test = true
+font_size = 52
+outline_size = 14
+script = ExtResource("9_prompt")
