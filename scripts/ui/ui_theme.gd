@@ -52,6 +52,16 @@ const CARD_GLOW_HIGHLIGHT := 0.2
 const HOVER_GROW := 1.04
 const PRESS_SQUASH := 0.95
 const MOTION_TIME := 0.12
+## Vaivén de "no alcanza" de cartas y botones (ver reject): ángulo (grados)
+## de cada paso y su duración (segundos).
+const REJECT_SWINGS: Array[float] = [-4.0, 4.0, -2.0, 0.0]
+const REJECT_SWING_TIMES: Array[float] = [0.05, 0.08, 0.07, 0.06]
+## El vaivén más suave de las filas de las pantallas meta.
+const REJECT_SWINGS_ROW: Array[float] = [-2.0, 2.0, 0.0]
+const REJECT_SWING_TIMES_ROW: Array[float] = [0.05, 0.08, 0.07]
+## Duración (segundos) del destello rojo y de su vuelta al modulate de reposo.
+const REJECT_FLASH_TIME := 0.06
+const REJECT_RESTORE_TIME := 0.18
 
 # --- textos compartidos ------------------------------------------------------
 
@@ -228,6 +238,32 @@ static func pop(control: Control, peak: float = 1.22, duration: float = 0.26) ->
 	tween.tween_property(control, "scale", Vector2.ONE, duration * 0.65) \
 			.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 	control.set_meta(&"ui_pop_tween", tween)
+
+
+## Respuesta de "no alcanza": destello rojo (REJECT_FLASH) y un vaivén de
+## rotación que recorre `swings` (grados), cada paso con su tiempo en
+## `swing_times` (segundos); con el último paso el modulate vuelve a
+## `rest_modulate`. La rotación no pelea con el layout de un contenedor como
+## lo haría la posición. El tween queda en la metadata `meta_key`: repetirlo
+## lo reinicia en vez de apilar tweens.
+static func reject(control: Control, swings: Array[float] = REJECT_SWINGS,
+		swing_times: Array[float] = REJECT_SWING_TIMES,
+		rest_modulate: Color = Color.WHITE,
+		meta_key: StringName = &"ui_reject_tween") -> void:
+	control.pivot_offset = control.size * 0.5
+	kill_meta_tween(control, meta_key)
+	var tween := control.create_tween()
+	tween.set_ignore_time_scale(true)
+	tween.tween_property(control, "modulate", REJECT_FLASH, REJECT_FLASH_TIME)
+	for i in swings.size():
+		if i == 0:
+			tween.parallel().tween_property(control, "rotation_degrees",
+					swings[i], swing_times[i])
+		else:
+			tween.tween_property(control, "rotation_degrees", swings[i], swing_times[i])
+	tween.parallel().tween_property(control, "modulate", rest_modulate,
+			REJECT_RESTORE_TIME)
+	control.set_meta(meta_key, tween)
 
 
 ## Mata el tween guardado en la metadata del nodo con esa llave (el patrón que

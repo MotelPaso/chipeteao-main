@@ -168,24 +168,14 @@ func payoff(row: Control, before: int, after: int, sound: StringName) -> void:
 	flash.tween_callback(rebuild)
 
 
-## Vaivén de "no alcanza". Un tween por fila guardado en la metadata:
-## insistir en el botón lo reinicia en vez de apilar tweens que escriben la
-## misma rotación y modulate.
+## Vaivén suave de "no alcanza" (UiTheme.reject con el perfil de filas).
+## Parte siempre de la pose recta: insistir en el botón lo reinicia.
 func reject(row: Control) -> void:
 	if not is_instance_valid(row):
 		return
-	row.pivot_offset = row.size * 0.5
-	UiTheme.kill_meta_tween(row, &"ui_reject_tween")
 	row.rotation_degrees = 0.0
 	row.modulate = Color.WHITE
-	var tween := create_tween()
-	tween.set_ignore_time_scale(true)
-	tween.tween_property(row, "modulate", UiTheme.REJECT_FLASH, 0.06)
-	tween.parallel().tween_property(row, "rotation_degrees", -2.0, 0.05)
-	tween.tween_property(row, "rotation_degrees", 2.0, 0.08)
-	tween.tween_property(row, "rotation_degrees", 0.0, 0.07)
-	tween.parallel().tween_property(row, "modulate", Color.WHITE, 0.18)
-	row.set_meta(&"ui_reject_tween", tween)
+	UiTheme.reject(row, UiTheme.REJECT_SWINGS_ROW, UiTheme.REJECT_SWING_TIMES_ROW)
 
 
 ## remove_child ANTES de queue_free: un hijo liberado este frame sigue en el

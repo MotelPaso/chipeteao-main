@@ -832,14 +832,5 @@ func _populate_confirm_card(card: Button, character: Dictionary) -> void:
 ## sus vecinas) y comparte la metadata de _settle_card para que los dos
 ## nunca animen a la vez.
 func _reject_card(card: Button, rest_modulate: Color = Color.WHITE) -> void:
-	card.pivot_offset = card.size / 2.0
-	UiTheme.kill_meta_tween(card, &"ui_settle_tween")
-	var tween := card.create_tween()
-	tween.set_ignore_time_scale(true)
-	tween.tween_property(card, "modulate", UiTheme.REJECT_FLASH, 0.06)
-	tween.parallel().tween_property(card, "rotation_degrees", -4.0, 0.05)
-	tween.tween_property(card, "rotation_degrees", 4.0, 0.08)
-	tween.tween_property(card, "rotation_degrees", -2.0, 0.07)
-	tween.tween_property(card, "rotation_degrees", 0.0, 0.06)
-	tween.parallel().tween_property(card, "modulate", rest_modulate, 0.18)
-	card.set_meta(&"ui_settle_tween", tween)
+	UiTheme.reject(card, UiTheme.REJECT_SWINGS, UiTheme.REJECT_SWING_TIMES,
+			rest_modulate, &"ui_settle_tween")
