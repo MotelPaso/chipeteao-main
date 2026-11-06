@@ -260,10 +260,10 @@ func ground_height(x: float, z: float) -> float:
 	return terrain.height_at(x, z)
 
 
-## --- Fachada de la máscara: otros nodos llaman estos métodos por el grupo
-## "arena_bounds" (spawner, director, jefes, jugador, mapa, harness).
-## Conservar nombres y firmas.
-##
+# --- Fachada de la máscara: otros nodos llaman estos métodos por el grupo
+# "arena_bounds" (spawner, director, jefes, jugador, mapa, harness).
+# Conservar nombres y firmas.
+
 ## True si una posición plana está dentro de la arena y no cae en una celda
 ## bloqueada. Todo lo que coloca cuerpos o POIs pregunta esto primero.
 func is_walkable(xz: Vector2) -> bool:
