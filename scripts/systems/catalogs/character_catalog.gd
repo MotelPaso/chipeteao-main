@@ -8,7 +8,9 @@ extends RefCounted
 ## Se puede cambiar libremente: display_name, blurb, passive_*, unlock_cost,
 ## tint, model_*.
 ## Llave interna, NUNCA la cambies: id (es la llave del guardado y de las
-## misiones; usa minúsculas y guiones bajos).
+## misiones; usa minúsculas y guiones bajos). Si de verdad hay que
+## renombrarlo, agrega la fila viejo -> nuevo en SaveData.ID_ALIASES para que
+## los guardados existentes no pierdan el personaje ni sus contadores.
 ## Cuidado con unlock_cost: poner 0 lo deja gratis para siempre en los
 ## guardados existentes. SaveData agrega cada personaje gratis al guardado al
 ## cargarlo, y volver a ponerle precio después no lo bloquea de nuevo.
@@ -90,7 +92,7 @@ const CHARACTER_LIBRARY: Array[Dictionary] = [
 		"tint": Color(0.89, 0.45, 0.18),
 	},
 	{
-		"id": "Yandere-chan", "display_name": "Yandere-chan",
+		"id": "yandere_chan", "display_name": "Yandere-chan",
 		"blurb": "Termina tu juego yandere-dev.",
 		"weapon_scene": "res://scenes/weapons/HuntingBow.tscn",
 		"weapon_node_name": "HuntingBow",
@@ -114,7 +116,7 @@ const CHARACTER_LIBRARY: Array[Dictionary] = [
 		"tint": Color(0.55, 0.85, 0.95),
 	},
 	{
-		"id": "Electro Gato", "display_name": "Electro Gato",
+		"id": "electro_gato", "display_name": "Electro Gato",
 		"blurb": "Un cazatormentas cuya suerte se lee como un parte del clima.",
 		"weapon_scene": "res://scenes/weapons/StormRod.tscn",
 		"weapon_node_name": "StormRod",
@@ -138,7 +140,7 @@ const CHARACTER_LIBRARY: Array[Dictionary] = [
 		"tint": Color(0.72, 0.16, 0.2),
 	},
 	{
-		"id": "Moka", "display_name": "Moka",
+		"id": "moka", "display_name": "Moka",
 		"blurb": "Una foca muy watona.",
 		"weapon_scene": "res://scenes/weapons/SlimeTrail.tscn",
 		"weapon_node_name": "SlimeTrail",
@@ -160,7 +162,7 @@ const CHARACTER_LIBRARY: Array[Dictionary] = [
 		"tint": Color(0.6, 0.7, 0.3),
 	},
 	{
-		"id": "Goku", "display_name": "Goku",
+		"id": "goku", "display_name": "Goku",
 		"blurb": "Carga seis segundos y después reescribe el mapa.",
 		"weapon_scene": "res://scenes/weapons/Kamehameha.tscn",
 		"weapon_node_name": "Kamehameha",

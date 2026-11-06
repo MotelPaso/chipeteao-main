@@ -5,7 +5,8 @@ extends RefCounted
 ##
 ## Se puede cambiar libremente: display_name, description, target, reward.
 ## Llave interna, NUNCA la cambies: id (SaveData guarda las misiones
-## completadas y reclamadas por id).
+## completadas y reclamadas por id). Borrar una fila es seguro: los ids
+## guardados que ya no están en el catálogo se ignoran.
 ## stat nombra un contador de SaveData (lista en save_data.gd). Los contadores
 ## con prefijo llevan un id de otro catálogo dentro del nombre y dejan de
 ## avanzar en silencio si ese id cambia:
@@ -150,11 +151,6 @@ const QUEST_LIBRARY: Array[Dictionary] = [
 		"id": "rook_win", "display_name": "La prueba de Rook",
 		"description": "Gana una incursión con Rook.",
 		"stat": "wins_as_rook", "target": 1, "reward": 40,
-	},
-	{
-		"id": "vex_runs_5", "display_name": "La rutina de Vex",
-		"description": "Termina 5 incursiones con Vex.",
-		"stat": "runs_as_vex", "target": 5, "reward": 30,
 	},
 	# Por mapa.
 	{

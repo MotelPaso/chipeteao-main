@@ -24,7 +24,8 @@ extends Node
 ##   pseudo-infinito después de superar una etapa).
 ## Con prefijo, donde el resto del nombre es un id de otro catálogo
 ## (renombrar ese id deja el contador huérfano):
-##   runs_as_<character_id>, wins_as_<character_id>: CharacterCatalog.
+##   runs_as_<character_id>, wins_as_<character_id>: CharacterCatalog (los
+##   ids renombrados se traducen al cargar, ver ID_ALIASES).
 ##   runs_on_<map_id> (cada mapa visitado), victories_<map_id> (cada mapa
 ##   superado): MapCatalog.
 ##   slain_<secret_boss_id>: jefes ocultos (SecretBossBase).
@@ -58,6 +59,23 @@ const MAX_MOUSE_SENSITIVITY := 2.0
 ## guarda el índice. Un guardado sin la llave juega en Alta.
 const DEFAULT_GRAPHICS_QUALITY := 0
 const MAX_GRAPHICS_QUALITY := 2
+
+## Ids viejos de personaje -> id actual. load_from_disk traduce con esta tabla
+## los personajes desbloqueados y comprados y los contadores runs_as_/wins_as_
+## de un guardado viejo. Si renombras un id en CharacterCatalog, agrega aquí
+## la fila viejo -> nuevo.
+const ID_ALIASES: Dictionary[String, String] = {
+	"juno": "yandere_chan",
+	"Yandere-chan": "yandere_chan",
+	"torren": "electro_gato",
+	"Electro Gato": "electro_gato",
+	"miro": "moka",
+	"Moka": "moka",
+	"kael": "goku",
+	"Goku": "goku",
+}
+## Prefijos de contador seguidos de un id de personaje.
+const CHARACTER_COUNTER_PREFIXES: Array[String] = ["runs_as_", "wins_as_"]
 
 ## Los harness de prueba lo apuntan a un archivo descartable antes de
 ## load_from_disk().
@@ -362,7 +380,8 @@ func purchase_character(character_id: String) -> bool:
 ## copia .bak y después los valores por defecto (nunca se cae: un archivo
 ## malo empieza de cero). Un archivo de una versión más nueva se lee hasta
 ## donde este esquema permite y queda bloqueado (ver _read_only) en vez de
-## sobrescribirse.
+## sobrescribirse. Los ids viejos de personaje se traducen (ID_ALIASES) y, si
+## hubo alguno, el guardado se reescribe una vez con los ids actuales.
 func load_from_disk() -> void:
 	_apply_defaults()
 	_read_only = false
@@ -393,11 +412,66 @@ func load_from_disk() -> void:
 	# no conoce simplemente no se leen.
 	relic_ranks = _as_int_dict(data.get("relics"))
 	_load_settings(data.get("settings"))
+	var migrated := _migrate_character_ids()
 	# Los personajes gratis siempre son jugables, aunque un archivo editado
 	# los haya quitado.
 	for starter_id: String in CharacterCatalog.starter_ids():
 		if not unlocked_character_ids.has(starter_id):
 			unlocked_character_ids.append(starter_id)
+	if migrated > 0:
+		print("Save migrated: %d character id(s)" % migrated)
+		save()
+
+
+## Traduce los ids viejos de personaje (ID_ALIASES) en los desbloqueos, las
+## compras y los contadores runs_as_/wins_as_; si el contador viejo y el
+## nuevo existen a la vez, suma los dos. Devuelve cuántos ids viejos distintos
+## encontró: con 0 nada cambió.
+func _migrate_character_ids() -> int:
+	var found: Dictionary[String, bool] = {}
+	unlocked_character_ids = _renamed_ids(unlocked_character_ids, found)
+	purchased_character_ids = _renamed_ids(purchased_character_ids, found)
+	counters = _renamed_counters(counters, found)
+	return found.size()
+
+
+## `ids` con cada id viejo cambiado por el actual y sin repetidos. Sin ids
+## viejos devuelve la misma lista intacta. Anota en `found` los ids viejos.
+static func _renamed_ids(ids: Array[String], found: Dictionary[String, bool]) -> Array[String]:
+	var has_old := false
+	for id: String in ids:
+		if ID_ALIASES.has(id):
+			has_old = true
+			found[id] = true
+	if not has_old:
+		return ids
+	var out: Array[String] = []
+	for id: String in ids:
+		var current: String = ID_ALIASES.get(id, id)
+		if not out.has(current):
+			out.append(current)
+	return out
+
+
+## `source` con los contadores runs_as_/wins_as_ de ids viejos renombrados al
+## id actual, sumando cuando las dos llaves existen. Sin ids viejos devuelve
+## el mismo diccionario intacto. Anota en `found` los ids viejos.
+static func _renamed_counters(source: Dictionary[String, int],
+		found: Dictionary[String, bool]) -> Dictionary[String, int]:
+	var renames: Dictionary[String, String] = {}
+	for key: String in source:
+		for prefix: String in CHARACTER_COUNTER_PREFIXES:
+			var old_id := key.trim_prefix(prefix)
+			if key.begins_with(prefix) and ID_ALIASES.has(old_id):
+				renames[key] = prefix + ID_ALIASES[old_id]
+				found[old_id] = true
+	if renames.is_empty():
+		return source
+	var out: Dictionary[String, int] = {}
+	for key: String in source:
+		var target: String = renames.get(key, key)
+		out[target] = int(out.get(target, 0)) + source[key]
+	return out
 
 
 ## Contenido de un archivo de guardado, o {} si falta, no se puede leer o no
