@@ -1,30 +1,35 @@
 class_name PortalShrine
 extends Interactable
-## Portal altar (iteration 41): the WorldDirector drops portals around the
-## map at run start and links them in random PAIRS. Pressing E inside
-## one teleports the raider to its twin; both then recharge for
-## `cooldown` seconds (Cosmic Worm copies on the traveller shorten it).
-## Built entirely in code (ring, pillar of light, detection shape), so
-## the director can spawn any number without a scene per portal.
+## Altar portal: el WorldDirector pone portales por el mapa al inicio de
+## cada etapa y los une en PARES al azar. Con [E] dentro de uno, el jugador
+## aparece junto a su pareja; los dos se recargan `cooldown` segundos (las
+## copias del Gusano Cósmico del viajero lo acortan).
+## Se construye en código (anillo, pilar de luz y forma de detección).
 
+## Segundos de recarga de los dos portales tras un viaje.
 @export var cooldown: float = 30.0
+## Cuánto acorta la recarga cada Gusano Cósmico del viajero:
+## recarga = cooldown / (1 + esto x copias).
 @export var worm_cooldown_per_copy: float = 0.25
+## Radio (metros) del anillo donde hay que pararse.
 @export var ring_radius: float = 1.6
-## How far past the twin's ring the traveller lands (so the arrival does
-## not immediately re-trigger the portal they just came out of).
+## Cuánto más allá del anillo de la pareja aparece el viajero (metros),
+## para no volver a activar el portal por el que acaba de salir.
 @export var exit_margin: float = 1.2
 
-## Idle presentation of the built-in-code visual.
+## Aspecto en reposo del anillo y el pilar.
 const RING_SPIN: float = 0.8
 const IDLE_PULSE_HZ: float = 3.0
 const IDLE_PULSE_AMOUNT: float = 0.05
 const PILLAR_HEIGHT: float = 6.0
 const PILLAR_TOP_RADIUS: float = 0.9
-## Detection cylinder = ring + this, so the prompt shows a step early.
+## Cilindro de detección = anillo + esto (metros), para que el aviso
+## aparezca un paso antes.
 const DETECT_MARGIN: float = 0.6
-## Exit angles tried around the twin before giving up and landing on it.
+## Ángulos de salida que se prueban alrededor de la pareja antes de
+## aparecer encima de ella.
 const EXIT_ANGLE_TRIES: int = 8
-## Height the traveller is placed at, clear of the floor plate.
+## Altura (metros) a la que se pone al viajero, sobre el suelo.
 const EXIT_LIFT: float = 0.2
 
 var twin: PortalShrine = null
@@ -42,15 +47,13 @@ func _init() -> void:
 	meta_stat_id = ""
 	collision_layer = 0
 	collision_mask = 1
-	# Nothing in the game detects areas as areas (no area_entered or
-	# overlapping-area query anywhere), so being detectable only parks this
-	# ring in the physics broadphase for nothing. Set here, before the node
-	# enters the tree, like the scene-built interactables set it in .tscn.
+	# Nada en el juego detecta áreas como áreas, así que ser detectable
+	# solo ocupa la física. Se fija aquí, antes de entrar al árbol.
 	monitorable = false
 
 
 func _ready() -> void:
-	# Detection ring BEFORE super(), which wires body_entered on this Area3D.
+	# El anillo de detección ANTES de super(), que conecta body_entered.
 	var shape := CollisionShape3D.new()
 	var cylinder := CylinderShape3D.new()
 	cylinder.radius = ring_radius + DETECT_MARGIN
@@ -67,8 +70,8 @@ func _build_visual() -> void:
 	var torus := TorusMesh.new()
 	torus.inner_radius = ring_radius - 0.12
 	torus.outer_radius = ring_radius + 0.12
-	# Explicit tessellation (engine default 64 x 32, 4k tris): 32 slices
-	# keep a 1.6 m ring round, 8 sides are plenty for a 12 cm tube.
+	# Teselado explícito (el del motor es 64 x 32): 32 cortes mantienen
+	# redondo un anillo de 1.6 m y 8 lados bastan para un tubo de 12 cm.
 	torus.rings = 32
 	torus.ring_segments = 8
 	_ring.mesh = torus
@@ -80,7 +83,7 @@ func _build_visual() -> void:
 	mesh.top_radius = PILLAR_TOP_RADIUS
 	mesh.bottom_radius = ring_radius
 	mesh.height = PILLAR_HEIGHT
-	# Explicit tessellation: a straight cone needs no height rings.
+	# Teselado explícito: un cono recto no necesita anillos en altura.
 	mesh.radial_segments = 24
 	mesh.rings = 1
 	_pillar.mesh = mesh
@@ -95,6 +98,7 @@ func _build_visual() -> void:
 	add_child(light)
 
 
+## Material propio de esta instancia: así el pulso no pasa a otro portal.
 func _glow_material(alpha: float, additive: bool = false) -> StandardMaterial3D:
 	var material := StandardMaterial3D.new()
 	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
@@ -108,6 +112,7 @@ func _glow_material(alpha: float, additive: bool = false) -> StandardMaterial3D:
 	return material
 
 
+## Verdadero si está recargado y tiene pareja.
 func is_ready() -> bool:
 	return _cooldown_left <= 0.0 and twin != null and is_instance_valid(twin)
 
@@ -117,6 +122,7 @@ func _physics_process(delta: float) -> void:
 	if _ring != null:
 		_ring.rotate_y(delta * RING_SPIN)
 	if _cooldown_left > 0.0:
+		# Mientras recarga, el pilar se estrecha y vuelve a crecer.
 		_cooldown_left = maxf(_cooldown_left - delta, 0.0)
 		var fraction := 1.0 - _cooldown_left / maxf(cooldown, 0.01)
 		if _pillar != null:
@@ -159,12 +165,10 @@ func _interact(player: Node) -> void:
 	print("Portal used: %s -> %s (recharge %.0fs)" % [name, twin.name, recharge])
 
 
-## Landing spot just outside the twin's ring (so the arrival does not
-## re-trigger it), on a WALKABLE cell: the irregular arena mask can seal
-## a whole 10 m cell right next to a portal, and a blind random angle used
-## to drop the traveller inside the mask wall's collider — encased in
-## rock, with both portals already on a 30 s cooldown. Falls back to the
-## twin's own spot, whose cell is open by construction.
+## Punto de llegada justo fuera del anillo de la pareja (para no volver a
+## activarla) y en una celda CAMINABLE: la máscara de la arena puede
+## tapar una celda entera junto a un portal. Si ningún ángulo sirve, cae
+## sobre la pareja, cuya celda está abierta.
 func _exit_position() -> Vector3:
 	var bounds := get_tree().get_first_node_in_group("arena_bounds")
 	var start := randf() * TAU
@@ -179,6 +183,7 @@ func _exit_position() -> Vector3:
 	return twin.global_position + Vector3.UP * EXIT_LIFT
 
 
+## Empieza la recarga de este portal (también la llama su pareja).
 func start_cooldown(seconds: float) -> void:
 	_cooldown_left = seconds
 	if player_in_range:

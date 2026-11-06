@@ -1,23 +1,22 @@
 extends Node
-## WorldDirector (iteration 33): keeps the arena ALIVE for the whole run.
-## Lives in RunSystems.tscn, so every map gets it for free. Two jobs:
+## Director del mundo: mantiene viva la arena durante toda la partida.
+## Vive en RunSystems.tscn (un solo nodo por partida) y Arena._ready le
+## avisa de cada etapa por el grupo "world_director". En cada etapa:
 ##
-## 1. Layout shuffle (at _enter_tree, BEFORE the scatter's _ready uses
-##    interactable positions as keepouts): every ground-level interactable
-##    tagged "scatter_keepout" (shrines, the ground chest, the buried
-##    secrets) moves to a fresh random spot each run, so exploration can't
-##    be memorized. Chests placed on verticality spots stay put — climbing
-##    for them is the point.
+## 1. Reparto (on_stage_started, antes de que el scatter ponga sus props):
+##    cada interactuable de suelo del grupo "scatter_keepout" (altares, el
+##    cofre de suelo, los secretos) se mueve a un punto al azar, para que
+##    el mapa no se pueda memorizar. Lo que está sobre una plataforma
+##    conserva su altura. Después pone los objetos de inicio.
 ##
-## 2. Timed world events, announced on the HUD banner, from ~75s until the
-##    run ends — the answer to "explored everything by minute 2, nothing
-##    left to do": every 50-75s one row of EVENT_LIBRARY fires (supply
-##    chest, elite pack, essence rift, charge altar, demonic obelisk,
-##    spring), and a sky event may roll on top of it.
-## Every point these place goes through the arena's walkable mask and a
-## ground probe, so an announced POI is always something the player can
-## actually walk to and stand on.
-## Default pausable process mode: events freeze under card picks/pause.
+## 2. Eventos con aviso en el HUD desde first_event_at hasta el final: cada
+##    cierto tiempo sale una fila de EVENT_LIBRARY y puede empezar un clima
+##    de WEATHER_CATALOG.
+##
+## 3. El portal de salida al superar la etapa, y las balizas de luz.
+## Todo punto pasa por la máscara caminable de la arena y una sonda de
+## suelo: lo anunciado siempre se puede alcanzar y pisar.
+## Modo de proceso pausable: los eventos se congelan con la pausa y las cartas.
 
 const CHEST_SCENE := preload("res://scenes/world/chests/Chest.tscn")
 const XP_GEM_SCENE := preload("res://scenes/systems/XpGem.tscn")
@@ -31,64 +30,57 @@ const PET_BOX_SCENE := preload("res://scenes/world/PetBox.tscn")
 const VENDOR_SCENE := preload("res://scenes/world/Vendor.tscn")
 const PortalShrineScript := preload("res://scripts/world/interactables/portal_shrine.gd")
 
-## Timed world events as catalog rows (project convention: content is
-## data). `weight` is relative; `method` runs the event. A new event is
-## one row plus its method — no index arithmetic to keep in sync.
+## Eventos del mundo, una fila por evento. `weight` es el peso relativo
+## del sorteo; `method` es el método que lo ejecuta (se llama con call() y
+## catalog_lint.gd revisa que exista).
 const EVENT_LIBRARY: Array[Dictionary] = [
 	{"id": "supply_chest", "weight": 1.0, "method": &"_event_supply_chest"},
 	{"id": "elite_pack", "weight": 1.0, "method": &"_event_elite_pack"},
 	{"id": "essence_rift", "weight": 1.0, "method": &"_event_essence_rift"},
-	# `altar` marks the rows the altar cadence rules apply to (weight rising
-	# with the minute, capped by how many unspent altars already stand).
+	# `altar` marca las filas con la cadencia de altares: su peso sube con
+	# el minuto y vale 0 mientras haya demasiados altares sin usar.
 	{"id": "charge_altar", "weight": 1.6, "method": &"_event_charge_altar", "altar": true},
 	{"id": "demonic_altar", "weight": 0.5, "method": &"_event_demonic_altar", "altar": true},
 	{"id": "spring", "weight": 0.7, "method": &"_event_spring"},
-	# The star is the only power-up nobody can farm: it is not a kill drop
-	# and no vendor sells it, so this row is the entire supply.
+	# La estrella solo aparece con este evento: no cae de enemigos ni se vende.
 	{"id": "star_sighting", "weight": 0.15, "method": &"_event_star"},
-	# Vendors and the pet box (iteration 54). No `altar` flag: the altar
-	# cadence and its cap are about altars, and a stall counted there would
-	# starve them.
+	# Puestos y caja de mascota, sin `altar`: si contaran en el tope de
+	# altares, dejarían el mapa sin altares.
 	{"id": "vendor", "weight": 0.8, "method": &"_event_vendor"},
 	{"id": "pet_box", "weight": 0.35, "method": &"_event_pet_box"},
-	# The event altar (iteration 55). No `altar` flag: that flag drives the
-	# charge/demonic cadence and its unspent cap, and this one is neither.
+	# El altar de evento tampoco lleva `altar`: no es de carga ni demoníaco.
 	{"id": "event_altar", "weight": 0.4, "method": &"_event_event_altar"},
 	{"id": "lucky_block", "weight": 0.25, "method": &"_event_lucky_block"},
 ]
 
-## Rejection-sampling budget for a clear POI spot, and for the ring sample
-## an event point gets before it falls back to the run-start sampler.
-## How long the star's beacon burns. It marks WHERE it was seen, not where
-## it is: the star moves, and a beacon that tracked it would turn the one
-## thing you are supposed to chase into a thing you follow.
+## Segundos que dura la baliza de la estrella. Marca dónde se vio, no
+## dónde está: la estrella se mueve y hay que buscarla.
 const STAR_BEACON_TIME: float = 12.0
+## Intentos de muestreo para un punto libre de POI, y para el anillo de un
+## punto de evento antes de recurrir al muestreo de inicio.
 const CLEAR_POINT_ATTEMPTS: int = 60
 const EVENT_POINT_ATTEMPTS: int = 24
-## Fallback probe span used when there is no terrain to measure against.
+## Altura de la sonda de suelo cuando no hay terreno contra el que medir.
 const GROUND_PROBE_HEIGHT: float = 20.0
-## With a terrain, the probe starts this far above its highest point (room
-## for a mesa standing on a hill) and ends this far below its lowest.
+## Con terreno, la sonda empieza esto sobre su punto más alto (cabe una
+## meseta sobre una loma) y termina esto bajo el más bajo (metros).
 const PROBE_HEADROOM: float = 30.0
 const PROBE_UNDERSHOOT: float = 2.0
-## Used only if portal_pair_colors is emptied in the inspector.
+## Solo se usa si portal_pair_colors queda vacío en el Inspector.
 const DEFAULT_PORTAL_COLORS: Array[Color] = [Color(0.5, 0.9, 1.0)]
 
 
-## One live light beacon: the pillar node, the POI it advertises and the
-## seconds it has left. The beacon dies WITH its owner — an altar charged
-## three seconds after it rose used to leave a 22 m pillar burning over
-## empty ground for the remaining 42 s, pulling players across the arena
-## toward nothing.
+## Una baliza viva: el nodo del pilar, el POI que señala y los segundos
+## que le quedan. Se apaga junto con su POI: un pilar de 22 m sobre un
+## altar ya usado llama a cruzar el mapa por nada.
 class TimedBeacon:
 	var node: Node3D
-	## The POI this beacon points at; null for the essence rift, whose gems
-	## carry their own lifetime and leave nothing behind to watch.
+	## POI que señala; null en la grieta de esencia, cuyas gemas tienen su
+	## propia duración y no dejan nada que vigilar.
 	var poi: Node = null
 	var time_left: float = 0.0
-	## Supply chests are missable on purpose: when the window closes the
-	## chest sinks away with its beacon. Altars and springs own their own
-	## idle_lifetime, so only the light goes out.
+	## Solo el cofre de suministros se hunde al apagarse la luz: se puede
+	## perder a propósito. Los demás POI se quedan; solo se apaga la luz.
 	var sink_poi: bool = false
 
 	func _init(p_node: Node3D, p_poi: Node, p_time_left: float,
@@ -98,7 +90,8 @@ class TimedBeacon:
 		time_left = p_time_left
 		sink_poi = p_sink_poi
 
-	## True while the thing this beacon advertises is still worth the walk.
+	## Verdadero mientras el POI siga valiendo el viaje: existe y, si tiene
+	## `available`, sigue en true.
 	func poi_worth_showing() -> bool:
 		if poi == null:
 			return true
@@ -108,162 +101,179 @@ class TimedBeacon:
 		return not (available is bool) or bool(available)
 
 
-## A shuffled POI authored above this height is standing on a verticality
-## platform and keeps its y; anything at or below it is ground furniture
-## and gets dropped onto the relief.
+## Un POI del reparto puesto por encima de esta altura (metros) está sobre
+## una plataforma y conserva su y; el resto se apoya en el relieve.
 const POI_PLATFORM_Y: float = 0.5
 
 @export_group("Layout Shuffle")
+## Mueve los POI de suelo a puntos al azar en cada etapa.
 @export var shuffle_layout: bool = true
-## Repositioned POIs keep at least these distances (meters) from the
-## spawn, each other, and the hand-placed verticality spots.
+## Distancia mínima (metros) de un POI movido al punto de aparición.
 @export var min_distance_from_spawn: float = 16.0
+## Distancia mínima (metros) entre dos POI.
 @export var min_distance_between: float = 18.0
+## Distancia mínima (metros) a los puntos fijos: plataformas y rocas.
 @export var min_distance_from_keepouts: float = 12.0
-## Margin off arena_half_extent POIs must stay inside (perimeter band).
+## Margen (metros) que los POI dejan con el borde de la arena.
 @export var bounds_margin: float = 14.0
 
 @export_group("Events")
+## Activa los eventos del mundo y el clima.
 @export var events_enabled: bool = true
-## Run seconds before the first event, and the min/max gap between events.
+## Segundos desde el inicio de la etapa hasta el primer evento.
 @export var first_event_at: float = 75.0
+## Pausa mínima y máxima entre eventos (segundos), antes de acortarse con el minuto.
 @export var event_gap_min: float = 50.0
 @export var event_gap_max: float = 75.0
-## The gap shrinks as the run goes on (iteration 47) — a map that stops
-## producing anything new is the whole complaint the events answer — but
-## never below the floor, which is the shortest window a raider can
-## actually cross the arena in.
+## Pausa más corta posible entre eventos (segundos), aunque la partida avance.
 @export var event_gap_floor: float = 20.0
+## Cuánto se acorta la pausa por minuto de partida: pausa / (1 + esto x minutos).
 @export var event_gap_decay_per_minute: float = 0.18
-## Event points land this far from a random alive player.
+## Distancia mínima y máxima (metros) de un evento a un jugador vivo al azar.
 @export var event_min_distance: float = 25.0
 @export var event_max_distance: float = 45.0
+## Segundos que dura el cofre de suministros (y su baliza) antes de hundirse.
 @export var chest_lifetime: float = 40.0
+## Suerte extra del cofre de suministros al sortear su rareza.
 @export var chest_luck_bonus: float = 0.4
+## Enemigos shiny de la jauría de élite.
 @export var elite_pack_size: int = 3
+## Gemas de XP que suelta la grieta de esencia.
 @export var rift_gem_count: int = 10
-## Each rift gem is worth this many XP (scene default is 1).
+## XP de cada gema de la grieta (una gema normal vale 1).
 @export var rift_gem_value: int = 3
-## Seconds the essence rift's beacon burns; the gems' own lifetime is the
-## real pickup window, so the light fades sooner on purpose.
+## Segundos que dura la baliza de la grieta; las gemas tienen su propia duración.
 @export var rift_beacon_lifetime: float = 30.0
-## Per-arena weight overrides for EVENT_LIBRARY, keyed by event id. An id
-## left out keeps the library weight; a weight of 0 drops that event from
-## the rotation for this map.
+## Pesos que reemplazan los de EVENT_LIBRARY, por id de evento; 0 quita el
+## evento. Vale para todas las arenas: el director es uno por partida.
 @export var event_weight_overrides: Dictionary[String, float] = {}
 @export_group("Altars (iteration 47)")
-## Altars get commoner as the run goes on: their EVENT_LIBRARY weight is
-## multiplied by (1 + this x minutes), capped by altar_weight_max_scale.
+## Cuánto sube el peso de los altares por minuto: peso x (1 + esto x minutos).
 @export var altar_weight_per_minute: float = 0.25
+## Tope de ese multiplicador del peso de los altares.
 @export var altar_weight_max_scale: float = 3.0
-## Cap on UNSPENT altars standing at once (scene-placed ones included),
-## itself growing with the minute: altar_cap_base + minutes / cap_minutes.
-## Altars no longer time out (iteration 47), so without a cap they would
-## accumulate for the whole run.
-## Stalls alive at once. Two is a choice between shops; three is clutter.
+## Puestos de venta vivos a la vez, como máximo.
 @export var max_vendors: int = 2
-## Chance a stage opens with a pet box already standing.
+## Probabilidad (0-1) de que la etapa empiece con una caja de mascota.
 @export var start_pet_box_chance: float = 0.5
-## Chance a stage opens with an event altar already standing.
+## Probabilidad (0-1) de que la etapa empiece con un altar de evento.
 @export var start_event_altar_chance: float = 0.5
-## Chance a stage opens with a lucky block already standing.
+## Probabilidad (0-1) de que la etapa empiece con un bloque de la suerte.
 @export var lucky_block_start_chance: float = 0.5
+## Altares sin usar permitidos a la vez al empezar, contando los de la escena.
 @export var altar_cap_base: int = 3
+## Cada tantos minutos se permite un altar sin usar más.
 @export var altar_cap_minutes: float = 3.0
-## Share of the run-start chests (scene-placed and the extras below) that
-## costs nothing. Free chests roll their rarity when opened, so an early
-## one is a real chance at a Legendary before any points exist.
+## Probabilidad (0-1) de que cada cofre de inicio (de la escena o extra) sea gratis.
 @export var free_start_chest_chance: float = 0.15
 @export_group("Exit portal (iteration 49)")
-## How far the stage's exit portal lands from the nearest raider. Far
-## enough to be a trip across the map, which is the point of a portal that
-## opens when you have already won the stage.
+## Distancia mínima (metros) del portal de salida al jugador más cercano.
 @export var exit_portal_min_distance: float = 40.0
-## Portals dropped at run start (paired: keep it even) and roulette wheels.
+## Portales al inicio de la etapa; van en pares, así que conviene un número par.
 @export var portal_count: int = 4
+## Ruletas al inicio de la etapa.
 @export var roulette_count: int = 1
+## Colores de los portales: los portales se crean de dos en dos y cada dos
+## toman el siguiente color de la lista.
 @export var portal_pair_colors: Array[Color] = [
 	Color(0.5, 0.9, 1.0), Color(0.95, 0.6, 1.0), Color(0.6, 1.0, 0.55), Color(1.0, 0.85, 0.4)]
 @export_group("Sky events (iteration 42)")
-## Rolled on every event tick once sky_event_min_gap passed; each demonic
-## altar use makes them likelier. A negative moon is always followed by a
-## full moon that buffs the party.
+## Probabilidad (0-1) de luna en cada evento, pasada la pausa sky_event_min_gap.
 @export var sky_event_chance: float = 0.18
+## Probabilidad extra de luna por cada altar demoníaco usado.
 @export var sky_event_chance_per_demonic: float = 0.08
-## The gap applies to EVERY weather group, not just the moons: exclusivity
-## is about "one at a time", this is about "not back to back".
+## Segundos sin clima tras terminar uno; vale para lunas, lluvias y desastres.
 @export var sky_event_min_gap: float = 150.0
+## XP extra (porcentaje) que da la luna llena a todo el grupo.
 @export var full_moon_xp_bonus: float = 50.0
+## Suerte extra que da la luna llena a todo el grupo.
 @export var full_moon_luck_bonus: float = 30.0
-## Rolled BEFORE the rain and the moon on an event tick, so the rarest
-## group gets first refusal. Demonic pacts sell this directly.
+## Probabilidad (0-1) de desastre en cada evento; se tira antes que la
+## lluvia y la luna. Los pactos demoníacos la suben.
 @export var disaster_chance: float = 0.08
-## Rolled after the disaster, before the moon.
+## Probabilidad (0-1) de lluvia en cada evento; se tira después del desastre.
 @export var rain_chance: float = 0.12
-## Per-arena duration overrides for WEATHER_CATALOG, keyed by weather id,
-## in seconds. Mirrors event_weight_overrides: an id left out keeps the
-## catalog duration. (This replaced the old sky_event_duration and
-## full_moon_duration exports, which could not live in a const catalog.)
+## Duraciones (segundos) que reemplazan las de WEATHER_CATALOG, por id de
+## clima. Vale para todas las arenas: el director es uno por partida.
 @export var weather_duration_overrides: Dictionary[String, float] = {}
 @export_group("Rains (iteration 55)")
+## Segundos entre tandas de la lluvia de enemigos.
 @export var enemy_rain_interval: float = 1.5
+## Enemigos mínimos y máximos por tanda.
 @export var enemy_rain_min_drops: int = 3
 @export var enemy_rain_max_drops: int = 6
+## Distancia mínima y máxima (metros) de cada caída al jugador.
 @export var enemy_rain_min_distance: float = 12.0
 @export var enemy_rain_max_distance: float = 25.0
+## Segundos entre charcos de ácido durante la lluvia radiactiva.
 @export var acid_pool_interval: float = 2.0
+## Radio (metros) de cada charco de ácido.
 @export var acid_pool_radius: float = 2.0
+## Segundos que dura cada charco.
 @export var acid_pool_lifetime: float = 6.0
+## Distancia máxima (metros) de un charco al jugador.
 @export var acid_pool_spawn_range: float = 20.0
-## Points multiplier and price discount while the golden rain falls.
+## Multiplicador de puntos durante la lluvia dorada.
 @export var golden_points_multiplier: float = 2.0
+## Factor de precio durante la lluvia dorada (0.5 = mitad de precio).
 @export var golden_price_discount: float = 0.5
 @export_group("Disasters (iteration 55)")
+## Enemigos de la ola del tsunami al empezar la etapa.
 @export var tsunami_base: int = 40
+## Enemigos extra de la ola por minuto de etapa.
 @export var tsunami_per_minute: int = 4
+## Distancia mínima y máxima (metros) de la ola al jugador.
 @export var tsunami_arc_min: float = 40.0
 @export var tsunami_arc_max: float = 60.0
+## Segundos entre sacudidas de cámara del terremoto.
 @export var earthquake_shake_interval: float = 0.5
+## Fuerza de cada sacudida de cámara.
 @export var earthquake_shake_strength: float = 0.25
+## Cuánto se desplaza el HUD durante el terremoto (píxeles).
 @export var earthquake_hud_amplitude: float = 14.0
+## Vibraciones por segundo del HUD durante el terremoto.
 @export var earthquake_hud_hz: float = 20.0
+## Segundos entre nubes de polvo sobre cada jugador.
 @export var earthquake_dust_interval: float = 3.0
+## Segundos entre meteoritos.
 @export var meteor_interval: float = 0.8
+## Distancia máxima (metros) de un meteorito al jugador.
 @export var meteor_range: float = 20.0
+## Radio (metros) de cada impacto.
 @export var meteor_radius: float = 3.0
+## Segundos de aviso en el suelo antes del impacto.
 @export var meteor_telegraph: float = 1.2
+## Daño de cada impacto a los jugadores; crece con el minuto.
 @export var meteor_damage: float = 40.0
+## Multiplicador del daño del impacto a los enemigos.
 @export var meteor_enemy_scale: float = 3.0
 
-## RAW half-extent of the arena plate, as published by the "arena_bounds"
-## node (scatter.gd's own default is 80.0); bounds_margin is subtracted at
-## each use, so this must not be a pre-margined number.
+## Semiancho BRUTO de la arena, publicado por el nodo "arena_bounds" (el
+## scatter); bounds_margin se resta en cada uso, así que no puede venir ya
+## con el margen descontado.
 var _arena_half_extent: float = 80.0
-## The arena-bounds node: the single source of arena size AND of the
-## irregular walkable mask (iteration 44).
+## El nodo de límites de la arena: tamaño y máscara caminable.
 var _bounds: Node3D = null
-## The arena of the current stage; everything this director spawns is
-## parented to it (see _stage_parent).
+## Arena de la etapa actual; todo lo que pone el director cuelga de ella
+## (ver _stage_parent).
 var _arena: Node3D = null
-## One exit portal per stage (iteration 49).
+## Un portal de salida por etapa.
 var _exit_portal_spawned: bool = false
 var _event_timer: float = 0.0
-## Every point already occupied by a POI (shuffled or spawned), so later
-## placements keep their distance.
+## Puntos ya ocupados por un POI (movido o creado), para que lo siguiente
+## guarde su distancia.
 var _placed_points: Array[Vector2] = []
 var _anchor_points: Array[Vector2] = []
-## The shuffled POIs themselves, parallel to _placed_points, so the
-## irregular start can release the points of the ones it culls.
+## Los POI movidos, en el mismo orden que _placed_points, para liberar el
+## punto de los que el inicio irregular quita.
 var _placed_pois: Array[Node3D] = []
-## Live beacons (supply chests, altars, springs, rifts).
+## Balizas vivas (cofres de suministros, altares, manantiales, grietas...).
 var _beacons: Array[TimedBeacon] = []
-## Sky event state: current kind, seconds left, gap timer, cached lights.
-## THE live weather, or empty: {id, group, time_left}. One at a time
-## across all three groups — that exclusivity is the whole point of having
-## one channel instead of three timers that could overlap.
+## El clima activo, o vacío: {id, group, time_left}. Uno solo a la vez
+## entre los tres grupos: por eso es un solo canal y no tres temporizadores.
 var active_weather: Dictionary = {}
-## Scratch owned by the running row's start/tick/stop, cleared on start so
-## a row never reads the previous one's leftovers.
+## Datos propios del clima activo (start/tick/stop); se vacía al empezar
+## uno, así ningún clima lee lo que dejó el anterior.
 var _weather_state: Dictionary = {}
 var _sky_gap_left: float = 0.0
 var _sun: DirectionalLight3D = null
@@ -272,10 +282,8 @@ var _sun_energy: float = 1.0
 var _environment: Environment = null
 var _ambient_color: Color = Color.WHITE
 var _ambient_energy: float = 1.0
-## The ONE tween allowed to write sun/ambient. Two of them — an expiring
-## dark moon restoring while the full moon tints — write the same
-## properties every frame and the longer one lands last, which is why the
-## announced FULL MOON never showed on screen.
+## El ÚNICO tween que escribe el sol y el ambiente: dos a la vez escriben
+## las mismas propiedades cada frame y gana el más largo.
 var _sky_tween: Tween = null
 
 
@@ -283,24 +291,19 @@ func _ready() -> void:
 	add_to_group("world_director")
 
 
-## Stage hook (iteration 49), called by Arena._ready through the
-## "world_director" group. This director is now PERSISTENT — one per run,
-## not one per arena — so everything it used to do in _enter_tree/_ready
-## happens here instead, once per stage, and every cached arena reference
-## has to be dropped first.
-## Order inside a stage: the scatter's _enter_tree already built the mask;
-## this claims the arena, shuffles the ground POIs and places the
-## run-start fixtures; the Arena then calls scatter.place_props(), whose
-## keepouts therefore see the shuffled positions — the exact sequence the
-## old per-arena director produced.
+## Inicio de etapa: Arena._ready lo llama por el grupo "world_director".
+## El director dura toda la partida, así que aquí olvida todo lo que
+## guardaba de la arena anterior.
+## Orden dentro de la etapa: el _enter_tree del scatter ya construyó la
+## máscara; esto toma la arena, mueve los POI de suelo y pone los objetos
+## de inicio; después Arena llama a scatter.place_props(), cuyas zonas
+## vedadas ven así las posiciones nuevas.
 func on_stage_started(arena: Node3D) -> void:
 	set_physics_process(true)
 	_arena = arena
-	# Re-cache the arena's lights from scratch. _cache_lights() returns
-	# early while _sun is set, and _exit_tree (which used to restore them)
-	# never fires now that this node outlives the arena: without these four
-	# lines the second stage would tint stage 1's freed Sun and every sky
-	# event after the first would be invisible.
+	# Vuelve a buscar las luces de la arena nueva. _cache_lights() no hace
+	# nada mientras _sun tenga valor: sin estas líneas la etapa 2 teñiría
+	# el sol ya liberado de la etapa 1 y ningún evento de cielo se vería.
 	_kill_sky_tween()
 	_sun = null
 	_environment = null
@@ -323,9 +326,8 @@ func on_stage_started(arena: Node3D) -> void:
 	_placed_pois.clear()
 	_beacons.clear()
 	_event_timer = first_event_at
-	# Fog and map are per STAGE. Reset from HERE and not from the
-	# stage_changed signal: this call is what stage 0 goes through too, so
-	# there is no first-stage special case to forget.
+	# La niebla y el mapa son por etapa. Se reinician aquí y no con la
+	# señal stage_changed: la etapa 0 también pasa por aquí.
 	var fog := FogOfWar.find(get_tree())
 	if fog != null:
 		fog.reset_for_stage(arena)
@@ -333,12 +335,11 @@ func on_stage_started(arena: Node3D) -> void:
 	_exit_portal_spawned = false
 	if shuffle_layout:
 		_shuffle_ground_interactables()
-	# Irregular start (iteration 44) FIRST: it culls scene-placed POIs, and
-	# the spots they were holding have to be released before the run-start
-	# fixtures pick theirs — otherwise portals and the roulette keep their
-	# 18 m distance from POIs that no longer exist.
+	# El inicio irregular va ANTES de los objetos de inicio: quita POI de
+	# la escena y sus puntos tienen que quedar libres para los portales y
+	# la ruleta.
 	_randomize_starting_pois()
-	# Run-start fixtures (iteration 41): paired portals and the roulette.
+	# Objetos de inicio. Este orden es parte del sorteo: no cambiarlo.
 	_spawn_portals()
 	_spawn_roulettes()
 	_spawn_start_pet_boxes()
@@ -346,58 +347,45 @@ func on_stage_started(arena: Node3D) -> void:
 	_spawn_start_lucky_blocks()
 
 
-## 0-1 pet boxes at stage start (iteration 54). Zero is a real outcome:
-## a companion should feel like something the map offered, not something
-## every stage hands out.
-## A chance of zero must draw NO random number: the run stream is shared,
-## so a die rolled here shifts every shuffled POI after it. Its two
-## siblings below already say so; this one drew unconditionally.
+## 0-1 cajas de mascota al inicio de la etapa: una mascota tiene que
+## sentirse como algo que el mapa ofrece, no algo que siempre está.
+## Con probabilidad 0 no se tira ningún dado: el RNG de la partida es uno
+## solo y un dado de más aquí mueve todo lo que se sortea después.
 func _spawn_start_pet_boxes() -> void:
 	if start_pet_box_chance <= 0.0 or randf() >= start_pet_box_chance:
 		return
 	_spawn_pet_box(_claim_clear_point())
 
 
-## 0-1 event altars at stage start, like the pet box: a stage that always
-## opened with one would make the weather feel scheduled rather than found.
+## 0-1 altares de evento al inicio de la etapa, como la caja de mascota.
 func _spawn_start_event_altars() -> void:
-	# Short-circuited, like the weather roll: a chance of zero must draw NO
-	# random number. The game RNG is one shared stream and this runs at
-	# stage start, so a die rolled here shifts where the portals, the
-	# roulettes and every shuffled POI land.
+	# Con probabilidad 0 no se tira ningún dado (ver la caja de mascota):
+	# cambiaría dónde caen los portales, las ruletas y los POI movidos.
 	if start_event_altar_chance <= 0.0 or randf() >= start_event_altar_chance:
 		return
 	_spawn_event_altar(_claim_clear_point())
 
 
-## 0-1 lucky blocks at stage start, same short-circuit rule as the altar:
-## a chance of zero must draw no random number, or it shifts the layout.
+## 0-1 bloques de la suerte al inicio de la etapa; con probabilidad 0 no
+## se tira ningún dado.
 func _spawn_start_lucky_blocks() -> void:
 	if lucky_block_start_chance <= 0.0 or randf() >= lucky_block_start_chance:
 		return
 	_spawn_lucky_block(_claim_clear_point())
 
 
-## Stage teardown (RunRoot, before the arena is freed): restore the sky the
-## event tint borrowed and drop the beacon bookkeeping. The beacon NODES
-## are parented to the arena and die with it; this only clears the list so
-## the sweep can report zero.
+## Fin de etapa: RunRoot lo llama antes de liberar la arena. Para el
+## clima, devuelve el cielo y libera las balizas.
 func on_stage_ended() -> void:
-	# Stop ticking for the length of the swap: this node OUTLIVES the
-	# arena, and a director still firing events between the teardown and
-	# the next map drops chests and altars into a scene about to be freed
-	# (see the note in RunRoot._swap_stage about inherited process modes).
+	# Deja de procesar durante el cambio: este nodo sobrevive a la arena y
+	# un evento disparado ahora caería en un mapa a punto de liberarse.
 	set_physics_process(false)
-	# The row's own stop() FIRST: a golden rain that ended with the stage
-	# would otherwise leave a x2 points source on every raider and a 0.5
-	# price discount in RunState, both of which outlive the arena.
+	# Primero el stop() del clima: una lluvia dorada sin cerrar dejaría el
+	# x2 de puntos y el descuento vivos después de la arena.
 	_stop_weather(false)
 	_snap_sky_back()
-	# The beacon NODES, not just the list: they are parented to the arena
-	# and would die with it one step later, but the stage sweep runs
-	# BEFORE that and its contract is "every counter is zero here". Only
-	# the list was being dropped, so the sweep's beacons= field could
-	# never be anything but zero and the gate on it was decorative.
+	# Libera los NODOS de las balizas, no solo la lista: el barrido de etapa
+	# corre antes de liberar la arena y exige beacons=0.
 	for entry: TimedBeacon in _beacons:
 		_free_beacon(entry.node)
 	_beacons.clear()
@@ -408,15 +396,14 @@ func on_stage_ended() -> void:
 	_bounds = null
 
 
-## Live beacons, for the stage sweep.
+## Balizas vivas, para el barrido de etapa (RunRoot).
 func beacon_count() -> int:
 	return _beacons.size()
 
 
-## Where every world object this director spawns is parented: the arena of
-## the moment, so a stage change takes them all with it. Falls back to
-## this node only when there is no arena (teardown races), which keeps the
-## spawn from erroring instead of silently leaking into the next stage.
+## Padre de todo lo que pone el director: la arena actual, así un cambio
+## de etapa se lo lleva todo. Sin arena (carreras en el cambio) usa la de
+## RunRoot, y en último caso este nodo, para no fallar.
 func _stage_parent() -> Node:
 	if _arena != null and is_instance_valid(_arena):
 		return _arena
@@ -428,18 +415,15 @@ func _stage_parent() -> Node:
 	return self
 
 
-## The run can end — or the scene reload — mid sky event, which kills the
-## tint tween halfway. Snap the cached lighting back on the way out so a
-## blood moon cannot bleed into the next run through a shared resource.
+## La partida puede terminar en medio de un clima: se detiene y el cielo
+## vuelve en seco, para que el tinte no pase a la partida siguiente.
 func _exit_tree() -> void:
 	_stop_weather(false)
 	_snap_sky_back()
 
 
-## Restores the arena's own lighting IMMEDIATELY (no tween). Used when the
-## arena is about to go — run teardown, or a stage swap: _restore_sky()
-## eases over two seconds, and a tween writing into a freed Sun is an
-## error, not a fade.
+## Devuelve la luz original de la arena AL INSTANTE (sin tween). Se usa
+## cuando la arena se va: un tween sobre un sol liberado es un error.
 func _snap_sky_back() -> void:
 	_kill_sky_tween()
 	if _sun != null and is_instance_valid(_sun):
@@ -451,13 +435,16 @@ func _snap_sky_back() -> void:
 
 
 @export_group("Irregular start (iteration 44)")
-## Chance each scene-placed chest or altar is removed for this run.
+## Probabilidad (0-1) de quitar cada cofre o altar de la escena en esta etapa.
 @export var poi_skip_chance: float = 0.3
-## Extra chests dropped at run start: random in [min, max].
+## Cofres extra al empezar la etapa: un número al azar entre mínimo y máximo.
 @export var extra_start_chests_min: int = 0
 @export var extra_start_chests_max: int = 2
 
 
+## Inicio irregular: quita al azar cofres y altares de la escena (siempre
+## queda el primer cofre de suelo), hace gratis algunos cofres y suma
+## cofres extra.
 func _randomize_starting_pois() -> void:
 	var removed := 0
 	var chests_kept := 0
@@ -465,7 +452,7 @@ func _randomize_starting_pois() -> void:
 	for node: Node in get_tree().get_nodes_in_group("scatter_keepout"):
 		if node is Chest or node is ChargeShrine or node is GreedShrine:
 			if node is Chest and chests_kept == 0:
-				chests_kept += 1  # always keep the first ground chest
+				chests_kept += 1  # el primer cofre de suelo siempre se queda
 				if _make_start_chest_free(node as Chest):
 					freebies += 1
 				continue
@@ -480,8 +467,7 @@ func _randomize_starting_pois() -> void:
 	var extra := randi_range(extra_start_chests_min, extra_start_chests_max)
 	for i in extra:
 		var chest := CHEST_SCENE.instantiate() as Chest
-		# Set BEFORE add_child: a chest decides its tint and its prompt in
-		# _ready, and one flipped afterwards has to repaint itself.
+		# ANTES de add_child: el cofre elige su tinte y su texto en _ready.
 		if randf() < free_start_chest_chance:
 			chest.free_open = true
 			freebies += 1
@@ -491,7 +477,7 @@ func _randomize_starting_pois() -> void:
 			removed, extra, freebies])
 
 
-## Rolls one already-ready scene chest free. Returns true when it flipped.
+## Hace gratis un cofre de la escena que ya pasó su _ready. Devuelve true si cambió.
 func _make_start_chest_free(chest: Chest) -> bool:
 	if chest == null or randf() >= free_start_chest_chance:
 		return false
@@ -501,13 +487,9 @@ func _make_start_chest_free(chest: Chest) -> bool:
 
 func _physics_process(delta: float) -> void:
 	if not RunState.run_active:
-		# The run just ended (a wipe, an extraction). on_stage_ended and
-		# _exit_tree cover the other two ways weather can outlive its
-		# window, but neither of them fires here: the end screen keeps the
-		# arena alive and paused. A row left running keeps the HUD's quake
-		# offset frozen, keeps RunState.price_discount at the golden
-		# rain's 0.5 and keeps its points source on every raider until the
-		# next reset.
+		# La partida acaba de terminar (derrota o extracción) y la pantalla
+		# final deja la arena viva y en pausa: el clima se detiene aquí, o el
+		# HUD quedaría desplazado y el descuento dorado seguiría activo.
 		_stop_weather(false)
 		return
 	_tick_exit_portal()
@@ -523,10 +505,9 @@ func _physics_process(delta: float) -> void:
 	_maybe_weather()
 
 
-## Raises the stage's exit portal the first frame the stage counts as
-## cleared. Polled rather than signalled: the gate is a poll too
-## (RunManager), and one flag read per frame is cheaper than keeping two
-## systems' signal wiring in sync across a stage swap.
+## Levanta el portal de salida el primer frame en que la etapa cuenta como
+## superada (RunState.stage_cleared). Se consulta cada frame, igual que la
+## meta en RunManager.
 func _tick_exit_portal() -> void:
 	if _exit_portal_spawned or not RunState.stage_cleared:
 		return
@@ -535,20 +516,20 @@ func _tick_exit_portal() -> void:
 	portal.name = "ExitPortal"
 	_stage_parent().add_child(portal)
 	portal.global_position = _exit_portal_point()
-	# Burns until the party takes it: an exit with no deadline still needs
-	# to be findable, and poi_worth_showing() puts the light out when the
-	# portal is consumed.
+	# Su baliza arde hasta que el grupo lo cruza: poi_worth_showing() la
+	# apaga cuando el portal se consume.
 	_beacons.append(TimedBeacon.new(
 			_spawn_beacon(portal.global_position, portal.portal_color), portal, INF))
 	get_tree().call_group("boss_ui", "track_objective", portal)
 	_announce("Se abrió el portal de salida — crúzalo cuando quieras")
-	# One-line log (RunManager convention) for headless soaks.
+	# Línea de log para los soaks headless.
 	print("Exit portal opened at %.1fs" % RunState.run_time)
 
 
-## Somewhere clear, walkable and at least exit_portal_min_distance from
-## every raider: the exit is a destination, not a thing you trip over the
-## second the stage ends.
+## Un punto libre y caminable, al menos a exit_portal_min_distance de todo
+## jugador: la salida es un destino, no algo que se pisa al terminar.
+## Muestrea el cuadrado de la arena (no un anillo) y se queda con el punto
+## más lejano.
 func _exit_portal_point() -> Vector3:
 	var limit := _arena_half_extent - bounds_margin
 	var best := Vector3.ZERO
@@ -564,14 +545,15 @@ func _exit_portal_point() -> Vector3:
 		if nearest >= exit_portal_min_distance:
 			break
 	if best_distance < 0.0:
-		# Every sample landed in a mask wall: fall back to the sampler that
-		# knows where the open cells actually are.
+		# Todas las muestras cayeron en una pared de la máscara: se usa el
+		# muestreo que sabe dónde están las celdas abiertas.
 		var point := _random_walkable_point()
 		best = Vector3(point.x, 0.0, point.y)
 	best.y = _ground_height(best)
 	return best
 
 
+## Distancia (metros) al jugador vivo más cercano; 0 si no hay ninguno.
 func _distance_to_nearest_player(at: Vector3) -> float:
 	var nearest := INF
 	for node: Node in Coop.alive_players(get_tree()):
@@ -581,21 +563,20 @@ func _distance_to_nearest_player(at: Vector3) -> float:
 	return 0.0 if nearest == INF else nearest
 
 
-## Run minutes elapsed; the altar cadence and the event gap both ride it.
+## Minutos de partida; los usan la cadencia de altares y la pausa entre eventos.
 func _minutes() -> float:
 	return RunState.run_time / 60.0
 
 
-## Seconds until the next event: the authored window, compressed by the
-## minute, never below event_gap_floor.
+## Segundos hasta el próximo evento: la ventana base, acortada con el
+## minuto, nunca por debajo de event_gap_floor.
 func _next_event_gap() -> float:
 	var raw := randf_range(event_gap_min, event_gap_max)
 	return maxf(raw / (1.0 + event_gap_decay_per_minute * _minutes()), event_gap_floor)
 
 
-## Unspent altars standing right now, wherever they came from — the arena's
-## own fixtures and the ones this director raised are the same thing since
-## iteration 47, so the cap has to see both. Group, not node paths.
+## Altares sin usar que hay ahora, vengan de la escena o del director
+## (los dos están en el grupo "altars").
 func _unspent_altars() -> int:
 	var count := 0
 	for node: Node in get_tree().get_nodes_in_group("altars"):
@@ -605,11 +586,12 @@ func _unspent_altars() -> int:
 	return count
 
 
+## Tope de altares sin usar: altar_cap_base + minutos / altar_cap_minutes.
 func _altar_cap() -> int:
 	return altar_cap_base + floori(_minutes() / maxf(altar_cap_minutes, 0.001))
 
 
-## --- arena mask -------------------------------------------------------------
+## --- máscara de la arena ----------------------------------------------------
 
 func _walkable_xz(xz: Vector2) -> bool:
 	if _bounds == null or not _bounds.has_method("is_walkable"):
@@ -621,8 +603,8 @@ func _walkable(pos: Vector3) -> bool:
 	return _walkable_xz(Vector2(pos.x, pos.z))
 
 
-## Last resort when rejection sampling finds nothing: the mask's own
-## sampler, which knows where the open cells actually are.
+## Último recurso cuando el muestreo no encuentra nada: el muestreo de la
+## propia máscara, que sabe dónde están las celdas abiertas.
 func _random_walkable_point() -> Vector2:
 	if _bounds != null and _bounds.has_method("random_walkable_point"):
 		var point: Variant = _bounds.call("random_walkable_point", bounds_margin)
@@ -631,16 +613,12 @@ func _random_walkable_point() -> Vector2:
 	return Vector2.ZERO
 
 
-## Drops a POI onto whatever world geometry (layer 1) is under it. The
-## arenas have real verticality — Ash Dunes' two-tier mesas, the forest
-## platforms — well inside event_min_distance..event_max_distance, and a
-## chest or altar left at y=0 under a mesa is buried: its Area3D never
-## sees the player who climbed up following the beacon.
+## Altura del suelo (capa 1) bajo un punto: un POI bajo una meseta
+## quedaría enterrado y su Area3D no vería al jugador que subió.
 func _ground_height(pos: Vector3) -> float:
 	var space := get_tree().root.world_3d.direct_space_state
-	# The ray has to span the WHOLE relief (iteration 51): a mesa standing
-	# on a hill is above the old 20 m start, and a hollow is below the old
-	# -1 end, so either one used to escape the cast and fall back to 0.
+	# El rayo cubre TODO el relieve: desde sobre la meseta más alta hasta
+	# bajo la hondonada más honda.
 	var terrain := Terrain.find(get_tree())
 	var top := GROUND_PROBE_HEIGHT
 	var bottom := -1.0
@@ -649,7 +627,7 @@ func _ground_height(pos: Vector3) -> float:
 		bottom = terrain.min_height - PROBE_UNDERSHOOT
 	var ray := PhysicsRayQueryParameters3D.create(
 			Vector3(pos.x, top, pos.z), Vector3(pos.x, bottom, pos.z), 1)
-	# Raiders share layer 1 with the world; never mistake a head for ground.
+	# Los jugadores comparten la capa 1 con el mundo: una cabeza no es suelo.
 	var excluded: Array[RID] = []
 	for node: Node in Coop.alive_players(get_tree()):
 		var body := node as CollisionObject3D
@@ -658,16 +636,17 @@ func _ground_height(pos: Vector3) -> float:
 	ray.exclude = excluded
 	var hit := space.intersect_ray(ray)
 	if hit.is_empty():
-		# Nothing under the point: the TERRAIN height, not 0. Zero is a
-		# real height somewhere on a heightmap, so falling back to it used
-		# to bury or float a POI by whatever the relief happened to be.
+		# Nada bajo el punto: la altura del TERRENO, no 0 (0 también es una
+		# altura real del relieve y enterraría o haría flotar el POI).
 		return terrain.height_at(pos.x, pos.z) if terrain != null else 0.0
 	var hit_position: Vector3 = hit["position"]
 	return hit_position.y
 
 
-## --- layout shuffle ---------------------------------------------------------
+## --- reparto ----------------------------------------------------------------
 
+## Mueve cada interactuable de "scatter_keepout" a un punto libre; el resto
+## del grupo (plataformas, rocas) queda como obstáculo fijo.
 func _shuffle_ground_interactables() -> void:
 	var movable: Array[Node3D] = []
 	var anchors: Array[Vector2] = []
@@ -678,17 +657,17 @@ func _shuffle_ground_interactables() -> void:
 		if spot is Interactable:
 			movable.append(spot)
 		else:
-			# Verticality spots and rock clusters: fixed obstacles to avoid.
+			# Plataformas y grupos de rocas: obstáculos fijos que evitar.
 			anchors.append(Vector2(spot.global_position.x, spot.global_position.z))
 	var placed: Array[Vector2] = []
 	var limit := _arena_half_extent - bounds_margin
 	for poi: Node3D in movable:
 		var spot_xz := _find_clear_point(limit, placed, anchors)
 		placed.append(spot_xz)
-		# Ground-level POIs land ON the relief at their new spot; ones
-		# authored on a platform (y above POI_PLATFORM_Y) keep their height,
-		# because the platform they stand on is not moving with them and the
-		# terrain under it is flat anyway (the Terrain pads it).
+		# Los POI de suelo se apoyan en el relieve del punto nuevo; los que
+		# están sobre una plataforma (y > POI_PLATFORM_Y) conservan su
+		# altura, porque la plataforma no se mueve y el terreno bajo ella
+		# es plano.
 		var authored_y := poi.global_position.y
 		var new_y := authored_y if authored_y > POI_PLATFORM_Y else _terrain_height(spot_xz)
 		poi.global_position = Vector3(spot_xz.x, new_y, spot_xz.y)
@@ -697,9 +676,8 @@ func _shuffle_ground_interactables() -> void:
 	_anchor_points = anchors
 
 
-## Rebuilds _placed_points from the POIs still standing, so a spot freed
-## by the irregular start stops reserving min_distance_between meters of
-## arena around nothing.
+## Rehace _placed_points con los POI que siguen en pie, para que un punto
+## liberado por el inicio irregular no reserve espacio alrededor de nada.
 func _refresh_placed_points() -> void:
 	var points: Array[Vector2] = []
 	for poi: Node3D in _placed_pois:
@@ -708,29 +686,29 @@ func _refresh_placed_points() -> void:
 	_placed_points = points
 
 
-## A fresh clear spot for a run-time spawn, remembered for later ones.
+## Un punto libre nuevo para algo que se crea durante la etapa; queda
+## anotado para los siguientes.
 func _claim_clear_point() -> Vector3:
 	var spot := _find_clear_point(_arena_half_extent - bounds_margin, _placed_points, _anchor_points)
 	_placed_points.append(spot)
 	return Vector3(spot.x, _terrain_height(spot), spot.y)
 
 
-## Terrain height at a flat point, or 0 without a terrain. Placement code
-## in this file goes through here rather than through the raycast when it
-## only needs the ground and not whatever prop is standing on it.
+## Altura del terreno en un punto, o 0 sin terreno. Para colocar algo en
+## el suelo sin el rayo, que también vería los props encima.
 func _terrain_height(xz: Vector2) -> float:
 	var terrain := Terrain.find(get_tree())
 	return terrain.height_at(xz.x, xz.y) if terrain != null else 0.0
 
 
-## --- run-start fixtures -----------------------------------------------------
+## --- objetos de inicio ------------------------------------------------------
 
-## Portals in random pairs, each pair sharing a color.
+## Portales en pares al azar. Los colores se asignan de dos en dos por
+## orden de creación y los pares se forman después de mezclar: el color
+## no indica cuál es la pareja.
 func _spawn_portals() -> void:
 	var count := portal_count - (portal_count % 2)
-	# An emptied color list would make the pair index a modulo by zero — a
-	# runtime error that aborts _ready and takes the roulette and the
-	# irregular start down with the portals.
+	# Sin colores, el índice del par sería un módulo por cero.
 	var colors := portal_pair_colors if not portal_pair_colors.is_empty() \
 			else DEFAULT_PORTAL_COLORS
 	var portals: Array = []
@@ -756,16 +734,16 @@ func _spawn_roulettes() -> void:
 		wheel.global_position = _claim_clear_point()
 
 
-## Rejection-samples a point inside +-limit respecting every distance rule;
-## after the attempt cap it returns the best (farthest-from-everything)
-## candidate seen, so a crowded setup degrades instead of hanging.
+## Busca al azar un punto dentro de +-limit que cumpla todas las
+## distancias; si se acaban los intentos devuelve el mejor candidato visto,
+## así un mapa lleno empeora en vez de colgarse.
 func _find_clear_point(limit: float, placed: Array[Vector2],
 		anchors: Array[Vector2]) -> Vector2:
 	var best := Vector2.ZERO
 	var best_score := -INF
 	for attempt in CLEAR_POINT_ATTEMPTS:
 		var candidate := Vector2(randf_range(-limit, limit), randf_range(-limit, limit))
-		# Irregular arena (iteration 44): never place a POI in a blocked cell.
+		# Nunca en una celda bloqueada de la máscara.
 		if not _walkable_xz(candidate):
 			continue
 		var clearance := candidate.length() - min_distance_from_spawn
@@ -780,32 +758,25 @@ func _find_clear_point(limit: float, placed: Array[Vector2],
 			best_score = clearance
 			best = candidate
 	if best_score == -INF:
-		# Not one candidate was even walkable, so `best` is still (0,0) —
-		# the spawn point, the one cell the mask guarantees open and the
-		# worst possible place to drop a portal or the roulette on top of
-		# the player. Ask the mask for a real open cell instead.
+		# Ningún candidato era caminable y `best` sigue en (0,0), el punto
+		# de aparición: se pide a la máscara una celda abierta de verdad.
 		return _random_walkable_point()
 	return best
 
 
-## --- events -----------------------------------------------------------------
+## --- eventos ----------------------------------------------------------------
 
-## This map's weight for an EVENT_LIBRARY row. Altar rows carry the
-## iteration-47 cadence: heavier by the minute, and zero (i.e. rerolled
-## into another event) while the field already holds its cap of unspent
-## altars — which is what keeps "more altars" from becoming "an arena
-## paved with altars nobody walks to".
+## Peso de una fila de EVENT_LIBRARY ahora mismo. Un peso 0 saca el evento
+## del sorteo (sale otro): así un evento que no puede ocurrir no gasta la
+## ventana. Los altares pesan más con el minuto y valen 0 mientras haya
+## demasiados sin usar.
 func _event_weight(row: Dictionary) -> float:
 	var weight := float(event_weight_overrides.get(row["id"], row["weight"]))
-	# Exactly one spring on the field (iteration 53). Weighted to zero
-	# rather than no-op'd inside _event_spring: a row that fires and does
-	# nothing burns the whole event window, which is the same reason the
-	# altar cap works this way.
+	# Un solo manantial en el mapa.
 	if String(row["id"]) == "spring" \
 			and get_tree().get_node_count_in_group(&"springs") > 0:
 		return 0.0
-	# Two stalls at most (iteration 54), same mechanism: a third would just
-	# be a third walk nobody takes before one of them sells.
+	# Como mucho max_vendors puestos a la vez.
 	if String(row["id"]) == "vendor" \
 			and get_tree().get_node_count_in_group(&"vendors") >= max_vendors:
 		return 0.0
@@ -816,6 +787,7 @@ func _event_weight(row: Dictionary) -> float:
 	return weight * minf(1.0 + altar_weight_per_minute * _minutes(), altar_weight_max_scale)
 
 
+## Sortea una fila de EVENT_LIBRARY por peso y llama a su método.
 func _fire_random_event() -> void:
 	var total := 0.0
 	for row: Dictionary in EVENT_LIBRARY:
@@ -826,8 +798,8 @@ func _fire_random_event() -> void:
 	var chosen: StringName = &""
 	for row: Dictionary in EVENT_LIBRARY:
 		var weight := _event_weight(row)
-		# Rows weighted out are skipped outright: subtracting zero used to
-		# let a roll that landed exactly on a boundary pick a dead event.
+		# Las filas con peso 0 se saltan: una tirada justo en el borde no
+		# puede elegir un evento muerto.
 		if weight <= 0.0:
 			continue
 		chosen = row["method"]
@@ -847,10 +819,8 @@ func _event_demonic_altar() -> void:
 	_event_altar(CURSE_SHRINE_SCENE, "Un obelisco demoníaco sale del suelo a zarpazos...")
 
 
-## Recurring altar (charge or demonic): far from a player, and it STAYS.
-## Since iteration 47 an altar never times out, so its beacon has no
-## deadline either — it burns until the altar is spent, which the
-## TimedBeacon's own poi_worth_showing() check reports.
+## Altar de carga o demoníaco lejos de un jugador. No caduca, así que su
+## baliza tampoco: arde hasta que el altar se usa.
 func _event_altar(scene: PackedScene, message: String) -> void:
 	var altar := scene.instantiate() as Node3D
 	_stage_parent().add_child(altar)
@@ -860,13 +830,12 @@ func _event_altar(scene: PackedScene, message: String) -> void:
 	_beacons.append(TimedBeacon.new(
 			_spawn_beacon(altar.global_position, color), altar, INF))
 	_announce(message)
-	# One-line log (RunManager convention) for headless soaks.
+	# Línea de log para los soaks headless.
 	print("Altar placed: %s" % ("demonic" if scene == CURSE_SHRINE_SCENE else "charge"))
 
 
-## The one spring. Like an altar since iteration 53: it stays until it is
-## drunk, so its beacon has no deadline either (the TimedBeacon's own
-## poi_worth_showing() check puts it out when the spring is spent).
+## El único manantial. Como un altar: se queda hasta que alguien bebe, y
+## su baliza arde hasta entonces.
 func _event_spring() -> void:
 	var spring := SPRING_SHRINE_SCENE.instantiate() as Node3D
 	_stage_parent().add_child(spring)
@@ -877,19 +846,17 @@ func _event_spring() -> void:
 	_announce("Un manantial brota en algún lugar del campo...")
 
 
-## A stall arrives. The KIND is rolled here and deliberately not named in
-## the announce or the beacon: walking over to find out which one it is is
-## the whole event, and a beacon that said "animals" would answer it from
-## across the map.
+## Llega un puesto. El TIPO se sortea aquí y no se nombra en el aviso ni
+## en la baliza: ir a ver cuál es, es el evento.
 func _event_vendor() -> void:
 	var vendor := VENDOR_SCENE.instantiate() as Node3D
 	var row: Dictionary = Vendor.VENDOR_LIBRARY[randi() % Vendor.VENDOR_LIBRARY.size()]
-	# Set BEFORE the node enters the tree: Vendor._ready reads it to pick
-	# its prompt, its colour and the figure behind the counter.
+	# ANTES de entrar al árbol: Vendor._ready lo lee para elegir su texto,
+	# su color y la figura tras el mostrador.
 	vendor.set("kind", String(row.id))
 	_stage_parent().add_child(vendor)
 	vendor.global_position = _event_point()
-	# Like an altar, the beacon burns until the stall is gone.
+	# Como un altar, la baliza arde hasta que el puesto se va.
 	_beacons.append(TimedBeacon.new(
 			_spawn_beacon(vendor.global_position, row.get("color", Color.WHITE)),
 			vendor, INF))
@@ -897,8 +864,7 @@ func _event_vendor() -> void:
 	print("Vendor arrived: %s" % String(row.id))
 
 
-## A lucky block. Rarer than the altar: it always pays something good, and
-## something that always pays has to be something you rarely find.
+## Un bloque de la suerte. Más raro que un altar porque siempre paga algo bueno.
 func _event_lucky_block() -> void:
 	_spawn_lucky_block(_event_point())
 	_announce("Un bloque dorado aparece en algún lugar...")
@@ -911,7 +877,7 @@ func _spawn_lucky_block(at: Vector3) -> Node3D:
 	return block
 
 
-## The event altar: free, one use, and whatever it summons is a surprise.
+## El altar de evento: gratis, de un uso, e invoca un clima sorpresa.
 func _event_event_altar() -> void:
 	_spawn_event_altar(_event_point())
 	_announce("Un cristal de tormenta se alza en el campo...")
@@ -924,8 +890,8 @@ func _spawn_event_altar(at: Vector3) -> Node3D:
 	return altar
 
 
-## A pet box, free and one-use. Rarer than a vendor because a companion is
-## a bigger swing than a purchase and the player pays nothing for it.
+## Una caja de mascota, gratis y de un uso. Más rara que un puesto: una
+## mascota cambia más la partida y no cuesta nada.
 func _event_pet_box() -> void:
 	_spawn_pet_box(_event_point())
 	_announce("Una caja con una huella aparece en el campo...")
@@ -938,9 +904,9 @@ func _spawn_pet_box(at: Vector3) -> Node3D:
 	return box
 
 
-## Star sighting: the rarest thing on the map walks across it. Spawned
-## through the spawner's own pickup door, so the stage parenting, the
-## group and the "Power-up dropped:" line are written once.
+## Avistamiento de estrella: lo más raro del mapa cruza el campo. Sale por
+## la puerta de power-ups del spawner, que ya pone el padre, el grupo y la
+## línea "Power-up dropped:".
 func _event_star() -> void:
 	var spawner := get_tree().get_first_node_in_group("enemy_spawner")
 	if spawner == null or not spawner.has_method("spawn_powerup_pickup"):
@@ -953,10 +919,9 @@ func _event_star() -> void:
 	_announce("Algo brillante cruza el campo...")
 
 
-## A far point from a random alive player: inside the arena band, on a
-## WALKABLE cell, and standing on whatever geometry is there. The
-## irregular-arena mask can wall off up to ~38% of the plate, and an event
-## announced inside a mask wall burns its whole window unreachable.
+## Un punto lejos de un jugador vivo al azar: dentro de la franja de la
+## arena, en una celda CAMINABLE y apoyado en lo que haya. Un evento dentro
+## de una pared de la máscara gastaría su ventana sin que nadie llegue.
 func _event_point() -> Vector3:
 	var anchor := Coop.random_player(get_tree())
 	var origin := anchor.global_position if anchor != null else Vector3.ZERO
@@ -973,16 +938,17 @@ func _event_point() -> Vector3:
 			found = true
 			break
 	if not found:
-		# The whole ring around this player is walled in: fall back to the
-		# run-start sampler, which is mask-aware by construction.
+		# Todo el anillo alrededor del jugador está tapado: se usa el
+		# muestreo de inicio, que respeta la máscara.
 		pos = _claim_clear_point()
 	pos.y = _ground_height(pos)
 	return pos
 
 
+## Cofre de suministros: nunca común (mínimo Raro y con suerte extra), y se
+## hunde si nadie lo abre antes de que se apague su baliza.
 func _event_supply_chest() -> void:
 	var chest := CHEST_SCENE.instantiate() as Chest
-	# Supply chests are never Common: floored to Rare and luck-tilted up.
 	chest.min_rarity = "Rare"
 	chest.luck_bonus = chest_luck_bonus
 	_stage_parent().add_child(chest)
@@ -993,13 +959,13 @@ func _event_supply_chest() -> void:
 	_announce("Un cofre de suministros zumba en algún lugar del campo...")
 
 
+## Jauría de élite alrededor de un jugador al azar. El aviso promete una
+## recompensa, así que solo sale si el spawner tuvo sitio bajo su tope.
 func _event_elite_pack() -> void:
 	var anchor := Coop.random_player(get_tree())
 	if anchor == null:
 		return
-	# Resolved through the group (never by path) instead of call_group,
-	# because the answer matters: the banner promises a bounty, so it only
-	# goes out if the spawner actually had room under its live cap.
+	# Por grupo y no con call_group: hace falta la respuesta del spawner.
 	var spawner := get_tree().get_first_node_in_group("enemy_spawner")
 	if spawner == null or not spawner.has_method("spawn_pressure_burst"):
 		return
@@ -1010,6 +976,7 @@ func _event_elite_pack() -> void:
 	_announce("¡Una jauría shiny te huele el rastro!")
 
 
+## Grieta de esencia: un círculo de gemas de XP y un orbe de vida.
 func _event_essence_rift() -> void:
 	var center := _event_point()
 	for i in rift_gem_count:
@@ -1024,17 +991,16 @@ func _event_essence_rift() -> void:
 		var orb := Pools.acquire_scene(Pools.HEALTH_ORB_SCENE) as HealthOrb
 		if orb != null:
 			orb.global_position = center + Vector3.UP * 0.6
-	# The gems' own lifetime is the pickup window; the beacon fades sooner
-	# and has no POI to outlive.
+	# Las gemas tienen su propia duración; la baliza se apaga antes y no
+	# tiene POI que vigilar.
 	_beacons.append(TimedBeacon.new(
 			_spawn_beacon(center, Color(0.35, 0.95, 0.6)), null, rift_beacon_lifetime))
 	_announce("Se abre una grieta de esencia...")
 
 
-## One pass over every live beacon: a beacon goes out when its POI is
-## taken, spent or gone, or when its own window closes. Supply chests are
-## the only owner that sinks with the light (missable on purpose — that
-## urgency is what pulls players across the map).
+## Una pasada por las balizas vivas: se apaga la que señala un POI usado o
+## desaparecido, o la que agotó su tiempo. Solo el cofre de suministros se
+## hunde con ella.
 func _tick_beacons(delta: float) -> void:
 	for i in range(_beacons.size() - 1, -1, -1):
 		var entry := _beacons[i]
@@ -1051,26 +1017,24 @@ func _tick_beacons(delta: float) -> void:
 		_beacons.remove_at(i)
 
 
-## Unclaimed supply chest sinks away. Guarded: a chest that was opened
-## sinks and frees itself (iteration 47), so by the time a stale beacon
-## entry gets here the box may already be gone.
+## El cofre de suministros que nadie abrió se hunde. Puede que ya no exista
+## (un cofre abierto se hunde y se libera solo).
 func _despawn_chest(chest: Chest) -> void:
 	if chest == null or not is_instance_valid(chest) or chest.is_queued_for_deletion():
 		return
-	# A missed chest must not credit the chests_opened quest counter.
+	# Un cofre perdido no cuenta para la misión chests_opened.
 	chest.meta_stat_id = ""
 	chest.consume()
-	# The CHEST's tween, not the director's: this node outlives the arena,
-	# and a stage swap inside the 0.4 s would free the chest under a tween
-	# still animating it. Every other sink in the round does it this way.
+	# El tween es del COFRE, no del director: un cambio de etapa dentro de
+	# los 0.4 s liberaría el cofre bajo un tween ajeno todavía animándolo.
 	var tween := chest.create_tween()
 	tween.tween_property(chest, "scale", Vector3.ONE * 0.05, 0.4) \
 			.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_IN)
 	tween.tween_callback(chest.queue_free)
 
 
-## Tall unshaded light pillar visible across the arena, with a soft pulse
-## so it reads as an invitation rather than a threat.
+## Pilar de luz alto y sin sombreado que se ve desde toda la arena, con un
+## pulso suave para que se lea como invitación y no como amenaza.
 func _spawn_beacon(at: Vector3, color: Color) -> Node3D:
 	var beacon := Node3D.new()
 	_stage_parent().add_child(beacon)
@@ -1080,9 +1044,8 @@ func _spawn_beacon(at: Vector3, color: Color) -> Node3D:
 	mesh.top_radius = 0.55
 	mesh.bottom_radius = 0.25
 	mesh.height = 22.0
-	# Explicit tessellation (iteration 64): the engine default is 64 sides
-	# and 4 rings. 16 sides keep the 0.55 m top within 1 cm of round, and
-	# rings only subdivide a straight side, so 0 looks identical.
+	# Teselado explícito: 16 lados bastan para que la tapa de 0.55 m se vea
+	# redonda, y los anillos solo subdividen un lado recto.
 	mesh.radial_segments = 16
 	mesh.rings = 0
 	pillar.mesh = mesh
@@ -1111,29 +1074,25 @@ func _spawn_beacon(at: Vector3, color: Color) -> Node3D:
 	return beacon
 
 
-## --- weather ----------------------------------------------------------------
-## ONE channel for moons, rains and disasters (iteration 55). They are
-## independent kinds but never overlap: `active_weather` holds at most one
-## row, so "only one moon, rain or disaster at a time" is a property of the
-## data structure rather than three timers that have to agree.
+## --- clima ------------------------------------------------------------------
+## UN canal para lunas, lluvias y desastres: `active_weather` guarda como
+## mucho una fila, así que nunca se solapan.
 ##
-## In code this is WEATHER, never "event": EVENT_LIBRARY above is the
-## POI/event-tick table and the two meanings would collide on every read.
-## The player-facing word stays «evento» (the altar summons one).
+## En el código esto es WEATHER, nunca "event": EVENT_LIBRARY es la tabla
+## de eventos de POI. Para el jugador la palabra sigue siendo «evento».
 ##
-## Row fields:
-##   id/group:   identifier and one of moon | rain | disaster.
-##   weight:     roll weight WITHIN its group.
-##   duration:   seconds, before weather_duration_overrides and, for moons
-##               and rains, RunState.sky_duration_multiplier. Disasters are
-##               fixed: a pact that sells "longer moons" must not also sell
-##               a longer meteor shower.
-##   start/tick/stop: method names, called through call(). tick and stop
-##               may be empty.
-##   follow_up:  the row that starts the instant this one ends, with no
-##               gap (blood_moon/eclipse -> full_moon, and the two rains ->
-##               golden_rain: the reward for having survived the bad one).
-##   follow_up_only: never rolled directly; only reachable as a follow_up.
+## Campos de cada fila:
+##   id/group:   identificador y grupo: moon | rain | disaster.
+##   weight:     peso del sorteo DENTRO de su grupo.
+##   duration:   segundos, antes de weather_duration_overrides y, en lunas
+##               y lluvias, de RunState.sky_duration_multiplier. Los
+##               desastres no se alargan con los pactos.
+##   start/tick/stop: métodos que se llaman con call(); tick y stop pueden
+##               ir vacíos. catalog_lint.gd revisa que existan.
+##   follow_up:  la fila que empieza en cuanto esta termina, sin pausa
+##               (las lunas malas -> luna llena; las dos lluvias -> lluvia
+##               dorada, el premio por aguantar la mala).
+##   follow_up_only: nunca sale por sorteo, solo como follow_up.
 const WEATHER_CATALOG: Array[Dictionary] = [
 	{
 		"id": "blood_moon", "group": "moon", "weight": 1.0, "duration": 45.0,
@@ -1167,8 +1126,8 @@ const WEATHER_CATALOG: Array[Dictionary] = [
 		"stop": &"_weather_stop_golden_rain", "follow_up_only": true,
 	},
 	{
-		# One wave, not a window: its tick spends three seconds pouring the
-		# wave in and then ends the disaster itself. It can roll again later.
+		# Una sola ola: su tick la vierte en tres segundos y termina el
+		# desastre él mismo. Puede volver a salir más tarde.
 		"id": "enemy_tsunami", "group": "disaster", "weight": 1.0, "duration": 3.0,
 		"start": &"_weather_start_tsunami", "tick": &"_weather_tick_tsunami",
 		"stop": &"",
@@ -1185,28 +1144,28 @@ const WEATHER_CATALOG: Array[Dictionary] = [
 	},
 ]
 
-## Groups whose length a demonic pact can stretch (RunState.sky_duration_multiplier).
+## Grupos que un pacto demoníaco puede alargar (RunState.sky_duration_multiplier).
 const STRETCHABLE_GROUPS: Array[String] = ["moon", "rain"]
-## Weather ids the event altar refuses to summon: the two rewards. An altar
-## that could hand out a golden rain outright would make the rains that earn
-## it pointless.
+## Climas que el altar de evento no invoca: los dos premios. Un altar que
+## diera la lluvia dorada directa haría inútiles las lluvias que la ganan.
 const ALTAR_EXCLUDED: Array[String] = ["golden_rain", "full_moon"]
-## Cap on live acid pools and the spacing between them. A cap that is
-## RAISED to fit more pools is not a fix; spawns past it are skipped.
+## Tope de charcos de ácido vivos y distancia mínima entre ellos (metros).
+## Pasado el tope se saltan; subir el tope no es la solución.
 const MAX_LIVE_ACID_POOLS: int = 24
 const ACID_POOL_SPACING: float = 3.0
-## Cap on live meteor telegraphs, for the same reason (the pool of discs is
-## 32 and the rest of the game uses it too).
+## Tope de avisos de meteorito vivos, por lo mismo (el pool de discos es
+## de 32 y lo usa todo el juego).
 const MAX_LIVE_TELEGRAPHS: int = 16
-## Bodies the tsunami pours in per physics frame. Forty in one frame is a
-## visible hitch; spread over the row's three seconds nobody notices.
+## Enemigos que el tsunami vierte por frame de física: cuarenta en un solo
+## frame dan un tirón visible.
 const TSUNAMI_PER_FRAME: int = 6
-## Half-width of the arc the wave comes from, in radians (~60 degrees wide).
+## Medio ancho del arco del que viene la ola (radianes, ~60 grados en total).
 const TSUNAMI_ARC_SPREAD: float = 0.52
-## Acid damage per second to a raider standing in a pool.
+## Daño por segundo del ácido a un jugador dentro de un charco.
 const ACID_DAMAGE_PER_SECOND: float = 4.0
 
 
+## La fila de WEATHER_CATALOG con ese id, o vacío.
 static func weather_row(id: String) -> Dictionary:
 	for row: Dictionary in WEATHER_CATALOG:
 		if String(row.id) == id:
@@ -1214,8 +1173,8 @@ static func weather_row(id: String) -> Dictionary:
 	return {}
 
 
-## Seconds this row runs for, with the arena override and — for moons and
-## rains only — the pact multiplier.
+## Segundos que dura esta fila, con el reemplazo del Inspector y, solo en
+## lunas y lluvias, el multiplicador de los pactos.
 func _weather_duration(row: Dictionary) -> float:
 	var seconds := float(weather_duration_overrides.get(String(row.id), row.duration))
 	if STRETCHABLE_GROUPS.has(String(row.group)):
@@ -1223,15 +1182,13 @@ func _weather_duration(row: Dictionary) -> float:
 	return seconds
 
 
-## The event-tick roll: rarest group first, so a disaster is not crowded
-## out by the commoner rains and moons.
+## La tirada de clima de cada evento: primero el grupo más raro, para que
+## las lluvias y lunas no tapen a los desastres.
 func _maybe_weather() -> void:
 	if not active_weather.is_empty() or _sky_gap_left > 0.0:
 		return
-	# Short-circuited so a group whose chance is ZERO draws NO random
-	# number. Not a micro-optimisation: the game RNG is one shared stream,
-	# and a die rolled for a disabled group shifts every later draw in the
-	# run — which is how disabling a group "changed" the arena layout.
+	# Con probabilidad 0 un grupo NO tira dado: el RNG de la partida es uno
+	# solo y un dado de más cambia todo lo que se sortea después.
 	var disaster_odds := disaster_chance + RunState.disaster_chance_bonus
 	if disaster_odds > 0.0 and randf() < disaster_odds:
 		_start_weather(_roll_group("disaster"))
@@ -1240,8 +1197,8 @@ func _maybe_weather() -> void:
 	if rain_odds > 0.0 and randf() < rain_odds:
 		_start_weather(_roll_group("rain"))
 		return
-	# Demonic pacts can sell sky-event odds outright (iteration 47), on top
-	# of the per-use tilt every demonic completion already adds.
+	# Los pactos demoníacos venden probabilidad de luna, además del extra
+	# que suma cada altar demoníaco usado.
 	var chance := sky_event_chance + RunState.event_chance_bonus \
 			+ sky_event_chance_per_demonic * float(RunState.demonic_uses)
 	if randf() >= chance:
@@ -1249,7 +1206,7 @@ func _maybe_weather() -> void:
 	_start_weather(_roll_group("moon"))
 
 
-## A weighted id from one group, skipping the follow-up-only rows.
+## Un id al azar del grupo, por peso, sin las filas follow_up_only.
 func _roll_group(group: String) -> String:
 	var total := 0.0
 	for row: Dictionary in WEATHER_CATALOG:
@@ -1267,16 +1224,15 @@ func _roll_group(group: String) -> String:
 	return ""
 
 
-## PUBLIC group hook (the probe, BONK_WEATHER_NOW, the event altar): FORCES
-## a row. It stops whatever is running and starts even inside the gap —
-## exclusivity is a rule, the gap is only a cadence, and a forced summon
-## that silently did nothing would make the altar feel broken and would
-## break verificar.sh's CIELO_TRAS_AVANCE gate.
+## Entrada PÚBLICA por grupo (el probe, BONK_WEATHER_NOW, el altar de
+## evento): FUERZA un clima. Detiene el que haya y empieza aunque no haya
+## pasado la pausa; si no hiciera nada, el altar parecería roto y fallaría
+## la puerta CIELO_TRAS_AVANCE de verificar.sh.
 func start_sky_event(kind: String) -> void:
 	_start_weather(kind, true)
 
 
-## The event altar's roll: any row except the two rewards.
+## La tirada del altar de evento: cualquier fila menos los dos premios.
 func random_altar_weather() -> String:
 	var total := 0.0
 	for row: Dictionary in WEATHER_CATALOG:
@@ -1304,9 +1260,8 @@ func _start_weather(id: String, forced: bool = false) -> void:
 	if not active_weather.is_empty():
 		if not forced:
 			return
-		# Forced: the running row is stopped properly, never just dropped —
-		# its stop() is what releases the tint, the points source and the
-		# HUD offset.
+		# Forzado: el clima activo se detiene bien, con su stop(), que es lo
+		# que suelta el tinte, la fuente de puntos y el desplazamiento del HUD.
 		_stop_weather(false)
 	_cache_lights()
 	_weather_state = {}
@@ -1314,8 +1269,7 @@ func _start_weather(id: String, forced: bool = false) -> void:
 	active_weather = {"id": id, "group": String(row.group), "time_left": seconds}
 	call(row.start)
 	if String(row.group) == "disaster":
-		# Extra line so a soak can grep disasters apart from the weather
-		# they share a channel with.
+		# Línea aparte para que un soak distinga los desastres del resto.
 		print("Disaster: %s" % id)
 	print("Weather started: %s" % id)
 
@@ -1328,8 +1282,8 @@ func _tick_weather(delta: float) -> void:
 	var tick: StringName = row.get("tick", &"")
 	if not tick.is_empty():
 		call(tick, delta)
-	# The tick can end the weather itself (the tsunami does once its wave
-	# is in), and then there is nothing left to count down.
+	# El tick puede terminar el clima él mismo (el tsunami, cuando vierte
+	# su ola); entonces no queda nada que descontar.
 	if active_weather.is_empty():
 		return
 	active_weather.time_left = float(active_weather.time_left) - delta
@@ -1338,8 +1292,8 @@ func _tick_weather(delta: float) -> void:
 	_stop_weather(true)
 
 
-## Ends the live row. `chain` is false for teardown (stage swap, run exit):
-## the follow-up must not start into an arena that is going away.
+## Termina el clima activo. `chain` es false al desmontar (cambio de etapa,
+## salida de la partida): el follow_up no puede empezar en una arena que se va.
 func _stop_weather(chain: bool) -> void:
 	if active_weather.is_empty():
 		return
@@ -1355,16 +1309,15 @@ func _stop_weather(chain: bool) -> void:
 		return
 	var follow_up := String(row.get("follow_up", ""))
 	if not follow_up.is_empty():
-		# Straight into it, no restore first: restoring spawned a 2 s tween
-		# racing the follow-up's 1.5 s one over the same properties, and the
-		# longer restore won.
+		# Directo al siguiente, sin devolver el cielo: un tween de vuelta de
+		# 2 s competiría con el de 1.5 s del siguiente y ganaría el más largo.
 		_start_weather(follow_up)
 		return
 	_restore_sky()
 	_sky_gap_left = sky_event_min_gap
 
 
-## --- moons ------------------------------------------------------------------
+## --- lunas ------------------------------------------------------------------
 
 func _weather_start_blood_moon() -> void:
 	var seconds := float(active_weather.time_left)
@@ -1382,22 +1335,18 @@ func _weather_start_eclipse() -> void:
 	_print_sky_event("eclipse", seconds)
 
 
-## Tag on the full moon's two boons, so a second moon inside the first
-## one's window replaces them instead of stacking (add_timed_boon appends;
-## only clear_timed_boons drops by tag).
+## Etiqueta de las dos ventajas de la luna llena: una segunda luna dentro
+## de la primera las reemplaza en vez de sumarlas (solo
+## clear_timed_boons quita por etiqueta).
 const FULL_MOON_TAG: String = "full_moon"
 
 
 func _weather_start_full_moon() -> void:
-	# The pact sells "the moons last longer", so the good one grows too — a
-	# cost that only stretched the bad half would read as a straight
-	# penalty rather than a bargain.
+	# El pacto vende "lunas más largas", así que la buena también crece.
 	var seconds := float(active_weather.time_left)
-	# BOTH groups and TAGGED, like the golden rain below. A sky event is a
-	# permanent-for-its-window gift to the whole party, and a raider that
-	# happened to be down when the moon rose used to come back to a deficit
-	# nothing would ever repay; the tag is what makes a forced re-summon
-	# (the event altar) replace the boons instead of stacking them.
+	# A los dos grupos (de pie y caídos) y con etiqueta, como la lluvia
+	# dorada: quien estaba caído al salir la luna también la recibe, y una
+	# luna forzada (altar de evento) reemplaza las ventajas en vez de sumarlas.
 	for body: Node3D in _all_raiders():
 		var stats := PlayerStats.find_in(body)
 		if stats != null:
@@ -1409,15 +1358,15 @@ func _weather_start_full_moon() -> void:
 	_print_sky_event("full_moon", seconds)
 
 
-## The moons keep their original log line VERBATIM: tools/verificar.sh's
-## CIELO_TRAS_AVANCE gate counts it after every stage change to prove the
-## director re-cached the new map's lights. Rains and disasters do not
-## print it — they tint nothing that gate is about.
+## Las lunas imprimen esta línea TAL CUAL: la puerta CIELO_TRAS_AVANCE de
+## verificar.sh la cuenta tras cada cambio de etapa para probar que el
+## director volvió a buscar las luces del mapa nuevo. Lluvias y desastres
+## no la imprimen.
 func _print_sky_event(kind: String, seconds: float) -> void:
 	print("Sky event: %s for %.0fs" % [kind, seconds])
 
 
-## --- rains ------------------------------------------------------------------
+## --- lluvias ----------------------------------------------------------------
 
 func _weather_start_enemy_rain() -> void:
 	_weather_state["drop_left"] = 0.0
@@ -1425,11 +1374,10 @@ func _weather_start_enemy_rain() -> void:
 	_announce("LLUVIA DE ENEMIGOS — ¡caen del cielo!")
 
 
-## Enemies "fall" as a telegraph plus a downward streak, and then simply
-## appear on the ground. They are NOT dropped from a height: a body falling
-## in is a body with upward-then-downward velocity off the floor, which is
-## exactly what the harness's airborne detector exists to catch — and that
-## detector is deliberately narrow and must not be widened for scenery.
+## Los enemigos "caen" como un aviso en el suelo más un destello, y después
+## aparecen en el suelo. NO se sueltan desde arriba: un cuerpo cayendo es lo
+## que el detector de cuerpos en el aire del harness atrapa, y ese detector
+## no se amplía por decorado.
 func _weather_tick_enemy_rain(delta: float) -> void:
 	_weather_state["drop_left"] = float(_weather_state.get("drop_left", 0.0)) - delta
 	if float(_weather_state["drop_left"]) > 0.0:
@@ -1449,11 +1397,9 @@ func _weather_tick_enemy_rain(delta: float) -> void:
 		Telegraph.spawn_disc(self, point, 1.4, 1.0, Color(0.6, 0.85, 1.0))
 		Juice.burst(point + Vector3.UP * 3.0, Color(0.6, 0.85, 1.0), 6)
 	if not points.is_empty():
-		# NOT the horde budget: a rain is ambient weather that runs for 35
-		# seconds, and the extra 40 bodies of horde headroom kept the arena
-		# pinned at its cap for the whole window — a wall the party cannot
-		# push through, which stopped a stage soak from ever reaching its
-		# exit portal. The tsunami below is the one that IS a wave.
+		# Sin el cupo de horda (false): la lluvia es clima de 35 s, y con
+		# ese cupo la arena se quedaba en su tope toda la ventana, un muro
+		# que no deja pasar. El tsunami sí es una ola.
 		get_tree().call_group("enemy_spawner", "spawn_at_points", points, false)
 
 
@@ -1477,16 +1423,15 @@ func _weather_tick_radioactive_rain(delta: float) -> void:
 
 
 func _weather_stop_radioactive_rain() -> void:
-	# The pools outlive the rain by design (they are already on the ground
-	# and lethal); each one expires on its own clock, and the stage swap
-	# reclaims any that are still live through Pools.release_all_live.
+	# Los charcos sobreviven a la lluvia a propósito: cada uno caduca con
+	# su propio reloj, y el cambio de etapa recoge los que queden con
+	# Pools.release_all_live.
 	pass
 
 
-## PUBLIC (EnemyBase calls it on death while the radioactive rain runs):
-## one acid puddle, subject to the live cap and the spacing rule. Skipped
-## silently past either — a warning here would fail a soak for working as
-## designed, and raising the cap to fit more is not a fix.
+## PÚBLICO (EnemyBase lo llama al morir durante la lluvia radiactiva): un
+## charco de ácido, si cabe bajo el tope y respeta la distancia. Si no, se
+## salta en silencio: un aviso aquí haría fallar un soak por funcionar bien.
 func spawn_acid_pool(at: Vector3) -> void:
 	if not is_weather_active("radioactive_rain"):
 		return
@@ -1504,16 +1449,16 @@ func spawn_acid_pool(at: Vector3) -> void:
 	fresh.play(at, acid_pool_radius, acid_pool_lifetime, ACID_DAMAGE_PER_SECOND)
 
 
-## True while `id` is the live weather. THE public read for anything that
-## has to behave differently under one (EnemyBase's acid drop, the HUD).
+## Verdadero mientras `id` sea el clima activo. Es LA consulta pública para
+## lo que cambia con un clima (el ácido de EnemyBase, el HUD).
 func is_weather_active(id: String) -> bool:
 	return not active_weather.is_empty() and String(active_weather.id) == id
 
 
 func _weather_start_golden_rain() -> void:
 	_tint_sky(Color(1.0, 0.85, 0.4), 1.2, Color(0.6, 0.5, 0.2))
-	# BOTH groups: a downed raider still earns the points their teammates
-	# bank on their behalf, and the source has to come off them too.
+	# A los dos grupos: un jugador caído también gana los puntos que el
+	# grupo junta por él, y la fuente se le quita igual al terminar.
 	for body: Node3D in _all_raiders():
 		if body.has_method("set_points_source"):
 			body.call("set_points_source", "golden_rain", golden_points_multiplier)
@@ -1528,8 +1473,9 @@ func _weather_stop_golden_rain() -> void:
 	RunState.price_discount = 1.0
 
 
-## Every raider, standing or downed. Party-wide effects have to reach both
-## groups: a downed body leaves "player" and joins "downed_players".
+## Todos los jugadores, de pie o caídos. Un efecto de grupo tiene que
+## llegar a los dos: un cuerpo caído sale de "player" y entra en
+## "downed_players".
 func _all_raiders() -> Array[Node3D]:
 	var bodies: Array[Node3D] = []
 	for group: String in ["player", "downed_players"]:
@@ -1540,9 +1486,9 @@ func _all_raiders() -> Array[Node3D]:
 	return bodies
 
 
-## A walkable, grounded point in a ring around `origin`, or Vector3.INF
-## when the mask offers none. Rain and meteors both land through here, so
-## nothing weather drops can end up inside the arena's rocks.
+## Un punto caminable y apoyado en el suelo en un anillo alrededor de
+## `origin`, o Vector3.INF si la máscara no ofrece ninguno. La lluvia y los
+## meteoritos caen por aquí, así nada del clima termina dentro de una roca.
 func _rain_point(origin: Vector3, min_distance: float, max_distance: float) -> Vector3:
 	for attempt in EVENT_POINT_ATTEMPTS:
 		var angle := randf() * TAU
@@ -1557,7 +1503,7 @@ func _rain_point(origin: Vector3, min_distance: float, max_distance: float) -> V
 	return Vector3.INF
 
 
-## --- disasters --------------------------------------------------------------
+## --- desastres --------------------------------------------------------------
 
 func _weather_start_tsunami() -> void:
 	var anchor_body := Coop.random_player(get_tree())
@@ -1565,19 +1511,16 @@ func _weather_start_tsunami() -> void:
 	var angle := randf() * TAU
 	_weather_state["angle"] = angle
 	_weather_state["origin"] = origin
-	# The STAGE clock, not the run clock: iteration 50 moved the boss
-	# timetable and the hordes onto stage_time so every map of a run gets
-	# its own full stretch, and docs/ARQUITECTURA.md documents this wave
-	# the same way. Off the run clock, a tsunami on a fresh third stage
-	# asked for a wave sized by half an hour of play.
+	# Con el reloj de la ETAPA, no el de la partida, como las hordas: cada
+	# mapa tiene su propio tramo, y con el reloj de la partida la ola de
+	# una tercera etapa saldría enorme.
 	var wanted := tsunami_base + tsunami_per_minute * int(RunState.stage_time / 60.0)
 	_weather_state["left"] = wanted
 	_announce("¡TSUNAMI DE ENEMIGOS! %s" % _compass_word(angle))
 
 
-## Poured in over the row's three seconds, in per-frame chunks: forty-plus
-## bodies made in one frame is a visible hitch, and the horde cap inside
-## spawn_at_points bounds the total anyway.
+## Vierte la ola durante los tres segundos de la fila, por tandas de
+## TSUNAMI_PER_FRAME; el tope de horda de spawn_at_points limita el total.
 func _weather_tick_tsunami(_delta: float) -> void:
 	var left := int(_weather_state.get("left", 0))
 	if left <= 0:
@@ -1587,8 +1530,8 @@ func _weather_tick_tsunami(_delta: float) -> void:
 	var angle := float(_weather_state.get("angle", 0.0))
 	var points: Array[Vector3] = []
 	for i in chunk:
-		# A 60 degree arc on ONE side: a tsunami is a wall coming from
-		# somewhere, not a ring closing in (that is what a horde is).
+		# Un arco de un solo lado: un tsunami es un muro que viene de un
+		# lugar, no un anillo que se cierra (eso es una horda).
 		var spread := angle + randf_range(-TSUNAMI_ARC_SPREAD, TSUNAMI_ARC_SPREAD)
 		var pos := origin + Vector3(cos(spread), 0.0, sin(spread)) \
 				* randf_range(tsunami_arc_min, tsunami_arc_max)
@@ -1619,10 +1562,9 @@ func _weather_tick_earthquake(delta: float) -> void:
 		_weather_state["dust_left"] = earthquake_dust_interval
 		for body: Node3D in _all_raiders():
 			Juice.burst(body.global_position, Color(0.6, 0.55, 0.45), 8)
-	# The HUD is a CanvasLayer, so ONE offset moves every element it owns —
-	# bars, timer, loadout strips and the per-view minimaps — which is what
-	# "the sprites move around" means. The Tab map is a different layer and
-	# deliberately stays still: a map that shook would be unreadable.
+	# El HUD es un CanvasLayer: UN desplazamiento mueve todo lo que tiene
+	# (barras, reloj, minimapas). El mapa de Tab está en otra capa y queda
+	# quieto a propósito: un mapa que tiembla no se puede leer.
 	var hud_time := float(_weather_state.get("hud_time", 0.0)) + delta
 	_weather_state["hud_time"] = hud_time
 	var phase := hud_time * earthquake_hud_hz * TAU
@@ -1642,6 +1584,8 @@ func _weather_start_meteors() -> void:
 	_announce("¡LLUVIA DE METEORITOS! Sal de los círculos")
 
 
+## Descuenta los avisos pendientes (los que llegan a 0 impactan) y, cada
+## meteor_interval, marca un impacto nuevo cerca de un jugador al azar.
 func _weather_tick_meteors(delta: float) -> void:
 	var pending: Array = _weather_state.get("pending", [])
 	for i in range(pending.size() - 1, -1, -1):
@@ -1671,9 +1615,8 @@ func _weather_tick_meteors(delta: float) -> void:
 	_weather_state["pending"] = pending
 
 
-## One meteor lands. Enemies take the brunt: a disaster that only hurt the
-## party would be a pure tax, and one that only hurt the horde would be a
-## gift — this is both, which is what makes standing still the mistake.
+## Cae un meteorito. Daña a jugadores y enemigos (a estos más): quedarse
+## quieto es el error.
 func _meteor_impact(at: Vector3) -> void:
 	Juice.burst(at + Vector3.UP * 0.5, Color(1.0, 0.6, 0.25), 26)
 	Juice.shake(0.35)
@@ -1696,14 +1639,15 @@ func _meteor_impact(at: Vector3) -> void:
 			enemy_health.take_damage(damage * meteor_enemy_scale)
 
 
+## Distancia al cuadrado en el plano XZ (ignora la altura).
 static func _flat_distance_sq(a: Vector3, b: Vector3) -> float:
 	var span := a - b
 	span.y = 0.0
 	return span.length_squared()
 
 
-## Which way the tsunami comes from, for the announce. Four words is
-## enough: the player needs a direction to run, not a bearing.
+## De dónde viene el tsunami, para el aviso: cuatro rumbos bastan para
+## saber hacia dónde correr.
 static func _compass_word(angle: float) -> String:
 	var turns := fposmod(angle / TAU, 1.0)
 	if turns < 0.125 or turns >= 0.875:
@@ -1715,11 +1659,13 @@ static func _compass_word(angle: float) -> String:
 	return "desde el norte"
 
 
+## Guarda el sol y el ambiente de la arena actual y sus valores originales.
+## No hace nada si ya los tiene (on_stage_started los olvida en cada etapa).
 func _cache_lights() -> void:
 	if _sun != null:
 		return
-	# The ARENA, not current_scene: current_scene is the persistent run
-	# root now, and its lights are whatever arena happens to be under it.
+	# La ARENA, no current_scene: current_scene es la raíz de la partida y
+	# sus luces son las de la arena que tenga debajo.
 	var scene := _stage_parent()
 	if scene == null or scene == self:
 		return
@@ -1732,11 +1678,9 @@ func _cache_lights() -> void:
 		var world_environment := node as WorldEnvironment
 		if world_environment == null or world_environment.environment == null:
 			break
-		# The arenas' Environment is a plain sub_resource: every instance of
-		# the PackedScene shares the SAME resource for as long as it stays
-		# cached, so tinting it bled into the next run — and Retry then
-		# re-cached the blood-red ambient as the "original" color. Work on
-		# a copy that belongs to this arena instance.
+		# El Environment de la arena es un sub_resource COMPARTIDO por todas
+		# las instancias de la escena: teñirlo pasaría a la partida
+		# siguiente. Se trabaja sobre una copia propia de esta arena.
 		_environment = world_environment.environment.duplicate()
 		world_environment.environment = _environment
 		_ambient_color = _environment.ambient_light_color
@@ -1744,6 +1688,8 @@ func _cache_lights() -> void:
 		break
 
 
+## Lleva el sol y el ambiente a un tinte en 1.5 s. `sun_energy` multiplica
+## la energía original del sol.
 func _tint_sky(sun_color: Color, sun_energy: float, ambient: Color) -> void:
 	_kill_sky_tween()
 	_sky_tween = create_tween().set_parallel()
@@ -1754,6 +1700,7 @@ func _tint_sky(sun_color: Color, sun_energy: float, ambient: Color) -> void:
 		_sky_tween.tween_property(_environment, "ambient_light_color", ambient, 1.5)
 
 
+## Devuelve el cielo original de la arena en 2 s.
 func _restore_sky() -> void:
 	_kill_sky_tween()
 	_sky_tween = create_tween().set_parallel()
@@ -1775,5 +1722,6 @@ func _free_beacon(beacon: Node3D) -> void:
 		beacon.queue_free()
 
 
+## Muestra un aviso centrado en el HUD (grupo "boss_ui").
 func _announce(message: String) -> void:
 	get_tree().call_group("boss_ui", "announce", message)
