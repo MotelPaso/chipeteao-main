@@ -43,13 +43,22 @@ func _ready() -> void:
 	_extract_button.pressed.connect(_on_extract_pressed)
 	_quit_button.pressed.connect(_on_quit_pressed)
 	_settings_panel.closed.connect(_on_settings_closed)
+	# Button prompts under the buttons; they follow the last device used.
+	_resume_button.get_parent().add_child(InputHints.build([
+			["ui_accept", "Elegir"], ["ui_cancel", "Continuar"]]))
 
 
+## pause_game (Esc / Start) toggles the menu. ui_cancel (B on a pad) only
+## CLOSES it: B is "back" everywhere else in the game, and with the pause
+## on Start alone a pad player pressing B on this menu got nothing. B does
+## not open it — in a run B is free for gameplay.
 func _unhandled_input(event: InputEvent) -> void:
-	if not event.is_action_pressed("pause_game"):
+	var toggle := event.is_action_pressed("pause_game")
+	var back := visible and event.is_action_pressed("ui_cancel")
+	if not toggle and not back:
 		return
 	if _settings_panel.visible:
-		return  # the panel handles Esc itself and returns to these buttons
+		return  # the panel handles Esc / B itself and returns to these buttons
 	if visible:
 		_close()
 		get_viewport().set_input_as_handled()

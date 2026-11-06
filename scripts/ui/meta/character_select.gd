@@ -43,10 +43,17 @@ const CARD_SIZE := Vector2(184, 244)
 ## longer than the English these cards were first measured against). The
 ## locked card gets the tighter passive cap because it also carries the
 ## price chip and the unlock hint.
-const PASSIVE_MAX_LINES := 3
+##
+## The passive is the line that changes how a raider plays, so it gets room
+## for four lines (Nyx's needs all four; with three it was cut mid-sentence
+## and the card still overflowed its bottom margin by 5 px). The flavor
+## blurb has no fixed cap: it takes whatever height is LEFT and trims there,
+## so a one-line passive leaves room for the whole blurb and a long one
+## squeezes it instead of pushing it out of the card. The full text of both
+## is always in the card's tooltip.
+const PASSIVE_MAX_LINES := 4
 const LOCKED_PASSIVE_MAX_LINES := 2
 const UNLOCK_HINT_MAX_LINES := 2
-const BLURB_MAX_LINES := 2
 const REJECT_FLASH_COLOR := Color(1.0, 0.42, 0.42)
 ## Segmented button size, shared by the co-op player-count row (it was
 ## the tier picker's size before iteration 50 removed that row).
@@ -124,6 +131,13 @@ func _ready() -> void:
 	_start_button.pressed.connect(_on_start_pressed)
 	_quests_button.pressed.connect(_on_quests_pressed)
 	_build_extra_buttons()
+	# Button prompt in the free bottom-left corner (the row of buttons is
+	# centred and the version sits bottom-right). Added BEFORE the settings
+	# panel in the tree order so the panel's dim still covers it.
+	var hints := InputHints.build([["ui_accept", "Elegir"]])
+	add_child(hints)
+	move_child(hints, _settings_panel.get_index())
+	hints.pin_bottom_left()
 	# The shared SettingsPanel (same scene the pause menu embeds) overlays
 	# this whole screen; on close, focus returns to Start.
 	_settings_button.pressed.connect(_settings_panel.open)
@@ -173,6 +187,7 @@ func _update_grid_columns() -> void:
 	var columns := clampi(wanted, 1, fits)
 	if _cards_grid.columns != columns:
 		_cards_grid.columns = columns
+	_link_focus()
 
 
 ## Cards scale from their center, but their size is only known after the
@@ -310,6 +325,7 @@ func _refresh_slot_row() -> void:
 		button.queue_free()
 	_slot_buttons.clear()
 	if _coop_count <= 1:
+		_link_focus()
 		return
 	for slot in _coop_count:
 		var slot_button := Button.new()
@@ -333,6 +349,7 @@ func _refresh_slot_row() -> void:
 		_slot_buttons.append(slot_button)
 	if had_focus:
 		_slot_buttons[clampi(_editing_slot, 0, _slot_buttons.size() - 1)].grab_focus()
+	_link_focus()
 
 
 func _refresh_start_button() -> void:
@@ -434,6 +451,12 @@ func _on_unlock_confirmed(character_id: String) -> void:
 		_select(character_id)  # also refreshes every card
 	else:
 		_refresh_all_cards()
+	# The «Sí» that was just pressed is freed by the refresh, and the focus
+	# went with it: a pad player was left with nothing focused. Hand it to
+	# the card the button lived on.
+	var card := _cards_by_id.get(character_id) as Button
+	if card != null:
+		card.grab_focus()
 
 
 func _cancel_pending_unlock() -> void:
@@ -560,6 +583,93 @@ func _on_daily_pressed() -> void:
 func _refresh_all_cards() -> void:
 	for id: String in _cards_by_id:
 		_populate_card(_cards_by_id[id], CharacterCatalog.by_id(id))
+	_link_focus()
+
+
+## --- Pad / keyboard navigation -------------------------------------------
+
+## Focus neighbours for the card grid and the bottom button row, wired by
+## hand. Left to Godot's nearest-control search, ui_down from any card in
+## columns 3+ fell into "Cacería diaria" / "Misiones" (they sit under those
+## columns; Iniciar sits under columns 1-2), and down from there stuck on
+## "Armería": a pad player who picked one of ten raiders could not reach
+## Iniciar at all. Now:
+##   - down from a card goes to the card below it, or to Iniciar when the
+##     column ends (through the inline «Sí» while a card asks to unlock);
+##   - up from the top row goes to the party row above the grid;
+##   - the button row walks left/right, never down, and up returns to the
+##     raider that is selected.
+## Re-run after anything that rebuilds cards, slots or the grid's columns.
+func _link_focus() -> void:
+	var cards: Array[Button] = []
+	for child: Node in _cards_grid.get_children():
+		if child is Button:
+			cards.append(child as Button)
+	var columns := maxi(_cards_grid.columns, 1)
+	var above_grid := _party_focus_target()
+	for i in cards.size():
+		var card := cards[i]
+		var below: Control = cards[i + columns] if i + columns < cards.size() \
+				else _start_button
+		if i < columns and above_grid != null:
+			card.focus_neighbor_top = card.get_path_to(above_grid)
+		var yes := _inline_button(card)
+		if yes == null:
+			card.focus_neighbor_bottom = card.get_path_to(below)
+			continue
+		card.focus_neighbor_bottom = card.get_path_to(yes)
+		yes.focus_neighbor_top = yes.get_path_to(card)
+		yes.focus_neighbor_bottom = yes.get_path_to(below)
+		yes.focus_neighbor_left = yes.get_path_to(yes)
+		yes.focus_neighbor_right = yes.get_path_to(yes)
+	var row: Array[Button] = []
+	for child: Node in _button_row.get_children():
+		if child is Button and (child as Button).visible:
+			row.append(child as Button)
+	var picked: Button = _cards_by_id.get(GameConfig.selected_character_id) as Button
+	if picked == null and not cards.is_empty():
+		picked = cards[0]
+	for j in row.size():
+		var button := row[j]
+		if picked != null:
+			button.focus_neighbor_top = button.get_path_to(picked)
+		button.focus_neighbor_bottom = button.get_path_to(button)
+		button.focus_neighbor_left = button.get_path_to(row[maxi(j - 1, 0)])
+		button.focus_neighbor_right = button.get_path_to(row[mini(j + 1, row.size() - 1)])
+
+
+## What "up" from the top row of cards should reach: the slot being edited
+## in co-op, else the selected player-count button.
+func _party_focus_target() -> Control:
+	if _slot_row != null and _slot_row.visible and not _slot_buttons.is_empty():
+		return _slot_buttons[clampi(_editing_slot, 0, _slot_buttons.size() - 1)]
+	if _coop_buttons.is_empty():
+		return null
+	return _coop_buttons[clampi(_coop_count - 1, 0, _coop_buttons.size() - 1)]
+
+
+## The «Sí» a card shows while it asks to unlock, or null.
+func _inline_button(card: Button) -> Button:
+	for node: Node in card.find_children("*", "Button", true, false):
+		return node as Button
+	return null
+
+
+## The card's whole text on mouse hover: the grid card trims the passive and
+## the blurb to fit its fixed size, the tooltip never does.
+func _card_tooltip(character: Dictionary) -> String:
+	var lines: Array[String] = [
+		"%s — %s" % [String(character.display_name), String(character.weapon_display_name)],
+		String(character.passive_description),
+	]
+	var blurb := String(character.get("blurb", ""))
+	if not blurb.is_empty():
+		lines.append_array(["", blurb])
+	if not SaveData.is_unlocked(String(character.id)):
+		var price := "%d esquirlas" % int(character.get("unlock_cost", 0))
+		var hint := String(character.get("unlock_hint", ""))
+		lines.append_array(["", price if hint.is_empty() else "%s, o %s" % [price, hint]])
+	return "\n".join(lines)
 
 
 ## queue_free is deferred, so the outgoing content box would keep laying
@@ -573,6 +683,7 @@ func _clear_card(card: Button) -> void:
 
 func _populate_card(card: Button, character: Dictionary) -> void:
 	_clear_card(card)
+	card.tooltip_text = _card_tooltip(character)
 	var character_id := String(character.id)
 	if not SaveData.is_unlocked(character_id):
 		if _pending_unlock_id == character_id:
@@ -605,8 +716,9 @@ func _populate_card(card: Button, character: Dictionary) -> void:
 	var blurb := CardFactory.label(String(character.blurb), 11, Color(0.6, 0.62, 0.68))
 	blurb.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	# The passive line takes priority in the compact grid card; the flavor
-	# blurb takes the leftover space and trims rather than overflowing.
-	blurb.max_lines_visible = BLURB_MAX_LINES
+	# blurb takes the leftover space and trims there rather than overflowing
+	# (no max_lines_visible: with trimming on, an autowrapped Label shows the
+	# lines that fit its height and asks for none, see PASSIVE_MAX_LINES).
 	blurb.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	blurb.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	blurb.vertical_alignment = VERTICAL_ALIGNMENT_CENTER

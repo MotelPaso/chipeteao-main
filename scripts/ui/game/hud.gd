@@ -346,13 +346,13 @@ func _build_map_widgets(player_count: int) -> void:
 		_minimaps.append(minimap)
 		# Its own CanvasLayer: the overlay has to draw ABOVE this HUD and
 		# below the card picker, and a Control cannot cross layers.
-		var layer := CanvasLayer.new()
-		layer.layer = MAP_OVERLAY_LAYER
-		add_child(layer)
+		var overlay_layer := CanvasLayer.new()
+		overlay_layer.layer = MAP_OVERLAY_LAYER
+		add_child(overlay_layer)
 		var overlay := MapOverlay.new()
 		overlay.slot = slot
 		_anchor_to_cell(overlay, cell)
-		layer.add_child(overlay)
+		overlay_layer.add_child(overlay)
 		_overlays.append(overlay)
 
 
