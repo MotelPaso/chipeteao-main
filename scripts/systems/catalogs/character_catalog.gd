@@ -5,8 +5,8 @@ extends RefCounted
 ## pantalla de selección y el spawn del jugador leen las filas, no hay código
 ## por personaje.
 ##
-## Se puede cambiar libremente: display_name, blurb, passive_*, unlock_cost,
-## tint, model_*.
+## Se puede cambiar libremente: display_name, blurb, weapon_node_name,
+## passive_*, unlock_cost, tint, model_*.
 ## Llave interna, NUNCA la cambies: id (es la llave del guardado y de las
 ## misiones; usa minúsculas y guiones bajos). Si de verdad hay que
 ## renombrarlo, agrega la fila viejo -> nuevo en SaveData.ID_ALIASES para que
@@ -14,19 +14,19 @@ extends RefCounted
 ## Cuidado con unlock_cost: poner 0 lo deja gratis para siempre en los
 ## guardados existentes. SaveData agrega cada personaje gratis al guardado al
 ## cargarlo, y volver a ponerle precio después no lo bloquea de nuevo.
-## weapon_node_name debe ser el node_name de una fila de WEAPON_LIBRARY.
+## weapon_node_name debe ser el node_name de una fila de WeaponCatalog: de esa
+## fila salen la escena y el nombre del arma inicial.
 ##
 ## Campos de cada fila:
 ##   id: llave interna (ver arriba). SaveData guarda los desbloqueos por id y
 ##       cuenta runs_as_<id> / wins_as_<id>; las misiones nombran esos
 ##       contadores.
 ##   display_name, blurb: nombre y frase de la carta de selección.
-##   weapon_scene: escena del arma inicial, instanciada bajo el montaje
-##       Weapons del jugador.
-##   weapon_node_name: nombre del nodo del arma inicial; debe ser el node_name
-##       de su fila en WEAPON_LIBRARY para que el pool de mejoras la cuente
-##       como poseída.
-##   weapon_display_name: nombre del arma en la carta de selección.
+##   weapon_node_name: arma inicial, por el node_name de su fila en
+##       WeaponCatalog. El jugador la instancia bajo su montaje Weapons con
+##       ese nombre, así el pool de mejoras la cuenta como poseída.
+##   weapon_scene, weapon_display_name: NO se escriben aquí. CHARACTER_LIBRARY
+##       los copia de la fila del arma (escena y nombre en la carta).
 ##   passive_description: texto de la pasiva en la carta; sus números deben
 ##       coincidir con passive_amount y passive_base.
 ##   passive_stat, passive_amount: efecto de la pasiva como dato, un stat de
@@ -61,19 +61,19 @@ extends RefCounted
 ##   tint_material_prefix (opcional): prefijo del resource_name de los
 ##       materiales teñibles de ESTE modelo; las superficies cuyo material no
 ##       lleva el prefijo no se tiñen. Ausente = "Azul personaje" de la foca.
-## Texto que ve el jugador: display_name, blurb, weapon_display_name,
-## passive_description y unlock_hint. El resto son identificadores.
+## Texto que ve el jugador: display_name, blurb, passive_description y
+## unlock_hint. El resto son identificadores.
 
 ## Personaje de respaldo cuando no hubo selección (arena arrancada directo).
 const DEFAULT_ID: String = "rook"
 
-const CHARACTER_LIBRARY: Array[Dictionary] = [
+## Filas como se editan (ver la cabecera). El juego lee CHARACTER_LIBRARY, que
+## es esta lista con weapon_scene y weapon_display_name agregados.
+const CHARACTER_ROWS: Array[Dictionary] = [
 	{
 		"id": "rook", "display_name": "Rook",
 		"blurb": "Un muro con patas: sus golpes solo se ponen más feos.",
-		"weapon_scene": "res://scenes/weapons/Shortsword.tscn",
 		"weapon_node_name": "Shortsword",
-		"weapon_display_name": "Espada corta",
 		"passive_description": "+0.8% de daño por nivel",
 		"passive_stat": "damage", "passive_amount": 0.8,
 		"unlock_cost": 0,
@@ -82,9 +82,7 @@ const CHARACTER_LIBRARY: Array[Dictionary] = [
 	{
 		"id": "ash", "display_name": "Ash",
 		"blurb": "Un ermitaño cubierto de hollín cuyo fuego se abre más en cada nivel.",
-		"weapon_scene": "res://scenes/weapons/EmberWand.tscn",
 		"weapon_node_name": "EmberWand",
-		"weapon_display_name": "Vara de brasas",
 		"passive_description": "+0.7% de área por nivel",
 		"passive_stat": "area", "passive_amount": 0.7,
 		"unlock_cost": 0,
@@ -94,9 +92,7 @@ const CHARACTER_LIBRARY: Array[Dictionary] = [
 	{
 		"id": "yandere_chan", "display_name": "Yandere-chan",
 		"blurb": "Termina tu juego yandere-dev.",
-		"weapon_scene": "res://scenes/weapons/HuntingBow.tscn",
 		"weapon_node_name": "HuntingBow",
-		"weapon_display_name": "Arco de caza",
 		"passive_description": "+0.6% de daño por cada 1% de velocidad extra",
 		"passive_stat": "damage", "passive_amount": 0.6,
 		"model_scene": "res://assets/models/yandere_character.tscn",
@@ -107,9 +103,7 @@ const CHARACTER_LIBRARY: Array[Dictionary] = [
 	{
 		"id": "wisp", "display_name": "Wisp",
 		"blurb": "Un espíritu a medias, rodeado de luces que solo le obedecen a él.",
-		"weapon_scene": "res://scenes/weapons/SpiritOrbs.tscn",
 		"weapon_node_name": "SpiritOrbs",
-		"weapon_display_name": "Orbes espirituales",
 		"passive_description": "+1.0% de xp por nivel",
 		"passive_stat": "xp", "passive_amount": 1.0,
 		"unlock_cost": 0,
@@ -118,9 +112,7 @@ const CHARACTER_LIBRARY: Array[Dictionary] = [
 	{
 		"id": "electro_gato", "display_name": "Electro Gato",
 		"blurb": "Un cazatormentas cuya suerte se lee como un parte del clima.",
-		"weapon_scene": "res://scenes/weapons/StormRod.tscn",
 		"weapon_node_name": "StormRod",
-		"weapon_display_name": "Pararrayos",
 		"passive_description": "+1 de suerte por nivel (cartas más raras)",
 		"passive_stat": "luck", "passive_amount": 1.0,
 		"model_scene": "res://assets/models/storm_cat_character.tscn",
@@ -130,9 +122,7 @@ const CHARACTER_LIBRARY: Array[Dictionary] = [
 	{
 		"id": "doc", "display_name": "Doc",
 		"blurb": "Un cirujano de campaña muy alegre que le cobra a cada paciente en sangre.",
-		"weapon_scene": "res://scenes/weapons/BloodVial.tscn",
 		"weapon_node_name": "BloodVial",
-		"weapon_display_name": "Vial de sangre",
 		"passive_description": "+1% de robo de vida por nivel (base +5%)",
 		"passive_stat": "lifesteal", "passive_amount": 1.0,
 		"passive_base": 5.0,
@@ -142,9 +132,7 @@ const CHARACTER_LIBRARY: Array[Dictionary] = [
 	{
 		"id": "moka", "display_name": "Moka",
 		"blurb": "Una foca muy watona.",
-		"weapon_scene": "res://scenes/weapons/SlimeTrail.tscn",
 		"weapon_node_name": "SlimeTrail",
-		"weapon_display_name": "Rastro de baba",
 		"passive_description": "+2% de duración de efectos por nivel",
 		"passive_stat": "duration", "passive_amount": 2.0,
 		"unlock_cost": 120,
@@ -153,9 +141,7 @@ const CHARACTER_LIBRARY: Array[Dictionary] = [
 	{
 		"id": "bogg", "display_name": "Bogg",
 		"blurb": "Nadie se sienta al lado de Bogg. Tampoco nadie sobrevive cerca de Bogg.",
-		"weapon_scene": "res://scenes/weapons/Stench.tscn",
 		"weapon_node_name": "Stench",
-		"weapon_display_name": "Hedor",
 		"passive_description": "+1% de área de ataque por nivel",
 		"passive_stat": "area", "passive_amount": 1.0,
 		"unlock_cost": 120,
@@ -164,9 +150,7 @@ const CHARACTER_LIBRARY: Array[Dictionary] = [
 	{
 		"id": "goku", "display_name": "Goku",
 		"blurb": "Carga seis segundos y después reescribe el mapa.",
-		"weapon_scene": "res://scenes/weapons/Kamehameha.tscn",
 		"weapon_node_name": "Kamehameha",
-		"weapon_display_name": "Kamehameha",
 		"passive_description": "+1% de daño por nivel",
 		"passive_stat": "damage", "passive_amount": 1.0,
 		"model_scene": "res://assets/models/goku_character.tscn",
@@ -178,9 +162,7 @@ const CHARACTER_LIBRARY: Array[Dictionary] = [
 	{
 		"id": "boxer", "display_name": "Boxeador",
 		"blurb": "Pega primero, pega dos veces y nunca pregunta nombres.",
-		"weapon_scene": "res://scenes/weapons/TwinDaggers.tscn",
 		"weapon_node_name": "TwinDaggers",
-		"weapon_display_name": "Dagas gemelas",
 		# Bajo a propósito: las dagas golpean muy seguido, así que cada punto
 		# de crítico rinde más por nivel.
 		"passive_description": "+0.4% de prob. de crítico por nivel",
@@ -191,9 +173,7 @@ const CHARACTER_LIBRARY: Array[Dictionary] = [
 	{
 		"id": "gucci_morty", "display_name": "PNG gucci morty",
 		"blurb": "Un recorte de baja resolución al que la suerte no deja de sonreírle.",
-		"weapon_scene": "res://scenes/weapons/DartPistol.tscn",
 		"weapon_node_name": "DartPistol",
-		"weapon_display_name": "Pistola de dardos",
 		# Menos suerte por nivel que Electro Gato (1.0) a propósito.
 		"passive_description": "+0.6 de suerte por nivel",
 		"passive_stat": "luck", "passive_amount": 0.6,
@@ -204,9 +184,7 @@ const CHARACTER_LIBRARY: Array[Dictionary] = [
 	{
 		"id": "backyardigan", "display_name": "Backyardigan",
 		"blurb": "No corre, coreografía; y todo lo que roza se prende.",
-		"weapon_scene": "res://scenes/weapons/Aura.tscn",
 		"weapon_node_name": "Aura",
-		"weapon_display_name": "Aura",
 		# La velocidad ES el stat de daño del Aura: un anillo que solo quema
 		# lo que toca rinde según cuánto terreno cubre el raider.
 		"passive_description": "+0.8% de velocidad de movimiento por nivel",
@@ -218,6 +196,12 @@ const CHARACTER_LIBRARY: Array[Dictionary] = [
 	},
 ]
 
+
+## Filas listas para el juego: CHARACTER_ROWS más weapon_scene y
+## weapon_display_name, copiados de la fila de WeaponCatalog cuyo node_name es
+## el weapon_node_name del personaje. Se arma una vez al cargar el script y es
+## de solo lectura, como una const.
+static var CHARACTER_LIBRARY: Array[Dictionary] = _with_weapon_fields(CHARACTER_ROWS)
 
 ## Índices armados al primer uso (ver CatalogIndex): la selección resuelve
 ## una fila por carta en cada redibujo y el spawn una por raider.
@@ -258,3 +242,31 @@ static func starter_ids() -> Array[String]:
 		if int(row.get("unlock_cost", 0)) == 0:
 			ids.append(String(row.id))
 	return ids
+
+
+## Copia de `rows` donde cada fila suma weapon_scene y weapon_display_name de
+## su arma en WeaponCatalog. Filas y lista quedan de solo lectura. Un
+## weapon_node_name que no existe deja los dos campos vacíos y avisa.
+static func _with_weapon_fields(rows: Array[Dictionary]) -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	for row: Dictionary in rows:
+		var full := row.duplicate(true)
+		var weapon := _weapon_row(String(row.get("weapon_node_name", "")))
+		if weapon.is_empty():
+			push_warning("CharacterCatalog: weapon_node_name '%s' of '%s' is in no WeaponCatalog row"
+					% [String(row.get("weapon_node_name", "")), String(row.get("id", "?"))])
+		full["weapon_scene"] = String(weapon.get("scene", ""))
+		full["weapon_display_name"] = String(weapon.get("display_name", ""))
+		full.make_read_only()
+		out.append(full)
+	out.make_read_only()
+	return out
+
+
+## Fila de WeaponCatalog con ese node_name, o vacío. Recorre la const
+## directamente porque corre al cargar este script.
+static func _weapon_row(node_name: String) -> Dictionary:
+	for weapon: Dictionary in WeaponCatalog.WEAPON_LIBRARY:
+		if String(weapon.node_name) == node_name:
+			return weapon
+	return {}
