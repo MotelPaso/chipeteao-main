@@ -1,16 +1,17 @@
 class_name EmberBurst
 extends Node3D
-## Pooled Ember Wand detonation: the expanding emissive shell (the burst
-## read), a ground scorch disc that lingers and fades, and a one-shot
-## spray of rising ember particles. All meshes/materials are shared scene
-## resources; per-instance fades use MeshInstance3D.transparency.
+## Detonación de la Vara de brasas, del pool: la cáscara emisiva que se
+## expande (la lectura del estallido), un disco de quemadura en el suelo que
+## dura y se desvanece, y una ráfaga de brasas que suben. Mallas y materiales
+## son recursos compartidos de la escena; cada instancia se desvanece con
+## MeshInstance3D.transparency.
 
 const SHELL_TIME: float = 0.35
 const SCORCH_TIME: float = 1.1
 
-## Burst radius the authored ember spray is sized for; the spray scales
-## against it so an area build's 6 m detonation is not a hollow bubble
-## with one 0.8 m puff of sparks at its center.
+## Radio de estallido para el que está pensada la ráfaga de brasas de la
+## escena; las brasas se escalan contra él, así una detonación de 6 m de un
+## build de área no es una burbuja hueca con un soplo de chispas en el centro.
 @export var embers_reference_radius: float = 2.5
 
 @onready var _shell: MeshInstance3D = $Shell
@@ -20,7 +21,7 @@ const SCORCH_TIME: float = 1.1
 var _tween: Tween = null
 
 
-## Pooled-node contract: kill a stale burst so reuse starts clean.
+## Contrato del pool: mata un estallido viejo para que el reuso empiece limpio.
 func pool_reset() -> void:
 	if _tween != null and _tween.is_valid():
 		_tween.kill()
@@ -30,8 +31,8 @@ func pool_reset() -> void:
 	_embers.emitting = false
 
 
-## Detonates at `center` (the struck enemy's origin) with the given hit
-## radius: shell swells to the damage radius, scorch marks the ground.
+## Detona en `center` (el origen del enemigo golpeado) con el radio de daño
+## dado: la cáscara crece hasta ese radio y la quemadura marca el suelo.
 func play(center: Vector3, radius: float) -> void:
 	global_position = center
 	_shell.transparency = 0.0

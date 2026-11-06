@@ -1,11 +1,11 @@
 extends WeaponBase
-## Stench ("Mal olor", iteration 43): flatulent pulses — every cooldown a
-## gas cloud bursts from the carrier, damaging everything in its radius,
-## poisoning it and slowing it. Knob mapping:
-##   damage        — burst hit (through deal_damage); poison dps derives from it
-##   cooldown      — seconds between pulses
-##   attack_range  — cloud radius (area tomes scale it)
-## Poison and slow durations follow the duration stat.
+## Hedor: pulsos flatulentos. En cada enfriamiento estalla una nube de gas
+## desde el portador que daña, envenena y ralentiza todo lo que hay en su
+## radio. Cómo usa los ajustes de WeaponBase:
+##   damage        — golpe del estallido (por deal_damage); el veneno por segundo sale de él
+##   cooldown      — segundos entre pulsos
+##   attack_range  — radio de la nube (los tomos de área lo escalan)
+## Veneno y ralentización duran más con el stat de duración.
 
 @export var poison_damage_fraction: float = 0.4
 @export var poison_duration: float = 3.0
@@ -14,17 +14,16 @@ extends WeaponBase
 @export var gas_color: Color = Color(0.55, 0.8, 0.25)
 @export var height_window: float = 2.2
 
-## Extra cloud radius per point of Tome of Multitude, as a fraction of the
-## base radius. The tome cannot add CLOUDS here: a second burst is centered
-## on the same carrier, so it is the same sphere drawn twice — invisible,
-## and it would silently double every pulse's damage, poison and slow. The
-## extra count grows the one cloud instead.
+## Radio extra de la nube por punto del Tomo de Multitud, como fracción del
+## radio base. El tomo no puede sumar NUBES: una segunda centrada en el mismo
+## portador es la misma esfera dibujada dos veces (invisible) y duplicaría
+## daño, veneno y ralentización de cada pulso. El conteo extra agranda la única nube.
 const STENCH_RADIUS_PER_EXTRA: float = 0.12
-## Fraction of the pulse interval each extra point shaves off, so a stacked
-## tome also makes the gas go off more often.
+## Fracción del intervalo de pulso que quita cada punto extra: con el tomo
+## apilado el gas también sale más seguido.
 const STENCH_PULSE_PER_EXTRA: float = 0.08
-## Floor on the accumulated pulse scale: the poison and slow it applies are
-## refreshes, so an interval that collapsed would just be a permanent field.
+## Piso de la escala de pulso acumulada: veneno y ralentización se refrescan,
+## así que un intervalo colapsado sería un campo permanente.
 const STENCH_MIN_PULSE_SCALE: float = 0.6
 
 var _shell_mesh: SphereMesh = null
@@ -34,9 +33,9 @@ func _ready() -> void:
 	_shell_mesh = SphereMesh.new()
 	_shell_mesh.radius = 1.0
 	_shell_mesh.height = 2.0
-	# Explicit tessellation: a double-sided alpha shell can fill the whole
-	# screen around the carrier, and at the engine default (64 x 32) every
-	# pulse drew ~4.2k overlapping transparent triangles.
+	# Teselado explícito: una cáscara alfa de doble cara puede llenar la
+	# pantalla alrededor del portador, y con el teselado por defecto del motor
+	# (64 x 32) cada pulso dibujaría miles de triángulos transparentes.
 	_shell_mesh.radial_segments = 24
 	_shell_mesh.rings = 12
 	var material := StandardMaterial3D.new()
@@ -50,32 +49,29 @@ func _ready() -> void:
 	_shell_mesh.material = material
 
 
-## Cloud radius: the damage area, the drawn shell and the pulse trigger all
-## read this one number — and so does fire(), which is where the Tome of
-## Multitude bonus below reaches the attack.
+## Radio de la nube: el área de daño, la cáscara dibujada y el disparo del
+## pulso leen este único número, y por aquí llega el bono del Tomo de Multitud.
 func reach() -> float:
 	return attack_range * area_scale() \
 			* (1.0 + STENCH_RADIUS_PER_EXTRA * float(_multitude_extra()))
 
 
-## Pulses per second rise with the tome too (see STENCH_PULSE_PER_EXTRA);
-## the floor keeps a heavy stack from collapsing the interval into a tick.
+## Con el tomo también suben los pulsos por segundo (STENCH_PULSE_PER_EXTRA);
+## el piso evita que una pila grande convierta el intervalo en un tick.
 func effective_cooldown() -> float:
 	var pulse_scale := maxf(1.0 - STENCH_PULSE_PER_EXTRA * float(_multitude_extra()),
 			STENCH_MIN_PULSE_SCALE)
 	return maxf(super() * pulse_scale, MIN_COOLDOWN)
 
 
-## Projectiles past the first this weapon would have fired, i.e. what the
-## Tome of Multitude granted (weapon ascensions raise projectile_count too).
+## Disparos después del primero que el arma habría hecho, o sea lo que dio el
+## Tomo de Multitud (los ascensos también suben projectile_count).
 func _multitude_extra() -> int:
 	return maxi(effective_projectile_count() - 1, 0)
 
 
-## The cloud IS the hit area, so the pulse has to trigger on anything inside
-## it. Leaving this at attack_range made the area-scaled outer band purely
-## decorative: with a big area multiplier and every enemy in that band the
-## gas simply never went off.
+## La nube ES el área de daño, así que el pulso debe dispararse con
+## cualquier enemigo dentro, también en la franja que agrega area_scale().
 func targeting_range() -> float:
 	return reach()
 
@@ -88,16 +84,16 @@ func fire(_target: Node3D) -> void:
 		if health != null:
 			deal_damage(health)
 		var enemy := body as EnemyBase
-		# Corpses take no status: apply_poison already refuses the dead, and
-		# writing a slow onto a body this very pulse killed only leaves state
-		# behind for whatever reads it next (a revived dummy, say).
+		# Los cadáveres no reciben estados: apply_poison ya rechaza a los
+		# muertos, y una ralentización sobre un cuerpo que este pulso mató solo
+		# deja estado para quien lo lea después.
 		if enemy != null and (health == null or not health.is_dead):
 			enemy.apply_poison(poison_dps, poison_duration * duration_scale())
 			enemy.apply_slow(slow_multiplier, slow_duration * duration_scale())
 	_play_cloud(radius)
 
 
-## Expanding translucent sphere that thins out — the "pfff" read.
+## Esfera translúcida que se expande y se adelgaza: el "pfff".
 func _play_cloud(radius: float) -> void:
 	var shell := spawn_fx_mesh(_shell_mesh)
 	shell.global_position = global_position + Vector3.DOWN * 0.3

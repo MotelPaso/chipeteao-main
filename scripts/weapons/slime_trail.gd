@@ -1,45 +1,42 @@
 extends WeaponBase
-## Slime Trail ("Baba", iteration 43): the carrier leaves a line of caustic
-## slime puddles behind them while moving; every enemy standing in a
-## puddle takes a damage tick each tick_interval. No target needed — the
-## weapon "fires" on its own cadence whenever the carrier has moved.
-## Knob mapping onto the WeaponBase contract:
-##   damage        — per tick (through deal_damage)
-##   cooldown      — seconds between puddle drops while moving
-##   attack_range  — unused (Long Reach still widens puddles via area)
-## Puddles are SlimePuddle records ticked here (no pooled scene): the visual
-## is a flat emissive disc built per puddle and faded out on expiry.
+## Rastro de baba: el portador deja una fila de charcos cáusticos al moverse;
+## cada enemigo parado en un charco recibe un golpe cada tick_interval. No
+## necesita blanco: el arma "dispara" a su ritmo siempre que el portador se movió.
+## Cómo usa los ajustes de WeaponBase:
+##   damage        — daño por pulso (por deal_damage)
+##   cooldown      — segundos entre charcos mientras se mueve
+##   attack_range  — sin uso (Largo alcance igual ensancha los charcos por el área)
+## Los charcos son registros SlimePuddle que avanza esta arma (sin escena de
+## pool): el visual es un disco emisivo plano por charco que se desvanece al expirar.
 
 @export var puddle_radius: float = 1.4
-## Seconds a puddle lasts (Tome of Lingering / "Thicker Slime" stretch it).
+## Segundos que dura un charco (Tomo de Persistencia y "Baba más espesa" lo alargan).
 @export var puddle_life: float = 3.0
 @export var tick_interval: float = 0.5
-## Carrier must have moved at least this far since the last drop.
+## Distancia mínima, en metros, que el portador debe moverse desde el último charco.
 @export var min_drop_distance: float = 0.8
 @export var slime_color: Color = Color(0.45, 0.95, 0.3)
-## Enemies farther than this above/below the puddle are unaffected.
+## Altura máxima, en metros, por encima o por debajo del charco a la que alcanza.
 @export var height_window: float = 1.6
-## How far above the carrier's feet the disc sits — just enough to clear
-## the arena floor's top face without floating.
+## Cuánto sobre los pies del portador se dibuja el disco: lo justo para despegarlo de la cara superior del piso.
 @export var puddle_ground_offset: float = 0.05
 
-## Seconds a puddle takes to fade out once its life runs out.
+## Segundos que tarda un charco en desvanecerse al terminar su vida.
 const FADE_TIME: float = 0.3
-## Seconds the drop animation takes to swell to full radius.
+## Segundos que tarda la animación de caída en llegar al radio completo.
 const GROW_TIME: float = 0.2
-## Radius fraction a puddle starts at before swelling.
+## Fracción del radio con que nace un charco antes de crecer.
 const GROW_FROM: float = 0.3
-## Distance from the drop point to each puddle a Tome of Multitude adds, in
-## puddle radii. Just over 1.0: the extras ring the main puddle and touch
-## it, widening the trail into a smear the horde has to wade through,
-## instead of stacking discs on one spot where they would be invisible and
-## just tick the same enemies several times.
+## Distancia del punto de caída a cada charco que agrega el Tomo de Multitud,
+## en radios de charco. Apenas más de 1.0: los extras rodean y tocan el
+## charco principal y ensanchan el rastro, en vez de apilarse invisibles en un
+## punto y golpear varias veces a los mismos enemigos.
 const EXTRA_PUDDLE_SPACING: float = 1.2
 
 
-## One live slime puddle. A record instead of a loose Dictionary: the
-## `visual` is a node crossing frames, and typed fields let the compiler
-## catch a mistyped key that used to fail silently at runtime.
+## Un charco vivo. Un registro en vez de un Dictionary suelto: el `visual` es
+## un nodo que cruza frames, y con campos tipados el compilador atrapa una
+## clave mal escrita.
 class SlimePuddle extends RefCounted:
 	var center: Vector3 = Vector3.ZERO
 	var radius: float = 0.0
@@ -55,18 +52,18 @@ var _puddle_mesh: CylinderMesh = null
 
 
 func _ready() -> void:
-	# The puddle VISUALS are stage-scoped (RunRoot.stage_parent) while
-	# these records ride across on the raider, so a stage change has to
-	# drop them or _tick_puddles keeps pulsing at the old arena's
-	# coordinates with nothing on screen to explain the damage.
+	# Los VISUALES de los charcos son de la etapa (RunRoot.stage_parent) y
+	# estos registros viajan con el raider: un cambio de etapa los suelta, o
+	# _tick_puddles seguiría pulsando en las coordenadas de la arena anterior
+	# sin nada en pantalla que explique el daño.
 	RunState.stage_changed.connect(
 			func(_index: int, _map_id: String) -> void: clear_weapon_fields())
 	_puddle_mesh = CylinderMesh.new()
 	_puddle_mesh.top_radius = 1.0
 	_puddle_mesh.bottom_radius = 1.0
 	_puddle_mesh.height = 0.06
-	# Explicit tessellation: a 6 cm slab needs no height rings, and the
-	# engine's 64 sides were the bulk of every puddle's triangles.
+	# Teselado explícito: una losa de 6 cm no necesita anillos de altura, y los
+	# 64 lados del motor serían el grueso de los triángulos de cada charco.
 	_puddle_mesh.radial_segments = 24
 	_puddle_mesh.rings = 1
 	var material := StandardMaterial3D.new()
@@ -81,35 +78,32 @@ func _ready() -> void:
 
 func _physics_process(delta: float) -> void:
 	_drop_timer = maxf(_drop_timer - delta, 0.0)
-	# The trail follows whatever rig carries this weapon — a pet leaves ITS
-	# own trail instead of painting one under the player it follows.
+	# El rastro sigue al montaje que lleva el arma: una mascota deja SU propio
+	# rastro en vez de pintar uno bajo el jugador al que sigue.
 	var carrier := carrier_node()
 	if carrier != null and _drop_timer <= 0.0:
 		var feet := carrier.global_position
 		if _last_drop == Vector3.INF or feet.distance_to(_last_drop) >= min_drop_distance:
 			_drop_timer = effective_cooldown()
 			_last_drop = feet
-			# This weapon never calls fire(), so the Tome of Multitude has to
-			# be read here: it is the drop that is the attack.
+			# Esta arma nunca llama a fire(), así que el Tomo de Multitud se lee
+			# aquí: la caída del charco es el ataque.
 			_drop_cluster(feet, maxi(effective_projectile_count(), 1))
 	_tick_puddles(delta)
 
 
-## Puddle visuals live under the scene root, not under this weapon, so
-## nothing frees them when the weapon goes: drop them by hand. Freed on the
-## spot rather than faded — the fade tween would have to be created on a
-## node that may already be leaving the tree with us.
+## Los visuales de los charcos cuelgan de la arena, no de esta arma, así que
+## nada los libera cuando el arma se va: se sueltan a mano. Se liberan al
+## instante y sin desvanecer: el tween se crearía sobre un nodo que puede estar
+## saliendo del árbol con nosotros.
 func _exit_tree() -> void:
 	clear_weapon_fields()
 
 
-## The optional half of Player's downed contract, and the stage hook.
-## Iteration 49 moved the VISUALS to the arena (RunRoot.stage_parent) but
-## left the records on the weapon, which rides across on the raider: after
-## a stage change _tick_puddles kept pulsing at the previous arena's world
-## coordinates, dealing damage nobody could see in a map where nothing was
-## standing there. Player._clear_weapon_fields has been looking for this
-## method since the co-op down path was written; no weapon implemented it.
+## La mitad opcional del contrato de caída del Player (Player._clear_weapon_fields
+## la llama por nombre), y el gancho de etapa: los VISUALES son de la arena y
+## los registros viajan con el raider, así que sin esto _tick_puddles seguiría
+## pulsando en las coordenadas de la arena anterior.
 func clear_weapon_fields() -> void:
 	for puddle: SlimePuddle in _puddles:
 		if puddle.visual != null and is_instance_valid(puddle.visual):
@@ -118,9 +112,9 @@ func clear_weapon_fields() -> void:
 	_puddles.clear()
 
 
-## One drop: the puddle under the carrier's feet plus, once a Tome of
-## Multitude is in play, `count - 1` more evenly ringed around it at
-## EXTRA_PUDDLE_SPACING radii, so the trail gets wider instead of thicker.
+## Una caída: el charco bajo los pies del portador y, con el Tomo de
+## Multitud, `count - 1` más repartidos en anillo a EXTRA_PUDDLE_SPACING
+## radios, así el rastro se ensancha en vez de engrosarse.
 func _drop_cluster(center: Vector3, count: int) -> void:
 	_spawn_puddle(center)
 	var extras := count - 1
@@ -176,6 +170,6 @@ func _expire(puddle: SlimePuddle) -> void:
 	fade.tween_callback(visual.queue_free)
 
 
-## Never targets: the trail drops wherever the carrier walks.
+## Nunca busca blanco: el rastro cae donde camine el portador.
 func acquire_target() -> Node3D:
 	return null

@@ -1,26 +1,26 @@
 class_name Projectile
 extends Area3D
-## Weapon bullet: flies along -Z (bending lightly toward the target it was
-## fired at) and damages "enemies"-group bodies it overlaps — each body at
-## most once — until its pierce budget runs out (1 = classic dart).
-## The firing weapon acquires it from Pools (parented to the scene root so
-## it survives player movement); it releases back on hit-out or after
-## max_distance, and pool_reset() re-arms pierce/hit-set/tracer for reuse.
+## Bala de arma: vuela por -Z (curvándose un poco hacia el blanco al que se
+## disparó) y daña los cuerpos del grupo "enemies" que toca, cada uno como
+## máximo una vez, hasta agotar su perforación (1 = dardo clásico).
+## El arma la saca de Pools (colgada de la arena, así sobrevive al movimiento
+## del jugador); vuelve al pool al gastar la perforación o tras max_distance,
+## y pool_reset() rearma perforación, registro de golpes y trazador.
 
+## Velocidad de vuelo, en metros por segundo.
 @export var speed: float = 26.0
-## Whether the flight bends toward the target at all (arrows fly straight).
+## Si el vuelo se curva hacia el blanco (las flechas vuelan rectas).
 @export var homing_enabled: bool = true
-## Radians/sec the flight direction may bend toward the target; 0 disables homing.
+## Radianes por segundo que el vuelo puede girar hacia el blanco; 0 apaga la persecución.
 @export var homing_turn_speed: float = 3.5
-## How many distinct enemies this projectile may damage before despawning.
-## The firing weapon can raise it per shot (Hunting Bow pierce upgrades).
+## Cuántos enemigos distintos puede dañar antes de desaparecer (el Arco de caza lo sube por disparo).
 @export var pierce_remaining: int = 1
-## Aim above the target's origin so bullets converge on body height, not feet.
+## Altura sobre el origen del blanco a la que apunta la persecución, para converger en el cuerpo.
 @export var aim_height: float = 0.8
-## Tracer spawns stretched along its length and relaxes to 1 (cheap trail feel).
+## El trazador nace estirado este factor a lo largo y vuelve a 1 (sensación de estela).
 @export var spawn_stretch: float = 2.4
 
-## Seconds the spawn stretch takes to relax back to 1 (pure feel knob).
+## Segundos que tarda el estirón inicial en volver a 1.
 const TRACER_RELAX_TIME: float = 0.12
 
 @onready var _tracer: MeshInstance3D = $Tracer
@@ -29,19 +29,20 @@ var _source: WeaponBase = null
 var _max_distance: float = 20.0
 var _travelled: float = 0.0
 var _target: Node3D = null
-## Instance ids already damaged, so a body re-entering (or hugging) the
-## hitbox of a piercing shot is never hit twice by the same projectile.
+## IDs de instancia ya dañados: un cuerpo que vuelve a entrar (o se queda
+## pegado) al área de un disparo perforante nunca recibe dos golpes de la
+## misma bala.
 var _hit_ids: Dictionary[int, bool] = {}
-## Scene-default pierce budget, restored on reuse (the bow overrides it
-## per shot AFTER the pool's reset).
+## Perforación de la escena, restaurada al reusar (el arco la cambia por
+## disparo DESPUÉS del reinicio del pool).
 var _default_pierce: int = 1
-## Seconds left of the spawn-stretch relax. Plain state instead of a Tween:
-## pool_reset() runs once per shot, and a create_tween() there meant one
-## Tween object per bullet — plus every parked projectile left a paused
-## Tween registered in the SceneTree until its next acquire.
+## Segundos que quedan del estirón. Estado plano en vez de un Tween:
+## pool_reset() corre una vez por disparo, y un tween ahí sería un objeto por
+## bala más un tween pausado registrado por cada bala guardada.
 var _stretch_left: float = 0.0
-## Optional per-shot callback(body) run on every hit AFTER the damage
-## (item spiders attach their poison here). Cleared on pool reset.
+## Callback opcional por disparo, callback(cuerpo), que corre en cada golpe
+## DESPUÉS del daño (las arañas de objetos ponen aquí su veneno). Se limpia al
+## reiniciar el pool.
 var extra_on_hit: Callable = Callable()
 var _tint_material: StandardMaterial3D = null
 
@@ -51,7 +52,7 @@ func _ready() -> void:
 	_default_pierce = pierce_remaining
 
 
-## Pooled-node contract: fresh flight state and the tracer stretch replay.
+## Contrato del pool: estado de vuelo nuevo y el estirón del trazador otra vez.
 func pool_reset() -> void:
 	_source = null
 	_target = null
@@ -62,24 +63,24 @@ func pool_reset() -> void:
 	extra_on_hit = Callable()
 	if _tint_material != null:
 		_tracer.material_override = null
-	# Orientation too: launch() never writes it, and ItemBag's spiders skip
-	# their look_at when the corpse and the target sit on the same spot —
-	# they used to fly off along the previous dart's heading.
+	# También la orientación: launch() nunca la escribe, y las arañas de
+	# ItemBag saltan su look_at cuando el cadáver y el blanco están en el
+	# mismo punto; sin esto saldrían con el rumbo del dardo anterior.
 	transform = Transform3D.IDENTITY
 	_tracer.scale = Vector3(1.0, 1.0, spawn_stretch)
 	_stretch_left = TRACER_RELAX_TIME
 
 
-## Called by the firing weapon right after spawning and orienting the
-## bullet. Damage is resolved at impact through the weapon's shared
-## deal_damage funnel so global stats (crit, lifesteal) apply.
+## Lo llama el arma justo después de crear y orientar la bala. El daño se
+## resuelve al impactar por el embudo deal_damage del arma, así las stats
+## globales (crítico, robo de vida) aplican.
 func launch(source: WeaponBase, max_distance: float, target: Node3D) -> void:
 	_source = source
 	_max_distance = max_distance
 	_target = target
 
 
-## Recolors the tracer for this flight only (spiders); reset restores it.
+## Recolorea el trazador solo para este vuelo (arañas); el reinicio lo restaura.
 func tint(color: Color) -> void:
 	if _tint_material == null:
 		_tint_material = StandardMaterial3D.new()
@@ -99,14 +100,14 @@ func _physics_process(delta: float) -> void:
 	global_position += -global_transform.basis.z * step
 	_travelled += step
 	if _travelled >= _max_distance:
-		# Spend the pierce budget too: the release below is deferred, so the
-		# Area3D is still live this physics flush and would otherwise still
-		# damage an enemy the bullet meets past its own range.
+		# También se gasta la perforación: la liberación de abajo es diferida,
+		# así que el Area3D sigue vivo este paso de física y dañaría a un
+		# enemigo encontrado más allá de su alcance.
 		pierce_remaining = 0
 		Pools.release(self)
 
 
-## Eases the spawn stretch back to 1 without a Tween (see _stretch_left).
+## Devuelve el estirón a 1 sin Tween (ver _stretch_left).
 func _relax_tracer(delta: float) -> void:
 	if _stretch_left <= 0.0:
 		return
@@ -125,28 +126,28 @@ func _steer_toward_target(delta: float) -> void:
 	if angle < 0.001:
 		return
 	var axis := forward.cross(desired)
-	# Parallel/anti-parallel directions have no rotation axis; fly straight.
+	# Direcciones paralelas u opuestas no tienen eje de giro: vuela recto.
 	if axis.length_squared() < 0.000001:
 		return
 	var new_forward := forward.rotated(axis.normalized(), minf(angle, homing_turn_speed * delta))
-	# Near-vertical flight (homing over/under a target from a ledge) is
-	# colinear with UP; a sideways up vector keeps the basis buildable.
+	# Un vuelo casi vertical (persiguiendo desde una cornisa) es colineal con
+	# UP; un "arriba" lateral mantiene la base construible.
 	look_at(global_position + new_forward, WeaponBase.safe_up(new_forward))
 
 
 func _homing_active() -> bool:
-	# A dying enemy leaves the "enemies" group; the bullet stops chasing the
-	# corpse and just flies out its remaining range.
+	# Un enemigo que muere sale del grupo "enemies": la bala deja de perseguir
+	# el cadáver y termina su alcance en línea recta.
 	return homing_enabled and homing_turn_speed > 0.0 and _target != null \
 			and is_instance_valid(_target) and _target.is_inside_tree() \
 			and _target.is_in_group("enemies")
 
 
 func _on_body_entered(body: Node3D) -> void:
-	# Spent budget, still cutting: Pools.release() only defers the reparent,
-	# so the Area3D keeps reporting bodies for the rest of this physics
-	# flush. Without this guard a pierce-3 arrow that meets enemies 3, 4 and
-	# 5 in one step damaged all five.
+	# Perforación gastada: Pools.release() solo difiere el cambio de padre,
+	# así que el Area3D sigue reportando cuerpos el resto del paso de física.
+	# Sin esta guarda una flecha de perforación 3 dañaría a todos los que
+	# encuentre en ese paso.
 	if pierce_remaining <= 0:
 		return
 	if not body.is_in_group("enemies"):
@@ -156,11 +157,10 @@ func _on_body_entered(body: Node3D) -> void:
 		return
 	_hit_ids[body_id] = true
 	var health := Health.find_in(body)
-	# A dart whose weapon was freed mid-flight fizzles (cannot happen with
-	# the current no-weapon-removal rules; belt and braces).
+	# Un dardo cuya arma se liberó en pleno vuelo se apaga sin daño.
 	if health != null and _source != null and is_instance_valid(_source):
-		# A per-shot on-hit callback marks this as an item-spawned projectile
-		# (ItemBag's spiders): its kills must not spawn a second generation.
+		# Un callback por disparo marca un proyectil creado por un objeto (las
+		# arañas de ItemBag): sus muertes no crean otra generación.
 		_source.deal_damage(health, not extra_on_hit.is_valid())
 	if extra_on_hit.is_valid():
 		extra_on_hit.call(body)

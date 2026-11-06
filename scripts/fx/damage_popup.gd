@@ -1,18 +1,18 @@
 class_name DamagePopup
 extends Label3D
-## Pooled floating combat text (damage numbers, "Dodge!"): identical look
-## and motion to the old per-hit code-built Label3D — rises while fading,
-## crit sizing/colors decided by the caller — but acquired and released
-## through Pools instead of allocated per hit. Health._spawn_popup is the
-## only caller and keeps its old API.
+## Texto de combate flotante del pool (números de daño, "!" de esquiva): sube
+## mientras se desvanece y se devuelve solo a Pools. Los colores viven aquí;
+## el texto y el tamaño de letra los pasa Health._spawn_popup, su único llamador.
 
-## Motion constants match the pre-pooling popup exactly.
+## Movimiento del número: metros que sube, segundos que tarda, y el retraso y
+## la duración del desvanecido.
 const RISE_HEIGHT: float = 1.2
 const RISE_TIME: float = 0.6
 const FADE_DELAY: float = 0.25
 const FADE_TIME: float = 0.35
-## Label3D draws the outline as its own surface with its own color, so the
-## scene's 16 px outline needs fading (and restoring) alongside `modulate`.
+## Label3D dibuja el contorno como su propia superficie con su propio color:
+## el contorno de 16 px de la escena se desvanece (y se restaura) junto con
+## `modulate`.
 const OUTLINE_COLOR: Color = Color(0.0, 0.0, 0.0, 1.0)
 
 const damage_text_color: Color = Color(1.0, 0.85, 0.25)
@@ -22,9 +22,9 @@ const dodge_popup_color := Color(0.5, 0.88, 1.0)
 var _tween: Tween = null
 
 
-## Pooled-node contract: no stale motion OR stale looks from the previous
-## flight. show_popup sets text/size/color, but everything the fade touched
-## has to come back by itself or the next number inherits a faded outline.
+## Contrato del pool: nada del vuelo anterior (ni movimiento ni aspecto).
+## show_popup fija texto, tamaño y color; lo que tocó el desvanecido vuelve
+## aquí, o el siguiente número hereda un contorno transparente.
 func pool_reset() -> void:
 	_kill_tween()
 	modulate = Color.WHITE
@@ -33,7 +33,7 @@ func pool_reset() -> void:
 	rotation = Vector3.ZERO
 
 
-## Configures and plays one popup; the node releases itself when done.
+## Configura y reproduce un número; el nodo se libera solo al terminar.
 func show_popup(popup_text: String, popup_font_size: int, is_crit: bool, at: Vector3, is_dodge:bool = false) -> void:
 	text = popup_text
 	font_size = popup_font_size
@@ -45,8 +45,8 @@ func show_popup(popup_text: String, popup_font_size: int, is_crit: bool, at: Vec
 	_tween.set_parallel(true)
 	_tween.tween_property(self, "position:y", position.y + RISE_HEIGHT, RISE_TIME)
 	_tween.tween_property(self, "modulate:a", 0.0, FADE_TIME).set_delay(FADE_DELAY)
-	# Without this the fill vanished and left the opaque black silhouette of
-	# the outline floating until the tween ended.
+	# El contorno se desvanece con el relleno; si no, su silueta negra queda
+	# flotando hasta el final del tween.
 	_tween.tween_property(self, "outline_modulate:a", 0.0, FADE_TIME).set_delay(FADE_DELAY)
 	_tween.chain().tween_callback(_on_popup_done)
 

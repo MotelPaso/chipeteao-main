@@ -1,34 +1,33 @@
 extends WeaponBase
-## Bramble's starting weapon: cracks a thorned lash along a narrow strip
-## from the wielder toward the target, damaging every "enemies"-group body
-## inside it and briefly slowing the EnemyBase ones (refresh, not stack —
-## see EnemyBase.apply_slow). No held model — the crack reads through a
-## pooled WhipCrack: a tapering green strip that whips out along the lane
-## and snaps back, spraying thorn particles.
+## Látigo de espinas: restalla un latigazo con espinas por una franja angosta
+## desde quien lo empuña hacia el blanco, daña a todo cuerpo del grupo
+## "enemies" dentro y ralentiza un momento a los EnemyBase (refresca, no
+## apila: ver EnemyBase.apply_slow). Sin modelo en la mano: el golpe se lee
+## por un WhipCrack del pool, una franja verde que se estira por el carril y
+## vuelve, soltando partículas de espinas.
 
-## Full width of the lash strip; the strip's length is attack_range. Both
-## scale with area tomes.
+## Ancho total de la franja del latigazo; su largo es attack_range. Los dos crecen con los tomos de área.
 @export var strip_width: float = 1.2
-## Percent of move speed removed from lashed enemies (30 = they keep 70%).
+## Porcentaje de velocidad que pierden los enemigos azotados (30 = conservan el 70%).
 @export var slow_percent: float = 30.0
 @export var slow_duration: float = 1.5
-## Whip strip tint (verdant, matching the old coil's emission).
+## Color de la franja del latigazo.
 @export var crack_color: Color = Color(0.5, 0.85, 0.3)
 
-## Seconds between the lashes a Tome of Multitude adds. One coil cannot be
-## in two places at once, so the extras crack one after the other.
+## Segundos entre los latigazos que agrega el Tomo de Multitud. Un látigo no
+## puede estar en dos lugares a la vez, así que los extras restallan uno tras otro.
 const EXTRA_LASH_STAGGER: float = 0.09
-## Yaw between neighboring lashes: the strip is narrow, so a small fan is
-## enough for each extra to sweep its own lane.
+## Giro entre latigazos vecinos: la franja es angosta, así que un abanico
+## chico basta para que cada extra barra su propio carril.
 const EXTRA_LASH_FAN_DEG: float = 18.0
-## The whole staggered chain has to end inside this fraction of one
-## cooldown, or the tail of one volley would overlap the next.
+## La cadena escalonada entera termina dentro de esta fracción de un
+## enfriamiento, o la cola de una ráfaga se montaría sobre la siguiente.
 const LASH_CHAIN_WINDOW: float = 0.6
 
 
 func fire(target: Node3D) -> void:
-	# Degenerate case (target directly above/below): lash where we face, and
-	# FORWARD when our own facing is vertical too.
+	# Caso degenerado (blanco justo arriba o abajo): se azota hacia donde
+	# miramos, y hacia FORWARD si nuestro frente también es vertical.
 	var center_dir := flat_dir_or(target.global_position - global_position,
 			flat_dir_or(-global_transform.basis.z, Vector3.FORWARD))
 	var length := attack_range * area_scale()
@@ -41,16 +40,16 @@ func fire(target: Node3D) -> void:
 		if i == 0:
 			_lash(lash_dir, length)
 		else:
-			# Pausable and stepped in physics: an extra lash must not land
-			# while the upgrade UI holds the tree, and damage belongs on the
-			# same tick the rest of the combat runs on.
+			# Temporizador pausable y en paso de física: un latigazo extra no
+			# sale con la pantalla de mejoras abierta, y el daño cae en el mismo
+			# tick que el resto del combate.
 			get_tree().create_timer(step * float(i), false, true).timeout \
 					.connect(_lash.bind(lash_dir, length))
 
 
-## One crack of the lash: the hit pass plus its visual. The staggered extras
-## land here a beat later, when this weapon may already have left the tree
-## with a removed raider.
+## Un latigazo: la pasada de daño más su visual. Los extras escalonados
+## llegan aquí un poco después, cuando el arma puede haber salido del árbol
+## con un raider quitado.
 func _lash(lash_dir: Vector3, length: float) -> void:
 	if not is_inside_tree():
 		return
@@ -58,8 +57,9 @@ func _lash(lash_dir: Vector3, length: float) -> void:
 	_spawn_crack_visual(lash_dir, length)
 
 
-## Hits every enemy whose flat position falls inside the strip: within
-## `length` along lash_dir and half the (area-scaled) width off its axis.
+## Golpea a cada enemigo cuya posición plana cae dentro de la franja: a no
+## más de `length` a lo largo de lash_dir y a no más de medio ancho (escalado
+## por área) de su eje.
 func _lash_strip(lash_dir: Vector3, length: float) -> void:
 	var half_width := strip_width * 0.5 * area_scale()
 	var slow_mult := 1.0 - clampf(slow_percent, 0.0, 95.0) / 100.0
@@ -68,15 +68,15 @@ func _lash_strip(lash_dir: Vector3, length: float) -> void:
 		if health != null:
 			deal_damage(health)
 		var enemy := body as EnemyBase
-		# No slowing corpses: the lash that killed this body must not leave
-		# a slow behind on it (see the same guard in stench.gd).
+		# Sin ralentizar cadáveres: el latigazo que mató este cuerpo no le
+		# deja una ralentización encima (la misma guarda que en stench.gd).
 		if enemy != null and (health == null or not health.is_dead):
 			enemy.apply_slow(slow_mult, slow_duration * duration_scale())
 
 
 func _spawn_crack_visual(lash_dir: Vector3, length: float) -> void:
-	# Pooled, scene-root parented so the crack stays put while the player
-	# moves on.
+	# Del pool, colgado de la arena: el latigazo queda en su lugar mientras el
+	# jugador camina.
 	var crack := Pools.acquire_scene(Pools.WHIP_CRACK_SCENE) as WhipCrack
 	if crack == null:
 		return

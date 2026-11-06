@@ -1,44 +1,42 @@
 extends WeaponBase
-## Storm Rod (iteration 37): zaps the nearest foe, then the bolt forks to
-## the closest not-yet-hit enemies in a chain. Every link goes through
-## deal_damage (crit/lifesteal apply per link). The visual is a self-freeing
-## emissive beam per link — no pooled projectile, the hit is instant.
-##   damage       — per link
-##   cooldown     — time between casts
-##   attack_range — first-target acquisition range
-##   chain_count  — extra links after the first hit (+1 chain card; the
-##                  evolution adds three)
+## Pararrayos: electrocuta al enemigo más cercano y el rayo salta a los
+## enemigos aún no golpeados más próximos, en cadena. Cada eslabón pasa por
+## deal_damage (crítico y robo de vida por eslabón). El visual es un rayo
+## emisivo por eslabón que se libera solo: no hay proyectil, el golpe es
+## instantáneo.
+##   damage       — daño por eslabón
+##   cooldown     — tiempo entre lanzamientos
+##   attack_range — alcance para elegir el primer blanco
+##   chain_count  — eslabones extra tras el primer golpe
 
 @export var chain_count: int = 2
-## A link can fork to an enemy at most this far from the previous one.
+## Un eslabón salta como máximo a esta distancia del anterior, en metros.
 @export var chain_range: float = 6.5
-## Radius of one bolt segment; the length lives in the node's Y scale so a
-## single mesh can serve every link.
+## Radio de un segmento del rayo; el largo va en la escala Y del nodo, así una
+## sola malla sirve para todos los eslabones.
 @export var beam_radius: float = 0.05
-## Seconds a segment takes to thin out and vanish.
+## Segundos que tarda un segmento en adelgazarse y desaparecer.
 @export var beam_fade_time: float = 0.22
-## Fraction of its radius a fading segment shrinks to.
+## Fracción de su radio a la que se encoge un segmento al desvanecerse.
 @export var beam_fade_scale: float = 0.3
-## Below this span a link is not worth drawing (two bodies on one spot).
+## Por debajo de este largo un eslabón no se dibuja (dos cuerpos en el mismo punto).
 @export var min_beam_length: float = 0.05
 
 const BEAM_COLOR := Color(0.55, 0.75, 1.0)
-## Sides of the bolt cylinder: it is a thin streak seen for a fifth of a
-## second, so six is plenty.
+## Lados del cilindro del rayo: es una raya fina que se ve un quinto de
+## segundo, seis alcanzan.
 const BEAM_SEGMENTS: int = 6
 
-## Seconds between the bolts a Tome of Multitude adds. Staggered rather
-## than simultaneous: two casts in the same frame would fork through the
-## same nearest bodies and draw both chains on top of each other.
+## Segundos entre los rayos que agrega el Tomo de Multitud. Escalonados y no
+## simultáneos: dos lanzamientos en el mismo frame saltarían por los mismos
+## cuerpos y dibujarían las dos cadenas una encima de la otra.
 const EXTRA_BOLT_STAGGER: float = 0.1
-## The whole staggered chain has to end inside this fraction of one
-## cooldown, or the last bolt of a volley would land after the next cast.
+## La cadena escalonada entera termina dentro de esta fracción de un
+## enfriamiento, o el último rayo de una ráfaga caería después del siguiente.
 const BOLT_CHAIN_WINDOW: float = 0.6
 
-## One mesh and one material for every bolt ever drawn. Building a
-## CylinderMesh plus a StandardMaterial3D per link (six links a cast, several
-## casts a second once Tempest Crown lands) was the per-spawn resource churn
-## the pools exist to avoid — and it never showed up in Pools.stats_line().
+## Una malla y un material para todos los rayos: construir un cilindro y un
+## material por eslabón es el gasto por efecto que Pools existe para evitar.
 var _beam_mesh: CylinderMesh = null
 
 
@@ -46,10 +44,10 @@ func _ready() -> void:
 	_beam_mesh = CylinderMesh.new()
 	_beam_mesh.top_radius = beam_radius
 	_beam_mesh.bottom_radius = beam_radius
-	# Unit height: _spawn_beam encodes the real span in scale.y.
+	# Altura unitaria: _spawn_beam guarda el largo real en scale.y.
 	_beam_mesh.height = 1.0
 	_beam_mesh.radial_segments = BEAM_SEGMENTS
-	# A straight streak: height rings only add collinear vertices.
+	# Una raya recta: los anillos de altura solo suman vértices colineales.
 	_beam_mesh.rings = 1
 	var material := StandardMaterial3D.new()
 	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
@@ -68,18 +66,17 @@ func fire(target: Node3D) -> void:
 			effective_cooldown() * BOLT_CHAIN_WINDOW / float(maxi(count - 1, 1)))
 	_zap(target)
 	for i: int in range(1, count):
-		# Pausable and stepped in physics: an extra bolt must not fire while
-		# the upgrade UI holds the tree, and damage belongs on the same tick
-		# the rest of the combat runs on.
+		# Temporizador pausable y en paso de física: un rayo extra no sale con
+		# la pantalla de mejoras abierta, y el daño cae en el mismo tick que el
+		# resto del combate.
 		get_tree().create_timer(step * float(i), false, true).timeout \
 				.connect(_refork)
 
 
-## A follow-up bolt from a Tome of Multitude. It picks its OWN first target
-## instead of reusing the one the volley started on: by now the opening
-## chain may have killed it, and re-acquiring is what makes the extra bolt
-## fork through a different part of the horde. Lands a beat after fire(),
-## when this weapon may already have left the tree with a removed raider.
+## Un rayo extra del Tomo de Multitud. Elige su PROPIO primer blanco en vez
+## de reusar el de la ráfaga: la cadena inicial pudo haberlo matado, y así el
+## rayo extra salta por otra parte de la horda. Llega un poco después de
+## fire(), cuando el arma puede haber salido del árbol con un raider quitado.
 func _refork() -> void:
 	if not is_inside_tree():
 		return
@@ -88,7 +85,7 @@ func _refork() -> void:
 		_zap(target)
 
 
-## One bolt: the first strike plus its chain_count forks.
+## Un rayo: el primer golpe más sus chain_count saltos.
 func _zap(target: Node3D) -> void:
 	var previous_point := global_position + Vector3.UP * 1.1
 	var current := target
@@ -108,13 +105,12 @@ func _zap(target: Node3D) -> void:
 		current = _next_link(current, hit_ids, fork_range)
 
 
-## Nearest living enemy to `from` within `fork_range` not already struck.
+## Enemigo vivo más cercano a `from` dentro de `fork_range` que aún no recibió el rayo.
 func _next_link(from: Node3D, hit_ids: Dictionary[int, bool],
 		fork_range: float) -> Node3D:
 	var nearest: Node3D = null
 	var nearest_dist_sq := fork_range * fork_range
-	# Read once, here, where the old per-enemy read started: the loop below
-	# only reads, so `from` cannot move while it runs.
+	# Se lee una vez: el bucle solo lee, así que `from` no se mueve mientras corre.
 	var from_position := from.global_position
 	for enemy in get_tree().get_nodes_in_group("enemies"):
 		var body := enemy as Node3D
@@ -129,11 +125,10 @@ func _next_link(from: Node3D, hit_ids: Dictionary[int, bool],
 	return nearest
 
 
-## One emissive bolt segment between two points that flashes and fades out
-## on its own. The span rides in scale.y so every segment can share the one
-## unit-height mesh built in _ready; the fade runs on the node's own
-## transparency, because the material is shared and animating its alpha
-## would dim every other live bolt with it.
+## Un segmento emisivo entre dos puntos que destella y se desvanece solo. El
+## largo va en scale.y para que todos compartan la malla unitaria de _ready;
+## el desvanecido usa la transparencia del nodo porque el material es
+## compartido y animar su alfa apagaría todos los rayos vivos.
 func _spawn_beam(from: Vector3, to: Vector3) -> void:
 	var span := to - from
 	var length := span.length()
@@ -141,8 +136,8 @@ func _spawn_beam(from: Vector3, to: Vector3) -> void:
 		return
 	var beam := spawn_fx_mesh(_beam_mesh)
 	beam.global_position = (from + to) * 0.5
-	# Cylinder axis is Y: aim -Z at the far point, then fold Y onto it (the
-	# same degenerate-up guard the skirmisher's bolt aim uses).
+	# El eje del cilindro es Y: se apunta -Z al punto lejano y luego se dobla Y
+	# sobre él (con la guarda de "arriba" degenerado).
 	var direction := span / length
 	beam.look_at(to, safe_up(direction))
 	beam.rotate_object_local(Vector3.RIGHT, PI * 0.5)

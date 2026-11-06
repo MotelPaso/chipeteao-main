@@ -1,24 +1,23 @@
 extends WeaponBase
-## Otto's starting weapon: hurls a spinning blade that flies out along the
-## aim line, then swings back to the player, cutting everything it passes
-## in both directions (BoomerangProjectile owns the out-and-back flight).
+## Bumerán: lanza una hoja giratoria que vuela por la línea de puntería y
+## vuelve al jugador, cortando todo lo que cruza a la ida y a la vuelta
+## (BoomerangProjectile maneja el vuelo de ida y vuelta).
 
 @export var projectile_scene: PackedScene
-## Multiplier on how far the blade flies before turning back ("Far Flight"
-## raises it; area tomes stretch the sweep too).
+## Multiplicador de la distancia de vuelo antes de dar la vuelta ("Vuelo
+## lejano" lo sube; los tomos de área también estiran el recorrido).
 @export var travel_scale: float = 1.0
-## Height above this mount the blade is thrown from.
+## Altura sobre este montaje desde la que se lanza la hoja, en metros.
 @export var throw_height: float = 0.0
 
-## Seconds between the blades a Tome of Multitude adds. Thrown one after
-## the other, never together: blades launched from the same hand on the
-## same frame fly the same line out and back, so only the first one ever
-## touches anything.
+## Segundos entre las hojas que agrega el Tomo de Multitud. Se lanzan una
+## tras otra, nunca juntas: hojas de la misma mano en el mismo frame vuelan
+## la misma línea y solo la primera toca algo.
 const EXTRA_THROW_STAGGER: float = 0.11
-## Yaw between neighboring blades, so each extra sweeps its own corridor.
+## Giro entre hojas vecinas, así cada extra barre su propio pasillo.
 const EXTRA_THROW_FAN_DEG: float = 20.0
-## The whole staggered chain has to end inside this fraction of one
-## cooldown, or a volley would still be leaving the hand at the next throw.
+## La cadena escalonada entera termina dentro de esta fracción de un
+## enfriamiento, o una ráfaga seguiría saliendo de la mano en el siguiente lanzamiento.
 const THROW_CHAIN_WINDOW: float = 0.6
 
 
@@ -26,8 +25,8 @@ func fire(target: Node3D) -> void:
 	if projectile_scene == null:
 		push_warning("%s: projectile_scene not set" % name)
 		return
-	# Degenerate case (target directly above/below): throw where we face, and
-	# FORWARD when our own facing is vertical too.
+	# Caso degenerado (blanco justo arriba o abajo): se lanza hacia donde
+	# miramos, y hacia FORWARD si nuestro frente también es vertical.
 	var center_dir := flat_dir_or(target.global_position - global_position,
 			flat_dir_or(-global_transform.basis.z, Vector3.FORWARD))
 	var count := maxi(effective_projectile_count(), 1)
@@ -39,22 +38,20 @@ func fire(target: Node3D) -> void:
 		if i == 0:
 			_throw_blade(throw_dir)
 		else:
-			# Pausable and stepped in physics: an extra blade must not leave
-			# while the upgrade UI holds the tree, and the throw belongs on
-			# the same tick the rest of the combat runs on.
+			# Temporizador pausable y en paso de física: una hoja extra no sale
+			# con la pantalla de mejoras abierta, y el lanzamiento cae en el
+			# mismo tick que el resto del combate.
 			get_tree().create_timer(step * float(i), false, true).timeout \
 					.connect(_throw_blade.bind(throw_dir))
 
 
-## Hurls one blade along `throw_dir`. The staggered extras land here a beat
-## later, when this weapon may already have left the tree with a removed
-## raider — and a blade thrown from outside the tree has no position to
-## start from (nor a player to come home to).
+## Lanza una hoja por `throw_dir`. Los extras escalonados llegan aquí un poco
+## después, cuando el arma puede haber salido del árbol con un raider
+## quitado: fuera del árbol no hay posición de salida ni jugador al que volver.
 func _throw_blade(throw_dir: Vector3) -> void:
 	if not is_inside_tree():
 		return
-	# Pooled, parented to the scene root so the blade keeps flying while
-	# the player moves on.
+	# Del pool, colgada de la arena: la hoja sigue volando mientras el jugador camina.
 	var blade := Pools.acquire_scene(projectile_scene) as BoomerangProjectile
 	if blade == null:
 		return

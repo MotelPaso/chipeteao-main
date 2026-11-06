@@ -1,46 +1,41 @@
 class_name NecroStaff
 extends WeaponBase
-## Báculo de nigromante (iteration 56): a slow soul bolt that homes on the
-## nearest enemy, and whatever it KILLS gets back up on your side.
+## Báculo de nigromante: un rayo de alma lento que persigue al enemigo más
+## cercano, y lo que MATA se levanta de tu lado.
 ##
-## The corpse dies completely first — XP gem, run points, health orbs, the
-## elite chest roll and the bestiary counter all pay out, because
-## `Health.died` is synchronous and `EnemyBase._on_died` has already run by
-## the time `deal_damage` returns. The possessed body is a fresh copy of
-## the same scene spawned at the corpse, so the kill is a kill AND a
-## servant, never one instead of the other.
+## El cadáver muere entero primero (gema de XP, puntos, orbes de vida, la
+## tirada de cofre de élite y el bestiario pagan), porque `Health.died` es
+## síncrona y `EnemyBase._on_died` ya corrió cuando `deal_damage` vuelve. El
+## siervo es una copia nueva de la misma escena creada en el cadáver: la
+## muerte cuenta Y además hay siervo.
 ##
-## A possessed servant pays NOTHING when it expires: it already paid once
-## as a corpse, and a weapon that could farm the same body twice would make
-## every other weapon a rounding error.
+## Un siervo no paga NADA al expirar: ya pagó una vez como cadáver.
 ##
-## Only contact fighters can be possessed (EnemyBase.possessable): a
-## possessed caster would need its bolts and beams to change sides too, and
-## those are wired to the "player" group all the way down.
+## Solo se poseen luchadores de contacto (EnemyBase.possessable): un lanzador
+## poseído necesitaría que sus proyectiles y rayos cambiaran de bando, y esos
+## apuntan al grupo "player" en todo su recorrido.
 
 @export var possess_duration: float = 8.0
-## Servants alive at once per carrier. The oldest expires early to make
-## room — a cap that refused new ones instead would make the weapon feel
-## broken at exactly the moment it is working.
+## Siervos vivos a la vez por portador. El más viejo expira antes para hacer
+## lugar: un tope que rechazara nuevos haría sentir el arma rota justo cuando funciona.
 @export var max_possessed: int = 12
 @export var bolt_speed: float = 9.0
 @export var bolt_lifetime: float = 2.5
 @export var bolt_radius: float = 0.28
-## Seconds between the extra bolts a Tome of Multitude adds. Staggered like
-## every other multi-shot here: bolts fired on the same frame share one
-## flight path and hit the same body twice.
+## Segundos entre los rayos extra que agrega el Tomo de Multitud. Escalonados:
+## rayos lanzados en el mismo frame comparten trayectoria y golpean dos veces el mismo cuerpo.
 @export var extra_bolt_stagger: float = 0.1
 
 const BOLT_COLOR := Color(0.65, 0.35, 0.95)
-## How close a bolt has to get to count as a hit.
+## Qué tan cerca tiene que llegar un rayo para contar como golpe, en metros.
 const BOLT_HIT_RADIUS: float = 0.9
-## Live servants, so the carrier's cap is readable from outside (the soak
-## prints possessed=a/b off this).
+## Grupo de los siervos vivos, para leer el tope del portador desde afuera (el
+## soak imprime possessed=a/b con esto).
 const POSSESSED_GROUP: StringName = &"possessed"
 
 var _bolt_mesh: SphereMesh = null
-## One in-flight soul bolt. A record instead of a loose Dictionary: its
-## `visual` crosses frames, and with fields the compiler catches a typo.
+## Un rayo de alma en vuelo. Un registro en vez de un Dictionary suelto: su
+## `visual` cruza frames, y con campos el compilador atrapa un error de tipeo.
 class SoulBolt extends RefCounted:
 	var visual: MeshInstance3D = null
 	var target: Node3D = null
@@ -69,12 +64,11 @@ func fire(target: Node3D) -> void:
 	var shots := effective_projectile_count()
 	_launch(target)
 	for i in range(1, shots):
-		# Staggered, and each one re-acquires: by the time the third bolt
-		# leaves, the first may have already killed what it was aimed at.
+		# Escalonados, y cada uno vuelve a buscar blanco: cuando sale el
+		# tercero, el primero puede haber matado al suyo.
 		var delay := extra_bolt_stagger * float(i)
-		# process_in_physics, like every other multi-shot weapon of this
-		# round: damage belongs on the same tick the rest of the combat
-		# runs on, not on an idle frame between two of them.
+		# En paso de física, como las demás armas de ráfaga: el daño cae en el
+		# mismo tick que el resto del combate.
 		get_tree().create_timer(delay, false, true).timeout.connect(_launch_at_fresh_target)
 
 
@@ -100,19 +94,17 @@ func _physics_process(delta: float) -> void:
 	_tick_bolts(delta)
 
 
-## Bolts home on their target and resolve on contact. Walked backwards so
-## a bolt can be removed inside the loop, and every target is re-checked:
-## the body can be freed mid-flight (something else killed it) or possessed
-## by another bolt of ours.
+## Los rayos persiguen su blanco y se resuelven al contacto. Se recorren
+## hacia atrás para poder quitar un rayo dentro del bucle, y cada blanco se
+## revisa de nuevo: el cuerpo pudo liberarse en pleno vuelo (otro lo mató) o
+## ser poseído por otro rayo nuestro.
 func _tick_bolts(delta: float) -> void:
 	for i in range(_bolts.size() - 1, -1, -1):
 		var bolt := _bolts[i]
 		bolt.left -= delta
-		# A body that left the "enemies" group is gone AS A TARGET even
-		# though it is still alive: it was raised as a servant by another
-		# carrier between the launch and now, and iteration 56's rule is
-		# that a servant is invisible to player weapons. Without this the
-		# bolt kept homing and killed a teammate's minion.
+		# Un cuerpo que salió del grupo "enemies" ya no es blanco aunque siga
+		# vivo: otro portador lo levantó como siervo, y un siervo es invisible
+		# para las armas de los jugadores.
 		var target_gone := bolt.target == null or not is_instance_valid(bolt.target) \
 				or not bolt.target.is_inside_tree() \
 				or not bolt.target.is_in_group(&"enemies")
@@ -129,18 +121,17 @@ func _tick_bolts(delta: float) -> void:
 		bolt.visual.global_position += span.normalized() * step
 
 
-## One bolt lands. The kill and the possession are two separate facts: the
-## body dies normally (paying out everything it owes) and only THEN, if it
-## actually died to this hit and is allowed to be raised, does a servant
-## get up in its place.
+## Un rayo impacta. La muerte y la posesión son dos hechos separados: el
+## cuerpo muere normal (paga todo lo que debe) y solo ENTONCES, si murió por
+## este golpe y se puede levantar, se levanta un siervo en su lugar.
 func _strike(target: Node3D) -> void:
 	var health := Health.find_in(target)
 	if health == null or health.is_dead:
 		return
 	var enemy := target as EnemyBase
-	# Read BEFORE the blow: _on_died runs synchronously inside take_damage
-	# and leaves the corpse mid-teardown, but its exports and transform are
-	# still readable for the 0.3 s its death tween lasts.
+	# Se lee ANTES del golpe: _on_died corre síncrono dentro de take_damage y
+	# deja el cadáver a medio desmontar, pero sus exports y su transformada
+	# siguen legibles los 0.3 s que dura su tween de muerte.
 	var scene_path := enemy.get_scene_file_path() if enemy != null else ""
 	var at := target.global_position
 	var can_raise := enemy != null and enemy.possessable and not scene_path.is_empty()
@@ -162,9 +153,9 @@ func _raise_servant(scene_path: String, at: Vector3, corpse: EnemyBase) -> void:
 	var servant := scene.instantiate() as EnemyBase
 	if servant == null:
 		return
-	# Carried over from the corpse so a possessed tank still hits like a
-	# tank; everything else is the scene's own defaults, which is what
-	# keeps this from having to know each enemy's exports.
+	# Se copia del cadáver para que un tanque poseído siga pegando como
+	# tanque; lo demás son los valores de la escena, así esto no necesita
+	# conocer los exports de cada enemigo.
 	var contact: Variant = corpse.get("contact_damage")
 	if contact != null:
 		servant.set("contact_damage", contact)
@@ -174,27 +165,25 @@ func _raise_servant(scene_path: String, at: Vector3, corpse: EnemyBase) -> void:
 	servant.make_possessed(carrier, possess_duration * duration_scale())
 
 
-## The oldest servant goes when the cap is full. Oldest and not newest:
-## the one you just raised is the one standing where the fight is.
+## Con el tope lleno se va el siervo más viejo, no el más nuevo: el recién
+## levantado es el que está donde ocurre la pelea.
 func _trim_servants() -> void:
 	var mine: Array[Node] = []
 	for node: Node in get_tree().get_nodes_in_group(POSSESSED_GROUP):
 		var servant := node as EnemyBase
 		if servant != null and servant.possession_carrier() == carrier_player():
 			mine.append(servant)
-	# maxi(..., 1) and the emptiness test together: pop_front on an empty
-	# array returns null, the guard below skips it and the size stays 0,
-	# which is still >= a max_possessed of 0 — and evolution rows write
-	# weapon properties by NAME, so a mults entry naming this one could
-	# reach zero and hang the physics thread.
+	# maxi(..., 1) y la prueba de vacío juntos: con un max_possessed de 0 (las
+	# filas de evolución escriben propiedades por NOMBRE y podrían llevarlo a
+	# cero) el bucle sin esto no terminaría y colgaría el hilo de física.
 	while not mine.is_empty() and mine.size() >= maxi(max_possessed, 1):
 		var oldest := mine.pop_front() as EnemyBase
 		if oldest != null and is_instance_valid(oldest):
 			oldest.end_possession()
 
 
-## Servants this carrier currently holds, and the cap — the soak prints
-## both as possessed=a/b, and a>b would mean the cap is not being kept.
+## Siervos que tiene ahora este portador; el soak imprime possessed=a/b con
+## esto y el tope, y a>b significaría que el tope no se cumple.
 func possessed_count() -> int:
 	var mine := 0
 	for node: Node in get_tree().get_nodes_in_group(POSSESSED_GROUP):
@@ -211,9 +200,9 @@ func _kill_bolt(index: int) -> void:
 	_bolts.remove_at(index)
 
 
-## The bolts are parented to the arena, not to this weapon, so they survive
-## the raider dying mid-flight — but they must not survive the WEAPON being
-## freed (evolution, run teardown) with nobody left to tick them.
+## Los rayos cuelgan de la arena, no de esta arma, así sobreviven si el
+## raider muere en pleno vuelo; pero no deben sobrevivir al ARMA (evolución,
+## fin de partida) sin nadie que los avance.
 func _exit_tree() -> void:
 	for i in range(_bolts.size() - 1, -1, -1):
 		_kill_bolt(i)

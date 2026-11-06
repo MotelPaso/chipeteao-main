@@ -1,31 +1,30 @@
 extends WeaponBase
-## Aura (iteration 43): a standing ring of light around the carrier that
-## damages every enemy inside it on each pulse. Knob mapping:
-##   damage        — per pulse (through deal_damage)
-##   cooldown      — pulse interval
-##   attack_range  — ring radius (Long Reach + area tomes widen it)
-## The visual is a translucent disc that breathes with the pulse.
+## Aura: un anillo de luz fijo alrededor del portador que daña a todo enemigo
+## dentro en cada pulso. Cómo usa los ajustes de WeaponBase:
+##   damage        — daño por pulso (por deal_damage)
+##   cooldown      — intervalo entre pulsos
+##   attack_range  — radio del anillo (Largo alcance y los tomos de área lo ensanchan)
+## El visual es un disco translúcido que respira con cada pulso.
 
 @export var aura_color: Color = Color(1.0, 0.85, 0.4)
-## Enemies farther than this above/below the carrier are unaffected.
+## Altura máxima, en metros, por encima o por debajo del portador a la que el pulso alcanza.
 @export var height_window: float = 2.2
 
-## How fast the drawn disc chases the real radius, in "fraction closed per
-## second" terms — used through the exponential form below so the smoothing
-## reads the same at any physics tick rate.
+## Qué tan rápido el disco dibujado alcanza el radio real, como "fracción
+## cerrada por segundo"; se usa en forma exponencial para que el suavizado sea
+## igual a cualquier tasa de física.
 const DISC_FOLLOW_RATE: float = 8.0
 
-## Extra ring radius per point of Tome of Multitude, as a fraction of the
-## base radius. The tome cannot add RINGS here: a second aura is centered
-## on the same carrier, so it is the same circle drawn twice — invisible,
-## and it would silently double every pulse. The extra count widens the one
-## ring instead, which is the same "more of this weapon" the tome promises.
+## Radio extra del anillo por punto del Tomo de Multitud, como fracción del
+## radio base. El tomo no puede sumar ANILLOS: un segundo anillo centrado en
+## el mismo portador es el mismo círculo dibujado dos veces (invisible) y
+## duplicaría cada pulso. El conteo extra ensancha el único anillo.
 const AURA_RADIUS_PER_EXTRA: float = 0.12
-## Fraction of the pulse interval each extra point shaves off, so a stacked
-## tome also makes the ring beat faster and not just reach farther.
+## Fracción del intervalo de pulso que quita cada punto extra: con el tomo
+## apilado el anillo también late más rápido.
 const AURA_PULSE_PER_EXTRA: float = 0.08
-## Floor on the accumulated pulse scale: the aura must stay a pulse, not
-## become a per-frame damage field.
+## Piso de la escala de pulso acumulada: el aura sigue siendo un pulso y no
+## un campo de daño por frame.
 const AURA_MIN_PULSE_SCALE: float = 0.6
 
 var _disc: MeshInstance3D = null
@@ -38,8 +37,8 @@ func _ready() -> void:
 	mesh.top_radius = 1.0
 	mesh.bottom_radius = 1.0
 	mesh.height = 0.05
-	# Explicit tessellation: no height rings on a 5 cm slab, and 32 sides
-	# (half the engine default) keep the always-on ring round at full area.
+	# Teselado explícito: una losa de 5 cm no necesita anillos de altura, y 32
+	# lados mantienen redondo el anillo con el área al máximo.
 	mesh.radial_segments = 32
 	mesh.rings = 1
 	var material := StandardMaterial3D.new()
@@ -59,47 +58,44 @@ func _ready() -> void:
 func _physics_process(delta: float) -> void:
 	var radius := reach()
 	_disc.global_position = global_position + Vector3.DOWN * 1.0
-	# Framerate-independent smoothing: a raw delta * rate lerp would close
-	# at half the speed if physics_ticks_per_second were halved, showing a
-	# small ring while the damage already covers the wide one.
+	# Suavizado independiente del framerate: un lerp con delta * tasa cerraría
+	# a otra velocidad si cambiara physics_ticks_per_second, y mostraría un
+	# anillo chico mientras el daño ya cubre el grande.
 	var follow := 1.0 - exp(-DISC_FOLLOW_RATE * delta)
 	_disc.scale = _disc.scale.lerp(Vector3(radius, 1.0, radius), follow)
 	super(delta)
 
 
-## Ring radius: the damage area, the drawn disc and the pulse trigger all
-## read this one number — and so does fire(), which is where the Tome of
-## Multitude bonus below reaches the attack.
+## Radio del anillo: el área de daño, el disco dibujado y el disparo del pulso
+## leen este único número, y por aquí llega el bono del Tomo de Multitud.
 func reach() -> float:
 	return attack_range * area_scale() \
 			* (1.0 + AURA_RADIUS_PER_EXTRA * float(_multitude_extra()))
 
 
-## Pulses per second rise with the tome too (see AURA_PULSE_PER_EXTRA); the
-## floor keeps a heavy stack from collapsing the interval into a tick.
+## Con el tomo también suben los pulsos por segundo (AURA_PULSE_PER_EXTRA); el
+## piso evita que una pila grande convierta el intervalo en un tick.
 func effective_cooldown() -> float:
 	var pulse_scale := maxf(1.0 - AURA_PULSE_PER_EXTRA * float(_multitude_extra()),
 			AURA_MIN_PULSE_SCALE)
 	return maxf(super() * pulse_scale, MIN_COOLDOWN)
 
 
-## Projectiles past the first this weapon would have fired, i.e. what the
-## Tome of Multitude granted (weapon ascensions raise projectile_count too).
+## Disparos después del primero que el arma habría hecho, o sea lo que dio el
+## Tomo de Multitud (los ascensos también suben projectile_count).
 func _multitude_extra() -> int:
 	return maxi(effective_projectile_count() - 1, 0)
 
 
-## The ring IS the hit area, so the pulse has to trigger on anything inside
-## it. Leaving this at attack_range made the area-scaled outer band purely
-## decorative: with a big area multiplier and every enemy in that band the
-## aura simply never pulsed.
+## El anillo ES el área de daño, así que el pulso debe dispararse con
+## cualquier enemigo dentro, también en la franja que agrega area_scale().
 func targeting_range() -> float:
 	return reach()
 
 
 func fire(_target: Node3D) -> void:
 	damage_all(enemies_in_disc(global_position, reach(), height_window))
-	# Breath: the disc flares a touch on every pulse.
+	# Respiración: el disco destella un poco en cada pulso.
 	if _pulse_tween != null and _pulse_tween.is_valid():
 		_pulse_tween.kill()
 	_disc.transparency = 0.0

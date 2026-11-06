@@ -1,31 +1,29 @@
 extends WeaponBase
-## Rook's starting weapon: sweeps a melee arc toward the nearest enemy and
-## damages every "enemies"-group body inside it. No held model — the
-## attack reads through a pooled crescent SlashArc swipe flashed through
-## the hit arc, plus a small spark burst on each enemy struck.
+## Espada corta: barre un arco cuerpo a cuerpo hacia el enemigo más cercano y
+## daña a todo cuerpo del grupo "enemies" dentro. Sin modelo en la mano: el
+## ataque se lee por una medialuna SlashArc del pool que cruza el arco de
+## golpe, más una chispa pequeña en cada enemigo alcanzado.
 
 @export var arc_angle_deg: float = 150.0
 @export var swing_time: float = 0.25
-## Slash swipe tint (steel-blue, matching the old blade's emission).
+## Color de la medialuna del tajo.
 @export var slash_color: Color = Color(0.75, 0.85, 1.0)
-## Spark tint for per-enemy hit bursts.
+## Color de la chispa en cada enemigo alcanzado.
 @export var spark_color: Color = Color(0.7, 0.8, 1.0)
 
-## Seconds between the swings a Tome of Multitude adds. Extra swings are
-## staggered instead of simultaneous: two arcs cast from the same shoulder
-## in the same frame are one arc that happens to hit twice.
+## Segundos entre los tajos que agrega el Tomo de Multitud. Escalonados y no
+## simultáneos: dos arcos desde el mismo hombro en el mismo frame son un arco
+## que golpea dos veces.
 const EXTRA_SWING_STAGGER: float = 0.09
-## Yaw between neighboring swings, so the extras carve their own ground
-## instead of retracing the first one.
+## Giro entre tajos vecinos, así los extras cubren su propio terreno.
 const EXTRA_SWING_FAN_DEG: float = 25.0
-## The whole staggered chain has to end inside this fraction of one
-## cooldown, or a long volley would still be swinging when the next one
-## starts and the combo would read as a single smear.
+## La cadena escalonada entera termina dentro de esta fracción de un
+## enfriamiento, o una ráfaga larga seguiría tajeando al empezar la siguiente.
 const SWING_CHAIN_WINDOW: float = 0.6
 
 
 func fire(target: Node3D) -> void:
-	# Degenerate case (target directly above/below): swing where we face.
+	# Caso degenerado (blanco justo arriba o abajo): se tajea hacia donde miramos.
 	var center_dir := flat_dir_or(target.global_position - global_position,
 			-global_transform.basis.z)
 	var count := maxi(effective_projectile_count(), 1)
@@ -37,16 +35,16 @@ func fire(target: Node3D) -> void:
 		if i == 0:
 			_swing(swing_dir)
 		else:
-			# Pausable and stepped in physics: an extra swing must not land
-			# while the upgrade UI holds the tree, and damage belongs on the
-			# same tick the rest of the combat runs on.
+			# Temporizador pausable y en paso de física: un tajo extra no sale
+			# con la pantalla de mejoras abierta, y el daño cae en el mismo tick
+			# que el resto del combate.
 			get_tree().create_timer(step * float(i), false, true).timeout \
 					.connect(_swing.bind(swing_dir))
 
 
-## One full swing: the hit pass plus its crescent. The staggered extras land
-## here a beat later, when this weapon may already have left the tree with
-## a removed raider.
+## Un tajo completo: la pasada de daño más su medialuna. Los extras
+## escalonados llegan aquí un poco después, cuando el arma puede haber
+## salido del árbol con un raider quitado.
 func _swing(center_dir: Vector3) -> void:
 	if not is_inside_tree():
 		return
@@ -55,13 +53,13 @@ func _swing(center_dir: Vector3) -> void:
 
 
 func _hit_enemies_in_arc(center_dir: Vector3) -> void:
-	# Area tomes extend the swing's reach past the base targeting range.
+	# Los tomos de área alargan el tajo más allá del alcance de búsqueda.
 	var reach := attack_range * area_scale()
 	for body: Node3D in enemies_in_arc(global_position, center_dir, reach, arc_angle_deg):
 		var health := Health.find_in(body)
 		if health != null:
 			deal_damage(health)
-			# Tiny spark burst where the blade "connects".
+			# Chispa pequeña donde "conecta" la hoja.
 			Juice.burst(body.global_position + Vector3.UP * 0.6, spark_color, 4)
 
 

@@ -1,16 +1,16 @@
 class_name BloodPoolFx
 extends Node3D
-## Pooled Blood Vial pool visual: crimson disc with a darker rim ring and
-## slow rising bubble particles, throbbing gently while active. Purely
-## cosmetic — blood_vial.gd owns the damage ticks and calls play() when a
-## pool forms and expire() when its last tick lapses.
-## The radius scales the DISC AND RIM, never the root: the bubbles hang off
-## the same node, and a non-uniform root scale squashed them into smears
-## that pumped with the throb instead of reading as bubbles.
+## Visual del pool para el charco del Vial de sangre: disco carmesí con un
+## anillo de borde más oscuro y burbujas lentas que suben, latiendo suave
+## mientras está activo. Solo visual: blood_vial.gd maneja los pulsos de daño
+## y llama a play() al formarse el charco y a expire() tras su último pulso.
+## El radio escala el DISCO Y EL BORDE, nunca la raíz: las burbujas cuelgan
+## del mismo nodo, y una escala no uniforme en la raíz las aplastaría en
+## manchas que laten con el charco.
 
 const THROB_TIME: float = 0.35
 const FADE_TIME: float = 0.3
-## Bubble emission sphere at radius 1, matching the authored disc.
+## Esfera de emisión de burbujas a radio 1, a juego con el disco de la escena.
 const BUBBLE_EMISSION_RATIO: float = 0.85
 
 @onready var _disc: MeshInstance3D = $Disc
@@ -19,13 +19,13 @@ const BUBBLE_EMISSION_RATIO: float = 0.85
 
 var _throb: Tween = null
 var _fade: Tween = null
-## True between expire() and the pooled release: expire() has two callers
-## in waiting (run teardown, weapon evolution) and a second fade tween
-## would queue a second release for a node that may already be re-acquired.
+## True entre expire() y la liberación al pool: expire() tiene dos llamadores
+## posibles (fin de partida, evolución del arma) y un segundo tween de
+## desvanecido encolaría otra liberación para un nodo quizá ya readquirido.
 var _expiring: bool = false
 
 
-## Pooled-node contract: kill stale tweens so reuse starts clean.
+## Contrato del pool: mata los tweens viejos para que el reuso empiece limpio.
 func pool_reset() -> void:
 	_kill_tweens()
 	_expiring = false
@@ -36,15 +36,15 @@ func pool_reset() -> void:
 	_bubbles.emitting = false
 
 
-## Forms the pool at `center` (ground plane) with the given damage radius.
+## Forma el charco en `center` (plano del suelo) con el radio de daño dado.
 func play(center: Vector3, radius: float) -> void:
 	_expiring = false
 	global_position = center
 	_disc.transparency = 0.0
 	_rim.transparency = 0.15
 	_scale_ground(radius)
-	# The bubbles keep unit scale and grow their emission sphere instead,
-	# so each bubble stays round whatever the pool radius is.
+	# Las burbujas mantienen escala 1 y agrandan su esfera de emisión, así cada
+	# burbuja sigue redonda sea cual sea el radio del charco.
 	var bubble_material := _bubbles.process_material as ParticleProcessMaterial
 	if bubble_material != null:
 		bubble_material.emission_sphere_radius = radius * BUBBLE_EMISSION_RATIO
@@ -64,7 +64,7 @@ func play(center: Vector3, radius: float) -> void:
 			.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 
 
-## Fades the pool out and parks it back in the pool of pools.
+## Desvanece el charco y lo devuelve al pool.
 func expire() -> void:
 	if _expiring:
 		return

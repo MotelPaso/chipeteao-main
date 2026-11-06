@@ -1,42 +1,41 @@
 extends WeaponBase
-## Spirit Orbs (iteration 37): a ring of glowing familiars that orbit the
-## carrier and burn whatever they touch. No firing — the whole weapon is a
-## persistent contact aura, so it overrides _physics_process instead of
-## fire(). It deliberately does NOT call super(): there is no cooldown tick
-## and no acquire_target()/fire() cycle here, the ring simply always runs.
-## Knob mapping onto the shared WeaponBase contract:
-##   damage           — per touch (through deal_damage: crit/lifesteal apply)
-##   cooldown         — per-ENEMY re-hit interval (haste tomes tighten it)
-##   attack_range     — orbit radius (Long Reach widens the ring)
-##   projectile_count — number of orbs (+1 orb card; evolution adds one)
+## Orbes espirituales: un anillo de espíritus brillantes que orbitan al
+## portador y queman lo que tocan. No dispara: el arma entera es un aura de
+## contacto permanente, así que reemplaza _physics_process en vez de fire().
+## A propósito NO llama a super(): no hay enfriamiento ni ciclo
+## acquire_target()/fire(), el anillo siempre corre.
+## Cómo usa los ajustes de WeaponBase:
+##   damage           — daño por toque (por deal_damage: crítico y robo de vida aplican)
+##   cooldown         — intervalo de re-golpe POR ENEMIGO (los tomos de celeridad lo acortan)
+##   attack_range     — radio de la órbita (Largo alcance ensancha el anillo)
+##   projectile_count — cantidad de orbes
 
-## Contact distance from an orb's center to an enemy body.
+## Distancia de contacto desde el centro de un orbe hasta un enemigo, en metros.
 @export var hit_radius: float = 3.1
-## Ring angular speed, radians per second.
+## Velocidad angular del anillo, en radianes por segundo.
 @export var orbit_speed: float = 2.6
-## Height of the ring above the carrier's feet.
+## Altura del anillo sobre los pies del portador, en metros.
 @export var orb_height: float = 1.0
 
-## Vertical wobble that keeps the ring from reading as a flat decal.
+## Oscilación vertical que evita que el anillo se lea como una calcomanía plana.
 const BOB_HEIGHT: float = 0.15
 const ORB_RADIUS: float = 0.40
 
 var _angle: float = 0.0
 var _orbs: Array[MeshInstance3D] = []
-## Where the ring is centered this frame (the carrier rig's feet); kept so
-## the contact pass can bound its search around the same point.
+## Centro del anillo este frame (los pies del montaje portador); se guarda
+## para que el contacto acote su búsqueda alrededor del mismo punto.
 var _ring_center: Vector3 = Vector3.ZERO
-## Per-enemy re-hit timers, keyed by instance id.
+## Temporizadores de re-golpe por enemigo, por ID de instancia.
 var _rehit: Dictionary[int, float] = {}
-## Scratch list for _tick_rehit: the keys whose timer ran out this frame.
-## A member so the countdown allocates nothing on the frames where no
-## timer expires (it used to copy the whole key set every frame).
+## Lista auxiliar de _tick_rehit: las claves cuyo temporizador terminó este
+## frame. Es un miembro para que la cuenta regresiva no reserve memoria en
+## los frames donde nada expira.
 var _rehit_expired: Array[int] = []
-## Scratch list for _touch_enemies: every orb's world position this frame.
+## Lista auxiliar de _touch_enemies: la posición mundial de cada orbe este frame.
 var _orb_positions: PackedVector3Array = PackedVector3Array()
-## One mesh (with its material) shared by every orb, for the life of the
-## weapon: _rebuild_orbs runs whenever an upgrade changes the orb count, and
-## it used to mint a fresh SphereMesh and StandardMaterial3D each time.
+## Una malla (con su material) compartida por todos los orbes durante la vida
+## del arma: _rebuild_orbs corre cada vez que una mejora cambia la cantidad.
 var _orb_mesh: SphereMesh = null
 
 
@@ -44,8 +43,8 @@ func _ready() -> void:
 	_orb_mesh = SphereMesh.new()
 	_orb_mesh.radius = ORB_RADIUS
 	_orb_mesh.height = ORB_RADIUS * 2.0
-	# Explicit tessellation: the engine default (64 x 32, ~4.2k triangles
-	# per orb) for a 44 cm unshaded glow ball.
+	# Teselado explícito: el del motor (64 x 32) son miles de triángulos por
+	# orbe para una bola brillante sin sombreado.
 	_orb_mesh.radial_segments = 12
 	_orb_mesh.rings = 6
 	var material := StandardMaterial3D.new()
@@ -65,14 +64,15 @@ func _physics_process(delta: float) -> void:
 	_touch_enemies()
 
 
-## Presentation: walks the orbit clock and places the orbs in world space.
+## Presentación: avanza el reloj de la órbita y coloca los orbes en el mundo.
 func _update_ring(delta: float) -> void:
 	_angle = wrapf(_angle + orbit_speed * delta, 0.0, TAU)
 	var radius := attack_range
-	# World-space ring around the carrier's feet: the orbit angle is its own
-	# clock, so turning or strafing the seal never drags the ring around with
-	# the body (the orbs are children, hence global_position). The center
-	# follows the rig that carries the weapon, so a pet's ring orbits the pet.
+	# Anillo en espacio mundial alrededor de los pies del portador: el ángulo
+	# de la órbita tiene su propio reloj, así girar o moverse de lado no
+	# arrastra el anillo con el cuerpo (los orbes son hijos, de ahí
+	# global_position). El centro sigue al montaje portador: el anillo de una
+	# mascota orbita a la mascota.
 	_ring_center = global_position
 	var carrier := carrier_node()
 	if carrier != null:
@@ -85,10 +85,10 @@ func _update_ring(delta: float) -> void:
 				sin(orb_angle) * radius)
 
 
-## Simulation: counts down the per-enemy immunity left by the last touch.
-## Same arithmetic as before (one subtraction per frame per key), but it
-## walks the dictionary in place: writing a value under an existing key
-## is safe mid-iteration, erasing is not, so the erases wait for the loop.
+## Simulación: descuenta la inmunidad por enemigo que dejó el último toque.
+## Recorre el diccionario en su lugar: escribir un valor bajo una clave
+## existente es seguro durante la iteración, borrar no, así que los borrados
+## esperan al final del bucle.
 func _tick_rehit(delta: float) -> void:
 	for key: int in _rehit:
 		var left := _rehit[key] - delta
@@ -102,21 +102,20 @@ func _tick_rehit(delta: float) -> void:
 	_rehit_expired.clear()
 
 
-## Simulation: burns every enemy an orb is currently overlapping.
+## Simulación: quema a cada enemigo que un orbe está tocando ahora.
 func _touch_enemies() -> void:
 	if get_tree().get_first_node_in_group("enemies") == null:
 		return
 	var reach := hit_radius * area_scale()
 	var reach_sq := reach * reach
-	# Broad phase around the ring center. No orb sits farther from it than
-	# attack_range horizontally plus orb_height + BOB_HEIGHT vertically, and
-	# no contact reaches past `reach` from an orb, so this sphere is a strict
-	# superset of what the per-orb test below can accept.
+	# Fase amplia alrededor del centro del anillo. Ningún orbe está más lejos
+	# que attack_range en horizontal más orb_height + BOB_HEIGHT en vertical,
+	# y ningún contacto pasa de `reach` desde un orbe, así que esta esfera
+	# contiene todo lo que la prueba por orbe de abajo puede aceptar.
 	var search := attack_range + orb_height + BOB_HEIGHT + reach
-	# Each orb's world position, read ONCE per frame instead of once per
-	# (body, orb) pair. Read back through the getter, not taken from what
-	# _update_ring wrote, so the value is bit-for-bit the one the old
-	# per-pair read returned; nothing a hit triggers moves the carrier.
+	# La posición de cada orbe se lee UNA vez por frame, por el getter (no se
+	# toma lo que escribió _update_ring) para que sea idéntica bit a bit; nada
+	# de lo que dispara un golpe mueve al portador.
 	_orb_positions.resize(_orbs.size())
 	for i: int in _orbs.size():
 		_orb_positions[i] = _orbs[i].global_position
@@ -124,8 +123,8 @@ func _touch_enemies() -> void:
 	for body: Node3D in enemies_in_sphere(_ring_center, search):
 		if _rehit.has(body.get_instance_id()):
 			continue
-		# Once per body: the orb loop below damages at most once and then
-		# breaks, so the body cannot move between two of these reads.
+		# Una vez por cuerpo: el bucle de orbes daña como máximo una vez y
+		# corta, así que el cuerpo no puede moverse entre dos lecturas.
 		var aim := body.global_position + aim_lift
 		for orb_position: Vector3 in _orb_positions:
 			if orb_position.distance_squared_to(aim) > reach_sq:
@@ -137,8 +136,8 @@ func _touch_enemies() -> void:
 			break
 
 
-## Rebuilds the orb rig after an upgrade changed the count. Only the
-## MeshInstance3D nodes are new; the mesh and material are shared.
+## Rehace los orbes cuando una mejora cambió la cantidad. Solo los nodos
+## MeshInstance3D son nuevos; malla y material se comparten.
 func _rebuild_orbs() -> void:
 	for orb: MeshInstance3D in _orbs:
 		orb.queue_free()
@@ -146,9 +145,9 @@ func _rebuild_orbs() -> void:
 	for i in effective_projectile_count():
 		var orb := MeshInstance3D.new()
 		orb.mesh = _orb_mesh
-		# A glowing familiar casting a speck of a shadow under itself read
-		# as noise, and cost a draw in every shadow cascade; every other
-		# FX already opts out (spawn_fx_mesh).
+		# Un espíritu brillante no proyecta sombra: se leería como ruido y
+		# costaría un dibujo en cada cascada de sombras (como todo efecto,
+		# ver spawn_fx_mesh).
 		orb.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		add_child(orb)
 		_orbs.append(orb)

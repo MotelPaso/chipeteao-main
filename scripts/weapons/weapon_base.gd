@@ -1,71 +1,69 @@
 class_name WeaponBase
 extends Node3D
-## Base for auto-firing weapons: ticks a cooldown and calls fire() at the
-## nearest body in the "enemies" group within targeting_range().
-## Subclasses override fire() with their attack behavior and funnel every
-## hit through deal_damage(), so the player's global stats layer (damage
-## multiplier, crit, lifesteal) applies in exactly one place. Cooldown and
-## area-like reach respect the stats layer through the effective_* helpers.
-## Area weapons scan the horde through the enemies_in_* helpers below: that
-## loop used to be copied into eight weapons, with the height and liveness
-## filters quietly drifting apart between the copies.
+## Base de las armas automáticas: cuenta el enfriamiento y llama a fire() con
+## el cuerpo más cercano del grupo "enemies" dentro de targeting_range().
+## Cada subclase escribe su ataque en fire() y pasa todo golpe por
+## deal_damage(), así las stats del portador (multiplicador de daño, crítico,
+## robo de vida) se aplican en un solo lugar. El enfriamiento y el alcance de
+## área pasan por los helpers effective_*, y los barridos de la horda por los
+## helpers enemies_in_* de abajo.
 
-## Effective cooldown can never drop below this many seconds.
+## El enfriamiento efectivo nunca baja de estos segundos.
 const MIN_COOLDOWN: float = 0.05
-## Below this squared length an aim vector carries no usable direction (the
-## target sits exactly on the muzzle); weapons fall back to their facing.
+## Por debajo de este largo al cuadrado un vector de puntería no tiene
+## dirección usable (el blanco está encima de la boca); se usa el frente.
 const DEGENERATE_LENGTH_SQ: float = 0.0001
-## Past this |dot| with UP a direction is colinear with the world up axis,
-## where look_at / Basis.looking_at cannot build a basis from UP.
+## Pasado este |dot| con UP una dirección es colineal con el eje vertical, y
+## look_at / Basis.looking_at no pueden construir una base con UP.
 const UP_COLINEAR_DOT: float = 0.99
 
+## Daño por golpe.
 @export var damage: float = 10.0
+## Segundos entre ataques.
 @export var cooldown: float = 1.0
+## Distancia a la que el arma busca blanco, en metros.
 @export var attack_range: float = 3.0
+## Disparos, orbes o golpes por ráfaga.
 @export var projectile_count: int = 1
-## Per-weapon cooldown multiplier ("Flurry"-style upgrades lower it); stacks
-## multiplicatively with the player-wide cooldown multiplier, leaving the
-## base cooldown untouched.
+## Multiplicador de enfriamiento propio del arma; se multiplica con el del jugador sin tocar cooldown.
 @export var cooldown_scale: float = 1.0
 
-## Upgrade cards this weapon has received this run (bumped by
-## UpgradePool.apply); the evolution/ascension gate (EvolutionCatalog).
+## Cartas de mejora que recibió el arma en la partida (las suma
+## UpgradePool.apply); es la puerta de evolución y ascenso (EvolutionCatalog).
 var upgrade_level: int = 0
-## True once evolve() ran; an evolved weapon never evolves again.
+## True cuando evolve() ya corrió; un arma evolucionada no vuelve a evolucionar.
 var evolved: bool = false
-## The evolved form's display name ("" until evolved).
+## Nombre visible de la forma evolucionada ("" hasta evolucionar).
 var evolved_name: String = ""
-## Milestones of EvolutionCatalog.EVOLVE_AT_LEVEL this weapon has passed
-## (iteration 46): tier 1 is level 10 — the evolution for weapons with a
-## recipe, a plain ascension for the rest — then one per further multiple.
+## Hitos de EvolutionCatalog.EVOLVE_AT_LEVEL que pasó el arma: el tier 1 es el
+## nivel 10 (evolución si hay receta, ascenso si no) y suma uno por múltiplo.
 var ascension_tier: int = 0
 
-## Flat ascension step, applied ON TOP of whatever the weapon already is,
-## at every EvolutionCatalog.EVOLVE_AT_LEVEL milestone past the first.
-## It lives here, not in the catalog, because it needs no recipe row: a
-## weapon nobody wrote an evolution for still improves every ten levels.
+## Escalón plano de ascenso, aplicado SOBRE lo que el arma ya es en cada hito
+## de EvolutionCatalog.EVOLVE_AT_LEVEL después del primero. Vive aquí y no en
+## el catálogo porque no necesita receta: toda arma mejora cada diez niveles.
 const ASCEND_MULTS: Dictionary[String, float] = {
 	"damage": 1.15, "cooldown_scale": 0.9, "attack_range": 1.1}
-## Extra projectile granted on EVEN tiers only (20, 40, ...): one per tier
-## would double a volley weapon's output far faster than the flat mults.
+## Proyectil extra solo en los tiers PARES (20, 40...): uno por tier haría
+## crecer un arma de ráfaga mucho más rápido que los multiplicadores.
 const ASCEND_PROJECTILE_TIER_STEP: int = 2
 const ASCEND_PROJECTILE_ADD: int = 1
 
 var _cooldown_left: float = 0.0
 
-## The carrying player's stats layer; null means neutral multipliers (e.g.
-## a weapon exercised outside a player rig in tests). Always read through
-## _stats_or_null(), never directly: a weapon can outlive its carrier.
+## Capa de stats del jugador que lleva el arma; null = multiplicadores
+## neutros (un arma probada fuera de un jugador). Léela siempre con
+## _stats_or_null(): el arma puede sobrevivir a su portador.
 @onready var _stats: PlayerStats = _find_carrier_stats()
-## The carrier's item bag (iteration 40): hit/kill hooks for on-hit items.
+## Bolsa de objetos del portador: ganchos de golpe y de muerte de los objetos.
 @onready var _bag: ItemBag = ItemBag.find_in(carrier_player())
 
 
-# --- carrier ---------------------------------------------------------------
+# --- portador --------------------------------------------------------------
 
-## The player body carrying this weapon (walks up the ancestry, so each
-## co-op raider's weapons read THEIR stats); test rigs without a Player
-## ancestor fall back to the first player in the scene, as before.
+## El jugador que lleva el arma. Sube por los ancestros, así cada raider en
+## co-op lee SUS stats; un montaje de prueba sin Player como ancestro usa el
+## primer jugador de la escena.
 func carrier_player() -> Node3D:
 	var node: Node = self
 	while node != null:
@@ -75,10 +73,10 @@ func carrier_player() -> Node3D:
 	return get_tree().get_first_node_in_group("player") as Node3D
 
 
-## The rig this weapon is mounted on: the Pet companion when one carries it,
-## otherwise the raider. Carrier-anchored effects (the slime trail's drop
-## point, the spirit ring's center) follow THIS so a pet's weapon acts around
-## the pet; stats, lifesteal and item hooks keep reading carrier_player().
+## El montaje que lleva el arma: la mascota si la lleva una, si no el raider.
+## Los efectos anclados al portador (el punto de caída de la baba, el centro
+## del anillo de orbes) siguen a ESTE; stats, robo de vida y objetos siguen
+## leyendo carrier_player().
 func carrier_node() -> Node3D:
 	var node: Node = self
 	while node != null:
@@ -93,16 +91,15 @@ func _find_carrier_stats() -> PlayerStats:
 	return PlayerStats.find_in(carrier) if carrier != null else null
 
 
-## The carrier's stats, or null when there are none to read. Drops a stale
-## reference instead of touching a freed object, the same guard deal_damage
-## already applied to _bag — every multiplier below has a neutral null path.
+## Stats del portador, o null si no hay. Suelta una referencia liberada en
+## vez de tocarla; cada multiplicador de abajo tiene un camino neutro para null.
 func _stats_or_null() -> PlayerStats:
 	if _stats != null and not is_instance_valid(_stats):
 		_stats = null
 	return _stats
 
 
-# --- firing cycle ----------------------------------------------------------
+# --- ciclo de disparo ------------------------------------------------------
 
 func _physics_process(delta: float) -> void:
 	_cooldown_left = maxf(_cooldown_left - delta, 0.0)
@@ -126,49 +123,48 @@ func effective_cooldown() -> float:
 	return maxf(cooldown * multiplier * cooldown_scale, MIN_COOLDOWN)
 
 
-## Multiplier subclasses apply to their area-like reach (burst radius,
-## melee arc range) — deliberately not to the targeting attack_range, except
-## where a weapon widens its targeting to match (see targeting_range()).
+## Multiplicador que cada subclase aplica a su alcance de área (radio de
+## estallido, alcance del tajo). No se aplica al attack_range de búsqueda,
+## salvo en las armas que ensanchan la búsqueda para igualarlo (targeting_range()).
 func area_scale() -> float:
 	var stats := _stats_or_null()
 	return stats.area_multiplier if stats != null else 1.0
 
 
-## Shots/orbs/arrows per volley: the weapon's own count plus the carrier's
-## flat projectile bonus (Tome of Multitude, iteration 39). Weapons that
-## fan projectiles read this instead of projectile_count.
+## Disparos, orbes o flechas por ráfaga: el conteo propio del arma más el
+## bono plano del portador (Tomo de Multitud). Las armas leen esto, no
+## projectile_count.
 func effective_projectile_count() -> int:
 	var stats := _stats_or_null()
 	return projectile_count + (stats.projectile_bonus if stats != null else 0)
 
 
-## Multiplier for timed effects a weapon leaves behind (slows, pools,
-## poison): Tome of Lingering stretches them (iteration 39).
+## Multiplicador de los efectos con duración que deja un arma (ralentización,
+## charcos, veneno); el Tomo de Persistencia lo sube.
 func duration_scale() -> float:
 	var stats := _stats_or_null()
 	return stats.duration_multiplier if stats != null else 1.0
 
 
-## Distance acquire_target() searches. Aimed weapons keep the raw
-## attack_range; weapons whose hit area IS attack_range * area_scale()
-## (Aura, Stench) widen this to match, or the outer band of their own ring
-## becomes decorative and they never pulse at enemies standing in it.
+## Distancia de búsqueda de acquire_target(). Las armas de puntería usan
+## attack_range tal cual; las de campo cuyo daño cubre attack_range * area_scale()
+## (Aura, Hedor) la ensanchan para igualarla, o la franja exterior de su anillo
+## nunca dispararía.
 func targeting_range() -> float:
 	return attack_range
 
 
-## Nearest body in the "enemies" group within targeting_range(), or null.
+## Cuerpo del grupo "enemies" más cercano dentro de targeting_range(), o null.
 func acquire_target() -> Node3D:
-	# Empty-horde fast path: while nothing is alive this runs every physics
-	# frame, so skip the Array get_nodes_in_group would build.
+	# Atajo con la horda vacía: esto corre cada frame de física mientras no
+	# hay nadie vivo, así se evita el Array de get_nodes_in_group.
 	if get_tree().get_first_node_in_group("enemies") == null:
 		return null
 	var nearest: Node3D = null
 	var search_range := targeting_range()
 	var nearest_dist_sq := search_range * search_range
-	# Read once: an idle weapon runs this scan every physics frame, and the
-	# loop only reads transforms, so the per-enemy native getter on our own
-	# position returned the same value every time.
+	# Se lee una vez: el bucle solo lee transformadas, así que nuestra
+	# posición no cambia mientras corre.
 	var origin := global_position
 	for enemy in get_tree().get_nodes_in_group("enemies"):
 		var body := enemy as Node3D
@@ -181,23 +177,22 @@ func acquire_target() -> Node3D:
 	return nearest
 
 
-## Virtual: perform the attack against the acquired target.
+## Virtual: el ataque contra el blanco adquirido.
 func fire(_target: Node3D) -> void:
 	push_warning("%s: fire() not implemented" % name)
 
 
-# --- damage funnel ---------------------------------------------------------
+# --- embudo de daño --------------------------------------------------------
 
-## Shared damage funnel: applies effective damage, rolls crit, and heals the
-## player for lifesteal. Every weapon hit goes through here.
-## Returns the damage ACTUALLY applied, not the raw roll: Health subtracts
-## armor, ignores hits on an already dead body, and a killing blow only
-## removes the HP that was left. Damage-derived effects (lifesteal, Blood
-## Vial's innate drain) pay out on that, so armored targets no longer heal
-## the player as if their armor did not exist.
-## `allow_kill_hooks` is false for hits that came FROM an item-spawned
-## projectile (ItemBag's spiders): letting their kills spawn more spiders
-## turns one kill into an exponential cascade that drains the dart pool.
+## Embudo de daño compartido: aplica el daño efectivo, tira el crítico y cura
+## al portador por robo de vida. Todo golpe de arma pasa por aquí.
+## Devuelve el daño APLICADO, no la tirada: Health resta armadura, ignora un
+## cuerpo ya muerto y un golpe letal solo quita la vida que quedaba. Los
+## efectos que pagan por daño (robo de vida, drenaje del Vial de sangre) usan
+## este valor.
+## `allow_kill_hooks` es false para golpes de proyectiles creados por objetos
+## (las arañas de ItemBag): si sus muertes crearan más arañas, una muerte se
+## volvería una cascada exponencial que vacía el pool de dardos.
 func deal_damage(target_health: Health, allow_kill_hooks: bool = true) -> float:
 	var stats := _stats_or_null()
 	var amount := effective_damage()
@@ -206,18 +201,18 @@ func deal_damage(target_health: Health, allow_kill_hooks: bool = true) -> float:
 		amount *= stats.crit_damage
 		Juice.crit_punch()
 	Sfx.play(&"hit_crit" if is_crit else &"hit_soft")
-	# Health reports nothing back, so read the HP it actually removed.
+	# La vida que el golpe quitó de verdad (0 si lo esquivó o ya estaba muerto).
 	var hp_before := target_health.current_hp
 	target_health.take_damage(amount, is_crit)
 	var applied := maxf(hp_before - target_health.current_hp, 0.0)
 	if applied <= 0.0:
-		# Dodged, or the body was already dead when this hit landed. Firing
-		# the item hooks here used to poison corpses and — worse — run
-		# on_weapon_kill a second time for a body someone else already killed.
+		# Esquivado, o el cuerpo ya estaba muerto: los ganchos de objetos no
+		# corren, o envenenarían cadáveres y repetirían on_weapon_kill para un
+		# cuerpo que otro ya mató.
 		return 0.0
 	if stats != null and stats.lifesteal > 0.0:
 		_lifesteal_heal(applied * stats.lifesteal)
-	# Item hooks (iteration 40): on-hit poison, on-kill spiders.
+	# Ganchos de objetos: veneno al golpear, arañas al matar.
 	if _bag != null and is_instance_valid(_bag):
 		var body := target_health.get_parent() as Node3D
 		if body != null:
@@ -236,8 +231,8 @@ func _lifesteal_heal(amount: float) -> void:
 		player_health.heal(amount)
 
 
-## Damages every body in `bodies` through the funnel above; returns the
-## total damage actually applied (Blood Vial's innate drain reads it).
+## Daña cada cuerpo de `bodies` por el embudo de arriba; devuelve el daño
+## total aplicado (el drenaje del Vial de sangre lo lee).
 func damage_all(bodies: Array[Node3D]) -> float:
 	var total := 0.0
 	for body: Node3D in bodies:
@@ -247,14 +242,14 @@ func damage_all(bodies: Array[Node3D]) -> float:
 	return total
 
 
-# --- horde scans -----------------------------------------------------------
-# One home for "walk the enemies group, keep the live bodies, test a shape".
-# Each helper returns the bodies it found; callers hand them to damage_all()
-# and add their own per-enemy effects (poison, slow, sparks).
+# --- barridos de la horda --------------------------------------------------
+# Un solo lugar para "recorre el grupo enemies, quédate con los cuerpos vivos
+# y prueba una forma". Cada helper devuelve los cuerpos encontrados; quien
+# llama los pasa a damage_all() y suma sus efectos propios (veneno, chispas).
 
-## Live enemies inside a flat disc: within `radius` of `center` on the XZ
-## plane and no farther than `height_window` above or below it. The height
-## filter is what keeps a ground pool from reaching bodies on a ledge.
+## Enemigos vivos dentro de un disco plano: a `radius` o menos de `center` en
+## el plano XZ y a no más de `height_window` por encima o por debajo. El filtro
+## de altura evita que un charco en el suelo alcance cuerpos sobre una cornisa.
 func enemies_in_disc(center: Vector3, radius: float, height_window: float) -> Array[Node3D]:
 	var found: Array[Node3D] = []
 	var radius_sq := radius * radius
@@ -271,8 +266,8 @@ func enemies_in_disc(center: Vector3, radius: float, height_window: float) -> Ar
 	return found
 
 
-## Live enemies inside a full sphere of `radius` around `center` — bursts
-## that should also catch bodies well above or below their center.
+## Enemigos vivos dentro de una esfera de `radius` alrededor de `center`: los
+## estallidos que también deben alcanzar cuerpos por encima o por debajo.
 func enemies_in_sphere(center: Vector3, radius: float) -> Array[Node3D]:
 	var found: Array[Node3D] = []
 	var radius_sq := radius * radius
@@ -285,9 +280,9 @@ func enemies_in_sphere(center: Vector3, radius: float) -> Array[Node3D]:
 	return found
 
 
-## Live enemies inside a flat lane from `origin`: between 0 and `length`
-## along `direction` (which must be flat and normalized) and at most
-## `half_width` off its axis.
+## Enemigos vivos dentro de un carril plano desde `origin`: entre 0 y `length`
+## a lo largo de `direction` (plana y normalizada) y a no más de `half_width`
+## de su eje.
 func enemies_in_lane(origin: Vector3, direction: Vector3, length: float,
 		half_width: float) -> Array[Node3D]:
 	var found: Array[Node3D] = []
@@ -305,9 +300,9 @@ func enemies_in_lane(origin: Vector3, direction: Vector3, length: float,
 	return found
 
 
-## Live enemies inside a flat cone of `arc_deg` around `center_dir`, out to
-## `reach` (measured in 3D from `center`). A body standing on top of the
-## caster carries no usable direction, so it always counts as inside.
+## Enemigos vivos dentro de un cono plano de `arc_deg` alrededor de
+## `center_dir`, hasta `reach` (medido en 3D desde `center`). Un cuerpo encima
+## del atacante no tiene dirección usable, así que siempre cuenta como dentro.
 func enemies_in_arc(center: Vector3, center_dir: Vector3, reach: float,
 		arc_deg: float) -> Array[Node3D]:
 	var found: Array[Node3D] = []
@@ -329,38 +324,38 @@ func enemies_in_arc(center: Vector3, center_dir: Vector3, reach: float,
 	return found
 
 
-# --- aim helpers -----------------------------------------------------------
+# --- puntería --------------------------------------------------------------
 
-## `vector` normalized, or `fallback` when it is too short to carry a
-## direction (the target is sitting exactly on the muzzle).
+## `vector` normalizado, o `fallback` si es demasiado corto para tener
+## dirección (el blanco está justo en la boca del arma).
 static func aim_dir_or(vector: Vector3, fallback: Vector3) -> Vector3:
 	return vector.normalized() if vector.length_squared() > DEGENERATE_LENGTH_SQ \
 			else fallback
 
 
-## `vector` flattened onto the XZ plane and normalized, or `fallback` when
-## nothing is left of it (target directly above or below us).
+## `vector` aplanado al plano XZ y normalizado, o `fallback` si no queda nada
+## de él (blanco justo arriba o abajo).
 static func flat_dir_or(vector: Vector3, fallback: Vector3) -> Vector3:
 	vector.y = 0.0
 	return vector.normalized() if vector.length_squared() > DEGENERATE_LENGTH_SQ \
 			else fallback
 
 
-## Up vector safe to build a basis with for `direction`: near-vertical aim
-## (shooting at something straight below a ledge) runs colinear with UP,
-## which leaves look_at / Basis.looking_at without a basis to build.
+## Vector "arriba" válido para construir una base con `direction`: una
+## puntería casi vertical (disparar a algo justo debajo de una cornisa) es
+## colineal con UP y deja a look_at / Basis.looking_at sin base.
 static func safe_up(direction: Vector3) -> Vector3:
 	return Vector3.UP if absf(direction.dot(Vector3.UP)) < UP_COLINEAR_DOT \
 			else Vector3.RIGHT
 
 
-# --- throwaway FX ----------------------------------------------------------
+# --- efectos de un solo uso ------------------------------------------------
 
-## Parents a one-shot FX mesh under the current scene (tree root as the
-## headless fallback) so it plays out where it was born while the carrier
-## walks on. The caller owns placement, scaling and the fade that frees it.
-## Shared `mesh` resources are the point: building a Mesh per effect is the
-## per-spawn churn Pools exists to avoid.
+## Cuelga una malla de efecto de un solo uso de la etapa actual (o de la raíz
+## del árbol, sin etapa) para que se reproduzca donde nació mientras el
+## portador sigue caminando. Quien llama la coloca, la escala y la libera con
+## su desvanecido. La malla `mesh` se comparte entre efectos: construir una
+## por efecto es el gasto que Pools existe para evitar.
 func spawn_fx_mesh(mesh: Mesh) -> MeshInstance3D:
 	var node := MeshInstance3D.new()
 	node.mesh = mesh
@@ -372,11 +367,11 @@ func spawn_fx_mesh(mesh: Mesh) -> MeshInstance3D:
 	return node
 
 
-# --- evolution -------------------------------------------------------------
+# --- evolución -------------------------------------------------------------
 
-## Applies an EvolutionCatalog row to this live weapon: every "mults" entry
-## multiplies the named property, every "adds" entry adds to it.
-## Idempotent: a second call is a no-op.
+## Aplica una fila de EvolutionCatalog a esta arma viva: cada entrada de
+## "mults" multiplica la propiedad nombrada y cada una de "adds" le suma.
+## Idempotente: una segunda llamada no hace nada.
 func evolve(row: Dictionary) -> void:
 	if evolved:
 		return
@@ -385,10 +380,10 @@ func evolve(row: Dictionary) -> void:
 	_apply_stat_tables(row.get("mults", {}), row.get("adds", {}), "evolve")
 
 
-## Ascension step (iteration 46): the flat, recipe-free upgrade a weapon
-## takes at every EvolutionCatalog.EVOLVE_AT_LEVEL milestone past the
-## first, so weapons without an evolution row keep improving too.
-## `tier` is the milestone number (1 = level 10, 2 = level 20, ...).
+## Ascenso: la mejora plana, sin receta, que el arma recibe en cada hito de
+## EvolutionCatalog.EVOLVE_AT_LEVEL después del primero, así las armas sin
+## evolución también siguen mejorando. `tier` es el número de hito
+## (1 = nivel 10, 2 = nivel 20...).
 func ascend(tier: int) -> void:
 	ascension_tier = tier
 	var adds: Dictionary[String, int] = {}
@@ -397,20 +392,20 @@ func ascend(tier: int) -> void:
 	_apply_stat_tables(ASCEND_MULTS, adds, "ascend")
 
 
-## Applies a {property: factor} multiply table and a {property: amount}
-## add table onto this weapon's own properties, generically through
-## get()/set() so subclass-only knobs (burst_radius, pierce_count) need no
-## per-weapon code. Shared by evolve() and ascend(); `what` only names the
-## caller in the warning a mistyped table would raise.
+## Aplica una tabla {propiedad: factor} que multiplica y una
+## {propiedad: cantidad} que suma sobre las propiedades de esta arma, por
+## nombre con get()/set(), así los ajustes propios de una subclase
+## (burst_radius, pierce_count) no necesitan código por arma. La comparten
+## evolve() y ascend(); `what` solo nombra al llamador en el aviso.
 func _apply_stat_tables(mults: Dictionary, adds: Dictionary, what: String) -> void:
 	for property: Variant in mults:
 		var current: Variant = get(String(property))
 		if current == null:
 			push_warning("%s: %s mult on unknown property '%s'" % [name, what, property])
 			continue
-		# Int knobs (projectile_count, pierce_count, chain_count) round to the
-		# nearest whole step instead of taking GDScript's truncation, so a
-		# "x1.5" on 3 reads as the 5 the card promises, not 4.
+		# Los ajustes enteros (projectile_count, pierce_count, chain_count) se
+		# redondean al entero más cercano en vez de truncar: "x1.5" sobre 3
+		# da los 5 que promete la carta, no 4.
 		if current is int:
 			set(String(property), roundi(float(current) * float(mults[property])))
 		else:

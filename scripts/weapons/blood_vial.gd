@@ -1,58 +1,56 @@
 extends WeaponBase
-## Doc's starting weapon: lobs a crimson flask at the densest enemy cluster
-## in range; where it lands it shatters into a lingering blood pool that
-## pulses damage ticks (`damage` is per tick, through the shared funnel)
-## and returns heal_fraction of the damage the pool dealt to the player as
-## healing — innate drain, on top of any regular lifesteal.
-## Pools are BloodPoolEntry records ticked by this weapon each physics frame
-## (no pool scene); a pool lives pool_ticks * tick_interval seconds.
+## Vial de sangre: lanza un frasco carmesí al grupo de enemigos más denso en
+## alcance; al caer se rompe en un charco de sangre que pulsa daño (`damage`
+## es por pulso, por el embudo compartido) y devuelve al jugador como
+## curación heal_fraction del daño que hizo el charco: un drenaje propio,
+## aparte del robo de vida normal.
+## Los charcos son registros BloodPoolEntry que esta arma avanza cada frame
+## de física; un charco dura pool_ticks * tick_interval segundos.
 
-## Neighborhood radius used to score cluster density around each candidate.
+## Radio del vecindario con que se puntúa la densidad alrededor de cada candidato.
 @export var cluster_radius: float = 3.0
-## Density scoring stops collecting candidates past this many, bounding the
-## O(n^2) neighbor count on huge hordes.
+## La puntuación deja de juntar candidatos pasado este número, para acotar el
+## conteo O(n^2) de vecinos en hordas enormes.
 @export var max_cluster_candidates: int = 24
-## Blood pool radius (area tomes scale it at throw time).
+## Radio del charco (los tomos de área lo escalan al lanzar).
 @export var pool_radius: float = 2.2
-## Damage pulses per pool. Lifetime is pool_ticks * tick_interval, so
-## "Coagulate" (+1 pulse) also lengthens the pool by one interval.
+## Pulsos de daño por charco. La duración es pool_ticks * tick_interval, así
+## que "Coagular" (+1 pulso) también alarga el charco un intervalo.
 @export var pool_ticks: int = 6
 @export var tick_interval: float = 0.5
-## Fraction of pool damage dealt returned to the player as healing.
+## Fracción del daño del charco que vuelve al jugador como curación.
 @export var heal_fraction: float = 0.15
-## Enemies farther than this above/below the pool's plane are unaffected.
+## Altura máxima, en metros, por encima o por debajo del plano del charco a la que alcanza.
 @export var pool_height_window: float = 1.6
-## Flask flight time from hand to impact point.
+## Segundos de vuelo del frasco desde la mano hasta el impacto.
 @export var lob_time: float = 0.5
-## Peak height of the flask arc above the straight throw line.
+## Altura máxima del arco del frasco sobre la línea recta del lanzamiento.
 @export var arc_height: float = 3.0
-## How far above the impact point the pool visual sits. Enemy origins are
-## already at ground level, so this only has to clear the arena floor's top
-## face; going below it buries the disc and the rim inside the opaque floor.
+## Cuánto sobre el punto de impacto se dibuja el charco. El origen de los
+## enemigos ya está a ras del suelo: esto solo despega el disco de la cara
+## superior del piso; más abajo el disco y el borde quedan enterrados.
 @export var pool_ground_offset: float = 0.03
 
-## Floor on tick_interval when advancing a pool. A designer (or a future
-## evolution row, which WeaponBase.evolve applies generically) setting it to
-## zero would otherwise leave _tick_pools spinning its whole tick budget in
-## one frame, sweeping the horde once per pending tick.
+## Piso de tick_interval al avanzar un charco. Con cero (puesto a mano o por
+## una fila de evolución, que WeaponBase.evolve aplica por nombre),
+## _tick_pools gastaría todo su presupuesto de pulsos en un frame.
 const MIN_TICK_INTERVAL: float = 0.01
 
-## Seconds between the flasks a Tome of Multitude adds. Thrown one after
-## the other: flasks lobbed together share one arc and shatter into pools
-## sitting on the exact same ground, which is a single pool that ticks
-## twice rather than a wider wet floor.
+## Segundos entre los frascos que agrega el Tomo de Multitud. Se lanzan uno
+## tras otro: frascos lanzados juntos comparten arco y caen en el mismo
+## suelo, que es un solo charco que pulsa dos veces y no un suelo más ancho.
 const EXTRA_FLASK_STAGGER: float = 0.12
-## Yaw between neighboring flasks, swung around the THROWER, so the extra
-## pools land beside the cluster instead of inside the first one.
+## Giro entre frascos vecinos, alrededor de QUIEN LANZA, así los charcos
+## extra caen al lado del grupo y no dentro del primero.
 const EXTRA_FLASK_FAN_DEG: float = 22.0
-## The whole staggered chain has to end inside this fraction of one
-## cooldown, or a volley would still be leaving the hand at the next throw.
+## La cadena escalonada entera termina dentro de esta fracción de un
+## enfriamiento, o una ráfaga seguiría saliendo de la mano en el siguiente lanzamiento.
 const FLASK_CHAIN_WINDOW: float = 0.6
 
 
-## One live blood pool. A record instead of a loose Dictionary because its
-## `visual` is a POOLED node crossing frames: with fields the compiler
-## catches a mistyped name, and every read has one obvious home.
+## Un charco vivo. Un registro en vez de un Dictionary suelto porque su
+## `visual` es un nodo del POOL que cruza frames: con campos el compilador
+## atrapa un nombre mal escrito.
 class BloodPoolEntry extends RefCounted:
 	var center: Vector3 = Vector3.ZERO
 	var radius: float = 0.0
@@ -62,26 +60,26 @@ class BloodPoolEntry extends RefCounted:
 
 
 var _pools: Array[BloodPoolEntry] = []
-## Flask visuals still in the air, so a weapon that dies mid-throw takes its
-## flasks with it instead of leaving them frozen on the arc.
+## Frascos aún en el aire, para que un arma que muere a mitad de lanzamiento
+## se los lleve en vez de dejarlos congelados en el arco.
 var _flasks_in_flight: Array[MeshInstance3D] = []
 
 var _flask_mesh: SphereMesh
 
 
 func _ready() -> void:
-	# Same reason as SlimeTrail's: the pool visuals are stage-scoped and
-	# these records are not, so the map change is what drops them.
+	# Mismo motivo que en SlimeTrail: los visuales de los charcos son de la
+	# etapa y estos registros no, así que el cambio de mapa los suelta.
 	RunState.stage_changed.connect(
 			func(_index: int, _map_id: String) -> void: clear_weapon_fields())
-	# The lobbed flask stays a visible projectile — one shared mesh for
-	# every throw. The landing pool visual is the pooled BloodPool scene
-	# (darker rim + slow bubbles).
+	# El frasco lanzado es un proyectil visible con una malla compartida por
+	# todos los lanzamientos. El charco al caer es la escena BloodPool del pool
+	# (borde más oscuro y burbujas lentas).
 	_flask_mesh = SphereMesh.new()
 	_flask_mesh.radius = 0.14
 	_flask_mesh.height = 0.24
-	# Explicit tessellation: the engine default (64 x 32, ~4.2k triangles)
-	# is absurd for a 28 cm flask seen for half a second.
+	# Teselado explícito: el del motor (64 x 32) es absurdo para un frasco de
+	# 28 cm que se ve medio segundo.
 	_flask_mesh.radial_segments = 12
 	_flask_mesh.rings = 6
 	var flask_material := StandardMaterial3D.new()
@@ -97,25 +95,25 @@ func _physics_process(delta: float) -> void:
 	_tick_pools(delta)
 
 
-## Pools and flasks live under the scene root, not under this weapon, so
-## nothing frees them when the weapon goes: hand them back by hand or the
-## BloodPoolFx instances throb on forever and never park back in Pools.
-## Parked straight away rather than faded — expire()'s fade tween would have
-## to be created on a node that may already be leaving the tree with us.
+## Charcos y frascos cuelgan de la arena, no de esta arma, así que nada los
+## libera cuando el arma se va: se devuelven a mano o las instancias de
+## BloodPoolFx laten para siempre y nunca vuelven a Pools. Se guardan al
+## instante y sin desvanecer: el tween de expire() se crearía sobre un nodo
+## que puede estar saliendo del árbol con nosotros.
 func _exit_tree() -> void:
 	clear_weapon_fields()
-	# Flasks belong to the WEAPON, not to a stage: they are in flight for
-	# a fraction of a second and a swap frees them with the arena anyway.
+	# Los frascos son del ARMA, no de la etapa: vuelan una fracción de
+	# segundo y un cambio de etapa los libera con la arena de todos modos.
 	for flask: MeshInstance3D in _flasks_in_flight:
 		if is_instance_valid(flask):
 			flask.queue_free()
 	_flasks_in_flight.clear()
 
 
-## The optional half of Player's downed contract, and the stage hook: the
-## pool VISUALS are stage-scoped since iteration 49 while these records
-## ride across on the raider, so without this _tick_pools kept damaging at
-## the old arena's coordinates after a swap, with nothing on screen.
+## La mitad opcional del contrato de caída del Player, y el gancho de etapa:
+## los VISUALES de los charcos son de la etapa y estos registros viajan con el
+## raider, así que sin esto _tick_pools seguiría dañando en las coordenadas de
+## la arena anterior, sin nada en pantalla.
 func clear_weapon_fields() -> void:
 	for pool: BloodPoolEntry in _pools:
 		if pool.visual != null and is_instance_valid(pool.visual):
@@ -124,11 +122,11 @@ func clear_weapon_fields() -> void:
 	_pools.clear()
 
 
-## The in-range enemy with the most neighbors within cluster_radius (among
-## the first max_cluster_candidates found) — the flask lands on packs, not
-## the nearest straggler. Ties keep the earliest candidate.
+## El enemigo en alcance con más vecinos dentro de cluster_radius (entre los
+## primeros max_cluster_candidates encontrados): el frasco cae en los grupos,
+## no en el rezagado más cercano. En empate gana el primer candidato.
 func acquire_target() -> Node3D:
-	# Empty-horde fast path (see WeaponBase.acquire_target).
+	# Atajo con la horda vacía (ver WeaponBase.acquire_target).
 	if get_tree().get_first_node_in_group("enemies") == null:
 		return null
 	var candidates := enemies_in_sphere(global_position, attack_range)
@@ -139,7 +137,7 @@ func acquire_target() -> Node3D:
 	var cluster_sq := cluster_radius * cluster_radius
 	for body: Node3D in candidates:
 		var neighbors := 0
-		# Hoisted out of the inner loop: nothing in it moves a body.
+		# Fuera del bucle interno: nada dentro mueve un cuerpo.
 		var body_position := body.global_position
 		for other: Node3D in candidates:
 			if other != body and body_position \
@@ -158,53 +156,51 @@ func fire(target: Node3D) -> void:
 			effective_cooldown() * FLASK_CHAIN_WINDOW / float(maxi(count - 1, 1)))
 	for i: int in count:
 		var yaw := deg_to_rad(EXTRA_FLASK_FAN_DEG) * (float(i) - float(count - 1) * 0.5)
-		# Fanned around the thrower, so the lateral spread grows with the
-		# throw distance and the pools stay a lane rather than a stack.
+		# Abanico alrededor de quien lanza: la separación lateral crece con la
+		# distancia del tiro y los charcos quedan en fila y no apilados.
 		var spot := global_position + (impact - global_position).rotated(Vector3.UP, yaw)
 		if i == 0:
 			_throw_at(spot)
 		else:
-			# Pausable and stepped in physics: an extra flask must not leave
-			# while the upgrade UI holds the tree, and the throw belongs on
-			# the same tick the rest of the combat runs on.
+			# Temporizador pausable y en paso de física: un frasco extra no sale
+			# con la pantalla de mejoras abierta, y el lanzamiento cae en el
+			# mismo tick que el resto del combate.
 			get_tree().create_timer(step * float(i), false, true).timeout \
 					.connect(_throw_at.bind(spot))
 
 
-## Throws one flask at `impact`. The staggered extras land here a beat
-## later, when this weapon may already have left the tree with a removed
-## raider — and a flask thrown from outside the tree has no hand to leave.
+## Lanza un frasco a `impact`. Los extras escalonados llegan aquí un poco
+## después, cuando el arma puede haber salido del árbol con un raider quitado;
+## fuera del árbol no hay mano desde donde lanzar.
 func _throw_at(impact: Vector3) -> void:
 	if not is_inside_tree():
 		return
 	_lob_flask(impact)
 
 
-## Throws the flask visual along a parabolic arc; the pool spawns where it
-## lands (the target's position at throw time), lob_time later.
+## Lanza el visual del frasco en un arco parabólico; el charco aparece donde
+## cae (la posición del blanco al lanzar), lob_time segundos después.
 func _lob_flask(impact: Vector3) -> void:
 	var flask := spawn_fx_mesh(_flask_mesh)
 	var start := global_position + Vector3.UP * 1.2
 	flask.global_position = start
 	_flasks_in_flight.append(flask)
-	# The tween is OURS, not the flask's: its steps call back into this
-	# weapon, so binding it to the flask (which lives under the scene root)
-	# left it running against a freed weapon if the weapon went first.
+	# El tween es NUESTRO, no del frasco: sus pasos llaman a esta arma, y
+	# atado al frasco (que cuelga de la arena) seguiría corriendo contra un
+	# arma liberada si el arma se fuera antes.
 	var tween := create_tween()
-	# Bound as an INSTANCE ID, never as the node itself: the flask is
-	# parented into the arena and a stage swap frees it mid-flight, while
-	# this tween — owned by the weapon, which rides the persistent Player
-	# across the swap — is still running. Godot cannot marshal a freed
-	# Object into a bound argument, so the call fails at the argument
-	# BEFORE the is_instance_valid() guard inside the method can run
-	# ("Cannot convert argument from Object to Object"). An int always
-	# marshals, and the lookup below answers null for a dead one.
+	# Se ata el ID de instancia, nunca el nodo: un cambio de etapa libera el
+	# frasco en pleno vuelo mientras este tween (del arma, que viaja con el
+	# Player) sigue corriendo, y Godot no puede pasar un Object liberado como
+	# argumento atado: la llamada falla ANTES de la guarda is_instance_valid()
+	# del método. Un int siempre pasa, y la búsqueda de abajo da null si murió.
 	var flask_id := flask.get_instance_id()
 	tween.tween_method(_arc_flask.bind(flask_id, start, impact), 0.0, 1.0, lob_time)
 	tween.tween_callback(_shatter.bind(flask_id, impact))
 
 
-## Flight sampler: linear lerp plus an arc lift that peaks mid-flight.
+## Muestra del vuelo: interpolación lineal más un arco que llega al máximo a
+## mitad de camino.
 func _arc_flask(progress: float, flask_id: int, start: Vector3, impact: Vector3) -> void:
 	var flask := _live_flask(flask_id)
 	if flask == null:
@@ -218,9 +214,9 @@ func _shatter(flask_id: int, impact: Vector3) -> void:
 	var flask := _live_flask(flask_id)
 	if flask != null:
 		flask.queue_free()
-	# Rebuilt instead of erased by reference: a flask the stage swap took
-	# is already gone, and erase() cannot find a freed entry — the array
-	# would grow one dead slot per interrupted throw.
+	# Se reconstruye en vez de borrar por referencia: un frasco que se llevó
+	# el cambio de etapa ya no existe, erase() no lo encuentra y el arreglo
+	# crecería con una entrada muerta por lanzamiento interrumpido.
 	var kept: Array[MeshInstance3D] = []
 	for other: MeshInstance3D in _flasks_in_flight:
 		if is_instance_valid(other) and other != flask:
@@ -229,7 +225,7 @@ func _shatter(flask_id: int, impact: Vector3) -> void:
 	_spawn_pool(impact)
 
 
-## The flask behind an id, or null once it has been freed.
+## El frasco detrás de un ID, o null si ya fue liberado.
 func _live_flask(flask_id: int) -> MeshInstance3D:
 	if not is_instance_id_valid(flask_id):
 		return null
@@ -237,12 +233,12 @@ func _live_flask(flask_id: int) -> MeshInstance3D:
 
 
 func _spawn_pool(center: Vector3) -> void:
-	# Pooled visual (disc + darker rim + slow bubbles), scene-root parented.
+	# Visual del pool (disco, borde oscuro y burbujas lentas) colgado de la arena.
 	var visual := Pools.acquire_scene(Pools.BLOOD_POOL_SCENE) as BloodPoolFx
 	var radius := pool_radius * area_scale()
 	if visual != null:
-		# Just above the floor: the struck body's origin already sits ON the
-		# ground, so anything below it renders inside the opaque floor slab.
+		# Apenas sobre el suelo: el origen del cuerpo golpeado ya está EN el
+		# suelo, y cualquier cosa debajo se dibuja dentro de la losa opaca.
 		visual.play(center + Vector3.UP * pool_ground_offset, radius)
 	var pool := BloodPoolEntry.new()
 	pool.center = center
@@ -253,12 +249,12 @@ func _spawn_pool(center: Vector3) -> void:
 	_pools.append(pool)
 
 
-## Advances every pool: pulses come due every tick_interval (the first one
-## right after landing); the pool expires one interval after its last
-## pulse, so lifetime is exactly ticks * interval.
+## Avanza cada charco: un pulso cada tick_interval (el primero apenas cae) y
+## el charco expira un intervalo después del último pulso, así su duración es
+## exactamente pulsos * intervalo.
 func _tick_pools(delta: float) -> void:
 	var step := maxf(tick_interval, MIN_TICK_INTERVAL)
-	# Backward so finished pools can be removed in place.
+	# Hacia atrás, para quitar los charcos terminados en el mismo recorrido.
 	for i in range(_pools.size() - 1, -1, -1):
 		var pool := _pools[i]
 		pool.tick_timer -= delta
@@ -271,20 +267,20 @@ func _tick_pools(delta: float) -> void:
 			_pools.remove_at(i)
 
 
-## One damage pulse: every enemy standing in the pool takes a tick through
-## the shared funnel, then the player drinks a fraction of the total.
+## Un pulso de daño: cada enemigo parado en el charco recibe un golpe por el
+## embudo compartido, y el jugador bebe una fracción del total.
 func _pulse_pool(pool: BloodPoolEntry) -> void:
 	var dealt_total := damage_all(
 			enemies_in_disc(pool.center, pool.radius, pool_height_window))
 	if dealt_total > 0.0:
-		# Innate drain: same player-heal path lifesteal uses, now paid on
-		# the damage that actually landed rather than on the raw roll.
+		# Drenaje propio: la misma curación que usa el robo de vida, pagada
+		# sobre el daño que entró de verdad.
 		_lifesteal_heal(dealt_total * heal_fraction)
 
 
 func _expire_pool(pool: BloodPoolEntry) -> void:
 	if pool.visual == null or not is_instance_valid(pool.visual):
 		return
-	# Fades out, then parks itself back in the Pools.
+	# Se desvanece y vuelve solo al pool.
 	pool.visual.expire()
 	pool.visual = null
