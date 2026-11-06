@@ -9,7 +9,8 @@ extends RefCounted
 ## UpgradePool.apply). El primer hito evoluciona el arma si tiene receta aquí;
 ## cada hito siguiente, y el primero de un arma sin receta, es un ascenso
 ## (WeaponBase.ascend), así ninguna arma deja de mejorar. Los dos comparten la
-## misma ceremonia (fanfarria, cartel, destello).
+## misma ceremonia (EvolutionCeremony: fanfarria, cartel, destello). Los
+## textos del cartel están en evolution_ceremony.gd.
 ##
 ## Se puede cambiar libremente: evolved_name, glyph, mults, adds, flavor.
 ## Llaves internas, NUNCA las cambies: weapon_id y weapon_node (deben ser el id
@@ -171,7 +172,7 @@ static func by_weapon_node(node_name: String) -> Dictionary:
 ## Corre el hito que `weapon` acaba de alcanzar, si hay uno: la evolución en
 ## el primero (si hay receta) y un ascenso en cada uno de los siguientes y en
 ## el primero de un arma sin receta. Aplica el cambio, corre la ceremonia
-## (fanfarria, cartel, destello sobre quien la lleva, sacudida), suma los
+## (EvolutionCeremony: fanfarria, cartel, destello, sacudida), suma los
 ## contadores de Colección y misiones e imprime la línea de log del soak.
 ## Devuelve true cuando hubo hito.
 static func try_advance_by_level(weapon: WeaponBase, player: Node) -> bool:
@@ -186,50 +187,25 @@ static func try_advance_by_level(weapon: WeaponBase, player: Node) -> bool:
 		var row := by_weapon_node(weapon.name)
 		if not row.is_empty():
 			weapon.evolve(row)
-			_celebrate(player)
-			_announce("¡%s evolucionó a %s!" % [
-					weapon_display(weapon), weapon.evolved_name])
+			EvolutionCeremony.play_evolution(player, weapon_display(weapon),
+					weapon.evolved_name)
 			_record_evolution(String(row.weapon_id))
 			# Línea de log de formato fijo para los soaks headless.
 			print("Weapon evolved: %s -> %s" % [String(row.weapon_id), weapon.evolved_name])
 			return true
 	weapon.ascend(tier)
-	_celebrate(player)
-	_announce("¡%s asciende!" % weapon_display(weapon))
+	EvolutionCeremony.play_ascension(player, weapon_display(weapon))
 	print("Weapon ascended: %s tier %d"
 			% [WeaponCatalog.id_for_node(weapon.name), tier])
 	return true
 
 
 ## Nombre que usa el cartel de un hito: la forma evolucionada si el arma ya
-## la tiene, si no su display_name de WEAPON_LIBRARY. Nunca el id interno.
+## la tiene, si no su display_name de WeaponCatalog. Nunca el id interno.
 static func weapon_display(weapon: WeaponBase) -> String:
 	if weapon.evolved and not weapon.evolved_name.is_empty():
 		return weapon.evolved_name
 	return WeaponCatalog.display_name_for_node(weapon.name)
-
-
-## Celebración común de evoluciones y ascensos: fanfarria, destello sobre
-## quien lleva el arma y sacudida de cámara. Los autoloads se buscan con
-## AutoloadLookup: un harness `-s` no los tiene y debe seguir sin ellos en
-## vez de abortar.
-static func _celebrate(player: Node) -> void:
-	var sfx := AutoloadLookup.find(&"Sfx")
-	if sfx != null:
-		sfx.play(&"secret_fanfare")
-	var juice := AutoloadLookup.find(&"Juice")
-	if juice != null:
-		if player is Node3D:
-			juice.sparkle((player as Node3D).global_position + Vector3.UP * 1.2)
-		juice.shake(0.25, 0.5)
-
-
-## El cartel grande, por el grupo "boss_ui" (announce_major).
-static func _announce(message: String) -> void:
-	var loop := Engine.get_main_loop() as SceneTree
-	if loop == null:
-		return
-	loop.call_group("boss_ui", "announce_major", message)
 
 
 ## Contadores de Colección y misiones de una evolución (los ascensos no
