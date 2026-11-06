@@ -1,0 +1,10 @@
+[gd_scene load_steps=3 format=3 uid="uid://dow0drriadm73"]
+
+[ext_resource type="PackedScene" uid="uid://buqhhj8tj0mdg" path="res://assets/models/Tyrone (2).glb" id="1_tyrone"]
+[ext_resource type="Script" path="res://assets/models/tyrone_character.gd" id="2_script"]
+
+[node name="TyroneCharacter" type="Node3D"]
+script = ExtResource("2_script")
+
+[node name="Tyrone" parent="." instance=ExtResource("1_tyrone")]
+transform = Transform3D(-1.5, 0, 0, 0, 1.5, 0, 0, 0, -1.5, 0, 0, 0)

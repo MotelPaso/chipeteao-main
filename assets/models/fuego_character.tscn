@@ -1,0 +1,10 @@
+[gd_scene format=3 uid="uid://dfuegochar01"]
+
+[ext_resource type="PackedScene" uid="uid://brxmo8b5wy5k8" path="res://assets/models/fuego.glb" id="1_fuego"]
+[ext_resource type="Script" path="res://assets/models/fuego_character.gd" id="2_script"]
+
+[node name="FuegoCharacter" type="Node3D"]
+script = ExtResource("2_script")
+
+[node name="Fuego" parent="." instance=ExtResource("1_fuego")]
+transform = Transform3D(-1.55, 0, 0, 0, 1.55, 0, 0, 0, -1.55, 0, 0, 0)
