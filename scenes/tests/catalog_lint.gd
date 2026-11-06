@@ -302,6 +302,11 @@ func _check_director_methods() -> void:
 		declared[String(method.get("name", ""))] = true
 	for row: Dictionary in WORLD_DIRECTOR.EVENT_LIBRARY:
 		rows += 1
+		if not row.has("method"):
+			if not (row.get("scene") is PackedScene):
+				failures.append("event '%s' has neither a method nor a scene"
+						% String(row.get("id", "?")))
+			continue
 		var method := String(row.get("method", ""))
 		if not declared.has(method):
 			failures.append("event '%s' method '%s' is not declared on WorldDirector"
