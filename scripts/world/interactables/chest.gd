@@ -27,16 +27,13 @@ extends Interactable
 @export var open_duration: float = 0.45
 ## Rotación X de la tapa abierta (no hace nada: la escena no tiene LidPivot).
 @export var lid_open_angle: float = -1.75
-## Segundos que sigue vivo el cofre tras pagar antes de liberarse.
+## Segundos que sigue vivo el cofre tras pagar; el hundimiento (sink_duration) empieza de inmediato.
 @export var reward_linger: float = 1.4
 
 ## Salto al abrir: altura en metros y fracción de open_duration que dura la
 ## subida (el resto es el rebote de bajada).
 const OPEN_HOP_HEIGHT: float = 0.3
 const OPEN_HOP_UP_SHARE: float = 0.4
-## Hundimiento al pagar: segundos y metros.
-const SINK_TIME: float = 0.5
-const SINK_DEPTH: float = 1.8
 ## Tinte de los cofres gratis (fuera de los cuatro colores de rareza).
 const FREE_TINT: Color = Color(1.0, 0.93, 0.72)
 ## Aviso del cofre gratis: no hay precio, así que no hay variante "te faltan".
@@ -172,7 +169,7 @@ func _pop_reward() -> void:
 	# liberado no es null.
 	if _opener == null or not is_instance_valid(_opener):
 		_emit_completed()
-		_sink()
+		sink_away(reward_linger)
 		return
 	if free_open:
 		# Se tira aquí: un cofre gratis no tiene piso ni rareza sellada, así
@@ -185,7 +182,7 @@ func _pop_reward() -> void:
 	if item_id.is_empty() or bag == null:
 		push_warning("Chest: no item to grant (rarity %s)" % rarity)
 		_emit_completed()
-		_sink()
+		sink_away(reward_linger)
 		return
 	bag.add_item(item_id)
 	var row := ItemCatalog.by_id(item_id)
@@ -197,21 +194,9 @@ func _pop_reward() -> void:
 			rarity, item_id, RunState.chest_price_multiplier,
 			" (free)" if free_open else ""])
 	_emit_completed()
-	_sink()
-
-
-## El cofre gastado se va del campo. consume() ya apagó `available`, que es
-## lo que lee la baliza del WorldDirector, así que nadie lo retira dos veces.
-func _sink() -> void:
-	set_physics_process(false)
-	var tween := create_tween()
-	tween.tween_interval(reward_linger)
-	tween.set_parallel(true)
-	tween.tween_property(self, "position:y", position.y - SINK_DEPTH, SINK_TIME) \
-			.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
-	tween.tween_property(self, "scale", Vector3.ONE * 0.05, SINK_TIME) \
-			.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_IN)
-	tween.chain().tween_callback(queue_free)
+	# consume() ya apagó `available`, que es lo que lee la baliza del
+	# WorldDirector: nadie retira este cofre por segunda vez.
+	sink_away(reward_linger)
 
 
 ## Pinta el cofre con el color de su rareza (o el tinte gratis), con

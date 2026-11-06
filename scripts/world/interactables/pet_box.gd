@@ -8,8 +8,6 @@ extends Interactable
 ## Gratis a propósito: el traficante vende una elección de tres por puntos;
 ## la caja es la que te encuentras, y su precio es caminar hasta ella.
 
-## Segundos que tarda en encogerse y desaparecer tras usarse.
-@export var sink_time: float = 0.55
 @export var paw_color: Color = Color(0.7, 0.95, 0.6)
 
 ## Títulos de las cartas. La opción 0 es el CAMBIO: el harness siempre aprieta
@@ -139,7 +137,7 @@ func _grant(player: Node, pet_id: String) -> void:
 		player.call("set_pet", pet_id)
 	Juice.sparkle(global_position + Vector3.UP * 1.2)
 	_emit_completed()
-	_sink()
+	sink_away()
 
 
 ## Arma y stat en dos líneas: lo que de verdad distingue a dos compañeros.
@@ -162,10 +160,3 @@ func _roll_pet(player: Node) -> String:
 		return ""
 	return candidates[randi() % candidates.size()]
 
-
-func _sink() -> void:
-	set_physics_process(false)
-	var tween := create_tween()
-	tween.tween_property(self, "scale", Vector3.ONE * 0.05, sink_time) \
-			.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_IN)
-	tween.tween_callback(queue_free)

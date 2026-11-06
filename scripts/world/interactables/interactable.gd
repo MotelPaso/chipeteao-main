@@ -11,21 +11,41 @@ signal interaction_started
 signal interaction_completed
 signal interaction_cancelled
 
-## Línea del aviso mientras un raider está en el anillo; el botón se escribe [E] y se cambia por el del raider.
-@export var prompt_text: String = "[E] Interactuar"
-## Altura del aviso sobre el origen del interactuable, en metros.
-@export var prompt_height: float = 3.4
-## Contador de SaveData que sube al gastarse ("" = ninguno); lo leen las misiones.
-@export var meta_stat_id: String = ""
-## Sonido (id de Sfx) que suena al completarse.
-@export var complete_sound: StringName = &"shrine_done"
-
 ## Marcador del botón en cada línea de aviso. "interact" está en E y en un
 ## botón del control (Coop.PAD_INTERACT_BUTTON): la etiqueta lo cambia según
 ## el raider que está en el anillo.
 const INTERACT_TOKEN: String = "[E]"
 ## Lo que muestra el marcador para un slot que juega con control.
 const PAD_INTERACT_GLYPH: String = "[Y]"
+
+@export_group("Aviso flotante")
+## Línea del aviso mientras un raider está en el anillo; el botón se escribe [E] y se cambia por el del raider.
+@export var prompt_text: String = "[E] Interactuar"
+## Altura del aviso sobre el origen del interactuable, en metros.
+@export var prompt_height: float = 3.4
+## Tamaño de letra del aviso, en píxeles (el mismo para todos los interactuables).
+@export var prompt_font_size: int = 52
+## Grosor del contorno del aviso, en píxeles.
+@export var prompt_outline_size: int = 14
+## Color del texto del aviso.
+@export var prompt_color: Color = Color(0.96, 0.93, 0.8)
+@export_group("Al completarse")
+## Sonido (id de Sfx) que suena al completarse.
+@export var complete_sound: StringName = &"shrine_done"
+## Contador de SaveData que sube al gastarse ("" = ninguno); lo leen las misiones.
+@export var meta_stat_id: String = ""
+@export_group("Gastado")
+## Color plano de piedra que toman todas las mallas al apagarse (dim_visuals).
+@export var spent_color: Color = Color(0.34, 0.34, 0.37)
+## Segundos que tarda en hundirse y desaparecer (sink_away).
+@export var sink_duration: float = 0.5
+## Metros que baja mientras se hunde (0 = solo se encoge).
+@export var sink_depth: float = 0.0
+## Escala final antes de liberarse, como fracción del tamaño (0-1).
+@export var sink_end_scale: float = 0.05
+@export_group("Mapa")
+## Punto que dibuja en el minimapa y el mapa (Tab); vacío = no aparece (los secretos lo dejan vacío a propósito).
+@export var marker_kind: StringName = &""
 
 ## Lo apaga consume(); un interactuable gastado ignora "interact".
 var available: bool = true
@@ -40,10 +60,8 @@ var _players_in_range: Array[Node3D] = []
 var _held_loop: StringName = &""
 
 var _prompt: Label3D
-
-
-## Punto que dibuja en el minimapa y el mapa (Tab); vacío = no aparece (los secretos lo dejan vacío a propósito).
-@export var marker_kind: StringName = &""
+## Lo enciende sink_away para no apilar dos salidas.
+var _sinking: bool = false
 
 
 func _ready() -> void:
@@ -54,9 +72,9 @@ func _ready() -> void:
 	_prompt = Label3D.new()
 	_prompt.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 	_prompt.no_depth_test = true
-	_prompt.font_size = 52
-	_prompt.outline_size = 14
-	_prompt.modulate = Color(0.96, 0.93, 0.8)
+	_prompt.font_size = prompt_font_size
+	_prompt.outline_size = prompt_outline_size
+	_prompt.modulate = prompt_color
 	_prompt.position = Vector3.UP * prompt_height
 	add_child(_prompt)
 	_refresh_prompt()
@@ -179,11 +197,11 @@ func prompt_visible() -> bool:
 	return _prompt != null and _prompt.visible
 
 
-## Gris de "usado": toda malla recibe un material de piedra plano y las luces
-## se apagan, para que se lea gastado desde lejos.
+## Gris de "usado": toda malla recibe un material plano de spent_color y las
+## luces se apagan, para que se lea gastado desde lejos.
 func dim_visuals() -> void:
 	var dim := StandardMaterial3D.new()
-	dim.albedo_color = Color(0.34, 0.34, 0.37)
+	dim.albedo_color = spent_color
 	dim.roughness = 1.0
 	for node: Node in find_children("*", "MeshInstance3D", true, false):
 		var mesh_instance := node as MeshInstance3D
@@ -193,6 +211,27 @@ func dim_visuals() -> void:
 		var light := node as OmniLight3D
 		if light != null:
 			light.visible = false
+
+
+## Hunde y encoge el interactuable (sink_duration, sink_depth, sink_end_scale) y
+## lo libera al terminar; detiene _physics_process. Con `keep_alive` el nodo
+## sigue vivo hasta esos segundos aunque el hundimiento ya haya terminado.
+## Una sola vez: las llamadas siguientes no hacen nada.
+func sink_away(keep_alive: float = 0.0) -> void:
+	if _sinking:
+		return
+	_sinking = true
+	set_physics_process(false)
+	var tween := create_tween()
+	tween.set_parallel(true)
+	if keep_alive > 0.0:
+		tween.tween_interval(keep_alive)
+	if not is_zero_approx(sink_depth):
+		tween.tween_property(self, "position:y", position.y - sink_depth, sink_duration) \
+				.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	tween.tween_property(self, "scale", Vector3.ONE * sink_end_scale, sink_duration) \
+			.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_IN)
+	tween.chain().tween_callback(queue_free)
 
 
 func _emit_started() -> void:

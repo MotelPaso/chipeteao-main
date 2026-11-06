@@ -12,7 +12,6 @@ extends Interactable
 ## Gratis a propósito: el precio es no elegir, y un desastre es una de las
 ## respuestas posibles.
 
-@export var sink_time: float = 0.55
 @export var glass_color: Color = Color(0.7, 0.78, 1.0)
 
 ## Aviso mientras ya corre un clima: invocar funciona igual y lo REEMPLAZA.
@@ -129,12 +128,5 @@ func _interact(_player: Node) -> void:
 	print("Event altar used: %s" % summoned)
 	Juice.sparkle(global_position + Vector3.UP * 1.5)
 	_emit_completed()
-	_sink()
+	sink_away()
 
-
-func _sink() -> void:
-	set_physics_process(false)
-	var tween := create_tween()
-	tween.tween_property(self, "scale", Vector3.ONE * 0.05, sink_time) \
-			.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_IN)
-	tween.tween_callback(queue_free)

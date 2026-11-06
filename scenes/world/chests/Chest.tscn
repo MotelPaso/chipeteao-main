@@ -15,6 +15,7 @@ collision_layer = 0
 monitorable = false
 script = ExtResource("1_chest")
 prompt_height = 1.9
+sink_depth = 1.8
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="." unique_id=567677611]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.2, 0)

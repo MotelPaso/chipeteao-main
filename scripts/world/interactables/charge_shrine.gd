@@ -389,19 +389,12 @@ func grant_boon(stat: String, amount: float) -> void:
 				stats.add_altar_boon(stat, amount)
 
 
-## Se hunde, se encoge y se libera. Solo lo toma un altar gastado.
+## Se hunde, se encoge y se libera (sink_away). Solo lo toma un altar gastado.
 func _leave(reason: String) -> void:
 	if _leaving:
 		return
 	_leaving = true
 	available = false
 	_refresh_prompt()
-	set_physics_process(false)
-	var tween := create_tween()
-	tween.set_parallel(true)
-	tween.tween_property(self, "position:y", position.y - 2.5, 0.6) \
-			.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
-	tween.tween_property(self, "scale", Vector3.ONE * 0.2, 0.6) \
-			.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_IN)
-	tween.chain().tween_callback(queue_free)
+	sink_away()
 	print("Altar left: %s %s" % [name, reason])

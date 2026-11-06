@@ -7,7 +7,6 @@ extends Interactable
 ## Los premios son una tabla con pesos y una rama por premio: uno nuevo es
 ## una fila más una rama, nunca un caso especial en otro sitio.
 
-@export var sink_time: float = 0.55
 @export var block_color: Color = Color(1.0, 0.85, 0.2)
 ## Alcance de enemy_explosion en metros, y fracción de la vida máxima que pierde un jefe en vez de morir.
 @export var explosion_radius: float = 12.0
@@ -145,7 +144,7 @@ func _interact(player: Node) -> void:
 func _finish() -> void:
 	Juice.sparkle(global_position + Vector3.UP * 1.0)
 	_emit_completed()
-	_sink()
+	sink_away()
 
 
 ## Encola los ids que pagan los próximos bloques (solo el harness). Un id
@@ -299,10 +298,3 @@ static func _next_rarity_item(rarity_name: String) -> String:
 	var better := mini(index + 1, UpgradePool.RARITIES.size() - 1)
 	return ItemCatalog.roll_id(String(UpgradePool.RARITIES[better].name))
 
-
-func _sink() -> void:
-	set_physics_process(false)
-	var tween := create_tween()
-	tween.tween_property(self, "scale", Vector3.ONE * 0.05, sink_time) \
-			.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_IN)
-	tween.tween_callback(queue_free)

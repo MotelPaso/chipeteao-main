@@ -18,9 +18,6 @@ const RIPPLE_AMOUNT: float = 0.03
 
 var _time: float = 0.0
 var _water: MeshInstance3D = null
-## Lo enciende _dry_up para que dos salidas el mismo frame no apilen dos
-## tweens ni liberen el nodo dos veces.
-var _drying: bool = false
 
 
 func _init() -> void:
@@ -77,19 +74,5 @@ func _interact(player: Node) -> void:
 	get_tree().call_group("hud", "announce", "El manantial te restaura y te potencia")
 	print("Spring used: heal + %s" % powerup_id)
 	_emit_completed()
-	_dry_up()
+	sink_away()
 
-
-## Se encoge y se libera. El guardia evita que dos raiders bebiendo el mismo
-## frame apilen dos tweens y liberen el nodo dos veces.
-func _dry_up() -> void:
-	if _drying:
-		return
-	_drying = true
-	available = false
-	_refresh_prompt()
-	set_physics_process(false)
-	var tween := create_tween()
-	tween.tween_property(self, "scale", Vector3.ONE * 0.05, 0.5) \
-			.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_IN)
-	tween.tween_callback(queue_free)

@@ -43,6 +43,9 @@ collision_mask = 1
 monitorable = false
 script = ExtResource("1_curse")
 prompt_height = 3.9
+sink_duration = 0.6
+sink_depth = 2.5
+sink_end_scale = 0.2
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.7, 0)
