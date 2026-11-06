@@ -193,9 +193,9 @@ func _apply_row(row: Dictionary, duration: float) -> void:
 					expires_at - RunState.run_time, tag)
 	if String(row.get("kind", "")) == "time_stop":
 		# Por el grupo, como toda llamada entre escenas aquí; el spawner es
-		# dueño del conjunto congelado y de su propio reloj de deshielo.
-		get_tree().call_group("enemy_spawner", "freeze_enemies", duration)
-		get_tree().call_group("hud", "announce_major", "¡TIEMPO DETENIDO!")
+		# dueño del conjunto congelado, de su reloj de deshielo y de los dos
+		# avisos (true = anunciar el comienzo).
+		get_tree().call_group("enemy_spawner", "freeze_enemies", duration, true)
 
 
 ## Publica cada estado por tipo desde el conjunto ACTUAL de filas vivas.
