@@ -9,6 +9,7 @@
 [ext_resource type="Script" uid="uid://ginwod0otqua" path="res://scripts/player/components/player_camera.gd" id="7_camera"]
 [ext_resource type="Script" uid="uid://bqqg08luk7lph" path="res://scripts/player/components/player_revive.gd" id="8_revive"]
 [ext_resource type="Script" uid="uid://qcqf8asw7qkj" path="res://scripts/player/components/revive_prompt.gd" id="9_prompt"]
+[ext_resource type="Script" uid="uid://2lvnctj67fsv" path="res://scripts/player/components/player_flight.gd" id="10_flight"]
 
 [sub_resource type="CapsuleShape3D" id="CapsuleShape3D_1"]
 resource_local_to_scene = true
@@ -65,3 +66,6 @@ no_depth_test = true
 font_size = 52
 outline_size = 14
 script = ExtResource("9_prompt")
+
+[node name="Flight" type="Node" parent="."]
+script = ExtResource("10_flight")

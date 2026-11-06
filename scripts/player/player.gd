@@ -33,16 +33,6 @@ const RESCUE_MATE_OFFSET := Vector3(1.5, 0.5, 0.0)
 const PET_JOINS: String = "%s se une"
 const PET_LEAVES: String = "%s se despide"
 
-## Puntos caminables que se prueban al terminar Vuelo sobre una celda
-## bloqueada; gana el más cercano. Cada uno saca números del RNG de la
-## arena: cambiar la cantidad cambia las partidas con semilla.
-const FLIGHT_LANDING_SAMPLES: int = 24
-## Altura sobre el terreno, en metros, desde la que cae el raider al
-## aterrizar, para que se asiente sin empezar dentro del suelo.
-const FLIGHT_LANDING_CLEARANCE: float = 1.2
-## Margen respecto del borde de la arena mientras vuela, en metros.
-const FLIGHT_EDGE_MARGIN: float = 2.0
-
 @export_group("Movimiento")
 ## Velocidad base al caminar, en metros por segundo; tomos y objetos la multiplican.
 @export var move_speed: float = 8.6
@@ -52,14 +42,6 @@ const FLIGHT_EDGE_MARGIN: float = 2.0
 @export var air_acceleration: float = 12.0
 ## Velocidad vertical al saltar, en metros por segundo.
 @export var jump_velocity: float = 8.7
-@export_group("Vuelo (power-up)")
-## Vuelo: velocidad de subida mientras se mantiene saltar, en metros por segundo.
-@export var flight_rise_speed: float = 9.0
-## Vuelo: techo sobre el terreno bajo el raider, en metros (pasa mesetas y rocas, la cámara aún ve el suelo).
-@export var flight_ceiling: float = 12.0
-## Vuelo: velocidad de descenso al soltar saltar, en metros por segundo (un planeo, no una caída).
-@export var flight_fall_speed: float = 4.0
-
 @export_group("Derrape")
 ## Multiplicador de la velocidad efectiva durante el derrape.
 @export var slide_speed_multiplier: float = 2.21
@@ -112,6 +94,7 @@ var revive_time: float:
 @onready var _stats: PlayerStats = $Stats
 @onready var _camera: PlayerCamera = $CameraRig
 @onready var _revive: PlayerRevive = $Revive
+@onready var _flight: PlayerFlight = $Flight
 @onready var item_bag: ItemBag = $ItemBag
 
 ## Multiplicadores de puntos con nombre (Fiebre del oro, Lluvia dorada): el
@@ -274,14 +257,13 @@ func _physics_process(delta: float) -> void:
 
 	# Vuelo manda en el eje vertical mientras dura: con gravedad, la subida y
 	# la caída se equilibrarían a una altura cualquiera.
-	if _tick_flight(delta):
-		pass
-	elif not is_on_floor():
-		velocity.y -= _gravity * delta
-	else:
-		# Pisar suelo recarga los saltos. Se recarga aquí y no en _try_jump
-		# para que quien cae de un borde conserve sus saltos en el aire.
+	var flying := _flight.tick()
+	if is_on_floor():
+		# Pisar suelo recarga los saltos, también volando. Se recarga aquí y
+		# no en _try_jump para que quien cae de un borde conserve sus saltos.
 		_jumps_left = _max_jumps()
+	elif not flying:
+		velocity.y -= _gravity * delta
 
 	_camera.apply_stick_look(delta)
 
@@ -392,85 +374,9 @@ func _try_jump() -> void:
 	velocity.y = jump_velocity
 
 
-# --- Vuelo (power-up) --------------------------------------------------------
-
-## Movimiento vertical durante Vuelo; devuelve true si tomó el frame (el
-## llamador no aplica gravedad). Mantener saltar sube hasta un techo medido
-## SOBRE EL TERRENO (una Y fija enterraría al raider en una loma de un mapa
-## y lo dejaría en el cielo en otro); soltar planea hacia abajo. Pisar
-## suelo sigue recargando los saltos.
-func _tick_flight(delta: float) -> bool:
-	var powerups := PowerUps.find_in(self)
-	if powerups == null or not powerups.has("flight") or is_downed():
-		return false
-	if is_on_floor():
-		_jumps_left = _max_jumps()
-	var ceiling := _ground_height() + flight_ceiling
-	if Input.is_action_pressed(slot_action(&"jump")) and global_position.y < ceiling:
-		velocity.y = flight_rise_speed
-	elif global_position.y >= ceiling:
-		# Se queda en el techo en vez de rebotar.
-		velocity.y = minf(velocity.y, 0.0)
-	elif not is_on_floor():
-		velocity.y = -flight_fall_speed
-	else:
-		velocity.y = 0.0
-	# El borde de la arena es un muro para quien camina y nada para quien
-	# vuela: sin esto se podría salir volando sobre el vacío.
-	var limit := _arena_limit()
-	if limit > 0.0:
-		global_position.x = clampf(global_position.x, -limit, limit)
-		global_position.z = clampf(global_position.z, -limit, limit)
-	return true
-
-
-## PowerUps la llama por nombre cuando termina Vuelo. Si el raider quedó
-## sobre una celda bloqueada (el único lugar garantizado como NO caminable,
-## y el que vigila el probe), lo baja al punto caminable más cercano.
+## PowerUps la llama por nombre cuando termina Vuelo (ver PlayerFlight.end_flight).
 func end_flight() -> void:
-	var bounds := get_tree().get_first_node_in_group("arena_bounds")
-	if bounds == null or not bounds.has_method("is_walkable"):
-		return
-	var here := Vector2(global_position.x, global_position.z)
-	if bool(bounds.call("is_walkable", here)):
-		return
-	var best := here
-	var best_distance := INF
-	if bounds.has_method("random_walkable_point"):
-		for attempt in FLIGHT_LANDING_SAMPLES:
-			var candidate: Variant = bounds.call("random_walkable_point")
-			if candidate is not Vector2:
-				continue
-			var distance := (candidate as Vector2).distance_squared_to(here)
-			if distance < best_distance:
-				best_distance = distance
-				best = candidate
-	if best == here:
-		return
-	global_position.x = best.x
-	global_position.z = best.y
-	var terrain := Terrain.find(get_tree())
-	if terrain != null:
-		global_position.y = terrain.height_at(best.x, best.y) + FLIGHT_LANDING_CLEARANCE
-	velocity = Vector3.ZERO
-	print("Flight landing: p%d moved to walkable ground" % player_index)
-
-
-## Altura del terreno bajo el raider, para el techo de Vuelo.
-func _ground_height() -> float:
-	var terrain := Terrain.find(get_tree())
-	return terrain.height_at(global_position.x, global_position.z) if terrain != null else 0.0
-
-
-## Media extensión a la que se limita el vuelo, o 0 si la arena no la publica.
-func _arena_limit() -> float:
-	var bounds := get_tree().get_first_node_in_group("arena_bounds")
-	if bounds == null:
-		return 0.0
-	var extent: Variant = bounds.get("arena_half_extent")
-	if extent is not float and extent is not int:
-		return 0.0
-	return float(extent) - FLIGHT_EDGE_MARGIN
+	_flight.end_flight()
 
 
 ## Saltos disponibles desde el suelo: el del suelo más los que dan los stats.
