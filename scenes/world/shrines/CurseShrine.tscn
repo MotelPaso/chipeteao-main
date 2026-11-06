@@ -42,10 +42,17 @@ collision_layer = 0
 collision_mask = 1
 monitorable = false
 script = ExtResource("1_curse")
+prompt_text = "Quédate dentro para cargar"
 prompt_height = 3.9
+meta_stat_id = "shrines_used"
 sink_duration = 0.6
 sink_depth = 2.5
 sink_end_scale = 0.2
+marker_kind = &"altar_demonic"
+boon_scale = 1.6
+completed_text = "El obelisco bebe hondo: %s — la horda se pone más hambrienta"
+choice_title = "El obelisco ofrece un trato"
+choice_tag = "Pacto"
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.7, 0)

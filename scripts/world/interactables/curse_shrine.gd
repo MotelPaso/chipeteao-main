@@ -81,15 +81,6 @@ const PACT_LIBRARY: Array[Dictionary] = [
 const PACT_TEXT: String = "Ganas: %s\nPagas: %s"
 
 
-func _init() -> void:
-	super()
-	marker_kind = &"altar_demonic"
-	boon_scale = 1.6
-	completed_text = "El obelisco bebe hondo: %s — la horda se pone más hambrienta"
-	choice_title = "El obelisco ofrece un trato"
-	choice_tag = "Pacto"
-
-
 func _accent_color() -> Color:
 	return Color(1.0, 0.3, 0.25)
 

@@ -27,8 +27,8 @@ const WORLD_DIRECTOR := preload("res://scripts/world/run/world_director.gd")
 ## reflection for a match block, and hard-coding the list here would mean
 ## two copies of the same truth drifting apart on the next stat.
 const PLAYER_STATS_PATH := "res://scripts/systems/player_stats.gd"
-## Directories scanned for `marker_kind = &"..."` assignments.
-const SCRIPT_ROOTS: Array[String] = ["res://scripts"]
+## Directories scanned for `marker_kind = &"..."` assignments (.gd and .tscn).
+const SCRIPT_ROOTS: Array[String] = ["res://scripts", "res://scenes"]
 
 ## Marker kinds the map legend deliberately has no row for (MapDraw
 ## documents this; the lint reads the same constant so the exemption
@@ -436,8 +436,8 @@ func _check_marker_labels() -> void:
 
 
 ## Every `marker_kind = &"..."` assignment in the codebase, as
-## [kind, "file.gd:line"]. Scanned as text because the kinds are set in
-## _init() on scenes this lint never instances.
+## [kind, "file:line"]. Scanned as text because the kinds are set in
+## _init() or in .tscn files this lint never instances.
 func _assigned_marker_kinds() -> Array[Array]:
 	var found: Array[Array] = []
 	var pattern := RegEx.create_from_string('marker_kind\\s*=\\s*&"([a-z_]+)"')
@@ -455,7 +455,7 @@ func _assigned_marker_kinds() -> Array[Array]:
 	return found
 
 
-## Every .gd under the given roots, recursively.
+## Every .gd and .tscn under the given roots, recursively.
 func _gd_files(roots: Array[String]) -> Array[String]:
 	var found: Array[String] = []
 	var pending := roots.duplicate()
@@ -470,7 +470,7 @@ func _gd_files(roots: Array[String]) -> Array[String]:
 			var full := dir_path.path_join(entry)
 			if dir.current_is_dir():
 				pending.append(full)
-			elif entry.ends_with(".gd"):
+			elif entry.ends_with(".gd") or entry.ends_with(".tscn"):
 				found.append(full)
 			entry = dir.get_next()
 		dir.list_dir_end()

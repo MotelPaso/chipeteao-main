@@ -27,12 +27,6 @@ var interact_count: int = 0
 var _shudder_tween: Tween
 
 
-## Aviso y anuncio por defecto del tocón.
-func _init() -> void:
-	prompt_text = "[E] Hurgar el tocón raro"
-	awaken_text = "¡Algo gordo y furioso se abre paso entre las raíces!"
-
-
 func _interact(_player: Node) -> void:
 	_emit_started()
 	interact_count += 1

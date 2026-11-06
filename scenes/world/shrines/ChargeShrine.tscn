@@ -73,10 +73,13 @@ collision_layer = 0
 collision_mask = 1
 monitorable = false
 script = ExtResource("1_charge")
+prompt_text = "Quédate dentro para cargar"
 prompt_height = 4.3
+meta_stat_id = "shrines_used"
 sink_duration = 0.6
 sink_depth = 2.5
 sink_end_scale = 0.2
+marker_kind = &"altar"
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.5, 0)

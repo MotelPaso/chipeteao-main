@@ -106,13 +106,6 @@ var _marked_energy: float = NAN
 var _marked_alpha: float = NAN
 
 
-func _init() -> void:
-	meta_stat_id = "shrines_used"
-	marker_kind = &"altar"
-	# Sin botón: la carga es por cercanía, así que el aviso no ofrece uno.
-	prompt_text = "Quédate dentro para cargar"
-
-
 func _ready() -> void:
 	super()
 	# El WorldDirector limita los altares SIN GASTAR a la vez y encuentra los

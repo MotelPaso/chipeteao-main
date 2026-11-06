@@ -20,12 +20,6 @@ var _time: float = 0.0
 var _water: MeshInstance3D = null
 
 
-func _init() -> void:
-	meta_stat_id = "shrines_used"
-	marker_kind = &"spring"
-	complete_sound = &"heal"
-
-
 func _ready() -> void:
 	super()
 	# El director cuenta los manantiales vivos por este grupo para dejar uno

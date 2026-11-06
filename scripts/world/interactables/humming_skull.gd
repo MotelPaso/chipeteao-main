@@ -37,12 +37,6 @@ var _time: float = 0.0
 @onready var _glow_light: OmniLight3D = $Visual/GlowLight
 
 
-## Aviso y anuncio por defecto del cráneo.
-func _init() -> void:
-	prompt_text = "[E] Escuchar el cráneo zumbante"
-	awaken_text = "El zumbido era un cebo: ¡la arena vomita un cofre!"
-
-
 func _ready() -> void:
 	super()
 	_idle_prompt = prompt_text

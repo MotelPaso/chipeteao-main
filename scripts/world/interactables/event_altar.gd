@@ -26,15 +26,6 @@ var _time: float = 0.0
 var _spent: bool = false
 
 
-func _init() -> void:
-	prompt_text = READY_PROMPT
-	marker_kind = &"event_altar"
-	prompt_height = 3.0
-	meta_stat_id = "shrines_used"
-	collision_layer = 0
-	collision_mask = 1
-
-
 func _ready() -> void:
 	# El anillo de detección va ANTES de super(), que conecta body_entered.
 	var shape := CollisionShape3D.new()

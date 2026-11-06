@@ -7,4 +7,7 @@ collision_layer = 0
 collision_mask = 1
 monitorable = false
 script = ExtResource("1_lucky")
+prompt_text = "[E] Abrir bloque de la suerte"
+prompt_height = 2.4
 sink_duration = 0.55
+marker_kind = &"lucky_block"

@@ -7,4 +7,7 @@ collision_layer = 0
 collision_mask = 1
 monitorable = false
 script = ExtResource("1_petbox")
+prompt_text = "[E] Abrir la caja"
+prompt_height = 2.6
 sink_duration = 0.55
+marker_kind = &"pet_box"

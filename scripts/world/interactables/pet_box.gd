@@ -22,17 +22,6 @@ var _lid: MeshInstance3D = null
 var _time: float = 0.0
 
 
-func _init() -> void:
-	prompt_text = "[E] Abrir la caja"
-	marker_kind = &"pet_box"
-	prompt_height = 2.6
-	# Sin contador propio: las misiones cuentan el compañero, y eso sube donde
-	# la mascota cambia de manos.
-	meta_stat_id = ""
-	collision_layer = 0
-	collision_mask = 1
-
-
 func _ready() -> void:
 	# El anillo de detección va ANTES de super(), que conecta body_entered.
 	var shape := CollisionShape3D.new()

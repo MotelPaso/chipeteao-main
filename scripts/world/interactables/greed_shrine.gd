@@ -38,12 +38,6 @@ extends Interactable
 var _idle_prompt: String
 
 
-func _init() -> void:
-	meta_stat_id = "shrines_used"
-	prompt_text = "[E] Ofrendar sangre"
-	marker_kind = &"altar_greed"
-
-
 func _ready() -> void:
 	super()
 	_idle_prompt = prompt_text

@@ -49,16 +49,6 @@ var _time: float = 0.0
 var _body: MeshInstance3D = null
 
 
-func _init() -> void:
-	prompt_text = "[E] Abrir bloque de la suerte"
-	marker_kind = &"lucky_block"
-	prompt_height = 2.4
-	# Sin contador: no es un cofre y las misiones de cofres no lo cuentan.
-	meta_stat_id = ""
-	collision_layer = 0
-	collision_mask = 1
-
-
 func _ready() -> void:
 	# El anillo de detección va ANTES de super(), que conecta body_entered.
 	var shape := CollisionShape3D.new()

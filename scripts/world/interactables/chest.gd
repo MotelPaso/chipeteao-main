@@ -48,13 +48,6 @@ var _opener: Node = null
 var _glow_light: OmniLight3D = null
 
 
-func _init() -> void:
-	meta_stat_id = "chests_opened"
-	complete_sound = &"chest_open"
-	prompt_text = "[E] Abrir el cofre"
-	marker_kind = &"chest"
-
-
 func _ready() -> void:
 	super()
 	# `rarity` es la única fuente que leen precio, tinte, aviso y botín: la
