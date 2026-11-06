@@ -25,9 +25,6 @@ signal points_changed(total: int)
 ## Cinturón eléctrico (ItemBag).
 signal slide_started(direction: Vector3)
 
-## Fracción de la velocidad efectiva que el cuerpo ya debe llevar para
-## empezar un derrape (no se derrapa desde quieto).
-const SLIDE_MIN_SPEED_RATIO: float = 0.5
 ## Dónde queda un caído rescatado del vacío respecto de su compañero: al
 ## lado y no encima, para que la física no empuje a ninguno de los dos.
 const RESCUE_MATE_OFFSET := Vector3(1.5, 0.5, 0.0)
@@ -51,6 +48,8 @@ const RESCUE_MATE_OFFSET := Vector3(1.5, 0.5, 0.0)
 @export var slide_cooldown: float = 0.8
 ## Altura de la cápsula durante el derrape, en metros.
 @export var slide_collision_height: float = 0.9
+## Fracción de la velocidad efectiva que ya debe llevar el cuerpo para derrapar (0-1; no se derrapa desde quieto).
+@export var slide_min_speed_ratio: float = 0.5
 
 @export_group("Inventario")
 ## Tope de armas simultáneas; al llegar, el pool deja de ofrecer armas nuevas (upgrade_pool.gd lo lee por nombre).
@@ -454,7 +453,7 @@ func _can_start_slide(wish_dir: Vector3, effective_speed: float) -> bool:
 	if not is_on_floor() or _slide_cooldown_timer > 0.0:
 		return false
 	var horizontal_speed: float = Vector2(velocity.x, velocity.z).length()
-	return horizontal_speed > effective_speed * SLIDE_MIN_SPEED_RATIO
+	return horizontal_speed > effective_speed * slide_min_speed_ratio
 
 
 func _start_slide(direction: Vector3) -> void:
