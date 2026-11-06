@@ -95,6 +95,11 @@ var _cells: Dictionary[Vector2i, bool] = {}
 var _terrain: Terrain = null
 var _step: float = 2.0
 var _seed: int = 0
+## La cuadrícula de facetas en construcción: superficie, suelo y altura de
+## la roca sobre el suelo por punto (ver _sample_grid).
+var _tops := PackedVector3Array()
+var _grounds := PackedFloat32Array()
+var _heights := PackedFloat32Array()
 ## La superficie en construcción: una entrada por esquina de faceta, sombreado plano.
 var _vertices := PackedVector3Array()
 var _normals := PackedVector3Array()
@@ -134,13 +139,22 @@ func build(cells: Dictionary[Vector2i, bool], terrain: Terrain, noise_seed: int)
 			ceili((float(high.y + 1) * cell_size + pad) / _step))
 	var columns := last.x - first.x + 1
 	var rows := last.y - first.y + 1
+	_sample_grid(first, columns, rows, per_cell)
+	_emit_quads(first, columns, rows)
+	_tops = PackedVector3Array()
+	_grounds = PackedFloat32Array()
+	_heights = PackedFloat32Array()
+	if _vertices.is_empty():
+		return
+	_attach_mesh()
 
-	var tops := PackedVector3Array()
-	var grounds := PackedFloat32Array()
-	var heights := PackedFloat32Array()
-	tops.resize(columns * rows)
-	grounds.resize(columns * rows)
-	heights.resize(columns * rows)
+
+## Llena _tops, _grounds y _heights con un vértice por punto de la
+## cuadrícula de facetas que cubre la huella, y mide tallest y seal_low.
+func _sample_grid(first: Vector2i, columns: int, rows: int, per_cell: int) -> void:
+	_tops.resize(columns * rows)
+	_grounds.resize(columns * rows)
+	_heights.resize(columns * rows)
 	for row in rows:
 		for column in columns:
 			var gx := first.x + column
@@ -151,13 +165,17 @@ func build(cells: Dictionary[Vector2i, bool], terrain: Terrain, noise_seed: int)
 			var height := _profile(depth, at)
 			var ground := _ground(at)
 			var index := row * columns + column
-			tops[index] = Vector3(at.x, ground + height, at.y)
-			grounds[index] = ground
-			heights[index] = height
+			_tops[index] = Vector3(at.x, ground + height, at.y)
+			_grounds[index] = ground
+			_heights[index] = height
 			tallest = maxf(tallest, height)
 			if absf(signed) < 0.001 and height < SEAL_MIN_HEIGHT:
 				seal_low += 1
 
+
+## Dos facetas y un prisma de colisión por cada cuadrado de la cuadrícula
+## que asoma sobre el suelo.
+func _emit_quads(first: Vector2i, columns: int, rows: int) -> void:
 	var owner_id := create_shape_owner(self)
 	for row in rows - 1:
 		for column in columns - 1:
@@ -165,27 +183,30 @@ func build(cells: Dictionary[Vector2i, bool], terrain: Terrain, noise_seed: int)
 			var b := a + 1
 			var c := a + columns
 			var d := c + 1
-			if heights[a] < 0.0 and heights[b] < 0.0 and heights[c] < 0.0 and heights[d] < 0.0:
+			if _heights[a] < 0.0 and _heights[b] < 0.0 and _heights[c] < 0.0 and _heights[d] < 0.0:
 				continue
 			var key := ((first.y + row) * 65536 + (first.x + column)) * 2
 			# La diagonal MÁS ALTA: la envolvente superior de las cuatro
 			# esquinas, así el prisma y las dos caras dibujadas son la misma superficie.
-			if tops[a].y + tops[d].y >= tops[b].y + tops[c].y:
-				_emit(tops[a], tops[b], tops[d], heights[a] + heights[b] + heights[d], key)
-				_emit(tops[a], tops[d], tops[c], heights[a] + heights[d] + heights[c], key + 1)
+			if _tops[a].y + _tops[d].y >= _tops[b].y + _tops[c].y:
+				_emit(_tops[a], _tops[b], _tops[d], _heights[a] + _heights[b] + _heights[d], key)
+				_emit(_tops[a], _tops[d], _tops[c], _heights[a] + _heights[d] + _heights[c], key + 1)
 			else:
-				_emit(tops[a], tops[b], tops[c], heights[a] + heights[b] + heights[c], key)
-				_emit(tops[b], tops[d], tops[c], heights[b] + heights[d] + heights[c], key + 1)
+				_emit(_tops[a], _tops[b], _tops[c], _heights[a] + _heights[b] + _heights[c], key)
+				_emit(_tops[b], _tops[d], _tops[c], _heights[b] + _heights[d] + _heights[c], key + 1)
 			var hull := PackedVector3Array()
 			for corner: int in [a, b, c, d]:
-				hull.append(tops[corner])
-				hull.append(Vector3(tops[corner].x, grounds[corner] - PRISM_DEPTH, tops[corner].z))
+				hull.append(_tops[corner])
+				hull.append(Vector3(_tops[corner].x, _grounds[corner] - PRISM_DEPTH, _tops[corner].z))
 			var prism := ConvexPolygonShape3D.new()
 			prism.points = hull
 			shape_owner_add_shape(owner_id, prism)
 			prism_count += 1
-	if _vertices.is_empty():
-		return
+
+
+## Arma la malla con las facetas emitidas y libera los búferes: la malla ya
+## tiene su copia.
+func _attach_mesh() -> void:
 	var arrays := []
 	arrays.resize(Mesh.ARRAY_MAX)
 	arrays[Mesh.ARRAY_VERTEX] = _vertices
@@ -199,7 +220,6 @@ func build(cells: Dictionary[Vector2i, bool], terrain: Terrain, noise_seed: int)
 	view.material_override = style.surface_material if style.surface_material != null \
 			else DEFAULT_MATERIAL
 	add_child(view)
-	# Los búferes de construcción sobran cuando la malla ya tiene su copia.
 	_vertices = PackedVector3Array()
 	_normals = PackedVector3Array()
 	_colors = PackedColorArray()

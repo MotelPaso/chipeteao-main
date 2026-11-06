@@ -22,13 +22,14 @@ extends Node3D
 ##   4. Luego este _ready deja que el scatter vista la arena, así su lista
 ##      de keepouts ve las posiciones YA barajadas.
 
-## Id de MapCatalog de este bioma. Cada escena de arena pone el suyo; con él
-## RunRoot y el meta llevan sus contadores por mapa.
-@export var map_id: String = MapCatalog.DEFAULT_ID
-
 ## Nombre del Marker3D hijo donde aparece el slot 0 al llegar el equipo:
 ## un bioma mueve su punto de llegada sin tocar código. Sin él, el origen.
 const SPAWN_POINT_NAME: String = "SpawnPoint"
+
+@export_group("Mapa")
+## Id de MapCatalog de este bioma. Cada escena de arena pone el suyo; con él
+## RunRoot y el meta llevan sus contadores por mapa.
+@export var map_id: String = MapCatalog.DEFAULT_ID
 
 
 func _ready() -> void:

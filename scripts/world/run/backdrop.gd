@@ -13,8 +13,14 @@ extends Node3D
 ## anillo), con colores por export para que cada bioma tiña su mundo.
 ## Las colinas sacan números del RNG global de la partida (ver _build_hill_ring).
 
-@export_group("Distant Ground")
-## Color del disco de suelo lejano. También tiñe el minimapa (Terrain lo lee).
+## Las colinas lejanas se agrandan así para que se lean a través de la niebla.
+const FAR_RING_SCALE_BOOST: float = 1.6
+## Metros extra que una colina guarda entre su borde y el muro de la arena.
+const WALL_CLEARANCE: float = 4.0
+
+@export_group("Suelo lejano")
+## Color del disco de suelo lejano. También tiñe el minimapa (el Terrain lo
+## lee por su backdrop_path).
 @export var ground_color: Color = Color(0.22, 0.33, 0.2)
 ## Lado del disco de suelo lejano, en metros.
 @export var ground_size: float = 1000.0
@@ -22,12 +28,13 @@ extends Node3D
 ## que los bordes nunca parpadeen (z-fighting).
 @export var ground_drop: float = 0.35
 
-@export_group("Horizon Hills")
+@export_group("Colinas del horizonte")
 ## Color de las colinas del anillo cercano.
 @export var hill_color: Color = Color(0.16, 0.26, 0.17)
 ## Color del anillo lejano: más hondo en la niebla y un tono más oscuro.
 @export var far_hill_color: Color = Color(0.13, 0.21, 0.15)
-## Colinas del anillo cercano y del lejano.
+## Colinas del anillo cercano y del lejano. Cambiar la cantidad mueve los
+## POIs de la partida con la misma semilla (ver _build_hill_ring).
 @export var hill_count: int = 22
 @export var far_hill_count: int = 14
 ## Franjas de los anillos como MÚLTIPLOS de la mitad del lado de la arena,
@@ -37,17 +44,13 @@ extends Node3D
 @export var near_ring_max_factor: float = 2.1
 @export var far_ring_min_factor: float = 2.6
 @export var far_ring_max_factor: float = 3.4
-## Rango de altura visible de una colina, en metros.
+## Rango de altura visible de una colina, en metros. Cada arena pone su
+## máximo en la escena; el valor por defecto es el del bosque.
 @export var hill_height_min: float = 6.0
 @export var hill_height_max: float = 20.0
 ## Rango de media anchura de una colina, en metros.
 @export var hill_width_min: float = 18.0
 @export var hill_width_max: float = 46.0
-
-## Las colinas lejanas se agrandan así para que se lean a través de la niebla.
-const FAR_RING_SCALE_BOOST: float = 1.6
-## Metros extra que una colina guarda entre su borde y el muro de la arena.
-const WALL_CLEARANCE: float = 4.0
 
 ## Mitad del lado de la arena; 80 solo si no hay scatter.
 var _half_extent: float = 80.0
@@ -55,8 +58,7 @@ var _half_extent: float = 80.0
 
 func _ready() -> void:
 	_half_extent = _arena_half_extent()
-	_settle_ground_drop()
-	_build_ground()
+	_build_ground(_ground_depth())
 	_build_hill_ring(hill_count, near_ring_min_factor, near_ring_max_factor,
 			_hill_material(hill_color))
 	_build_hill_ring(far_hill_count, far_ring_min_factor, far_ring_max_factor,
@@ -75,19 +77,19 @@ func _arena_half_extent() -> float:
 	return float(value) if value != null else _half_extent
 
 
-## El disco lejano tiene que quedar bajo la hondonada MÁS honda. Llama a
-## Terrain.ensure_built() explícitamente: este nodo es el hijo #2 de la arena
-## y su _ready corre mucho antes que el del terreno, así que min_height
-## seguiría en 0.
-func _settle_ground_drop() -> void:
+## Profundidad en metros del disco lejano: ground_drop bajo la hondonada
+## MÁS honda. Llama a Terrain.ensure_built() explícitamente: este nodo es el
+## hijo #2 de la arena y su _ready corre mucho antes que el del terreno, así
+## que min_height seguiría en 0.
+func _ground_depth() -> float:
 	var terrain := Terrain.find(get_tree())
 	if terrain == null:
-		return
+		return ground_drop
 	terrain.ensure_built()
-	ground_drop = -terrain.min_height + ground_drop
+	return -terrain.min_height + ground_drop
 
 
-func _build_ground() -> void:
+func _build_ground(depth: float) -> void:
 	var ground := MeshInstance3D.new()
 	var mesh := PlaneMesh.new()
 	mesh.size = Vector2(ground_size, ground_size)
@@ -96,7 +98,7 @@ func _build_ground() -> void:
 	material.albedo_color = ground_color
 	material.roughness = 1.0
 	ground.material_override = material
-	ground.position.y = -ground_drop
+	ground.position.y = -depth
 	ground.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(ground)
 
