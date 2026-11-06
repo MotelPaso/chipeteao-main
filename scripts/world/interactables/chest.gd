@@ -14,6 +14,10 @@ extends Interactable
 ##
 ## Un solo uso: al pagar se hunde y se libera.
 
+## Aviso del cofre gratis: no hay precio, así que no hay variante "te faltan".
+const FREE_PROMPT: String = "[E] Abrir cofre — gratis"
+
+@export_group("Cofre")
 ## Modo gratis: sin precio, sin encarecer y con la rareza tirada al abrir. Se
 ## llama free_open y no `free`, que es Object.free().
 @export var free_open: bool = false
@@ -23,29 +27,33 @@ extends Interactable
 @export var luck_bonus: float = 0.0
 ## Piso de rareza de la tirada al aparecer, como id en inglés ("" = sin piso).
 @export var min_rarity: String = ""
+@export_group("Apertura")
 ## Segundos que dura el salto de apertura; el objeto se entrega al terminar.
 @export var open_duration: float = 0.45
-## Rotación X de la tapa abierta (no hace nada: la escena no tiene LidPivot).
-@export var lid_open_angle: float = -1.75
+## Altura del salto al abrir, en metros.
+@export var open_hop_height: float = 0.3
+## Fracción de open_duration que dura la subida (0-1); el resto es el rebote de bajada.
+@export_range(0.0, 1.0) var open_hop_up_share: float = 0.4
 ## Segundos que sigue vivo el cofre tras pagar; el hundimiento (sink_duration) empieza de inmediato.
 @export var reward_linger: float = 1.4
-
-## Salto al abrir: altura en metros y fracción de open_duration que dura la
-## subida (el resto es el rebote de bajada).
-const OPEN_HOP_HEIGHT: float = 0.3
-const OPEN_HOP_UP_SHARE: float = 0.4
+@export_group("Brillo por rareza")
+## Energía de emisión del modelo según la rareza (clave: id de rareza en inglés).
+@export var glow_energy_by_rarity: Dictionary[String, float] = {
+	"Common": 0.2, "Rare": 0.5, "Epic": 0.85, "Legendary": 0.85,
+}
+## Energía de emisión de un cofre gratis (no tiene rareza hasta abrirse).
+@export var free_glow_energy: float = 0.85
 ## Tinte de los cofres gratis (fuera de los cuatro colores de rareza).
-const FREE_TINT: Color = Color(1.0, 0.93, 0.72)
-## Aviso del cofre gratis: no hay precio, así que no hay variante "te faltan".
-const FREE_PROMPT: String = "[E] Abrir cofre — gratis"
-
-@onready var _lid_pivot: Node3D = get_node_or_null("Visual/LidPivot")
+@export var free_tint: Color = Color(1.0, 0.93, 0.72)
+## Rarezas (ids en inglés) que encienden la luz GlowLight de la escena; los cofres gratis siempre la encienden.
+@export var lit_rarities: Array[String] = ["Epic", "Legendary"]
+## Textura del modelo que usa el material con brillo; se carga al aparecer.
+@export_file("*.png") var model_texture_path: String = "res://assets/models/chest/Textures/colormap.png"
 
 ## Quien abrió el cofre (en co-op, el objeto le llega a ÉL).
 var _opener: Node = null
-## La luz del brillo, guardada para que make_free la recolore en vez de
-## añadir otra.
-var _glow_light: OmniLight3D = null
+
+@onready var _glow_light: OmniLight3D = $Visual/GlowLight
 
 
 func _ready() -> void:
@@ -140,20 +148,16 @@ func _interact(player: Node) -> void:
 	consume()
 	var rest_y := position.y
 	var tween := create_tween()
-	tween.set_parallel(true)
-	if _lid_pivot != null:
-		tween.tween_property(_lid_pivot, "rotation:x", lid_open_angle, open_duration) \
-				.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 	var ap := get_node_or_null("Visual/ChestModel/AnimationPlayer") as AnimationPlayer
 	if ap != null and ap.has_animation("open"):
 		ap.play("open")
-	tween.tween_property(self, "position:y", rest_y + OPEN_HOP_HEIGHT,
-			open_duration * OPEN_HOP_UP_SHARE) \
+	tween.tween_property(self, "position:y", rest_y + open_hop_height,
+			open_duration * open_hop_up_share) \
 			.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
-	tween.chain().tween_property(self, "position:y", rest_y,
-			open_duration * (1.0 - OPEN_HOP_UP_SHARE)) \
+	tween.tween_property(self, "position:y", rest_y,
+			open_duration * (1.0 - open_hop_up_share)) \
 			.set_trans(Tween.TRANS_BOUNCE).set_ease(Tween.EASE_OUT)
-	tween.chain().tween_callback(_pop_reward)
+	tween.tween_callback(_pop_reward)
 
 
 func _pop_reward() -> void:
@@ -192,42 +196,33 @@ func _pop_reward() -> void:
 	sink_away(reward_linger)
 
 
-## Pinta el cofre con el color de su rareza (o el tinte gratis), con
-## emisión para que se lea de noche.
+## Pinta el modelo con el color de su rareza (o free_tint), con emisión para
+## que se lea de noche, y enciende GlowLight en las rarezas de lit_rarities.
 func _tint_by_rarity() -> void:
-	var color := FREE_TINT if free_open else ItemCatalog.rarity_color(rarity)
-	var material := StandardMaterial3D.new()
-	material.albedo_color = color
-	material.metallic = 0.6
-	material.roughness = 0.35
-	material.emission_enabled = true
-	material.emission = color
-	material.emission_energy_multiplier = 0.3 if (not free_open and rarity == "Common") else 0.9
-	for path: String in ["Visual/Band", "Visual/Lock", "Visual/LidPivot/LidTrim"]:
-		var mesh_instance := get_node_or_null(path) as MeshInstance3D
-		if mesh_instance != null:
-			mesh_instance.material_override = material
-
+	var color := free_tint if free_open else ItemCatalog.rarity_color(rarity)
 	var model := get_node_or_null("Visual/ChestModel")
 	if model != null:
-		var tex = load("res://assets/models/chest/Textures/colormap.png")
 		var chest_mat := StandardMaterial3D.new()
-		if tex:
-			chest_mat.albedo_texture = tex
+		var texture := load(model_texture_path) as Texture2D
+		if texture != null:
+			chest_mat.albedo_texture = texture
 		chest_mat.emission_enabled = true
 		chest_mat.emission = color
-		chest_mat.emission_energy_multiplier = 0.2 if (not free_open and rarity == "Common") else (0.5 if rarity == "Rare" else 0.85)
+		chest_mat.emission_energy_multiplier = _glow_energy()
 		for node: Node in model.find_children("*", "MeshInstance3D", true, false):
 			var mi := node as MeshInstance3D
 			mi.material_override = chest_mat
-	if free_open or rarity == "Epic" or rarity == "Legendary":
-		if _glow_light == null:
-			_glow_light = OmniLight3D.new()
-			_glow_light.light_energy = 1.6
-			_glow_light.omni_range = 5.0
-			_glow_light.position = Vector3.UP * 1.2
-			add_child(_glow_light)
+	if free_open or rarity in lit_rarities:
+		_glow_light.visible = true
 		_glow_light.light_color = color
+
+
+## Energía del brillo: la de un cofre gratis mientras no tiene rareza, si no
+## la de su rareza.
+func _glow_energy() -> float:
+	if free_open and rarity.is_empty():
+		return free_glow_energy
+	return float(glow_energy_by_rarity.get(rarity, free_glow_energy))
 
 
 ## El cofre gratis tiene su propio marcador: en un mapa de 240 m, "vale la

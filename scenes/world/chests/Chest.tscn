@@ -29,6 +29,12 @@ shape = SubResource("CylinderShape3D_zone")
 [node name="ChestModel" parent="Visual" instance=ExtResource("2_model")]
 transform = Transform3D(1.7, 0, 0, 0, 1.7, 0, 0, 0, 1.7, 0, 0, 0)
 
+[node name="GlowLight" type="OmniLight3D" parent="Visual"]
+visible = false
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.2, 0)
+light_energy = 1.6
+omni_range = 5.0
+
 [node name="StaticBox" type="StaticBody3D" parent="." unique_id=1620591263]
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="StaticBox" unique_id=1699933929]
