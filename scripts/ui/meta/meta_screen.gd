@@ -8,12 +8,13 @@ extends Control
 ## vive aquí, así un arreglo llega a las tres a la vez.
 ##
 ## Contrato de escena (QuestLog.tscn / RelicShop.tscn / Collection.tscn):
-## %TitleLabel, %BadgeLabel, %List (VBoxContainer dentro de un
-## ScrollContainer) y %BackButton. El texto del título vive en la escena.
+## %BadgeLabel, %List (VBoxContainer dentro de un ScrollContainer) y
+## %BackButton. El título vive entero en la escena (texto, fuente, color), y
+## el color de texto de %BadgeLabel en la escena también pinta su píldora.
 ##
-## Ganchos de las subclases: _badge_color(), _tracks_shards() y
-## _build_rows(list). Momentos compartidos que llama una subclase: payoff()
-## (reclamar / comprar), reject() (no alcanza) y rebuild().
+## Ganchos de las subclases: _tracks_shards() y _build_rows(list). Momentos
+## compartidos que llama una subclase: payoff() (reclamar / comprar),
+## reject() (no alcanza) y rebuild().
 
 ## Destello de la fila (modulate) al pagar.
 const PAYOFF_FLASH := Color(1.7, 1.45, 0.85)
@@ -29,7 +30,6 @@ const COUNT_TIME := 0.4
 ## botón de fila al que mover el foco (ver _input).
 const SCROLL_STEP := 110
 
-@onready var _title_label: Label = %TitleLabel
 @onready var _badge_label: Label = %BadgeLabel
 @onready var _list: VBoxContainer = %List
 @onready var _back_button: Button = %BackButton
@@ -41,8 +41,7 @@ var _count_tween: Tween = null
 
 func _ready() -> void:
 	Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
-	UiTheme.style_title(_title_label, 40, UiTheme.ACCENT_AMBER, 8, 10)
-	var badge := _badge_color()
+	var badge := _badge_label.get_theme_color(&"font_color")
 	UiTheme.style_badge(_badge_label, badge, UiTheme.PANEL_BG, badge.darkened(0.45))
 	_badge_label.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	UiTheme.style_button(_back_button, UiTheme.ACCENT, true)
@@ -282,11 +281,6 @@ static func label(label_text: String, font_size: int, color: Color) -> Label:
 
 
 # --- ganchos de las subclases -----------------------------------------
-
-## Color de la insignia (y de su texto). Azul de esquirla por defecto.
-func _badge_color() -> Color:
-	return UiTheme.SHARD_BLUE
-
 
 ## False en las pantallas cuya insignia no es un saldo de esquirlas (la
 ## Colección escribe su propio porcentaje al reconstruir).

@@ -45,11 +45,7 @@ const BESTIARY: Array[Dictionary] = [
 ]
 
 
-## Insignia turquesa: esta pantalla cuenta descubrimientos, no esquirlas.
-func _badge_color() -> Color:
-	return UiTheme.ACCENT
-
-
+## La insignia cuenta descubrimientos, no esquirlas.
 func _tracks_shards() -> bool:
 	return false
 

@@ -1,9 +1,13 @@
 shader_type canvas_item;
-// Fondo de los menús (CharacterSelect, QuestLog, Collection, RelicShop):
-// degradado vertical oscuro con dos capas de niebla de ruido que se mueven
-// lento y una viñeta en las esquinas. Todo procedural, sin texturas: dos
-// capas de ruido de cuatro muestras cada una cuestan casi nada a pantalla
-// completa.
+// Fondo de los menús: degradado vertical oscuro con dos capas de niebla de
+// ruido que se mueven lento y una viñeta en las esquinas. Todo procedural,
+// sin texturas: dos capas de ruido de cuatro muestras cada una cuestan casi
+// nada a pantalla completa.
+// Lo usan las cuatro pantallas (CharacterSelect, QuestLog, Collection,
+// RelicShop) a través de un solo material, assets/ui/menu_backdrop.tres, que
+// no guarda valores propios: los colores, la fuerza de la niebla y su
+// velocidad que se ven son los valores por defecto de abajo. Edítalos aquí, o
+// en el Inspector del material (lo que guarde el material gana).
 
 uniform vec3 top_color: source_color = vec3(0.07, 0.085, 0.135);
 uniform vec3 bottom_color: source_color = vec3(0.028, 0.032, 0.052);

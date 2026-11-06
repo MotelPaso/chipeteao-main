@@ -19,7 +19,6 @@ const VOLUME_MIN := 0.0
 const VOLUME_MAX := 100.0
 
 @onready var _panel: PanelContainer = %Panel
-@onready var _title_label: Label = %TitleLabel
 @onready var _sfx_slider: HSlider = %SfxSlider
 @onready var _ambient_slider: HSlider = %AmbientSlider
 @onready var _sensitivity_slider: HSlider = %SensitivitySlider
@@ -210,13 +209,14 @@ func _apply_ranges() -> void:
 	_sensitivity_slider.max_value = SaveData.MAX_MOUSE_SENSITIVITY
 
 
-## Sistema de diseño UiTheme: panel y titular compartidos, sliders con canal
-## lleno y agarrador redondo turquesa, botón Volver turquesa.
+## Sistema de diseño UiTheme: panel compartido, sliders con canal lleno y
+## agarrador redondo turquesa, interruptores de píldora y botón Volver
+## turquesa. El título, las etiquetas y los encabezados de sección (SONIDO /
+## CONTROLES / PANTALLA) tienen su aspecto en la escena.
 func _apply_styles() -> void:
 	_apply_ranges()
 	_panel.add_theme_stylebox_override("panel",
 			UiTheme.panel(UiTheme.PANEL_BG, UiTheme.BORDER_DIM, 32.0, 24.0))
-	UiTheme.style_title(_title_label, 30, Color(0.96, 0.93, 0.82), 6, 8)
 	var grabber := UiTheme.grabber_icon(UiTheme.ACCENT)
 	var grabber_hi := UiTheme.grabber_icon(UiTheme.ACCENT.lightened(0.25))
 	for slider: HSlider in [_sfx_slider, _ambient_slider, _sensitivity_slider]:
@@ -234,8 +234,6 @@ func _apply_styles() -> void:
 		slider.add_theme_icon_override("grabber", grabber)
 		slider.add_theme_icon_override("grabber_highlight", grabber_hi)
 		slider.add_theme_icon_override("grabber_disabled", grabber)
-	for value_label: Label in [_sensitivity_value, _sfx_value, _ambient_value]:
-		value_label.add_theme_color_override("font_color", UiTheme.ACCENT)
 	for check: CheckButton in [_fullscreen_check, _fps_check]:
 		UiTheme.style_toggle(check)
 	for button: Button in _quality_buttons:
@@ -244,34 +242,4 @@ func _apply_styles() -> void:
 		chosen.border_color = UiTheme.ACCENT
 		button.add_theme_stylebox_override("hover_pressed", chosen)
 		button.add_theme_color_override("font_hover_pressed_color", UiTheme.TEXT_BRIGHT)
-	_add_section_headers()
 	UiTheme.style_button(_back_button, UiTheme.ACCENT, true)
-
-
-## Encabezados chicos y espaciados que agrupan las filas (sonido / controles
-## / pantalla), cada uno con una línea tenue, para que el panel se lea por
-## secciones y no como una lista plana.
-func _add_section_headers() -> void:
-	var vbox := _title_label.get_parent()
-	var sections: Array = [
-		["SONIDO", _sfx_slider.get_parent()],
-		["CONTROLES", _sensitivity_slider.get_parent()],
-		["PANTALLA", _fullscreen_check.get_parent()],
-	]
-	for section: Array in sections:
-		var header := VBoxContainer.new()
-		header.add_theme_constant_override("separation", 4)
-		var text := Label.new()
-		text.text = String(section[0])
-		text.add_theme_font_override("font", UiTheme.spaced_font(3))
-		text.add_theme_font_size_override("font_size", 12)
-		text.add_theme_color_override("font_color", UiTheme.TEXT_FAINT)
-		header.add_child(text)
-		var rule := ColorRect.new()
-		rule.custom_minimum_size = Vector2(0.0, 1.0)
-		rule.color = Color(UiTheme.BORDER_DIM, 0.5)
-		rule.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		header.add_child(rule)
-		var row: Control = section[1]
-		vbox.add_child(header)
-		vbox.move_child(header, row.get_index())

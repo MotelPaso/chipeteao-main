@@ -2,15 +2,13 @@
 
 [ext_resource type="Script" uid="uid://ddfplghyqfu1e" path="res://scripts/ui/meta/character_select.gd" id="1_charselect"]
 [ext_resource type="PackedScene" path="res://scenes/ui/SettingsPanel.tscn" id="2_settingspanel"]
-[ext_resource type="Shader" uid="uid://cnndc4w2t8jrk" path="res://assets/ui/menu_backdrop.gdshader" id="3_backdrop"]
+[ext_resource type="Material" path="res://assets/ui/menu_backdrop.tres" id="3_backdrop"]
 
-[sub_resource type="ShaderMaterial" id="ShaderMaterial_backdrop"]
-shader = ExtResource("3_backdrop")
-shader_parameter/top_color = Color(0.07, 0.085, 0.135, 1)
-shader_parameter/bottom_color = Color(0.028, 0.032, 0.052, 1)
-shader_parameter/fog_color = Color(0.18, 0.26, 0.33, 1)
-shader_parameter/fog_strength = 0.2
-shader_parameter/drift_speed = 0.03
+[sub_resource type="FontVariation" id="FontVariation_title"]
+spacing_glyph = 10
+
+[sub_resource type="FontVariation" id="FontVariation_subtitle"]
+spacing_glyph = 2
 
 [node name="CharacterSelect" type="Control" unique_id=183065464]
 layout_mode = 3
@@ -22,7 +20,7 @@ grow_vertical = 2
 script = ExtResource("1_charselect")
 
 [node name="Background" type="ColorRect" parent="." unique_id=136765249]
-material = SubResource("ShaderMaterial_backdrop")
+material = ExtResource("3_backdrop")
 layout_mode = 0
 anchor_right = 1.0
 anchor_bottom = 1.0
@@ -42,6 +40,7 @@ text = "Esquirlas: 0"
 horizontal_alignment = 2
 
 [node name="Layout" type="MarginContainer" parent="." unique_id=1388084542]
+unique_name_in_owner = true
 layout_mode = 0
 anchor_right = 1.0
 anchor_bottom = 1.0
@@ -57,15 +56,19 @@ theme_override_constants/separation = 12
 [node name="TitleLabel" type="Label" parent="Layout/VBox" unique_id=371227716]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_colors/font_color = Color(0.96, 0.78, 0.3, 1)
-theme_override_font_sizes/font_size = 48
+theme_override_colors/font_color = Color(0.98, 0.76, 0.28, 1)
+theme_override_colors/font_outline_color = Color(0.03, 0.035, 0.06, 0.92)
+theme_override_constants/outline_size = 12
+theme_override_fonts/font = SubResource("FontVariation_title")
+theme_override_font_sizes/font_size = 52
 text = "CHIPETIAO"
 horizontal_alignment = 1
 
 [node name="SubtitleLabel" type="Label" parent="Layout/VBox" unique_id=1758191480]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_colors/font_color = Color(0.72, 0.74, 0.78, 1)
+theme_override_colors/font_color = Color(0.66, 0.69, 0.75, 1)
+theme_override_fonts/font = SubResource("FontVariation_subtitle")
 theme_override_font_sizes/font_size = 16
 text = "Elige tu personaje!1!11!"
 horizontal_alignment = 1
@@ -87,6 +90,7 @@ theme_override_constants/separation = 12
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 4
+editor_description = "Las columnas las recalcula character_select.gd al abrir y al cambiar el tamaño de la ventana (nunca menos de grid_min_columns): este 4 solo se ve en el editor."
 theme_override_constants/h_separation = 18
 theme_override_constants/v_separation = 14
 columns = 4

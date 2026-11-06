@@ -95,7 +95,7 @@ func open(victory: bool) -> void:
 	# Ningún reloj termina la partida: victoria es haber cumplido la meta de
 	# supervivencia antes del final (muerte o extracción).
 	var ending: Dictionary = ENDINGS[_ending_key(victory, not _party_wiped())]
-	UiTheme.style_title(_title_label, 72, ending.color as Color, 8, 14)
+	_title_label.add_theme_color_override("font_color", ending.color as Color)
 	_title_label.text = String(ending.title)
 	_subtitle_label.text = String(ending.subtitle)
 	var total: int = int(RunState.run_time)
@@ -221,10 +221,10 @@ func _on_quit_pressed() -> void:
 	get_tree().quit()
 
 
-## Sistema de diseño UiTheme: subtítulo espaciado, panel de estadísticas con
-## línea de acento y Reintentar turquesa como botón principal.
+## Sistema de diseño UiTheme: panel de estadísticas con línea de acento y
+## Reintentar turquesa como botón principal. La tipografía del título y del
+## subtítulo vive en la escena; el color del título lo elige el final.
 func _apply_styles() -> void:
-	_subtitle_label.add_theme_font_override("font", UiTheme.spaced_font(2))
 	_stats_panel.add_theme_stylebox_override("panel",
 			UiTheme.panel(UiTheme.PANEL_BG, UiTheme.BORDER_DIM, 26.0, 16.0))
 	UiTheme.style_button(_retry_button, UiTheme.ACCENT, true)

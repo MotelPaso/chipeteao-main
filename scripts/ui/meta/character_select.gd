@@ -42,10 +42,6 @@ const SEGMENT_BUTTON_SIZE := Vector2(64, 36)
 ## Las cartas no elegidas quedan algo atenuadas para que la elegida se lea de
 ## un vistazo.
 const UNSELECTED_DIM := Color(0.8, 0.82, 0.86)
-## Margen lateral (píxeles) del MarginContainer Layout de la escena, para que
-## el cálculo de columnas mida el ancho real de la cuadrícula. Debe coincidir
-## con margin_left/margin_right de Layout en CharacterSelect.tscn.
-const LAYOUT_SIDE_MARGIN := 24.0
 ## La cuadrícula nunca baja de estas columnas y apunta a no pasar de estas
 ## filas antes de ensancharse (una más alta se desplaza).
 const GRID_MIN_COLUMNS := 4
@@ -53,6 +49,8 @@ const GRID_TARGET_ROWS := 3
 
 @onready var _title_label: Label = %TitleLabel
 @onready var _subtitle_label: Label = %SubtitleLabel
+## Sus márgenes laterales descuentan el ancho que recibe la cuadrícula.
+@onready var _layout: MarginContainer = %Layout
 @onready var _cards_grid: GridContainer = %CardsGrid
 ## HFlowContainer: los botones bajan a una segunda línea en una ventana
 ## angosta en vez de salirse.
@@ -164,7 +162,9 @@ func _exit_tree() -> void:
 ## la cuadrícula en vez de empujar filas (y el botón principal) fuera.
 func _update_grid_columns() -> void:
 	var separation := float(_cards_grid.get_theme_constant(&"h_separation"))
-	var available := get_viewport_rect().size.x - LAYOUT_SIDE_MARGIN * 2.0
+	var side_margins := _layout.get_theme_constant(&"margin_left") \
+			+ _layout.get_theme_constant(&"margin_right")
+	var available := get_viewport_rect().size.x - float(side_margins)
 	var fits := maxi(1, floori((available + separation) / (CARD_SIZE.x + separation)))
 	var wanted := maxi(GRID_MIN_COLUMNS, ceili(
 			float(CharacterCatalog.CHARACTER_LIBRARY.size()) / float(GRID_TARGET_ROWS)))
@@ -345,14 +345,12 @@ func _refresh_start_button() -> void:
 		_start_button.text = "Iniciar incursión — %s" % String(picked.display_name)
 
 
-## Tipografía del título, el subtítulo y las esquirlas, y el pulso lento de
-## brillo del título (el movimiento dice "vivo", nunca "ocupado").
+## La píldora del saldo (en el color de texto que tiene en la escena) y el
+## pulso lento de brillo del título (el movimiento dice "vivo", nunca
+## "ocupado"). La tipografía del título y del subtítulo vive en la escena.
 func _apply_chrome() -> void:
-	UiTheme.style_title(_title_label, 52, UiTheme.ACCENT_AMBER, 10, 12)
-	_subtitle_label.add_theme_font_override("font", UiTheme.spaced_font(2))
-	_subtitle_label.add_theme_color_override("font_color", UiTheme.TEXT_DIM)
-	UiTheme.style_badge(_shards_label, UiTheme.SHARD_BLUE,
-			UiTheme.PANEL_BG, UiTheme.SHARD_BLUE.darkened(0.45))
+	var badge := _shards_label.get_theme_color(&"font_color")
+	UiTheme.style_badge(_shards_label, badge, UiTheme.PANEL_BG, badge.darkened(0.45))
 	if _title_tween != null and _title_tween.is_valid():
 		_title_tween.kill()
 	_title_tween = create_tween().set_loops()
