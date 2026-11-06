@@ -2,7 +2,7 @@ class_name SealRig
 extends Node3D
 ## Rig visual del cuerpo del raider; solo cosmético (la colisión vive en
 ## Player). El modelo sale de la fila del personaje (setup(), lo llama
-## Player._apply_character) y sin modelo es la foca (assets/models/foca.glb).
+## Player._apply_character) y sin modelo es la foca (DEFAULT_MODEL_SCENE).
 ## Maneja el tinte del personaje, oculta el piso horneado SUELO del modelo y
 ## suma movimiento procedural al hijo Model: respiración, inclinación y
 ## rebote al moverse, estiramiento al saltar, aplastado al derrapar y la
@@ -22,27 +22,27 @@ const DEFAULT_MODEL_SCENE := "res://assets/models/foca_character.tscn"
 ## modelos pueden no tenerlo.
 const HIDDEN_NODE_NAME := "SUELO"
 
-@export_group("Idle")
+@export_group("Reposo")
 ## Amplitud de la respiración sobre la escala Y (0.02 = ±2 %).
 @export var breathe_amount: float = 0.02
 ## Velocidad de la respiración, en radianes por segundo.
 @export var breathe_speed: float = 2.2
 
-@export_group("Movement")
+@export_group("Movimiento")
 ## Inclinación máxima hacia donde se mueve, en radianes, a velocidad completa.
 @export var lean_max: float = 0.14
 ## Altura del rebote a velocidad completa sobre el suelo, en metros.
 @export var bob_amount: float = 0.05
 ## Velocidad del rebote, en radianes por segundo.
 @export var bob_speed: float = 9.0
-## Velocidad horizontal (m/s) que cuenta como "completa" para inclinación y rebote; no sigue a Player.move_speed.
+## Velocidad horizontal, en m/s, a la que inclinación y rebote llegan al máximo; número propio, no sigue a Player.move_speed.
 @export var reference_speed: float = 6.0
-## Velocidad vertical (m/s) que da el estiramiento máximo al saltar o caer; no sigue a Player.jump_velocity.
+## Velocidad vertical, en m/s, que da el estiramiento máximo al saltar o caer; número propio, no sigue a Player.jump_velocity.
 @export var stretch_reference: float = 8.0
 ## Estiramiento máximo de la escala Y en el aire (0.12 = +12 %; el ancho se achica a la par).
 @export var stretch_max: float = 0.12
 
-@export_group("Slide")
+@export_group("Derrape")
 ## Escala Y durante el derrape (más plana que la cápsula: se lee mejor en la foca ancha).
 @export var slide_squash: float = 0.55
 ## Ensanchamiento en X/Z durante el aplastado (multiplicador).
@@ -50,15 +50,17 @@ const HIDDEN_NODE_NAME := "SUELO"
 ## Inclinación de la nariz hacia abajo durante el derrape, en radianes.
 @export var slide_pitch: float = 0.22
 
-@export_group("Death")
+@export_group("Suavizado")
+## Rapidez con que inclinación, rebote y estiramiento alcanzan su objetivo (fracción cerrada por segundo, ver _damp).
+@export var motion_damp_rate: float = 10.0
+## Rapidez del aplastado del derrape (fracción cerrada por segundo); algo mayor para que se lea como un golpe.
+@export var squash_damp_rate: float = 14.0
+
+@export_group("Muerte")
 ## Cuánto se levanta el cuerpo al caer de cara, en metros sobre el origen del modelo (0.55 apoya bien la foca).
 @export var death_lift: float = 0.55
-
-## Ritmos de suavizado, en "fracción cerrada por segundo" (ver _damp):
-## inclinación, rebote y estiramiento se asientan rápido; el aplastado del
-## derrape un poco más, para que se lea como un golpe.
-const MOTION_DAMP_RATE: float = 10.0
-const SQUASH_DAMP_RATE: float = 14.0
+## Duración de la caída de cara al morir, en segundos.
+@export var death_duration: float = 0.5
 
 @onready var _model: Node3D = $Model
 
@@ -166,7 +168,7 @@ func _process(delta: float) -> void:
 	if _dead:
 		return
 	_phase += delta
-	var smoothing := _damp(MOTION_DAMP_RATE, delta)
+	var smoothing := _damp(motion_damp_rate, delta)
 
 	# Objetivos según el movimiento (todos en cero quieto o fuera de un jugador).
 	var target_lean := Vector2.ZERO
@@ -187,7 +189,7 @@ func _process(delta: float) -> void:
 	_bob = lerpf(_bob, bob_amount * speed_factor, smoothing)
 	# Ratio 0.5 (la cápsula agachada) da el aplastado completo.
 	_squash_blend = lerpf(_squash_blend, clampf((1.0 - _slide_ratio) * 2.0, 0.0, 1.0),
-			_damp(SQUASH_DAMP_RATE, delta))
+			_damp(squash_damp_rate, delta))
 
 	# Escala final: respiración * estiramiento * aplastado (conserva más o
 	# menos el volumen).
@@ -217,11 +219,11 @@ func play_death() -> void:
 	_death_tween = create_tween()
 	_death_tween.set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
 	_death_tween.set_parallel(true)
-	_death_tween.tween_property(_model, "rotation:x", -TAU * 0.25, 0.5) \
+	_death_tween.tween_property(_model, "rotation:x", -TAU * 0.25, death_duration) \
 			.set_trans(Tween.TRANS_BOUNCE).set_ease(Tween.EASE_OUT)
-	_death_tween.tween_property(_model, "position:y", death_lift, 0.5) \
+	_death_tween.tween_property(_model, "position:y", death_lift, death_duration) \
 			.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
-	_death_tween.tween_property(_model, "scale", Vector3(1.0, 1.0, 0.8), 0.5) \
+	_death_tween.tween_property(_model, "scale", Vector3(1.0, 1.0, 0.8), death_duration) \
 			.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 
 
@@ -231,8 +233,8 @@ func reset_death() -> void:
 	if not _dead:
 		return
 	_dead = false
-	# Matar el tween PRIMERO: ignora la pausa y dura 0.5 s, así que tras un
-	# rescate rápido seguiría escribiendo encima y la foca parpadearía.
+	# Matar el tween PRIMERO: ignora la pausa y dura death_duration, así que
+	# tras un rescate rápido seguiría escribiendo encima y la foca parpadearía.
 	_kill_death_tween()
 	_model.rotation = Vector3.ZERO
 	_model.position.y = 0.0
