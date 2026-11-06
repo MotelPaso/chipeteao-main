@@ -121,7 +121,7 @@ const POI_PLATFORM_Y: float = 0.5
 ## Activa los eventos del mundo y el clima.
 @export var events_enabled: bool = true
 ## Segundos desde el inicio de la etapa hasta el primer evento.
-@export var first_event_at: float = 75.0
+@export var first_event_at: float = 60.0
 ## Pausa mínima y máxima entre eventos (segundos), antes de acortarse con el minuto.
 @export var event_gap_min: float = 50.0
 @export var event_gap_max: float = 75.0

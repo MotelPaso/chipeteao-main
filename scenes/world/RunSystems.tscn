@@ -20,7 +20,6 @@ script = ExtResource("3_runmgr")
 
 [node name="WorldDirector" type="Node" parent="." unique_id=1873970074]
 script = ExtResource("8_director")
-first_event_at = 60.0
 
 [node name="UpgradeCardUI" parent="." unique_id=1865859061 instance=ExtResource("4_cardui")]
 
