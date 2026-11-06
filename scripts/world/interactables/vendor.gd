@@ -84,6 +84,12 @@ const VENDOR_PANEL_SCENE := preload("res://scenes/ui/modal/VendorPanel.tscn")
 ## Escala final del puesto al encogerse (0-1).
 @export var sink_scale: float = 0.05
 
+@export_group("Toldo")
+## Metros que sube y baja el toldo mientras el puesto atiende.
+@export var sign_bob_height: float = 0.04
+## Velocidad del vaivén del toldo, en radianes por segundo.
+@export var sign_bob_speed: float = 1.6
+
 @export_group("Textos")
 ## Línea que se muestra EN LUGAR de la del puesto mientras corre la espera; %d
 ## son los segundos que faltan. Sin el prefijo "[E] " de los demás prompts: el
@@ -97,11 +103,16 @@ const VENDOR_PANEL_SCENE := preload("res://scenes/ui/modal/VendorPanel.tscn")
 ## Aviso del HUD cuando el puesto se va tras la venta.
 @export var leave_announcement: String = "El vendedor recoge el puesto."
 
+@onready var _figure: MeshInstance3D = $Figure
+@onready var _sign: MeshInstance3D = $Sign
+@onready var _light: OmniLight3D = $Light
+
 var _sold: bool = false
 var _cooldown_left: float = 0.0
 var _ui: VendorUi = null
 var _time: float = 0.0
-var _sign: MeshInstance3D = null
+## Altura de reposo del toldo (la de Vendor.tscn); el vaivén oscila alrededor.
+var _sign_rest_y: float = 0.0
 
 
 func _init() -> void:
@@ -110,19 +121,13 @@ func _init() -> void:
 
 
 func _ready() -> void:
-	var shape := CollisionShape3D.new()
-	var cylinder := CylinderShape3D.new()
-	cylinder.radius = 2.4
-	cylinder.height = 3.5
-	shape.shape = cylinder
-	shape.position.y = 1.75
-	add_child(shape)
 	super()
 	# NO en el grupo "altars": el WorldDirector cuenta ese grupo para su tope de
 	# altares, y un puesto parado ahí dejaría a la partida sin altares.
 	add_to_group(&"vendors")
 	set_prompt(_row_prompt())
-	_build_visual()
+	_sign_rest_y = _sign.position.y
+	_apply_tint()
 
 
 ## La fila de VENDOR_LIBRARY de este puesto (la primera si `kind` es
@@ -152,53 +157,17 @@ func roll_offers(player: Node) -> Array[Dictionary]:
 	return []
 
 
-func _build_visual() -> void:
+## Pinta la figura, el toldo y la luz con el color de la fila del puesto: lo
+## único que insinúa el tipo antes de leer el prompt. Los materiales de la
+## figura y el toldo son locales a cada puesto (resource_local_to_scene), así
+## dos puestos de distinto tipo no se pintan entre sí.
+func _apply_tint() -> void:
 	var tint: Color = row().get("color", Color.WHITE)
-	var stall := MeshInstance3D.new()
-	var counter := BoxMesh.new()
-	counter.size = Vector3(2.2, 1.0, 0.8)
-	stall.mesh = counter
-	var wood := StandardMaterial3D.new()
-	wood.albedo_color = Color(0.35, 0.26, 0.18)
-	stall.material_override = wood
-	stall.position.y = 0.5
-	add_child(stall)
-	# La figura detrás del mostrador: una cápsula del color del puesto, lo único
-	# que insinúa el tipo antes del prompt.
-	var figure := MeshInstance3D.new()
-	var body := CapsuleMesh.new()
-	body.radius = 0.35
-	body.height = 1.5
-	# Teselado explícito (el motor usa 64 lados por defecto); 8 anillos por defecto.
-	body.radial_segments = 16
-	body.rings = 8
-	figure.mesh = body
-	var cloth := StandardMaterial3D.new()
-	cloth.albedo_color = tint
-	cloth.emission_enabled = true
-	cloth.emission = tint
-	cloth.emission_energy_multiplier = 0.5
-	figure.material_override = cloth
-	figure.position = Vector3(0.0, 1.15, -0.7)
-	add_child(figure)
-	_sign = MeshInstance3D.new()
-	var awning := BoxMesh.new()
-	awning.size = Vector3(2.4, 0.12, 1.2)
-	_sign.mesh = awning
-	var awning_material := StandardMaterial3D.new()
-	awning_material.albedo_color = tint
-	awning_material.emission_enabled = true
-	awning_material.emission = tint
-	awning_material.emission_energy_multiplier = 1.1
-	_sign.material_override = awning_material
-	_sign.position.y = 2.2
-	add_child(_sign)
-	var light := OmniLight3D.new()
-	light.light_color = tint
-	light.light_energy = 1.5
-	light.omni_range = 7.0
-	light.position.y = 2.0
-	add_child(light)
+	for mesh: MeshInstance3D in [_figure, _sign]:
+		var material := mesh.material_override as StandardMaterial3D
+		material.albedo_color = tint
+		material.emission = tint
+	_light.light_color = tint
 
 
 func _physics_process(delta: float) -> void:
@@ -206,8 +175,8 @@ func _physics_process(delta: float) -> void:
 	if _cooldown_left > 0.0:
 		_cooldown_left = maxf(_cooldown_left - delta, 0.0)
 		_refresh_cooldown_prompt()
-	if _sign != null and available:
-		_sign.position.y = 2.2 + sin(_time * 1.6) * 0.04
+	if available:
+		_sign.position.y = _sign_rest_y + sin(_time * sign_bob_speed) * sign_bob_height
 
 
 ## La línea propia del puesto, de su fila de VENDOR_LIBRARY.
