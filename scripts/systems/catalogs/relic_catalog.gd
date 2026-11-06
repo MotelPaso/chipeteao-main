@@ -1,27 +1,30 @@
 class_name RelicCatalog
 extends RefCounted
-## Static catalog of Relics (iteration 36): permanent between-run stat
-## upgrades bought with Shards in the Armory screen — the "every defeat
-## still funds the next attempt" retention layer. Data-driven like the
-## other catalogs; a new relic is one row here.
+## Catálogo de reliquias: mejoras permanentes de stats entre incursiones que
+## se compran con esquirlas en la Armería. Una reliquia nueva es una fila aquí.
+## Las cantidades son chicas a propósito (una Armería completa es ~+10% de
+## poder, lejos de un build de tomos): la maestría sigue siendo la curva real.
 ##
-## Design note: this deliberately amends GDD 8's "Shards only buy
-## characters" rule — amounts are small (a maxed armory is ~+10% power,
-## nowhere near a tome build), so mastery stays the real curve while every
-## run still banks visible progress.
+## Se puede cambiar libremente: display_name, description, amount,
+## amount_text, max_ranks, base_cost, cost_growth.
+## Llave interna, NUNCA la cambies: id (llave de SaveData.relic_ranks en el
+## guardado).
+## stat debe ser un efecto de PlayerStats._apply_effect.
 ##
-## Row fields:
-##   id: identifier (English, keys SaveData.relic_ranks) — never shown.
-##   display_name/description: player text; the description's "%s" is
-##             filled with the per-rank amount text.
-##   stat:     PlayerStats effect stat id (see _apply_effect there);
-##             applied every recompute at amount * owned rank.
-##   amount:   effect per rank (percent for multiplier stats, flat for
-##             armor/luck/max_hp).
-##   amount_text: how one rank reads on the row ("+2% damage").
-##   max_ranks / base_cost / cost_growth: rank cap and the Shard price
-##             ladder — rank N costs base_cost * cost_growth^N (rounded).
-## Persistence: SaveData.relic_ranks (purchase_relic / relic_rank).
+## Campos de cada fila:
+##   id: llave interna (ver arriba). Nunca se muestra.
+##   display_name, description: texto del jugador; el "%s" de description se
+##       llena con amount_text.
+##   stat: efecto de PlayerStats; se aplica en cada recompute como
+##       amount * rangos comprados.
+##   amount: efecto por rango (porcentaje en los stats multiplicadores; plano
+##       en armor, luck y max_hp).
+##   amount_text: cómo se lee un rango en la fila ("+2%"); su número debe
+##       coincidir con amount.
+##   max_ranks, base_cost, cost_growth: tope de rangos y escalera de precios en
+##       esquirlas; con N rangos comprados, el siguiente cuesta
+##       base_cost * cost_growth^N (redondeado).
+## Guardado: SaveData.relic_ranks (purchase_relic / relic_rank).
 
 const RELIC_LIBRARY: Array[Dictionary] = [
 	{
@@ -63,20 +66,20 @@ const RELIC_LIBRARY: Array[Dictionary] = [
 ]
 
 
-## Lazily built id -> row index (see CatalogIndex): PlayerStats._apply_relics
-## walks the whole library on every recompute.
+## Índice id -> fila armado al primer uso (ver CatalogIndex):
+## PlayerStats._apply_relics recorre la biblioteca entera en cada recompute.
 static var _by_id: Dictionary[String, Dictionary] = {}
 
 
-## Row for the given id, or an empty Dictionary if unknown.
+## Fila con ese id, o un Dictionary vacío si no existe.
 static func by_id(relic_id: String) -> Dictionary:
 	if _by_id.is_empty():
 		_by_id = CatalogIndex.build(RELIC_LIBRARY)
 	return _by_id.get(relic_id, {})
 
 
-## Shard cost of buying rank `owned_ranks + 1` (0-based owned count), or -1
-## when the relic is unknown or already at its cap.
+## Precio en esquirlas del rango `owned_ranks + 1` (owned_ranks cuenta desde 0),
+## o -1 si la reliquia no existe o ya está en su tope.
 static func next_rank_cost(relic_id: String, owned_ranks: int) -> int:
 	var row := by_id(relic_id)
 	if row.is_empty() or owned_ranks >= int(row.max_ranks):

@@ -1,36 +1,40 @@
 class_name PetCatalog
 extends RefCounted
-## Static catalog of pets (iteration 43, reshaped in 54): immortal
-## companions that trail the raider, carry an extra weapon of their own
-## (outside the 5-weapon cap, never in the upgrade pool) and grant a stat
-## that grows with the run level.
+## Catálogo de mascotas: compañeras inmortales que siguen al raider, llevan un
+## arma propia (fuera del tope de armas y nunca en el pool de mejoras) y dan un
+## stat que crece con el nivel de la incursión.
 ##
-## ONE pet at a time. The run has a single companion slot, so a second pet
-## REPLACES the first — weapon and stat swap together and nothing stacks.
-## Copies went with it: granting the same pet twice changes nothing, which
-## is why every row now declares BOTH a weapon and a stat. A pet is one
-## whole package; a row missing half of it would make a swap a downgrade
-## the player cannot undo.
+## UNA mascota a la vez: hay un solo espacio de compañera, así que una segunda
+## REEMPLAZA a la primera (arma y stat cambian juntos, nada se apila) y repetir
+## la misma no cambia nada. Por eso cada fila declara un arma Y un stat: una
+## fila a medias haría del cambio una pérdida sin vuelta atrás. Las mascotas
+## salen solo de la caja de mascotas (PetBox) y del traficante de animales
+## (Vendor, tipo "animals"), siempre por elección del jugador.
 ##
-## Pets come from exactly two places, both of them a choice the player
-## makes: the pet box (PetBox) and the animal trafficker (Vendor, kind
-## "animals"). Chests and the roulette no longer roll them — a companion
-## you did not pick is a companion that replaced the one you did.
+## Se puede cambiar libremente: display_name, glyph, weapon_damage_scale,
+## stat, amount_per_level, stat_label, shape, color, size, hover.
+## Llave interna, NUNCA la cambies: id (el nodo de la mascota se llama
+## "Pet_<id>").
+## weapon_scene: el nombre del archivo sin .tscn debe ser el node_name de una
+## fila de WEAPON_LIBRARY (StormRod.tscn -> "StormRod"); así se resuelve el
+## nombre del arma que ve el jugador.
 ##
-## Row fields:
-##   id: identifier (also the pet node name suffix) — never shown.
-##   display_name: player text.
-##   glyph:           two-letter tile the HUD draws while there is no
-##             sprite. DECLARED, and unique across the weapon, evolution,
-##             tome, item and power-up glyph sets — the strip mixes them.
-##   weapon_scene:    weapon scene instanced under the pet.
-##   weapon_damage_scale: the pet weapon's damage vs the player version,
-##             and the whole story now that no copies grow it.
-##   stat/amount_per_level: PlayerStats effect gained per run level.
-##   stat_label:      player text; the pet box and the trafficker print it
-##             on every card, so a row without one sells a mystery.
-##   shape/color/size: code-built body (sphere | capsule | box).
-##   hover:           height above the ground the pet floats at.
+## Campos de cada fila:
+##   id: llave interna (ver arriba). Nunca se muestra.
+##   display_name: texto del jugador.
+##   glyph: sigla de dos letras que dibuja el HUD mientras no hay ícono. Se
+##       DECLARA (no se deriva del nombre) y no debe repetirse entre los glifos
+##       de armas, evoluciones, tomos, objetos y power-ups.
+##   weapon_scene: escena del arma que se instancia bajo la mascota.
+##   weapon_damage_scale: daño del arma de la mascota respecto de la versión
+##       del jugador (0-1).
+##   stat, amount_per_level: efecto de PlayerStats que gana por cada nivel de
+##       la incursión.
+##   stat_label: texto del jugador; la caja de mascotas y el traficante lo
+##       muestran en cada carta. Su número debe coincidir con amount_per_level.
+##   shape, color, size: cuerpo hecho en código (sphere | capsule | box); size
+##       en metros.
+##   hover: altura sobre el suelo a la que flota la mascota, en metros.
 
 const PET_LIBRARY: Array[Dictionary] = [
 	{
@@ -58,7 +62,6 @@ const PET_LIBRARY: Array[Dictionary] = [
 		"stat_label": "velocidad de ataque +0.4% por nivel",
 		"shape": "box", "color": Color(0.6, 0.42, 0.25), "size": 0.5, "hover": 0.45,
 	},
-	# Iteration 54 wave: the five companions the team asked for by name.
 	{
 		"id": "doki", "display_name": "Doki", "glyph": "DK",
 		"weapon_scene": "res://scenes/weapons/Boomerang.tscn", "weapon_damage_scale": 0.55,
@@ -68,15 +71,15 @@ const PET_LIBRARY: Array[Dictionary] = [
 	{
 		"id": "pony", "display_name": "Pony", "glyph": "PN",
 		"weapon_scene": "res://scenes/weapons/HuntingBow.tscn", "weapon_damage_scale": 0.5,
-		# Under the band's top on purpose: move speed also feeds Juno's
-		# speed_to_damage passive, so it is worth more than it reads.
+		# Bajo a propósito: la velocidad también alimenta la pasiva
+		# speed_to_damage de Yandere-chan, así que vale más de lo que se lee.
 		"stat": "move_speed", "amount_per_level": 0.4, "stat_label": "velocidad +0.4% por nivel",
 		"shape": "box", "color": Color(0.85, 0.7, 0.45), "size": 0.6, "hover": 0.55,
 	},
 	{
 		"id": "cj7", "display_name": "Cj7", "glyph": "CJ",
-		# Always-on weapons (Aura, Orbes espirituales) sit at the bottom of
-		# the scale band: they never miss a window, so uptime pays the rest.
+		# Las armas siempre activas (Aura, Orbes espirituales) van al fondo de
+		# la banda de escala: nunca pierden una ventana de ataque.
 		"weapon_scene": "res://scenes/weapons/Aura.tscn", "weapon_damage_scale": 0.45,
 		"stat": "lifesteal", "amount_per_level": 0.5, "stat_label": "robo de vida +0.5% por nivel",
 		"shape": "sphere", "color": Color(0.6, 0.9, 0.75), "size": 0.35, "hover": 1.5,
@@ -96,18 +99,19 @@ const PET_LIBRARY: Array[Dictionary] = [
 ]
 
 
-## Lazily built id -> row index (see CatalogIndex): PlayerStats.recompute()
-## resolves one row per following pet.
+## Índice id -> fila armado al primer uso (ver CatalogIndex):
+## PlayerStats.recompute() resuelve una fila por cada mascota que lo sigue.
 static var _by_id: Dictionary[String, Dictionary] = {}
 
 
+## Fila con ese id, o un Dictionary vacío si no existe.
 static func by_id(pet_id: String) -> Dictionary:
 	if _by_id.is_empty():
 		_by_id = CatalogIndex.build(PET_LIBRARY)
 	return _by_id.get(pet_id, {})
 
 
-## Ids in catalog order (the pet box and the trafficker roll from these).
+## Ids en el orden del catálogo.
 static func ids() -> PackedStringArray:
 	var out := PackedStringArray()
 	for row: Dictionary in PET_LIBRARY:
@@ -115,9 +119,9 @@ static func ids() -> PackedStringArray:
 	return out
 
 
-## The pet's weapon under its CATALOG name. The scene file name is the
-## node_name the weapon library keys on (StormRod.tscn -> "StormRod"); the
-## live node is called "PetWeapon", so it cannot answer this.
+## Nombre del arma de la mascota según el catálogo de armas. Sale del nombre
+## del archivo de la escena, que es el node_name de WEAPON_LIBRARY
+## (StormRod.tscn -> "StormRod"); el nodo vivo se llama "PetWeapon" y no sirve.
 static func weapon_display_name(row: Dictionary) -> String:
 	var scene := String(row.get("weapon_scene", ""))
 	if scene.is_empty():

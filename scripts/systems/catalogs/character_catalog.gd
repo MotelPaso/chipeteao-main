@@ -1,60 +1,68 @@
 class_name CharacterCatalog
 extends RefCounted
-## Static catalog of playable characters (GDD 5): each pairs a starting
-## weapon with a scaling per-level passive. Data-driven like TOME_LIBRARY
-## and WEAPON_LIBRARY — a new playable character is one new row here (the
-## select screen and player spawn read the rows; no per-character code).
-## Row fields:
-##   id/display_name/blurb: identity plus the select-card flavor line.
-##   weapon_scene: starting weapon, instanced under the player's Weapons
-##             mount at spawn.
-##   weapon_node_name: instance name; must match the WEAPON_LIBRARY row's
-##             node_name so the upgrade pool sees the weapon as owned.
-##   weapon_display_name: weapon name shown on the select card.
-##   passive_description: passive line shown on the select card.
-##   passive_stat/passive_amount: passive effect as data — a PlayerStats
-##             effect stat id (see _apply_effect there) and the amount
-##             gained per level past 1 (percent for multiplier stats).
-##   passive_kind (optional, default "per_level"): how PlayerStats applies
-##             the passive — "per_level" scales with run level;
-##             "speed_to_damage" converts bonus move speed into bonus
-##             damage at the passive_amount ratio (stat id unused);
-##             "evasion_execute" is per_level scaling plus every dodge
-##             executing a weakened non-boss attacker.
-##   passive_base (optional, default 0): amount already granted at level 1,
-##             before any per-level increments (Doc's starting lifesteal).
-##   unlock_cost: Shards to unlock on the select screen (GDD 5/8); 0 means
-##             playable from the start. SaveData gates and persists the
-##             actual unlocks — this is only the price data.
-##   unlock_boss (optional): hidden-miniboss id whose kill grants this
-##             character for free, bypassing Shards (GDD 5: skill unlocks).
-##             SecretBossBase resolves the reward through by_unlock_boss on
-##             the kill, so the mapping lives here, not in boss code.
-##   unlock_hint (optional): vague select-screen clue for the boss path,
-##             rendered on the locked card beside the Shard price.
-##   tint:     the character's body identity colour (also the card swatch).
-##   model_scene (optional): cosmetic body for THIS character — a model
-##             wrapper scene (like foca_character.tscn) or a raw .glb.
-##             Absent = the seal. Wrapper scenes may carry a walk-animator
-##             script on their root (goku_walk_animation.gd,
-##             yandere_walk_animation.gd, storm_cat_walk.gd): it measures how
-##             far its own node moves each physics tick, so the limbs follow
-##             the player's real movement with no per-character code here.
-##   model_scale (optional): uniform scale multiplier applied on top of the
-##             model scene's own transform — raw .glb rows declare their
-##             sizing (the seal needs 0.6), wrapper scenes carry their own.
-##             Absent/<=0 = no rescaling.
-##   tint_material_prefix (optional): resource_name prefix of THIS model's
-##             tintable materials (each export names them differently;
-##             surfaces whose materials do not carry the prefix stay
-##             untouched). Absent = the seal's "Azul personaje".
-
+## Catálogo de personajes jugables: cada fila une un arma inicial con una
+## pasiva que escala por nivel. Un personaje nuevo es una fila nueva aquí; la
+## pantalla de selección y el spawn del jugador leen las filas, no hay código
+## por personaje.
 ##
-## Player-facing text: display_name, blurb, weapon_display_name,
-## passive_description and unlock_hint. Everything else (id, weapon_scene,
-## weapon_node_name, passive_stat, passive_kind) is an identifier.
+## Se puede cambiar libremente: display_name, blurb, passive_*, unlock_cost,
+## tint, model_*.
+## Llave interna, NUNCA la cambies: id (es la llave del guardado y de las
+## misiones; usa minúsculas y guiones bajos).
+## Cuidado con unlock_cost: poner 0 lo deja gratis para siempre en los
+## guardados existentes. SaveData agrega cada personaje gratis al guardado al
+## cargarlo, y volver a ponerle precio después no lo bloquea de nuevo.
+## weapon_node_name debe ser el node_name de una fila de WEAPON_LIBRARY.
+##
+## Campos de cada fila:
+##   id: llave interna (ver arriba). SaveData guarda los desbloqueos por id y
+##       cuenta runs_as_<id> / wins_as_<id>; las misiones nombran esos
+##       contadores.
+##   display_name, blurb: nombre y frase de la carta de selección.
+##   weapon_scene: escena del arma inicial, instanciada bajo el montaje
+##       Weapons del jugador.
+##   weapon_node_name: nombre del nodo del arma inicial; debe ser el node_name
+##       de su fila en WEAPON_LIBRARY para que el pool de mejoras la cuente
+##       como poseída.
+##   weapon_display_name: nombre del arma en la carta de selección.
+##   passive_description: texto de la pasiva en la carta; sus números deben
+##       coincidir con passive_amount y passive_base.
+##   passive_stat, passive_amount: efecto de la pasiva como dato, un stat de
+##       PlayerStats._apply_effect y lo que gana por cada nivel después del 1
+##       (porcentaje en los stats multiplicadores).
+##   passive_kind (opcional, "per_level" por defecto): cómo la aplica
+##       PlayerStats. "per_level" escala con el nivel de la incursión;
+##       "speed_to_damage" convierte la velocidad de movimiento extra en daño
+##       extra a razón de passive_amount (passive_stat no se usa);
+##       "evasion_execute" escala por nivel y además cada esquive ejecuta a un
+##       atacante debilitado que no sea jefe.
+##   passive_base (opcional, 0 por defecto): cantidad que ya da en el nivel 1,
+##       antes de los aumentos por nivel.
+##   unlock_cost: esquirlas para desbloquearlo en la selección; 0 = jugable
+##       desde el inicio (ver el aviso de arriba). SaveData guarda los
+##       desbloqueos; esto es solo el precio.
+##   unlock_boss (opcional): secret_boss_id del minijefe oculto cuya muerte
+##       regala el personaje sin esquirlas. SecretBossBase lo busca con
+##       by_unlock_boss, así la relación vive aquí y no en el código del jefe.
+##   unlock_hint (opcional): pista vaga para el camino del jefe, en la carta
+##       bloqueada junto al precio.
+##   tint: color de identidad del cuerpo (también la muestra de la carta).
+##   model_scene (opcional): cuerpo cosmético de ESTE personaje, una escena
+##       envoltorio (como foca_character.tscn) o un .glb crudo. Sin él, la
+##       foca. La raíz del envoltorio puede llevar un script de caminata
+##       (goku_walk_animation.gd, storm_cat_walk.gd) que mide cuánto se mueve
+##       su nodo en cada tick de física, así las extremidades siguen el
+##       movimiento real del jugador sin código por personaje.
+##   model_scale (opcional): escala uniforme sobre la transformación propia
+##       del modelo; las filas con .glb crudo declaran su tamaño (la foca usa
+##       0.6) y los envoltorios traen el suyo. Ausente o <= 0 = sin reescalar.
+##   tint_material_prefix (opcional): prefijo del resource_name de los
+##       materiales teñibles de ESTE modelo; las superficies cuyo material no
+##       lleva el prefijo no se tiñen. Ausente = "Azul personaje" de la foca.
+## Texto que ve el jugador: display_name, blurb, weapon_display_name,
+## passive_description y unlock_hint. El resto son identificadores.
 
-## Fallback character when no selection was made (Main booted directly).
+## Personaje de respaldo cuando no hubo selección (arena arrancada directo).
 const DEFAULT_ID: String = "rook"
 
 const CHARACTER_LIBRARY: Array[Dictionary] = [
@@ -77,7 +85,7 @@ const CHARACTER_LIBRARY: Array[Dictionary] = [
 		"weapon_display_name": "Vara de brasas",
 		"passive_description": "+0.7% de área por nivel",
 		"passive_stat": "area", "passive_amount": 0.7,
-		"unlock_cost": 0, # 50
+		"unlock_cost": 0,
 		"model_scene": "res://assets/models/fuego_character.tscn",
 		"tint": Color(0.89, 0.45, 0.18),
 	},
@@ -91,7 +99,7 @@ const CHARACTER_LIBRARY: Array[Dictionary] = [
 		"passive_stat": "damage", "passive_amount": 0.6,
 		"model_scene": "res://assets/models/yandere_character.tscn",
 		"passive_kind": "speed_to_damage",
-		"unlock_cost": 0, # 80
+		"unlock_cost": 0,
 		"tint": Color(0.24, 0.55, 0.32),
 	},
 	{
@@ -102,7 +110,7 @@ const CHARACTER_LIBRARY: Array[Dictionary] = [
 		"weapon_display_name": "Orbes espirituales",
 		"passive_description": "+1.0% de xp por nivel",
 		"passive_stat": "xp", "passive_amount": 1.0,
-		"unlock_cost": 0, # 120
+		"unlock_cost": 0,
 		"tint": Color(0.55, 0.85, 0.95),
 	},
 	{
@@ -114,7 +122,7 @@ const CHARACTER_LIBRARY: Array[Dictionary] = [
 		"passive_description": "+1 de suerte por nivel (cartas más raras)",
 		"passive_stat": "luck", "passive_amount": 1.0,
 		"model_scene": "res://assets/models/storm_cat_character.tscn",
-		"unlock_cost": 0, # 130
+		"unlock_cost": 0,
 		"tint": Color(0.35, 0.45, 0.85),
 	},
 	{
@@ -126,10 +134,9 @@ const CHARACTER_LIBRARY: Array[Dictionary] = [
 		"passive_description": "+1% de robo de vida por nivel (base +5%)",
 		"passive_stat": "lifesteal", "passive_amount": 1.0,
 		"passive_base": 5.0,
-		"unlock_cost": 0, # 150
+		"unlock_cost": 0,
 		"tint": Color(0.72, 0.16, 0.2),
 	},
-	# Iteration 43 roster: the slime, stench and beam starters.
 	{
 		"id": "Moka", "display_name": "Moka",
 		"blurb": "Una foca muy watona.",
@@ -164,18 +171,16 @@ const CHARACTER_LIBRARY: Array[Dictionary] = [
 		"unlock_cost": 0,
 		"tint": Color(0.4, 0.7, 1.0),
 	},
-	# Iteration 54 roster: the team's three picks. The display names are
-	# their own words and ship verbatim — no sentence case, no translation
-	# (GLOSARIO rule 5). All three cost 0, so starter_ids() grows from two
-	# to five and SaveData appends them to existing saves on load.
+	# Los display_name de las tres filas siguientes son palabras textuales del
+	# equipo: no se traducen ni se pasan a caja de oración (GLOSARIO, regla 5).
 	{
 		"id": "boxer", "display_name": "Boxeador",
 		"blurb": "Pega primero, pega dos veces y nunca pregunta nombres.",
 		"weapon_scene": "res://scenes/weapons/TwinDaggers.tscn",
 		"weapon_node_name": "TwinDaggers",
 		"weapon_display_name": "Dagas gemelas",
-		# Under Vex's 0.5 on purpose: the daggers swing far more often than
-		# the pistol, so a point of crit is worth more per level here.
+		# Bajo a propósito: las dagas golpean muy seguido, así que cada punto
+		# de crítico rinde más por nivel.
 		"passive_description": "+0.4% de prob. de crítico por nivel",
 		"passive_stat": "crit_chance", "passive_amount": 0.4,
 		"unlock_cost": 0,
@@ -187,8 +192,7 @@ const CHARACTER_LIBRARY: Array[Dictionary] = [
 		"weapon_scene": "res://scenes/weapons/DartPistol.tscn",
 		"weapon_node_name": "DartPistol",
 		"weapon_display_name": "Pistola de dardos",
-		# Torren keeps luck at 1.0 per level: a free starter matching him
-		# would leave nothing to buy for his 130 esquirlas.
+		# Menos suerte por nivel que Electro Gato (1.0) a propósito.
 		"passive_description": "+0.6 de suerte por nivel",
 		"passive_stat": "luck", "passive_amount": 0.6,
 		"model_scene": "res://assets/models/gucci_morty.tscn",
@@ -201,8 +205,8 @@ const CHARACTER_LIBRARY: Array[Dictionary] = [
 		"weapon_scene": "res://scenes/weapons/Aura.tscn",
 		"weapon_node_name": "Aura",
 		"weapon_display_name": "Aura",
-		# Move speed IS the Aura's damage stat: a ring that only burns what
-		# it touches scales with how much ground the raider covers.
+		# La velocidad ES el stat de daño del Aura: un anillo que solo quema
+		# lo que toca rinde según cuánto terreno cubre el raider.
 		"passive_description": "+0.8% de velocidad de movimiento por nivel",
 		"passive_stat": "move_speed", "passive_amount": 0.8,
 		"unlock_cost": 0,
@@ -213,28 +217,28 @@ const CHARACTER_LIBRARY: Array[Dictionary] = [
 ]
 
 
-## Lazily built lookups (see CatalogIndex): the select screen resolves a
-## row per card per redraw, and the player spawn one per raider.
+## Índices armados al primer uso (ver CatalogIndex): la selección resuelve
+## una fila por carta en cada redibujo y el spawn una por raider.
 static var _by_id: Dictionary[String, Dictionary] = {}
 static var _by_unlock_boss: Dictionary[String, Dictionary] = {}
 
 
-## Row for the given id, or an empty Dictionary if unknown.
+## Fila con ese id, o un Dictionary vacío si no existe.
 static func by_id(character_id: String) -> Dictionary:
 	if _by_id.is_empty():
 		_by_id = CatalogIndex.build(CHARACTER_LIBRARY)
 	return _by_id.get(character_id, {})
 
 
-## Row for the given id, falling back to the default character so spawn
-## paths always get a valid loadout (e.g. a stale or mistyped saved id).
+## Fila con ese id, o la del personaje por defecto, así el spawn siempre
+## recibe un equipo válido (por ejemplo, con un id viejo o mal escrito).
 static func by_id_or_default(character_id: String) -> Dictionary:
 	var row := by_id(character_id)
 	return row if not row.is_empty() else by_id(DEFAULT_ID)
 
 
-## Row whose unlock_boss names the given hidden-miniboss id, or an empty
-## Dictionary when no character unlocks off that boss.
+## Fila cuyo unlock_boss nombra ese minijefe oculto, o un Dictionary vacío
+## si ningún personaje se desbloquea con él.
 static func by_unlock_boss(boss_id: String) -> Dictionary:
 	if boss_id.is_empty():
 		return {}
@@ -243,9 +247,9 @@ static func by_unlock_boss(boss_id: String) -> Dictionary:
 	return _by_unlock_boss.get(boss_id, {})
 
 
-## Ids playable from the start (unlock_cost 0) — Rook and Vex from GDD 5,
-## plus the iteration-54 trio.
-## SaveData seeds a fresh save's unlocked list from this.
+## Ids jugables desde el inicio (unlock_cost 0). SaveData arma con esta
+## lista los desbloqueos de un guardado nuevo y la agrega a cada guardado al
+## cargarlo.
 static func starter_ids() -> Array[String]:
 	var ids: Array[String] = []
 	for row: Dictionary in CHARACTER_LIBRARY:

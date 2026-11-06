@@ -1,116 +1,116 @@
 extends Node
-## Autoload "SaveData": the between-runs meta-progression ledger (GDD 8) —
-## Shard balance, unlocked/purchased characters, lifetime quest counters,
-## and completed/claimed quest ids — persisted as JSON at user://save.json.
-## Shards buy character unlocks and, since iteration 36, Armory relic ranks
-## (small permanent stat buffs — RelicCatalog keeps the amounts modest so
-## mastery, not grinding, remains the real power curve per GDD 8's intent).
+## Autoload "SaveData": el libro de progreso entre incursiones (saldo de
+## esquirlas, personajes desbloqueados y comprados, contadores de misiones de
+## toda la vida, misiones completadas y reclamadas, rangos de reliquias y
+## ajustes), guardado como JSON en user://save.json.
 ##
-## Write points: fold_run_results() on every run end (RunManager), plus
-## purchases and quest claims. Mid-run systems credit counters with bump()
-## / raise_to(), which land in a RUN BUFFER (_run_counters/_run_highs) that
-## only a run END merges into the persisted ledger — so an abandoned run
-## persists nothing even though a purchase, a quest claim or a secret-boss
-## unlock can write the file while that run is still going. RunState.reset()
-## drops whatever is pending (run start and the abandon path both go
-## through it). Progress readouts use stat() (ledger + buffer); quest
-## completion deliberately reads the LEDGER only, so a quest can never be
-## marked complete off counters that a later abandon rolls back.
+## Escrituras: fold_run_results() al terminar cada incursión (RunManager), más
+## las compras y los reclamos de misiones. Durante una incursión los sistemas
+## suman con bump() / raise_to(), que caen en un BÚFER DE INCURSIÓN
+## (_run_counters/_run_highs); solo el FINAL de la incursión lo mezcla con el
+## libro. Así una incursión abandonada no guarda nada, aunque una compra, un
+## reclamo o el desbloqueo de un jefe secreto escriban el archivo mientras
+## sigue en curso. RunState.reset() descarta lo pendiente (el inicio de una
+## incursión y el abandono pasan por ahí). Las lecturas de progreso usan
+## stat() (libro + búfer); completar misiones lee SOLO el libro, para que una
+## misión nunca quede completa por contadores que un abandono deshace.
 ##
-## Canonical counter stat ids (quest_catalog rows target these; map
-## unlock rules in map_catalog target them too):
+## Ids de contadores (las filas de QuestCatalog los nombran en `stat`):
 ##   total_kills, bosses_killed, runs_finished, victories, shrines_used,
-##   chests_opened, max_level (high-water), best_run_minutes (high-water),
-##   runs_as_<character_id>, wins_as_<character_id>,
-##   runs_on_<map_id> (every map a run VISITED), victories_<map_id>
-##   (every map a run CLEARED — a run walks several maps since
-##   iteration 50), stages_cleared, laps_completed (high-water),
-##   any_t2_win / any_t3_win (kept ids, now the LAP quests),
-##   slain_<miniboss_id> (hidden-boss kills, bumped by SecretBossBase),
-##   used_weapon_<weapon_id> (Collection: ever carried; Player/UpgradePool),
-##   evo_<weapon_id> / evolutions_total (chest evolution ceremonies),
-##   kills_<enemy_script> (bestiary, bumped by EnemyBase on death),
-##   relics_bought (Armory purchases), daily_runs / daily_best_<date>
-##   (Daily Hunt; best is a per-date high-water), best_endless_minutes
-##   (longest victorious run in minutes; runs have no clock since it. 38).
+##   chests_opened, portals_used, roulette_spins, stages_cleared,
+##   evolutions_total, relics_bought, daily_runs, any_t2_win / any_t3_win
+##   (misiones de vuelta), y los máximos de una incursión: max_level,
+##   best_run_minutes, laps_completed y best_endless_minutes (minutos en modo
+##   pseudo-infinito después de superar una etapa).
+## Con prefijo, donde el resto del nombre es un id de otro catálogo
+## (renombrar ese id deja el contador huérfano):
+##   runs_as_<character_id>, wins_as_<character_id>: CharacterCatalog.
+##   runs_on_<map_id> (cada mapa visitado), victories_<map_id> (cada mapa
+##   superado): MapCatalog.
+##   slain_<secret_boss_id>: jefes ocultos (SecretBossBase).
+##   used_weapon_<weapon_id>: Colección, arma llevada alguna vez (Player y
+##   UpgradePool). evo_<weapon_id>: evoluciones (EvolutionCatalog).
+##   kills_<script_del_enemigo>: bestiario (EnemyBase al morir).
+##   item_<item_id>: objetos tomados (ItemBag).
+##   daily_best_<fecha>: mejor puntaje de la Cacería diaria de ese día.
 
 signal shards_changed(balance: int)
 
 const DEFAULT_SAVE_PATH := "user://save.json"
 const SAVE_VERSION := 1
-## save() writes here first and only renames on success, so an interrupted
-## write can never truncate the real file...
+## save() escribe primero aquí y solo renombra si salió bien, así una
+## escritura interrumpida nunca trunca el archivo real...
 const TEMP_SUFFIX := ".tmp"
-## ...and the copy it replaces stays around as the last-known-good file.
+## ...y la copia que reemplaza queda como último archivo bueno conocido.
 const BACKUP_SUFFIX := ".bak"
 
-## Settings defaults (the "settings" dict in the JSON). Volumes are 0..100
-## slider values (100 = the pre-settings mix, see Settings.volume_to_db);
-## sensitivity is a look multiplier on the player's exported base.
+## Valores por defecto de los ajustes (el diccionario "settings" del JSON).
+## Los volúmenes son valores de slider 0..100 (100 = la mezcla original, ver
+## Settings.volume_to_db); la sensibilidad multiplica la base exportada del
+## jugador.
 const DEFAULT_SFX_VOLUME := 100.0
 const DEFAULT_AMBIENT_VOLUME := 100.0
 const DEFAULT_MOUSE_SENSITIVITY := 1.0
 const MIN_MOUSE_SENSITIVITY := 0.3
 const MAX_MOUSE_SENSITIVITY := 2.0
-## Graphics preset (iteration 64): 0 Alta, 1 Media, 2 Baja. What each one
-## does lives in Settings (settings_apply.gd), the only applier; the save
-## only keeps the index. Alta is what the game always rendered, so a save
-## without the key — every save before this iteration — plays unchanged.
+## Preset gráfico: 0 Alta, 1 Media, 2 Baja. Lo que hace cada uno vive en
+## Settings (settings_apply.gd), el único que lo aplica; el guardado solo
+## guarda el índice. Un guardado sin la llave juega en Alta.
 const DEFAULT_GRAPHICS_QUALITY := 0
 const MAX_GRAPHICS_QUALITY := 2
 
-## Test harnesses point this at a scratch file before load_from_disk().
+## Los harness de prueba lo apuntan a un archivo descartable antes de
+## load_from_disk().
 var save_path: String = DEFAULT_SAVE_PATH
 
 var shards: int = 0
-## Character ids playable right now (starters plus purchases).
+## Ids de personajes jugables ahora (los gratis más los comprados).
 var unlocked_character_ids: Array[String] = []
-## Subset of unlocked ids that were bought with Shards (purchase history).
+## Los ids desbloqueados que se compraron con esquirlas (historial de compras).
 var purchased_character_ids: Array[String] = []
-## Lifetime quest counters, keyed by stat id (see header). Only credits
-## that survived a run end (or happened outside a run) live here — this is
-## the dictionary save() serializes.
+## Contadores de toda la vida por id de stat (ver la cabecera). Solo viven
+## aquí los créditos que sobrevivieron al final de una incursión (o que
+## ocurrieron fuera de una); es el diccionario que save() escribe.
 var counters: Dictionary[String, int] = {}
-## In-run credit buffer: bump() lands here (as a delta) and raise_to() in
-## _run_highs (as an absolute high-water), and both only reach `counters`
-## when fold_run_results merges them. Abandoning drops them.
+## Búfer de la incursión: bump() suma aquí (como delta) y raise_to() en
+## _run_highs (como máximo absoluto); los dos llegan a `counters` solo cuando
+## fold_run_results los mezcla. Abandonar los descarta.
 var _run_counters: Dictionary[String, int] = {}
 var _run_highs: Dictionary[String, int] = {}
-## Quests whose target has been hit; claimable until they enter claimed.
+## Misiones que llegaron a su meta; se pueden reclamar hasta pasar a claimed.
 var completed_quest_ids: Array[String] = []
 var claimed_quest_ids: Array[String] = []
 
-## Most recent fold_run_results() outcome, read by the run-end screen
-## (the run_ended signal shape stays untouched; loose coupling via here).
+## Resultado del último fold_run_results(); lo lee la pantalla de fin de
+## incursión.
 var last_new_quest_ids: Array[String] = []
 var last_reward_shards: int = 0
-## Owned Armory ranks per relic id (iteration 36; see RelicCatalog).
+## Rangos de la Armería comprados por id de reliquia (ver RelicCatalog).
 var relic_ranks: Dictionary[String, int] = {}
 
-## True when the file on disk was written by a NEWER build: its schema is
-## unknown here, so this build plays on defaults and never writes, rather
-## than silently downgrading real progress.
+## True cuando el archivo en disco lo escribió una versión MÁS NUEVA: su
+## esquema es desconocido aquí, así que esta versión juega con lo que pudo
+## leer y nunca escribe, para no degradar progreso real en silencio.
 var _read_only: bool = false
 
-## --- Settings (persisted values; the Settings autoload applies them to
-## buses/window and is the only writer — see settings_apply.gd) ----------
+# --- Ajustes (valores guardados; el autoload Settings los aplica a los buses
+# y a la ventana y es el único que los escribe, ver settings_apply.gd) ------
 var sfx_volume: float = DEFAULT_SFX_VOLUME
 var ambient_volume: float = DEFAULT_AMBIENT_VOLUME
-## Look-speed multiplier the player applies on top of its exported base.
+## Multiplicador de la velocidad de mirada sobre la base exportada del jugador.
 var mouse_sensitivity: float = DEFAULT_MOUSE_SENSITIVITY
 var fullscreen: bool = false
-## User-facing FPS readout in the HUD (iteration 48). Independent from the
-## debug perf probe, which stays hidden behind its own export/env switch.
+## Contador de FPS del HUD para el jugador. Es independiente de la sonda de
+## rendimiento de depuración, que tiene su propio interruptor.
 var show_fps: bool = false
-## Graphics preset index, 0..MAX_GRAPHICS_QUALITY (see the const above).
+## Índice del preset gráfico, 0..MAX_GRAPHICS_QUALITY (ver la const de arriba).
 var graphics_quality: int = DEFAULT_GRAPHICS_QUALITY
 
 
-## Env override (test-only, iteration 49): BONK_SAVE_PATH re-points the
-## ledger before the first read, so ANY headless boot — the select screen,
-## a scene opened by hand, a future harness — can be run without touching
-## the player's real save. The soak probe still redirects on its own,
-## earlier, because it boots the run itself; this covers everything else.
+## Variable de entorno solo para pruebas: BONK_SAVE_PATH apunta el libro a
+## otro archivo antes de la primera lectura, así cualquier arranque headless
+## corre sin tocar el guardado real del jugador. El harness de soak además
+## redirige por su cuenta, antes, porque arranca la incursión él mismo.
 const SAVE_PATH_ENV: String = "BONK_SAVE_PATH"
 
 
@@ -122,46 +122,47 @@ func _ready() -> void:
 	load_from_disk()
 
 
-## --- Counters ---------------------------------------------------------
+# --- Contadores -------------------------------------------------------
 
-## Lifetime value INCLUDING what the current run has credited so far — the
-## number to show a player (quest-log progress bars, map unlock checks).
+## Valor de toda la vida INCLUYENDO lo que la incursión actual ya sumó: el
+## número que se le muestra al jugador (barras del registro de misiones).
 func stat(stat_id: String) -> int:
 	return maxi(_persisted_stat(stat_id) + int(_run_counters.get(stat_id, 0)),
 			int(_run_highs.get(stat_id, 0)))
 
 
-## Value already on disk, ignoring the current run's pending credits. Quest
-## completion evaluates against THIS so an abandoned run can never leave a
-## quest permanently marked complete off counters that rolled back.
+## Valor ya guardado, sin lo pendiente de la incursión actual. Las misiones
+## se evalúan contra ESTE valor, para que una incursión abandonada nunca deje
+## una misión completa por contadores que se deshicieron.
 func _persisted_stat(stat_id: String) -> int:
 	return int(counters.get(stat_id, 0))
 
 
-## In-run increment for cumulative counters. Shrines, chests, and boss
-## deaths call this where they resolve; it becomes permanent only when the
-## run is folded (see the header).
+## Suma durante la incursión para los contadores acumulativos. Altares,
+## cofres y muertes de jefes la llaman al resolverse; se vuelve permanente
+## solo cuando la incursión se cierra (ver la cabecera).
 func bump(stat_id: String, amount: int = 1) -> void:
 	if amount <= 0:
 		return
 	_run_counters[stat_id] = int(_run_counters.get(stat_id, 0)) + amount
 
 
-## High-water counters (best level / best minutes in one run).
+## Contadores de máximo (mejor nivel / más minutos en una incursión).
 func raise_to(stat_id: String, value: int) -> void:
 	if value > stat(stat_id):
 		_run_highs[stat_id] = value
 
 
-## Credit that must persist immediately because it happens OUTSIDE a run
-## (Armory purchases): straight into the ledger, bypassing the run buffer
-## that only a fold commits.
+## Crédito que debe guardarse al instante porque ocurre FUERA de una
+## incursión (compras en la Armería): va directo al libro, sin pasar por el
+## búfer de la incursión.
 func _credit_now(stat_id: String, amount: int = 1) -> void:
 	counters[stat_id] = _persisted_stat(stat_id) + amount
 
 
-## Merges the run buffer into the lifetime ledger. ONLY fold_run_results
-## calls this: it is the single point where a run's credits become real.
+## Mezcla el búfer de la incursión con el libro. SOLO fold_run_results la
+## llama: es el único punto donde los créditos de una incursión se vuelven
+## reales.
 func _merge_run_counters() -> void:
 	for stat_id: String in _run_counters:
 		counters[stat_id] = _persisted_stat(stat_id) + _run_counters[stat_id]
@@ -171,30 +172,25 @@ func _merge_run_counters() -> void:
 	_run_highs.clear()
 
 
-## Drops every credit the current run made without folding. Called by
-## RunState.reset(), which every run start AND the "Quit to Menu" abandon
-## path go through.
+## Descarta todo lo que la incursión actual sumó sin cerrarla. La llama
+## RunState.reset(), por donde pasan el inicio de cada incursión Y el
+## abandono con «Salir al menú».
 func discard_run_counters() -> void:
 	_run_counters.clear()
 	_run_highs.clear()
 
 
-## --- Run-end fold (RunManager) ----------------------------------------
+# --- Cierre de la incursión (RunManager) -------------------------------
 
-## Folds one finished run into the lifetime counters, marks any quest that
-## just hit its target (claiming stays manual, in the quest log) and
-## saves. The outcome is published in last_new_quest_ids /
-## last_reward_shards, which RunManager and the run-end screen read.
-##
-## `character_ids` is the WHOLE party (one entry per co-op slot, solo is a
-## single id): every distinct raider in it earns the runs_as_/wins_as_
-## credit, so slots 1..3 stop playing for free.
-## Folds a finished run (iteration 50 signature). A run now walks SEVERAL
-## maps, so the per-map counters are credited per map instead of once:
-## runs_on_<map> for every map visited and victories_<map> for every map
-## cleared, which is what keeps dunes_run_1 / fen_win_1 and friends
-## working unchanged across a multi-map run. `victory` means "cleared at
-## least one stage".
+## Cierra una incursión terminada: la suma a los contadores de toda la vida,
+## marca las misiones que acaban de llegar a su meta (reclamarlas sigue siendo
+## manual, en el registro) y guarda. El resultado queda en last_new_quest_ids
+## y last_reward_shards, que leen RunManager y la pantalla final.
+## `character_ids` es el grupo ENTERO (una entrada por espacio co-op; en solo,
+## un id): cada raider distinto suma su runs_as_/wins_as_. Una incursión
+## recorre VARIOS mapas, así que runs_on_<mapa> se suma por cada mapa visitado
+## y victories_<mapa> por cada mapa superado. `victory` significa «superó al
+## menos una etapa».
 func fold_run_results(victory: bool, character_ids: Array[String],
 		visited_map_ids: Array[String], cleared_map_ids: Array[String],
 		stages_cleared: int, laps: int,
@@ -213,8 +209,8 @@ func fold_run_results(victory: bool, character_ids: Array[String],
 		for character_id: String in party:
 			bump("wins_as_" + character_id)
 	bump("stages_cleared", stages_cleared)
-	# Lap quests (iteration 50) reuse the ids the tier quests had, so a
-	# save that already completed them keeps them completed.
+	# Las misiones de vuelta leen any_t2_win / any_t3_win: esos nombres se
+	# mantienen para que los guardados que ya las completaron las conserven.
 	raise_to("laps_completed", laps)
 	if laps >= 1:
 		bump("any_t2_win")
@@ -222,11 +218,11 @@ func fold_run_results(victory: bool, character_ids: Array[String],
 		bump("any_t3_win")
 	raise_to("max_level", level)
 	raise_to("best_run_minutes", int(run_seconds / 60.0))
-	# The "endless" counter (kept for its quest ids) is now the
-	# pseudo-infinite time this run accumulated past its stage gates.
+	# Minutos que esta incursión pasó en modo pseudo-infinito tras superar
+	# una etapa.
 	raise_to("best_endless_minutes", int(RunState.endless_seconds_total / 60.0))
-	# The run reached its end, so everything it credited becomes permanent
-	# BEFORE the quests are judged — this is the only merge point.
+	# La incursión llegó al final: lo que sumó se vuelve permanente ANTES de
+	# evaluar las misiones (único punto de mezcla).
 	_merge_run_counters()
 	last_new_quest_ids = _commit()
 	last_reward_shards = 0
@@ -234,8 +230,8 @@ func fold_run_results(victory: bool, character_ids: Array[String],
 		last_reward_shards += int(QuestCatalog.by_id(quest_id).reward)
 
 
-## Ids without repeats, order preserved (a co-op party can field the same
-## raider twice; the credit is per raider, not per slot).
+## Ids sin repetir, en el mismo orden (un grupo co-op puede llevar dos veces
+## al mismo raider; el crédito es por raider, no por espacio).
 static func _distinct(ids: Array[String]) -> Array[String]:
 	var out: Array[String] = []
 	for id: String in ids:
@@ -244,11 +240,10 @@ static func _distinct(ids: Array[String]) -> Array[String]:
 	return out
 
 
-## The single commit point: judge the quests against what is now on the
-## ledger, persist, and optionally announce the new balance. Every write
-## path goes through it, so a counter credited OUTSIDE a run (an Armory
-## purchase) completes its quest right away instead of waiting for the
-## next run to end.
+## Único punto de confirmación: evalúa las misiones contra lo que hay en el
+## libro, guarda y, si se pide, anuncia el saldo nuevo. Toda escritura pasa
+## por aquí, así un contador sumado FUERA de una incursión (una compra en la
+## Armería) completa su misión al momento, sin esperar otra incursión.
 func _commit(emit_shards: bool = false) -> Array[String]:
 	var newly := _evaluate_quests()
 	save()
@@ -257,9 +252,9 @@ func _commit(emit_shards: bool = false) -> Array[String]:
 	return newly
 
 
-## Marks every not-yet-completed quest whose PERSISTED counter reached its
-## target; returns the newly completed ids. completed_quest_ids persists,
-## so a quest can never complete (or pay out) twice.
+## Marca cada misión aún no completada cuyo contador GUARDADO llegó a la
+## meta; devuelve los ids recién completados. completed_quest_ids se guarda,
+## así una misión nunca se completa (ni paga) dos veces.
 func _evaluate_quests() -> Array[String]:
 	var newly: Array[String] = []
 	for quest: Dictionary in QuestCatalog.QUEST_LIBRARY:
@@ -272,7 +267,7 @@ func _evaluate_quests() -> Array[String]:
 	return newly
 
 
-## --- Quest claims ------------------------------------------------------
+# --- Reclamos de misiones ----------------------------------------------
 
 func is_quest_completed(quest_id: String) -> bool:
 	return completed_quest_ids.has(quest_id)
@@ -282,8 +277,8 @@ func is_quest_claimed(quest_id: String) -> bool:
 	return claimed_quest_ids.has(quest_id)
 
 
-## Credits a completed, unclaimed quest's Shards exactly once and saves.
-## Returns the Shards granted (0 if the quest is not claimable).
+## Paga una sola vez las esquirlas de una misión completada y no reclamada,
+## y guarda. Devuelve las esquirlas dadas (0 si no se puede reclamar).
 func claim_quest(quest_id: String) -> int:
 	if not is_quest_completed(quest_id) or is_quest_claimed(quest_id):
 		return 0
@@ -297,18 +292,17 @@ func claim_quest(quest_id: String) -> int:
 	return reward
 
 
-## --- Relics (Armory; iteration 36) --------------------------------------
+# --- Reliquias (Armería) -----------------------------------------------
 
 func relic_rank(relic_id: String) -> int:
 	return int(relic_ranks.get(relic_id, 0))
 
 
-## Buys the next rank of a relic at RelicCatalog's price ladder. Deducts,
-## records, saves, and returns true; false (and no deduction) when the id
-## is unknown, capped, or the balance is short. The purchase happens
-## outside a run, so its counter is credited straight to the ledger and
-## _commit judges the quests on it right away (the "First Relic" quest is
-## claimable the moment you buy, without finishing another run).
+## Compra el siguiente rango de una reliquia según la escalera de precios de
+## RelicCatalog. Descuenta, registra, guarda y devuelve true; false (sin
+## descontar) si el id no existe, está en el tope o no alcanza el saldo. La
+## compra ocurre fuera de una incursión, así que su contador va directo al
+## libro y la misión «Primera reliquia» se puede reclamar al instante.
 func purchase_relic(relic_id: String) -> bool:
 	var cost := RelicCatalog.next_rank_cost(relic_id, relic_rank(relic_id))
 	if cost < 0 or not can_afford(cost):
@@ -320,7 +314,7 @@ func purchase_relic(relic_id: String) -> bool:
 	return true
 
 
-## --- Character unlocks -------------------------------------------------
+# --- Desbloqueo de personajes -----------------------------------------
 
 func is_unlocked(character_id: String) -> bool:
 	return unlocked_character_ids.has(character_id)
@@ -330,12 +324,12 @@ func can_afford(cost: int) -> bool:
 	return shards >= cost
 
 
-## Grants a character outright — the single unlock write both paths share.
-## Boss kills call this directly with source "boss" (no Shard cost, GDD 5's
-## skill-unlock path); purchase_character routes through it with source
-## "purchase", the only tag that also records purchase history. Idempotent:
-## an unknown or already-unlocked/purchased id is a no-op returning false;
-## a fresh unlock persists immediately and returns true.
+## Da un personaje sin más: la única escritura de desbloqueo que comparten
+## los dos caminos. La muerte de un jefe la llama con source "boss" (sin
+## costo); purchase_character pasa por aquí con source "purchase", la única
+## etiqueta que además registra la compra. Idempotente: un id desconocido o
+## ya desbloqueado no hace nada y devuelve false; un desbloqueo nuevo se
+## guarda al instante y devuelve true.
 func unlock_character(character_id: String, source: String) -> bool:
 	if CharacterCatalog.by_id(character_id).is_empty() or is_unlocked(character_id):
 		return false
@@ -346,9 +340,9 @@ func unlock_character(character_id: String, source: String) -> bool:
 	return true
 
 
-## Buys a locked catalog character at its row's unlock_cost. Deducts,
-## unlocks, records the purchase, saves. False (and no deduction) when the
-## id is unknown, already unlocked, or the balance is short.
+## Compra un personaje bloqueado al unlock_cost de su fila. Descuenta,
+## desbloquea, registra la compra y guarda. False (sin descontar) si el id no
+## existe, ya está desbloqueado o no alcanza el saldo.
 func purchase_character(character_id: String) -> bool:
 	var row := CharacterCatalog.by_id(character_id)
 	if row.is_empty() or is_unlocked(character_id):
@@ -362,29 +356,28 @@ func purchase_character(character_id: String) -> bool:
 	return true
 
 
-## --- Disk -------------------------------------------------------------
+# --- Disco -------------------------------------------------------------
 
-## Loads save_path, falling back to the .bak copy and then to clean
-## defaults on a missing, corrupt, or wrongly-typed file (never crashes; a
-## bad file just starts fresh). A file from a newer build is read as far as
-## this schema allows and then locked (see _read_only) instead of being
-## overwritten.
+## Carga save_path; si falta, está corrupto o tiene tipos equivocados, usa la
+## copia .bak y después los valores por defecto (nunca se cae: un archivo
+## malo empieza de cero). Un archivo de una versión más nueva se lee hasta
+## donde este esquema permite y queda bloqueado (ver _read_only) en vez de
+## sobrescribirse.
 func load_from_disk() -> void:
 	_apply_defaults()
 	_read_only = false
 	discard_run_counters()
 	var data := _read_save_dict(save_path)
 	if data.is_empty():
-		# save() only ever renames a complete file into place and keeps the
-		# one it replaced, so a truncated main file has a good predecessor.
+		# save() solo pone en su lugar un archivo completo y conserva el que
+		# reemplaza, así un archivo principal truncado tiene un antecesor bueno.
 		data = _read_save_dict(save_path + BACKUP_SUFFIX)
 		if not data.is_empty():
 			print("Save recovered from backup: %s" % save_path)
 	if data.is_empty():
 		return
-	# Pre-versioned saves read as 0; every schema change since is additive
-	# (missing keys fall back to defaults), so there is no migration to run
-	# yet — this is where one would hang off.
+	# Un guardado sin versión se lee como 0. Los cambios de esquema son
+	# aditivos: una llave que falta toma su valor por defecto.
 	var version := _as_int(data.get("version"), 0)
 	if version > SAVE_VERSION:
 		push_warning("SaveData: %s comes from a newer build (v%d); read-only."
@@ -396,19 +389,19 @@ func load_from_disk() -> void:
 	counters = _as_int_dict(data.get("counters"))
 	completed_quest_ids = _as_string_array(data.get("completed_quests"))
 	claimed_quest_ids = _as_string_array(data.get("claimed_quests"))
-	# Missing on pre-iteration-36 saves: no relics owned. Keys this build
-	# no longer knows (tier_choice, from before iteration 50) are simply
-	# not read — an old save loads clean and silent.
+	# Sin la llave "relics" no hay reliquias. Las llaves que esta versión ya
+	# no conoce simplemente no se leen.
 	relic_ranks = _as_int_dict(data.get("relics"))
 	_load_settings(data.get("settings"))
-	# Starters are always playable, even if an edited file dropped them.
+	# Los personajes gratis siempre son jugables, aunque un archivo editado
+	# los haya quitado.
 	for starter_id: String in CharacterCatalog.starter_ids():
 		if not unlocked_character_ids.has(starter_id):
 			unlocked_character_ids.append(starter_id)
 
 
-## Parsed contents of one save file, or {} when it is missing, unreadable
-## or not a JSON object.
+## Contenido de un archivo de guardado, o {} si falta, no se puede leer o no
+## es un objeto JSON.
 func _read_save_dict(path: String) -> Dictionary:
 	if not FileAccess.file_exists(path):
 		return {}
@@ -423,10 +416,9 @@ func _read_save_dict(path: String) -> Dictionary:
 	return parsed as Dictionary
 
 
-## Atomic write: the JSON goes to a temp file that is renamed over
-## save_path only once it is complete, and the file it replaces is kept as
-## .bak. A crash mid-write can therefore never leave a half-written
-## save.json — which would take the whole meta-progression with it.
+## Escritura atómica: el JSON va a un archivo temporal que se renombra sobre
+## save_path solo cuando está completo, y el archivo que reemplaza queda como
+## .bak. Un cierre a mitad de escritura nunca deja un save.json a medias.
 func save() -> void:
 	if _read_only:
 		return
@@ -465,8 +457,8 @@ func _apply_defaults() -> void:
 	graphics_quality = DEFAULT_GRAPHICS_QUALITY
 
 
-## Missing/legacy "settings" (pre-iteration-22 saves) or malformed entries
-## keep the defaults _apply_defaults just set; values clamp to legal ranges.
+## Si "settings" falta o viene mal formado se quedan los valores que
+## _apply_defaults acaba de poner; los valores se limitan a su rango legal.
 func _load_settings(value: Variant) -> void:
 	if value is not Dictionary:
 		return
@@ -484,8 +476,8 @@ func _load_settings(value: Variant) -> void:
 			0, MAX_GRAPHICS_QUALITY)
 
 
-## The persisted ledger. Note it serializes `counters` only: whatever the
-## current run has pending in the buffer stays out of the file by design.
+## El libro que se guarda. Solo escribe `counters`: lo pendiente en el búfer
+## de la incursión actual queda fuera del archivo a propósito.
 func _to_save_dict() -> Dictionary[String, Variant]:
 	return {
 		"version": SAVE_VERSION,
@@ -507,8 +499,8 @@ func _to_save_dict() -> Dictionary[String, Variant]:
 	}
 
 
-## --- JSON round-trip helpers (parsed values arrive untyped; numbers as
-## floats). Anything malformed degrades to the empty/zero default. -------
+# --- Ayudas de lectura del JSON (los valores llegan sin tipo y los números
+# como float). Todo lo mal formado cae al valor vacío o cero. -------------
 
 static func _as_int(value: Variant, fallback: int) -> int:
 	if value is int or value is float:

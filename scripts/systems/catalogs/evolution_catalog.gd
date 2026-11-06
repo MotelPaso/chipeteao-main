@@ -1,40 +1,42 @@
 class_name EvolutionCatalog
 extends RefCounted
-## Static catalog of weapon evolutions: the recipes that turn an invested
-## weapon into a named, far stronger form. Data-driven like the other
-## catalogs — a new evolution is one row here.
+## Catálogo de evoluciones de arma: la receta que convierte un arma invertida
+## en una forma con nombre propio y mucho más fuerte. Una evolución nueva es
+## una fila aquí.
 ##
-## The rule (iteration 46, deepening iteration 38's card-only ceremony):
-## every upgrade card invested in a weapon is one weapon level, and every
-## EVOLVE_AT_LEVEL-th level is a MILESTONE run by try_advance_by_level from
-## UpgradePool.apply. The first milestone evolves the weapon when it has a
-## recipe here; every milestone after that — and the first one for a weapon
-## with no recipe at all — is an ascension (WeaponBase.ascend), so no weapon
-## ever stops improving. Both share one ceremony (fanfare, banner, sparkle).
-## Chests and tomes play no part any more.
+## Regla: cada carta de mejora invertida en un arma es un nivel de arma, y cada
+## EVOLVE_AT_LEVEL niveles hay un HITO que corre try_advance_by_level (lo llama
+## UpgradePool.apply). El primer hito evoluciona el arma si tiene receta aquí;
+## cada hito siguiente, y el primero de un arma sin receta, es un ascenso
+## (WeaponBase.ascend), así ninguna arma deja de mejorar. Los dos comparten la
+## misma ceremonia (fanfarria, cartel, destello).
 ##
-## Row fields:
-##   weapon_id/weapon_node: WEAPON_LIBRARY identity of the base weapon —
-##             identifiers, never shown.
-##   evolved_name: the new display name, announced and shown in Collection.
-##   flavor: Collection line. evolved_name and flavor are player text.
-##   glyph:  2-letter tile the HUD loadout strip draws for the evolved
-##             weapon while there is no sprite. DECLARED, never derived from
-##             evolved_name: initials of Spanish names collapse ("Cáliz de
-##             peste" and "Corona de tempestad" would both give "CD"). Keep
-##             it unique across this library, WEAPON_LIBRARY, TOME_LIBRARY
-##             and ITEM_LIBRARY — the strip mixes all four.
-##   mults: {property: factor} multiplied onto the weapon node on evolve.
-##   adds:  {property: amount} added onto the weapon node on evolve.
-##   flavor: Collection line describing what the evolved form does.
-## Persistence: the ceremony bumps "evo_<weapon_id>" and "evolutions_total"
-## (SaveData counters), which the Collection screen and quests read.
+## Se puede cambiar libremente: evolved_name, glyph, mults, adds, flavor.
+## Llaves internas, NUNCA las cambies: weapon_id y weapon_node (deben ser el id
+## y el node_name de la fila del arma en WEAPON_LIBRARY).
+##
+## Campos de cada fila:
+##   weapon_id, weapon_node: id y node_name del arma base en WEAPON_LIBRARY.
+##       Nunca se muestran.
+##   evolved_name: nombre nuevo, anunciado en el cartel y mostrado en Colección.
+##   glyph: sigla de dos letras que dibuja la tira de armas del HUD mientras no
+##       hay ícono. Se DECLARA, no se deriva de evolved_name: las iniciales de
+##       los nombres en español chocan («Cáliz de peste» y «Corona de
+##       tempestad» darían «CD»). No debe repetirse en esta biblioteca,
+##       WEAPON_LIBRARY, TOME_LIBRARY ni ITEM_LIBRARY (la tira las mezcla).
+##   mults: {propiedad: factor} que se multiplica sobre el nodo del arma al
+##       evolucionar. La propiedad debe existir en la escena del arma.
+##   adds: {propiedad: cantidad} que se suma sobre el nodo del arma al
+##       evolucionar.
+##   flavor: línea de Colección que describe lo que hace la forma evolucionada.
+## Texto que ve el jugador: evolved_name y flavor.
+## Guardado: la ceremonia suma "evo_<weapon_id>" y "evolutions_total" en
+## SaveData; Colección y las misiones los leen.
 
-## Upgrade cards a weapon must have received (WeaponBase.upgrade_level)
-## per milestone: the first EVOLVE_AT_LEVEL levels buy the evolution, and
-## every further multiple buys an ascension. ONE number on purpose — an
-## evolution threshold that drifted from the ascension period would leave
-## a dead stretch of levels where a weapon gains nothing.
+## Cartas que un arma debe recibir (WeaponBase.upgrade_level) por hito: los
+## primeros EVOLVE_AT_LEVEL niveles compran la evolución y cada múltiplo
+## siguiente un ascenso. Es UN número a propósito: si el umbral de evolución y
+## el período de ascenso se separaran, quedaría un tramo de niveles sin premio.
 const EVOLVE_AT_LEVEL: int = 10
 
 const EVOLUTION_LIBRARY: Array[Dictionary] = [
@@ -115,7 +117,6 @@ const EVOLUTION_LIBRARY: Array[Dictionary] = [
 		"adds": {"chain_count": 3},
 		"flavor": "rayos que se bifurcan hasta que no queda nada en pie",
 	},
-	# Iteration 43 wave.
 	{
 		"weapon_id": "slime_trail", "weapon_node": "SlimeTrail",
 		"evolved_name": "Marea ácida", "glyph": "MA",
@@ -147,36 +148,36 @@ const EVOLUTION_LIBRARY: Array[Dictionary] = [
 ]
 
 
-## Lazily built lookups (see CatalogIndex); the Collection screen resolves
-## one recipe per weapon row it draws.
+## Índices armados al primer uso (ver CatalogIndex): Colección resuelve una
+## receta por cada fila de arma que dibuja.
 static var _by_weapon_id: Dictionary[String, Dictionary] = {}
 static var _by_weapon_node: Dictionary[String, Dictionary] = {}
 
 
-## Row for the given base weapon id, or an empty Dictionary if none.
+## Fila del arma base con ese id, o un Dictionary vacío si no tiene receta.
 static func by_weapon_id(weapon_id: String) -> Dictionary:
 	if _by_weapon_id.is_empty():
 		_by_weapon_id = CatalogIndex.build(EVOLUTION_LIBRARY, "weapon_id")
 	return _by_weapon_id.get(weapon_id, {})
 
 
-## Row for a live weapon node (matched by mount node name), or empty.
+## Fila de un arma viva (por el nombre de su nodo en el montaje), o vacío.
 static func by_weapon_node(node_name: String) -> Dictionary:
 	if _by_weapon_node.is_empty():
 		_by_weapon_node = CatalogIndex.build(EVOLUTION_LIBRARY, "weapon_node")
 	return _by_weapon_node.get(node_name, {})
 
 
-## Runs the milestone `weapon` just reached, if any: the evolution at the
-## first one (when a recipe exists), an ascension at every later one and at
-## the first one for a recipe-less weapon. Applies the change, runs the
-## ceremony (fanfare, banner, sparkle on the carrier, shake), bumps the
-## Collection/quest counters and prints the soak log line.
-## Returns true when a milestone fired.
+## Corre el hito que `weapon` acaba de alcanzar, si hay uno: la evolución en
+## el primero (si hay receta) y un ascenso en cada uno de los siguientes y en
+## el primero de un arma sin receta. Aplica el cambio, corre la ceremonia
+## (fanfarria, cartel, destello sobre quien la lleva, sacudida), suma los
+## contadores de Colección y misiones e imprime la línea de log del soak.
+## Devuelve true cuando hubo hito.
 static func try_advance_by_level(weapon: WeaponBase, player: Node) -> bool:
 	if weapon == null:
 		return false
-	# Integer division: level 10-19 is tier 1, 20-29 tier 2, and so on.
+	# División entera: los niveles 10-19 son el escalón 1, 20-29 el 2, etc.
 	var tier := weapon.upgrade_level / EVOLVE_AT_LEVEL
 	if tier <= weapon.ascension_tier:
 		return false
@@ -189,7 +190,7 @@ static func try_advance_by_level(weapon: WeaponBase, player: Node) -> bool:
 			_announce("¡%s evolucionó a %s!" % [
 					weapon_display(weapon), weapon.evolved_name])
 			_record_evolution(String(row.weapon_id))
-			# One-line log (RunManager convention) for headless soaks.
+			# Línea de log de formato fijo para los soaks headless.
 			print("Weapon evolved: %s -> %s" % [String(row.weapon_id), weapon.evolved_name])
 			return true
 	weapon.ascend(tier)
@@ -200,19 +201,18 @@ static func try_advance_by_level(weapon: WeaponBase, player: Node) -> bool:
 	return true
 
 
-## The name a milestone banner uses: the evolved form once the weapon has
-## one, otherwise its WEAPON_LIBRARY display name. Never the internal id.
+## Nombre que usa el cartel de un hito: la forma evolucionada si el arma ya
+## la tiene, si no su display_name de WEAPON_LIBRARY. Nunca el id interno.
 static func weapon_display(weapon: WeaponBase) -> String:
 	if weapon.evolved and not weapon.evolved_name.is_empty():
 		return weapon.evolved_name
 	return UpgradePool.weapon_display_name(weapon.name)
 
 
-## The payoff moment shared by evolutions and ascensions: fanfare, sparkle
-## on the carrier, shake. Split out of try_advance_by_level so the catalog
-## side stays testable, and every autoload is reached through the same
-## guarded helper — a `-s` harness has no autoloads instanced, and the old
-## direct Sfx/Juice calls aborted it before a single assert ran.
+## Celebración común de evoluciones y ascensos: fanfarria, destello sobre
+## quien lleva el arma y sacudida de cámara. Los autoloads se buscan con
+## UpgradePool.autoload_node: un harness `-s` no los tiene y debe seguir sin
+## ellos en vez de abortar.
 static func _celebrate(player: Node) -> void:
 	var sfx := UpgradePool.autoload_node(&"Sfx")
 	if sfx != null:
@@ -224,9 +224,7 @@ static func _celebrate(player: Node) -> void:
 		juice.shake(0.25, 0.5)
 
 
-## The banner. Names the weapon the way every other screen does — from
-## WEAPON_LIBRARY (it used to prettify the internal id, which only ever
-## matched the English names by accident and could never be translated).
+## El cartel grande, por el grupo "boss_ui" (announce_major).
 static func _announce(message: String) -> void:
 	var loop := Engine.get_main_loop() as SceneTree
 	if loop == null:
@@ -234,8 +232,8 @@ static func _announce(message: String) -> void:
 	loop.call_group("boss_ui", "announce_major", message)
 
 
-## Collection/quest bookkeeping for an evolution (ascensions have no
-## counters of their own: the weapon level already carries them).
+## Contadores de Colección y misiones de una evolución (los ascensos no
+## tienen contadores propios).
 static func _record_evolution(weapon_id: String) -> void:
 	var save_data := UpgradePool.autoload_node(&"SaveData")
 	if save_data != null:

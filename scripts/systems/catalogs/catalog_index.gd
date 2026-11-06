@@ -1,22 +1,18 @@
 class_name CatalogIndex
 extends RefCounted
-## Shared id -> row lookup for the static catalogs (tomes, items, relics,
-## characters, pets, quests, maps, evolutions, weapons).
+## Índice id -> fila que comparten los catálogos estáticos (tomos, objetos,
+## reliquias, personajes, mascotas, misiones, mapas, evoluciones, armas).
 ##
-## Why this exists: every catalog used to copy the same linear
-## "for row in LIBRARY: if String(row.id) == wanted: return row" loop — nine
-## identical bodies that a new catalog copied a tenth time. Worse, those
-## lookups sit on a hot path: PlayerStats.recompute() resolves one row per
-## tome stack, per item stack and per relic, and it runs on every level-up,
-## every altar boon and every timed-boon expiry.
-##
-## The libraries are `const`, so an index built once can never go stale.
-## Each catalog keeps its own `static var` index plus its public by_id():
-## the contract callers see does not change, only the cost of a lookup.
+## Las búsquedas por id están en un camino caliente: PlayerStats.recompute()
+## resuelve una fila por cada stack de tomo, por cada stack de objeto y por
+## cada reliquia, y corre en cada subida de nivel, boon de altar y fin de boon
+## temporal. Las bibliotecas no cambian en tiempo de ejecución, así que un
+## índice armado una vez nunca queda desactualizado. Cada catálogo guarda su
+## propio índice en un `static var` y expone su by_id().
 
-## id -> row map for `rows`, keyed by `field`. Rows without the field (or
-## with an empty value) are skipped, so optional keys like `unlock_boss`
-## index cleanly. First row wins on duplicate ids, matching the old loops.
+## Mapa id -> fila de `rows`, con `field` como llave. Las filas sin ese campo
+## (o con el valor vacío) se saltan, así las llaves opcionales como
+## `unlock_boss` se indexan sin ruido. Con ids repetidos gana la primera fila.
 static func build(rows: Array[Dictionary], field: String = "id") -> Dictionary[String, Dictionary]:
 	var index: Dictionary[String, Dictionary] = {}
 	for row: Dictionary in rows:
@@ -27,8 +23,8 @@ static func build(rows: Array[Dictionary], field: String = "id") -> Dictionary[S
 	return index
 
 
-## Every value of `field` across `rows` whose row matches `value` on
-## `match_field` — the "all ids of this rarity/kind" shape.
+## Todos los valores de `field` en las filas de `rows` cuyo `match_field` vale
+## `value` (la forma «todos los ids de esta rareza/tipo»).
 static func values_where(rows: Array[Dictionary], match_field: String, value: String,
 		field: String = "id") -> Array[String]:
 	var out: Array[String] = []

@@ -1,51 +1,58 @@
 class_name UpgradePool
 extends RefCounted
-## Data-driven pool of level-up upgrades with rarity weighting (GDD 3/4).
-## Since iteration 46 a LEVEL pick rolls one SIDE of the pool, never a
-## mix: either weapons (owned-weapon stat cards + new_weapon cards) or
-## tomes/stats (tome cards + GENERIC_POOL). roll_side() picks the side,
-## weighted by how many entries each currently has, and never returns an
-## empty one; the card UI names it in the title. Bonus picks (chests,
-## shrines) pass no side and keep mixing everything.
-## The offer pool is rebuilt per roll from:
-##   - GENERIC_POOL: player/health/run_state tweaks, always available.
-##   - Tome cards (Tome.TOME_LIBRARY): the next stack of every tome the
-##     player has not capped yet; applying adds a stack to PlayerStats.
-##   - Per-OWNED-weapon stat entries (damage/cooldown/range, plus extras
-##     declared in WEAPON_LIBRARY), so every carried weapon keeps scaling.
-##   - "new_weapon" cards for library weapons the player does NOT own yet,
-##     hidden entirely once the player's max_weapons cap is reached.
-## Entry fields:
-##   kind:     "stat" (default, omitted), "new_weapon", or "tome"
-##   target:   "player" | "health" | "run_state" | "weapon/<NodeName>"
-##             (weapons are looked up under the player's Weapons mount)
-##   op:       "mul_percent" (amount = +/- percent) | "add" (flat amount)
-##   effects:  OPTIONAL multi-stat form (iteration 38): a list of
-##             {property, op, amount} applied together on the same target,
-##             replacing the single property/op/amount trio. The card's
-##             description then carries one "%d" per effect, in order.
-##   description: "%d" slot(s) filled with the rarity-scaled amount(s);
-##             new_weapon descriptions are shown verbatim.
-##   offer_weight: relative chance of appearing in an offer (default 1.0).
-##   rarity:   fixes the card's rarity tier by name instead of rolling one.
-## Rarity multiplies the base amount (an Epic +25% card rolls +50%), so
-## future weapons/tomes just append entries — the card UI never changes.
-## Rolled rarity weights are tilted by the player's luck stat (PlayerStats):
-## luck moves a fraction of Common's weight up the tiers.
+## Pool de mejoras de subida de nivel, con rareza ponderada. Cada elección de
+## NIVEL sortea UN lado del pool, nunca una mezcla: armas (cartas de stats de
+## las armas que se tienen + cartas new_weapon) o tomos/stats (cartas de tomo +
+## GENERIC_POOL). roll_side() elige el lado, ponderado por cuántas entradas
+## tiene cada uno, y nunca devuelve uno vacío; la UI de cartas lo nombra en el
+## título. Las elecciones extra (cofres, altares) no pasan lado y mezclan todo.
+## El pool se arma de nuevo en cada tirada con:
+##   - GENERIC_POOL: ajustes de player/health/run_state, siempre disponibles.
+##   - Cartas de tomo (Tome.TOME_LIBRARY): el siguiente stack de cada tomo que
+##     el jugador aún puede tomar; aplicarla suma un stack en PlayerStats.
+##   - Cartas de stats por cada arma QUE SE TIENE (daño, velocidad de ataque,
+##     alcance, más los extras declarados en WEAPON_LIBRARY), así cada arma
+##     sigue escalando.
+##   - Cartas "new_weapon" para las armas de la biblioteca que el jugador NO
+##     tiene, ocultas del todo al llegar a su tope max_weapons.
+## Campos de una entrada:
+##   kind: "stat" (por defecto, se omite), "new_weapon" o "tome".
+##   target: "player" | "health" | "run_state" | "weapon/<NodeName>" (las armas
+##       se buscan bajo el montaje Weapons del jugador).
+##   op: "mul_percent" (amount = +/- porcentaje) | "add" (cantidad plana).
+##   effects: forma OPCIONAL de varios stats: una lista de
+##       {property, op, amount} que se aplica junta sobre el mismo target, en
+##       lugar del trío property/op/amount. La descripción lleva un "%d" por
+##       efecto, en orden.
+##   description: "%d" que se llena con la cantidad escalada por la rareza; las
+##       descripciones de new_weapon se muestran tal cual.
+##   offer_weight: probabilidad relativa de aparecer en una oferta (1.0 por
+##       defecto).
+##   rarity: fija la rareza de la carta por nombre en vez de sortearla.
+## La rareza multiplica la cantidad base (una carta Epic de +25% sale con
+## +50%), así un arma o tomo nuevo solo agrega entradas y la UI no cambia. La
+## suerte del jugador (PlayerStats) inclina los pesos de rareza: mueve una
+## fracción del peso de Common hacia las rarezas superiores.
 ##
-## Player-facing text lives in `display_name`, `flavor`, `title` and
-## `description`; `id`, `node_name`, `scene` and every rarity name are
-## identifiers and stay in English.
+## Texto que ve el jugador: display_name, flavor, title y description. id,
+## node_name, scene y los nombres de rareza son identificadores en inglés.
 
-## Every equippable weapon: new_weapon cards and per-owned-weapon stat
-## entries are generated from this, so adding a weapon is one new row.
-## `glyph` is the 2-letter tile the HUD loadout strip draws while there is
-## no sprite (same field ItemCatalog rows carry). It is DECLARED, never
-## derived from display_name: Spanish weapon names nearly all read
-## "Sustantivo de Complemento", so initials collapse ("Vara de brasas" and
-## "Vial de sangre" both give "VD"). Keep every glyph unique across
-## WEAPON_LIBRARY, EvolutionCatalog.EVOLUTION_LIBRARY, Tome.TOME_LIBRARY
-## and ItemCatalog.ITEM_LIBRARY — the strip mixes all four.
+## Todas las armas equipables. Las cartas new_weapon y las cartas de stats
+## por arma se generan desde aquí, así un arma nueva es una fila nueva.
+## Se puede cambiar libremente: display_name, glyph, flavor y los textos y
+## números de extra_entries.
+## Llaves internas, NUNCA las cambies: id (contadores used_weapon_<id> y
+## evo_<id>, recetas de EvolutionCatalog) y node_name (nombre del nodo del arma
+## en el montaje Weapons; las cartas lo nombran como "weapon/<node_name>", las
+## filas de personaje como weapon_node_name, y debe ser el nombre del archivo
+## de su escena porque las mascotas resuelven su arma así). scene debe existir.
+## `glyph` es la sigla de dos letras que dibuja la tira de armas del HUD
+## mientras no hay ícono (el mismo campo que llevan las filas de ItemCatalog).
+## Se DECLARA, no se deriva de display_name: casi todos los nombres en español
+## son «Sustantivo de Complemento» y las iniciales chocan («Vara de brasas» y
+## «Vial de sangre» darían «VD»). No debe repetirse en WEAPON_LIBRARY,
+## EvolutionCatalog.EVOLUTION_LIBRARY, Tome.TOME_LIBRARY ni
+## ItemCatalog.ITEM_LIBRARY: la tira mezcla las cuatro.
 const WEAPON_LIBRARY: Array[Dictionary] = [
 	{
 		"id": "shortsword", "display_name": "Espada corta", "glyph": "EC",
@@ -115,8 +122,8 @@ const WEAPON_LIBRARY: Array[Dictionary] = [
 		"flavor": "destroza al enemigo más cercano con estocadas rapidísimas",
 		"extra_entries": [
 			{
-				# Attack-speed flavor on its own knob (cooldown_scale), so it
-				# stacks with "Mano rápida" without touching the base cooldown.
+				# Velocidad de ataque en su propia perilla (cooldown_scale): se
+				# acumula con «Mano rápida» sin tocar el cooldown base.
 				"id": "twin_daggers_flurry", "title": "Ráfaga",
 				"description": "Velocidad de ataque de las Dagas gemelas +%d%%",
 				"target": "weapon/TwinDaggers", "property": "cooldown_scale",
@@ -175,7 +182,7 @@ const WEAPON_LIBRARY: Array[Dictionary] = [
 		"flavor": "arroja frascos que encharcan sangre bajo los grupos más densos",
 		"extra_entries": [
 			{
-				# One extra pulse = one extra tick_interval of pool lifetime.
+				# Un pulso extra = un tick_interval más de vida del charco.
 				"id": "blood_vial_coagulate", "title": "Coagular",
 				"description": "Los charcos del Vial de sangre pulsan %d vez(ces) más",
 				"target": "weapon/BloodVial", "property": "pool_ticks",
@@ -183,7 +190,6 @@ const WEAPON_LIBRARY: Array[Dictionary] = [
 			},
 		],
 	},
-	# Iteration 43 wave.
 	{
 		"id": "slime_trail", "display_name": "Rastro de baba", "glyph": "RB",
 		"node_name": "SlimeTrail", "scene": "res://scenes/weapons/SlimeTrail.tscn",
@@ -230,50 +236,49 @@ const WEAPON_LIBRARY: Array[Dictionary] = [
 	},
 ]
 
-## The two sides of the pool (iteration 46). Identifiers, not display
-## text — SIDE_LABELS translates them for the card title.
+## Los dos lados del pool. Son identificadores, no texto: SIDE_LABELS los
+## traduce para el título de la carta.
 const SIDE_WEAPONS: String = "weapons"
 const SIDE_TOMES: String = "tomes"
 const SIDE_LABELS: Dictionary[String, String] = {
 	SIDE_WEAPONS: "Armas", SIDE_TOMES: "Tomos"}
 
-## Fallback weapon cap when the player script doesn't export max_weapons.
+## Tope de armas de respaldo, SOLO para un nodo jugador sin max_weapons. El
+## tope real es el export Player.max_weapons.
 const DEFAULT_MAX_WEAPONS: int = 5
-## Fallback cap on DISTINCT tomes when the player doesn't export max_tomes
-## (iteration 38): past it the pool only offers deeper stacks of owned tomes.
+## Tope de tomos DISTINTOS de respaldo, SOLO para un nodo jugador sin
+## max_tomes. El tope real es el export Player.max_tomes.
 const DEFAULT_MAX_TOMES: int = 5
-## Two-stat weapon cards show up a little less often than single-stat ones.
+## Peso de oferta de las cartas de arma de dos stats (algo menos que las de
+## un stat).
 const MULTI_STAT_OFFER_WEIGHT: float = 0.7
-## New-weapon cards show up meaningfully but less often than stat cards.
+## Peso de oferta de las cartas de arma nueva (menos que las de stats).
 const NEW_WEAPON_OFFER_WEIGHT: float = 0.6
-## Nine tome entries would otherwise crowd the pool; damp each a little.
+## Peso de oferta de cada carta de tomo, algo bajo para que los tomos no
+## llenen el pool.
 const TOME_OFFER_WEIGHT: float = 0.8
-## Luck's slope at zero: each luck point moves this fraction of Common's
-## rarity weight upward. The curve in _rarity_weights bends away from it as
-## luck grows, but never flattens.
+## Pendiente de la suerte en cero: cada punto de suerte mueve esta fracción
+## del peso de Common hacia arriba. La curva de _rarity_weights se aleja de
+## esta pendiente al crecer la suerte, pero nunca se aplana.
 const LUCK_TILT_PER_POINT: float = 0.01
-## Asymptote of that curve: at most this fraction of Common's weight ever
-## moves up. It is approached, never reached, so stacking luck past the old
-## hard clamp (50 points) is no longer a silent no-op.
+## Asíntota de esa curva: como máximo se mueve esta fracción del peso de
+## Common. Se acerca sin llegar nunca, así cada punto de suerte extra aporta.
 const MAX_LUCK_TILT: float = 0.5
 
-## Balance steps of the cards every weapon generates, at Common potency
-## (the rolled rarity scales them). These are the most-retuned numbers in
-## the game, so they sit up here with their cousins instead of buried
-## inside the generator's dictionaries.
+## Escalones de balance de las cartas que genera cada arma, en porcentaje y
+## a potencia Common (la rareza sorteada los escala).
 const WEAPON_DAMAGE_STEP: float = 25.0
 const WEAPON_COOLDOWN_STEP: float = -10.0
 const WEAPON_RANGE_STEP: float = 15.0
-## Two-stat cards: x is the first effect's step, y the second's.
+## Cartas de dos stats: x es el escalón del primer efecto, y el del segundo.
 const TEMPERED_STEPS: Vector2 = Vector2(15.0, 10.0)
 const RHYTHM_STEPS: Vector2 = Vector2(-6.0, 10.0)
 
-## Stats with a tome equivalent (move speed -> Tomo de Ligereza) live only
-## in the tome catalog; entries here have no tome counterpart.
+## Cartas de stats sin tomo equivalente. Los stats que tienen tomo
+## (velocidad -> Tomo de Ligereza) viven solo en el catálogo de tomos.
 const GENERIC_POOL: Array[Dictionary] = [
 	{
-		# Iteration 38: raises the cap and heals ONLY the gained amount (no
-		# more free full heal on every "Corazón recio" card).
+		# Sube el máximo y cura SOLO lo ganado (ver _apply_property).
 		"id": "max_hp", "title": "Corazón recio",
 		"description": "HP máx. +%d (te cura lo que ganas)",
 		"target": "health", "property": "max_hp",
@@ -287,11 +292,12 @@ const GENERIC_POOL: Array[Dictionary] = [
 	},
 ]
 
-## Rarity tiers. `name` is an IDENTIFIER, not display text: it keys chest
-## prices (RunState.CHEST_BASE_PRICES), the `rarity` field of every
-## ItemCatalog row, and the min_rarity floors passed around by chests,
-## shrines and the world director. It stays in English forever — screens
-## call rarity_display() to show it.
+## Rarezas. `name` es un IDENTIFICADOR, no texto: llavea los precios de cofre
+## (RunState.CHEST_BASE_PRICES), el campo `rarity` de cada fila de ItemCatalog
+## y los pisos min_rarity que pasan cofres, altares y el director del mundo.
+## Queda en inglés; las pantallas lo muestran con rarity_display().
+## weight: peso relativo del sorteo. potency: multiplicador de la cantidad de
+## la carta. color: color de la rareza en pantalla.
 const RARITIES: Array[Dictionary] = [
 	{"name": "Common", "color": Color(0.62, 0.65, 0.68), "weight": 60.0, "potency": 1.0},
 	{"name": "Rare", "color": Color(0.3, 0.55, 1.0), "weight": 25.0, "potency": 1.5},
@@ -299,7 +305,8 @@ const RARITIES: Array[Dictionary] = [
 	{"name": "Legendary", "color": Color(1.0, 0.78, 0.2), "weight": 3.0, "potency": 3.0},
 ]
 
-## Player-facing name per rarity id. The only place a rarity is translated.
+## Nombre que ve el jugador por cada id de rareza. Es el único lugar donde se
+## traduce una rareza.
 const RARITY_DISPLAY: Dictionary[String, String] = {
 	"Common": "Común",
 	"Rare": "Raro",
@@ -307,23 +314,24 @@ const RARITY_DISPLAY: Dictionary[String, String] = {
 	"Legendary": "Legendario",
 }
 
-## Lazily built node_name -> WEAPON_LIBRARY row index (see CatalogIndex).
+## Índice node_name -> fila de WEAPON_LIBRARY armado al primer uso (ver
+## CatalogIndex).
 static var _weapons_by_node: Dictionary[String, Dictionary] = {}
 
 
-## Translates a rarity id for display. Every screen that prints a rarity
-## goes through here; nothing compares against the result.
+## Traduce un id de rareza para mostrarlo. Toda pantalla que imprime una
+## rareza pasa por aquí; nada compara contra el resultado.
 static func rarity_display(rarity_name: String) -> String:
 	return RARITY_DISPLAY.get(rarity_name, rarity_name)
 
 
-## Rolls `count` distinct upgrades from the pool valid for this player's
-## loadout, each with an independently weighted rarity. Returns
-## display-ready dicts: entry, rarity, amount, title, description.
-## Shrine/chest picks pass luck_bonus (temporary rarity-tilt luck on top
-## of PlayerStats) and/or min_rarity (a tier name every rarity is floored
-## to, fixed ones included). `side` restricts the pool to SIDE_WEAPONS or
-## SIDE_TOMES; "" (the default, and what every bonus pick passes) mixes.
+## Sortea `count` mejoras distintas del pool válido para el equipo de este
+## jugador, cada una con su propia rareza ponderada. Devuelve diccionarios
+## listos para mostrar: entry, rarity, amount, title, description. Altares y
+## cofres pasan luck_bonus (suerte temporal sobre la de PlayerStats) y/o
+## min_rarity (nombre de la rareza mínima, que sube también las fijas). `side`
+## limita el pool a SIDE_WEAPONS o SIDE_TOMES; "" (por defecto, lo que pasan
+## las elecciones extra) mezcla.
 static func roll_offer(player: Node, count: int = 3, luck_bonus: float = 0.0,
 		min_rarity: String = "", side: String = "") -> Array[Dictionary]:
 	var offer: Array[Dictionary] = []
@@ -342,7 +350,7 @@ static func roll_offer(player: Node, count: int = 3, luck_bonus: float = 0.0,
 			})
 			continue
 		if entry.has("effects"):
-			# Multi-stat card: one rarity-scaled amount per effect, in order.
+			# Carta de varios stats: una cantidad escalada por efecto, en orden.
 			var amounts: Array[float] = []
 			var shown: Array[int] = []
 			for effect: Dictionary in entry.effects as Array:
@@ -360,10 +368,9 @@ static func roll_offer(player: Node, count: int = 3, luck_bonus: float = 0.0,
 			continue
 		var amount: float = roundf(float(entry.amount) * float(rarity.potency))
 		if bool(entry.get("gamble", false)):
-			# Tomo del Azar: the number of boons is a step function of the
-			# rarity rank, not amount x potency (which under-counted Epic and
-			# Legendary). Both sides now read the same pure function, so the
-			# card can never promise fewer boons than PlayerStats rolls.
+			# Tomo del Azar: la cantidad de boons sale del rango de rareza, no
+			# de amount x potencia. La carta y PlayerStats leen la misma
+			# función, así la carta nunca promete menos boons de los que salen.
 			amount = float(Tome.gamble_boon_count(float(rarity.potency)))
 		offer.append({
 			"entry": entry,
@@ -375,9 +382,9 @@ static func roll_offer(player: Node, count: int = 3, luck_bonus: float = 0.0,
 	return offer
 
 
-## The pool the player can currently roll from. `side` restricts it to one
-## half (SIDE_WEAPONS / SIDE_TOMES); "" returns both, which is what bonus
-## picks want.
+## El pool del que el jugador puede sortear ahora. `side` lo limita a una
+## mitad (SIDE_WEAPONS / SIDE_TOMES); "" devuelve las dos, como quieren las
+## elecciones extra.
 static func build_pool(player: Node, side: String = "") -> Array[Dictionary]:
 	var pool: Array[Dictionary] = []
 	if side != SIDE_WEAPONS:
@@ -387,8 +394,8 @@ static func build_pool(player: Node, side: String = "") -> Array[Dictionary]:
 	return pool
 
 
-## Tomes/stats half: the generic stat cards, always available, plus the
-## next stack of every tome the player may still take.
+## Mitad de tomos/stats: las cartas genéricas, siempre disponibles, más el
+## siguiente stack de cada tomo que el jugador aún puede tomar.
 static func _tome_side(player: Node) -> Array[Dictionary]:
 	var pool: Array[Dictionary] = GENERIC_POOL.duplicate()
 	if player == null:
@@ -397,8 +404,8 @@ static func _tome_side(player: Node) -> Array[Dictionary]:
 	return pool
 
 
-## Weapons half: stat entries for each owned weapon plus new_weapon cards
-## for the unowned ones (none once the weapon cap is reached).
+## Mitad de armas: cartas de stats por cada arma que se tiene más cartas
+## new_weapon para las que no (ninguna al llegar al tope de armas).
 static func _weapon_side(player: Node) -> Array[Dictionary]:
 	var pool: Array[Dictionary] = []
 	if player == null:
@@ -418,13 +425,11 @@ static func _weapon_side(player: Node) -> Array[Dictionary]:
 	return pool
 
 
-## Which side a level pick offers: random, weighted by how many entries
-## each side actually has right now, so a raider with five maxed weapons
-## and nine open tomes mostly sees tomes. Never returns an empty side —
-## a pick with nothing to show is a wedge over a paused tree.
-## Both halves are built to count them: this runs once per level-up, not
-## per frame, and counting them any other way would duplicate the rules
-## about caps that _tome_side / _weapon_side already own.
+## Qué lado ofrece una elección de nivel: al azar, ponderado por cuántas
+## entradas tiene cada lado ahora. Nunca devuelve un lado vacío: una elección
+## sin nada que mostrar trabaría el árbol pausado. Arma las dos mitades para
+## contarlas (corre una vez por subida de nivel), así las reglas de topes
+## viven solo en _tome_side / _weapon_side.
 static func roll_side(player: Node) -> String:
 	var weapons := _weapon_side(player).size()
 	var tomes := _tome_side(player).size()
@@ -436,14 +441,14 @@ static func roll_side(player: Node) -> String:
 			else SIDE_TOMES
 
 
-## Player-facing name of a side, for the card-picker title.
+## Nombre de un lado para el título del selector de cartas.
 static func side_label(side: String) -> String:
 	return SIDE_LABELS.get(side, "")
 
 
-## Applies one rolled offer to the live nodes reachable from `player`.
-## Returns the boons a gambling tome (Tomo del Azar) just rolled, so the
-## caller can show the player what the bet paid; empty for every other card.
+## Aplica una oferta sorteada a los nodos vivos que cuelgan de `player`.
+## Devuelve los boons que acaba de sortear un tomo de apuesta (Tomo del Azar),
+## para que quien llama muestre lo que pagó; vacío para cualquier otra carta.
 static func apply(offer: Dictionary, player: Node) -> Array[Dictionary]:
 	var entry: Dictionary = offer.entry
 	var rolled: Array[Dictionary] = []
@@ -467,9 +472,8 @@ static func apply(offer: Dictionary, player: Node) -> Array[Dictionary]:
 	else:
 		_apply_property(target, String(entry.property), String(entry.op),
 				float(offer.amount), entry)
-	# Weapon level bookkeeping (iteration 38): every card invested in a
-	# weapon is one weapon level, and reaching the catalog's threshold
-	# evolves it on the spot — no chest, no tome pairing.
+	# Cada carta invertida en un arma es un nivel de arma; en cada umbral de
+	# EvolutionCatalog evoluciona o asciende en el acto.
 	if target is WeaponBase:
 		var weapon := target as WeaponBase
 		weapon.upgrade_level += 1
@@ -477,14 +481,14 @@ static func apply(offer: Dictionary, player: Node) -> Array[Dictionary]:
 	return rolled
 
 
-## One property change on a live target. A max_hp raise on a Health also
-## heals by the gained amount (never a full heal — iteration 38 rule).
+## Un cambio de propiedad sobre un objetivo vivo. Subir max_hp de un Health
+## también cura lo ganado (nunca una curación completa).
 static func _apply_property(target: Object, property: String, op: String,
 		amount: float, entry: Dictionary) -> void:
-	# Object.get() answers null for a property that does not exist, and a
-	# typed `float` assignment turns that into a hard error mid-card, with
-	# the tree paused by the card UI. A mistyped catalog row must degrade to
-	# a warning instead of freezing the run (WeaponBase.evolve does the same).
+	# Object.get() devuelve null para una propiedad que no existe, y asignarlo
+	# a un `float` tipado sería un error duro a mitad de carta, con el árbol
+	# pausado. Una fila mal escrita debe quedar en advertencia y no congelar la
+	# incursión (WeaponBase.evolve hace lo mismo).
 	var raw: Variant = target.get(property)
 	if raw == null:
 		push_warning("UpgradePool: no property '%s' on target for '%s'"
@@ -502,12 +506,11 @@ static func _apply_property(target: Object, property: String, op: String,
 		(target as Health).heal(amount)
 
 
-## Stat entries every owned weapon contributes (same scaling for all
-## weapons; per-weapon extras ride along from the library row).
-## Weapon-stat descriptions carry NO weapon name: the card UI shows a
-## weapon label for any entry whose `target` starts with "weapon/", and
-## the label resolves the display name via weapon_display_name() — so the
-## extra_entries here read as upgrades without repeating the weapon name.
+## Cartas de stats que aporta cada arma que se tiene (mismo escalado para
+## todas) más los extra_entries de su fila. Las descripciones genéricas no
+## nombran el arma: la UI de cartas muestra una etiqueta con el arma en toda
+## entrada cuyo `target` empieza con "weapon/" (la resuelve
+## weapon_display_name()).
 static func _entries_for_weapon(weapon: Dictionary) -> Array[Dictionary]:
 	var target: String = "weapon/" + String(weapon.node_name)
 	var entries: Array[Dictionary] = [
@@ -529,7 +532,7 @@ static func _entries_for_weapon(weapon: Dictionary) -> Array[Dictionary]:
 			"target": target, "property": "attack_range",
 			"op": "mul_percent", "amount": WEAPON_RANGE_STEP,
 		},
-		# Two-stat cards (iteration 38): one level, two knobs.
+		# Cartas de dos stats: un nivel, dos perillas.
 		{
 			"id": String(weapon.id) + "_tempered", "title": "Temple",
 			"description": "Aumenta el daño en un %d%%\nAumenta el alcance en un %d%%",
@@ -556,15 +559,15 @@ static func _entries_for_weapon(weapon: Dictionary) -> Array[Dictionary]:
 	return entries
 
 
-## One card per available tome, offering the NEXT stack (the title carries
-## the stack numeral, e.g. "Tomo de Furia II" — Tome.stack_label builds it
-## for any count). The rolled rarity's potency scales the granted amounts
-## exactly like stat cards.
+## Una carta por tomo disponible, que ofrece el SIGUIENTE stack (el título
+## lleva el numeral, p. ej. «Tomo de Furia II»; Tome.stack_label lo arma para
+## cualquier número). La potencia de la rareza sorteada escala las cantidades
+## igual que en las cartas de stats.
 static func _tome_entries(player: Node) -> Array[Dictionary]:
 	var stats := PlayerStats.find_in(player)
 	var entries: Array[Dictionary] = []
-	# Distinct-tome cap (iteration 38): once the player carries max_tomes
-	# different tomes, only deeper stacks of those are offered.
+	# Tope de tomos distintos: con max_tomes tomos diferentes, solo se
+	# ofrecen más stacks de esos.
 	var owned_distinct := stats.distinct_tome_count() if stats != null else 0
 	var at_cap := owned_distinct >= _player_cap(player, "max_tomes", DEFAULT_MAX_TOMES)
 	for tome: Dictionary in Tome.TOME_LIBRARY:
@@ -572,8 +575,8 @@ static func _tome_entries(player: Node) -> Array[Dictionary]:
 		var owned_stacks := stats.stack_count(tome_id) if stats != null else 0
 		if at_cap and owned_stacks == 0:
 			continue
-		# No stack ceiling since iteration 46: only the number of DISTINCT
-		# tomes is capped, so a favourite tome keeps deepening all run.
+		# Sin tope de stacks: solo se limita la cantidad de tomos DISTINTOS,
+		# así un tomo favorito sigue creciendo toda la incursión.
 		var next_stack := owned_stacks + 1
 		var effects: Array = tome.effects
 		var primary: Dictionary = effects[0]
@@ -583,9 +586,9 @@ static func _tome_entries(player: Node) -> Array[Dictionary]:
 			"tome_id": tome_id,
 			"title": Tome.display_title(tome, next_stack),
 			"description": String(tome.description),
-			# The primary effect drives the number shown on the card.
+			# El efecto principal da el número que muestra la carta.
 			"amount": float(primary.amount),
-			# Gambling tomes count boons instead (see roll_offer).
+			# Los tomos de apuesta cuentan boons en su lugar (ver roll_offer).
 			"gamble": bool(tome.get("gamble", false)),
 			"offer_weight": TOME_OFFER_WEIGHT,
 		})
@@ -611,7 +614,8 @@ static func _grant_weapon(entry: Dictionary, player: Node) -> void:
 	if mount == null:
 		push_warning("UpgradePool: no Weapons mount on player for '%s'" % entry.id)
 		return
-	# Offers filter owned weapons, but a stale queued reroll could race.
+	# Las ofertas ya filtran las armas que se tienen, pero una tirada vieja en
+	# cola podría llegar tarde.
 	if mount.has_node(String(entry.weapon_name)):
 		return
 	var scene := load(String(entry.scene)) as PackedScene
@@ -621,8 +625,8 @@ static func _grant_weapon(entry: Dictionary, player: Node) -> void:
 	var weapon := scene.instantiate() as Node3D
 	weapon.name = String(entry.weapon_name)
 	mount.add_child(weapon)
-	# Collection discovery: "has ever carried this weapon" (persists at the
-	# run-end fold like every other counter).
+	# Colección: «llevó esta arma alguna vez» (se guarda al cerrar la
+	# incursión, como todo contador).
 	var weapon_id := String(entry.get("weapon_id", ""))
 	if not weapon_id.is_empty():
 		var save_data := autoload_node(&"SaveData")
@@ -630,10 +634,10 @@ static func _grant_weapon(entry: Dictionary, player: Node) -> void:
 			save_data.bump("used_weapon_" + weapon_id)
 
 
-## An autoload node reached through the main loop: static functions cannot
-## see autoload names directly, and a `-s` harness has no autoloads at all,
-## so every static autoload use in this domain funnels through here and
-## degrades to null instead of crashing.
+## Un nodo autoload buscado por el árbol principal: las funciones estáticas
+## no ven los nombres de autoload directamente y un harness `-s` no tiene
+## autoloads, así que todo uso estático de un autoload en estos catálogos
+## pasa por aquí y devuelve null en vez de caerse.
 static func autoload_node(node_name: StringName) -> Node:
 	var loop := Engine.get_main_loop() as SceneTree
 	if loop == null:
@@ -641,10 +645,7 @@ static func autoload_node(node_name: StringName) -> Node:
 	return loop.root.get_node_or_null(NodePath(node_name))
 
 
-## WEAPON_LIBRARY row for a mount node name (empty when unknown).
-## Row by WEAPON_LIBRARY id, or empty. The by-node lookups below answer
-## "what is this live weapon"; this one answers "what is this id", which
-## is what a catalog-driven grant needs.
+## Fila de WEAPON_LIBRARY con ese id, o vacío si no existe.
 static func weapon_by_id(weapon_id: String) -> Dictionary:
 	for row: Dictionary in WEAPON_LIBRARY:
 		if String(row.id) == weapon_id:
@@ -652,28 +653,30 @@ static func weapon_by_id(weapon_id: String) -> Dictionary:
 	return {}
 
 
+## Fila de WEAPON_LIBRARY para el nombre de un nodo del montaje, o vacío si
+## no existe.
 static func weapon_by_node(node_name: String) -> Dictionary:
 	if _weapons_by_node.is_empty():
 		_weapons_by_node = CatalogIndex.build(WEAPON_LIBRARY, "node_name")
 	return _weapons_by_node.get(node_name, {})
 
 
-## WEAPON_LIBRARY id for a mount node name ("" when unknown) — lets the
-## player spawn and the Collection screen key discovery counters by id.
+## Id de WEAPON_LIBRARY para el nombre de un nodo del montaje ("" si no
+## existe); con él se arman los contadores used_weapon_<id>.
 static func weapon_id_for_node(node_name: String) -> String:
 	return String(weapon_by_node(node_name).get("id", ""))
 
 
-## Player-facing weapon name for a mount node name, falling back to the
-## node name. Screens (HUD loadout strip, evolution banner) resolve names
-## through the catalog instead of prettifying an internal id.
+## Nombre del arma que ve el jugador para el nombre de un nodo del montaje,
+## o el propio nombre del nodo si no existe. La tira del HUD y el cartel de
+## evolución resuelven nombres por aquí.
 static func weapon_display_name(node_name: String) -> String:
 	return String(weapon_by_node(node_name).get("display_name", node_name))
 
 
-## Adds one stack at the rolled rarity's potency; PlayerStats recomputes
-## every derived stat from scratch, so displayed amounts match applied.
-## Returns the boons a gambling tome rolled (empty for every other tome).
+## Suma un stack con la potencia de la rareza sorteada; PlayerStats
+## recalcula todo desde cero, así lo mostrado coincide con lo aplicado.
+## Devuelve los boons que sorteó un tomo de apuesta (vacío para los demás).
 static func _grant_tome(entry: Dictionary, offer: Dictionary,
 		player: Node) -> Array[Dictionary]:
 	var stats := PlayerStats.find_in(player)
@@ -688,7 +691,7 @@ static func _max_weapons(player: Node) -> int:
 	return _player_cap(player, "max_weapons", DEFAULT_MAX_WEAPONS)
 
 
-## An exported cap on the player script, or the fallback when absent.
+## Un tope exportado en el script del jugador, o el respaldo si no existe.
 static func _player_cap(player: Node, property: String, fallback: int) -> int:
 	if player == null:
 		return fallback
@@ -711,7 +714,7 @@ static func _resolve_target(target_path: String, player: Node) -> Object:
 	return null
 
 
-## Picks up to `count` distinct entries, weighted by offer_weight.
+## Elige hasta `count` entradas distintas, ponderadas por offer_weight.
 static func _weighted_pick(entries: Array[Dictionary], count: int) -> Array[Dictionary]:
 	var remaining := entries.duplicate()
 	var picked: Array[Dictionary] = []
@@ -731,8 +734,8 @@ static func _weighted_pick(entries: Array[Dictionary], count: int) -> Array[Dict
 	return picked
 
 
-## Rarity tier index for a potency value (Common 1.0 -> 0 ... Legendary
-## 3.0 -> 3); the nearest tier wins for off-table values.
+## Índice de rareza para un valor de potencia (Common 1.0 -> 0 ...
+## Legendary 3.0 -> 3); para valores fuera de la tabla gana la más cercana.
 static func potency_rank(potency: float) -> int:
 	var best := 0
 	var best_gap := INF
@@ -744,8 +747,8 @@ static func potency_rank(potency: float) -> int:
 	return best
 
 
-## Index of a rarity tier by name; unknown or empty names map to the base
-## tier (index 0), which floors nothing.
+## Índice de una rareza por nombre; un nombre desconocido o vacío da la
+## rareza base (índice 0), que no pone piso.
 static func rarity_index(rarity_name: String) -> int:
 	for i: int in RARITIES.size():
 		if String(RARITIES[i].name) == rarity_name:
@@ -758,16 +761,15 @@ static func _rarity_for(entry: Dictionary, luck: float, floor_index: int = 0) ->
 	if not fixed_name.is_empty():
 		for i: int in RARITIES.size():
 			if String(RARITIES[i].name) == fixed_name:
-				# A bonus pick's min_rarity floor lifts fixed rarities too,
-				# so an "Epic+" pick can never show a card sealed RARE.
+				# El piso min_rarity de una elección extra también sube las
+				# rarezas fijas: una elección «Epic o más» nunca muestra Rare.
 				return RARITIES[maxi(i, floor_index)]
 	return roll_rarity(luck, floor_index)
 
 
-## Rolls one rarity tier, luck-tilted and floored to `floor_index`.
-## Public because chests roll their own tier at ready (chest.gd) and the
-## luck curve — with its exponential tilt toward MAX_LUCK_TILT — must have
-## exactly one implementation.
+## Sortea una rareza, inclinada por la suerte y con piso en `floor_index`.
+## Es pública porque los cofres sortean su propia rareza (chest.gd) y la
+## curva de suerte debe tener una sola implementación.
 static func roll_rarity(luck: float, floor_index: int = 0) -> Dictionary:
 	var weights := _rarity_weights(luck)
 	var total := 0.0
@@ -783,13 +785,11 @@ static func roll_rarity(luck: float, floor_index: int = 0) -> Dictionary:
 	return RARITIES[maxi(index, floor_index)]
 
 
-## Roll-time rarity weights: luck moves a fraction of the base tier's
-## (RARITIES[0], Common) weight onto the higher tiers, distributed
-## proportionally to their base weights.
-## The fraction saturates toward MAX_LUCK_TILT instead of clamping at it:
-## the old hard clamp went flat at 50 luck, and the game hands out far more
-## than that (Tomo de Fortuna alone can reach 150), so every point past the
-## cap used to buy literally nothing while the cards kept advertising it.
+## Pesos de rareza al sortear: la suerte mueve una fracción del peso de la
+## rareza base (RARITIES[0], Common) a las superiores, repartida en
+## proporción a sus pesos base. La fracción se acerca a MAX_LUCK_TILT sin
+## cortarse en seco, así la suerte sigue sirviendo por encima de 50 (el Tomo
+## de Fortuna solo puede llegar a 150).
 static func _rarity_weights(luck: float) -> PackedFloat32Array:
 	var weights := PackedFloat32Array()
 	var upper_total := 0.0

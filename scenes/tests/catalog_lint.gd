@@ -1,38 +1,36 @@
 extends Node
-## Headless catalog lint (iteration 57): the cross-references a soak can
-## never check, because a broken one does not crash — it silently does
-## nothing. A misspelled `passive_stat` costs its raider its whole
-## passive and prints one warning buried in a 20 000-line log; a `scene`
-## path with a typo only fails the day somebody rolls that row; a glyph
-## reused between two catalogs shows the wrong sigil on a HUD slot.
+## Lint headless de catálogos: revisa las referencias cruzadas que un soak
+## nunca revisa, porque una rota no se cae, simplemente no hace nada. Un
+## `passive_stat` mal escrito le quita la pasiva entera a su raider con una
+## sola advertencia perdida en el log; una ruta `scene` con un error solo
+## falla el día que alguien sortea esa fila; un glifo repetido entre dos
+## catálogos muestra la sigla equivocada en el HUD.
 ##
-## Run it alone with:
+## Se corre solo con:
 ##   godot --headless --fixed-fps 60 --quit-after 600 \
 ##     res://scenes/tests/CatalogLint.tscn
 ##
-## Output contract (tools/verificar.sh greps every name from its own
-## fixed list, so a check that stops running is a failure, not a silence):
-##   Catalog lint: check <name> ok rows=%d   ... one per PASSING check
-##   Catalog lint: ok checks=%d              ... only when all of them pass
-## Every failure is a push_error, which PATRON_ERROR catches on its own.
+## Contrato de salida (tools/verificar.sh busca cada nombre de su lista fija
+## LINT_CHECKS, así una comprobación que deja de correr es un fallo y no un
+## silencio):
+##   Catalog lint: check <name> ok rows=%d   ... una por comprobación que pasa
+##   Catalog lint: ok checks=%d              ... solo cuando pasan todas
+## Cada fallo es un push_error, que PATRON_ERROR atrapa por su cuenta.
 ##
-## `rows` is the number of entries the check actually INSPECTED. Zero rows
-## is a failure: a check that walks an empty list passes for the wrong
-## reason, and that is exactly how a renamed constant would go unnoticed.
+## `rows` es la cantidad de entradas que la comprobación REVISÓ de verdad. Cero
+## filas es un fallo: una comprobación que recorre una lista vacía pasa por la
+## razón equivocada (así pasaría inadvertida una constante renombrada).
 
-## The director declares no class_name; its EVENT_LIBRARY and
-## WEATHER_CATALOG are only reachable through the script resource.
+## El director no declara class_name: su EVENT_LIBRARY y su WEATHER_CATALOG
+## solo se alcanzan por el recurso del script.
 const WORLD_DIRECTOR := preload("res://scripts/world/run/world_director.gd")
-## Scanned as TEXT for the `match stat:` arms of _apply_effect. There is no
-## reflection for a match block, and hard-coding the list here would mean
-## two copies of the same truth drifting apart on the next stat.
+## Se lee como TEXTO para sacar los brazos `match stat:` de _apply_effect: no
+## hay reflexión para un bloque match, y copiar la lista aquí serían dos
+## verdades que se separan con el próximo stat.
 const PLAYER_STATS_PATH := "res://scripts/systems/player_stats.gd"
-## Directories scanned for `marker_kind = &"..."` assignments.
+## Carpetas donde se buscan asignaciones `marker_kind = &"..."`.
 const SCRIPT_ROOTS: Array[String] = ["res://scripts"]
 
-## Marker kinds the map legend deliberately has no row for (MapDraw
-## documents this; the lint reads the same constant so the exemption
-## cannot drift).
 var _checks_run: int = 0
 var _checks_failed: int = 0
 
@@ -58,10 +56,10 @@ func _quit() -> void:
 	get_tree().quit(0 if _checks_failed == 0 else 1)
 
 
-## One check's verdict. `rows` is what was inspected; `failures` is one
-## human sentence per problem. A passing check prints its line, a failing
-## one prints none (so the grep in verificar.sh misses it) and pushes one
-## error per failure.
+## Veredicto de una comprobación. `rows` es lo revisado; `failures`, una frase
+## por problema. Una comprobación que pasa imprime su línea; una que falla no
+## imprime ninguna (así el grep de verificar.sh no la encuentra) y lanza un
+## error por fallo.
 func _report(check_name: String, rows: int, failures: Array[String]) -> void:
 	_checks_run += 1
 	if rows <= 0:
@@ -75,8 +73,8 @@ func _report(check_name: String, rows: int, failures: Array[String]) -> void:
 		push_error("Catalog lint: %s — %s" % [check_name, failure])
 
 
-## Every id-keyed library, one at a time: a duplicate id makes by_id()
-## return the first row forever and the second one dead content.
+## Cada biblioteca con llave id, una por una: un id repetido hace que by_id()
+## devuelva siempre la primera fila y deja la segunda como contenido muerto.
 func _check_ids_unique() -> void:
 	var failures: Array[String] = []
 	var rows := 0
@@ -97,7 +95,7 @@ func _check_ids_unique() -> void:
 	_report("ids_unique", rows, failures)
 
 
-## name, library, id key.
+## nombre, biblioteca, llave del id.
 func _id_libraries() -> Array[Array]:
 	return [
 		["WEAPON_LIBRARY", UpgradePool.WEAPON_LIBRARY, "id"],
@@ -116,9 +114,9 @@ func _id_libraries() -> Array[Array]:
 	]
 
 
-## Glyphs are the two-letter sigil a HUD slot paints when no icon PNG
-## exists. They are keyed by CONTENT, not by library: the same "PA" on a
-## weapon slot and an item slot reads as the same thing to a player.
+## Los glifos son la sigla de dos letras que pinta un espacio del HUD cuando
+## no hay ícono PNG. Se comparan por CONTENIDO, no por biblioteca: el mismo
+## «PA» en un arma y en un objeto se lee como la misma cosa.
 func _check_glyphs_unique() -> void:
 	var failures: Array[String] = []
 	var rows := 0
@@ -148,8 +146,8 @@ func _check_glyphs_unique() -> void:
 	_report("glyphs_unique", rows, failures)
 
 
-## Every res:// path a catalog row names. ResourceLoader.exists() and not
-## FileAccess: an .tscn whose .import is missing loads as nothing.
+## Cada ruta res:// que nombra una fila de catálogo. Con
+## ResourceLoader.exists() y no FileAccess: un recurso sin su .import no carga.
 func _check_paths_exist() -> void:
 	var failures: Array[String] = []
 	var rows := 0
@@ -180,10 +178,10 @@ func _check_paths_exist() -> void:
 	_report("paths_exist", rows, failures)
 
 
-## Every stat id any content row hands to PlayerStats._apply_effect. An id
-## that is not one of its match arms falls through to the `_` arm, which
-## warns once and applies NOTHING: the raider keeps the passive on its
-## card and never gets it.
+## Cada id de stat que una fila de contenido le pasa a
+## PlayerStats._apply_effect. Un id que no es uno de sus brazos cae en `_`,
+## que advierte una vez y no aplica NADA: el raider muestra la pasiva en su
+## carta y nunca la recibe.
 func _check_stat_ids() -> void:
 	var accepted := _accepted_stat_ids()
 	var failures: Array[String] = []
@@ -243,9 +241,8 @@ func _check_stat_ids() -> void:
 	_report("stat_ids", rows, failures)
 
 
-## The `match stat:` arms of PlayerStats._apply_effect, read off the
-## source. There is no reflection for a match block and a hard-coded copy
-## here would be a second truth to keep in sync.
+## Los brazos `match stat:` de PlayerStats._apply_effect, leídos del código
+## fuente.
 func _accepted_stat_ids() -> Dictionary[String, bool]:
 	var accepted: Dictionary[String, bool] = {}
 	var file := FileAccess.open(PLAYER_STATS_PATH, FileAccess.READ)
@@ -257,8 +254,8 @@ func _accepted_stat_ids() -> Dictionary[String, bool]:
 	if start < 0:
 		return accepted
 	var body := text.substr(start)
-	# The arms end at the catch-all; everything after it belongs to the
-	# next function.
+	# Los brazos terminan en el comodín `_`; lo que sigue es de la próxima
+	# función.
 	var end := body.find("\n\t\t_:")
 	if end >= 0:
 		body = body.substr(0, end)
@@ -268,10 +265,9 @@ func _accepted_stat_ids() -> Dictionary[String, bool]:
 	return accepted
 
 
-## Every raider's weapon_node_name must be a node_name a WEAPON_LIBRARY
-## row publishes: it is how the level-up pool finds the weapon the raider
-## is already carrying, and a mismatch offers the starting weapon again as
-## a "new" card.
+## El weapon_node_name de cada raider debe ser el node_name de una fila de
+## WEAPON_LIBRARY: así el pool de mejoras encuentra el arma que el raider ya
+## lleva; si no coincide, ofrece el arma inicial otra vez como carta «nueva».
 func _check_character_weapons() -> void:
 	var failures: Array[String] = []
 	var rows := 0
@@ -287,16 +283,17 @@ func _check_character_weapons() -> void:
 	_report("character_weapons", rows, failures)
 
 
-## Every method name EVENT_LIBRARY and WEATHER_CATALOG hand to call().
-## They are called through call(), so a renamed method is a silent no-op
-## with one error per roll, minutes into a run.
+## Cada nombre de método que EVENT_LIBRARY y WEATHER_CATALOG pasan a call().
+## Se llaman por call(), así un método renombrado no hace nada y da un error
+## por tirada, minutos dentro de la incursión.
 func _check_director_methods() -> void:
 	var failures: Array[String] = []
 	var rows := 0
 	var declared: Dictionary[String, bool] = {}
-	# Through a Script-typed local: `WORLD_DIRECTOR.get_script_method_list()`
-	# reads as "call a static method declared in that script" and does not
-	# parse. The resource's own method list is what we want.
+	# Por una variable local tipada Script:
+	# `WORLD_DIRECTOR.get_script_method_list()` se lee como «llamar a un
+	# método estático de ese script» y no compila. Se quiere la lista de
+	# métodos del recurso.
 	var director_script: Script = WORLD_DIRECTOR
 	for method: Dictionary in director_script.get_script_method_list():
 		declared[String(method.get("name", ""))] = true
@@ -310,7 +307,7 @@ func _check_director_methods() -> void:
 		for key: String in ["start", "tick", "stop"]:
 			var method := String(row.get(key, ""))
 			if method.is_empty():
-				continue  # tick and stop are optional, and empty means none
+				continue  # tick y stop son opcionales; vacío = ninguno
 			rows += 1
 			if not declared.has(method):
 				failures.append("weather '%s' %s '%s' is not declared on WorldDirector"
@@ -318,9 +315,9 @@ func _check_director_methods() -> void:
 	_report("director_methods", rows, failures)
 
 
-## Every property a card or an evolution writes on a weapon. Both go
-## through set()/get() by name, so a renamed export turns the card into a
-## no-op that still costs the player their level-up.
+## Cada propiedad que una carta o una evolución escribe en un arma. Las dos
+## pasan por set()/get() por nombre, así un export renombrado convierte la
+## carta en una que no hace nada y aun así gasta la subida de nivel.
 func _check_weapon_properties() -> void:
 	var failures: Array[String] = []
 	var rows := 0
@@ -361,10 +358,9 @@ func _check_weapon_properties() -> void:
 	_report("weapon_properties", rows, failures)
 
 
-## The property names one weapon scene publishes. Read off the instance's
-## property list rather than with get() != null: an @onready node member
-## is legitimately null before _ready and would fail a null test while
-## existing perfectly well.
+## Los nombres de propiedad que publica la escena de un arma. Se leen de la
+## lista de propiedades de la instancia y no con get() != null: un miembro
+## @onready es null antes de _ready y fallaría esa prueba aunque exista.
 func _weapon_properties(scene_path: String) -> Dictionary[String, bool]:
 	var names: Dictionary[String, bool] = {}
 	if scene_path.is_empty() or not ResourceLoader.exists(scene_path):
@@ -381,8 +377,8 @@ func _weapon_properties(scene_path: String) -> Dictionary[String, bool]:
 	return names
 
 
-## The three small id tables that live outside scripts/systems: they are
-## rolled the same way and a duplicate does the same damage.
+## Las tres tablas chicas de ids que viven fuera de scripts/systems: se
+## sortean igual y un id repetido hace el mismo daño.
 func _check_vendor_lucky_roulette_ids() -> void:
 	var failures: Array[String] = []
 	var rows := 0
@@ -407,10 +403,10 @@ func _check_vendor_lucky_roulette_ids() -> void:
 	_report("vendor_lucky_roulette_ids", rows, failures)
 
 
-## Every marker kind that can reach the map needs a legend row, so a
-## player who sees a dot can find out what it is. The exceptions are
-## VARIANTS of a kind that already has one (a free chest is a chest), and
-## they are named in MapDraw.LEGEND_VARIANTS rather than here.
+## Cada tipo de marcador que puede llegar al mapa necesita una fila en la
+## leyenda, así quien ve un punto puede saber qué es. Las excepciones son
+## VARIANTES de un tipo que ya tiene fila (un cofre gratis es un cofre) y se
+## nombran en MapDraw.LEGEND_VARIANTS, no aquí.
 func _check_marker_labels() -> void:
 	var failures: Array[String] = []
 	var rows := 0
@@ -419,8 +415,8 @@ func _check_marker_labels() -> void:
 		kinds[String(kind)] = "MARKER_STYLES"
 	for entry: Array in _assigned_marker_kinds():
 		kinds[String(entry[0])] = String(entry[1])
-	# The party, the boss and the way out are drawn always_visible and are
-	# not things you go looking for in a legend.
+	# El grupo, el jefe y la salida se dibujan siempre (always_visible) y no
+	# son cosas que se buscan en una leyenda.
 	var exempt: Dictionary[String, bool] = {"player": true, "boss": true, "exit": true}
 	for kind: String in kinds:
 		if exempt.has(kind):
@@ -435,9 +431,9 @@ func _check_marker_labels() -> void:
 	_report("marker_labels", rows, failures)
 
 
-## Every `marker_kind = &"..."` assignment in the codebase, as
-## [kind, "file.gd:line"]. Scanned as text because the kinds are set in
-## _init() on scenes this lint never instances.
+## Cada asignación `marker_kind = &"..."` del código, como
+## [tipo, "archivo.gd:línea"]. Se lee como texto porque los tipos se asignan
+## en _init() de escenas que este lint nunca instancia.
 func _assigned_marker_kinds() -> Array[Array]:
 	var found: Array[Array] = []
 	var pattern := RegEx.create_from_string('marker_kind\\s*=\\s*&"([a-z_]+)"')
@@ -455,7 +451,7 @@ func _assigned_marker_kinds() -> Array[Array]:
 	return found
 
 
-## Every .gd under the given roots, recursively.
+## Cada .gd bajo las carpetas dadas, recursivamente.
 func _gd_files(roots: Array[String]) -> Array[String]:
 	var found: Array[String] = []
 	var pending := roots.duplicate()

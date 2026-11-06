@@ -1,21 +1,27 @@
 class_name MapCatalog
 extends RefCounted
-## Static catalog of run maps/biomes (GDD 7). Data-driven like the other
-## catalogs — a new biome is one row here plus its arena scene (root
-## script arena.gd; it does NOT instance RunSystems any more).
+## Catálogo de mapas (biomas) de una incursión. Un bioma nuevo es una fila aquí
+## más su escena de arena (script raíz arena.gd).
 ##
-## THE ORDER OF THIS LIST IS THE ORDER OF A RUN (iteration 50): every run
-## opens on the first row and walks down it, wrapping to the top with
-## lap + 1. There is no map picker and no unlock gate — a biome is reached
-## by getting there, not by choosing it — so a new biome inserted here
-## changes the progression for everyone immediately.
-## Row fields:
-##   id:     identifier (English, keys SaveData counters) — never shown.
-##   display_name/blurb: player text (the stage banner, the end screen).
-##   scene_path: arena scene RunRoot instantiates for that stage.
-##   palette: swatch colors for the biome's mood (used by the UI).
+## EL ORDEN DE ESTA LISTA ES EL ORDEN DE LA INCURSIÓN: cada incursión empieza
+## en DEFAULT_ID (la primera fila) y baja por la lista, volviendo arriba con
+## vuelta + 1. No hay selector de mapa ni desbloqueo, así que un bioma
+## insertado aquí cambia la progresión de todos de inmediato.
+##
+## Se puede cambiar libremente: display_name, blurb, palette y el orden de las
+## filas.
+## Llave interna, NUNCA la cambies: id. Va dentro de los contadores
+## runs_on_<id> y victories_<id> de SaveData, que las misiones de mapa nombran
+## en QuestCatalog, y debe ser igual al export map_id de su escena de arena.
+## scene_path debe apuntar a una escena que exista.
+##
+## Campos de cada fila:
+##   id: llave interna (ver arriba). Nunca se muestra.
+##   display_name, blurb: texto del jugador (cartel de etapa, pantalla final).
+##   scene_path: escena de arena que RunRoot instancia para esa etapa.
+##   palette: colores del ambiente del bioma (los usa la UI).
 
-## First stage of every run, and the fallback for an unknown id.
+## Primera etapa de cada incursión y respaldo para un id desconocido.
 const DEFAULT_ID: String = "hollow_woods"
 
 const MAP_LIBRARY: Array[Dictionary] = [
@@ -43,21 +49,21 @@ const MAP_LIBRARY: Array[Dictionary] = [
 ]
 
 
-## Lazily built id -> row index (see CatalogIndex): RunRoot resolves a row
-## on every stage, the end screen on every map it names.
+## Índice id -> fila armado al primer uso (ver CatalogIndex): RunRoot resuelve
+## una fila en cada etapa y la pantalla final una por cada mapa que nombra.
 static var _by_id: Dictionary[String, Dictionary] = {}
 
 
-## Row for the given id, or an empty Dictionary if unknown.
+## Fila con ese id, o un Dictionary vacío si no existe.
 static func by_id(map_id: String) -> Dictionary:
 	if _by_id.is_empty():
 		_by_id = CatalogIndex.build(MAP_LIBRARY)
 	return _by_id.get(map_id, {})
 
 
-## Position of a map in the progression order, or 0 (the first stage) for
-## an unknown id. THE stage-order accessor: RunRoot advances by index and
-## wraps on MAP_LIBRARY.size(), so the library's order IS the run's order.
+## Posición de un mapa en el orden de la incursión, o 0 (la primera etapa) para
+## un id desconocido. RunRoot avanza por índice y da la vuelta con
+## MAP_LIBRARY.size(), así que el orden de la biblioteca ES el de la incursión.
 static func index_of(map_id: String) -> int:
 	for i: int in MAP_LIBRARY.size():
 		if String(MAP_LIBRARY[i].id) == map_id:
@@ -65,7 +71,7 @@ static func index_of(map_id: String) -> int:
 	return 0
 
 
-## Row for the given id, or the default map's row when the id is unknown.
+## Fila con ese id, o la del mapa por defecto si el id es desconocido.
 static func by_id_or_default(map_id: String) -> Dictionary:
 	var row := by_id(map_id)
 	return row if not row.is_empty() else by_id(DEFAULT_ID)
