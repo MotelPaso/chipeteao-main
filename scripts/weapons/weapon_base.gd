@@ -17,15 +17,16 @@ const DEGENERATE_LENGTH_SQ: float = 0.0001
 ## look_at / Basis.looking_at no pueden construir una base con UP.
 const UP_COLINEAR_DOT: float = 0.99
 
-## Daño por golpe.
+@export_group("Estadísticas")
+## Daño por golpe. Valor de respaldo; cada arma fija el suyo en su escena. Lo suben «Afilado», «Temple», «Ritmo de batalla», evoluciones y ascensos.
 @export var damage: float = 10.0
-## Segundos entre ataques.
+## Segundos entre ataques. Valor de respaldo; cada arma fija el suyo en su escena. Lo bajan «Mano rápida» y «Ritmo de batalla».
 @export var cooldown: float = 1.0
-## Distancia a la que el arma busca blanco, en metros.
+## Distancia de búsqueda de blanco, en metros. Valor de respaldo; cada arma fija el suyo en su escena. Lo suben «Largo alcance», «Temple» y ascensos.
 @export var attack_range: float = 3.0
-## Disparos, orbes o golpes por ráfaga.
+## Disparos, orbes o golpes por ráfaga (1 salvo que la escena diga otra cosa); el Tomo de Multitud y los ascensos pares suman.
 @export var projectile_count: int = 1
-## Multiplicador de enfriamiento propio del arma; se multiplica con el del jugador sin tocar cooldown.
+## Multiplicador de enfriamiento propio del arma (1 = sin cambio); lo bajan evoluciones, ascensos y cartas como «Ráfaga».
 @export var cooldown_scale: float = 1.0
 
 ## Cartas de mejora que recibió el arma en la partida (las suma

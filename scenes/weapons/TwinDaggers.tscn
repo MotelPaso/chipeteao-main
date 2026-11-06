@@ -4,9 +4,6 @@
 
 [node name="TwinDaggers" type="Node3D" unique_id=749985561]
 script = ExtResource("1_daggers")
-slash_time = 0.2
-slash_radius = 1.51
-slash_color = Color(0.991721, 0.64353454, 0.27002934, 1)
 damage = 3.0
 cooldown = 0.5
 attack_range = 3.5

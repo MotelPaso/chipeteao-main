@@ -23,9 +23,9 @@ extends WeaponBase
 ## Altura máxima, en metros, por encima o por debajo del plano del charco a la que alcanza.
 @export var pool_height_window: float = 1.6
 ## Segundos de vuelo del frasco desde la mano hasta el impacto.
-@export var lob_time: float = 0.5
+@export var lob_time: float = 0.435
 ## Altura máxima del arco del frasco sobre la línea recta del lanzamiento.
-@export var arc_height: float = 3.0
+@export var arc_height: float = 4.145
 ## Cuánto sobre el punto de impacto se dibuja el charco. El origen de los
 ## enemigos ya está a ras del suelo: esto solo despega el disco de la cara
 ## superior del piso; más abajo el disco y el borde quedan enterrados.

@@ -19,8 +19,8 @@ extends WeaponBase
 ## Siervos vivos a la vez por portador. El más viejo expira antes para hacer
 ## lugar: un tope que rechazara nuevos haría sentir el arma rota justo cuando funciona.
 @export var max_possessed: int = 12
-@export var bolt_speed: float = 9.0
-@export var bolt_lifetime: float = 2.5
+@export var bolt_speed: float = 7.0
+@export var bolt_lifetime: float = 3.7
 @export var bolt_radius: float = 0.28
 ## Segundos entre los rayos extra que agrega el Tomo de Multitud. Escalonados:
 ## rayos lanzados en el mismo frame comparten trayectoria y golpean dos veces el mismo cuerpo.

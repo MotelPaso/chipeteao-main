@@ -8,11 +8,11 @@ extends WeaponBase
 ## el ritmo de dos dagas.
 
 ## Segundos que dura el destello de un corte.
-@export var slash_time: float = 0.1
+@export var slash_time: float = 0.2
 ## Radio de la medialuna de un corte, en metros.
-@export var slash_radius: float = 1.0
+@export var slash_radius: float = 1.51
 ## Color de la medialuna del corte.
-@export var slash_color: Color = Color(0.8, 0.65, 1.0)
+@export var slash_color: Color = Color(0.991721, 0.64353454, 0.27002934, 1)
 
 ## Segundos entre las estocadas que agrega el Tomo de Multitud. Escalonadas,
 ## no simultáneas: esta arma es un ritmo de cortes sueltos, y dos estocadas en

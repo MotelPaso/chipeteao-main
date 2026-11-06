@@ -4,8 +4,6 @@
 
 [node name="BloodVial" type="Node3D" unique_id=1744899349]
 script = ExtResource("1_vial")
-lob_time = 0.435
-arc_height = 4.145
 damage = 4.0
 cooldown = 1.705
 attack_range = 12.0

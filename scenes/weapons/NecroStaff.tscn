@@ -4,8 +4,6 @@
 
 [node name="NecroStaff" type="Node3D" unique_id=1336858352]
 script = ExtResource("1_necro")
-bolt_speed = 7.0
-bolt_lifetime = 3.7
 damage = 20.0
 cooldown = 3.0
 attack_range = 9.0
