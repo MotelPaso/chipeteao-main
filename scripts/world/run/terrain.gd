@@ -32,9 +32,6 @@ const FALLBACK_SIZE: float = 240.0
 ## HeightMapShape3D va fijo a UNA UNIDAD DE MUNDO POR MUESTRA y el nodo no
 ## se escala, así que la cuadrícula del colisionador es de 1 m y esto no se ajusta.
 const SAMPLE_METERS: float = 1.0
-## Franja de mezcla en metros alrededor de un claro: el claro es plano
-## dentro de su radio y vuelve al ruido en esta franja.
-const PAD_BLEND: float = 6.0
 ## Tinte del minimapa cuando no se encuentra el nodo de backdrop_path.
 const FALLBACK_MAP_TINT := Color(0.25, 0.27, 0.3)
 
@@ -59,6 +56,9 @@ const FALLBACK_MAP_TINT := Color(0.25, 0.27, 0.3)
 ## Radio en metros del claro plano bajo cada grupo de verticalidad de
 ## autor y cada meseta: una rampa tiene que tocar suelo parejo o flota en un extremo.
 @export var pad_radius: float = 8.0
+## Franja de mezcla en metros alrededor de cada claro: el claro es plano
+## dentro de su radio y vuelve al relieve en esta franja.
+@export var pad_blend: float = 6.0
 ## El ruido baja a cero dentro de estos metros desde el borde, para que
 ## los muros del perímetro y el disco del backdrop encuentren un borde plano.
 @export var rim_flat_band: float = 10.0
@@ -75,6 +75,10 @@ const FALLBACK_MAP_TINT := Color(0.25, 0.27, 0.3)
 ## Nodo cuyo ground_color tiñe el minimapa: el Backdrop de la arena. Si lo
 ## renombras o lo mueves, actualiza esta ruta; sin él, el mapa sale gris.
 @export_node_path("Node3D") var backdrop_path: NodePath = ^"../Backdrop"
+## Cuánto se aclaran las cimas en el minimapa (0-1).
+@export_range(0.0, 1.0) var map_peak_lighten: float = 0.45
+## Cuánto se oscurecen las hondonadas en el minimapa (0-1).
+@export_range(0.0, 1.0) var map_hollow_darken: float = 0.35
 
 ## Lado del terreno en metros: el doble de arena_half_extent del scatter, que
 ## se lee al construir. Lo leen el mapa y TerrainShots.
@@ -179,8 +183,8 @@ func map_image(px_per_meter: float) -> Image:
 			# Sombreado por altura: más oscuro en las hondonadas y más claro
 			# en las cimas, para que el relieve se lea hasta en 121 px.
 			var shade := clampf((height_at(x, z) - min_height) / span, 0.0, 1.0)
-			var tint := base.lerp(base.lightened(0.45), shade)
-			tint = tint.darkened(0.35 * (1.0 - shade))
+			var tint := base.lerp(base.lightened(map_peak_lighten), shade)
+			tint = tint.darkened(map_hollow_darken * (1.0 - shade))
 			image.set_pixel(px, py, tint)
 	return image
 
@@ -316,7 +320,7 @@ func _rim_falloff(x: float, z: float) -> float:
 	return smoothstep(0.0, 1.0, maxf(edge, 0.0) / maxf(rim_flat_band, 0.001))
 
 
-## Aplana `h` hacia 0 dentro de un claro y vuelve al ruido en PAD_BLEND.
+## Aplana `h` hacia 0 dentro de un claro y vuelve al ruido en pad_blend.
 ## Gana el claro más fuerte, así dos claros superpuestos no se suman.
 func _apply_pads(x: float, z: float, h: float) -> float:
 	var flat := 0.0
@@ -324,10 +328,10 @@ func _apply_pads(x: float, z: float, h: float) -> float:
 		var center: Vector2 = pad["center"]
 		var radius: float = pad["radius"]
 		var distance := Vector2(x, z).distance_to(center)
-		if distance >= radius + PAD_BLEND:
+		if distance >= radius + pad_blend:
 			continue
 		var strength := 1.0 if distance <= radius \
-				else 1.0 - smoothstep(0.0, 1.0, (distance - radius) / PAD_BLEND)
+				else 1.0 - smoothstep(0.0, 1.0, (distance - radius) / pad_blend)
 		flat = maxf(flat, strength)
 	return lerpf(h, 0.0, flat)
 

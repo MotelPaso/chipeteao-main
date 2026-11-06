@@ -13,11 +13,6 @@ extends Node3D
 ## anillo), con colores por export para que cada bioma tiña su mundo.
 ## Las colinas sacan números del RNG global de la partida (ver _build_hill_ring).
 
-## Las colinas lejanas se agrandan así para que se lean a través de la niebla.
-const FAR_RING_SCALE_BOOST: float = 1.6
-## Metros extra que una colina guarda entre su borde y el muro de la arena.
-const WALL_CLEARANCE: float = 4.0
-
 @export_group("Suelo lejano")
 ## Color del disco de suelo lejano. También tiñe el minimapa (el Terrain lo
 ## lee por su backdrop_path).
@@ -51,6 +46,16 @@ const WALL_CLEARANCE: float = 4.0
 ## Rango de media anchura de una colina, en metros.
 @export var hill_width_min: float = 18.0
 @export var hill_width_max: float = 46.0
+## Profundidad de una colina como fracción de su media anchura (rango).
+@export var hill_depth_ratio_min: float = 0.7
+@export var hill_depth_ratio_max: float = 1.0
+## Desvío al azar del ángulo de cada colina en su anillo, en radianes.
+@export var hill_angle_jitter: float = 0.12
+## Multiplicador de tamaño de las colinas lejanas, para que se lean a
+## través de la niebla.
+@export var far_hill_scale_boost: float = 1.6
+## Metros extra que una colina guarda entre su borde y el muro de la arena.
+@export var wall_clearance: float = 4.0
 
 ## Mitad del lado de la arena; 80 solo si no hay scatter.
 var _half_extent: float = 80.0
@@ -62,7 +67,7 @@ func _ready() -> void:
 	_build_hill_ring(hill_count, near_ring_min_factor, near_ring_max_factor,
 			_hill_material(hill_color))
 	_build_hill_ring(far_hill_count, far_ring_min_factor, far_ring_max_factor,
-			_hill_material(far_hill_color), FAR_RING_SCALE_BOOST)
+			_hill_material(far_hill_color), far_hill_scale_boost)
 
 
 ## Mitad del lado de la arena desde el nodo "arena_bounds" (el scatter),
@@ -122,10 +127,10 @@ func _build_hill_ring(count: int, min_factor: float, max_factor: float,
 		hill.mesh = mesh
 		hill.material_override = material
 		hill.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-		var angle := TAU * float(i) / float(count) + randf_range(-0.12, 0.12)
+		var angle := TAU * float(i) / float(count) + randf_range(-hill_angle_jitter, hill_angle_jitter)
 		var width := randf_range(hill_width_min, hill_width_max) * scale_boost
 		var height := randf_range(hill_height_min, hill_height_max) * scale_boost
-		var depth := width * randf_range(0.7, 1.0)
+		var depth := width * randf_range(hill_depth_ratio_min, hill_depth_ratio_max)
 		var distance := maxf(randf_range(min_factor, max_factor) * _half_extent,
 				_clear_distance(angle, width, depth))
 		hill.position = Vector3(cos(angle) * distance, 0.0, sin(angle) * distance)
@@ -143,7 +148,7 @@ func _build_hill_ring(count: int, min_factor: float, max_factor: float,
 func _clear_distance(angle: float, width: float, depth: float) -> float:
 	var cos_a := absf(cos(angle))
 	var sin_a := absf(sin(angle))
-	var limit := _half_extent + WALL_CLEARANCE
+	var limit := _half_extent + wall_clearance
 	# Basta con salir por UN eje para que la caja de la cúpula quede fuera
 	# del cuadrado, así gana el más barato de los dos.
 	var by_x := (limit + width) / cos_a if cos_a > 0.001 else INF

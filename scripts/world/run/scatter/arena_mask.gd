@@ -14,6 +14,9 @@ extends RefCounted
 ## al crearla): build() y random_walkable_point() sortean en el orden de
 ## siempre, y BONK_GAME_SEED reproduce la máscara.
 
+## Constantes del algoritmo: edita aquí (no hay Inspector). Los valores que
+## se ajustan por arena están en los exports del scatter.
+##
 ## Los cuatro pasos de la vecindad-4: crecimiento, relleno de muescas, flood
 ## fill y división en regiones usan la misma.
 const STEPS: Array[Vector2i] = [Vector2i.LEFT, Vector2i.RIGHT, Vector2i.UP, Vector2i.DOWN]

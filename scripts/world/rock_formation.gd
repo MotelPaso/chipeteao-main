@@ -36,6 +36,10 @@ extends StaticBody3D
 ## altura aquí es relativa a Terrain.height_at, así la formación se apoya en
 ## el relieve en vez de flotar sobre una hondonada.
 
+## Ajustes de forma y sombreado comunes a todos los biomas. Este nodo se crea
+## por código y no tiene Inspector: edita aquí. Lo que cambia por bioma vive
+## en RockFormationStyle (assets/world/rock_style_<mapa>.tres).
+##
 ## Material de las caras si el estilo no trae otro: albedo blanco
 ## multiplicado por los colores de vértice por faceta que se arman abajo.
 const DEFAULT_MATERIAL: Material = preload("res://assets/materials/rock_formation.tres")
