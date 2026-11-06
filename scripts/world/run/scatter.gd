@@ -387,7 +387,7 @@ func _build_mesas() -> void:
 	if mesa_platform_scene == null:
 		return
 	for site: Vector2 in _mesa_sites:
-		var scale := _rng.randf_range(mesa_scale_min, mesa_scale_max)
+		var mesa_scale := _rng.randf_range(mesa_scale_min, mesa_scale_max)
 		var plat := mesa_platform_scene.instantiate() as Node3D
 		if plat == null:
 			continue
@@ -395,7 +395,7 @@ func _build_mesas() -> void:
 		var plat_angle := _rng.randf_range(0.0, TAU)
 		plat.position = Vector3(site.x, ground_height(site.x, site.y), site.y)
 		plat.rotation.y = plat_angle
-		plat.scale = Vector3.ONE * scale
+		plat.scale = Vector3.ONE * mesa_scale
 
 		if mesa_ramp_scene == null:
 			_keepouts_xz.append(site)
@@ -413,10 +413,10 @@ func _build_mesas() -> void:
 				Vector3(0.0, 0.0, -mesa_ramp_offset)
 			]
 			var local_rot_y: Array[float] = [PI, PI * 0.5, 0.0, -PI * 0.5]
-			var world_pos: Vector3 = plat.transform * (local_offsets[side_idx] * scale)
+			var world_pos: Vector3 = plat.transform * (local_offsets[side_idx] * mesa_scale)
 			ramp.position = Vector3(world_pos.x, ground_height(world_pos.x, world_pos.z), world_pos.z)
 			ramp.rotation.y = plat_angle + local_rot_y[side_idx]
-			ramp.scale = Vector3.ONE * scale
+			ramp.scale = Vector3.ONE * mesa_scale
 
 		# La meseta cuenta como keepout del reparto interior, para que no
 		# crezcan árboles a través de su plataforma.
