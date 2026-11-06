@@ -30,6 +30,12 @@ const WORLD_DIRECTOR := preload("res://scripts/world/run/world_director.gd")
 const PLAYER_STATS_PATH := "res://scripts/systems/player_stats.gd"
 ## Carpetas donde se buscan asignaciones `marker_kind = &"..."`.
 const SCRIPT_ROOTS: Array[String] = ["res://scripts"]
+## Escenas donde se buscan los `secret_boss_id` de los jefes secretos.
+const SCENE_ROOTS: Array[String] = ["res://scenes"]
+## Scripts de enemigos: EnemyBase cuenta las bajas en kills_<nombre del script>.
+const ENEMY_SCRIPT_ROOTS: Array[String] = ["res://scripts/enemies"]
+## Formato de todo id de catálogo: minúsculas, dígitos y guiones bajos.
+const ID_PATTERN := "^[a-z0-9_]+$"
 
 var _checks_run: int = 0
 var _checks_failed: int = 0
@@ -45,6 +51,9 @@ func _ready() -> void:
 	_check_weapon_properties()
 	_check_vendor_lucky_roulette_ids()
 	_check_marker_labels()
+	_check_id_format()
+	_check_quest_stats()
+	_check_text_numbers()
 	if _checks_failed == 0:
 		print("Catalog lint: ok checks=%d" % _checks_run)
 	else:
@@ -116,7 +125,8 @@ func _id_libraries() -> Array[Array]:
 
 ## Los glifos son la sigla de dos letras que pinta un espacio del HUD cuando
 ## no hay ícono PNG. Se comparan por CONTENIDO, no por biblioteca: el mismo
-## «PA» en un arma y en un objeto se lee como la misma cosa.
+## «PA» en un arma y en un objeto se lee como la misma cosa. La mascota se
+## dibuja en la misma tira que armas y tomos, por eso entra también.
 func _check_glyphs_unique() -> void:
 	var failures: Array[String] = []
 	var rows := 0
@@ -127,6 +137,7 @@ func _check_glyphs_unique() -> void:
 		["TOME_LIBRARY", Tome.TOME_LIBRARY, "id"],
 		["ITEM_LIBRARY", ItemCatalog.ITEM_LIBRARY, "id"],
 		["POWERUP_LIBRARY", PowerUpCatalog.POWERUP_LIBRARY, "id"],
+		["PET_LIBRARY", PetCatalog.PET_LIBRARY, "id"],
 	]
 	for entry: Array in sources:
 		var library_name := String(entry[0])
@@ -451,8 +462,149 @@ func _assigned_marker_kinds() -> Array[Array]:
 	return found
 
 
-## Cada .gd bajo las carpetas dadas, recursivamente.
-func _gd_files(roots: Array[String]) -> Array[String]:
+## Cada id de catálogo con el formato de ID_PATTERN. Un id con espacios o
+## mayúsculas termina dentro de llaves del guardado ("runs_as_Electro Gato") y
+## de los contadores que nombran las misiones.
+func _check_id_format() -> void:
+	var failures: Array[String] = []
+	var rows := 0
+	var pattern := RegEx.create_from_string(ID_PATTERN)
+	var sources: Array[Array] = _id_libraries()
+	sources.append(["VENDOR_LIBRARY", Vendor.VENDOR_LIBRARY, "id"])
+	sources.append(["LUCKY_REWARDS", LuckyBlock.LUCKY_REWARDS, "id"])
+	sources.append(["OUTCOMES", RouletteShrine.OUTCOMES, "id"])
+	for entry: Array in sources:
+		var library_name := String(entry[0])
+		var library: Array[Dictionary] = entry[1]
+		var key := String(entry[2])
+		for row: Dictionary in library:
+			rows += 1
+			var id := String(row.get(key, ""))
+			if pattern.search(id) == null:
+				failures.append("%s %s '%s' is not lowercase snake_case" % [library_name, key, id])
+	_report("id_format", rows, failures)
+
+
+## Cada misión cuyo `stat` lleva un id de otro catálogo después de un prefijo
+## de SaveData. Si ese id no existe, el contador nunca sube y la misión queda
+## imposible para siempre sin ningún error.
+func _check_quest_stats() -> void:
+	var failures: Array[String] = []
+	var rows := 0
+	var character_ids := _ids_of(CharacterCatalog.CHARACTER_LIBRARY)
+	var map_ids := _ids_of(MapCatalog.MAP_LIBRARY)
+	var weapon_ids := _ids_of(WeaponCatalog.WEAPON_LIBRARY)
+	# prefijo -> [qué debe nombrar, ids válidos]
+	var prefixes: Dictionary[String, Array] = {
+		"runs_as_": ["a character id", character_ids],
+		"wins_as_": ["a character id", character_ids],
+		"runs_on_": ["a map id", map_ids],
+		"victories_": ["a map id", map_ids],
+		"slain_": ["a secret_boss_id in a scene", _secret_boss_ids()],
+		"kills_": ["an enemy script name", _enemy_script_names()],
+		"evo_": ["a weapon id", weapon_ids],
+		"used_weapon_": ["a weapon id", weapon_ids],
+	}
+	for row: Dictionary in QuestCatalog.QUEST_LIBRARY:
+		var stat := String(row.get("stat", ""))
+		for prefix: String in prefixes:
+			if not stat.begins_with(prefix):
+				continue
+			rows += 1
+			var rule: Array = prefixes[prefix]
+			var valid: Dictionary[String, bool] = rule[1]
+			if not valid.has(stat.trim_prefix(prefix)):
+				failures.append("quest '%s' stat '%s' does not name %s"
+						% [String(row.get("id", "?")), stat, String(rule[0])])
+			break
+	_report("quest_stats", rows, failures)
+
+
+## Números que un texto repite de su propia fila: la pasiva de cada
+## personaje, la etiqueta de cada mascota y el texto de rango de cada
+## reliquia. El texto se escribe a mano al lado del número que de verdad se
+## aplica; si alguien cambia uno y no el otro, la carta miente.
+func _check_text_numbers() -> void:
+	var failures: Array[String] = []
+	var rows := 0
+	for row: Dictionary in CharacterCatalog.CHARACTER_LIBRARY:
+		rows += 1
+		var text := String(row.get("passive_description", ""))
+		var numbers := _numbers_in(text)
+		if numbers.is_empty() or not is_equal_approx(numbers[0], float(row.get("passive_amount", 0.0))):
+			failures.append("character '%s' passive_description '%s' does not start with passive_amount %s"
+					% [String(row.get("id", "?")), text, str(row.get("passive_amount", 0.0))])
+		var base := float(row.get("passive_base", 0.0))
+		if base > 0.0 and not _has_number(numbers, base):
+			failures.append("character '%s' passive_description '%s' does not show passive_base %s"
+					% [String(row.get("id", "?")), text, str(base)])
+	for row: Dictionary in PetCatalog.PET_LIBRARY:
+		rows += 1
+		var label := String(row.get("stat_label", ""))
+		var numbers := _numbers_in(label)
+		if numbers.is_empty() or not is_equal_approx(numbers[0], float(row.get("amount_per_level", 0.0))):
+			failures.append("pet '%s' stat_label '%s' does not show amount_per_level %s"
+					% [String(row.get("id", "?")), label, str(row.get("amount_per_level", 0.0))])
+	for row: Dictionary in RelicCatalog.RELIC_LIBRARY:
+		rows += 1
+		var amount_text := String(row.get("amount_text", ""))
+		var numbers := _numbers_in(amount_text)
+		if numbers.is_empty() or not is_equal_approx(numbers[0], float(row.get("amount", 0.0))):
+			failures.append("relic '%s' amount_text '%s' does not show amount %s"
+					% [String(row.get("id", "?")), amount_text, str(row.get("amount", 0.0))])
+	_report("text_numbers", rows, failures)
+
+
+## Conjunto de los valores de `field` en `rows`.
+func _ids_of(rows: Array[Dictionary], field: String = "id") -> Dictionary[String, bool]:
+	var ids: Dictionary[String, bool] = {}
+	for row: Dictionary in rows:
+		ids[String(row.get(field, ""))] = true
+	return ids
+
+
+## Cada `secret_boss_id = "..."` guardado en una escena, leído como texto
+## porque los jefes secretos solo se instancian en plena incursión.
+func _secret_boss_ids() -> Dictionary[String, bool]:
+	var ids: Dictionary[String, bool] = {}
+	var pattern := RegEx.create_from_string('(?m)^secret_boss_id = "([^"]+)"')
+	for path: String in _gd_files(SCENE_ROOTS, ".tscn"):
+		var file := FileAccess.open(path, FileAccess.READ)
+		if file == null:
+			continue
+		for found: RegExMatch in pattern.search_all(file.get_as_text()):
+			ids[found.get_string(1)] = true
+		file.close()
+	return ids
+
+
+## Nombre de archivo (sin .gd) de cada script de enemigo.
+func _enemy_script_names() -> Dictionary[String, bool]:
+	var names: Dictionary[String, bool] = {}
+	for path: String in _gd_files(ENEMY_SCRIPT_ROOTS):
+		names[path.get_file().get_basename()] = true
+	return names
+
+
+## Los números de un texto, en orden ("+0.8% de daño" -> [0.8]).
+func _numbers_in(text: String) -> Array[float]:
+	var numbers: Array[float] = []
+	var pattern := RegEx.create_from_string("[0-9]+(?:\\.[0-9]+)?")
+	for found: RegExMatch in pattern.search_all(text):
+		numbers.append(found.get_string().to_float())
+	return numbers
+
+
+func _has_number(numbers: Array[float], value: float) -> bool:
+	for number: float in numbers:
+		if is_equal_approx(number, value):
+			return true
+	return false
+
+
+## Cada archivo con extensión `extension` bajo las carpetas dadas,
+## recursivamente.
+func _gd_files(roots: Array[String], extension: String = ".gd") -> Array[String]:
 	var found: Array[String] = []
 	var pending := roots.duplicate()
 	while not pending.is_empty():
@@ -466,7 +618,7 @@ func _gd_files(roots: Array[String]) -> Array[String]:
 			var full := dir_path.path_join(entry)
 			if dir.current_is_dir():
 				pending.append(full)
-			elif entry.ends_with(".gd"):
+			elif entry.ends_with(extension):
 				found.append(full)
 			entry = dir.get_next()
 		dir.list_dir_end()
