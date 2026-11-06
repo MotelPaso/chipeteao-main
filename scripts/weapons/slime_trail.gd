@@ -7,31 +7,37 @@ extends WeaponBase
 ##   cooldown      — segundos entre charcos mientras se mueve
 ##   attack_range  — sin uso (Largo alcance igual ensancha los charcos por el área)
 ## Los charcos son registros SlimePuddle que avanza esta arma (sin escena de
-## pool): el visual es un disco emisivo plano por charco que se desvanece al expirar.
+## pool): el visual es un disco emisivo plano por charco (puddle_mesh) que se
+## desvanece al expirar.
+## La evolución «Marea ácida» multiplica damage, puddle_radius y puddle_life.
 
+@export_group("Charco")
+## Radio del charco, en metros (los tomos de área lo escalan); la evolución «Marea ácida» lo multiplica.
 @export var puddle_radius: float = 1.4
-## Segundos que dura un charco (Tomo de Persistencia y "Baba más espesa" lo alargan).
+## Segundos que dura un charco; la carta «Baba más espesa», la evolución y el Tomo de Persistencia lo alargan.
 @export var puddle_life: float = 3.0
+## Segundos entre pulsos de daño de cada charco.
 @export var tick_interval: float = 0.5
 ## Distancia mínima, en metros, que el portador debe moverse desde el último charco.
 @export var min_drop_distance: float = 0.8
-@export var slime_color: Color = Color(0.45, 0.95, 0.3)
 ## Altura máxima, en metros, por encima o por debajo del charco a la que alcanza.
 @export var height_window: float = 1.6
-## Cuánto sobre los pies del portador se dibuja el disco: lo justo para despegarlo de la cara superior del piso.
-@export var puddle_ground_offset: float = 0.05
 
+@export_group("Visual")
+## Malla y material del charco (color, transparencia, brillo); disco de radio 1 que se escala al radio del charco.
+@export var puddle_mesh: Mesh
+## Cuánto sobre los pies del portador se dibuja el disco, en metros: lo justo para despegarlo del piso.
+@export var puddle_ground_offset: float = 0.05
 ## Segundos que tarda un charco en desvanecerse al terminar su vida.
-const FADE_TIME: float = 0.3
+@export var fade_time: float = 0.3
 ## Segundos que tarda la animación de caída en llegar al radio completo.
-const GROW_TIME: float = 0.2
-## Fracción del radio con que nace un charco antes de crecer.
-const GROW_FROM: float = 0.3
-## Distancia del punto de caída a cada charco que agrega el Tomo de Multitud,
-## en radios de charco. Apenas más de 1.0: los extras rodean y tocan el
-## charco principal y ensanchan el rastro, en vez de apilarse invisibles en un
-## punto y golpear varias veces a los mismos enemigos.
-const EXTRA_PUDDLE_SPACING: float = 1.2
+@export var grow_time: float = 0.2
+## Fracción del radio (0-1) con que nace un charco antes de crecer.
+@export var grow_from: float = 0.3
+
+@export_group("Multitud")
+## Distancia, en radios de charco, de cada charco extra del Tomo de Multitud al de los pies; apenas más de 1 para que se toquen sin apilarse.
+@export var extra_puddle_spacing: float = 1.2
 
 
 ## Un charco vivo. Un registro en vez de un Dictionary suelto: el `visual` es
@@ -48,7 +54,6 @@ class SlimePuddle extends RefCounted:
 var _puddles: Array[SlimePuddle] = []
 var _last_drop: Vector3 = Vector3.INF
 var _drop_timer: float = 0.0
-var _puddle_mesh: CylinderMesh = null
 
 
 func _ready() -> void:
@@ -58,22 +63,6 @@ func _ready() -> void:
 	# sin nada en pantalla que explique el daño.
 	RunState.stage_changed.connect(
 			func(_index: int, _map_id: String) -> void: clear_weapon_fields())
-	_puddle_mesh = CylinderMesh.new()
-	_puddle_mesh.top_radius = 1.0
-	_puddle_mesh.bottom_radius = 1.0
-	_puddle_mesh.height = 0.06
-	# Teselado explícito: una losa de 6 cm no necesita anillos de altura, y los
-	# 64 lados del motor serían el grueso de los triángulos de cada charco.
-	_puddle_mesh.radial_segments = 24
-	_puddle_mesh.rings = 1
-	var material := StandardMaterial3D.new()
-	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	material.albedo_color = Color(slime_color, 0.55)
-	material.emission_enabled = true
-	material.emission = slime_color
-	material.emission_energy_multiplier = 0.8
-	_puddle_mesh.material = material
 
 
 func _physics_process(delta: float) -> void:
@@ -113,14 +102,14 @@ func clear_weapon_fields() -> void:
 
 
 ## Una caída: el charco bajo los pies del portador y, con el Tomo de
-## Multitud, `count - 1` más repartidos en anillo a EXTRA_PUDDLE_SPACING
+## Multitud, `count - 1` más repartidos en anillo a extra_puddle_spacing
 ## radios, así el rastro se ensancha en vez de engrosarse.
 func _drop_cluster(center: Vector3, count: int) -> void:
 	_spawn_puddle(center)
 	var extras := count - 1
 	if extras <= 0:
 		return
-	var offset := puddle_radius * area_scale() * EXTRA_PUDDLE_SPACING
+	var offset := puddle_radius * area_scale() * extra_puddle_spacing
 	for i: int in extras:
 		var angle := TAU * float(i) / float(extras)
 		_spawn_puddle(center + Vector3(cos(angle), 0.0, sin(angle)) * offset)
@@ -128,11 +117,11 @@ func _drop_cluster(center: Vector3, count: int) -> void:
 
 func _spawn_puddle(center: Vector3) -> void:
 	var radius := puddle_radius * area_scale()
-	var visual := spawn_fx_mesh(_puddle_mesh)
+	var visual := spawn_fx_mesh(puddle_mesh)
 	visual.global_position = center + Vector3.UP * puddle_ground_offset
-	visual.scale = Vector3(radius * GROW_FROM, 1.0, radius * GROW_FROM)
+	visual.scale = Vector3(radius * grow_from, 1.0, radius * grow_from)
 	var grow := visual.create_tween()
-	grow.tween_property(visual, "scale", Vector3(radius, 1.0, radius), GROW_TIME) \
+	grow.tween_property(visual, "scale", Vector3(radius, 1.0, radius), grow_time) \
 			.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 	var puddle := SlimePuddle.new()
 	puddle.center = center
@@ -165,8 +154,9 @@ func _expire(puddle: SlimePuddle) -> void:
 	puddle.visual = null
 	if visual == null or not is_instance_valid(visual):
 		return
+	# Se anima la transparencia del nodo, no el material compartido de la escena.
 	var fade := visual.create_tween()
-	fade.tween_property(visual, "transparency", 1.0, FADE_TIME)
+	fade.tween_property(visual, "transparency", 1.0, fade_time)
 	fade.tween_callback(visual.queue_free)
 
 

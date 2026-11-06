@@ -8,18 +8,22 @@ extends WeaponBase
 ##   damage           — daño por toque (por deal_damage: crítico y robo de vida aplican)
 ##   cooldown         — intervalo de re-golpe POR ENEMIGO (los tomos de celeridad lo acortan)
 ##   attack_range     — radio de la órbita (Largo alcance ensancha el anillo)
-##   projectile_count — cantidad de orbes
+##   projectile_count — cantidad de orbes (la carta «Otro espíritu» suma uno)
+## La evolución «Anillo de cometas» suma un orbe y multiplica damage y cooldown.
 
-## Distancia de contacto desde el centro de un orbe hasta un enemigo, en metros.
+@export_group("Orbes")
+## Radio visual de cada orbe, en metros (escala la malla unitaria orb_mesh); no cambia el daño.
+@export var orb_radius: float = 0.4
+## Distancia de contacto desde el centro de un orbe hasta un enemigo, en metros; independiente de orb_radius.
 @export var hit_radius: float = 3.1
 ## Velocidad angular del anillo, en radianes por segundo.
 @export var orbit_speed: float = 2.6
 ## Altura del anillo sobre los pies del portador, en metros.
 @export var orb_height: float = 1.0
-
-## Oscilación vertical que evita que el anillo se lea como una calcomanía plana.
-const BOB_HEIGHT: float = 0.15
-const ORB_RADIUS: float = 0.40
+## Oscilación vertical del anillo, en metros, para que no se lea como una calcomanía plana.
+@export var bob_height: float = 0.15
+## Malla y material de cada orbe (color y brillo); esfera de radio 1 que orb_radius escala.
+@export var orb_mesh: Mesh
 
 var _angle: float = 0.0
 var _orbs: Array[MeshInstance3D] = []
@@ -34,26 +38,6 @@ var _rehit: Dictionary[int, float] = {}
 var _rehit_expired: Array[int] = []
 ## Lista auxiliar de _touch_enemies: la posición mundial de cada orbe este frame.
 var _orb_positions: PackedVector3Array = PackedVector3Array()
-## Una malla (con su material) compartida por todos los orbes durante la vida
-## del arma: _rebuild_orbs corre cada vez que una mejora cambia la cantidad.
-var _orb_mesh: SphereMesh = null
-
-
-func _ready() -> void:
-	_orb_mesh = SphereMesh.new()
-	_orb_mesh.radius = ORB_RADIUS
-	_orb_mesh.height = ORB_RADIUS * 2.0
-	# Teselado explícito: el del motor (64 x 32) son miles de triángulos por
-	# orbe para una bola brillante sin sombreado.
-	_orb_mesh.radial_segments = 12
-	_orb_mesh.rings = 6
-	var material := StandardMaterial3D.new()
-	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	material.albedo_color = Color(0.6, 0.95, 1.0)
-	material.emission_enabled = true
-	material.emission = Color(0.45, 0.9, 1.0)
-	material.emission_energy_multiplier = 2.2
-	_orb_mesh.material = material
 
 
 func _physics_process(delta: float) -> void:
@@ -81,7 +65,7 @@ func _update_ring(delta: float) -> void:
 		var orb_angle := _angle + TAU * float(i) / float(_orbs.size())
 		_orbs[i].global_position = _ring_center + Vector3(
 				cos(orb_angle) * radius,
-				orb_height + sin(orb_angle * 2.0) * BOB_HEIGHT,
+				orb_height + sin(orb_angle * 2.0) * bob_height,
 				sin(orb_angle) * radius)
 
 
@@ -109,10 +93,10 @@ func _touch_enemies() -> void:
 	var reach := hit_radius * area_scale()
 	var reach_sq := reach * reach
 	# Fase amplia alrededor del centro del anillo. Ningún orbe está más lejos
-	# que attack_range en horizontal más orb_height + BOB_HEIGHT en vertical,
+	# que attack_range en horizontal más orb_height + bob_height en vertical,
 	# y ningún contacto pasa de `reach` desde un orbe, así que esta esfera
 	# contiene todo lo que la prueba por orbe de abajo puede aceptar.
-	var search := attack_range + orb_height + BOB_HEIGHT + reach
+	var search := attack_range + orb_height + bob_height + reach
 	# La posición de cada orbe se lee UNA vez por frame, por el getter (no se
 	# toma lo que escribió _update_ring) para que sea idéntica bit a bit; nada
 	# de lo que dispara un golpe mueve al portador.
@@ -137,14 +121,15 @@ func _touch_enemies() -> void:
 
 
 ## Rehace los orbes cuando una mejora cambió la cantidad. Solo los nodos
-## MeshInstance3D son nuevos; malla y material se comparten.
+## MeshInstance3D son nuevos; malla y material (orb_mesh) se comparten.
 func _rebuild_orbs() -> void:
 	for orb: MeshInstance3D in _orbs:
 		orb.queue_free()
 	_orbs.clear()
 	for i in effective_projectile_count():
 		var orb := MeshInstance3D.new()
-		orb.mesh = _orb_mesh
+		orb.mesh = orb_mesh
+		orb.scale = Vector3.ONE * orb_radius
 		# Un espíritu brillante no proyecta sombra: se leería como ruido y
 		# costaría un dibujo en cada cascada de sombras (como todo efecto,
 		# ver spawn_fx_mesh).

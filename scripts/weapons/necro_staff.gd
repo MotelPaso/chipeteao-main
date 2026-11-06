@@ -14,27 +14,35 @@ extends WeaponBase
 ## Solo se poseen luchadores de contacto (EnemyBase.possessable): un lanzador
 ## poseído necesitaría que sus proyectiles y rayos cambiaran de bando, y esos
 ## apuntan al grupo "player" en todo su recorrido.
+##
+## Los siervos viven en el grupo EnemyBase.POSSESSED_GROUP; el soak lee el
+## tope con possessed_count() y max_possessed.
 
+@export_group("Siervos")
+## Segundos que dura un siervo; la carta «Posesión más larga» (+25%) y la evolución «Corona del Rey Lich» (+4 s) lo suben.
 @export var possess_duration: float = 8.0
-## Siervos vivos a la vez por portador. El más viejo expira antes para hacer
-## lugar: un tope que rechazara nuevos haría sentir el arma rota justo cuando funciona.
+## Siervos vivos a la vez por portador (expira el más viejo); la carta «Más siervos» (+3) y la evolución (+6) lo suben.
 @export var max_possessed: int = 12
+
+@export_group("Rayo de alma")
+## Velocidad del rayo, en metros por segundo.
 @export var bolt_speed: float = 7.0
+## Segundos que vuela un rayo antes de apagarse sin golpear.
 @export var bolt_lifetime: float = 3.7
+## Radio visual del rayo, en metros (escala la malla unitaria bolt_mesh).
 @export var bolt_radius: float = 0.28
+## Qué tan cerca del blanco tiene que llegar el rayo para contar como golpe, en metros.
+@export var bolt_hit_radius: float = 0.9
+## Altura sobre el montaje desde la que sale el rayo, en metros.
+@export var bolt_spawn_height: float = 1.0
+## Malla y material del rayo (color, transparencia, brillo); esfera de radio 1 que bolt_radius escala.
+@export var bolt_mesh: Mesh
 
 @export_group("Multitud")
 ## Segundos entre los rayos extra del Tomo de Multitud (sin comprimir en VOLLEY_WINDOW); juntos compartirían trayectoria.
 @export var extra_stagger: float = 0.1
 
-const BOLT_COLOR := Color(0.65, 0.35, 0.95)
-## Qué tan cerca tiene que llegar un rayo para contar como golpe, en metros.
-const BOLT_HIT_RADIUS: float = 0.9
-## Grupo de los siervos vivos, para leer el tope del portador desde afuera (el
-## soak imprime possessed=a/b con esto).
-const POSSESSED_GROUP: StringName = &"possessed"
 
-var _bolt_mesh: SphereMesh = null
 ## Un rayo de alma en vuelo. Un registro en vez de un Dictionary suelto: su
 ## `visual` cruza frames, y con campos el compilador atrapa un error de tipeo.
 class SoulBolt extends RefCounted:
@@ -42,23 +50,21 @@ class SoulBolt extends RefCounted:
 	var target: Node3D = null
 	var left: float = 0.0
 
+
 var _bolts: Array[SoulBolt] = []
 
 
-func _ready() -> void:
-	_bolt_mesh = SphereMesh.new()
-	_bolt_mesh.radius = bolt_radius
-	_bolt_mesh.height = bolt_radius * 2.0
-	_bolt_mesh.radial_segments = 8
-	_bolt_mesh.rings = 4
-	var material := StandardMaterial3D.new()
-	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	material.albedo_color = Color(BOLT_COLOR, 0.9)
-	material.emission_enabled = true
-	material.emission = BOLT_COLOR
-	material.emission_energy_multiplier = 2.2
-	_bolt_mesh.material = material
+func _physics_process(delta: float) -> void:
+	super(delta)
+	_tick_bolts(delta)
+
+
+## Los rayos cuelgan de la arena, no de esta arma, así sobreviven si el
+## raider muere en pleno vuelo; pero no deben sobrevivir al ARMA (evolución,
+## fin de partida) sin nadie que los avance.
+func _exit_tree() -> void:
+	for i in range(_bolts.size() - 1, -1, -1):
+		_kill_bolt(i)
 
 
 func fire(target: Node3D) -> void:
@@ -66,6 +72,17 @@ func fire(target: Node3D) -> void:
 	# el primero puede haber matado al suyo.
 	fire_volley_retarget(effective_projectile_count(), _launch.bind(target),
 			_launch_at_fresh_target, extra_stagger, false)
+
+
+## Siervos que tiene ahora este portador; el soak imprime possessed=a/b con
+## esto y el tope, y a>b significaría que el tope no se cumple.
+func possessed_count() -> int:
+	var mine := 0
+	for node: Node in get_tree().get_nodes_in_group(EnemyBase.POSSESSED_GROUP):
+		var servant := node as EnemyBase
+		if servant != null and servant.possession_carrier() == carrier_player():
+			mine += 1
+	return mine
 
 
 func _launch_at_fresh_target() -> void:
@@ -76,16 +93,12 @@ func _launch(target: Node3D) -> void:
 	if target == null or not is_instance_valid(target):
 		return
 	var bolt := SoulBolt.new()
-	bolt.visual = spawn_fx_mesh(_bolt_mesh)
-	bolt.visual.global_position = global_position + Vector3.UP * 1.0
+	bolt.visual = spawn_fx_mesh(bolt_mesh)
+	bolt.visual.scale = Vector3.ONE * bolt_radius
+	bolt.visual.global_position = global_position + Vector3.UP * bolt_spawn_height
 	bolt.target = target
 	bolt.left = bolt_lifetime
 	_bolts.append(bolt)
-
-
-func _physics_process(delta: float) -> void:
-	super(delta)
-	_tick_bolts(delta)
 
 
 ## Los rayos persiguen su blanco y se resuelven al contacto. Se recorren
@@ -108,7 +121,7 @@ func _tick_bolts(delta: float) -> void:
 		var aim := bolt.target.global_position + Vector3.UP * 0.8
 		var span := aim - bolt.visual.global_position
 		var step := bolt_speed * delta
-		if span.length() <= maxf(step, BOLT_HIT_RADIUS):
+		if span.length() <= maxf(step, bolt_hit_radius):
 			_strike(bolt.target)
 			_kill_bolt(i)
 			continue
@@ -163,7 +176,7 @@ func _raise_servant(scene_path: String, at: Vector3, corpse: EnemyBase) -> void:
 ## levantado es el que está donde ocurre la pelea.
 func _trim_servants() -> void:
 	var mine: Array[Node] = []
-	for node: Node in get_tree().get_nodes_in_group(POSSESSED_GROUP):
+	for node: Node in get_tree().get_nodes_in_group(EnemyBase.POSSESSED_GROUP):
 		var servant := node as EnemyBase
 		if servant != null and servant.possession_carrier() == carrier_player():
 			mine.append(servant)
@@ -176,27 +189,8 @@ func _trim_servants() -> void:
 			oldest.end_possession()
 
 
-## Siervos que tiene ahora este portador; el soak imprime possessed=a/b con
-## esto y el tope, y a>b significaría que el tope no se cumple.
-func possessed_count() -> int:
-	var mine := 0
-	for node: Node in get_tree().get_nodes_in_group(POSSESSED_GROUP):
-		var servant := node as EnemyBase
-		if servant != null and servant.possession_carrier() == carrier_player():
-			mine += 1
-	return mine
-
-
 func _kill_bolt(index: int) -> void:
 	var bolt := _bolts[index]
 	if bolt.visual != null and is_instance_valid(bolt.visual):
 		bolt.visual.queue_free()
 	_bolts.remove_at(index)
-
-
-## Los rayos cuelgan de la arena, no de esta arma, así sobreviven si el
-## raider muere en pleno vuelo; pero no deben sobrevivir al ARMA (evolución,
-## fin de partida) sin nadie que los avance.
-func _exit_tree() -> void:
-	for i in range(_bolts.size() - 1, -1, -1):
-		_kill_bolt(i)

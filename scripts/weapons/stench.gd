@@ -7,34 +7,29 @@ extends FieldWeapon
 ##   attack_range  — radio de la nube (los tomos de área lo escalan)
 ## Veneno y ralentización duran más con el stat de duración. El radio, la
 ## altura y el bono del Tomo de Multitud vienen de FieldWeapon.
+## La evolución «Miasma» multiplica poison_duration y attack_range.
 
+@export_group("Veneno y ralentización")
+## Veneno por segundo como fracción del daño efectivo del pulso (0-1).
 @export var poison_damage_fraction: float = 0.4
+## Segundos de veneno por pulso; la carta «Hedor más rancio» y la evolución «Miasma» lo alargan.
 @export var poison_duration: float = 3.0
+## Multiplicador de velocidad de los enemigos ralentizados (0.6 = conservan el 60%).
 @export var slow_multiplier: float = 0.6
+## Segundos de ralentización por pulso.
 @export var slow_duration: float = 2.0
-@export var gas_color: Color = Color(0.55, 0.8, 0.25)
 
-var _shell_mesh: SphereMesh = null
-
-
-func _ready() -> void:
-	_shell_mesh = SphereMesh.new()
-	_shell_mesh.radius = 1.0
-	_shell_mesh.height = 2.0
-	# Teselado explícito: una cáscara alfa de doble cara puede llenar la
-	# pantalla alrededor del portador, y con el teselado por defecto del motor
-	# (64 x 32) cada pulso dibujaría miles de triángulos transparentes.
-	_shell_mesh.radial_segments = 24
-	_shell_mesh.rings = 12
-	var material := StandardMaterial3D.new()
-	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	material.albedo_color = Color(gas_color, 0.35)
-	material.emission_enabled = true
-	material.emission = gas_color
-	material.emission_energy_multiplier = 0.5
-	material.cull_mode = BaseMaterial3D.CULL_DISABLED
-	_shell_mesh.material = material
+@export_group("Nube")
+## Malla y material de la nube (color, transparencia, brillo); radio 1, se escala al radio del pulso.
+@export var cloud_mesh: Mesh
+## Cuánto debajo del montaje del arma nace la nube, en metros.
+@export var cloud_drop: float = 0.3
+## Escala con que nace la nube antes de crecer, en metros de radio.
+@export var cloud_start_scale: float = 0.3
+## Segundos que tarda la nube en crecer hasta el radio del pulso.
+@export var cloud_grow_time: float = 0.45
+## Segundos que tarda la nube en desvanecerse.
+@export var cloud_fade_time: float = 0.6
 
 
 func fire(_target: Node3D) -> void:
@@ -54,15 +49,16 @@ func fire(_target: Node3D) -> void:
 	_play_cloud(radius)
 
 
-## Esfera translúcida que se expande y se adelgaza: el "pfff".
+## Esfera translúcida que se expande y se adelgaza: el "pfff". Se anima la
+## transparencia del nodo, no el material compartido de la escena.
 func _play_cloud(radius: float) -> void:
-	var shell := spawn_fx_mesh(_shell_mesh)
-	shell.global_position = global_position + Vector3.DOWN * 0.3
-	shell.scale = Vector3.ONE * 0.3
+	var shell := spawn_fx_mesh(cloud_mesh)
+	shell.global_position = global_position + Vector3.DOWN * cloud_drop
+	shell.scale = Vector3.ONE * cloud_start_scale
 	var tween := shell.create_tween()
 	tween.set_parallel(true)
-	tween.tween_property(shell, "scale", Vector3.ONE * radius, 0.45) \
+	tween.tween_property(shell, "scale", Vector3.ONE * radius, cloud_grow_time) \
 			.set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
-	tween.tween_property(shell, "transparency", 1.0, 0.6) \
+	tween.tween_property(shell, "transparency", 1.0, cloud_fade_time) \
 			.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
 	tween.chain().tween_callback(shell.queue_free)

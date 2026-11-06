@@ -5,43 +5,50 @@ extends WeaponBase
 ## curación heal_fraction del daño que hizo el charco: un drenaje propio,
 ## aparte del robo de vida normal.
 ## Los charcos son registros BloodPoolEntry que esta arma avanza cada frame
-## de física; un charco dura pool_ticks * tick_interval segundos.
-
-## Radio del vecindario con que se puntúa la densidad alrededor de cada candidato.
-@export var cluster_radius: float = 3.0
-## La puntuación deja de juntar candidatos pasado este número, para acotar el
-## conteo O(n^2) de vecinos en hordas enormes.
-@export var max_cluster_candidates: int = 24
-## Radio del charco (los tomos de área lo escalan al lanzar).
-@export var pool_radius: float = 2.2
-## Pulsos de daño por charco. La duración es pool_ticks * tick_interval, así
-## que "Coagular" (+1 pulso) también alarga el charco un intervalo.
-@export var pool_ticks: int = 6
-@export var tick_interval: float = 0.5
-## Fracción del daño del charco que vuelve al jugador como curación.
-@export var heal_fraction: float = 0.15
-## Altura máxima, en metros, por encima o por debajo del plano del charco a la que alcanza.
-@export var pool_height_window: float = 1.6
-## Segundos de vuelo del frasco desde la mano hasta el impacto.
-@export var lob_time: float = 0.435
-## Altura máxima del arco del frasco sobre la línea recta del lanzamiento.
-@export var arc_height: float = 4.145
-## Cuánto sobre el punto de impacto se dibuja el charco. El origen de los
-## enemigos ya está a ras del suelo: esto solo despega el disco de la cara
-## superior del piso; más abajo el disco y el borde quedan enterrados.
-@export var pool_ground_offset: float = 0.03
-
-@export_group("Multitud")
-## Segundos entre los frascos extra del Tomo de Multitud; lanzados juntos caerían en el mismo charco.
-@export var extra_stagger: float = 0.12
-## Grados entre frascos vecinos, girados alrededor de QUIEN LANZA para que los charcos extra caigan junto al grupo.
-@export var extra_fan_deg: float = 22.0
+## de física; un charco dura pool_ticks * tick_interval segundos. Su visual es
+## la escena BloodPool del pool; el frasco en vuelo usa flask_mesh.
+## La evolución «Cáliz de peste» multiplica damage y suma pool_ticks.
 
 ## Piso de tick_interval al avanzar un charco. Con cero (puesto a mano o por
 ## una fila de evolución, que WeaponBase.evolve aplica por nombre),
 ## _tick_pools gastaría todo su presupuesto de pulsos en un frame.
 const MIN_TICK_INTERVAL: float = 0.01
 
+@export_group("Puntería")
+## Radio del vecindario con que se puntúa la densidad alrededor de cada candidato, en metros.
+@export var cluster_radius: float = 3.0
+## Máximo de candidatos que se puntúan, para acotar el conteo O(n^2) de vecinos en hordas enormes.
+@export var max_cluster_candidates: int = 24
+
+@export_group("Charco")
+## Radio del charco, en metros (los tomos de área lo escalan al lanzar).
+@export var pool_radius: float = 2.2
+## Pulsos de daño por charco; dura pool_ticks * tick_interval. La carta «Coagular» (+1) y la evolución (+2) lo suben.
+@export var pool_ticks: int = 6
+## Segundos entre pulsos de daño del charco.
+@export var tick_interval: float = 0.5
+## Fracción del daño del charco que vuelve al jugador como curación (0-1).
+@export var heal_fraction: float = 0.15
+## Altura máxima, en metros, por encima o por debajo del plano del charco a la que alcanza.
+@export var pool_height_window: float = 1.6
+## Cuánto sobre el punto de impacto se dibuja el charco, en metros; lo justo para no enterrarlo en el piso.
+@export var pool_ground_offset: float = 0.03
+
+@export_group("Frasco")
+## Segundos de vuelo del frasco desde la mano hasta el impacto.
+@export var lob_time: float = 0.435
+## Altura máxima del arco del frasco sobre la línea recta del lanzamiento, en metros.
+@export var arc_height: float = 4.145
+## Altura sobre el montaje desde la que sale el frasco, en metros.
+@export var throw_height: float = 1.2
+## Malla y material del frasco en vuelo (tamaño y color).
+@export var flask_mesh: Mesh
+
+@export_group("Multitud")
+## Segundos entre los frascos extra del Tomo de Multitud; lanzados juntos caerían en el mismo charco.
+@export var extra_stagger: float = 0.12
+## Grados entre frascos vecinos, girados alrededor de QUIEN LANZA para que los charcos extra caigan junto al grupo.
+@export var extra_fan_deg: float = 22.0
 
 
 ## Un charco vivo. Un registro en vez de un Dictionary suelto porque su
@@ -60,30 +67,12 @@ var _pools: Array[BloodPoolEntry] = []
 ## se los lleve en vez de dejarlos congelados en el arco.
 var _flasks_in_flight: Array[MeshInstance3D] = []
 
-var _flask_mesh: SphereMesh
-
 
 func _ready() -> void:
 	# Mismo motivo que en SlimeTrail: los visuales de los charcos son de la
 	# etapa y estos registros no, así que el cambio de mapa los suelta.
 	RunState.stage_changed.connect(
 			func(_index: int, _map_id: String) -> void: clear_weapon_fields())
-	# El frasco lanzado es un proyectil visible con una malla compartida por
-	# todos los lanzamientos. El charco al caer es la escena BloodPool del pool
-	# (borde más oscuro y burbujas lentas).
-	_flask_mesh = SphereMesh.new()
-	_flask_mesh.radius = 0.14
-	_flask_mesh.height = 0.24
-	# Teselado explícito: el del motor (64 x 32) es absurdo para un frasco de
-	# 28 cm que se ve medio segundo.
-	_flask_mesh.radial_segments = 12
-	_flask_mesh.rings = 6
-	var flask_material := StandardMaterial3D.new()
-	flask_material.albedo_color = Color(0.5, 0.06, 0.1)
-	flask_material.emission_enabled = true
-	flask_material.emission = Color(0.7, 0.08, 0.1)
-	flask_material.emission_energy_multiplier = 1.2
-	_flask_mesh.material = flask_material
 
 
 func _physics_process(delta: float) -> void:
@@ -161,8 +150,8 @@ func _throw_from(offset: Vector3, origin: Vector3) -> void:
 ## Lanza el visual del frasco en un arco parabólico; el charco aparece donde
 ## cae (la posición del blanco al lanzar), lob_time segundos después.
 func _lob_flask(impact: Vector3) -> void:
-	var flask := spawn_fx_mesh(_flask_mesh)
-	var start := global_position + Vector3.UP * 1.2
+	var flask := spawn_fx_mesh(flask_mesh)
+	var start := global_position + Vector3.UP * throw_height
 	flask.global_position = start
 	_flasks_in_flight.append(flask)
 	# El tween es NUESTRO, no del frasco: sus pasos llaman a esta arma, y

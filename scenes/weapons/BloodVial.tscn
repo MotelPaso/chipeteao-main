@@ -2,8 +2,22 @@
 
 [ext_resource type="Script" uid="uid://ia3ds2abux2k" path="res://scripts/weapons/blood_vial.gd" id="1_vial"]
 
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_flask"]
+albedo_color = Color(0.5, 0.06, 0.1, 1)
+emission_enabled = true
+emission = Color(0.7, 0.08, 0.1, 1)
+emission_energy_multiplier = 1.2
+
+[sub_resource type="SphereMesh" id="SphereMesh_flask"]
+material = SubResource("StandardMaterial3D_flask")
+radius = 0.14
+height = 0.24
+radial_segments = 12
+rings = 6
+
 [node name="BloodVial" type="Node3D" unique_id=1744899349]
 script = ExtResource("1_vial")
 damage = 4.0
 cooldown = 1.705
 attack_range = 12.0
+flask_mesh = SubResource("SphereMesh_flask")

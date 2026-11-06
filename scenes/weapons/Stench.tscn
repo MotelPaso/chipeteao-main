@@ -1,9 +1,26 @@
-[gd_scene load_steps=2 format=3]
+[gd_scene load_steps=4 format=3]
 
 [ext_resource type="Script" path="res://scripts/weapons/stench.gd" id="1_stench"]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_gas"]
+cull_mode = 2
+shading_mode = 0
+transparency = 1
+albedo_color = Color(0.55, 0.8, 0.25, 0.35)
+emission_enabled = true
+emission = Color(0.55, 0.8, 0.25, 1)
+emission_energy_multiplier = 0.5
+
+[sub_resource type="SphereMesh" id="SphereMesh_cloud"]
+material = SubResource("StandardMaterial3D_gas")
+radius = 1.0
+height = 2.0
+radial_segments = 24
+rings = 12
 
 [node name="Stench" type="Node3D"]
 script = ExtResource("1_stench")
 damage = 9.0
 cooldown = 2.5
 attack_range = 3.6
+cloud_mesh = SubResource("SphereMesh_cloud")
