@@ -1,56 +1,56 @@
 class_name Minimap
 extends Control
-## North-up minimap (iteration 52), one per player view. Draws MapDraw's
-## composite — the stage's relief, darkened where the arena mask blocks
-## it, dimmed where the fog is still unexplored — plus the markers that
-## the fog has revealed.
+## Minimapa con el norte arriba, uno por vista de jugador. Dibuja la
+## composición de MapDraw (el relieve de la etapa, oscurecido donde la máscara
+## de la arena lo bloquea y atenuado donde la niebla no se ha explorado) más
+## los marcadores que la niebla ya reveló.
 ##
-## Regular enemies are NEVER drawn. A minimap dotted with forty grunts is
-## noise, and the horde is the thing the player is already looking at; what
-## the map is for is what you CANNOT see from where you stand: the chest
-## two hills over, the altar you have not charged, the way out.
+## Los enemigos comunes NUNCA se dibujan: un minimapa con cuarenta puntos es
+## ruido, y la horda es lo que el jugador ya está mirando. El mapa sirve para
+## lo que NO ves desde donde estás: el cofre tras dos colinas, el altar sin
+## cargar, la salida.
 ##
-## Rebuilt from WorldDirector.on_stage_started (relayed by the HUD), not
-## from the stage_changed signal: that call is what stage 0 goes through
-## too, so the first stage needs no special case.
+## Se reconstruye desde WorldDirector.on_stage_started (reenviado por el HUD),
+## no desde la señal stage_changed: esa llamada también ocurre en la etapa 0,
+## así que la primera etapa no necesita caso especial.
 
-## Side of the widget, in pixels.
+## Lado del widget, en píxeles.
 const SIZE: float = 150.0
-## Inset of the map inside its frame.
+## Margen del mapa dentro de su marco, en píxeles.
 const FRAME_PAD: float = 3.0
-## Markers are drawn smaller here than on the full-screen overlay.
+## Los marcadores se dibujan más chicos aquí que en el mapa de Tab.
 const MARKER_SCALE: float = 0.75
-## Seconds between marker collections and composite checks. The fog
-## itself paints on its own slower tick; this is what turns it into a
-## picture — when it changed (see _composite_if_changed).
+## Segundos entre recolecciones de marcadores y revisiones de la composición.
+## La niebla pinta en su propio tick, más lento; esto la convierte en imagen
+## cuando cambió (ver _composite_if_changed).
 const REFRESH: float = 0.1
 
 var _map: MapDraw = null
 var _refresh_left: float = 0.0
-## composite_key() as of the last composite this widget ran. Empty means
-## "unknown": the next refresh composites whatever the key says.
+## composite_key() de la última composición de este widget. Vacío significa
+## "desconocido": el próximo refresco compone sin mirar la clave.
 var _composited: Array = []
 
 
 func _ready() -> void:
 	custom_minimum_size = Vector2(SIZE, SIZE)
 	size = Vector2(SIZE, SIZE)
-	# Never eats a click meant for the world, and never takes focus (Tab
-	# has to reach the overlay, not walk the focus chain).
+	# Nunca se come un clic destinado al mundo ni toma el foco (Tab tiene que
+	# llegar al mapa grande, no recorrer la cadena de foco).
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	focus_mode = Control.FOCUS_NONE
 	_map = MapDraw.new(get_tree())
 	_map.build_background()
 
 
-## Stage hook, relayed by the HUD from WorldDirector.on_stage_started.
+## Gancho de etapa, reenviado por el HUD desde WorldDirector.on_stage_started.
 func on_stage_started(_arena: Node3D = null) -> void:
 	if _map == null:
 		_map = MapDraw.new(get_tree())
 	_map.build_background()
-	# build_background rewrites the picture's pixels, and the key cannot see
-	# an edit made inside an Image it already knows: forget it, so the next
-	# refresh composites unconditionally.
+	# build_background reescribe los píxeles de la imagen, y la clave no ve un
+	# cambio dentro de una Image que ya conoce: se olvida, para que el próximo
+	# refresco componga sí o sí.
 	_composited = []
 	_map.collect_markers()
 	queue_redraw()
@@ -63,21 +63,18 @@ func _process(delta: float) -> void:
 	if _refresh_left > 0.0:
 		return
 	_refresh_left = REFRESH
-	# Both are plain methods with no Control involved, so a headless soak
-	# exercises the map even where _draw() is never dispatched. Markers move
-	# every tick and are always collected; the composite only when its
-	# inputs moved.
+	# Ambos son métodos simples sin Control, así que un soak headless ejercita
+	# el mapa aunque _draw() nunca se despache. Los marcadores se mueven y se
+	# recolectan en cada tick; la composición solo cuando cambiaron sus entradas.
 	_map.collect_markers()
 	_composite_if_changed()
 	queue_redraw()
 
 
-## MapDraw.composite() is a pure function of the background Image and the
-## fog image: a 14 400-pixel get_pixel/set_pixel loop (~1.5 ms of GDScript)
-## that, run unconditionally, was most of this widget's cost and a spike
-## every sixth frame. The fog only changes when a raider steps onto ground
-## nobody has seen, so on most ticks the texture it would upload is the
-## one already on screen.
+## MapDraw.composite() depende solo de la imagen de fondo y de la de niebla:
+## un bucle de get_pixel/set_pixel sobre 14 400 píxeles (~1.5 ms de GDScript).
+## La niebla solo cambia cuando un jugador pisa suelo que nadie había visto,
+## así que en la mayoría de los ticks la textura sería la que ya está en pantalla.
 func _composite_if_changed() -> void:
 	var key := composite_key(_map, get_tree())
 	if key == _composited:
@@ -86,14 +83,13 @@ func _composite_if_changed() -> void:
 	_map.composite()
 
 
-## Everything MapDraw.composite() reads, as one comparable value: the
-## background Image the map holds (build_background swaps in a new one per
-## stage), the fog node, and that fog's revision (which moves exactly when
-## its image does). Equal keys mean composite() would write the very pixels
-## it wrote last time. Edits INSIDE the background are not visible here,
-## which is why every build_background call also clears the caller's key.
-## Static and shared with MapOverlay, so the two consumers cannot disagree
-## about when their picture is stale.
+## Todo lo que lee MapDraw.composite(), como un valor comparable: la Image de
+## fondo del mapa (build_background pone una nueva por etapa), el nodo de
+## niebla y su revisión (que cambia justo cuando cambia su imagen). Claves
+## iguales significan que composite() escribiría los mismos píxeles. Los
+## cambios DENTRO del fondo no se ven aquí; por eso cada llamada a
+## build_background también borra la clave del llamador. Estático y compartido
+## con MapOverlay, para que ambos coincidan sobre cuándo su imagen está vieja.
 static func composite_key(map: MapDraw, tree: SceneTree) -> Array:
 	var fog := FogOfWar.find(tree)
 	return [

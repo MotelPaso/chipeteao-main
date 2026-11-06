@@ -1,37 +1,35 @@
 class_name MapOverlay
 extends Control
-## The Tab map (iteration 52): a full-cell overlay showing the whole stage
-## plus this raider's build, the party and what they are carrying.
+## El mapa de Tab: una superposición del tamaño de la celda con toda la
+## etapa, el equipo de este jugador, el grupo y lo que llevan.
 ##
-## It does NOT pause. A bullet-heaven has no safe moment to read a menu in,
-## so the horde keeps coming while the map is up — checking it is a choice
-## with a cost, which is what makes it interesting. The overlay hides
-## itself the moment the run is over, the tree is paused by something that
-## DOES own the pause (the card picker, the pause menu), or this slot's
-## raider is gone.
+## NO pausa. Un bullet-heaven no tiene un momento seguro para leer un menú,
+## así que la horda sigue mientras el mapa está abierto: mirarlo es una
+## decisión con costo. Se oculta solo en cuanto termina la partida, cuando
+## algo que SÍ es dueño de la pausa pausa el árbol (el selector de cartas, el
+## menú de pausa) o cuando el jugador de esta ranura ya no está.
 ##
-## One instance per player, built by the HUD on its own CanvasLayer (layer
-## 8: above the HUD, below the card picker) and anchored to that player's
-## split-screen cell — a single map in a window corner belongs to nobody.
+## Una instancia por jugador, creada por el HUD en su propia CanvasLayer (capa
+## 8: sobre el HUD, bajo el selector de cartas) y anclada a la celda de
+## pantalla dividida de ese jugador.
 ##
-## Focus: every Control here is FOCUS_NONE. Tab is Godot's built-in
-## `ui_focus_next`, and one focusable Control anywhere in this tree would
-## eat the key before the toggle ever sees it.
+## Foco: cada Control de aquí es FOCUS_NONE. Tab es el `ui_focus_next` de
+## Godot, y un solo Control con foco en este árbol se comería la tecla antes
+## de que el interruptor la vea.
 
-## Which raider this overlay belongs to. Set by the HUD.
+## Qué jugador es dueño de este mapa (ranura 0-3). Lo asigna el HUD.
 @export var slot: int = 0
 
-## Share of the cell the map takes; the panels take the rest.
+## Fracción de la celda que ocupa el mapa (0-1); los paneles usan el resto.
 const MAP_SHARE: float = 0.6
-## Padding around everything.
+## Margen alrededor de todo, en píxeles.
 const PAD: float = 18.0
-## Gap between the map and the panel column.
+## Separación entre el mapa y la columna de paneles, en píxeles.
 const GUTTER: float = 14.0
-## Seconds between refreshes while the overlay is open. Markers move and
-## HP changes; a tenth of a second is invisible and costs nothing, and
-## NOTHING is refreshed while the overlay is hidden.
+## Segundos entre refrescos mientras el mapa está abierto. Mientras está
+## oculto no se refresca NADA.
 const REFRESH: float = 0.1
-## Legend swatch size.
+## Tamaño de la muestra de color de la leyenda, en píxeles.
 const SWATCH := Vector2(12.0, 12.0)
 const HEADER_FONT_SIZE: int = 20
 const SECTION_FONT_SIZE: int = 15
@@ -47,11 +45,11 @@ var _stats_body: Label = null
 var _players_body: Label = null
 var _items_body: Label = null
 var _refresh_left: float = 0.0
-## Minimap.composite_key() as of this overlay's last composite; empty =
-## unknown, so the next refresh composites unconditionally.
+## Minimap.composite_key() de la última composición de este mapa; vacío =
+## desconocido, así que el próximo refresco compone sin condiciones.
 var _composited: Array = []
-## Last body _has_raider() saw for this slot. Only ever a shortcut for
-## that per-frame yes/no: anything that reads the raider still scans.
+## Último cuerpo que vio _has_raider() para esta ranura. Solo es un atajo
+## para ese sí/no de cada cuadro: todo lo que lee al jugador vuelve a buscarlo.
 var _seen_raider: Node3D = null
 
 
@@ -66,27 +64,27 @@ func _ready() -> void:
 	_build_ui()
 
 
-## Stage hook, relayed by the HUD from WorldDirector.on_stage_started.
+## Gancho de etapa, reenviado por el HUD desde WorldDirector.on_stage_started.
 func on_stage_started(arena: Node3D = null) -> void:
 	if _map == null:
 		_map = MapDraw.new(get_tree())
 	_map.build_background(arena)
-	# The key cannot see pixels rewritten inside a known Image (see
-	# Minimap.composite_key): forget it.
+	# La clave no ve los píxeles reescritos dentro de una Image conocida (ver
+	# Minimap.composite_key): se olvida.
 	_composited = []
 	_map.collect_markers()
 	queue_redraw()
 
 
-## Markers currently on this overlay's map (the soak reads it).
+## Marcadores que hay ahora en este mapa (el soak lo lee por nombre).
 func marker_count() -> int:
 	return _map.marker_count() if _map != null else 0
 
 
 func _process(delta: float) -> void:
-	# Hidden whenever something else owns the screen. Checked BEFORE the
-	# toggle so a press landing on the same frame as a death cannot open a
-	# map over the run-end screen.
+	# Oculto cuando otra cosa es dueña de la pantalla. Se revisa ANTES del
+	# interruptor para que una pulsación en el mismo cuadro que una muerte no
+	# abra el mapa sobre la pantalla de fin.
 	if not RunState.run_active or get_tree().paused or not _has_raider():
 		if visible:
 			visible = false
@@ -94,9 +92,8 @@ func _process(delta: float) -> void:
 	if Input.is_action_just_pressed(Coop.action(slot, &"map_overlay")):
 		visible = not visible
 		if visible and _map != null:
-			# Refreshed HERE, not on the next tick: the map has to be
-			# correct on the very frame it appears, and a tick of delay
-			# would show the previous refresh's markers and stats.
+			# Se refresca AQUÍ y no en el próximo tick: el mapa debe estar al
+			# día en el mismo cuadro en que aparece.
 			_refresh_left = REFRESH
 			_map.collect_markers()
 			_composite_if_changed()
@@ -108,17 +105,17 @@ func _process(delta: float) -> void:
 	if _refresh_left > 0.0:
 		return
 	_refresh_left = REFRESH
-	# Plain methods, no Control involved: a headless soak exercises the
-	# whole map path whether or not _draw() is ever dispatched.
+	# Métodos simples, sin Control: un soak headless ejercita todo el camino
+	# del mapa aunque _draw() nunca se despache.
 	_map.collect_markers()
 	_composite_if_changed()
 	_refresh_panels()
 	queue_redraw()
 
 
-## Same gate as the minimap's (Minimap._composite_if_changed): this
-## overlay's own MapDraw keeps the texture of its last composite, hidden or
-## not, so on open it only recomposites when the fog moved since.
+## La misma puerta que la del minimapa (Minimap._composite_if_changed): el
+## MapDraw propio de este mapa guarda la textura de su última composición,
+## oculto o no, así que al abrirse solo recompone si la niebla cambió.
 func _composite_if_changed() -> void:
 	var key := Minimap.composite_key(_map, get_tree())
 	if key == _composited:
@@ -127,7 +124,7 @@ func _composite_if_changed() -> void:
 	_map.composite()
 
 
-## --- layout ---------------------------------------------------------------
+## --- armado ---------------------------------------------------------------
 
 func _build_ui() -> void:
 	_dim = ColorRect.new()
@@ -159,7 +156,7 @@ func _build_ui() -> void:
 	_anchor_column(column)
 
 
-## One titled panel with a multi-line body; returns the body label.
+## Un panel con título y un cuerpo de varias líneas; devuelve el Label del cuerpo.
 func _add_section(column: VBoxContainer, title: String) -> Label:
 	var panel := PanelContainer.new()
 	panel.add_theme_stylebox_override("panel",
@@ -197,8 +194,8 @@ func _anchor_column(column: VBoxContainer) -> void:
 	column.offset_bottom = -PAD
 
 
-## Legend rows straight off MapDraw.MARKER_LABELS, so a kind added there
-## for part C shows up here with no edit.
+## Filas de la leyenda directo de MapDraw.MARKER_LABELS: un tipo agregado ahí
+## aparece aquí sin tocar nada.
 func _build_legend() -> void:
 	for kind: StringName in MapDraw.MARKER_LABELS:
 		var style: Dictionary = MapDraw.MARKER_STYLES.get(kind, {})
@@ -221,14 +218,14 @@ func _build_legend() -> void:
 		row.add_child(label)
 
 
-## Every Control this overlay builds: never focusable (Tab is
-## ui_focus_next), never hit-testable (the world is still live behind it).
+## Cada Control que crea este mapa: nunca toma foco (Tab es ui_focus_next) ni
+## recibe el mouse (el mundo sigue vivo detrás).
 func _own(control: Control) -> void:
 	control.focus_mode = Control.FOCUS_NONE
 	control.mouse_filter = Control.MOUSE_FILTER_IGNORE
 
 
-## --- content --------------------------------------------------------------
+## --- contenido ------------------------------------------------------------
 
 func _refresh_panels() -> void:
 	var seconds := int(RunState.run_time)
@@ -237,8 +234,8 @@ func _refresh_panels() -> void:
 		title += " · Vuelta %d" % (RunState.lap + 1)
 	_header.text = "%s — %02d:%02d" % [title, seconds / 60, seconds % 60]
 	_legend.position = Vector2(PAD, size.y - PAD - _legend.size.y)
-	# One scan for the four panels that read this slot's raider: nothing in
-	# between can move a body between groups.
+	# Una sola búsqueda para los cuatro paneles que leen al jugador de esta
+	# ranura: nada entre medio puede cambiar un cuerpo de grupo.
 	var raider := _raider()
 	_powerups_body.text = _powerups_text(raider)
 	_pet_body.text = _pet_text(raider)
@@ -247,7 +244,7 @@ func _refresh_panels() -> void:
 	_items_body.text = _items_text(raider)
 
 
-## This slot's raider, standing or downed; null when the slot is empty.
+## El jugador de esta ranura, de pie o caído; null si la ranura está vacía.
 func _raider() -> Node3D:
 	for group: String in ["player", "downed_players"]:
 		for node: Node in get_tree().get_nodes_in_group(group):
@@ -257,16 +254,16 @@ func _raider() -> Node3D:
 	return null
 
 
-## `_raider() != null`, asked every frame even while the overlay is hidden,
-## without the two group scans when the body seen last time still answers
-## it: inside the tree, in one of the two groups, still this slot. A body
-## like that is one _raider()'s scan would reach, so it could not answer
-## null; when it does not hold, the full scan decides and is remembered.
-## is_inside_tree() is not optional: a node keeps its groups after it
-## leaves the tree, but the tree's group lists drop it.
+## `_raider() != null`, preguntado cada cuadro aunque el mapa esté oculto,
+## sin las dos búsquedas de grupo cuando el último cuerpo visto sigue
+## respondiendo: dentro del árbol, en uno de los dos grupos y con esta ranura.
+## Un cuerpo así es uno que encontraría la búsqueda de _raider(), así que no
+## podría dar null; si no se cumple, decide la búsqueda completa y se recuerda.
+## is_inside_tree() es obligatorio: un nodo conserva sus grupos al salir del
+## árbol, pero las listas de grupo del árbol lo sueltan.
 func _has_raider() -> bool:
-	# Read through the member, never copied into a typed local first: a
-	# freed body cannot be assigned to a typed variable.
+	# Se lee por el miembro, nunca copiado antes a una variable local tipada:
+	# un cuerpo liberado no se puede asignar a una variable tipada.
 	if is_instance_valid(_seen_raider) and _seen_raider.is_inside_tree() \
 			and (_seen_raider.is_in_group(&"player") \
 				or _seen_raider.is_in_group(&"downed_players")) \
@@ -276,9 +273,8 @@ func _has_raider() -> bool:
 	return _seen_raider != null
 
 
-## Live power-ups with their remaining seconds (iteration 53). The map is
-## where you look when you are deciding what to do next, and "eleven
-## seconds of Furia left" is exactly that kind of decision.
+## Power-ups activos con sus segundos restantes. El mapa es donde miras al
+## decidir qué hacer, y "once segundos de Furia" es justo esa clase de decisión.
 func _powerups_text(raider: Node3D) -> String:
 	var powerups := PowerUps.find_in(raider)
 	if powerups == null:
@@ -290,10 +286,10 @@ func _powerups_text(raider: Node3D) -> String:
 	return "\n".join(rows) if not rows.is_empty() else "—"
 
 
-## The derived stat layer, as the player reads it.
-## `cooldown_multiplier` is shown as ATTACK SPEED and POSITIVE (GLOSARIO
-## rule 7): 0.8 is "+20% de velocidad de ataque", never "-20% de
-## enfriamiento". The multiplier itself is untouched, only the wording.
+## La capa de estadísticas derivadas, como la lee el jugador.
+## `cooldown_multiplier` se muestra como VELOCIDAD DE ATAQUE y en POSITIVO
+## (GLOSARIO regla 7): 0.8 es "+20% de velocidad de ataque", nunca "-20% de
+## enfriamiento". Solo cambia la redacción, no el multiplicador.
 func _stats_text(body: Node3D) -> String:
 	var stats := PlayerStats.find_in(body) if body != null else null
 	if stats == null:
@@ -326,8 +322,8 @@ func _flat(amount: float) -> String:
 	return "%+d" % roundi(amount)
 
 
-## The whole party, downed raiders included: knowing a teammate is at 0 HP
-## across the map is most of what this panel is for in co-op.
+## Todo el grupo, caídos incluidos: saber que un compañero está en 0 de vida
+## al otro lado del mapa es casi todo el propósito de este panel en co-op.
 func _players_text() -> String:
 	var rows: PackedStringArray = PackedStringArray()
 	for player_slot: int in maxi(Coop.player_count, 1):
@@ -357,9 +353,9 @@ func _raider_at(player_slot: int) -> Node3D:
 	return null
 
 
-## The companion line: name, its weapon and the stat it pays. Shown even
-## with no pet, because "you have no companion" is itself information when
-## a pet box is somewhere on the map.
+## La línea de la mascota: nombre, su arma y la estadística que da. Se
+## muestra aunque no haya mascota, porque "no tienes compañero" también es
+## información cuando hay una caja de mascota en el mapa.
 func _pet_text(body: Node3D) -> String:
 	if body == null:
 		return "—"
@@ -373,9 +369,9 @@ func _pet_text(body: Node3D) -> String:
 			PetCatalog.weapon_display_name(row), String(row.get("stat_label", ""))]
 
 
-## Items with copies, then weapons with their level or milestone tier,
-## then tomes with their stack numeral — the same three families the HUD
-## strip shows, spelled out with full names because there is room here.
+## Objetos con copias, luego armas con su nivel o rango de hito, luego
+## tomos con sus pilas: las mismas tres familias que las franjas del HUD, con
+## nombres completos porque aquí hay espacio.
 func _items_text(body: Node3D) -> String:
 	if body == null:
 		return "—"
@@ -407,7 +403,7 @@ func _items_text(body: Node3D) -> String:
 	return "\n".join(rows) if not rows.is_empty() else "—"
 
 
-## --- drawing --------------------------------------------------------------
+## --- dibujo ---------------------------------------------------------------
 
 func _draw() -> void:
 	if _map == null:
