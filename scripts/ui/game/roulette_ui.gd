@@ -1,26 +1,26 @@
 extends CanvasLayer
-## Roulette menu (iteration 41), built in code by a RouletteShrine: pauses
-## the tree (ui_blocking contract, layer between cards and run-end), lists
-## every outcome, and on SPIN runs a slot-style highlight sweep before the
-## real result (already rolled and applied) lands. Leave/Esc unpauses.
+## Menú de la ruleta, creado por un RouletteShrine: pausa el árbol (contrato
+## "ui_blocking", capa entre las cartas y la pantalla de fin), lista todos los
+## resultados y, al GIRAR, hace un barrido tipo tragamonedas antes de que caiga
+## el resultado real (ya sorteado y aplicado). Salir o Esc quitan la pausa.
 ##
-## Pause safety: this layer holds the whole tree paused, so it must never
-## be able to outlive its owner. It closes itself if the raider that
-## opened it — or the shrine it belongs to, on a stage teardown — goes
-## away, exposes dismiss() for anything that needs to shut it down
-## programmatically (group "blocking_ui_closable"), and on a headless
-## display it plays itself — a soak has nobody to press SPIN, and a wheel
-## waiting forever freezes the whole run. The release also runs from
-## _exit_tree, so a panel freed rather than closed still hands the tree
-## back — and, like the card picker, it never releases a pause another
-## blocking layer has taken over.
+## Pausa segura: esta capa tiene todo el árbol pausado, así que nunca puede
+## sobrevivir a su dueño. Se cierra sola si el raider que la abrió, o el altar al
+## que pertenece (al desmontar la etapa), desaparece; expone dismiss() para
+## cerrarla desde código (grupo "blocking_ui_closable"); y sin pantalla
+## (headless) juega sola: un soak no tiene quien presione GIRAR, y una ruleta
+## esperando para siempre congela la partida. La pausa también se suelta desde
+## _exit_tree, así que un panel liberado en vez de cerrado devuelve el árbol
+## igual; y, como el selector de cartas, nunca suelta una pausa que tomó otra
+## capa bloqueante.
 
-## Sweep tunables. The delays are derived from sweep_time, so the constant
-## actually controls the length of the spin.
+## Segundos que dura el barrido completo del resaltado; las esperas entre saltos
+## se derivan de este valor.
 @export var sweep_time: float = 1.4
+## Saltos del resaltado en un giro (mínimo 2).
 @export var sweep_steps: int = 22
 
-## Shape of the slowdown: the last hops are ~4.6x longer than the first.
+## Forma del frenado: los últimos saltos duran ~4.6 veces más que los primeros.
 const SWEEP_EASE_MIN := 0.03
 const SWEEP_EASE_MAX := 0.14
 
@@ -32,7 +32,7 @@ const CLOSE_BUTTON_SIZE := Vector2(140.0, 46.0)
 const HIGHLIGHT_ON := Color(1.6, 1.5, 1.2)
 const HIGHLIGHT_OFF := Color(1.0, 1.0, 1.0, 0.55)
 
-## Headless self-play: spin once, show the result, leave.
+## Juego sin pantalla: gira una vez, muestra el resultado y se va (segundos).
 const HEADLESS_SPIN_DELAY := 0.4
 const HEADLESS_LEAVE_DELAY := 3.0
 
@@ -44,15 +44,15 @@ var _close_button: Button = null
 var _result_label: Label = null
 var _points_label: Label = null
 var _spinning: bool = false
-## True only between the _ready that paused the tree and the release that
-## hands it back (pause_menu.gd's _pause_owned rule). Both the close and the
-## _exit_tree backstop go through it, so the pause is released exactly once
-## and a panel that never got as far as pausing releases nothing.
+## true solo entre el _ready que pausó el árbol y la liberación que lo devuelve
+## (la regla de _pause_owned de pause_menu.gd). El cierre y el respaldo de
+## _exit_tree pasan por aquí, así que la pausa se suelta una sola vez y un panel
+## que nunca llegó a pausar no suelta nada.
 var _pause_held: bool = false
 
 
-## MUST be called before add_child(): _ready builds the panel from the
-## shrine's price and the raider's points.
+## DEBE llamarse antes de add_child(): _ready arma el panel con el precio del
+## altar y los puntos del raider.
 func setup(shrine: RouletteShrine, player: Node) -> void:
 	_shrine = shrine
 	_player = player
@@ -61,8 +61,8 @@ func setup(shrine: RouletteShrine, player: Node) -> void:
 func _ready() -> void:
 	layer = 15
 	process_mode = Node.PROCESS_MODE_ALWAYS
-	# Nothing to watch — and no pause of ours to release — until the panel
-	# is actually up.
+	# Nada que vigilar (ni pausa propia que soltar) hasta que el panel está
+	# arriba.
 	set_process(false)
 	if _shrine == null or not is_instance_valid(_player):
 		push_error("RouletteUi: setup() must run before add_child()")
@@ -79,29 +79,29 @@ func _ready() -> void:
 		_auto_play()
 
 
-## PauseMenu/UpgradeCardUi contract ("ui_blocking"): true while this layer
-## owns the tree pause. False once it is queued for deletion — the node
-## stays in the group until the delete queue flushes at the end of the
-## frame, and a dying wheel answering "yes" makes the card picker (or a
-## stage swap) skip its own unpause for that frame.
+## Contrato de PauseMenu/UpgradeCardUi ("ui_blocking"): true mientras esta capa
+## es dueña de la pausa. Es false apenas queda en cola para borrarse: el nodo
+## sigue en el grupo hasta que la cola de borrado se vacía al final del frame, y
+## una ruleta que se va y contesta "sí" hace que el selector de cartas (o un
+## cambio de etapa) se salte su propia quita de pausa en ese frame.
 func is_blocking() -> bool:
 	return not is_queued_for_deletion()
 
 
-## Programmatic close (soak harnesses, teardown). Mid-spin it waits: the
-## outcome is already applied, only the reveal is pending.
+## Cierre desde código (harness de soak, desmontaje). A mitad de un giro espera:
+## el resultado ya está aplicado y solo falta mostrarlo.
 func dismiss() -> void:
 	if _spinning:
 		return
 	_close()
 
 
-## The tree is paused, so nothing else can notice that the raider who
-## opened the wheel is gone (co-op wipe) — or that the shrine itself went
-## with the stage. Nobody would be left to press Leave, and the pause would
-## outlive the run. Both references are checked, like the vendor's panel:
-## the price and the spin are read off the shrine, so a wheel whose altar is
-## gone has nothing left to sell either.
+## Con el árbol pausado nada más puede notar que el raider que abrió la ruleta
+## ya no está (caída de todo el grupo en co-op), o que el altar se fue con la
+## etapa. No quedaría nadie para presionar Salir y la pausa duraría más que la
+## partida. Se revisan ambas referencias, como en el panel del vendedor: el
+## precio y el giro se leen del altar, así que una ruleta sin altar ya no tiene
+## nada que vender.
 func _process(_delta: float) -> void:
 	if is_queued_for_deletion():
 		return
@@ -189,7 +189,7 @@ func _build_buttons(box: VBoxContainer) -> void:
 	UiTheme.style_button(_close_button)
 	_close_button.pressed.connect(_close)
 	buttons.add_child(_close_button)
-	# Button prompts under the buttons; they follow the last device used.
+	# Indicaciones de botón bajo los botones; siguen al último dispositivo usado.
 	box.add_child(InputHints.build([["ui_accept", "Elegir"], ["ui_cancel", "Salir"]]))
 	_spin_button.grab_focus()
 
@@ -200,13 +200,13 @@ func _unhandled_input(event: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 
 
-## Spin stays disabled for the whole sweep: a button that looks pressable
-## and silently swallows the press is worse than a greyed-out one.
+## GIRAR queda deshabilitado durante todo el barrido: un botón que parece
+## presionable y se traga el clic en silencio es peor que uno en gris.
 func _refresh_points() -> void:
 	_points_label.text = "Tienes %d pts" % int(_player.get("points"))
 	if _spin_button != null:
-		# The price doubles with every spin (iteration 46), so the label is
-		# re-read here and not baked once when the panel is built.
+		# El precio se duplica con cada giro, así que la etiqueta se vuelve a
+		# leer aquí en vez de fijarse una vez al armar el panel.
 		var cost := _shrine.current_price()
 		_spin_button.text = "GIRAR — %d pts" % cost
 		_spin_button.disabled = _spinning or int(_player.get("points")) < cost
@@ -220,9 +220,9 @@ func _on_spin() -> void:
 		_result_label.text = "No te alcanzan los puntos."
 		return
 	_spinning = true
-	# Clear the previous spin before this one starts: the wheel is
-	# reusable, so a stale result line and a stale highlight would still be
-	# on screen while the new sweep runs.
+	# Limpia el giro anterior antes de empezar: la ruleta se reusa, y una línea
+	# de resultado y un resaltado viejos seguirían en pantalla durante el nuevo
+	# barrido.
 	_result_label.text = ""
 	for row: Label in _rows:
 		row.modulate = Color.WHITE
@@ -232,13 +232,14 @@ func _on_spin() -> void:
 	_sweep_to(outcome)
 
 
-## Slot-machine sweep: the highlight hops across rows, slowing down, and
-## stops on the real outcome. Runs on this ALWAYS layer, ignores time scale.
+## Barrido tipo tragamonedas: el resaltado salta entre filas, frenando, y se
+## detiene en el resultado real. Corre en esta capa ALWAYS e ignora la escala de
+## tiempo.
 func _sweep_to(outcome: Dictionary) -> void:
 	var target := _row_index(String(outcome.id))
 	if target < 0:
-		# Landing anywhere would contradict the result line we are about
-		# to print, and a lying wheel is worse than no animation.
+		# Caer en cualquier lado contradiría la línea de resultado que viene, y
+		# una ruleta que miente es peor que ninguna animación.
 		push_warning("RouletteUi: outcome '%s' has no row" % String(outcome.id))
 		_land(outcome)
 		return
@@ -263,8 +264,8 @@ func _row_index(outcome_id: String) -> int:
 	return -1
 
 
-## Eased-out hop delays normalized so they add up to sweep_time — that is
-## what makes the exported constant mean something.
+## Esperas de salto con frenado, normalizadas para que sumen sweep_time: eso es
+## lo que le da sentido al valor exportado.
 func _sweep_delays(steps: int) -> PackedFloat32Array:
 	var delays := PackedFloat32Array()
 	var total := 0.0
@@ -296,8 +297,8 @@ func _land(outcome: Dictionary) -> void:
 	_close_button.grab_focus()
 
 
-## Soaks (and any other headless run) have no hands: play one spin and
-## leave, so the paused tree is always handed back.
+## Los soaks (y toda corrida sin pantalla) no tienen manos: gira una vez y se
+## va, así el árbol pausado siempre se devuelve.
 func _auto_play() -> void:
 	await get_tree().create_timer(HEADLESS_SPIN_DELAY, true, false, true).timeout
 	if not is_inside_tree():
@@ -308,9 +309,9 @@ func _auto_play() -> void:
 		_close()
 
 
-## Guarded because several paths can reach it — Esc, the Salir button, the
-## headless leave backstop, the watchdog above — and the tree pause must be
-## released exactly once, by whichever gets here first.
+## Protegido porque varios caminos pueden llegar aquí (Esc, el botón Salir, el
+## respaldo de salida sin pantalla, el vigía de arriba) y la pausa debe soltarse
+## una sola vez, por el primero que llegue.
 func _close() -> void:
 	if is_queued_for_deletion():
 		return
@@ -318,12 +319,12 @@ func _close() -> void:
 	queue_free()
 
 
-## Hands the tree back, at most once, and only when it is OURS to hand back
-## (upgrade_card_ui.gd's rule). A spin can put another "ui_blocking" layer
-## on screen — the card picker off a rolled prize — and the run can end
-## under this panel, in which case the run-end screen owns the pause and the
-## mouse; unpausing in either case would resume the world behind somebody
-## else's modal and steal the mouse from its buttons.
+## Devuelve el árbol como máximo una vez, y solo si la pausa es NUESTRA (regla
+## de upgrade_card_ui.gd). Un giro puede poner otra capa "ui_blocking" en
+## pantalla, y la partida puede terminar debajo de este panel, en cuyo caso la
+## pantalla de fin es dueña de la pausa y del mouse: quitar la pausa en
+## cualquiera de los dos casos reanudaría el mundo detrás del modal de otro y le
+## quitaría el mouse a sus botones.
 func _release_pause() -> void:
 	if not _pause_held:
 		return
@@ -334,7 +335,7 @@ func _release_pause() -> void:
 	Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
 
 
-## Any OTHER member of "ui_blocking" holding the pause right now?
+## ¿Algún OTRO miembro de "ui_blocking" tiene la pausa ahora?
 func _other_blocking_ui_open() -> bool:
 	for node: Node in get_tree().get_nodes_in_group("ui_blocking"):
 		if node == self or not node.has_method(&"is_blocking"):
@@ -344,8 +345,9 @@ func _other_blocking_ui_open() -> bool:
 	return false
 
 
-## _close() is the only path that unpauses, so a panel FREED instead of
-## closed — free() from a harness, the stage parent going with a stage swap
-## — would strand a paused tree with nothing left on screen to release it.
+## _close() es el único camino que quita la pausa, así que un panel LIBERADO en
+## vez de cerrado (free() desde un harness, el padre de la etapa que se va con
+## un cambio de etapa) dejaría un árbol pausado sin nada en pantalla que lo
+## suelte.
 func _exit_tree() -> void:
 	_release_pause()

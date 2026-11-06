@@ -1,17 +1,18 @@
 class_name RouletteShrine
 extends Interactable
-## Roulette altar (iteration 41): a wheel of fortune that costs run points
-## per spin and opens a menu (RouletteUi) where the raider spins for one of
-## the outcomes below — from a Legendary item to a temporary curse. The
-## wheel is reusable, but since iteration 46 every spin DOUBLES the price
-## for the rest of the run (RunState.roulette_price_multiplier, run-wide
-## like chest prices), so `price` is the base, never what you pay.
+## Altar de la ruleta: una ruleta de la fortuna que cobra puntos de partida por
+## giro y abre un menú (RouletteUi) donde el raider gira por uno de los
+## resultados de abajo, desde un objeto legendario hasta una maldición temporal.
+## La ruleta se puede reusar, pero cada giro DUPLICA el precio para el resto de
+## la partida (RunState.roulette_price_multiplier, de toda la partida como los
+## precios de cofre), así que `price` es la base, nunca lo que se paga.
 
+## Precio base de un giro, en puntos, antes del multiplicador de la partida.
 @export var price: int = 60
 
-## Outcomes: {id, label, weight}. The id is the LOGIC key (apply_outcome
-## matches on it, and the four item rows carry a rarity id in their
-## suffix); the label is the only part the player reads.
+## Resultados: {id, label, weight, color}. El id es la llave LÓGICA
+## (apply_outcome decide por él, y las cuatro filas de objeto llevan un id de
+## rareza en su sufijo); label es lo único que lee el jugador.
 const OUTCOMES: Array[Dictionary] = [
 	{"id": "item_legendary", "label": "Objeto legendario", "weight": 3.0, "color": Color(1.0, 0.78, 0.2)},
 	{"id": "item_epic", "label": "Objeto épico", "weight": 7.0, "color": Color(0.68, 0.32, 0.95)},
@@ -33,7 +34,7 @@ var _time: float = 0.0
 var _ui: CanvasLayer = null
 
 
-## Idle spin of the wheel prop, in radians per second.
+## Giro de la rueda del altar en reposo, en radianes por segundo.
 const WHEEL_SPIN: float = 0.6
 
 
@@ -49,8 +50,8 @@ func _ready() -> void:
 	_refresh_prompt_text()
 
 
-## The price grows with every spin this run, so the prompt is re-read
-## rather than baked once at ready.
+## El precio sube con cada giro de la partida, así que el prompt se vuelve a
+## leer en vez de fijarse una vez al iniciar.
 func current_price() -> int:
 	return RunState.roulette_price(price)
 
@@ -73,11 +74,11 @@ func _interact(player: Node) -> void:
 		return
 	if _ui != null and is_instance_valid(_ui):
 		return
-	# Never over another tree-pausing layer: the wheel's panel releases the
-	# pause when it closes, and that pause could belong to the card picker
-	# or to the Esc menu. Same contract (and same shape) as
-	# pause_menu.gd's, where a member without is_blocking() counts as
-	# blocking — the rule is only worth having if forgetting it fails SAFE.
+	# Nunca sobre otra capa que pausa el árbol: el panel de la ruleta suelta la
+	# pausa al cerrarse, y esa pausa podría ser del selector de cartas o del
+	# menú de Esc. Mismo contrato (y misma forma) que el de pause_menu.gd, donde
+	# un miembro sin is_blocking() cuenta como bloqueante: la regla solo sirve si
+	# olvidarla falla del lado SEGURO.
 	for node: Node in get_tree().get_nodes_in_group("ui_blocking"):
 		if not node.has_method(&"is_blocking"):
 			push_warning("ui_blocking member without is_blocking(): %s" % node.name)
@@ -86,17 +87,17 @@ func _interact(player: Node) -> void:
 			return
 	_ui = RouletteUiScript.new()
 	_ui.setup(self, player)
-	# Under the CURRENT SCENE, never under /root: this layer holds the
-	# whole tree paused, and a CanvasLayer parented to root survives
-	# change_scene_to_file — leaving the next arena frozen behind an
-	# orphan panel with nothing left to close it.
+	# Bajo la ESCENA ACTUAL, nunca bajo /root: esta capa tiene todo el árbol
+	# pausado, y un CanvasLayer colgado de root sobrevive a
+	# change_scene_to_file y deja la siguiente arena congelada detrás de un
+	# panel huérfano que nadie puede cerrar.
 	var host := RunRoot.stage_parent(get_tree())
 	if host == null:
 		host = get_tree().root
 	host.add_child(_ui)
 
 
-## Pure weighted pick over OUTCOMES for a uniform roll in [0, 1).
+## Elección ponderada pura sobre OUTCOMES para una tirada uniforme en [0, 1).
 static func outcome_for(roll: float) -> Dictionary:
 	var total := 0.0
 	for outcome: Dictionary in OUTCOMES:
@@ -109,12 +110,13 @@ static func outcome_for(roll: float) -> Dictionary:
 	return OUTCOMES[OUTCOMES.size() - 1]
 
 
-## Charges the price and rolls; returns the outcome (empty if unaffordable).
+## Cobra el precio y tira; devuelve el resultado (vacío si no alcanza).
 func spin(player: Node) -> Dictionary:
 	if not player.has_method("spend_points") or not bool(player.call("spend_points", current_price())):
 		return {}
-	# Charge first, THEN raise the price: the next spin (this altar or any
-	# other) costs double, and the prompt re-reads it on the next refresh.
+	# Primero se cobra y DESPUÉS sube el precio: el siguiente giro (en este altar
+	# o en cualquier otro) cuesta el doble, y el prompt lo vuelve a leer al
+	# refrescarse.
 	RunState.register_roulette_spin()
 	_refresh_prompt_text()
 	SaveData.bump("shrines_used")
@@ -125,15 +127,15 @@ func spin(player: Node) -> Dictionary:
 	return outcome
 
 
-## Applies one outcome to `player` (and the run, for the shared ones).
+## Aplica un resultado a `player` (y a la partida, en los compartidos).
 func apply_outcome(outcome_id: String, player: Node) -> void:
 	var stats := PlayerStats.find_in(player)
 	var bag := ItemBag.find_in(player)
 	match outcome_id:
 		"item_legendary", "item_epic", "item_rare", "item_common":
-			# The id half is the RARITY KEY (ItemCatalog.roll_id and the
-			# chest prices index on it, so it stays English); only the
-			# banner goes through rarity_display.
+			# La mitad del id es la LLAVE de rareza (ItemCatalog.roll_id y los
+			# precios de cofre se indexan por ella, por eso queda en inglés);
+			# solo el aviso pasa por rarity_display.
 			var rarity := outcome_id.trim_prefix("item_").capitalize()
 			var item_id := ItemCatalog.roll_id(rarity)
 			if bag != null and not item_id.is_empty():

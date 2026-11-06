@@ -1,63 +1,64 @@
 extends CanvasLayer
-## Vendor menu (iteration 54), built in code by a Vendor: pauses the tree
-## (ui_blocking contract, the roulette's layer), lays the stall's goods out
-## as cards, and hands ONE purchase back to the vendor. The vendor owns the
-## economy — it charges, it logs, and it decides that a stall closes after
-## a sale; this layer owns the moment: what is on the shelf, what a card
-## says, and what happens between the press and the goodbye.
+## Menú del vendedor, creado por un Vendor: pausa el árbol (contrato
+## "ui_blocking", la misma capa que la ruleta), muestra la mercancía como cartas
+## y le devuelve UNA compra al vendedor. El vendedor es dueño de la economía
+## (cobra, registra y cierra el puesto tras una venta); esta capa es dueña del
+## momento: qué hay en el estante, qué dice cada carta y qué pasa entre el clic y
+## la despedida.
 ##
-## What the shelf holds comes from the vendor's `kind`, one branch each:
-##   "animals"  — three companions the buyer is not already following, at
-##                the vendor's flat pet_price.
-##   "powerups" — one rolled power-up, never the star, at the run-wide
-##                RunState.powerup_vendor_price.
-##   "items"    — four items, each at its own luck-rolled rarity and priced
-##                like a chest of that rarity, inflation included.
-## Every offer is a display-ready row AND the argument vendor.buy()
-## consumes: kind, price, title, tag, lines, color, plus the payload
-## (pet_id / powerup_id / item_id).
+## Lo que hay en el estante depende del `kind` del vendedor, una rama por tipo:
+##   "animals"  — tres mascotas que el comprador no lleva, al pet_price fijo del
+##                vendedor.
+##   "powerups" — un power-up sorteado, nunca la estrella, al precio de toda la
+##                partida RunState.powerup_vendor_price.
+##   "items"    — cuatro objetos, cada uno con su rareza sorteada con suerte y
+##                con precio de cofre de esa rareza, inflación incluida.
+## Cada oferta es una fila lista para mostrar Y el argumento que consume
+## vendor.buy(): kind, price, title, tag, lines, color y la carga (pet_id /
+## powerup_id / item_id).
 ##
-## The offers are rolled ONCE, in _ready: the panel redraws after every
-## press and after every purse change, and a shelf rebuilt in the redraw
-## would swap the goods out from under the raider's cursor.
+## Las ofertas se sortean UNA vez, en _ready: el panel se redibuja tras cada
+## clic y cada cambio de puntos, y un estante rearmado en el redibujo cambiaría
+## la mercancía bajo el cursor del raider.
 ##
-## Pause safety: this layer holds the whole tree paused, so it must never
-## be able to outlive its owner. It closes itself if the raider that opened
-## it — or the stall itself, on a stage teardown — goes away, exposes
-## dismiss() for anything that needs to shut it down programmatically
-## (group "blocking_ui_closable"), and on a headless display it plays
-## itself: a soak has nobody to press a card, and a stall waiting forever
-## freezes the whole run. The release also runs from _exit_tree, so a panel
-## freed rather than closed still hands the tree back — and, like the card
-## picker, it never releases a pause another blocking layer has taken over.
+## Pausa segura: esta capa tiene todo el árbol pausado, así que nunca puede
+## sobrevivir a su dueño. Se cierra sola si el raider que la abrió, o el puesto
+## (al desmontar la etapa), desaparece; expone dismiss() para cerrarla desde
+## código (grupo "blocking_ui_closable"); y sin pantalla (headless) juega sola,
+## porque un soak no tiene quien presione una carta y un puesto esperando para
+## siempre congela la partida. La pausa también se suelta desde _exit_tree, así
+## que un panel liberado en vez de cerrado devuelve el árbol igual; y, como el
+## selector de cartas, nunca suelta una pausa que tomó otra capa bloqueante.
 
-## Vendor kinds (VENDOR_LIBRARY row ids). Identifiers, never shown.
+## Tipos de vendedor (ids de fila de VENDOR_LIBRARY). Identificadores, nunca se
+## muestran.
 const KIND_ANIMALS: String = "animals"
 const KIND_POWERUPS: String = "powerups"
 const KIND_ITEMS: String = "items"
 
-## How many cards each kind puts out. Animals and items are a CHOICE (pick
-## one of several); the power-up is a single take-it-or-leave-it card,
-## because its price is the run-wide one that grows with every power-up
-## anybody buys — offering three would just be the same price three times.
+## Cuántas cartas pone cada tipo. Animales y objetos son una ELECCIÓN (elige
+## una de varias); el power-up es una sola carta, porque su precio es el de la
+## partida y sube con cada power-up que alguien compra: ofrecer tres sería el
+## mismo precio tres veces.
 const PET_OFFERS: int = 3
 const ITEM_OFFERS: int = 4
-## Re-rolls allowed when an item lands on a slot that already holds it: the
-## same name twice at two prices reads as a bug. Bounded, because a tier can
-## hold fewer items than the shelf has slots (Legendary has two).
+## Re-tiradas permitidas cuando un objeto cae en un hueco que ya lo tiene: el
+## mismo nombre dos veces con dos precios parece un bug. Es acotado porque una
+## rareza puede tener menos objetos que huecos el estante (Legendario tiene dos).
 const ITEM_REROLLS: int = 4
 
 const DIM_COLOR: Color = Color(0.03, 0.03, 0.05, 0.75)
 const CARD_SIZE: Vector2 = Vector2(196.0, 196.0)
 const CLOSE_BUTTON_SIZE: Vector2 = Vector2(140.0, 46.0)
 
-## Headless self-play: buy the first affordable card, then leave.
+## Juego sin pantalla: compra la primera carta que alcance y se va (segundos).
 const HEADLESS_BUY_DELAY: float = 0.4
 const HEADLESS_LEAVE_DELAY: float = 3.0
-## Beat between the thank-you line and the panel closing itself.
+## Segundos entre la línea de agradecimiento y el cierre del panel.
 const SOLD_CLOSE_DELAY: float = 1.1
 
-## Every player-visible string of the stall, in one block (docs/GLOSARIO.md).
+## Todos los textos que ve el jugador en el puesto, en un bloque
+## (docs/GLOSARIO.md).
 const POINTS_TEMPLATE: String = "Tienes %d pts"
 const PRICE_TEMPLATE: String = "%d pts"
 const DURATION_TEMPLATE: String = "%d s"
@@ -68,25 +69,25 @@ const EMPTY_SHELF_LINE: String = "El vendedor no tiene nada para ti."
 
 var _vendor: Vendor = null
 var _player: Node = null
-## Rolled once in _ready; the drawing code only ever reads them.
+## Se sortean una vez en _ready; el dibujo solo las lee.
 var _offers: Array[Dictionary] = []
 var _cards: Array[Button] = []
 var _price_labels: Array[Label] = []
 var _points_label: Label = null
 var _result_label: Label = null
 var _close_button: Button = null
-## One sale per stall: set the moment the vendor accepts, and every card
-## goes dead with it.
+## Una venta por puesto: se marca cuando el vendedor acepta, y todas las cartas
+## quedan inactivas.
 var _sold: bool = false
-## True only between the _ready that paused the tree and the release that
-## hands it back (pause_menu.gd's _pause_owned rule). Both the close and the
-## _exit_tree backstop go through it, so the pause is released exactly once
-## and a panel that never got as far as pausing releases nothing.
+## true solo entre el _ready que pausó el árbol y la liberación que lo devuelve
+## (la regla de _pause_owned de pause_menu.gd). El cierre y el respaldo de
+## _exit_tree pasan por aquí, así que la pausa se suelta una sola vez y un panel
+## que nunca llegó a pausar no suelta nada.
 var _pause_held: bool = false
 
 
-## MUST be called before add_child(): _ready rolls the shelf from the
-## vendor's kind and the raider's luck, and prices it against their points.
+## DEBE llamarse antes de add_child(): _ready sortea el estante según el tipo
+## del vendedor y la suerte del raider, y le pone precio contra sus puntos.
 func setup(vendor: Vendor, player: Node) -> void:
 	_vendor = vendor
 	_player = player
@@ -95,8 +96,8 @@ func setup(vendor: Vendor, player: Node) -> void:
 func _ready() -> void:
 	layer = 15
 	process_mode = Node.PROCESS_MODE_ALWAYS
-	# Nothing to watch — and no pause of ours to release — until the panel
-	# is actually up.
+	# Nada que vigilar (ni pausa propia que soltar) hasta que el panel está
+	# arriba.
 	set_process(false)
 	if not is_instance_valid(_vendor) or not is_instance_valid(_player):
 		push_error("VendorUi: setup() must run before add_child()")
@@ -114,25 +115,25 @@ func _ready() -> void:
 		_auto_play()
 
 
-## PauseMenu/UpgradeCardUi contract ("ui_blocking"): true while this layer
-## owns the tree pause. False once it is queued for deletion — the node
-## stays in the group until the delete queue flushes at the end of the
-## frame, and a dying stall answering "yes" makes the card picker (or a
-## stage swap) skip its own unpause for that frame.
+## Contrato de PauseMenu/UpgradeCardUi ("ui_blocking"): true mientras esta capa
+## es dueña de la pausa. Es false apenas queda en cola para borrarse: el nodo
+## sigue en el grupo hasta que la cola de borrado se vacía al final del frame, y
+## un puesto que se va y contesta "sí" hace que el selector de cartas (o un
+## cambio de etapa) se salte su propia quita de pausa en ese frame.
 func is_blocking() -> bool:
 	return not is_queued_for_deletion()
 
 
-## Programmatic close (soak harnesses, teardown). Nothing here is worth
-## waiting for: the sale, if there was one, already happened.
+## Cierre desde código (harness de soak, desmontaje). Nada aquí vale la espera:
+## la venta, si hubo, ya ocurrió.
 func dismiss() -> void:
 	_close()
 
 
-## The tree is paused, so nothing else can notice that the raider who
-## walked up to the stall is gone (co-op wipe, scene teardown) — or that
-## the stall itself went with the stage. Nobody would be left to press
-## Salir, and the pause would outlive the run.
+## Con el árbol pausado nada más puede notar que el raider que se acercó al
+## puesto ya no está (caída de todo el grupo en co-op, desmontaje de la escena),
+## o que el puesto se fue con la etapa. No quedaría nadie para presionar Salir y
+## la pausa duraría más que la partida.
 func _process(_delta: float) -> void:
 	if is_queued_for_deletion():
 		return
@@ -140,10 +141,10 @@ func _process(_delta: float) -> void:
 		_close()
 
 
-# --- shelf -----------------------------------------------------------------
+# --- estante -----------------------------------------------------------------
 
-## One branch per vendor kind, and nothing per id: a fourth kind is a row
-## in VENDOR_LIBRARY, a branch here and a branch in Vendor.buy().
+## Una rama por tipo de vendedor y nada por id: un cuarto tipo es una fila en
+## VENDOR_LIBRARY, una rama aquí y otra en Vendor.buy().
 func _build_offers() -> Array[Dictionary]:
 	match _vendor.kind:
 		KIND_ANIMALS:
@@ -156,8 +157,8 @@ func _build_offers() -> Array[Dictionary]:
 	return []
 
 
-## Three companions the buyer is not already following. Selling the pet
-## somebody already has would charge them 120 points to swap it for itself.
+## Tres mascotas que el comprador no lleva: venderle la que ya tiene le cobraría
+## por cambiarla por sí misma.
 func _animal_offers() -> Array[Dictionary]:
 	var current: Variant = _player.get("pet_id")
 	var held := String(current) if current != null else ""
@@ -174,9 +175,9 @@ func _animal_offers() -> Array[Dictionary]:
 			"pet_id": String(row.id),
 			"price": _vendor.pet_price,
 			"title": String(row.display_name),
-			# Weapon and stat are the only things that differ between
-			# companions, so both go on every card: a swap the player
-			# cannot undo must never be a guess.
+			# El arma y la stat son lo único que cambia entre mascotas, así que
+			# ambas van en cada carta: un cambio que no se puede deshacer nunca
+			# debe ser una apuesta.
 			"tag": PetCatalog.weapon_display_name(row),
 			"lines": PackedStringArray([String(row.get("stat_label", ""))]),
 			"color": row.get("color", UiTheme.TEXT_BRIGHT),
@@ -184,8 +185,8 @@ func _animal_offers() -> Array[Dictionary]:
 	return offers
 
 
-## One power-up, never the star: that one is found roaming the map, which
-## is why PowerUpCatalog.roll_id excludes it for every other source too.
+## Un power-up, nunca la estrella: esa se encuentra recorriendo el mapa, y por
+## eso PowerUpCatalog.roll_id la excluye también para toda otra fuente.
 func _powerup_offers() -> Array[Dictionary]:
 	var offers: Array[Dictionary] = []
 	var powerup_id := PowerUpCatalog.roll_id(true)
@@ -195,13 +196,13 @@ func _powerup_offers() -> Array[Dictionary]:
 	offers.append({
 		"kind": KIND_POWERUPS,
 		"powerup_id": powerup_id,
-		# Read here and not cached: the price grows with every power-up
-		# bought anywhere this run, so the card quotes what the last buyer
-		# left behind.
+		# Se lee aquí y no se guarda: el precio sube con cada power-up comprado
+		# en cualquier puesto de la partida, así que la carta cotiza lo que dejó
+		# el último comprador.
 		"price": RunState.powerup_vendor_price,
 		"title": String(row.display_name),
-		# The catalog duration, before the buyer's own duration stat
-		# stretches it — the stall sells the row, not the raider's build.
+		# La duración del catálogo, antes de que la stat de duración del
+		# comprador la estire: el puesto vende la fila, no el equipo del raider.
 		"tag": DURATION_TEMPLATE % int(row.get("duration", 0.0)),
 		"lines": PackedStringArray([String(row.get("description", ""))]),
 		"color": row.get("color", UiTheme.TEXT_BRIGHT),
@@ -209,9 +210,9 @@ func _powerup_offers() -> Array[Dictionary]:
 	return offers
 
 
-## Four items, each on its own luck-tilted rarity roll. An item bought off
-## a shelf and an item bought out of a lockbox are the same purchase, so
-## one curve prices both — chest inflation included.
+## Cuatro objetos, cada uno con su propia tirada de rareza inclinada por la
+## suerte. Un objeto de un estante y uno de un cofre son la misma compra, así
+## que una sola curva les pone precio a ambos, inflación de cofres incluida.
 func _item_offers() -> Array[Dictionary]:
 	var offers: Array[Dictionary] = []
 	var luck := _buyer_luck()
@@ -237,9 +238,9 @@ func _item_offers() -> Array[Dictionary]:
 	return offers
 
 
-## An item of `rarity_name` that is not on the shelf yet. The retries are
-## bounded because a tier can hold fewer items than the shelf has slots
-## (Legendary holds two), and a slot left empty is worse than a repeat.
+## Un objeto de `rarity_name` que todavía no está en el estante. Los reintentos
+## son acotados porque una rareza puede tener menos objetos que huecos el
+## estante (Legendario tiene dos), y un hueco vacío es peor que uno repetido.
 static func _roll_unused_item(rarity_name: String, taken: PackedStringArray) -> String:
 	var item_id := ItemCatalog.roll_id(rarity_name)
 	var tries := 0
@@ -254,7 +255,7 @@ func _buyer_luck() -> float:
 	return stats.luck if stats != null else 0.0
 
 
-# --- panel -----------------------------------------------------------------
+# --- panel -------------------------------------------------------------------
 
 func _build() -> void:
 	var row := _vendor.row()
@@ -298,9 +299,9 @@ func _build_header(box: VBoxContainer, title_text: String, accent: Color) -> voi
 
 func _build_cards(box: VBoxContainer) -> void:
 	if _offers.is_empty():
-		# Nothing to sell (every companion already followed, an empty
-		# roster): say so, instead of drawing an empty row and letting the
-		# raider wonder what broke.
+		# Nada que vender (todas las mascotas ya acompañan al raider, catálogo
+		# vacío): se dice, en vez de dibujar una fila vacía y dejar al raider
+		# preguntándose qué se rompió.
 		var empty := Label.new()
 		empty.text = EMPTY_SHELF_LINE
 		empty.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -315,17 +316,18 @@ func _build_cards(box: VBoxContainer) -> void:
 		shelf.add_child(_build_card(_offers[i], i))
 
 
-## The card IS the buy button (the one "pick one of these" surface every
-## other screen uses), so unaffordable and sold-out both read as the plain
-## disabled state instead of a live-looking card that swallows the press.
+## La carta ES el botón de compra (la misma superficie de "elige una de estas"
+## que usan las demás pantallas), así que inalcanzable y vendida se ven como el
+## estado deshabilitado normal en vez de una carta que parece viva y se traga el
+## clic.
 func _build_card(offer: Dictionary, index: int) -> Button:
 	var tint: Color = offer.color
 	var card := Button.new()
 	card.custom_minimum_size = CARD_SIZE
 	UiTheme.style_card(card, tint)
 	card.pressed.connect(_on_buy.bind(index))
-	# Coming back up from Salir lands on the card the player left, not on
-	# whichever card happens to sit nearest the button's centre.
+	# Al volver desde Salir se cae en la carta que el jugador dejó, no en la que
+	# quede más cerca del centro del botón.
 	card.focus_entered.connect(func() -> void:
 		if _close_button != null:
 			_close_button.focus_neighbor_top = _close_button.get_path_to(card))
@@ -343,8 +345,8 @@ func _build_card(offer: Dictionary, index: int) -> Button:
 		var body := CardFactory.label(line, 12, UiTheme.TEXT_DIM)
 		body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		box.add_child(body)
-	# The price sits on the bottom edge of every card, however much or
-	# little the body above it has to say.
+	# El precio va pegado al borde inferior de cada carta, diga lo que diga el
+	# cuerpo de arriba.
 	var spacer := Control.new()
 	spacer.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	spacer.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -359,9 +361,9 @@ func _build_card(offer: Dictionary, index: int) -> Button:
 	return card
 
 
-## Badges hug their text instead of stretching across the card. The wrapper
-## is click-through: containers default to MOUSE_FILTER_STOP and would eat
-## the press meant for the card underneath.
+## Las insignias abrazan su texto en vez de estirarse a lo ancho de la carta. El
+## envoltorio deja pasar el clic: los contenedores usan MOUSE_FILTER_STOP por
+## defecto y se comerían el clic de la carta de abajo.
 static func _centered(control: Control) -> CenterContainer:
 	var center := CenterContainer.new()
 	center.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -389,12 +391,12 @@ func _build_buttons(box: VBoxContainer) -> void:
 	UiTheme.style_button(_close_button)
 	_close_button.pressed.connect(_close)
 	buttons.add_child(_close_button)
-	# Button prompts under the buttons; they follow the last device used.
+	# Indicaciones de botón bajo los botones; siguen al último dispositivo usado.
 	box.add_child(InputHints.build([["ui_accept", "Comprar"], ["ui_cancel", "Salir"]]))
 
 
-## With the tree paused and the mouse free, a pad or keyboard player still
-## has to be able to answer this panel: something focusable, always.
+## Con el árbol pausado y el mouse libre, quien juega con control o teclado
+## igual tiene que poder contestar este panel: siempre hay algo enfocable.
 func _focus_first_offer() -> void:
 	for card: Button in _cards:
 		if not card.disabled:
@@ -409,10 +411,10 @@ func _unhandled_input(event: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 
 
-# --- buying ----------------------------------------------------------------
+# --- compra ------------------------------------------------------------------
 
-## A card the raider cannot pay for stays greyed out: a button that looks
-## pressable and silently swallows the press is worse than a dead one.
+## Una carta que el raider no puede pagar queda en gris: un botón que parece
+## presionable y se traga el clic en silencio es peor que uno muerto.
 func _refresh_points() -> void:
 	var purse := int(_player.get("points"))
 	_points_label.text = POINTS_TEMPLATE % purse
@@ -424,18 +426,19 @@ func _refresh_points() -> void:
 
 
 func _on_buy(index: int) -> void:
-	# The stall — or the buyer — can be gone by the time a queued press is
-	# handled (a stage teardown lands on the same frame, a co-op wipe frees
-	# the raider): _process closes for that, but input is flushed BEFORE
-	# _process inside a frame, so the press must not reach a freed vendor or
-	# a freed raider on its way out.
+	# El puesto (o el comprador) puede haberse ido cuando se procesa un clic en
+	# cola (un desmontaje de etapa en el mismo frame, una caída en co-op que
+	# libera al raider): _process cierra por eso, pero la entrada se procesa
+	# ANTES que _process en el frame, así que el clic no debe llegar a un
+	# vendedor o un raider liberados.
 	if _sold or not is_instance_valid(_vendor) or not is_instance_valid(_player) \
 			or index >= _offers.size():
 		return
 	var offer := _offers[index]
 	if not _vendor.buy(offer, _player):
-		# The vendor owns the purse check, so a refusal only ever means one
-		# thing. The stall stays open: there may be a cheaper card.
+		# El vendedor es dueño de la comprobación de puntos, así que un rechazo
+		# solo significa una cosa. El puesto sigue abierto: puede haber una carta
+		# más barata.
 		_result_label.text = BROKE_LINE
 		_result_label.add_theme_color_override("font_color", UiTheme.ACCENT_RED)
 		Sfx.play(&"dodge")
@@ -444,8 +447,9 @@ func _on_buy(index: int) -> void:
 	_finish_sale(offer)
 
 
-## One sale per stall (the vendor's rule; this is its face): every card goes
-## dead, the panel says thanks, and it hands the tree back a beat later.
+## Una venta por puesto (la regla del vendedor; esta es su cara): todas las
+## cartas quedan inactivas, el panel agradece y devuelve el árbol un momento
+## después.
 func _finish_sale(offer: Dictionary) -> void:
 	_sold = true
 	_result_label.text = SOLD_TEMPLATE % String(offer.title)
@@ -459,9 +463,9 @@ func _finish_sale(offer: Dictionary) -> void:
 		_close()
 
 
-## Soaks (and any other headless run) have no hands: take the first thing
-## the purse covers and leave, so the paused tree is always handed back —
-## including the run where nothing on the shelf is affordable.
+## Los soaks (y toda corrida sin pantalla) no tienen manos: compra lo primero
+## que alcance y se va, así el árbol pausado siempre se devuelve, también cuando
+## nada del estante alcanza.
 func _auto_play() -> void:
 	await get_tree().create_timer(HEADLESS_BUY_DELAY, true, false, true).timeout
 	if not is_inside_tree():
@@ -475,8 +479,8 @@ func _auto_play() -> void:
 
 
 func _first_affordable() -> int:
-	# Reached after _auto_play's await, so the raider it prices against may
-	# have been freed in between: nothing is affordable to a dead buyer.
+	# Se llega después del await de _auto_play, así que el raider contra el que
+	# cotiza pudo liberarse entretanto: a un comprador muerto nada le alcanza.
 	if not is_instance_valid(_player):
 		return -1
 	var purse := int(_player.get("points"))
@@ -486,9 +490,9 @@ func _first_affordable() -> int:
 	return -1
 
 
-## Guarded because two paths can reach it on a headless run — the sale's own
-## goodbye and the leave backstop — and the tree pause must be released
-## exactly once, by whichever gets here first.
+## Protegido porque en una corrida sin pantalla dos caminos pueden llegar aquí
+## (la despedida de la venta y el respaldo de salida) y la pausa debe soltarse
+## una sola vez, por el primero que llegue.
 func _close() -> void:
 	if is_queued_for_deletion():
 		return
@@ -496,12 +500,12 @@ func _close() -> void:
 	queue_free()
 
 
-## Hands the tree back, at most once, and only when it is OURS to hand back
-## (upgrade_card_ui.gd's rule). A purchase can put another "ui_blocking"
-## layer on screen — the card picker off a bought item — and the run can end
-## under this panel, in which case the run-end screen owns the pause and the
-## mouse; unpausing in either case would resume the world behind somebody
-## else's modal and steal the mouse from its buttons.
+## Devuelve el árbol como máximo una vez, y solo si la pausa es NUESTRA (regla
+## de upgrade_card_ui.gd). Una compra puede poner otra capa "ui_blocking" en
+## pantalla, y la partida puede terminar debajo de este panel, en cuyo caso la
+## pantalla de fin es dueña de la pausa y del mouse: quitar la pausa en
+## cualquiera de los dos casos reanudaría el mundo detrás del modal de otro y le
+## quitaría el mouse a sus botones.
 func _release_pause() -> void:
 	if not _pause_held:
 		return
@@ -512,7 +516,7 @@ func _release_pause() -> void:
 	Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
 
 
-## Any OTHER member of "ui_blocking" holding the pause right now?
+## ¿Algún OTRO miembro de "ui_blocking" tiene la pausa ahora?
 func _other_blocking_ui_open() -> bool:
 	for node: Node in get_tree().get_nodes_in_group("ui_blocking"):
 		if node == self or not node.has_method(&"is_blocking"):
@@ -522,8 +526,9 @@ func _other_blocking_ui_open() -> bool:
 	return false
 
 
-## _close() is the only path that unpauses, so a panel FREED instead of
-## closed — free() from a harness, the stage parent going with a stage swap
-## — would strand a paused tree with nothing left on screen to release it.
+## _close() es el único camino que quita la pausa, así que un panel LIBERADO en
+## vez de cerrado (free() desde un harness, el padre de la etapa que se va con
+## un cambio de etapa) dejaría un árbol pausado sin nada en pantalla que lo
+## suelte.
 func _exit_tree() -> void:
 	_release_pause()

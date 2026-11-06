@@ -1,26 +1,26 @@
 class_name Vendor
 extends Interactable
-## A stall that shows up mid-run (iteration 54) and leaves after ONE sale.
+## Un puesto que aparece a mitad de partida y se va tras UNA venta.
 ##
-## Three kinds, one table: the animal trafficker sells a choice of three
-## companions, the power-up vendor sells one rolled power-up at a price
-## that climbs run-wide, and the item vendor sells four items at chest
-## prices. The kind is rolled hidden by the WorldDirector and announced
-## only as "a vendor arrived" — walking over to find out which one is the
-## point, and a beacon that named the kind would answer the question from
-## across the map.
+## Tres tipos, una tabla: el traficante de animales vende una elección de tres
+## mascotas, el vendedor de power-ups vende un power-up sorteado a un precio que
+## sube en toda la partida, y el vendedor de objetos vende cuatro objetos a
+## precio de cofre. El WorldDirector sortea el tipo en secreto y solo anuncia
+## que llega un vendedor: caminar hasta él para descubrir cuál es es la gracia,
+## y una baliza que nombrara el tipo respondería la pregunta desde el otro lado
+## del mapa.
 ##
-## The stall owns the ECONOMY (what is charged, what is granted, the log,
-## and the one-sale rule); VendorUi owns the moment (what is on the shelf,
-## what a card says, what happens between the press and the goodbye).
+## El puesto es dueño de la ECONOMÍA (qué se cobra, qué se entrega, el registro y
+## la regla de una sola venta); VendorUi es dueño del momento (qué hay en el
+## estante, qué dice una carta y qué pasa entre el clic y la despedida).
 ##
-## It persists until it sells something: a vendor that timed out would be
-## a 240 m walk the party can lose by arriving late.
+## Se queda hasta vender algo: un vendedor que se fuera por tiempo sería una
+## caminata larga que el grupo puede perder por llegar tarde.
 
-## Row fields: id (identifier, also `kind`), display_name and prompt
-## (player text), color (beacon, panel accent and the marker). A fourth
-## kind is a row here plus one branch in VendorUi._build_offers and one in
-## buy() — never a special case keyed on an id somewhere else.
+## Campos de fila: id (identificador, también `kind`), display_name y prompt
+## (texto del jugador), color (baliza, acento del panel y marcador). Un cuarto
+## tipo es una fila aquí más una rama en VendorUi._build_offers y otra en
+## buy(), nunca un caso especial por id en otro lado.
 const VENDOR_LIBRARY: Array[Dictionary] = [
 	{
 		"id": "animals", "display_name": "Traficante de animales",
@@ -39,30 +39,33 @@ const VENDOR_LIBRARY: Array[Dictionary] = [
 	},
 ]
 
-## Which stall this is; set by the WorldDirector before it enters the tree.
+## Qué puesto es (id de fila de VENDOR_LIBRARY); lo fija el WorldDirector antes
+## de que entre al árbol.
 @export var kind: String = "items"
-## Flat price of any companion at the trafficker. Deliberately not a chest
-## price: a pet is a slot, not a rarity, and pricing it by tier would
-## imply one of them is the good one.
+## Precio fijo de cualquier mascota en el traficante, en puntos. A propósito no
+## es un precio de cofre: una mascota es un espacio, no una rareza, y ponerle
+## precio por rareza daría a entender que una es la buena.
 @export var pet_price: int = 120
-## After a menu closes with no sale, the stall ignores `interact` for this
-## long. The soak re-fires interact every 0.75 s while it lingers, and
-## without this the panel would reopen the instant it closed, forever.
+## Segundos que el puesto ignora `interact` tras cerrarse un menú sin venta. El
+## soak vuelve a interactuar cada 0.75 s mientras se queda cerca, y sin esto el
+## panel se reabriría apenas se cierra, para siempre.
 @export var retry_cooldown: float = 20.0
+## Segundos que tarda el puesto en encogerse y desaparecer tras la venta.
 @export var sink_time: float = 0.6
 
 const VENDOR_UI_SCRIPT := preload("res://scripts/ui/game/vendor_ui.gd")
 
-## Line shown INSTEAD of the stall's own while the retry cooldown runs. No
-## "[E] " prefix, unlike every other prompt: the token promises a press that
-## does something, and during the cooldown there is nothing to press — so it
-## reads as a state, the way the chest quotes a price it knows you cannot
-## pay instead of offering to open.
+## Línea que se muestra EN LUGAR de la del puesto mientras corre la espera. Sin
+## el prefijo "[E] " de los demás prompts: el token promete un botón que hace
+## algo, y durante la espera no hay nada que presionar, así que se lee como un
+## estado (como el cofre que cita un precio que no puedes pagar en vez de
+## ofrecer abrirse).
 const COOLDOWN_PROMPT_TEMPLATE: String = "Atiende de nuevo en %d s"
-## Prompt for a row that has none (a bad `kind` export).
+## Prompt para una fila que no tiene uno (un `kind` mal escrito).
 const DEFAULT_PROMPT: String = "[E] Comerciar"
 
-## The power-up price multiplies by this with every purchase, run-wide.
+## El precio del power-up se multiplica por esto con cada compra, en toda la
+## partida.
 const POWERUP_PRICE_GROWTH: float = 1.5
 
 var _sold: bool = false
@@ -89,15 +92,15 @@ func _ready() -> void:
 	shape.position.y = 1.75
 	add_child(shape)
 	super()
-	# NOT the "altars" group: the WorldDirector's altar cap counts that one,
-	# and a stall standing around would starve the altar cadence.
+	# NO en el grupo "altars": el WorldDirector cuenta ese grupo para su tope de
+	# altares, y un puesto parado ahí dejaría a la partida sin altares.
 	add_to_group(&"vendors")
 	set_prompt(_row_prompt())
 	_build_visual()
 
 
-## This stall's VENDOR_LIBRARY row (the first row if `kind` is unknown, so
-## a bad export still draws something instead of crashing).
+## La fila de VENDOR_LIBRARY de este puesto (la primera si `kind` es
+## desconocido, así un export mal escrito igual dibuja algo en vez de romperse).
 func row() -> Dictionary:
 	for entry: Dictionary in VENDOR_LIBRARY:
 		if String(entry.id) == kind:
@@ -117,13 +120,13 @@ func _build_visual() -> void:
 	stall.material_override = wood
 	stall.position.y = 0.5
 	add_child(stall)
-	# The figure behind the counter: a capsule in the stall's own colour,
-	# which is the only thing that hints at the kind before the prompt.
+	# La figura detrás del mostrador: una cápsula del color del puesto, lo único
+	# que insinúa el tipo antes del prompt.
 	var figure := MeshInstance3D.new()
 	var body := CapsuleMesh.new()
 	body.radius = 0.35
 	body.height = 1.5
-	# Explicit tessellation (engine default 64 sides); default 8 rings.
+	# Teselado explícito (el motor usa 64 lados por defecto); 8 anillos por defecto.
 	body.radial_segments = 16
 	body.rings = 8
 	figure.mesh = body
@@ -164,22 +167,21 @@ func _physics_process(delta: float) -> void:
 		_sign.position.y = 2.2 + sin(_time * 1.6) * 0.04
 
 
-## The stall's own line, from its VENDOR_LIBRARY row.
+## La línea propia del puesto, de su fila de VENDOR_LIBRARY.
 func _row_prompt() -> String:
 	return String(row().get("prompt", DEFAULT_PROMPT))
 
 
-## Counts the wait down on the prompt and hands the stall's own line back
-## the moment it ends. Without it the stall kept offering its goods while
-## refusing every press for 20 s — Chest and RouletteShrine both swap their
-## line when they say no, and a prompt that lies is worse than none.
-## Ungated by range on purpose: the cooldown can run out while nobody is
-## watching, and the restore still has to happen.
+## Cuenta la espera en el prompt y devuelve la línea propia del puesto apenas
+## termina: un puesto que ofrece la mercancía mientras rechaza cada clic miente
+## (el cofre y la ruleta también cambian su línea cuando dicen que no). No
+## depende del rango a propósito: la espera puede terminar sin nadie mirando y la
+## línea igual tiene que volver.
 func _refresh_cooldown_prompt() -> void:
 	var line: String = _row_prompt() if _cooldown_left <= 0.0 \
 			else COOLDOWN_PROMPT_TEMPLATE % ceili(_cooldown_left)
-	# Only on a real change: set_prompt rewrites the Label3D (which rebuilds
-	# its text mesh), and this line moves once a second, not once a frame.
+	# Solo ante un cambio real: set_prompt reescribe el Label3D (que rearma su
+	# malla de texto), y esta línea cambia una vez por segundo, no por frame.
 	if line == prompt_text:
 		return
 	set_prompt(line)
@@ -190,25 +192,25 @@ func _interact(player: Node) -> void:
 		return
 	if _ui != null and is_instance_valid(_ui):
 		return
-	# Never open a tree-pausing menu OVER another one: this stall's panel
-	# releases the pause when it closes, and that pause could belong to the
-	# card picker. The soak roots the whole run under an always-processing
-	# node, so Interactable._unhandled_input still fires while paused and the
-	# probe presses interact every 0.75 s while it lingers.
+	# Nunca abre un menú que pausa el árbol SOBRE otro: el panel de este puesto
+	# suelta la pausa al cerrarse, y esa pausa podría ser del selector de cartas.
+	# El soak cuelga toda la partida de un nodo que procesa siempre, así que
+	# Interactable._unhandled_input sigue disparando en pausa y el probe presiona
+	# interact cada 0.75 s mientras se queda cerca.
 	if _blocking_ui_open():
 		return
 	var ui := VENDOR_UI_SCRIPT.new() as CanvasLayer
 	ui.call("setup", self, player)
-	# Stage-scoped like every other spawned node, so a stage swap takes the
-	# panel with the stall instead of leaving a paused tree behind.
+	# Cuelga de la etapa como todo lo que aparece, así un cambio de etapa se
+	# lleva el panel junto con el puesto en vez de dejar un árbol pausado.
 	RunRoot.stage_parent(get_tree()).add_child(ui)
 	_ui = ui
 	ui.tree_exited.connect(_on_menu_closed)
 
 
-## Any "ui_blocking" layer up right now? Same contract (and same shape) as
-## pause_menu.gd: a member that does not expose is_blocking() COUNTS as
-## blocking — the contract is only worth having if forgetting it fails SAFE.
+## ¿Hay alguna capa "ui_blocking" arriba ahora? Mismo contrato (y misma forma)
+## que pause_menu.gd: un miembro sin is_blocking() CUENTA como bloqueante; si
+## alguien olvida el contrato, falla del lado SEGURO.
 func _blocking_ui_open() -> bool:
 	for node: Node in get_tree().get_nodes_in_group("ui_blocking"):
 		if not node.has_method(&"is_blocking"):
@@ -220,21 +222,20 @@ func _blocking_ui_open() -> bool:
 	return false
 
 
-## The menu is gone. If nothing was bought the stall stays, but goes quiet
-## for a while — otherwise the soak's repeated interact would reopen it on
-## the very next frame.
+## El menú se fue. Si no hubo compra el puesto sigue, pero se calla un rato: si
+## no, el interact repetido del soak lo reabriría en el frame siguiente.
 func _on_menu_closed() -> void:
 	_ui = null
 	if not _sold:
 		_cooldown_left = retry_cooldown
-		# Said straight away, not on the next physics tick: the raider is
-		# standing in the ring at the moment the panel folds, reading this.
+		# Se dice de inmediato, no en el próximo tick de física: el raider está
+		# parado en el anillo justo cuando el panel se cierra, leyéndolo.
 		_refresh_cooldown_prompt()
 
 
-## THE purchase. Charges, grants, logs, and closes the stall. Returns
-## false ONLY when the raider cannot pay, which is what lets the panel
-## keep itself open and say so.
+## LA compra. Cobra, entrega, registra y cierra el puesto. Devuelve false SOLO
+## si el raider no puede pagar, y eso es lo que deja al panel seguir abierto y
+## decirlo.
 func buy(offer: Dictionary, player: Node) -> bool:
 	if _sold:
 		return false
@@ -242,14 +243,14 @@ func buy(offer: Dictionary, player: Node) -> bool:
 	if not player.has_method("spend_points") or not bool(player.call("spend_points", price)):
 		return false
 	_sold = true
-	# One-line log (RunManager convention), printed BEFORE the grant so the
-	# soak reads cause then effect — this line, then whatever the payout
-	# announces itself ("Pet joined:", "Power-up picked:").
+	# Registro de una línea (convención de RunManager), impreso ANTES de la
+	# entrega para que el soak lea causa y después efecto: esta línea, y luego lo
+	# que la entrega anuncie ("Pet joined:", "Power-up picked:").
 	print("Vendor sold: %s %s %d" % [kind, _payload_id(offer), price])
-	# Separate line, never a field on the one above: "Vendor sold:" is the
-	# verification interface of three soaks and its shape is frozen. WHICH
-	# raider paid only matters in co-op, and only a co-op soak can prove
-	# the payout lands on the buyer rather than on slot 0.
+	# Línea aparte, nunca un campo de la de arriba: "Vendor sold:" es la interfaz
+	# de verificación de tres soaks y su forma está congelada. QUÉ raider pagó
+	# solo importa en co-op, y solo un soak co-op puede probar que la entrega cae
+	# en el comprador y no en la ranura 0.
 	var buyer: Variant = player.get("player_index")
 	print("Vendor buyer: p%d" % (int(buyer) if buyer != null else -1))
 	match String(offer.get("kind", "")):
@@ -260,17 +261,17 @@ func buy(offer: Dictionary, player: Node) -> bool:
 			var powerups := PowerUps.find_in(player)
 			if powerups != null:
 				powerups.apply(String(offer.get("powerup_id", "")))
-			# Run-wide, and only on a SALE: a shelf somebody looked at and
-			# walked away from must not make the next one dearer.
+			# Para toda la partida, y solo con una VENTA: un estante que alguien
+			# miró y dejó no debe encarecer el siguiente.
 			RunState.powerup_vendor_price = roundi(
 					float(RunState.powerup_vendor_price) * POWERUP_PRICE_GROWTH)
 		"items":
 			var bag := ItemBag.find_in(player)
 			if bag != null:
 				bag.add_item(String(offer.get("item_id", "")))
-			# The item shelf IS chest stock at chest prices, so it feeds the
-			# same inflation counter — otherwise a vendor would be a way to
-			# buy Legendaries while keeping chests cheap.
+			# El estante de objetos ES stock de cofre a precio de cofre, así que
+			# suma al mismo contador de inflación: si no, un vendedor sería una
+			# forma de comprar legendarios manteniendo baratos los cofres.
 			RunState.register_chest_opened()
 	consume()
 	_emit_completed()
@@ -278,14 +279,14 @@ func buy(offer: Dictionary, player: Node) -> bool:
 	return true
 
 
-## The stall's own colour on the map, so the three read apart ONCE found.
-## The marker itself is fog-gated like every other POI, so this never
-## spoils which vendor arrived before somebody walks there.
+## El color propio del puesto en el mapa, para distinguir los tres UNA VEZ
+## encontrados. El marcador se oculta tras la niebla como todo POI, así que
+## nunca revela qué vendedor llegó antes de que alguien camine hasta allá.
 func map_marker_color() -> Color:
 	return row().get("color", Color.WHITE)
 
 
-## What the offer actually handed over, for the log.
+## Lo que la oferta entregó de verdad, para el registro.
 static func _payload_id(offer: Dictionary) -> String:
 	for key: String in ["pet_id", "powerup_id", "item_id"]:
 		var value: Variant = offer.get(key)
