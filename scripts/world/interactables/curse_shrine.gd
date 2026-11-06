@@ -10,8 +10,8 @@ extends ChargeShrine
 
 const CHEST_SCENE := preload("res://scenes/world/chests/Chest.tscn")
 
-## Escala del costo de dificultad de los pactos, sobre 15 (15 = el de la tabla).
-@export var difficulty_per_use: float = 15.0
+## Multiplica el costo de dificultad de cada pacto (1 = el número de PACT_LIBRARY, 2 = el doble).
+@export var difficulty_scale: float = 1.0
 ## Sangre de demonio: cada copia de quien carga suma esta fracción al don Y al costo de dificultad.
 @export var demon_blood_per_copy: float = 0.25
 ## Distancia en metros desde el obelisco a la que cae el cofre gratis del pacto.
@@ -138,7 +138,7 @@ func _benefit_amount(benefit: Dictionary, keys: int) -> float:
 func _cost_amount(cost: Dictionary) -> float:
 	var amount := float(cost.amount)
 	if String(cost.kind) == "difficulty":
-		return amount * _blood_scale() * (difficulty_per_use / 15.0)
+		return amount * _blood_scale() * difficulty_scale
 	return amount
 
 
