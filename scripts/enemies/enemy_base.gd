@@ -1,30 +1,30 @@
 class_name EnemyBase
 extends CharacterBody3D
-## Shared enemy chassis (flat arena, no navmesh yet): gravity, seek-the-
-## player steering with a light separation push from nearby enemies so
-## hordes spread into a mob instead of stacking, facing, and the death flow
-## via the Health child (kill credit, XP gem drop, squash-out tween).
-## Subclasses shape behavior through the virtual hooks below.
-## make_elite() upgrades any enemy into a glowing elite variant.
+## Chasis común de todos los enemigos (arena plana, sin navmesh): gravedad,
+## persecución del raider con un empuje de separación de los vecinos (la
+## horda se reparte en vez de apilarse), orientación, y el flujo de muerte
+## por el hijo Health (crédito de la baja, gema de XP, caída final). Las
+## subclases cambian el comportamiento con los hooks virtuales de abajo.
+## make_elite() vuelve shiny a cualquier enemigo.
 
 @export var move_speed: float = 7.0
 @export var turn_speed: float = 10.0
 @export var separation_radius: float = 1.2
 @export var separation_strength: float = 1.5
 @export var xp_gem_scene: PackedScene
-## Run points paid to the nearest raider on death (iteration 40); elites
-## multiply it like XP, bosses set their own.
+## Puntos de partida que paga al raider más cercano al morir; los shiny lo
+## multiplican como la XP y los jefes fijan el suyo.
 @export var points_value: int = DEFAULT_POINTS_VALUE
-## Shiny shimmer (iteration 47). Turns of the hue wheel per second, how
-## many brightness beats fit in one full turn, and the energy/alpha bounds.
-## Slow enough to read as a sheen rather than a strobe.
+## Brillo shiny: vueltas de la rueda de matiz por segundo, pulsos de brillo
+## por vuelta, y los límites de energía y alfa. Lento a propósito, para que
+## se lea como un reflejo y no como un estrobo.
 const SHINY_HUE_SPEED: float = 0.28
 const SHINY_PULSE_CYCLES: float = 4.0
 const SHINY_ENERGY_MIN: float = 1.3
 const SHINY_ENERGY_MAX: float = 2.8
 const SHINY_SATURATION: float = 0.85
 const SHINY_ALPHA: float = 0.3
-## Distinct starting phases handed out by instance id.
+## Fases iniciales distintas, repartidas por instance id.
 const SHINY_PHASE_BUCKETS: int = 997
 
 @export_group("Elite")
@@ -34,148 +34,139 @@ const SHINY_PHASE_BUCKETS: int = 997
 @export var elite_body_scale: float = 1.35
 @export var elite_xp_multiplier: int = 5
 @export_group("Health Orb")
-## Chance an ELITE death also drops a health orb (regular enemies never
-## drop one; bosses override _drop_health_orbs with guaranteed counts).
+## Probabilidad de que un shiny suelte un orbe de vida al morir (los comunes
+## nunca sueltan; los jefes sobrescriben _drop_health_orbs).
 @export var elite_health_orb_chance: float = 0.4
-## Chance an ELITE death drops a chest (iteration 42; scaled up by the
-## run-wide difficulty, so demonic bargains pay in loot).
+## Probabilidad de que un shiny suelte un cofre; la dificultad de la partida
+## la escala.
 @export var elite_chest_chance: float = 0.3
 @export_group("Climbing")
-## Iteration 42: a body pushing against a wall or prop scrambles UP it at
-## this speed, so verticality never walls the horde off. Perimeter walls
-## are still uncrossable (position is clamped to the arena bounds).
+## Un cuerpo que empuja contra una pared o un prop trepa a esta velocidad,
+## así el relieve nunca encierra a la horda. Los muros del perímetro siguen
+## sin cruzarse (la posición se recorta a los límites de la arena).
 @export var can_climb: bool = true
 @export var climb_speed: float = 5.5
-## Ceiling on ONE climb, measured from the height the body started
-## scrambling at. Without it a body wedged against geometry keeps pushing
-## up forever and ends up perched on a prop out of everyone's reach.
-## Comfortably above the arena mask walls (7 m, see scatter.gd) so
-## climbers still cross those exactly as before.
+## Altura máxima de UNA trepada, medida desde donde empezó. Sin tope, un
+## cuerpo atascado contra la geometría sube para siempre y queda encaramado
+## fuera del alcance de todos. Por encima de los muros de máscara (7 m, ver
+## scatter.gd) para que los trepadores los sigan cruzando.
 @export var max_climb_height: float = 10.0
 
 const CHEST_SCENE := preload("res://scenes/world/chests/Chest.tscn")
-## EnemyBase's own baseline bounty; BossBase only overrides points_value
-## when the scene left it at this value (a scene-set number always wins).
+## Recompensa base de EnemyBase; BossBase solo cambia points_value cuando la
+## escena lo dejó en este valor.
 const DEFAULT_POINTS_VALUE: int = 1
-## Gap kept between a climber and the arena edge, so a body that scrambled
-## onto the perimeter can never be clamped into the wall itself. Bosses
-## keep their own, wider margin (BossBase.arena_clamp_margin).
+## Margen entre un trepador y el borde de la arena, para que el recorte
+## nunca lo meta dentro del muro. Los jefes usan su propio margen, más ancho
+## (BossBase.arena_clamp_margin).
 const ARENA_CLAMP_MARGIN: float = 1.5
-## Luck added to an elite's bounty chest per point of run-wide difficulty.
+## Suerte extra del cofre de un shiny por punto de dificultad de la partida.
 const ELITE_CHEST_LUCK_PER_DIFFICULTY: float = 15.0
-## Elite bounty chests (iteration 64): the most UNOPENED ones the map may
-## hold at once. They never expired, and the drop rate grows with the
-## run's difficulty twice over (elite chance and chest chance): a 15-minute
-## soak ended with ~390 on the floor, 171 dropped in its 13th minute alone,
-## each one an Area3D, a solid box the horde climbs and a map marker. Past
-## the cap an elite kill drops no chest until one is opened or the stage
-## changes — the HealthOrb.at_soft_cap pattern. Boss rings go through
-## spawn_chest directly and never count.
+## Máximo de cofres de recompensa shiny SIN abrir a la vez en el mapa. No
+## caducan y su probabilidad crece con la dificultad; cada uno es un Area3D,
+## una caja sólida que la horda trepa y un marcador de mapa. Pasado el tope,
+## una baja shiny no suelta cofre hasta que se abra uno o cambie la etapa
+## (el patrón de HealthOrb.at_soft_cap). Los anillos de jefe usan
+## spawn_chest directo y no cuentan. Lo lee ArenaProbe.
 const BOUNTY_CHEST_CAP: int = 30
 const BOUNTY_CHEST_GROUP: StringName = &"bounty_chests"
-## Drops the cap swallowed this process; the log line is rate-limited by it.
+## Cofres que el tope se tragó en este proceso; limita la frecuencia del log.
 static var _capped_bounty_drops: int = 0
 
 var is_elite: bool = false
-## Sky-event variant applied by the spawner ("" | "berserker" | "shade").
+## Variante del cielo aplicada por el spawner ("" | "berserker" | "shade").
 var variant: String = ""
-## Arena clamp for climbers (from the "arena_bounds" node; INF = none).
+## Límite de la arena para los trepadores (del nodo "arena_bounds"; INF = sin límite).
 var _arena_limit: float = INF
 
 @onready var _health: Health = $Health
 @onready var _visual: Node3D = $Visual
 @onready var _collision: CollisionShape3D = $CollisionShape3D
 
-## One shared per-physics-tick snapshot of the "enemies" group, so a horde
-## of n enemies costs one group query per tick instead of n (the arrays
-## get_nodes_in_group builds were the hottest allocation in late-run T3).
-## Entries stay valid instances for the whole tick (frees are deferred);
-## consumers still skip off-group/off-tree bodies like before.
+## Una sola foto del grupo "enemies" por tick de física, así una horda de n
+## enemigos hace una consulta de grupo por tick en vez de n. Las entradas
+## siguen siendo instancias válidas todo el tick (los free son diferidos);
+## igual se saltan los cuerpos que salieron del grupo o del árbol.
 static var _enemies_snapshot: Array[Node] = []
 static var _enemies_snapshot_frame: int = -1
 
-## Separation neighbour grid: that snapshot bucketed into square cells on
-## the flat plane, so a separation scan visits its own cell and the ring
-## around it instead of the whole horde — O(n) per tick instead of O(n^2),
-## which is what stood between the horde and a few hundred bodies.
-## Built once per physics tick by the first scan, from LIVE positions, and
-## kept live for the rest of the tick (_follow_separation_grid). The scan
-## itself did not change: live positions, the same distance test, group
-## check, stacked nudge and falloff, so the neighbour set and every
-## contribution are what the full scan produced; only the order the
-## contributions are summed in differs (float rounding, ~1e-7).
-## Kept above every separation_radius in use (every scene keeps the 1.2 m
-## default; nothing sets it at runtime). A larger radius stays correct —
-## the scan just widens to as many rings as it needs.
+## Grilla de vecinos para la separación: esa foto repartida en celdas
+## cuadradas del plano, así cada escaneo visita su celda y el anillo de
+## alrededor en vez de toda la horda (O(n) por tick en vez de O(n²)).
+## La arma el primer escaneo del tick con posiciones VIVAS y se mantiene
+## viva el resto del tick (_follow_separation_grid). El escaneo es el mismo
+## que el de la horda completa (posiciones vivas, mismo test de distancia,
+## chequeo de grupo, empujón de apilados y caída), así que los vecinos y
+## cada contribución son los mismos; solo cambia el orden de la suma
+## (redondeo float, ~1e-7).
+## Mayor que todo separation_radius en uso (todas las escenas usan 1.2 m).
+## Un radio mayor sigue siendo correcto: el escaneo abre más anillos.
 const SEPARATION_CELL_SIZE: float = 1.25
-## Cell (cx, cz) is packed as cx * STRIDE + cz. The packing is linear, so
-## a neighbour's key is a plain addition, and two cells could only alias
-## past 2^19 cells (~650 km) — where a scan would merely see EXTRA
-## candidates, which the exact distance test then rejects. Never fewer.
+## La celda (cx, cz) se empaqueta como cx * STRIDE + cz. Es lineal, así la
+## clave de un vecino es una suma; dos celdas solo se confunden pasadas 2^19
+## celdas (~650 km), y ahí el escaneo vería candidatos DE MÁS que el test de
+## distancia descarta. Nunca de menos.
 const SEPARATION_KEY_STRIDE: int = 1 << 20
 static var _separation_grid: Dictionary = {}
 static var _separation_grid_frame: int = -1
-## The body whose movement this tick is not in the grid yet: the one whose
-## _physics_process ran last, if it was bucketed. At most one at a time.
+## El cuerpo cuyo movimiento de este tick todavía no está en la grilla: el
+## último que corrió _physics_process, si estaba repartido. A lo sumo uno.
 static var _separation_grid_pending: EnemyBase = null
 
 var _gravity: float = ProjectSettings.get_setting("physics/3d/default_gravity", 9.8)
 var _xp_multiplier: int = 1
-## Map-tier XP gem value factor (see apply_tier_scaling); 1.0 = baseline.
+## Factor del valor de la gema por grado del mapa (ver apply_tier_scaling); 1.0 = base.
 var _tier_xp_multiplier: float = 1.0
-# Timed slow (Thorn Whip etc.): a speed multiplier active while the timer
-# runs; expiry restores full speed. See apply_slow for the refresh rules.
+# Ralentización temporal (Látigo de espinas, etc.): un multiplicador de
+# velocidad activo mientras corre su reloj. Ver apply_slow.
 var _slow_multiplier: float = 1.0
 var _slow_time_left: float = 0.0
-## Poison (iteration 40): damage over time ticking every POISON_TICK
-## seconds; re-application keeps the STRONGER dps and the LONGER timer.
+## Veneno: daño cada POISON_TICK segundos; al reaplicar ganan el dps MÁS
+## FUERTE y el reloj MÁS LARGO.
 const POISON_TICK: float = 0.5
 var _poison_dps: float = 0.0
 var _poison_time_left: float = 0.0
 var _poison_tick_timer: float = 0.0
 var _poison_overlay: StandardMaterial3D = null
-## Last computed separation push, reused on this enemy's off ticks.
+## Último empuje de separación calculado, reusado en los ticks alternos.
 var _separation_cache: Vector3 = Vector3.ZERO
-## This body's cell key in the separation grid, and the physics frame of
-## the grid it was bucketed into (-1: never bucketed).
+## Clave de celda de este cuerpo en la grilla de separación y el frame de
+## física de esa grilla (-1: nunca repartido).
 var _separation_key: int = 0
 var _separation_key_frame: int = -1
-## Overlay slots in priority order: the elite glow outranks a sky variant,
-## which outranks the poison tint. Every applier writes ITS OWN slot and
-## calls _refresh_overlay(), so a temporary effect can never erase a
-## permanent one (an elite berserker keeps reading as both, and poison
-## wearing off restores the variant instead of clearing to bare skin).
-## Typed narrower than its siblings on purpose: the shiny shimmer writes
-## albedo/emission on it every frame (_tick_shiny), which Material alone
-## does not expose.
+## Capas de overlay por prioridad: el brillo shiny sobre la variante del
+## cielo, y esta sobre el veneno. Cada efecto escribe SU capa y llama a
+## _refresh_overlay(), así uno temporal nunca borra uno permanente (un
+## berserker shiny se lee como ambos, y al pasarse el veneno vuelve la
+## variante en vez de la piel desnuda).
+## Tipado más estrecho que las demás: el brillo shiny reescribe su albedo y
+## su emisión cada frame (_tick_shiny), que Material no expone.
 var _overlay_elite: StandardMaterial3D = null
-## Possession outranks everything: whose side a body is on is the first
-## thing you need to read off it, and a servant is never elite (the raise
-## copies the corpse and never rolls one).
+## La posesión manda sobre todo: de qué bando es un cuerpo es lo primero que
+## hay que leer, y un siervo nunca es shiny (se levanta sin tirada).
 var _overlay_possessed: Material = null
 var _overlay_variant: Material = null
 var _overlay_status: Material = null
-## Meshes of the visual rig, resolved once at ready: the four overlay
-## appliers used to walk find_children on every application.
+## Mallas del rig visual, resueltas una vez en _ready.
 var _meshes: Array[MeshInstance3D] = []
-## Height the current climb started at, and whether one is in progress —
-## together they cap a single scramble at max_climb_height.
+## Altura donde empezó la trepada actual y si hay una en curso; juntas
+## limitan cada trepada a max_climb_height.
 var _climb_start_y: float = 0.0
 var _climbing: bool = false
-## Possession (iteration 56). A servant of the party: it fights enemies,
-## enemies ignore it, and it pays nothing when it goes.
+## Posesión: un siervo del equipo. Pelea contra los enemigos, ellos lo
+## ignoran y no paga nada al morir.
 @export var possessable: bool = true
 const POSSESSED_GROUP: StringName = &"possessed"
-## Its own collision layer, off the enemy one (2) and off world/players (1).
+## Capa de colisión propia, fuera de la de enemigos (2) y de mundo/jugadores (1).
 const POSSESSED_LAYER: int = 8
 const POSSESSED_TINT := Color(0.65, 0.35, 0.95)
-## How far a servant looks for something to fight.
+## Distancia a la que un siervo busca con quién pelear.
 const POSSESSED_SEEK_RANGE: float = 30.0
 var _possessed: bool = false
 var _possess_carrier: Node3D = null
 var _possess_left: float = 0.0
-## Set by end_possession so the two paths that can reach it (the clock and
-## the carrier dying on the same frame) cannot free the body twice.
+## Lo marca end_possession para que los dos caminos que llegan ahí (el reloj
+## y la muerte del portador en el mismo frame) no liberen el cuerpo dos veces.
 var _expiring_possession: bool = false
 
 
@@ -185,16 +176,16 @@ func _ready() -> void:
 	_cache_meshes()
 	var bounds := get_tree().get_first_node_in_group("arena_bounds") as Node3D
 	if bounds != null:
-		# Guarded: a bounds node without the property yields null, and
-		# float(null) is a hard script error.
+		# Con guarda: un nodo de límites sin la propiedad devuelve null, y
+		# float(null) es un error de script.
 		var extent: Variant = bounds.get("arena_half_extent")
 		if extent is float or extent is int:
 			_arena_limit = float(extent) - ARENA_CLAMP_MARGIN
 
 
 func _physics_process(delta: float) -> void:
-	# First, before anything below can move this body: fold the previous
-	# body's movement into the separation grid and enrol this one.
+	# Primero, antes de que algo mueva este cuerpo: pasar a la grilla de
+	# separación el movimiento del cuerpo anterior y anotar este.
 	if _separation_grid_frame == Engine.get_physics_frames():
 		_follow_separation_grid()
 	if _overlay_elite != null:
@@ -204,10 +195,10 @@ func _physics_process(delta: float) -> void:
 	_slow_time_left = maxf(_slow_time_left - delta, 0.0)
 	if _poison_time_left > 0.0:
 		_tick_poison(delta)
-	# A poison tick can KILL from inside this frame. set_physics_process(false)
-	# only takes effect next tick, so without this guard the corpse would
-	# still run its behaviour: a dead burrower erupting, a dead grunt
-	# landing a contact hit, a dead skirmisher firing one last bolt.
+	# Un tick de veneno puede MATAR dentro de este frame, y
+	# set_physics_process(false) recién rige en el próximo tick: sin esta
+	# guarda el cadáver seguiría actuando (un excavador muerto que erupciona,
+	# un esbirro muerto que pega, un hostigador muerto que dispara).
 	if _health.is_dead:
 		return
 	if _possessed:
@@ -218,10 +209,10 @@ func _physics_process(delta: float) -> void:
 
 	var steer := Vector3.ZERO
 	var seek := Vector3.ZERO
-	# NOT Coop.nearest_player directly: a possessed body overrides this to
-	# hunt enemies instead, and everything downstream (the seek, the facing
-	# and _combat_tick, which damages whatever Health it is handed) is
-	# already target-agnostic.
+	# NO Coop.nearest_player directo: un poseído lo cambia para cazar
+	# enemigos, y todo lo de abajo (la persecución, la orientación y
+	# _combat_tick, que daña cualquier Health que reciba) no depende de quién
+	# es el objetivo.
 	var player := _pick_target()
 	if player != null:
 		var to_player := player.global_position - global_position
@@ -232,14 +223,14 @@ func _physics_process(delta: float) -> void:
 		steer = _movement_intent(seek, distance)
 		_combat_tick(player, distance)
 
-	# Each enemy recomputes separation every 2nd physics tick (staggered by
-	# instance id parity, so half the horde computes per tick) and reuses
-	# its cached push in between — indistinguishable at 60fps.
-	# Bodies with no separation_strength (bosses, a burrowed Duneburrower)
-	# still compute on purpose: a Duneburrower that erupts on an off tick
-	# reads the push it cached while burrowed, now at full strength, so
-	# skipping them would change where it lands. On the grid the scan costs
-	# them a handful of neighbours, not the horde.
+	# Cada enemigo recalcula la separación cada 2 ticks de física (alternados
+	# por la paridad del instance id, así calcula media horda por tick) y
+	# reusa su empuje guardado entre medio.
+	# Los cuerpos sin separation_strength (jefes, un excavador enterrado)
+	# calculan igual a propósito: un excavador que erupciona en un tick
+	# alterno lee el empuje que guardó enterrado, ahora con fuerza completa;
+	# saltarlos cambiaría dónde aparece. En la grilla les cuesta unos pocos
+	# vecinos, no la horda.
 	if (Engine.get_physics_frames() + get_instance_id()) & 1 == 0:
 		_separation_cache = _separation_push()
 	steer += _separation_cache * separation_strength
@@ -247,13 +238,13 @@ func _physics_process(delta: float) -> void:
 	if steer.length_squared() > 1.0:
 		steer = steer.normalized()
 	var slowed_speed := move_speed * active_slow_multiplier()
-	# One property write instead of two get/set round trips: `velocity.x =`
-	# reads the whole vector and writes it back. Same float32 values.
+	# Una sola escritura de la propiedad en vez de dos get/set: `velocity.x =`
+	# lee el vector entero y lo vuelve a escribir. Mismos valores float32.
 	velocity = Vector3(steer.x * slowed_speed, velocity.y, steer.z * slowed_speed)
 
 	var face := _facing_direction(steer, seek)
 	if face.length_squared() > 0.0001:
-		# Face the chosen direction (-Z forward).
+		# Mira hacia la dirección elegida (-Z es el frente).
 		var target_yaw := atan2(-face.x, -face.z)
 		rotation.y = lerp_angle(rotation.y, target_yaw, minf(turn_speed * delta, 1.0))
 
@@ -261,12 +252,9 @@ func _physics_process(delta: float) -> void:
 	move_and_slide()
 	_clamp_solver_launch()
 	if _arena_limit != INF:
-		# Written only when the clamp actually bites (rarely: a climber on
-		# the perimeter). Each `global_position.x =` was a full global
-		# transform set, re-propagated through the rig and re-sent to the
-		# physics server, twice per enemy per tick even when it changed
-		# nothing. The enemy's parents carry no transform, so the old
-		# no-op writes stored exactly the value already there.
+		# Se escribe solo cuando el recorte actúa (rara vez: un trepador en el
+		# perímetro). Cada escritura de global_position es un set de transform
+		# global completo que se propaga al rig y al servidor de física.
 		var at := global_position
 		var clamped_x := clampf(at.x, -_arena_limit, _arena_limit)
 		var clamped_z := clampf(at.z, -_arena_limit, _arena_limit)
@@ -274,20 +262,19 @@ func _physics_process(delta: float) -> void:
 			global_position = Vector3(clamped_x, at.y, clamped_z)
 
 
-## Who this body fights. The base answer is the nearest standing raider;
-## a possessed servant answers with the nearest ENEMY instead. Every
-## caller downstream is target-agnostic, so this one override is the whole
-## side-switch.
+## Contra quién pelea este cuerpo. La respuesta base es el raider en pie más
+## cercano; un siervo poseído responde con el ENEMIGO más cercano. Todo lo
+## de abajo no depende del objetivo, así que este es todo el cambio de bando.
 func _pick_target() -> Node3D:
 	if _possessed:
 		return _nearest_enemy()
 	return Coop.nearest_player(get_tree(), global_position)
 
 
-## Nearest live enemy within POSSESSED_SEEK_RANGE, for a servant.
-## The LIVE group on purpose, not the per-tick snapshot: a body that joins
-## "enemies" mid-tick (a fresh spawn, a worm resurfacing) has to be a
-## target on this very tick, as it always was.
+## Enemigo vivo más cercano dentro de POSSESSED_SEEK_RANGE, para un siervo.
+## El grupo VIVO a propósito, no la foto del tick: un cuerpo que entra a
+## "enemies" a mitad del tick (uno recién aparecido, un gusano que sale)
+## tiene que ser objetivo en este mismo tick.
 func _nearest_enemy() -> Node3D:
 	var best: Node3D = null
 	var best_distance := POSSESSED_SEEK_RANGE * POSSESSED_SEEK_RANGE
@@ -303,14 +290,14 @@ func _nearest_enemy() -> Node3D:
 	return best
 
 
-## Turns this body into a servant of `carrier` for `duration` seconds.
+## Vuelve a este cuerpo siervo de `carrier` por `duration` segundos.
 ##
-## It LEAVES the "enemies" group (declared in the scene root), so every
-## player weapon, the spawner's live count and time stop all stop seeing
-## it — all three scan that group, which is what makes one removal enough.
-## It keeps its own layer off the enemy one and adds an explicit exception
-## per raider: players share collision layer 1 with the world, so a mask
-## that let it walk through raiders would also let it walk through terrain.
+## SALE del grupo "enemies" (declarado en la raíz de la escena), así dejan de
+## verlo las armas del raider, la cuenta viva del spawner y el tiempo
+## detenido: los tres recorren ese grupo, por eso alcanza con salir de él.
+## Pasa a su propia capa fuera de la de enemigos y suma una excepción por
+## raider: los jugadores comparten la capa 1 con el mundo, y una máscara que
+## lo dejara atravesar raiders también lo dejaría atravesar el terreno.
 func make_possessed(carrier: Node3D, duration: float) -> void:
 	_possessed = true
 	_possess_carrier = carrier
@@ -328,15 +315,14 @@ func make_possessed(carrier: Node3D, duration: float) -> void:
 	print("Possessed spawned: %s" % _script_name())
 
 
-## The raider this servant belongs to, or null when it is not possessed.
+## El raider al que sirve este siervo, o null si no está poseído.
 func possession_carrier() -> Node3D:
 	return _possess_carrier if _possessed else null
 
 
-## Ends the possession early (the cap made room, the carrier died, or the
-## clock ran out). A servant pays NOTHING: it already paid once as the
-## corpse it was raised from, and letting it pay twice would make the
-## necromancer the only weapon worth carrying.
+## Termina la posesión antes de tiempo (hizo falta lugar en el tope, murió
+## el portador o se acabó el reloj). Un siervo NO paga nada: ya pagó una vez
+## como el cadáver del que se levantó.
 func end_possession() -> void:
 	if not _possessed or _expiring_possession:
 		return
@@ -346,12 +332,11 @@ func end_possession() -> void:
 	queue_free()
 
 
-## Through the overlay SLOT protocol, not by writing material_overlay by
-## hand: Juice.flash restores current_overlay() after every damage flash,
-## and a tint that is not in a slot is not in that answer — so the first
-## hit a servant took erased the one thing on screen saying it was yours,
-## permanently. One material for the whole rig: it carries no per-mesh
-## state, and _refresh_overlay writes the same one to each of them.
+## Por el protocolo de CAPAS de overlay, no escribiendo material_overlay a
+## mano: Juice.flash restaura current_overlay() tras cada destello de daño,
+## y un tinte fuera de las capas no está en esa respuesta (el primer golpe
+## borraría lo único que dice que el siervo es tuyo). Un solo material para
+## todo el rig: no guarda estado por malla.
 func _tint_possessed() -> void:
 	var overlay := StandardMaterial3D.new()
 	overlay.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
@@ -371,7 +356,7 @@ func _script_name() -> String:
 	return script_resource.resource_path.get_file().get_basename()
 
 
-## Servant bookkeeping: the clock, and the carrier going away.
+## Contabilidad del siervo: el reloj, y el portador que se va.
 func _tick_possession(delta: float) -> void:
 	_possess_left -= delta
 	if _possess_left <= 0.0 or not is_instance_valid(_possess_carrier) \
@@ -379,30 +364,23 @@ func _tick_possession(delta: float) -> void:
 		end_possession()
 
 
-## THE only way an enemy is allowed to gain height is _tick_climb. Anything
-## else that ends a frame moving upward off the floor got there through
-## move_and_slide()'s own depenetration: a body squeezed inside a crush of
-## eighty others is popped out along the cheapest axis, and often that is
-## straight up. Keeping that impulse is what "enemies flying" looks like —
-## the body sails several metres over the horde before gravity wins.
-##
-## Pre-existing and intermittent (measured on the iteration-52 head: three
-## of three 720 s stage soaks tripped the harness's airborne detector);
-## found by that detector, fixed here rather than by widening its rule.
-##
-## Narrow on purpose: on the floor a raised velocity is a ramp or a step
-## and legitimate, and while climbing it is the climb itself. Only the
-## airborne, non-climbing case is the solver talking, and its answer is
-## discarded — the body simply falls from where it was pushed to.
+## La ÚNICA forma permitida de que un enemigo gane altura es _tick_climb.
+## Cualquier otro frame que termina subiendo en el aire viene de la
+## despenetración de move_and_slide(): un cuerpo apretado entre ochenta sale
+## por el eje más barato, que suele ser hacia arriba, y conservar ese
+## impulso es "enemigos volando". Acotado a propósito: en el suelo una
+## velocidad hacia arriba es una rampa o un escalón, y trepando es la
+## trepada; solo en el aire y sin trepar habla el solver, y se descarta su
+## respuesta (el cuerpo cae desde donde lo empujaron).
 func _clamp_solver_launch() -> void:
 	if _climbing or is_on_floor() or velocity.y <= 0.0:
 		return
 	velocity.y = 0.0
 
 
-## Wall climbing: blocked by geometry while trying to move -> go up, but
-## only up to max_climb_height above where this scramble began. Landing on
-## anything walkable re-arms the next climb from the new footing.
+## Trepar paredes: bloqueado por geometría mientras intenta moverse -> sube,
+## pero solo hasta max_climb_height sobre donde empezó. Pisar algo
+## caminable rearma la siguiente trepada desde el nuevo apoyo.
 func _tick_climb(steer: Vector3) -> void:
 	if not (can_climb and steer.length_squared() > 0.01 and _blocked_by_geometry()):
 		if _climbing and is_on_floor():
@@ -415,18 +393,18 @@ func _tick_climb(steer: Vector3) -> void:
 		velocity.y = climb_speed
 
 
-## True when a wall contact this frame came from LEVEL GEOMETRY. is_on_wall()
-## alone is not enough: enemies collide with the player and with each other
-## (collision_mask 3), and any near-vertical contact sets it — so a packed
-## horde would read its own neighbours, or the raider it is chewing on, as a
-## wall and scramble up on top of them, out of melee reach. Climbing is about
-## walls and ledges, so only non-character colliders count.
+## True si un contacto de pared de este frame vino de GEOMETRÍA del nivel.
+## is_on_wall() solo no alcanza: los enemigos chocan con el raider y entre
+## ellos (collision_mask 3), y cualquier contacto casi vertical lo marca;
+## una horda apretada leería a sus vecinos, o al raider que muerde, como
+## pared y se les subiría encima, fuera de alcance. Trepar es para paredes y
+## cornisas, así que solo cuentan los colisionadores que no son personajes.
 func _blocked_by_geometry() -> bool:
 	if not is_on_wall():
 		return false
 	for i in get_slide_collision_count():
 		var collision := get_slide_collision(i)
-		# Floors and shallow ramps are walked, not climbed.
+		# Los suelos y las rampas suaves se caminan, no se trepan.
 		if collision.get_normal().y > 0.5:
 			continue
 		if collision.get_collider() is CharacterBody3D:
@@ -435,55 +413,53 @@ func _blocked_by_geometry() -> bool:
 	return false
 
 
-## Virtual: per-frame housekeeping (attack cooldowns etc.) before steering.
+## Virtual: tareas por frame (esperas de ataque, etc.) antes de moverse.
 func _behavior_tick(_delta: float) -> void:
 	pass
 
 
-## Virtual: where to steer given the flat unit direction to the player and
-## the flat distance. Default chases straight in.
+## Virtual: hacia dónde moverse dada la dirección plana unitaria al raider y
+## la distancia plana. Por defecto persigue en línea recta.
 func _movement_intent(seek: Vector3, _distance: float) -> Vector3:
 	return seek
 
 
-## Virtual: attack opportunity for this frame; distance is flat.
+## Virtual: oportunidad de ataque de este frame; la distancia es plana.
 func _combat_tick(_player: Node3D, _distance: float) -> void:
 	pass
 
 
-## Virtual: direction the body turns toward. Default faces its steering.
+## Virtual: dirección hacia la que gira el cuerpo. Por defecto mira hacia
+## donde se mueve.
 func _facing_direction(steer: Vector3, _seek: Vector3) -> Vector3:
 	return steer
 
 
-## Virtual: scale whatever damage number(s) the subclass owns; called once
-## by make_elite().
+## Virtual: escala los números de daño propios de la subclase; lo llaman
+## make_elite(), apply_tier_scaling() y las variantes del cielo.
 func _apply_elite_damage(_multiplier: float) -> void:
 	pass
 
 
-# --- telegraphed area damage (the party-aware front door) -------------------
+# --- daño de área avisado (la puerta que conoce a todo el equipo) -------------
 
-## Resolves ONE telegraphed ground disc against the whole party. A disc is
-## drawn for everybody, so it has to hurt everybody standing on it: this is
-## the single resolver every AoE moveset calls, instead of each one asking
-## for the nearest raider and quietly missing the rest of the party.
-## Returns the bodies actually hit, so callers can layer extra effects
-## (the Sarcognath's root) on exactly those players.
+## Resuelve UN disco de suelo avisado contra todo el equipo. El disco se
+## dibuja para todos, así que daña a todos los que estén encima: es el único
+## resolvedor que usan los ataques de área, en vez de que cada uno busque al
+## raider más cercano y se olvide del resto. Devuelve los cuerpos golpeados,
+## para que quien llama sume efectos (el inmovilizar del Sarcognath) solo a
+## esos raiders.
 func damage_players_in_disc(center: Vector3, radius: float, height_window: float,
 		amount: float, attacker: Node3D = null) -> Array[Node3D]:
 	var spots: Array[Vector3] = [center]
 	return damage_players_in_discs(spots, radius, height_window, amount, attacker)
 
 
-## Multi-disc version (root bursts, coffin rings, glob volleys): each player
-## takes AT MOST one hit however many discs cover them — the old
-## "one hit max even where discs overlap" rule, now per player instead of
-## per attack.
-## Only players the hit actually LANDED on come back: take_damage reports
-## the HP it removed, so a raider who evaded the disc is left out of the
-## list and the follow-up effect callers layer on it (the Sarcognath's root)
-## misses them too — which is what dodging the attack should mean.
+## Versión de varios discos (estallidos de raíces, anillos de ataúdes,
+## escupitajos): cada raider recibe COMO MÁXIMO un golpe aunque lo cubran
+## varios discos. Solo vuelven los raiders a los que el golpe LLEGÓ:
+## take_damage informa la vida que quitó, así que un raider que esquivó
+## queda fuera de la lista y del efecto extra (eso es esquivar).
 func damage_players_in_discs(spots: Array[Vector3], radius: float,
 		height_window: float, amount: float, attacker: Node3D = null) -> Array[Node3D]:
 	var hit: Array[Node3D] = []
@@ -500,8 +476,8 @@ func damage_players_in_discs(spots: Array[Vector3], radius: float,
 	return hit
 
 
-## Flat distance inside `radius` of any spot, and no higher above it than
-## `height_window` — a well-timed jump or a ledge still clears the attack.
+## Distancia plana dentro de `radius` de algún punto, y no más alto que
+## `height_window` sobre él: un salto a tiempo o una cornisa esquivan el ataque.
 func _covered_by_any(player: Node3D, spots: Array[Vector3], radius: float,
 		height_window: float) -> bool:
 	for spot: Vector3 in spots:
@@ -514,11 +490,10 @@ func _covered_by_any(player: Node3D, spots: Array[Vector3], radius: float,
 	return false
 
 
-## Applies a timed slow: this enemy moves at speed_multiplier of its normal
-## speed for `duration` seconds. Re-application REFRESHES rather than
-## stacking, so repeated whip lashes can never compound a slow toward zero —
-## but, like apply_poison, the STRONGER slow and the LONGER timer win, so a
-## weak source can neither undo nor cut short a strong one.
+## Aplica una ralentización: este enemigo se mueve a speed_multiplier de su
+## velocidad durante `duration` segundos. Reaplicar REFRESCA en vez de
+## acumular, así latigazos repetidos nunca la llevan a cero; como en
+## apply_poison, ganan la ralentización MÁS FUERTE y el reloj MÁS LARGO.
 func apply_slow(speed_multiplier: float, duration: float) -> void:
 	if duration <= 0.0:
 		return
@@ -527,14 +502,14 @@ func apply_slow(speed_multiplier: float, duration: float) -> void:
 	_slow_time_left = maxf(_slow_time_left, duration)
 
 
-## Current external speed multiplier: 1.0 whenever no slow is active.
+## Multiplicador de velocidad externo actual: 1.0 sin ralentización activa.
 func active_slow_multiplier() -> float:
 	return _slow_multiplier if _slow_time_left > 0.0 else 1.0
 
 
-## Applies a poison of `dps` for `duration` seconds (Fart Bag, spiders,
-## Stench). Refresh rule: the stronger dps wins, the longer timer wins —
-## so spamming weak poison never overwrites a strong one.
+## Aplica un veneno de `dps` durante `duration` segundos (Bolsa de pedos,
+## arañas, Hedor). Al refrescar ganan el dps más fuerte y el reloj más
+## largo, así un veneno débil nunca pisa uno fuerte.
 func apply_poison(dps: float, duration: float) -> void:
 	if dps <= 0.0 or duration <= 0.0 or _health.is_dead:
 		return
@@ -554,17 +529,16 @@ func _tick_poison(delta: float) -> void:
 	_poison_tick_timer -= delta
 	if _poison_tick_timer <= 0.0:
 		_poison_tick_timer += POISON_TICK
-		# Through take_damage so armor, popups and the death flow all apply.
+		# Por take_damage, así aplican la armadura, los números y la muerte.
 		_health.take_damage(_poison_dps * POISON_TICK)
 	if _poison_time_left <= 0.0:
 		_poison_dps = 0.0
 		_apply_poison_tint(false)
 
 
-## Sickly green overlay while poisoned. It is the LOWEST-priority slot, so
-## elites and sky variants keep their own tint and only show poison through
-## the damage popups — exactly as before, but now the poison wearing off
-## restores their overlay instead of wiping it.
+## Capa verde mientras está envenenado. Es la de MENOR prioridad: los shiny
+## y las variantes del cielo conservan su tinte y muestran el veneno solo en
+## los números de daño, y al pasarse vuelve su capa en vez de borrarse.
 func _apply_poison_tint(on: bool) -> void:
 	if on and _poison_overlay == null:
 		_poison_overlay = StandardMaterial3D.new()
@@ -575,10 +549,9 @@ func _apply_poison_tint(on: bool) -> void:
 	_refresh_overlay()
 
 
-## The overlay this body should be wearing right now, or null for none.
-## Public so effects that borrow material_overlay for a moment (Juice.flash)
-## can restore the COMPOSED state instead of whatever happened to be in the
-## slot when they started.
+## El overlay que este cuerpo debería llevar ahora, o null si ninguno.
+## Público para que los efectos que toman material_overlay un momento
+## (Juice.flash, que lo busca por nombre) restauren el estado COMPUESTO.
 func current_overlay() -> Material:
 	if _overlay_possessed != null:
 		return _overlay_possessed
@@ -606,26 +579,26 @@ func _cache_meshes() -> void:
 			_meshes.append(mesh_instance)
 
 
-## Map-tier difficulty hook (GDD 6/7), applied by the spawner right after
-## a spawn: multiplies max HP (healed to the new max), attack damage
-## (through the same virtual elites use), and the XP gem payout. Distinct
-## from make_elite() and stacks multiplicatively with it in either order.
-## Every factor at 1.0 (tier 1) is an exact no-op. Call after the enemy is
-## inside the tree (relies on the onready Health child).
+## Dificultad por grado del mapa (GDD 6/7), la aplica el spawner justo
+## después de aparecer: multiplica la vida máxima (y cura al nuevo máximo),
+## el daño de ataque (por el mismo virtual que los shiny) y el pago de la
+## gema de XP. Distinto de make_elite() y se combina con él en cualquier
+## orden. Con todos los factores en 1.0 no cambia nada. Llamar con el
+## enemigo ya en el árbol (usa el hijo Health).
 func apply_tier_scaling(hp_mult: float, dmg_mult: float, xp_value_mult: float = 1.0) -> void:
 	if not is_equal_approx(hp_mult, 1.0):
 		_health.max_hp *= hp_mult
 		_health.heal_full()
 	if not is_equal_approx(dmg_mult, 1.0):
 		_apply_elite_damage(dmg_mult)
-	# Composes like every other spawn modifier (a second pass multiplies
-	# instead of replacing), so the XP channel cannot be silently reset.
+	# Se compone como todo modificador de aparición (una segunda pasada
+	# multiplica en vez de reemplazar).
 	_tier_xp_multiplier *= xp_value_mult
 
 
-## Promotes this enemy to an elite: more HP (healed to the new max), speed,
-## damage, and XP, bigger body, and an emissive glow overlay. Call after
-## the enemy is inside the tree (relies on onready children). Idempotent.
+## Vuelve shiny a este enemigo: más vida (curada al nuevo máximo), velocidad,
+## daño y XP, cuerpo más grande y una capa de brillo. Llamar con el enemigo
+## ya en el árbol. Idempotente.
 func make_elite() -> void:
 	if is_elite:
 		return
@@ -634,20 +607,21 @@ func make_elite() -> void:
 	_health.heal_full()
 	move_speed *= elite_speed_multiplier
 	_apply_elite_damage(elite_damage_multiplier)
-	# Multiplies (like points_value right below) instead of assigning: the
-	# spawner applies the sky variant FIRST, and an elite berserker must
-	# still pay the variant's doubled XP on top of the elite factor.
+	# Multiplica (como points_value justo abajo) en vez de asignar: el
+	# spawner aplica antes la variante del cielo, y un berserker shiny tiene
+	# que seguir pagando la XP doble de la variante encima del factor shiny.
 	_xp_multiplier *= elite_xp_multiplier
 	points_value *= elite_xp_multiplier
 	_grow_body(elite_body_scale)
 	_apply_elite_glow()
 
 
-## Sky-event variants (iteration 42), applied by the spawner on fresh
-## spawns while an event runs. Idempotent per body.
-##   "berserker" (blood moon): faster, harder-hitting, ignores the crowd
-##                             (no separation), red-lit; pays double.
-##   "shade"     (eclipse):    much tougher, near-black; pays double.
+## Variantes del cielo, las aplica el spawner a lo que aparece durante un
+## evento. Idempotente por cuerpo.
+##   "berserker" (luna de sangre): más rápido, pega más fuerte, ignora a la
+##                                 multitud (casi sin separación), tinte rojo;
+##                                 paga el doble.
+##   "shade"     (eclipse):        mucho más resistente, casi negro; paga el doble.
 func apply_variant(kind: String) -> void:
 	if not variant.is_empty() or kind.is_empty():
 		return
@@ -670,29 +644,26 @@ func apply_variant(kind: String) -> void:
 	points_value *= 2
 
 
-## Where this body sits in the shiny hue cycle (0-1); unused until
-## _apply_elite_glow seeds it.
+## Dónde está este cuerpo en el ciclo de matiz shiny (0-1); sin uso hasta
+## que _apply_elite_glow lo siembra.
 var _shiny_phase: float = 0.0
 
 
-## Grows this body by `factor`: the VISUAL rig is scaled, and the collision
-## shape is RESIZED on a per-instance duplicate.
-## Never `scale *= factor` on the CharacterBody3D itself, which is what
-## this replaced (iteration 48): Godot does not support scaling a physics
-## body — the scaled shape produces unstable contacts and depenetration
-## pops, worst exactly where bodies press against each other, which is the
-## crowded horde where "enemies fly" was reported.
-## The shape is duplicated because a .tscn [sub_resource] is ONE object
-## shared by every instance of the scene (project convention): resizing the
-## scene's own CapsuleShape3D would grow every grunt in the arena, and the
-## next run too.
+## Agranda este cuerpo por `factor`: se escala el rig VISUAL y se
+## REDIMENSIONA una copia propia de la forma de colisión.
+## Nunca `scale *= factor` sobre el CharacterBody3D: Godot no soporta
+## escalar un cuerpo físico (la forma escalada da contactos inestables y
+## saltos de despenetración, peores justo donde los cuerpos se aprietan).
+## La forma se duplica porque un [sub_resource] de .tscn es UN objeto
+## compartido por todas las instancias de la escena: agrandar la
+## CapsuleShape3D de la escena agrandaría a todos los esbirros de la arena.
 func _grow_body(factor: float) -> void:
 	if is_equal_approx(factor, 1.0) or factor <= 0.0:
 		return
 	if _visual != null:
 		_visual.scale *= factor
-		# Positions scale too, so a rig authored with its parts offset from
-		# the origin keeps its proportions — the old node-wide scale did.
+		# Las posiciones también escalan, así un rig con partes desplazadas
+		# del origen conserva sus proporciones.
 		_visual.position *= factor
 	for child: Node in get_children():
 		var shape_node := child as CollisionShape3D
@@ -702,15 +673,15 @@ func _grow_body(factor: float) -> void:
 		if not _resize_shape(shape, factor):
 			continue
 		shape_node.shape = shape
-		# Keeps the feet where they were: the old node-wide scale moved the
-		# shape's offset as well, and a capsule grown in place would sink
-		# half a body into the floor and be shoved back out on the next tick.
+		# Mantiene los pies donde estaban: una cápsula agrandada en el sitio
+		# se hundiría medio cuerpo en el suelo y la sacarían de un empujón en
+		# el siguiente tick.
 		shape_node.position *= factor
 
 
-## Resizes one shape in place by `factor`. Returns false for a shape kind
-## this does not know how to grow, so the caller leaves the original alone
-## instead of silently shipping a body whose collider stopped matching it.
+## Redimensiona una forma por `factor`, en el sitio. Devuelve false para un
+## tipo de forma que no sabe agrandar, así quien llama deja la original en
+## vez de dejar un cuerpo cuyo colisionador ya no coincide con él.
 func _resize_shape(shape: Shape3D, factor: float) -> bool:
 	var capsule := shape as CapsuleShape3D
 	if capsule != null:
@@ -740,26 +711,24 @@ func _apply_overlay(albedo: Color, emission: Color, energy: float) -> void:
 	_refresh_overlay()
 
 
-## The SHINY look (iteration 47, replacing the flat amber tint): a
-## self-illuminated overlay whose hue cycles and whose brightness breathes,
-## so a shiny reads at a glance even inside a horde and even when the horde
-## is entirely shiny. Material only, on purpose — no particles and no
-## pooled FX: the elite-boost soak makes every body shiny at once, and one
-## emitter per body would drain the pools and drown the log in warnings.
-## The overlay is built per body (_build_overlay news one every call), so
-## animating it here can never bleed into another enemy.
+## El aspecto SHINY: un overlay autoiluminado cuyo matiz cicla y cuyo brillo
+## respira, para que un shiny se lea de un vistazo aun dentro de la horda y
+## aun cuando toda la horda es shiny. Solo material, a propósito: sin
+## partículas ni FX del pool (cuando todo cuerpo es shiny a la vez, un
+## emisor por cuerpo vaciaría los pools). El overlay es propio de cada
+## cuerpo (_build_overlay crea uno nuevo), así animarlo nunca toca a otro.
 func _apply_elite_glow() -> void:
 	_overlay_elite = _build_overlay(
 			Color(1.0, 0.62, 0.12, SHINY_ALPHA), Color(1.0, 0.55, 0.1), SHINY_ENERGY_MIN)
-	# Each body starts somewhere else in the cycle: a horde pulsing in
-	# lockstep reads as one flashing object, not as many shiny ones.
+	# Cada cuerpo empieza en otro punto del ciclo: una horda que late al
+	# unísono se lee como un solo objeto parpadeando.
 	_shiny_phase = float(get_instance_id() % SHINY_PHASE_BUCKETS) \
 			/ float(SHINY_PHASE_BUCKETS)
 	_refresh_overlay()
 
 
-## One frame of the shimmer. Cheap on purpose: two writes on one material
-## this body owns, no allocation, no group walk.
+## Un frame del brillo. Barato a propósito: dos escrituras en un material
+## propio, sin reservar memoria ni recorrer grupos.
 func _tick_shiny(delta: float) -> void:
 	_shiny_phase = fmod(_shiny_phase + delta * SHINY_HUE_SPEED, 1.0)
 	var tint := Color.from_hsv(_shiny_phase, SHINY_SATURATION, 1.0)
@@ -785,15 +754,15 @@ func _on_damaged_flash(_amount: float, _current: float) -> void:
 	Juice.flash(_visual)
 
 
-## Virtual: death juice (tiny shake + shard burst tinted like the body);
-## the boss overrides this with its bigger moment.
+## Virtual: reacción a la muerte (sacudida chica y estallido de esquirlas
+## del color del cuerpo); el jefe la cambia por su momento grande.
 func _death_feedback() -> void:
 	Juice.enemy_died(global_position + Vector3.UP * 0.8, death_burst_color())
 
 
-## Tint for this enemy's death burst: the first visual mesh's albedo, so
-## the shards read as pieces of the body. Elites keep their base skin color
-## (the glow is an overlay, which get_active_material ignores).
+## Color del estallido de muerte: el albedo de la primera malla visual, así
+## las esquirlas se leen como pedazos del cuerpo. Los shiny conservan su
+## piel base (el brillo es un overlay, que get_active_material ignora).
 func death_burst_color() -> Color:
 	for mesh_instance: MeshInstance3D in _meshes:
 		if not is_instance_valid(mesh_instance) or mesh_instance.mesh == null \
@@ -805,18 +774,18 @@ func death_burst_color() -> Color:
 	return Color(0.75, 0.75, 0.78)
 
 
-## Sums push-away vectors from living "enemies" within separation_radius,
-## with falloff (strongest when overlapping, zero at the edge). Only the
-## cells around this body are visited (see SEPARATION_CELL_SIZE); every
-## test below is the one the full-horde scan ran, on live positions.
+## Suma los empujes de los "enemies" vivos dentro de separation_radius, con
+## caída (máximo al solaparse, cero en el borde). Solo visita las celdas
+## alrededor de este cuerpo (ver SEPARATION_CELL_SIZE); cada test es el del
+## escaneo de toda la horda, sobre posiciones vivas.
 func _separation_push() -> Vector3:
 	var grid := _separation_grid_this_tick(get_tree(), self)
 	var push := Vector3.ZERO
 	var here := global_position
-	# A neighbour passes the distance test only when it is closer than
-	# separation_radius on each flat axis, so one ring of cells covers any
-	# radius below the cell size (with ~4% to spare at 1.2 m, far above the
-	# float rounding of the cell index); a larger radius scans enough rings.
+	# Un vecino pasa el test de distancia solo si está más cerca que
+	# separation_radius en cada eje plano, así un anillo de celdas cubre todo
+	# radio menor que la celda (con ~4% de margen a 1.2 m, muy por encima del
+	# redondeo float del índice); un radio mayor escanea los anillos necesarios.
 	var rings := 1
 	if separation_radius >= SEPARATION_CELL_SIZE:
 		rings = ceili(separation_radius / SEPARATION_CELL_SIZE) + 1
@@ -828,8 +797,8 @@ func _separation_push() -> Vector3:
 			var cell: Variant = grid.get(column_key + dz)
 			if cell == null:
 				continue
-			# Typed loop: entries stay valid instances for the whole tick
-			# (frees are deferred), like the snapshot they came from.
+			# Bucle tipado: las entradas siguen siendo instancias válidas todo
+			# el tick (los free son diferidos), como la foto de la que salen.
 			for other: Node3D in cell:
 				if other == self or not other.is_inside_tree():
 					continue
@@ -838,24 +807,24 @@ func _separation_push() -> Vector3:
 				var dist := away.length()
 				if dist >= separation_radius:
 					continue
-				# Checked only for actual neighbours (the snapshot is taken once
-				# per tick, so a body that died EARLIER this tick is still in it
-				# and would keep shoving the horde around as a corpse).
+				# Solo para vecinos reales: la foto se toma una vez por tick, y un
+				# cuerpo que murió ANTES en este tick sigue en ella y empujaría a
+				# la horda como cadáver.
 				if not other.is_in_group(&"enemies"):
 					continue
 				if dist < 0.01:
-					# Perfectly stacked bodies: nudge apart in a stable per-instance direction.
+					# Cuerpos apilados exactos: se separan en una dirección estable por instancia.
 					away = Vector3.RIGHT.rotated(Vector3.UP, float(get_instance_id() % 64) * TAU / 64.0)
 					dist = 0.01
 				push += (away / dist) * (1.0 - dist / separation_radius)
 	return push
 
 
-## This tick's separation grid, built by the first scan that asks. Every
-## snapshot body is bucketed where it stands NOW: bodies that already ran
-## this tick have finished moving, and the rest are followed as they move
-## (_follow_separation_grid). `builder` is the scanning body, caught in
-## the middle of its own _physics_process with its move still ahead.
+## La grilla de separación de este tick, la arma el primer escaneo que la
+## pide. Cada cuerpo de la foto se reparte donde está AHORA: los que ya
+## corrieron este tick terminaron de moverse, y al resto se lo sigue
+## mientras se mueve (_follow_separation_grid). `builder` es el cuerpo que
+## escanea, a mitad de su _physics_process con su movimiento por delante.
 static func _separation_grid_this_tick(tree: SceneTree, builder: EnemyBase) -> Dictionary:
 	var frame := Engine.get_physics_frames()
 	if frame == _separation_grid_frame:
@@ -864,7 +833,7 @@ static func _separation_grid_this_tick(tree: SceneTree, builder: EnemyBase) -> D
 	_separation_grid.clear()
 	for node: Node in _enemies_this_tick(tree):
 		var body := node as Node3D
-		# The scan skips off-tree bodies anyway, and they have no position.
+		# El escaneo igual se salta los cuerpos fuera del árbol, que no tienen posición.
 		if body == null or not body.is_inside_tree():
 			continue
 		var at := body.global_position
@@ -883,14 +852,15 @@ static func _separation_grid_this_tick(tree: SceneTree, builder: EnemyBase) -> D
 	return _separation_grid
 
 
-## Keeps the grid true to live positions while bodies move during the
-## tick. A body moves only inside its own _physics_process (subclass work
-## included: BossBase clamps AFTER super()), and no scan can run between
-## the end of one body's _physics_process and the start of the next one's.
-## So re-bucketing the PREVIOUS body here, at the top of the next one, is
-## late enough to see all of its movement — a Fenwraith blink, a Grubthing
-## hop, the boss clamp — and early enough for every scan that follows.
-## Only called once this tick's grid exists.
+## Mantiene la grilla fiel a las posiciones vivas mientras los cuerpos se
+## mueven durante el tick. Un cuerpo solo se mueve dentro de su propio
+## _physics_process (incluido lo de la subclase: BossBase recorta DESPUÉS de
+## super()), y ningún escaneo corre entre el final del _physics_process de
+## un cuerpo y el inicio del siguiente. Por eso repartir de nuevo el cuerpo
+## ANTERIOR aquí, al inicio del siguiente, llega a ver todo su movimiento
+## (un salto del Fenwraith, un brinco del Grubthing, el recorte del jefe) y
+## a tiempo para todo escaneo posterior. Solo se llama si la grilla de este
+## tick ya existe.
 func _follow_separation_grid() -> void:
 	if is_instance_valid(_separation_grid_pending):
 		_rebucket_separation(_separation_grid_pending)
@@ -898,7 +868,7 @@ func _follow_separation_grid() -> void:
 
 
 static func _rebucket_separation(body: EnemyBase) -> void:
-	# Off the tree its stale entry is harmless: the scan skips it.
+	# Fuera del árbol su entrada vieja no molesta: el escaneo se la salta.
 	if not body.is_inside_tree():
 		return
 	var at := body.global_position
@@ -926,34 +896,33 @@ static func _enemies_this_tick(tree: SceneTree) -> Array[Node]:
 
 
 func _on_died() -> void:
-	# A frozen body (time_stop) is PROCESS_MODE_DISABLED, and a disabled
-	# node still receives calls and signals: it can be killed mid-freeze.
-	# Its death tween would then be bound to a node that never processes,
-	# so the tween never finishes and the corpse never frees. Thaw first,
-	# always — the freeze has nothing left to hold once this body is dead.
+	# Un cuerpo congelado (tiempo detenido) es PROCESS_MODE_DISABLED, y un
+	# nodo desactivado igual recibe llamadas y señales: se lo puede matar
+	# congelado. Su tween de muerte quedaría atado a un nodo que no procesa y
+	# el cadáver nunca se liberaría. Siempre se descongela primero.
 	process_mode = Node.PROCESS_MODE_INHERIT
-	# Leave the group first so weapons and separation ignore the corpse.
+	# Primero sale del grupo, así las armas y la separación ignoran el cadáver.
 	remove_from_group("enemies")
 	set_physics_process(false)
 	_collision.set_deferred("disabled", true)
 	if _possessed:
-		# A servant killed in the field pays NOTHING — no kill credit, no
-		# XP, no points, no orbs, no chest roll, no bestiary bump. It
-		# already paid all of that once, as the corpse it was raised from.
-		# Only the visual death is kept.
-		# It leaves the possessed group with the same breath: a corpse
-		# left in it for the 0.3 s of its death tween counted against the
-		# carrier's max_possessed, so the staff could "expire" a body that
-		# was already dead — a spurious Possessed expired: in a log that
-		# is the verification interface.
+		# Un siervo muerto en el campo NO paga nada: ni crédito, ni XP, ni
+		# puntos, ni orbes, ni tirada de cofre, ni contador del bestiario. Ya
+		# pagó todo eso como el cadáver del que se levantó. Solo queda la
+		# muerte visual.
+		# Sale del grupo de poseídos en el mismo momento: un cadáver que
+		# siguiera ahí durante los 0.3 s de su tween contaría contra el
+		# max_possessed del portador, y el bastón podría "expirar" un cuerpo
+		# ya muerto (un Possessed expired: falso en el log que lee el harness).
 		_possessed = false
 		remove_from_group(POSSESSED_GROUP)
 		_death_feedback()
 		_death_tween()
 		return
 	RunState.add_kill()
-	# Bestiary counter (Collection screen): keyed by the script's file name
-	# ("kills_grunt", "kills_rotking", ...), so no per-enemy code or export.
+	# Contador del bestiario (pantalla Colección): la clave sale del nombre
+	# del archivo del script ("kills_grunt", "kills_rotking", ...). No
+	# renombres los scripts de enemigos.
 	var script_path := (get_script() as Script).resource_path
 	if not script_path.is_empty():
 		SaveData.bump("kills_" + script_path.get_file().get_basename())
@@ -966,7 +935,7 @@ func _on_died() -> void:
 	_death_tween()
 
 
-## The squash-out every corpse shares, servants included.
+## La caída que comparten todos los cadáveres, siervos incluidos.
 func _death_tween() -> void:
 	var tween := create_tween()
 	tween.set_parallel(true)
@@ -977,8 +946,8 @@ func _death_tween() -> void:
 	tween.chain().tween_callback(queue_free)
 
 
-## Run points go to the NEAREST standing raider (co-op: whoever was in
-## the thick of it), never shared — the economy is per player by design.
+## Los puntos de partida van al raider en pie MÁS CERCANO (en co-op, quien
+## estaba en lo más denso), nunca repartidos: la economía es por jugador.
 func _award_points() -> void:
 	if points_value <= 0:
 		return
@@ -990,21 +959,21 @@ func _award_points() -> void:
 func _drop_xp_gem() -> void:
 	if xp_gem_scene == null:
 		return
-	# Pooled, parented to the scene root (not this enemy) so it outlives
-	# the corpse; pool_reset restored the scene-default xp_value.
+	# Del pool, colgada de la raíz de la escena (no de este enemigo) para
+	# sobrevivir al cadáver; pool_reset restauró el xp_value de la escena.
 	var gem := Pools.acquire_scene(xp_gem_scene) as XpGem
 	if gem == null:
 		return
-	# Elite factor first (int), then the map-tier value factor (min 1 XP);
-	# both 1 on a baseline spawn, leaving the scene value untouched.
+	# Primero el factor shiny (entero), después el del grado del mapa (mínimo
+	# 1 XP); ambos valen 1 en una aparición base y dejan el valor de la escena.
 	gem.xp_value = maxi(roundi(float(gem.xp_value * _xp_multiplier) * _tier_xp_multiplier), 1)
 	gem.global_position = global_position + Vector3.UP * 0.6
 
 
-## Virtual-ish health-orb payout for this death. Base rule: only elites
-## roll (elite_health_orb_chance for one orb); BossBase overrides with
-## guaranteed drops. Heal size is the orb's own flat max-HP fraction —
-## tier XP factors never touch it.
+## Orbes de vida de esta muerte. Regla base: solo los shiny tiran
+## (elite_health_orb_chance de un orbe) y además tiran cofre; BossBase lo
+## cambia por pagos garantizados. La curación es la fracción fija del orbe:
+## los factores de grado nunca la tocan.
 func _drop_health_orbs() -> void:
 	if is_elite and randf() < elite_health_orb_chance:
 		_spawn_health_orb(global_position + Vector3.UP * 0.6)
@@ -1012,28 +981,26 @@ func _drop_health_orbs() -> void:
 		_drop_chest()
 
 
-## Radioactive rain (iteration 55): every corpse leaves a puddle while it
-## falls. The director owns the cap and the spacing and refuses politely
-## when the weather is not running, so this stays one call with no state.
+## Lluvia radiactiva: todo cadáver deja un charco mientras dura. El director
+## lleva el tope y el espaciado y se niega solo si el clima no está activo,
+## así que esto es una llamada sin estado.
 func _drop_acid_pool() -> void:
 	var director := get_tree().get_first_node_in_group("world_director")
 	if director != null and director.has_method("spawn_acid_pool"):
 		director.call("spawn_acid_pool", global_position)
 
 
-## Temporary power-up drop (iteration 53). The base chance is tiny on
-## purpose — a power-up has to read as an event, not as loot — and the
-## raider's own powerup_drop_chance stat (A's «Fortuna menor») is finally
-## the thing that moves it. Shiny bodies roll a multiple of it.
-##
-## The STAR never drops here: it is found roaming the map (WorldDirector's
-## star_sighting), which is the only thing that makes it feel rare.
+## Power-up temporal. La probabilidad base es mínima a propósito (un
+## power-up tiene que sentirse como un evento, no como botín) y la mueve la
+## stat powerup_drop_chance del raider («Fortuna menor»). Los shiny tiran
+## un múltiplo. La ESTRELLA nunca cae aquí: se encuentra rondando el mapa
+## (star_sighting del WorldDirector).
 func _drop_powerup() -> void:
 	var spawner := get_tree().get_first_node_in_group("enemy_spawner")
 	if spawner == null or not spawner.has_method("roll_powerup_drop"):
 		return
-	# Nearest raider, like the points payout: whoever was in the thick of
-	# it owns the roll, so their «Fortuna menor» is the one that counts.
+	# El raider más cercano, como en el pago de puntos: es dueño de la
+	# tirada, así cuenta su «Fortuna menor».
 	var player := Coop.nearest_player(get_tree(), global_position)
 	if not bool(spawner.call("roll_powerup_drop", player, is_elite)):
 		return
@@ -1041,13 +1008,13 @@ func _drop_powerup() -> void:
 			PowerUpCatalog.roll_id(true))
 
 
-## Elite bounty chest (iteration 42): rarity rolled with a luck tilt that
-## grows with the run-wide difficulty. Skipped at BOUNTY_CHEST_CAP.
+## Cofre de recompensa shiny: la rareza se tira con una inclinación de
+## suerte que crece con la dificultad. Se salta en BOUNTY_CHEST_CAP.
 func _drop_chest() -> void:
 	if bounty_chests_at_cap(get_tree()):
 		_capped_bounty_drops += 1
-		# One line per 25 swallowed drops: late in a run the cap can be hit
-		# several times a second, and the first line is what a soak greps.
+		# Una línea cada 25 cofres tragados: tarde en la partida el tope puede
+		# saltar varias veces por segundo, y el harness busca la primera línea.
 		if _capped_bounty_drops % 25 == 1:
 			print("Elite chest capped: %d unopened (x%d)" % [
 					BOUNTY_CHEST_CAP, _capped_bounty_drops])
@@ -1057,14 +1024,14 @@ func _drop_chest() -> void:
 			ELITE_CHEST_LUCK_PER_DIFFICULTY * RunState.difficulty_bonus)
 	if chest != null:
 		chest.add_to_group(BOUNTY_CHEST_GROUP)
-		# A free chest has no rarity yet (it rolls when opened), so the log
-		# reports what it IS instead of an empty string.
+		# Un cofre gratis no tiene rareza todavía (la tira al abrirse), así
+		# que el log dice lo que ES en vez de una cadena vacía.
 		print("Elite chest dropped: free")
 
 
-## Unopened bounty chests on the map. An opened one stays in the group
-## while it sinks (Chest._sink frees it at the end of its tween), so it is
-## `available` that decides, not membership.
+## Cofres de recompensa sin abrir en el mapa. Uno abierto sigue en el grupo
+## mientras se hunde (Chest._sink lo libera al terminar su tween), así que
+## decide `available`, no la pertenencia. Lo lee ArenaProbe.
 static func unopened_bounty_chests(tree: SceneTree) -> int:
 	var count := 0
 	for node: Node in tree.get_nodes_in_group(BOUNTY_CHEST_GROUP):
@@ -1078,13 +1045,11 @@ static func bounty_chests_at_cap(tree: SceneTree) -> bool:
 	return unopened_bounty_chests(tree) >= BOUNTY_CHEST_CAP
 
 
-## Drops one chest at `at`, parented to the scene ROOT so it outlives the
-## corpse, or null when there is no scene to drop into (run teardown) or the
-## scene root is not a Chest. The single place both the shiny bounty and the
-## boss ring go through, so the guards can only be written once.
-## Every chest dropped by a BODY is free (iteration 47): you already paid
-## for it by killing the thing, and charging points for a boss reward on
-## top of the run economy is what made the rings go unopened.
+## Suelta un cofre en `at`, colgado de la RAÍZ de la escena para sobrevivir
+## al cadáver; devuelve null si no hay escena donde soltarlo (cierre de la
+## partida) o si la raíz de la escena no es un Chest. El único lugar por el
+## que pasan el cofre shiny y el anillo del jefe. Todo cofre soltado por un
+## CUERPO es gratis: ya se pagó al matarlo.
 func spawn_chest(at: Vector3, luck_bonus: float, min_rarity: String = "") -> Chest:
 	var parent := RunRoot.stage_parent(get_tree())
 	if parent == null:
@@ -1095,8 +1060,8 @@ func spawn_chest(at: Vector3, luck_bonus: float, min_rarity: String = "") -> Che
 	if chest == null:
 		push_warning("EnemyBase: Chest scene root is not a Chest.")
 		return null
-	# Empty keeps whatever floor the scene set (the elite chest's roll is
-	# unbounded; boss chests force Rare+).
+	# Vacío conserva el piso que tenga la escena (el cofre shiny tira sin
+	# límite; los de jefe pueden forzar un piso).
 	if not min_rarity.is_empty():
 		chest.min_rarity = min_rarity
 	chest.luck_bonus = luck_bonus
@@ -1106,8 +1071,9 @@ func spawn_chest(at: Vector3, luck_bonus: float, min_rarity: String = "") -> Che
 	return chest
 
 
-## One pooled health orb at `at`, skipped at the global live-orb soft cap.
-## Re-checked per orb, so a boss's multi-drop fills exactly up to the cap.
+## Un orbe de vida del pool en `at`, salvo en el tope global de orbes vivos.
+## Se comprueba por orbe, así el pago múltiple de un jefe llena justo hasta
+## el tope.
 func _spawn_health_orb(at: Vector3) -> void:
 	if HealthOrb.at_soft_cap(get_tree()):
 		return

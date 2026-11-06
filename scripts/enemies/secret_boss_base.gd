@@ -1,28 +1,23 @@
 class_name SecretBossBase
 extends BossBase
-## Chassis for the hidden minibosses (GDD 6): trigger-spawned only — no
-## spawner timetable and no Elder rematch — with all the boss plumbing
-## (boss group, HP-bar binding, arena clamp, ring payout, no elite glow)
-## inherited from BossBase. This layer adds the secrets meta on death:
-## the celebratory fanfare, the "slain_<id>" quest counter, and the free
-## character unlock for whichever catalog row names this boss in its
-## unlock_boss field — fully data-driven, so a new hidden boss is a scene
-## plus catalog rows, never a new branch here.
+## Chasis de los minijefes ocultos (GDD 6): solo aparecen por su disparador,
+## sin horario del spawner ni revancha Elder, y heredan de BossBase todo lo
+## de jefe (grupo boss, barra de vida, recorte de arena, pago en anillo, sin
+## brillo shiny). Esta capa suma lo secreto al morir: la fanfarria, el
+## contador de misión "slain_<id>" y el desbloqueo gratis del personaje cuya
+## fila de catálogo nombra a este jefe en unlock_boss. Todo sale de datos: un
+## jefe oculto nuevo es una escena más filas de catálogo, nunca una rama aquí.
 
-## Counter/catalog key for this miniboss ("grubthing"): quests watch the
-## "slain_<secret_boss_id>" counter and CharacterCatalog rows reference the
-## id through unlock_boss.
+## Clave de contador y de catálogo de este minijefe ("grubthing"): las
+## misiones leen "slain_<secret_boss_id>" y las filas de CharacterCatalog lo
+## nombran en unlock_boss.
 @export var secret_boss_id: String = ""
 
 
 func _init() -> void:
-	# Not possessable (iteration 56): a secret miniboss is a boss, and its
-	# death unlocks a raider, so a possessed one would keep attacking the
-	# party it now belongs to. Only contact fighters, whose _combat_tick
-	# damages whatever Health it is handed, can switch sides.
+	# No poseíble: es un jefe y su muerte desbloquea un raider.
 	possessable = false
-	# BossBase._init is not called implicitly when a subclass defines its
-	# own, and everything it may come to set belongs here too.
+	# Definir _init aquí oculta el de BossBase; se llama a mano.
 	super()
 
 
@@ -35,26 +30,26 @@ func _on_secret_boss_died() -> void:
 	Sfx.play(&"secret_fanfare")
 	if secret_boss_id.is_empty():
 		return
-	# In-memory bump; the run-end fold evaluates and persists it, so the
-	# quest completes even if the player dies right after the kill.
+	# Suma en memoria; el cierre de la partida la evalúa y la guarda, así la
+	# misión se completa aunque el raider muera justo después de la baja.
 	SaveData.bump("slain_" + secret_boss_id)
 	var row := CharacterCatalog.by_unlock_boss(secret_boss_id)
 	if row.is_empty():
 		return
-	# Read defensively, the way CharacterCatalog reads its own rows: a
-	# property access on a Dictionary throws if a future row omits the key,
-	# and this runs inside a death handler.
+	# Lectura defensiva, como CharacterCatalog lee sus filas: acceder a una
+	# clave que falta en un Dictionary falla, y esto corre dentro de un
+	# manejador de muerte.
 	var character_id := String(row.get("id", ""))
 	if character_id.is_empty():
 		push_warning("SecretBossBase: unlock row for '%s' has no id." % secret_boss_id)
 		return
-	# Idempotent: with the character already unlocked (purchase or an
-	# earlier kill) this no-ops and the fight stays a gem/quest payday.
+	# Idempotente: si el personaje ya estaba desbloqueado no hace nada y la
+	# pelea queda como pago de gemas y misión.
 	if SaveData.unlock_character(character_id, "boss"):
-		# announce_major, not announce: a free raider is the biggest banner
-		# of the run and a plain announce is overwritten within 0.3 s by the
-		# next kill streak line.
+		# announce_major y no announce: un raider gratis es el anuncio más
+		# grande de la partida, y un announce común lo pisa la siguiente
+		# racha de bajas en 0.3 s.
 		get_tree().call_group("boss_ui", "announce_major",
 				"¡RAIDER DESBLOQUEADO: %s!" % String(row.get("display_name", character_id)))
-	# One-line log (RunManager convention) so headless runs can confirm it.
+	# Log de una línea para que las corridas headless lo confirmen.
 	print("Secret boss slain: %s" % secret_boss_id)

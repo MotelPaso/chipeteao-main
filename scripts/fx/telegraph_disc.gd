@@ -1,28 +1,24 @@
 class_name TelegraphDisc
 extends MeshInstance3D
-## Pooled ground-telegraph disc: the center-out fill/glow-ramp/fade cue the
-## old Telegraph factory built from scratch per cast, now reused through
-## Pools. The unit-radius cylinder is scaled by the requested radius, so
-## the animation reads exactly like the old radius-sized mesh growing from
-## scale 0.2 to 1. The override material is local-to-scene, so every pooled
-## instance tweens its own alpha/emission copy.
+## Disco de aviso en el suelo, reusado por Pools: se llena desde el centro,
+## sube su brillo y se desvanece. El cilindro de radio 1 se escala al radio
+## pedido, empezando en 0.2 del radio. El material es local a la escena, así
+## cada instancia del pool anima su propia copia de alfa y emisión.
 
 var _tween: Tween = null
 
 
-## Pooled-node contract: no stale grow/fade from the previous cast.
+## Contrato de nodo del pool: sin crecer ni desvanecerse lo del aviso anterior.
 func pool_reset() -> void:
 	_kill_tween()
 
 
-## Plays one telegraph (same parameters and timings as the old
-## Telegraph.spawn_disc); the node releases itself after the fade.
+## Reproduce un aviso; el nodo vuelve solo al pool tras desvanecerse.
 func show_disc(center: Vector3, radius: float, duration: float, color: Color) -> void:
 	var material := material_override as StandardMaterial3D
 	if material == null:
-		# The node came out of the pool, so bailing without releasing would
-		# strand it in the scene forever — the only exit here that used to
-		# skip the pool contract.
+		# El nodo salió del pool: irse sin devolverlo lo dejaría varado en la
+		# escena para siempre.
 		Pools.release(self)
 		return
 	material.albedo_color = Color(color.r, color.g, color.b, 0.45)

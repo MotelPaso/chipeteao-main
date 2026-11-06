@@ -1,51 +1,50 @@
 class_name EnemyBolt
 extends Area3D
-## Enemy projectile: flies straight along -Z at a strafe-dodgeable speed
-## and hurts only the player. Its collision mask is world + player (layer
-## 1), so bodies on the enemy layer are never even detected — an enemy
-## bolt can never damage an enemy. Releases back to Pools on any body hit
-## (player, floor, prop) or after max_distance so strays never linger.
-## `monitorable` is off in EnemyBolt.tscn: the bolt only ever DETECTS
-## bodies, and no script in the game detects areas (no area_entered, no
-## overlapping-area query, no collide_with_areas), so being detectable
-## only cost the physics server area-vs-area bookkeeping. NodePool records
-## the value on release and restores it on acquire, so recycling keeps it off.
+## Proyectil enemigo: vuela recto por -Z a una velocidad que se esquiva de
+## lado y solo daña a raiders. Su máscara es mundo + jugador (capa 1), así
+## que nunca detecta cuerpos de la capa de enemigos. Vuelve a Pools al tocar
+## cualquier cuerpo (raider, suelo, prop) o tras max_distance.
+## `monitorable` está apagado en EnemyBolt.tscn: la saeta solo DETECTA
+## cuerpos y nadie detecta áreas, así que ser detectable solo costaría
+## trabajo de física. NodePool guarda el valor al soltarla y lo restaura al
+## reusarla.
 
 @export var speed: float = 10.0
 @export var damage: float = 8.0
 @export var max_distance: float = 30.0
 
-## The enemy that fired this bolt, so a reflected hit has somewhere to go
-## back to (iteration 53). Cleared on every acquire: a pooled bolt that
-## kept the previous caster would repay the wrong body — or a freed one.
+## El enemigo que la disparó, para que un golpe reflejado tenga a quién
+## volver. Se limpia en cada reuso: una saeta del pool con el lanzador
+## anterior le devolvería el daño al cuerpo equivocado (o a uno liberado).
 var launcher: Node3D = null
-## Set by EnemySpawner.freeze_enemies: a frozen bolt hangs in the air.
-## A FLAG and not set_physics_process(false), because NodePool.release
-## snapshots the processing state and acquire() restores it — a pooled
-## node frozen that way comes back inert forever.
+## Lo marca EnemySpawner.freeze_enemies: una saeta congelada queda quieta en
+## el aire. Es una BANDERA y no set_physics_process(false) porque
+## NodePool.release guarda el estado de proceso y acquire() lo restaura: una
+## saeta congelada así volvería inerte para siempre.
 var frozen: bool = false
 
 var _travelled: float = 0.0
-## Scene-default damage, restored on reuse (casters override it per shot
-## AFTER the pool's reset, so an elite's hot bolt never leaks to the next).
+## Daño por defecto de la escena, restaurado al reusarla (quien dispara lo
+## pisa en cada tiro DESPUÉS del reset del pool, así el daño de un shiny no
+## pasa a la siguiente saeta).
 var _default_damage: float = 8.0
-## Set the moment this bolt spends itself. Pools.release only DEFERS the
-## reparent, so the Area3D keeps monitoring for the rest of the signal
-## flush: without this flag two raiders entering on the same physics step
-## would each eat a full hit from one bolt.
+## Se marca en cuanto la saeta se gasta. Pools.release DIFIERE el cambio de
+## padre, así que el Area3D sigue detectando durante el resto del vaciado de
+## señales: sin esta bandera dos raiders que entran en el mismo paso de
+## física recibirían cada uno un golpe completo de la misma saeta.
 var _spent: bool = false
 
 
 func _ready() -> void:
 	body_entered.connect(_on_body_entered)
-	# Group joined here AND re-joined in pool_reset: a released bolt is
-	# reparented, not freed, and time_stop has to be able to find every
-	# bolt in flight without walking the whole tree.
+	# Se une aquí Y en pool_reset: al soltarla se cambia de padre (no se
+	# libera), y el tiempo detenido tiene que encontrar cada saeta en vuelo
+	# sin recorrer todo el árbol.
 	add_to_group(&"enemy_projectiles")
 	_default_damage = damage
 
 
-## Pooled-node contract: fresh flight on every acquire.
+## Contrato de nodo del pool: vuelo nuevo en cada reuso.
 func pool_reset() -> void:
 	damage = _default_damage
 	_travelled = 0.0
@@ -67,19 +66,17 @@ func _physics_process(delta: float) -> void:
 
 
 func _on_body_entered(body: Node3D) -> void:
-	# A frozen bolt hangs in stopped time: it must not spend itself, and it
-	# must not hit the raider who walks past it. Its Area3D keeps monitoring
-	# while frozen (that is the point of the flag over a processing toggle),
-	# so without this the one thing time stop guarantees — nothing touches
-	# you — would be broken by a bullet already in the air.
+	# Una saeta congelada cuelga en el tiempo detenido: no se gasta ni daña
+	# al raider que pasa a su lado. Su Area3D sigue detectando mientras está
+	# congelada (por eso es una bandera), y sin esto una bala ya en el aire
+	# rompería la única promesa del tiempo detenido: que nada te toca.
 	if _spent or frozen:
 		return
 	if body.is_in_group("player"):
 		var health := Health.find_in(body)
 		if health != null:
-			# The caster is named so Reflejo (and thorns) can repay it; a
-			# bolt whose caster already died passes null and simply deals
-			# its damage.
+			# Nombra al lanzador para que Reflejo (y las espinas) se lo
+			# devuelvan; si ya murió pasa null y solo hace su daño.
 			health.take_damage(damage, false,
 					launcher if is_instance_valid(launcher) else null)
 	_spend()

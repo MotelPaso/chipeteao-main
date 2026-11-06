@@ -1,34 +1,30 @@
 class_name Skirmisher
 extends EnemyBase
-## Ranged skirmisher: holds a standoff band around the player — advances
-## when too far, backs off when crowded, stands and casts inside it — and
-## lobs slow, dodgeable bolts on a cadence. Always turns to face the
-## player (even while retreating) so the silhouette reads as an aimer.
+## Hostigador a distancia: mantiene una banda de distancia con el raider
+## (avanza si está lejos, retrocede si está encima, se planta y dispara
+## dentro) y lanza saetas lentas y esquivables con un ritmo fijo. Siempre
+## mira al raider, incluso al retroceder, para que se lea como tirador.
 
 @export var band_inner: float = 8.0
 @export var band_outer: float = 12.0
 @export var fire_cooldown: float = 3.0
 @export var fire_range: float = 18.0
-## 6 (was 8, iteration-26 balance): once contact damage is kited well,
-## bolts are the run's dominant chip — instrumented T1 soaks measured them
-## at ~55% of all damage taken after minute 3, outpacing every recovery
-## source. 6 keeps the poke meaningful against orb heals without making
-## the skirmisher census a slow death sentence.
+## Daño de cada saeta. Las saetas son el desgaste dominante de la partida
+## una vez que se aprende a esquivar el contacto, así que subirlo pesa más
+## de lo que parece.
 @export var bolt_damage: float = 6.0
 @export var bolt_scene: PackedScene
-## Bolts leave at hand height and fly at the player's chest.
+## Las saetas salen a la altura de la mano y van al pecho del raider.
 @export var muzzle_height: float = 1.2
 @export var target_height: float = 0.9
 
-# Small grace period so a fresh spawn doesn't snipe the instant it lands.
+# Espera inicial para que uno recién aparecido no dispare al aterrizar.
 var _fire_timer: float = 1.0
 
 
 func _init() -> void:
-	# Not possessable (iteration 56): it fires pooled EnemyBolts that only
-	# damage group "player", so a possessed one would keep attacking the
-	# party it now belongs to. Only contact fighters, whose _combat_tick
-	# damages whatever Health it is handed, can switch sides.
+	# No poseíble: dispara EnemyBolts que solo dañan al grupo "player", así
+	# que poseído seguiría atacando al equipo al que ahora pertenece.
 	possessable = false
 
 
@@ -49,58 +45,48 @@ func _facing_direction(steer: Vector3, seek: Vector3) -> Vector3:
 
 
 func _combat_tick(player: Node3D, distance: float) -> void:
-	# The lower bound also keeps look_at away from the degenerate
-	# straight-up case when the player stands on this enemy's head.
+	# El mínimo también aleja a look_at del caso degenerado de mirar recto
+	# hacia arriba cuando el raider está parado sobre su cabeza.
 	if _fire_timer > 0.0 or distance > fire_range or distance < 0.5:
 		return
 	if bolt_scene == null:
 		return
-	# Only a shot that actually left the muzzle spends the cooldown; a
-	# failed acquire used to cost a full cadence of silence.
+	# Solo un tiro que salió de verdad gasta la espera.
 	if _fire_bolt(player):
 		_fire_timer = fire_cooldown
 
 
-## Below this squared length an aim is "no direction at all" (the caster
-## is standing on its target). A millimetre squared: anything a physics
-## solver leaves is orders of magnitude bigger, and anything smaller
-## cannot be normalized into a basis.
+## Bajo este largo al cuadrado una puntería es "ninguna dirección" (el
+## tirador está parado sobre su objetivo): un milímetro al cuadrado.
 const AIM_EPSILON_SQ: float = 0.000001
 
 
 func _fire_bolt(player: Node3D) -> bool:
-	# Pooled, parented to the scene root so the bolt outlives its caster.
+	# Del pool, colgada de la raíz de la escena para sobrevivir a su tirador.
 	var bolt := Pools.acquire_scene(bolt_scene) as EnemyBolt
 	if bolt == null:
 		return false
 	bolt.damage = bolt_damage
 	bolt.global_position = global_position + Vector3.UP * muzzle_height
 	bolt.launcher = self
-	# The bolt flies at the true 3D aim; when that runs near-colinear with UP
-	# (player jumping right overhead) look_at cannot build a basis, so swap
-	# in a sideways up vector — WeaponBase.safe_up is the one guard, and the
-	# one threshold, every aim in the game goes through.
+	# La saeta vuela hacia la puntería 3D real; si es casi colineal con UP
+	# (raider saltando justo encima) look_at no puede armar una base, así que
+	# se usa WeaponBase.safe_up, la única guarda y el único umbral de toda
+	# puntería del juego.
 	var to_target := player.global_position + Vector3.UP * target_height \
 			- bolt.global_position
-	# A skirmisher shoved onto the raider by the horde fires from EXACTLY
-	# the target point: normalized() hands back a zero vector, look_at is
-	# given an origin equal to its target and errors out (57 times in one
-	# 1200 s soak), leaving the bolt pointing wherever the pool parked it.
-	# The caster's own facing is the honest fallback — it is where the
-	# body was already looking when it decided to shoot.
+	# Si la horda lo empuja encima del raider, dispara desde EXACTAMENTE el
+	# punto objetivo: normalized() da cero y look_at falla. La orientación
+	# propia del tirador es el respaldo honesto.
 	var aim := to_target.normalized() if to_target.length_squared() > AIM_EPSILON_SQ \
 			else -global_transform.basis.z
 	var up := WeaponBase.safe_up(aim)
 	var aim_at := bolt.global_position + aim
-	# look_at refuses an origin it deems equal to its target, and it decides
-	# that with Vector3.is_equal_approx — a tolerance RELATIVE to the
-	# coordinates — so even a unit aim does not rule it out. After the guard
-	# above, one stage soak of iteration 64 still logged "Node origin and
-	# target are in the same position" here, once in ~20 soaks, and eight
-	# instrumented reruns never reproduced it. The engine's own predicate
-	# picks the path: the usual one is untouched, and the degenerate one
-	# builds the very basis look_at would (Basis.looking_at on the aim, the
-	# scale kept) with no position comparison to fail, and says what it saw.
+	# look_at rechaza un origen que considera igual a su objetivo, y lo decide
+	# con Vector3.is_equal_approx (tolerancia RELATIVA a las coordenadas), así
+	# que ni una puntería unitaria lo descarta. Se usa el mismo predicado del
+	# motor: el camino normal queda intacto y el degenerado arma la misma base
+	# que haría look_at (Basis.looking_at, conservando la escala) y lo registra.
 	if bolt.global_position.is_equal_approx(aim_at):
 		print("Skirmisher degenerate aim: bolt=%v aim=%v self=%v" % [
 				bolt.global_position, aim, global_position])
