@@ -14,7 +14,7 @@ extends RefCounted
 ##   runs_on_<id> / victories_<id>: id de MapCatalog.
 ##   slain_<id>: secret_boss_id de la escena de un jefe secreto.
 ##   kills_<script>: nombre del archivo del script del enemigo, sin .gd.
-##   evo_<id> / used_weapon_<id>: id de WEAPON_LIBRARY.
+##   evo_<id> / used_weapon_<id>: id de WeaponCatalog.
 ##
 ## Campos de cada fila:
 ##   id: llave interna (ver arriba). Nunca se muestra.

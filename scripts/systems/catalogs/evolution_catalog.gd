@@ -14,24 +14,24 @@ extends RefCounted
 ##
 ## Se puede cambiar libremente: evolved_name, glyph, mults, adds, flavor.
 ## Llaves internas, NUNCA las cambies: weapon_id y weapon_node (deben ser el id
-## y el node_name de la fila del arma en WEAPON_LIBRARY).
+## y el node_name de la fila del arma en WeaponCatalog).
 ##
 ## Campos de cada fila:
-##   weapon_id, weapon_node: id y node_name del arma base en WEAPON_LIBRARY.
+##   weapon_id, weapon_node: id y node_name del arma base en WeaponCatalog.
 ##       Nunca se muestran.
 ##   evolved_name: nombre nuevo, anunciado en el cartel y mostrado en Colección.
 ##   glyph: sigla de dos letras que dibuja la tira de armas del HUD mientras no
 ##       hay ícono. Se DECLARA, no se deriva de evolved_name: las iniciales de
 ##       los nombres en español chocan («Cáliz de peste» y «Corona de
-##       tempestad» darían «CD»). No debe repetirse en esta biblioteca,
-##       WEAPON_LIBRARY, TOME_LIBRARY ni ITEM_LIBRARY (la tira las mezcla).
+##       tempestad» darían «CD»). No debe repetirse entre armas, evoluciones,
+##       tomos, objetos, power-ups ni mascotas (el lint glyphs_unique lo revisa).
 ##   mults: {propiedad: factor} que se multiplica sobre el nodo del arma al
 ##       evolucionar. La propiedad debe existir en la escena del arma.
 ##   adds: {propiedad: cantidad} que se suma sobre el nodo del arma al
 ##       evolucionar.
 ##   flavor: línea de Colección que describe lo que hace la forma evolucionada.
 ## Texto que ve el jugador: evolved_name y flavor.
-## Guardado: la ceremonia suma "evo_<weapon_id>" y "evolutions_total" en
+## Guardado: cada evolución suma "evo_<weapon_id>" y "evolutions_total" en
 ## SaveData; Colección y las misiones los leen.
 
 ## Cartas que un arma debe recibir (WeaponBase.upgrade_level) por hito: los

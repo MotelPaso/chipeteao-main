@@ -30,7 +30,8 @@ extends Node
 ##   superado): MapCatalog.
 ##   slain_<secret_boss_id>: jefes ocultos (SecretBossBase).
 ##   used_weapon_<weapon_id>: Colección, arma llevada alguna vez (Player y
-##   UpgradePool). evo_<weapon_id>: evoluciones (EvolutionCatalog).
+##   UpgradePool); el id es de WeaponCatalog. evo_<weapon_id>: evoluciones
+##   (EvolutionCatalog).
 ##   kills_<script_del_enemigo>: bestiario (EnemyBase al morir).
 ##   item_<item_id>: objetos tomados (ItemBag).
 ##   daily_best_<fecha>: mejor puntaje de la Cacería diaria de ese día.

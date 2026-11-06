@@ -277,7 +277,7 @@ func _accepted_stat_ids() -> Dictionary[String, bool]:
 
 
 ## El weapon_node_name de cada raider debe ser el node_name de una fila de
-## WEAPON_LIBRARY: así el pool de mejoras encuentra el arma que el raider ya
+## WeaponCatalog: así el pool de mejoras encuentra el arma que el raider ya
 ## lleva; si no coincide, ofrece el arma inicial otra vez como carta «nueva».
 func _check_character_weapons() -> void:
 	var failures: Array[String] = []

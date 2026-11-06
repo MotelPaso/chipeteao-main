@@ -16,15 +16,16 @@ extends RefCounted
 ## Llave interna, NUNCA la cambies: id (el nodo de la mascota se llama
 ## "Pet_<id>").
 ## weapon_scene: el nombre del archivo sin .tscn debe ser el node_name de una
-## fila de WEAPON_LIBRARY (StormRod.tscn -> "StormRod"); así se resuelve el
+## fila de WeaponCatalog (StormRod.tscn -> "StormRod"); así se resuelve el
 ## nombre del arma que ve el jugador.
 ##
 ## Campos de cada fila:
 ##   id: llave interna (ver arriba). Nunca se muestra.
 ##   display_name: texto del jugador.
-##   glyph: sigla de dos letras que dibuja el HUD mientras no hay ícono. Se
-##       DECLARA (no se deriva del nombre) y no debe repetirse entre los glifos
-##       de armas, evoluciones, tomos, objetos y power-ups.
+##   glyph: sigla de dos letras que dibuja la tira de armas del HUD mientras
+##       no hay ícono. Se DECLARA (no se deriva del nombre) y no debe repetirse
+##       entre armas, evoluciones, tomos, objetos, power-ups ni mascotas (el
+##       lint glyphs_unique lo revisa).
 ##   weapon_scene: escena del arma que se instancia bajo la mascota.
 ##   weapon_damage_scale: daño del arma de la mascota respecto de la versión
 ##       del jugador (0-1).
@@ -112,7 +113,7 @@ static func by_id(pet_id: String) -> Dictionary:
 
 
 ## Nombre del arma de la mascota según el catálogo de armas. Sale del nombre
-## del archivo de la escena, que es el node_name de WEAPON_LIBRARY
+## del archivo de la escena, que es el node_name de WeaponCatalog
 ## (StormRod.tscn -> "StormRod"); el nodo vivo se llama "PetWeapon" y no sirve.
 static func weapon_display_name(row: Dictionary) -> String:
 	var scene := String(row.get("weapon_scene", ""))

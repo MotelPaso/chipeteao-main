@@ -24,9 +24,9 @@ extends RefCounted
 ##       no hay ícono (el mismo campo que llevan las filas de ItemCatalog). Se
 ##       DECLARA, no se deriva de display_name: casi todos los nombres en
 ##       español son «Sustantivo de Complemento» y las iniciales chocan («Vara
-##       de brasas» y «Vial de sangre» darían «VD»). No debe repetirse en esta
-##       biblioteca, EvolutionCatalog.EVOLUTION_LIBRARY, Tome.TOME_LIBRARY ni
-##       ItemCatalog.ITEM_LIBRARY: la tira mezcla las cuatro.
+##       de brasas» y «Vial de sangre» darían «VD»). No debe repetirse entre
+##       armas, evoluciones, tomos, objetos, power-ups ni mascotas: la tira los
+##       mezcla (el lint glyphs_unique lo revisa).
 ##   scene: escena del arma que se instancia al ganarla.
 ##   flavor: texto de la carta de arma nueva y de Colección.
 ##   extra_entries (opcional): cartas propias del arma, con el formato de
