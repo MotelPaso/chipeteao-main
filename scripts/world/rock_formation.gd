@@ -1,136 +1,134 @@
 class_name RockFormation
 extends StaticBody3D
-## One rock massif raised over a connected region of blocked arena-mask
-## cells (iteration 63). It replaces the lattice of nine identical sphere
-## rocks per blocked cell that iterations 48-62 packed the mask with: from
-## any distance that fill read as grey bubble wrap laid over a square grid,
-## with every cell outline in plain view and the same height everywhere.
+## Un macizo de roca levantado sobre una región conexa de celdas bloqueadas
+## de la máscara de la arena.
 ##
-## WHAT IT IS. A faceted heightfield over the region's footprint: a steep
-## cliff skirt that starts a noisy margin OUTSIDE the blocked cells, then a
-## slower rise toward a crest whose height follows how deep inside the
-## region a point is — a two-cell ridge reads as a ridge, a compact massif
-## gets a summit. Flat-shaded, one colour per facet: biome rock on the
-## faces, a cap tint on the near-flat tops, strata bands by height.
+## QUÉ ES. Un campo de alturas facetado sobre la huella de la región: un
+## acantilado empinado que empieza con un margen ruidoso FUERA de las celdas
+## bloqueadas, y luego una subida más lenta hacia una cresta cuya altura
+## sigue la profundidad dentro de la región: una cresta de dos celdas se lee
+## como cresta, un macizo compacto tiene cumbre. Sombreado plano, un color
+## por faceta: roca en las caras, tinte de cima en las partes casi planas,
+## bandas de estratos por altura.
 ##
-## COLLISION IS THE MESH. Every grid quad that shows above the ground is
-## also one convex prism: its four surface corners plus the same four sunk
-## under the terrain. The quad is split along whichever diagonal is HIGHER,
-## which is exactly the upper hull of those four corners, so the prism's top
-## is the two triangles you see — nothing invisible to bump into, nothing
-## visible to walk through. Convex prisms rather than one trimesh on
-## purpose: a trimesh has no inside, and the ArenaProbe mask sweep stands a
-## capsule INSIDE the rock at every cell boundary; against a convex solid
-## that is a hit, against a trimesh it is an "opening".
+## LA COLISIÓN ES LA MALLA. Cada cuadrado de la cuadrícula que asoma sobre
+## el suelo es también un prisma convexo: sus cuatro esquinas de superficie
+## más las mismas cuatro hundidas bajo el terreno. El cuadrado se parte por
+## la diagonal MÁS ALTA, que es justo la envolvente superior de esas
+## esquinas, así la tapa del prisma son los dos triángulos que se ven: nada
+## invisible con qué chocar, nada visible que se atraviese. Prismas
+## convexos y no un trimesh a propósito: un trimesh no tiene interior, y el
+## barrido de máscara del ArenaProbe pone una cápsula DENTRO de la roca en
+## cada borde de celda; contra un sólido convexo eso es un choque, contra un
+## trimesh es una "abertura".
 ##
-## THE SEAL. The mask is enforced by this geometry alone (there are no
-## invisible walls since iteration 48), so every boundary a blocked cell
-## shares with an open one must be solid at capsule height. Two choices
-## make that structural instead of likely: the facet step divides the cell
-## size exactly, so every cell boundary is a row of mesh edges (a vertex on
-## a boundary line is only ever jittered ALONG it); and the footprint always
-## starts at least margin_min outside the boundary, where the cliff profile
-## is already well above the ground. build() measures the second one on
-## every boundary vertex and warns below SEAL_MIN_HEIGHT, which fails
-## tools/verificar.sh.
+## EL SELLO. La máscara se impone solo con esta geometría (no hay muros
+## invisibles), así que todo borde que una celda bloqueada comparte con una
+## abierta debe ser sólido a la altura de la cápsula. Dos decisiones lo
+## vuelven estructural y no probable: el paso de faceta divide exacto el
+## tamaño de celda, así cada borde de celda es una fila de aristas (un
+## vértice sobre un borde solo se mueve A LO LARGO de él); y la huella
+## empieza al menos margin_min fuera del borde, donde el acantilado ya está
+## bien sobre el suelo. build() mide lo segundo en cada vértice de borde y
+## avisa bajo SEAL_MIN_HEIGHT, lo que hace fallar tools/verificar.sh.
 ##
-## Built once, by the scatter's place_props(), after the terrain: every
-## height here is relative to Terrain.height_at, so a formation sits on the
-## relief instead of floating over a hollow.
+## La construye una vez place_props() del scatter, después del terreno: toda
+## altura aquí es relativa a Terrain.height_at, así la formación se apoya en
+## el relieve en vez de flotar sobre una hondonada.
 
-## What the faces are drawn with when the scatter hands none over: white
-## albedo multiplied by the per-facet vertex colours built below.
+## Material de las caras si el scatter no entrega otro: albedo blanco
+## multiplicado por los colores de vértice por faceta que se arman abajo.
 const DEFAULT_MATERIAL: Material = preload("res://assets/materials/rock_formation.tres")
-## Sunk depth of the footprint's outer vertices, so the rock meets the
-## relief with no visible seam.
+## Profundidad en metros a la que se hunden los vértices exteriores de la
+## huella, para que la roca toque el relieve sin costura visible.
 const BURY_DEPTH: float = 0.8
-## Floor of every collision prism under the ground: deep enough that no
-## body standing on the terrain can slip under a prism's bottom face.
+## Fondo de cada prisma de colisión bajo el suelo, en metros: lo bastante
+## hondo para que ningún cuerpo sobre el terreno se cuele bajo un prisma.
 const PRISM_DEPTH: float = 1.6
-## Jitter of a vertex off its grid slot, as a fraction of the step. Under
-## 0.25 every quad stays convex in plan, which the prism hull relies on.
+## Desplazamiento de un vértice fuera de su lugar en la cuadrícula, como
+## fracción del paso. Bajo 0.25 todo cuadrado queda convexo en planta, y la
+## envolvente del prisma depende de eso.
 const JITTER: float = 0.22
-## Interior distance stops being measured past this: the profile has
-## flattened out long before.
+## La distancia interior deja de medirse pasados estos metros: el perfil
+## ya se aplanó mucho antes.
 const INTERIOR_CAP: float = 24.0
-## Minimum rock height over the ground ON a cell boundary. The mask sweep's
-## capsule spans 0-1.8 m above the ground there; anything above zero seals,
-## and this keeps a margin over the noise and the terrain's curvature. The
-## worst case of the default profile (margin_min, lift and crag both at
-## their floor) is ~0.95 m.
+## Altura mínima de roca sobre el suelo EN un borde de celda, en metros. La
+## cápsula del barrido ocupa 0-1.8 m sobre el suelo ahí; cualquier altura
+## sobre cero sella, y esto deja margen para el ruido y la curvatura del
+## terreno. El peor caso del perfil por defecto (margin_min, lift y crag en
+## su mínimo) es ~0.95 m.
 const SEAL_MIN_HEIGHT: float = 0.75
-## Strata bands per metre of height (sin argument), for strata_strength.
+## Bandas de estratos por metro de altura (argumento del seno), para strata_strength.
 const STRATA_FREQUENCY: float = 3.1
-## Below this face normal Y a facet is all rock; above CAP_TO it takes the
-## full cap tint: the crest flanks rise at 20-35 degrees (normal Y
-## 0.82-0.94), the cliff skirt at 50-70 (0.34-0.64).
+## Bajo esta normal Y una faceta es toda roca; sobre CAP_TO toma el tinte
+## de cima completo: los flancos de la cresta suben a 20-35 grados (normal
+## Y 0.82-0.94), el acantilado a 50-70 (0.34-0.64).
 const CAP_FROM: float = 0.8
 const CAP_TO: float = 0.94
-## Brightness of a vertical face against a flat one (slope shading).
+## Brillo de una cara vertical frente a una plana (sombreado por pendiente).
 const STEEP_SHADE: float = 0.58
-## Brightness at the very foot, recovering to 1 by FOOT_HEIGHT metres up.
+## Brillo en el pie mismo, que vuelve a 1 a FOOT_HEIGHT metros de altura.
 const FOOT_SHADE: float = 0.78
 const FOOT_HEIGHT: float = 2.5
-## +- per-facet brightness grain.
+## Grano de brillo +- por faceta.
 const GRAIN: float = 0.07
-## Fraction of max_height where the soft ceiling starts to bend heights.
+## Fracción de max_height donde el techo suave empieza a doblar las alturas.
 const KNEE: float = 0.75
 
-## Mask geometry, copied from the scatter before build().
+## Geometría de la máscara en metros, copiada del scatter antes de build().
 var cell_size: float = 10.0
 var half_extent: float = 120.0
-## Target facet size in metres; build() rounds it so it divides cell_size.
+## Tamaño de faceta deseado en metros; build() lo redondea para que divida cell_size.
 var mesh_step: float = 2.0
-## Noisy distance the footprint reaches past the blocked cells.
+## Distancia ruidosa, en metros, que la huella llega más allá de las celdas bloqueadas.
 var margin_min: float = 1.0
 var margin_max: float = 2.0
-## The cliff skirt: height reached over cliff_run metres inward of the
-## footprint's edge, steepest at the foot.
+## El acantilado: altura en metros alcanzada a cliff_run metros hacia
+## dentro del borde de la huella, más empinado en el pie.
 var cliff_height: float = 2.6
 var cliff_run: float = 2.0
-## Extra height toward the crest: 1 - e^(-d / peak_run) of it, d being the
-## depth past the cliff. Depth is distance to the region's outline, so the
-## crest runs along the formation's spine — a ridge reads as a ridge.
+## Altura extra hacia la cresta: 1 - e^(-d / peak_run) de ella, con d la
+## profundidad pasado el acantilado. La profundidad es la distancia al
+## contorno de la región, así la cresta sigue el espinazo de la formación.
 var peak_height: float = 4.0
 var peak_run: float = 7.0
-## Summits: a ridged noise field that only grows where the rock is already
-## deep, so peaks break the crest line instead of the cliff skirt.
+## Cumbres: un ruido ridged que solo crece donde la roca ya es profunda,
+## para que los picos rompan la cresta y no el acantilado.
 var spire_height: float = 2.4
-## Ceiling above the ground. EnemyBase.max_climb_height (10 m) caps a
-## single scramble, and a face taller than that is one the horde gives up
-## on halfway, so this stays under it. Approached through a soft knee from
-## KNEE of it upward: a hard clamp sliced every summit that reached it into
-## a flat table at exactly this height.
+## Techo sobre el suelo, en metros. EnemyBase.max_climb_height (10 m) limita
+## una trepada y la horda abandona una cara más alta a medio camino, así que
+## esto queda bajo eso. Se alcanza con una rodilla suave desde KNEE de él: un
+## corte duro dejaría cada cumbre como una mesa plana a esta altura.
 var max_height: float = 8.0
-## +- fraction the whole profile swells or sags across the formation.
+## Fracción +- en que todo el perfil se hincha o se hunde a lo largo de la formación.
 var lift_variation: float = 0.35
-## Amplitude of the facet-scale noise that makes the surface craggy.
+## Amplitud en metros del ruido a escala de faceta que vuelve rugosa la superficie.
 var crag_height: float = 0.6
-## Ledges: their height, and how hard heights snap to them (0 = off).
+## Escalones: su altura en metros y cuánto se ajustan las alturas a ellos (0 = sin escalones).
 var terrace_step: float = 1.6
 var terrace_strength: float = 0.0
 var rock_color: Color = Color(0.31, 0.32, 0.35)
 var cap_color: Color = Color(0.25, 0.39, 0.2)
-## How much of the cap tint a flat top takes (0 = bare rock everywhere).
+## Cuánto tinte de cima toma una cima plana (0 = roca desnuda en todas partes).
 var cap_strength: float = 0.65
-## +- brightness of the horizontal bands (0 = none).
+## Variación de brillo +- de las bandas horizontales (0 = sin bandas).
 var strata_strength: float = 0.05
-## Left null, DEFAULT_MATERIAL.
+## Vacío, se usa DEFAULT_MATERIAL.
 var surface_material: Material = null
 
-## Stats for the scatter's one-line log, valid after build().
+## Estadísticas para el log de una línea del scatter, válidas tras build().
 var face_count: int = 0
 var prism_count: int = 0
-## Boundary vertices that came out under SEAL_MIN_HEIGHT (should be 0).
+## Vértices de borde que quedaron bajo SEAL_MIN_HEIGHT (debería ser 0).
 var seal_low: int = 0
-## Height of the tallest vertex over its own ground.
+## Altura del vértice más alto sobre su propio suelo, en metros.
 var tallest: float = 0.0
 
 var _cells: Dictionary[Vector2i, bool] = {}
 var _terrain: Terrain = null
 var _step: float = 2.0
 var _seed: int = 0
-## The surface being assembled: one entry per facet corner, flat-shaded.
+## La superficie en construcción: una entrada por esquina de faceta, sombreado plano.
 var _vertices := PackedVector3Array()
 var _normals := PackedVector3Array()
 var _colors := PackedColorArray()
@@ -140,9 +138,9 @@ var _edge_noise := FastNoiseLite.new()
 var _spire_noise := FastNoiseLite.new()
 
 
-## Raises the formation over `cells` (one connected region, grid coords of
-## the scatter's mask). `noise_seed` is the run's seed, so BONK_GAME_SEED and
-## the Daily Hunt reproduce the same rock as well as the same mask.
+## Levanta la formación sobre `cells` (una región conexa, en coordenadas de
+## la máscara del scatter). `noise_seed` es la semilla de la partida, así
+## BONK_GAME_SEED y la Cacería diaria reproducen la misma roca y la misma máscara.
 func build(cells: Dictionary[Vector2i, bool], terrain: Terrain, noise_seed: int) -> void:
 	_cells = cells
 	_terrain = terrain
@@ -150,9 +148,9 @@ func build(cells: Dictionary[Vector2i, bool], terrain: Terrain, noise_seed: int)
 	_setup_noise(noise_seed)
 	var per_cell := maxi(int(round(cell_size / maxf(mesh_step, 0.5))), 1)
 	_step = cell_size / float(per_cell)
-	# Footprint bounds, padded by the widest margin plus one step, snapped
-	# outward to the global facet grid (which shares its origin with the
-	# cell grid — that alignment is THE SEAL above).
+	# Límites de la huella, con el margen máximo más un paso, ajustados hacia
+	# fuera a la cuadrícula global de facetas (comparte origen con la de
+	# celdas: esa alineación es EL SELLO de arriba).
 	var low := Vector2i(1 << 30, 1 << 30)
 	var high := Vector2i(-(1 << 30), -(1 << 30))
 	for cell: Vector2i in _cells:
@@ -201,8 +199,8 @@ func build(cells: Dictionary[Vector2i, bool], terrain: Terrain, noise_seed: int)
 			if heights[a] < 0.0 and heights[b] < 0.0 and heights[c] < 0.0 and heights[d] < 0.0:
 				continue
 			var key := ((first.y + row) * 65536 + (first.x + column)) * 2
-			# The HIGHER diagonal: the upper hull of the four corners, so the
-			# prism below and the two faces drawn are the same surface.
+			# La diagonal MÁS ALTA: la envolvente superior de las cuatro
+			# esquinas, así el prisma y las dos caras dibujadas son la misma superficie.
 			if tops[a].y + tops[d].y >= tops[b].y + tops[c].y:
 				_emit(tops[a], tops[b], tops[d], heights[a] + heights[b] + heights[d], key)
 				_emit(tops[a], tops[d], tops[c], heights[a] + heights[d] + heights[c], key + 1)
@@ -231,16 +229,16 @@ func build(cells: Dictionary[Vector2i, bool], terrain: Terrain, noise_seed: int)
 	view.mesh = mesh
 	view.material_override = surface_material if surface_material != null else DEFAULT_MATERIAL
 	add_child(view)
-	# The build buffers are dead weight once the mesh owns its copy.
+	# Los búferes de construcción sobran cuando la malla ya tiene su copia.
 	_vertices = PackedVector3Array()
 	_normals = PackedVector3Array()
 	_colors = PackedColorArray()
 
 
 func _setup_noise(noise_seed: int) -> void:
-	# Four fields from one seed: the profile's swell over tens of metres,
-	# the facet-scale crags, the wobble of the footprint's outline and the
-	# summits.
+	# Cuatro campos de una semilla: la ondulación del perfil a decenas de
+	# metros, la rugosidad a escala de faceta, el temblor del contorno de la
+	# huella y las cumbres.
 	_lift_noise.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH
 	_lift_noise.seed = noise_seed
 	_lift_noise.frequency = 1.0 / 28.0
@@ -259,8 +257,9 @@ func _setup_noise(noise_seed: int) -> void:
 	_spire_noise.fractal_octaves = 1
 
 
-## World XZ of facet-grid vertex (gx, gz), jittered. A vertex sitting on a
-## cell boundary line keeps that coordinate exactly (see THE SEAL).
+## XZ de mundo del vértice (gx, gz) de la cuadrícula de facetas, con jitter.
+## Un vértice sobre una línea de borde de celda conserva esa coordenada
+## exacta (ver EL SELLO).
 func _vertex_xz(gx: int, gz: int, per_cell: int) -> Vector2:
 	var x := -half_extent + float(gx) * _step
 	var z := -half_extent + float(gz) * _step
@@ -271,8 +270,9 @@ func _vertex_xz(gx: int, gz: int, per_cell: int) -> Vector2:
 	return Vector2(x, z)
 
 
-## Distance from `at` to the region's outline: positive inside (to the
-## nearest cell NOT in this region, off-grid included), negative outside.
+## Distancia de `at` al contorno de la región: positiva dentro (a la celda
+## más cercana que NO es de la región, fuera de la cuadrícula incluida),
+## negativa fuera.
 func _signed_distance(at: Vector2) -> float:
 	var cell := Vector2i(floori((at.x + half_extent) / cell_size),
 			floori((at.y + half_extent) / cell_size))
@@ -287,7 +287,7 @@ func _signed_distance(at: Vector2) -> float:
 					var other := cell + Vector2i(dx, dz)
 					if not _cells.has(other):
 						best = minf(best, _distance_to_cell(at, other))
-			# Ring r+1 is at least r cells away: nothing past here can win.
+			# El anillo r+1 está a r celdas o más: nada más allá puede ganar.
 			if best <= float(ring) * cell_size:
 				break
 		return best
@@ -309,15 +309,15 @@ func _distance_to_cell(at: Vector2, cell: Vector2i) -> float:
 	return sqrt(dx * dx + dz * dz)
 
 
-## How far past the blocked cells the footprint reaches at `at`.
+## Cuánto llega la huella más allá de las celdas bloqueadas en `at`.
 func _margin(at: Vector2) -> float:
-	# FBM simplex rarely leaves +-0.7; stretched so the whole range is used.
+	# El FBM simplex rara vez sale de +-0.7; se estira para usar todo el rango.
 	var wobble := clampf(_edge_noise.get_noise_2d(at.x, at.y) * 0.7 + 0.5, 0.0, 1.0)
 	return lerpf(margin_min, margin_max, wobble)
 
 
-## Rock height over the ground at `depth` metres inward of the footprint's
-## edge (negative = outside it, i.e. sunk).
+## Altura de la roca sobre el suelo a `depth` metros hacia dentro del borde
+## de la huella (negativo = fuera de ella, o sea hundida).
 func _profile(depth: float, at: Vector2) -> float:
 	if depth <= 0.0:
 		return -BURY_DEPTH
@@ -345,10 +345,10 @@ func _ground(at: Vector2) -> float:
 	return _terrain.height_at(at.x, at.y) if _terrain != null else 0.0
 
 
-## One flat-shaded facet. Godot's front face is CLOCKWISE seen from the
-## front, so a facet seen from above must have its right-hand normal
-## pointing DOWN — the same rule, and the same reason, as Terrain's ground.
-## `height_sum` is the three corners' heights over the ground, summed.
+## Una faceta de sombreado plano. La cara frontal en Godot es la HORARIA
+## vista de frente, así que una faceta vista desde arriba tiene su normal de
+## mano derecha hacia ABAJO: la misma regla que el suelo del Terrain.
+## `height_sum` es la suma de las alturas de las tres esquinas sobre el suelo.
 func _emit(v0: Vector3, v1: Vector3, v2: Vector3, height_sum: float, key: int) -> void:
 	var cross := (v1 - v0).cross(v2 - v0)
 	if cross.y > 0.0:
@@ -365,11 +365,11 @@ func _emit(v0: Vector3, v1: Vector3, v2: Vector3, height_sum: float, key: int) -
 	face_count += 1
 
 
-## Rock on the faces, the cap tint on the gentle tops, steep faces darker
-## than shallow ones, darker at the foot, banded by height and grained per
-## facet. The slope shading is BAKED on purpose: under the arenas' bright
-## sky ambient and fog the sun alone barely separates a cliff from a crest,
-## and the first build read as one pale paper model.
+## Roca en las caras, tinte de cima en las partes suaves, caras empinadas
+## más oscuras que las suaves, más oscuro al pie, bandas por altura y grano
+## por faceta. El sombreado por pendiente va HORNEADO a propósito: con el
+## cielo claro y la niebla de las arenas el sol solo apenas separa un
+## acantilado de una cresta, y la roca se leería como una maqueta de papel.
 func _facet_color(normal: Vector3, height: float, key: int) -> Color:
 	var cap := smoothstep(CAP_FROM, CAP_TO, normal.y) * cap_strength
 	var base := rock_color.lerp(cap_color, cap)
@@ -381,9 +381,9 @@ func _facet_color(normal: Vector3, height: float, key: int) -> Color:
 	return Color(base.r * value, base.g * value, base.b * value, 1.0)
 
 
-## Deterministic hash of two ints and a salt into [0, 1]: vertex jitter and
-## facet grain must not draw from any RNG stream, or two builds of the same
-## seed would disagree.
+## Hash determinista de dos enteros y una sal a [0, 1]: el jitter de
+## vértices y el grano de facetas no deben sacar números de ningún RNG, o dos
+## construcciones con la misma semilla no coincidirían.
 static func _hash01(x: int, z: int, salt: int) -> float:
 	var h := (x * 374761393 + z * 668265263 + salt * 1442695041) & 0x7fffffff
 	h = ((h ^ (h >> 13)) * 1274126177) & 0x7fffffff

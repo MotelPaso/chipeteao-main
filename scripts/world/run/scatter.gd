@@ -1,170 +1,164 @@
 extends Node3D
-## Deterministic ready-time prop scatter for the arena maps (GDD 7).
-## A seeded RandomNumberGenerator fills the field with three prop kinds
-## (Hollow Woods: trees/rocks/stumps; Ash Dunes: cacti/boulders/bone
-## piles) and rings the floor edge with a denser prop line so the bounds
-## read as biome instead of void. Keeps a clear radius around the player
-## spawn (origin) and around every node in the "scatter_keepout" group
-## (hand-placed verticality spots, rock clusters, interactables), and
-## enforces a minimum spacing between props so the no-navmesh grunt horde
-## always has wide walkable lanes (canopies carry no collision, so only
-## trunks/rocks actually block).
+## Reparto determinista de la arena: props interiores (árboles, rocas y
+## tocones o sus equivalentes del bioma), una franja más densa en el borde
+## para que el límite se lea como paisaje y no como vacío, mesetas, y la
+## máscara de celdas caminables con sus formaciones de roca.
+## Deja libre un radio alrededor del spawn (origen) y de cada nodo del grupo
+## "scatter_keepout", y una distancia mínima entre props para que la horda
+## (sin navmesh) siempre tenga pasillos anchos. Las copas no tienen
+## colisión: solo bloquean troncos y rocas.
 
-## The four steps of the mask's 4-neighbourhood: blob growth, the notch
-## fill, the flood fill and the region split all walk the same one.
+## Los cuatro pasos de la vecindad-4 de la máscara: crecimiento, relleno de
+## muescas, flood fill y división en regiones usan la misma.
 const STEPS: Array[Vector2i] = [Vector2i.LEFT, Vector2i.RIGHT, Vector2i.UP, Vector2i.DOWN]
-## "No cell found", for the formation seed picker.
+## "Ninguna celda", para el selector de semillas de formación.
 const NO_CELL := Vector2i(-1, -1)
-## Pull toward cells already touching the formation on two or more sides
-## while it grows: what makes a formation a solid mass instead of a
-## scribble of one-cell arms.
+## Atracción hacia celdas ya rodeadas por dos o más lados mientras la
+## formación crece: da masas sólidas en vez de brazos de una celda.
 const FORMATION_COMPACTNESS: float = 1.0
 
+## Semilla fija del reparto. Solo se usa con randomize_per_run apagado.
 @export var scatter_seed: int = 71382
 
-## True (the shipping default) re-seeds the scatter every run, so each
-## hunt reads as a fresh clearing instead of the same memorized forest.
-## Flip off (or in a harness, set a seed and this to false) to get the
-## old deterministic layout back for reproducible tests.
+## Encendido, cada partida siembra el reparto desde el RNG de la partida
+## (BONK_GAME_SEED lo reproduce). Apagado, usa scatter_seed: el mismo mapa
+## en cada partida.
 @export var randomize_per_run: bool = true
 
-## Single source of truth for the arena's half-size (floor is a square of
-## side 2x this). Consumers (BossBase clamp, EnemySpawner floor-plate
-## clamp) read it at ready through the "arena_bounds" group and subtract
-## their own margin, so resizing a map is this one number plus the floor/
-## wall geometry in the scene.
+## Mitad del lado de la arena, en metros (el suelo es un cuadrado de 2x
+## esto). BossBase, EnemySpawner, WorldDirector, el mapa y el Backdrop lo
+## leen por el grupo "arena_bounds" y le restan su propio margen.
 @export var arena_half_extent: float = 120.0
 
 @export_group("Prop Scenes")
+## Prop interior principal (árbol en el bosque, cactus en las dunas).
 @export var tree_scene: PackedScene
+## Segundo prop interior; también es el acento del borde si
+## perimeter_accent_scene está vacío.
 @export var rock_scene: PackedScene
+## Tercer prop interior.
 @export var stump_scene: PackedScene
 
 @export_group("Arena Mask")
-## Iteration 44: the square arena gets an IRREGULAR walkable shape each
-## run — a coarse cell grid where a few regions of cells are blocked by
-## rock (iteration 48: no invisible collider, the rock IS the wall;
-## iteration 63: one sculpted RockFormation per region instead of a lattice
-## of boulders). A flood fill from the spawn guarantees every open cell is
-## reachable on foot; unreachable pockets are blocked too. Spawner, director
-## and this scatter all ask is_walkable() before placing anything.
+## Encendida, la arena cuadrada recibe en cada partida una forma caminable
+## irregular: una cuadrícula gruesa donde algunas regiones de celdas quedan
+## tapadas por formaciones de roca (la roca es el muro; no hay colisión
+## invisible). Un flood fill desde el spawn garantiza que toda celda
+## abierta se alcanza a pie. Spawner, director y este scatter preguntan
+## is_walkable() antes de colocar nada.
 @export var mask_enabled: bool = true
-## 5 m since iteration 63 (it was 10). A formation can only be as round as
-## the grid it is drawn on: at 10 m every formation came out a Tetris piece
-## of 2-4 squares with dead-straight cliffs, and no margin noise hides that.
+## Lado de una celda de la máscara, en metros. Una formación solo es tan
+## redonda como la cuadrícula: con celdas grandes salen piezas cuadradas.
 @export var mask_cell_size: float = 5.0
-## Rock formations seeded per stage. Iteration 63 cut this from 13-22
-## random-walk blobs, which buried a fifth to a third of every arena under
-## rock (120-133 of 576 cells on the seed-7 soaks, up to 38% by the old
-## open-fraction gate).
+## Formaciones de roca sembradas por etapa (mínimo y máximo).
 @export var mask_blobs_min: int = 5
 @export var mask_blobs_max: int = 8
-## Cells each formation grows to from its seed (25 m² each at 5 m cells).
+## Celdas que crece cada formación desde su semilla (25 m² por celda de 5 m).
 @export var mask_blob_cells_min: int = 20
 @export var mask_blob_cells_max: int = 50
-## How hard a formation stretches along its own random axis while it
-## grows: 0 grows round massifs, ~3 grows ridges. Each formation rolls its
-## own stretch in [0, this], so a stage gets both.
+## Cuánto se estira una formación a lo largo de su propio eje al crecer:
+## 0 da macizos redondos, ~3 da crestas. Cada formación sortea su
+## estiramiento en [0, esto], así una etapa tiene de ambos.
 @export var mask_ridge_bias: float = 3.0
-## Minimum Chebyshev distance between two formation seeds, in cells, so
-## the formations stay distinct landmarks instead of fusing into one plate.
+## Distancia mínima (Chebyshev, en celdas) entre semillas de formación,
+## para que sigan siendo hitos distintos y no se fundan en una placa.
 @export var mask_blob_spacing: int = 10
-## Open cells always left between two different formations. Each one
-## reaches up to RockFormation.margin_max past its cells, so a one-cell gap
-## would close to a slot barely wider than a raider.
+## Celdas abiertas que siempre quedan entre dos formaciones distintas. Cada
+## una llega hasta RockFormation.margin_max más allá de sus celdas, así que
+## un hueco de una celda se cerraría a una ranura apenas más ancha que un raider.
 @export var mask_formation_gap: int = 2
-## Width of the outer ring of cells where rock never seeds or grows. With
-## the perimeter band always open a formation cannot cut a corner off, and
-## cutting corners off is what made the flood fill seal whole corners of
-## the map into the giant plates iterations 51-62 shipped.
+## Ancho, en celdas, del anillo exterior donde la roca nunca siembra ni
+## crece. Con el borde siempre abierto una formación no corta una esquina
+## del mapa, y el flood fill no sella esquinas enteras.
 @export var mask_border_cells: int = 2
-## Radius around the spawn and each authored verticality spot that never
-## gets rock. In metres, so it survives a change of mask_cell_size (it used
-## to be "the cell and its neighbours", i.e. 10-20 m at 10 m cells).
+## Radio en metros alrededor del spawn y de cada spot de verticalidad de
+## autor donde nunca hay roca.
 @export var mask_protect_radius: float = 15.0
-## Below this open fraction the mask is rebuilt with fewer formations.
+## Si la fracción abierta (0-1) queda bajo esto, la máscara se reconstruye
+## con menos formaciones.
 @export var mask_min_open_fraction: float = 0.84
 
-## Blocked cells (grid coords -> true) and the grid size (cells per side).
+## Celdas bloqueadas (coordenadas de cuadrícula -> true) y celdas por lado.
 var _blocked: Dictionary[Vector2i, bool] = {}
 var _mask_cells_per_side: int = 0
-## Frozen at _enter_tree (see run_seed).
+## Se fija en _enter_tree (ver run_seed).
 var _run_seed: int = 0
-## Flat centres of this stage's mesas (see mesa_sites).
+## Centros planos de las mesetas de esta etapa (ver mesa_sites).
 var _mesa_sites: PackedVector2Array = PackedVector2Array()
 
 @export_group("Mesas (iteration 51)")
-## Raised platform+ramp clusters the terrain flattens a pad under. They
-## are what makes a 240x240 arena readable: relief alone is too soft to
-## navigate by, and a mesa is a landmark you can name.
+## Mesetas (plataforma + rampa) por etapa; el Terrain aplana un claro bajo
+## cada una. Son los hitos con nombre que vuelven legible una arena grande.
 @export var mesa_count: int = 5
-## Minimum distance between two mesa centres, and from spawn/keepouts.
+## Distancia mínima en metros entre centros de meseta, y al spawn y a los
+## keepouts.
 @export var mesa_min_spacing: float = 42.0
-## Half-extent mesas are sampled in (inside the interior square).
+## Mitad del cuadrado donde se sortean los centros de meseta, en metros.
 @export var mesa_half_extent: float = 92.0
-## Platform and ramp scenes for this biome's mesas. Left null the biome
-## falls back to nothing (no mesas), which is a configuration error worth
-## seeing rather than a silent flat map.
+## Escenas de plataforma y rampa del bioma. Sin plataforma no hay mesetas:
+## es un error de configuración que se ve, no un mapa plano en silencio.
 @export var mesa_platform_scene: PackedScene
 @export var mesa_ramp_scene: PackedScene
-## Uniform scale range of a mesa platform, and how far the ramp sits from
-## the platform centre.
+## Rango de escala uniforme de la plataforma de una meseta.
 @export var mesa_scale_min: float = 1.0
 @export var mesa_scale_max: float = 1.6
+## Sin uso: la rampa se coloca a 4.95 m del centro (ver _build_mesas).
 @export var mesa_ramp_offset: float = 5.5
-## Radius around a mesa site that must be free of blocked cells: the
-## platform at its largest plus the ramp's reach, so neither one is ever
-## built into the side of a rock formation.
+## Radio en metros alrededor de una meseta que debe quedar libre de celdas
+## bloqueadas: la plataforma más grande más el alcance de la rampa.
 @export var mesa_clearance: float = 12.0
 
 @export_group("Rock Formations (iteration 63)")
-## Every connected region of blocked cells becomes ONE RockFormation (see
-## rock_formation.gd): a faceted massif whose collision is its own mesh.
-## Colours are sRGB, like any albedo picked in the inspector.
+## Cada región conexa de celdas bloqueadas se vuelve UNA RockFormation
+## (rock_formation.gd): un macizo facetado cuya colisión es su propia malla.
+## Colores en sRGB, como cualquier albedo del inspector.
 @export var formation_rock_color: Color = Color(0.31, 0.32, 0.35)
 @export var formation_cap_color: Color = Color(0.25, 0.39, 0.2)
-## How much of the cap tint the gentle tops take (0 = bare rock).
+## Cuánto tinte de cima toman las partes casi planas (0 = roca desnuda).
 @export var formation_cap_strength: float = 0.65
-## +- brightness of horizontal strata bands (0 = none).
+## Variación de brillo +- de las bandas de estratos (0 = sin bandas).
 @export var formation_strata: float = 0.05
-## How hard heights snap to ledges (0 = crags, 1 = stepped mesas).
+## Cuánto se ajustan las alturas a escalones (0 = riscos, 1 = mesetas escalonadas).
 @export var formation_terrace: float = 0.0
-## Cliff skirt height, and the extra rise toward a formation's crest.
-## Together (plus noise) they stay under RockFormation.max_height, which
-## stays under what one enemy climb can scale.
+## Altura del acantilado y altura extra hacia la cresta, en metros. Juntas
+## (más el ruido) quedan bajo RockFormation.max_height, que queda bajo lo
+## que un enemigo trepa de una vez.
 @export var formation_cliff_height: float = 2.6
 @export var formation_peak_height: float = 4.0
-## Facet size in metres (rounded so it divides mask_cell_size exactly).
+## Tamaño de faceta en metros (se redondea para que divida mask_cell_size).
 @export var formation_step: float = 2.0
-## Interior props keep this far from any blocked cell. A formation reaches
-## up to RockFormation.margin_max past its cells, and a tree growing out of
-## a cliff face reads as a bug.
+## Distancia en metros que los props interiores guardan a cualquier celda
+## bloqueada: una formación llega hasta RockFormation.margin_max más allá
+## de sus celdas, y un árbol saliendo de un acantilado parece un error.
 @export var formation_clearance: float = 2.5
 
 @export_group("Interior Scatter")
-## Props land in [-half_extent, half_extent] on X/Z; keep this inside the
-## perimeter band so the tree line stays visually distinct.
+## Los props caen en [-esto, esto] en X/Z, en metros; queda dentro de la
+## franja del perímetro para que el borde se distinga.
 @export var interior_half_extent: float = 108.0
+## Cantidad de cada prop interior.
 @export var tree_count: int = 128
 @export var rock_count: int = 54
 @export var stump_count: int = 34
-## No props inside this radius around the origin: spawn/tutorial-dummy space.
+## Radio libre de props alrededor del origen (spawn), en metros.
 @export var spawn_clear_radius: float = 9.0
-## No props inside this radius around any "scatter_keepout" node (covers a
-## platform plus its ramp at the largest placed scale).
+## Radio libre de props alrededor de cada nodo "scatter_keepout", en metros
+## (cubre una plataforma con su rampa a la escala máxima).
 @export var keepout_radius: float = 10.5
-## Center-to-center minimum between scattered props: wide horde lanes.
+## Distancia mínima entre centros de props, en metros: pasillos anchos para la horda.
 @export var min_prop_spacing: float = 5.0
 
 @export_group("Perimeter Line")
-## Optional edge-line overrides for biomes whose rim should differ from
-## the interior mix (dunes: boulder rim with obelisk accents). Left null,
-## the rim falls back to tree_scene with rock_scene accents (forest).
+## Prop del borde y su acento, para biomas cuyo borde difiere del interior
+## (dunas: rocas con obeliscos). Vacíos, el borde usa tree_scene con
+## acentos de rock_scene.
 @export var perimeter_scene: PackedScene
 @export var perimeter_accent_scene: PackedScene
+## Franja del borde: distancias al centro, en metros, entre las que caen los props.
 @export var perimeter_inner: float = 112.0
 @export var perimeter_outer: float = 118.0
-## Distance between slots along each edge; every Nth slot is an accent.
+## Distancia en metros entre ranuras a lo largo de cada lado; cada N-ésima
+## ranura es un acento.
 @export var perimeter_step: float = 9.0
 @export var perimeter_rock_every: int = 5
 
@@ -172,63 +166,53 @@ var _rng := RandomNumberGenerator.new()
 var _placed_xz: PackedVector2Array = PackedVector2Array()
 var _keepouts_xz: PackedVector2Array = PackedVector2Array()
 
-## Interior placements that hit the rejection-sampling attempt cap (kept
-## at 0 by tuning counts/spacing; asserted by the resize test harness).
+## Colocaciones interiores que agotaron sus intentos de muestreo.
 var failed_placements: int = 0
 
 
 func _enter_tree() -> void:
-	# Published before any sibling's _ready (tree order), so the spawner's
-	# bounds lookup always finds it.
+	# Se publica antes del _ready de cualquier hermano (orden del árbol): el
+	# spawner y el Terrain siempre lo encuentran.
 	add_to_group("arena_bounds")
 	if GameConfig.daily_mode and GameConfig.daily_seed != 0:
-		# Daily Hunt: every player walks the same field that day.
+		# Cacería diaria: todos juegan el mismo campo ese día.
 		_rng.seed = GameConfig.daily_seed
 	elif randomize_per_run:
-		# Drawn from the RUN's stream, not from _rng.randomize(): that call
-		# reseeds from system entropy and is deaf to RunState.reset(), so
-		# BONK_GAME_SEED (and any two-sided comparison built on it) never
-		# actually reproduced the mask, the props or the relief standing on
-		# them — two "identical" soaks came out with different arenas. A
-		# normal run is unaffected: reset() randomize()s the same stream.
+		# Del RNG global de la partida y no de _rng.randomize(), que usa
+		# entropía del sistema: así RunState.reset() y BONK_GAME_SEED
+		# reproducen la máscara, los props y el relieve.
 		_rng.seed = randi()
 	else:
 		_rng.seed = scatter_seed
-	# Frozen here, before anything draws from the stream: the Terrain node
-	# seeds its noise from this in ITS _ready, and a terrain that did not
-	# match the props standing on it would be a different arena every time
-	# the two were built in a different order.
+	# Se fija aquí, antes de cualquier sorteo: el Terrain siembra su ruido
+	# con esto en SU _ready, y el relieve tiene que coincidir con los props
+	# sea cual sea el orden en que se construyen.
 	_run_seed = int(_rng.seed)
-	# The mask must exist before the WorldDirector (later in tree order)
-	# shuffles interactables in ITS _enter_tree.
+	# La máscara debe existir antes del _ready del Terrain y antes de que el
+	# WorldDirector baraje los interactuables (desde Arena._ready).
 	if mask_enabled:
 		_build_mask()
-	# Mesa sites right after the mask (iteration 51): the Terrain reads
-	# them as flat pads in its _ready, and place_props() builds the
-	# platform + ramp on each one later.
+	# Sitios de meseta justo después de la máscara: el Terrain los lee como
+	# claros planos en su _ready, y place_props() construye cada meseta.
 	_pick_mesa_sites()
 
 
-## This run's seed, valid from _enter_tree onward. Read through the
-## "arena_bounds" group by the Terrain, so relief and props always agree.
+## Semilla de esta partida, válida desde _enter_tree. El Terrain la lee por
+## el grupo "arena_bounds", así relieve y props siempre coinciden.
 func run_seed() -> int:
 	return _run_seed
 
 
-## Flat XZ centres of this stage's mesas, for the Terrain's pads and for
-## place_props(). Empty before _enter_tree.
+## Centros XZ de las mesetas de esta etapa, para los claros del Terrain y
+## para place_props(). Vacío antes de _enter_tree.
 func mesa_sites() -> PackedVector2Array:
 	return _mesa_sites
 
 
-## Dressing the arena is NOT done in _ready any more (iteration 49): the
-## Arena root calls this AFTER the WorldDirector has shuffled the ground
-## POIs, so the keepout list below reads the SHUFFLED positions. That
-## ordering used to come from the director living in the arena and doing
-## its shuffle in _enter_tree; with one persistent director for the whole
-## run, the arena has to sequence it explicitly.
-## Idempotent by construction: an arena is dressed exactly once, when it
-## is built for its stage.
+## Viste la arena. No corre en _ready: Arena._ready lo llama DESPUÉS de que
+## el WorldDirector baraja los POIs del suelo, así la lista de keepouts lee
+## las posiciones ya barajadas. Una arena se viste una sola vez, al
+## construirse para su etapa.
 func place_props() -> void:
 	if mask_enabled:
 		_raise_formations()
@@ -237,8 +221,8 @@ func place_props() -> void:
 		var spot := node as Node3D
 		if spot == null or not is_inside_tree() or not spot.is_inside_tree():
 			continue
-		# Only THIS arena's keepouts: during a stage swap the outgoing
-		# arena can still be in the tree, and its POIs are not ours.
+		# Solo los keepouts de ESTA arena: durante un cambio de etapa la
+		# arena saliente puede seguir en el árbol, y sus POIs no son nuestros.
 		if not owner_arena_contains(spot):
 			continue
 		_keepouts_xz.append(Vector2(spot.global_position.x, spot.global_position.z))
@@ -248,10 +232,10 @@ func place_props() -> void:
 	_ring_perimeter()
 
 
-## True when `node` belongs to the same arena scene as this scatter. The
-## arena root is this node's nearest ancestor in group "arena_root".
-## Found by TYPE, not by the "arena_root" group: Arena claims that group
-## in its _ready, and this is also called from _enter_tree (mesa sites).
+## True si `node` pertenece a la misma escena de arena que este scatter (la
+## Arena ancestro más cercana). Se busca por TIPO y no por el grupo
+## "arena_root": Arena entra a ese grupo en su _ready, y esto también se
+## llama desde _enter_tree (sitios de meseta).
 func owner_arena_contains(node: Node) -> bool:
 	var arena: Node = self
 	while arena != null and not (arena is Arena):
@@ -259,9 +243,9 @@ func owner_arena_contains(node: Node) -> bool:
 	return arena == null or arena.is_ancestor_of(node)
 
 
-## Rejection-samples `count` positions inside the interior square, skipping
-## anything too close to spawn, a keepout spot, or an already-placed prop.
-## The attempt cap keeps a crowded/misconfigured setup from looping forever.
+## Muestreo por rechazo de `count` posiciones en el cuadrado interior, lejos
+## del spawn, de los keepouts y de los props ya puestos. El tope de intentos
+## evita un bucle infinito si la configuración no cabe.
 func _place_many(scene: PackedScene, count: int, min_scale: float, max_scale: float) -> void:
 	if scene == null:
 		return
@@ -296,9 +280,9 @@ func _is_clear(pos: Vector3) -> bool:
 	return true
 
 
-## Walks the four floor edges placing big rim props (and the odd accent)
-## in a jittered band, so the map edge reads as biome instead of void. The
-## band sits outside the interior square, so no spacing checks are needed.
+## Recorre los cuatro lados del suelo plantando props grandes (y algún
+## acento) en una franja con jitter. La franja queda fuera del cuadrado
+## interior, así que no revisa distancias.
 func _ring_perimeter() -> void:
 	if _perimeter_main() == null:
 		return
@@ -333,11 +317,10 @@ func _perimeter_accent() -> PackedScene:
 	return perimeter_accent_scene if perimeter_accent_scene != null else rock_scene
 
 
-## Uniform scale only: non-uniform scaling of collision shapes is not
-## supported by Godot physics.
-## `pos.y` is IGNORED and replaced by the terrain height at that XZ
-## (iteration 51): nothing in this project is placed at y = 0 any more, and
-## a prop left there would float over a hill or sink into a hollow.
+## Solo escala uniforme: Godot no soporta escalar formas de colisión de
+## forma no uniforme. `pos.y` se IGNORA y se usa la altura del terreno en
+## ese XZ: un prop a y = 0 flotaría sobre una loma o se hundiría en una
+## hondonada.
 func _spawn_prop(scene: PackedScene, pos: Vector3, uniform_scale: float) -> void:
 	var prop := scene.instantiate() as Node3D
 	if prop == null:
@@ -348,9 +331,9 @@ func _spawn_prop(scene: PackedScene, pos: Vector3, uniform_scale: float) -> void
 	prop.scale = Vector3.ONE * uniform_scale
 
 
-## Terrain height at a flat position, or 0 where there is no terrain yet
-## (a scene without one, or a consumer running before it built). Every
-## placement in this file goes through here.
+## Altura del terreno en una posición plana, o 0 donde aún no hay terreno
+## (una escena sin él, o un consumidor que corre antes de que se construya).
+## Toda colocación de este archivo pasa por aquí.
 func ground_height(x: float, z: float) -> float:
 	var terrain := Terrain.find(get_tree())
 	if terrain == null:
@@ -359,12 +342,12 @@ func ground_height(x: float, z: float) -> float:
 	return terrain.height_at(x, z)
 
 
-## --- mesas (iteration 51) -------------------------------------------------
+## --- mesetas --------------------------------------------------------------
 
-## Picks the stage's mesa centres: inside the sampling square, on walkable
-## ground, clear of the spawn, of the authored keepouts and of each other.
-## Runs in _enter_tree so the Terrain can flatten a pad under each one
-## before anything is placed.
+## Elige los centros de meseta de la etapa: dentro del cuadrado de muestreo,
+## en suelo caminable, lejos del spawn, de los keepouts de autor y entre sí.
+## Corre en _enter_tree para que el Terrain aplane un claro bajo cada una
+## antes de colocar nada.
 func _pick_mesa_sites() -> void:
 	_mesa_sites = PackedVector2Array()
 	if mesa_count <= 0 or mesa_platform_scene == null:
@@ -399,9 +382,9 @@ func _pick_mesa_sites() -> void:
 			_mesa_sites.append(candidate)
 
 
-## Builds a platform + ramp on each site. The pad under it is already flat
-## (the Terrain read mesa_sites()), so the ramp meets level ground at both
-## ends instead of floating at one.
+## Construye plataforma + rampa en cada sitio. El claro ya es plano (el
+## Terrain leyó mesa_sites()), así la rampa toca suelo parejo en sus dos
+## extremos en vez de flotar en uno.
 func _build_mesas() -> void:
 	if mesa_platform_scene == null:
 		return
@@ -423,7 +406,7 @@ func _build_mesas() -> void:
 		var ramp := mesa_ramp_scene.instantiate() as Node3D
 		if ramp != null:
 			add_child(ramp)
-			# Alinear la rampa exactamente con una de las 4 caras planas de la plataforma
+			# Alinea la rampa con una de las 4 caras planas de la plataforma.
 			var side_idx := _rng.randi_range(0, 3)
 			var local_offsets: Array[Vector3] = [
 				Vector3(4.95, 0.0, 0.0),
@@ -437,12 +420,12 @@ func _build_mesas() -> void:
 			ramp.rotation.y = plat_angle + local_rot_y[side_idx]
 			ramp.scale = Vector3.ONE * scale
 
-		# The mesa counts as a keepout for the interior scatter, so trees
-		# do not grow through the platform it stands on.
+		# La meseta cuenta como keepout del reparto interior, para que no
+		# crezcan árboles a través de su plataforma.
 		_keepouts_xz.append(site)
 
 
-## --- arena mask (iteration 44) ------------------------------------------------
+## --- máscara de la arena --------------------------------------------------
 
 func _cell_of(xz: Vector2) -> Vector2i:
 	return Vector2i(
@@ -461,17 +444,16 @@ func _in_grid(cell: Vector2i) -> bool:
 			and cell.x < _mask_cells_per_side and cell.y < _mask_cells_per_side
 
 
-## True when a flat position is inside the arena and not in a blocked
-## cell. Everything that places bodies or POIs asks this first.
+## True si una posición plana está dentro de la arena y no cae en una celda
+## bloqueada. Todo lo que coloca cuerpos o POIs pregunta esto primero.
 func is_walkable(xz: Vector2) -> bool:
 	if absf(xz.x) > arena_half_extent or absf(xz.y) > arena_half_extent:
 		return false
 	if not mask_enabled or _mask_cells_per_side == 0:
 		return true
-	# The grid, not just the box: a point clamped to exactly +-half_extent
-	# lands one cell PAST the last row, and an off-grid cell is never in
-	# _blocked, so the whole rim used to answer "walkable" no matter what
-	# the mask says there.
+	# La cuadrícula, no solo el cuadrado: un punto en exactamente
+	# +-half_extent cae una celda FUERA de la última fila, y una celda fuera
+	# de la cuadrícula nunca está en _blocked.
 	var cell := _cell_of(xz)
 	return _in_grid(cell) and not _blocked.has(cell)
 
@@ -488,9 +470,9 @@ func cell_size() -> float:
 	return mask_cell_size
 
 
-## Grid coords of every blocked cell. Public for the soak harness, whose
-## mask sweep walks each blocked cell's boundary hunting for a gap the
-## player capsule fits through.
+## Coordenadas de cada celda bloqueada. Pública para el barrido de máscara
+## del harness, que recorre el borde de cada celda bloqueada buscando un
+## hueco por donde quepa la cápsula del jugador.
 func blocked_cells() -> Array[Vector2i]:
 	var cells: Array[Vector2i] = []
 	for cell: Vector2i in _blocked:
@@ -498,20 +480,21 @@ func blocked_cells() -> Array[Vector2i]:
 	return cells
 
 
-## Flat center of a grid cell. Public alongside blocked_cells() so the
-## harness rebuilds an edge with the scatter's own arithmetic and the two
-## can never disagree about where a boundary is.
+## Centro plano de una celda. Público junto a blocked_cells() para que el
+## harness use la misma aritmética que el scatter y nunca discrepen sobre
+## dónde está un borde.
 func cell_center(cell: Vector2i) -> Vector2:
 	return _cell_center(cell)
 
 
-## Grid cell a flat position falls in. Public so a warning about someone
-## standing where they should not can name the cell, not just the metres.
+## Celda donde cae una posición plana. Pública para que un aviso nombre la
+## celda y no solo los metros.
 func cell_of(xz: Vector2) -> Vector2i:
 	return _cell_of(xz)
 
 
-## A random walkable flat point (uniform over open cells, jittered).
+## Un punto plano caminable al azar (uniforme sobre el área abierta), o el
+## origen si 64 intentos fallan.
 func random_walkable_point(margin: float = 4.0) -> Vector2:
 	for attempt in 64:
 		var candidate := Vector2(
@@ -522,8 +505,9 @@ func random_walkable_point(margin: float = 4.0) -> Vector2:
 	return Vector2.ZERO
 
 
-## Cells that must stay open: every cell within mask_protect_radius of the
-## spawn or of a hand-placed keepout (verticality spots, rock clusters).
+## Celdas que deben quedar abiertas: toda celda a menos de
+## mask_protect_radius del spawn o de un keepout de autor (spots de
+## verticalidad, grupos de rocas).
 func _protected_cells() -> Dictionary[Vector2i, bool]:
 	var protected: Dictionary[Vector2i, bool] = {}
 	var seeds: Array[Vector2] = [Vector2.ZERO]
@@ -538,8 +522,9 @@ func _protected_cells() -> Dictionary[Vector2i, bool]:
 		for dx in range(-reach, reach + 1):
 			for dy in range(-reach, reach + 1):
 				var cell := home + Vector2i(dx, dy)
-				# Distance from the seed to the cell's SQUARE, not its centre:
-				# a cell the circle merely clips is still ground the spot needs.
+				# Distancia de la semilla al CUADRADO de la celda, no a su
+				# centro: una celda que el círculo apenas toca sigue siendo
+				# suelo que el spot necesita.
 				var center := _cell_center(cell)
 				var gap := Vector2(maxf(absf(seed_xz.x - center.x) - half, 0.0),
 						maxf(absf(seed_xz.y - center.y) - half, 0.0))
@@ -555,8 +540,8 @@ func _build_mask() -> void:
 	for attempt in 4:
 		_blocked.clear()
 		var seeds: Array[Vector2i] = []
-		# Which formation grew each blocked cell, so the next one can keep
-		# mask_formation_gap away from it.
+		# Qué formación creció cada celda bloqueada, para que la siguiente
+		# guarde mask_formation_gap respecto de ella.
 		var owners: Dictionary[Vector2i, int] = {}
 		for formation in formations:
 			var seed_cell := _pick_formation_seed(seeds, protected, owners)
@@ -573,24 +558,24 @@ func _build_mask() -> void:
 			break
 		formations = maxi(formations - 1, 1)
 	var cells := _mask_cells_per_side * _mask_cells_per_side
-	# The OPEN FRACTION is the number that matters (mask_min_open_fraction
-	# is the gate the rebuild loop above is chasing), so the log states it
-	# instead of leaving a reader to divide two counts.
+	# El log da la FRACCIÓN ABIERTA, la cifra que persigue el bucle de
+	# reconstrucción de arriba (mask_min_open_fraction).
 	print("Arena mask: %d/%d cells blocked, open=%.2f" % [
 			_blocked.size(), cells, float(open_cell_count()) / float(maxi(cells, 1))])
 
 
-## True where rock may seed or grow: inside the grid, off the open border
-## ring, and not a protected cell (spawn, authored verticality).
+## True donde la roca puede sembrar o crecer: dentro de la cuadrícula,
+## fuera del anillo de borde abierto y fuera de las celdas protegidas
+## (spawn, verticalidad de autor).
 func _rock_may_grow(cell: Vector2i, protected: Dictionary[Vector2i, bool]) -> bool:
 	var last := _mask_cells_per_side - 1 - mask_border_cells
 	return cell.x >= mask_border_cells and cell.y >= mask_border_cells \
 			and cell.x <= last and cell.y <= last and not protected.has(cell)
 
 
-## A seed cell for the next formation, at least mask_blob_spacing cells
-## (Chebyshev) from every seed so far and clear of every formation grown so
-## far, or NO_CELL when the stage is full.
+## Celda semilla para la siguiente formación: a mask_blob_spacing celdas o
+## más (Chebyshev) de cada semilla previa y libre de las formaciones ya
+## crecidas, o NO_CELL si la etapa está llena.
 func _pick_formation_seed(seeds: Array[Vector2i], protected: Dictionary[Vector2i, bool],
 		owners: Dictionary[Vector2i, int]) -> Vector2i:
 	for attempt in 32:
@@ -611,8 +596,8 @@ func _pick_formation_seed(seeds: Array[Vector2i], protected: Dictionary[Vector2i
 	return NO_CELL
 
 
-## True when `cell` is within mask_formation_gap cells (Chebyshev) of a cell
-## grown by any formation other than `index`.
+## True si `cell` está a mask_formation_gap celdas o menos (Chebyshev) de
+## una celda crecida por cualquier formación distinta de `index`.
 func _crowds_formation(cell: Vector2i, index: int, owners: Dictionary[Vector2i, int]) -> bool:
 	for dx in range(-mask_formation_gap, mask_formation_gap + 1):
 		for dy in range(-mask_formation_gap, mask_formation_gap + 1):
@@ -622,12 +607,10 @@ func _crowds_formation(cell: Vector2i, index: int, owners: Dictionary[Vector2i, 
 	return false
 
 
-## Grows one formation from `start` to `size` cells by accretion: every
-## step adds one cell of the frontier (the free 4-neighbours of what has
-## grown so far), weighted toward the formation's own random axis (ridges)
-## and toward cells already walled on two or more sides (solid masses). The
-## random walk it replaces drew one-cell scribbles and crosses that no rock
-## could be made to look like.
+## Hace crecer una formación desde `start` hasta `size` celdas por
+## acreción: cada paso añade una celda de la frontera (los vecinos-4 libres
+## de lo ya crecido), con peso hacia el eje propio de la formación (crestas)
+## y hacia celdas ya rodeadas por dos o más lados (masas sólidas).
 func _grow_formation(start: Vector2i, size: int, protected: Dictionary[Vector2i, bool],
 		owners: Dictionary[Vector2i, int], index: int) -> void:
 	var axis := Vector2.from_angle(_rng.randf_range(0.0, TAU))
@@ -672,9 +655,9 @@ func _grow_formation(start: Vector2i, size: int, protected: Dictionary[Vector2i,
 				break
 
 
-## Open cells walled by rock on three or four sides become rock too. A 10 m
-## alcove closed on three sides is space nobody fights in, and its square
-## outline is the one thing a formation's margin cannot hide.
+## Las celdas abiertas rodeadas de roca por tres o cuatro lados se vuelven
+## roca: una muesca cerrada por tres lados no sirve para pelear, y su
+## contorno cuadrado es lo único que el margen de la formación no esconde.
 func _fill_notches(protected: Dictionary[Vector2i, bool]) -> void:
 	for sweep in 3:
 		var notches: Array[Vector2i] = []
@@ -695,12 +678,12 @@ func _fill_notches(protected: Dictionary[Vector2i, bool]) -> void:
 			_blocked[cell] = true
 
 
-## Flood fill from the spawn cell; open cells it cannot reach are sealed
-## so "walk anywhere" holds for every remaining open cell. PROTECTED cells
-## (the spawn and the hand-placed verticality spots) are never sealed:
-## if a blob ring cut one off, a corridor is carved back to reached ground
-## and the fill re-run, so both invariants survive — everything open is
-## reachable AND no authored spot is ever buried under a rock formation.
+## Flood fill desde la celda del spawn; las celdas abiertas que no alcanza
+## se sellan, así toda celda abierta que queda se alcanza a pie. Las celdas
+## PROTEGIDAS (spawn y spots de verticalidad) nunca se sellan: si una quedó
+## aislada, se abre un pasillo hasta suelo alcanzado y se repite el relleno.
+## Así se cumplen las dos cosas: todo lo abierto es alcanzable y ningún spot
+## de autor queda bajo una formación.
 func _seal_unreachable(protected: Dictionary[Vector2i, bool]) -> void:
 	var reached := _reachable_cells()
 	var carved := false
@@ -718,7 +701,7 @@ func _seal_unreachable(protected: Dictionary[Vector2i, bool]) -> void:
 				_blocked[cell] = true
 
 
-## 4-neighbor flood fill from the spawn cell over the open cells.
+## Flood fill vecindad-4 desde la celda del spawn sobre las celdas abiertas.
 func _reachable_cells() -> Dictionary[Vector2i, bool]:
 	var start := _cell_of(Vector2.ZERO)
 	var reached: Dictionary[Vector2i, bool] = {start: true}
@@ -734,10 +717,9 @@ func _reachable_cells() -> Dictionary[Vector2i, bool]:
 	return reached
 
 
-## Unblocks a staircase line of cells from `from` to the nearest reached
-## cell. 4-connected on purpose (one axis per step), so the corridor is
-## walkable by the same neighborhood the flood fill uses. True when it
-## actually opened something.
+## Desbloquea una escalera de celdas desde `from` hasta la celda alcanzada
+## más cercana. Conexa-4 a propósito (un eje por paso), para que el pasillo
+## se camine con la misma vecindad del flood fill. True si abrió algo.
 func _carve_corridor(from: Vector2i, reached: Dictionary[Vector2i, bool]) -> bool:
 	var target := from
 	var best := INF
@@ -762,18 +744,12 @@ func _carve_corridor(from: Vector2i, reached: Dictionary[Vector2i, bool]) -> boo
 	return carved
 
 
-## Every connected region of blocked cells becomes ONE RockFormation
-## (iteration 63) that covers the WHOLE region, boundary included, with
-## solid rock — rock_formation.gd says why the seal is structural rather
-## than likely. Iteration 48 dropped the invisible 7 m box that used to
-## stand here (the player bumped into nothing next to the rocks, and
-## climbing enemies walked along its roof at y~7, which reads as flying);
-## iterations 48-62 then packed every blocked cell with a 3x3 lattice of
-## oversized sphere rocks, ~1,200 props a stage that read as grey bubble
-## wrap over a square grid. The interior is rock and not just the rim, on
-## purpose: a raider can jump onto a formation and walk its crest (a soak
-## caught exactly that), and over a hollow region it would drop into ground
-## the mask calls unreachable and get stuck there.
+## Cada región conexa de celdas bloqueadas se vuelve UNA RockFormation que
+## cubre toda la región, borde incluido, con roca sólida (rock_formation.gd
+## explica por qué el sello es estructural y no probable). El interior
+## también es roca a propósito: un raider puede saltar a una formación y
+## caminar su cresta, y sobre una región hueca caería a suelo que la máscara
+## llama inalcanzable y quedaría atrapado.
 func _raise_formations() -> void:
 	if _blocked.is_empty():
 		return
@@ -812,8 +788,8 @@ func _raise_formations() -> void:
 				% [seal_low, RockFormation.SEAL_MIN_HEIGHT])
 
 
-## The blocked cells split into 4-connected regions, each one a set
-## (cell -> true) in the shape RockFormation.build() takes.
+## Las celdas bloqueadas divididas en regiones conexas-4, cada una un
+## conjunto (celda -> true) con la forma que recibe RockFormation.build().
 func _blocked_regions() -> Array[Dictionary]:
 	var regions: Array[Dictionary] = []
 	var seen: Dictionary[Vector2i, bool] = {}
@@ -835,8 +811,8 @@ func _blocked_regions() -> Array[Dictionary]:
 	return regions
 
 
-## True when `center` and the eight points `radius` away around it are all
-## walkable: the cheap test for "no formation reaches here".
+## True si `center` y los ocho puntos a `radius` a su alrededor son
+## caminables: la prueba barata de "ninguna formación llega aquí".
 func _clear_of_mask(center: Vector2, radius: float) -> bool:
 	if not is_walkable(center):
 		return false

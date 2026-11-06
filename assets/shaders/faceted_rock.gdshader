@@ -1,16 +1,18 @@
 shader_type spatial;
 
-// Faceted rock (iteration 63). The boulder props are 8x4 sphere blobs with
-// SMOOTH normals, which next to the flat-shaded RockFormations read as
-// river pebbles from another game. This lights every triangle with its own
-// face normal instead, so the same blob reads as a chipped boulder.
+// Roca facetada. Las rocas de props son esferas de 8x4 con normales SUAVES,
+// que junto a las RockFormation de sombreado plano parecen guijarros de río.
+// Este shader ilumina cada triángulo con su propia normal de cara, así la
+// misma esfera se lee como una roca tallada.
 //
-// The face normal comes from screen-space derivatives of the view-space
-// position, and is then turned to face the camera: which way round the
-// derivative cross product points depends on the platform's screen-space
-// Y convention, and a visible face always faces the camera anyway.
+// La normal de cara sale de las derivadas en pantalla de la posición en
+// espacio de vista, y luego se gira hacia la cámara: hacia dónde apunta el
+// producto cruz depende de la convención de Y de pantalla de la plataforma,
+// y una cara visible siempre mira a la cámara.
 
+// Color de la roca (sRGB).
 uniform vec4 albedo : source_color = vec4(0.38, 0.39, 0.42, 1.0);
+// Rugosidad de la superficie (0-1).
 uniform float roughness : hint_range(0.0, 1.0) = 0.95;
 
 void fragment() {
