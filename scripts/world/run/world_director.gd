@@ -29,6 +29,8 @@ const LUCKY_BLOCK_SCENE := preload("res://scenes/world/chests/LuckyBlock.tscn")
 const PET_BOX_SCENE := preload("res://scenes/world/PetBox.tscn")
 const VENDOR_SCENE := preload("res://scenes/world/Vendor.tscn")
 const PortalShrineScript := preload("res://scripts/world/interactables/portal_shrine.gd")
+const BEACON_SCENE := preload("res://scenes/world/director/Beacon.tscn")
+const Beacon := preload("res://scripts/world/run/director/beacon.gd")
 
 ## Eventos del mundo, una fila por evento. `weight` es el peso relativo
 ## del sorteo; `method` es el método que lo ejecuta (se llama con call() y
@@ -1033,44 +1035,12 @@ func _despawn_chest(chest: Chest) -> void:
 	tween.tween_callback(chest.queue_free)
 
 
-## Pilar de luz alto y sin sombreado que se ve desde toda la arena, con un
-## pulso suave para que se lea como invitación y no como amenaza.
+## Levanta una baliza (Beacon.tscn) del color dado sobre `at`.
 func _spawn_beacon(at: Vector3, color: Color) -> Node3D:
-	var beacon := Node3D.new()
+	var beacon := BEACON_SCENE.instantiate() as Beacon
+	beacon.color = color
 	_stage_parent().add_child(beacon)
 	beacon.global_position = at
-	var pillar := MeshInstance3D.new()
-	var mesh := CylinderMesh.new()
-	mesh.top_radius = 0.55
-	mesh.bottom_radius = 0.25
-	mesh.height = 22.0
-	# Teselado explícito: 16 lados bastan para que la tapa de 0.55 m se vea
-	# redonda, y los anillos solo subdividen un lado recto.
-	mesh.radial_segments = 16
-	mesh.rings = 0
-	pillar.mesh = mesh
-	pillar.position.y = 11.0
-	var material := StandardMaterial3D.new()
-	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	material.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
-	material.albedo_color = Color(color.r, color.g, color.b, 0.35)
-	material.emission_enabled = true
-	material.emission = color
-	material.emission_energy_multiplier = 1.6
-	pillar.material_override = material
-	beacon.add_child(pillar)
-	var light := OmniLight3D.new()
-	light.light_color = color
-	light.light_energy = 2.4
-	light.omni_range = 9.0
-	light.position.y = 1.6
-	beacon.add_child(light)
-	var pulse := beacon.create_tween().set_loops()
-	pulse.tween_property(pillar, "scale", Vector3(1.25, 1.0, 1.25), 0.8) \
-			.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
-	pulse.tween_property(pillar, "scale", Vector3.ONE, 0.8) \
-			.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 	return beacon
 
 
