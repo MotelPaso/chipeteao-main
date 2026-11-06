@@ -26,7 +26,6 @@ extends StaticBody3D
 ## LA regla de colocación del proyecto: nada va a y = 0. Toda colocación en
 ## el mundo pasa por height_at().
 
-@export var size: float = 240.0
 ## Escala del ruido de cima a fondo, en metros, por bioma (bosque 2.5,
 ## dunas 3.0, ciénaga 1.5). Cada escena de arena pone la suya.
 @export var amplitude: float = 2.5
@@ -54,6 +53,9 @@ extends StaticBody3D
 ## y la malla lleva UVs en XZ de mundo.
 @export var surface_material: Material
 
+## Lado del terreno en metros cuando no hay scatter en la escena (una escena
+## de prueba); en una arena el lado sale de arena_half_extent del scatter.
+const FALLBACK_SIZE: float = 240.0
 ## HeightMapShape3D va fijo a UNA UNIDAD DE MUNDO POR MUESTRA y el nodo no
 ## se escala, así que la cuadrícula del colisionador es de 1 m y esto no se ajusta.
 const SAMPLE_METERS: float = 1.0
@@ -63,11 +65,16 @@ const PAD_BLEND: float = 6.0
 ## Sin uso: map_image() reparte el sombreado entre min_height y max_height.
 const MAP_SHADE_RANGE: float = 6.0
 
+## Lado del terreno en metros: el doble de arena_half_extent del scatter, que
+## se lee al construir. Lo leen el mapa y TerrainShots.
+var size: float = FALLBACK_SIZE
+## Alturas mínima y máxima del suelo en metros, válidas tras ensure_built().
+var min_height: float = 0.0
+var max_height: float = 0.0
+
 ## Muestras del colisionador por lado (241 para una arena de 240 m a 1 m).
 var _samples: int = 0
 var _heights: PackedFloat32Array = PackedFloat32Array()
-var min_height: float = 0.0
-var max_height: float = 0.0
 var _built: bool = false
 ## Discos planos aplicados tras el ruido: {center, radius}. Vienen del
 ## spawn, de los keepouts de autor y de los sitios de meseta del scatter.
@@ -101,6 +108,7 @@ func ensure_built() -> void:
 		return
 	_built = true
 	var started := Time.get_ticks_msec()
+	size = _arena_size()
 	_samples = int(round(size / SAMPLE_METERS)) + 1
 	_collect_pads()
 	_build_heights()
@@ -400,6 +408,17 @@ func _build_collider() -> void:
 		_collision.name = "CollisionShape3D"
 		add_child(_collision)
 	_collision.shape = shape
+
+
+## Lado de la arena en metros según el scatter (grupo "arena_bounds"): el
+## doble de su arena_half_extent, la fuente única del tamaño.
+func _arena_size() -> float:
+	var bounds := get_tree().get_first_node_in_group(&"arena_bounds")
+	if bounds != null:
+		var value: Variant = bounds.get("arena_half_extent")
+		if value != null:
+			return float(value) * 2.0
+	return FALLBACK_SIZE
 
 
 ## La semilla de partida del scatter, para que el relieve coincida con los

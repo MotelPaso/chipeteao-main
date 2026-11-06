@@ -214,7 +214,6 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 40.3, 0, -40.3)
 
 [node name="MarshScatter" type="Node3D" parent="."]
 script = ExtResource("9_scatter")
-scatter_seed = 47113
 tree_scene = ExtResource("10_tree")
 rock_scene = ExtResource("11_rock")
 stump_scene = ExtResource("12_stump")

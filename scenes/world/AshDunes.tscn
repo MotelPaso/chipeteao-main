@@ -267,7 +267,6 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 29.9, 0, -37.5)
 
 [node name="DuneScatter" type="Node3D" parent="."]
 script = ExtResource("6_scatter")
-scatter_seed = 90417
 tree_scene = ExtResource("7_cactus")
 rock_scene = ExtResource("9_dunerock")
 stump_scene = ExtResource("10_bonepile")

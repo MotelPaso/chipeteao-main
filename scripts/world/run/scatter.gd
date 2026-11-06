@@ -8,17 +8,20 @@ extends Node3D
 ## (sin navmesh) siempre tenga pasillos anchos. Las copas no tienen
 ## colisión: solo bloquean troncos y rocas.
 
-## Semilla fija del reparto. Solo se usa con randomize_per_run apagado.
+## Solo para pruebas: semilla fija del reparto cuando randomize_per_run
+## está apagado. El juego y los soaks no la usan.
 @export var scatter_seed: int = 71382
 
-## Encendido, cada partida siembra el reparto desde el RNG de la partida
-## (BONK_GAME_SEED lo reproduce). Apagado, usa scatter_seed: el mismo mapa
-## en cada partida.
+## Encendido (lo normal), cada partida siembra el reparto desde el RNG de la
+## partida, que BONK_GAME_SEED reproduce. Apagado (solo pruebas), usa
+## scatter_seed: el mismo mapa en cada partida.
 @export var randomize_per_run: bool = true
 
 ## Mitad del lado de la arena, en metros (el suelo es un cuadrado de 2x
-## esto). BossBase, EnemySpawner, WorldDirector, el mapa y el Backdrop lo
-## leen por el grupo "arena_bounds" y le restan su propio margen.
+## esto). Fuente única del tamaño: de aquí salen la máscara, las mesetas, el
+## reparto, el borde, el Terrain y el Backdrop, y lo leen por el grupo
+## "arena_bounds" BossBase, EnemySpawner, WorldDirector y el mapa. Si lo
+## cambias, mueve también los muros de Perimeter en la escena (a ±esto + 0.5).
 @export var arena_half_extent: float = 120.0
 
 @export_group("Prop Scenes")
@@ -76,8 +79,9 @@ extends Node3D
 ## Distancia mínima en metros entre centros de meseta, y al spawn y a los
 ## keepouts.
 @export var mesa_min_spacing: float = 42.0
-## Mitad del cuadrado donde se sortean los centros de meseta, en metros.
-@export var mesa_half_extent: float = 92.0
+## Metros desde el borde de la arena que los centros de meseta nunca
+## cruzan (se sortean en ±(arena_half_extent - esto)).
+@export var mesa_edge_margin: float = 28.0
 ## Escenas de plataforma y rampa del bioma. Sin plataforma no hay mesetas:
 ## es un error de configuración que se ve, no un mapa plano en silencio.
 @export var mesa_platform_scene: PackedScene
@@ -85,8 +89,10 @@ extends Node3D
 ## Rango de escala uniforme de la plataforma de una meseta.
 @export var mesa_scale_min: float = 1.0
 @export var mesa_scale_max: float = 1.6
-## Sin uso: la rampa se coloca a 4.95 m del centro (ver _build_mesas).
-@export var mesa_ramp_offset: float = 5.5
+## Distancia en metros del centro de la plataforma al de su rampa, a
+## escala 1 (se multiplica por la escala de la meseta). 4.95 deja la rampa
+## pegada a una cara de la plataforma de 6 m.
+@export var mesa_ramp_offset: float = 4.95
 ## Radio en metros alrededor de una meseta que debe quedar libre de celdas
 ## bloqueadas: la plataforma más grande más el alcance de la rampa.
 @export var mesa_clearance: float = 12.0
@@ -103,9 +109,10 @@ extends Node3D
 @export var formation_clearance: float = 2.5
 
 @export_group("Interior Scatter")
-## Los props caen en [-esto, esto] en X/Z, en metros; queda dentro de la
-## franja del perímetro para que el borde se distinga.
-@export var interior_half_extent: float = 108.0
+## Metros desde el borde de la arena que los props interiores nunca
+## cruzan (caen en ±(arena_half_extent - esto)); mayor que el margen del
+## borde para que la franja del perímetro se distinga.
+@export var interior_edge_margin: float = 12.0
 ## Cantidad de cada prop interior.
 @export var tree_count: int = 128
 @export var rock_count: int = 54
@@ -124,9 +131,10 @@ extends Node3D
 ## acentos de rock_scene.
 @export var perimeter_scene: PackedScene
 @export var perimeter_accent_scene: PackedScene
-## Franja del borde: distancias al centro, en metros, entre las que caen los props.
-@export var perimeter_inner: float = 112.0
-@export var perimeter_outer: float = 118.0
+## Franja del borde: los props caen entre estos metros hacia dentro del
+## borde de la arena (máximo = lado interior de la franja).
+@export var perimeter_edge_margin_min: float = 2.0
+@export var perimeter_edge_margin_max: float = 8.0
 ## Distancia en metros entre ranuras a lo largo de cada lado; cada N-ésima
 ## ranura es un acento.
 @export var perimeter_step: float = 9.0
@@ -227,14 +235,12 @@ func owner_arena_contains(node: Node) -> bool:
 func _place_many(scene: PackedScene, count: int, min_scale: float, max_scale: float) -> void:
 	if scene == null:
 		return
+	var half := _interior_half_extent()
 	var placed := 0
 	var attempts := 0
 	while placed < count and attempts < count * 24:
 		attempts += 1
-		var pos := Vector3(
-				_rng.randf_range(-interior_half_extent, interior_half_extent),
-				0.0,
-				_rng.randf_range(-interior_half_extent, interior_half_extent))
+		var pos := Vector3(_rng.randf_range(-half, half), 0.0, _rng.randf_range(-half, half))
 		if not _is_clear(pos):
 			continue
 		_spawn_prop(scene, pos, _rng.randf_range(min_scale, max_scale))
@@ -265,8 +271,9 @@ func _ring_perimeter() -> void:
 	if _perimeter_main() == null:
 		return
 	var slot := 0
-	var t := -perimeter_outer + 1.0
-	while t <= perimeter_outer - 1.0:
+	var outer := arena_half_extent - perimeter_edge_margin_min
+	var t := -outer + 1.0
+	while t <= outer - 1.0:
 		_plant_edge_prop(Vector3(t + _rng.randf_range(-2.0, 2.0), 0.0, -_band_depth()), slot)
 		_plant_edge_prop(Vector3(t + _rng.randf_range(-2.0, 2.0), 0.0, _band_depth()), slot + 1)
 		_plant_edge_prop(Vector3(-_band_depth(), 0.0, t + _rng.randf_range(-2.0, 2.0)), slot + 2)
@@ -276,7 +283,8 @@ func _ring_perimeter() -> void:
 
 
 func _band_depth() -> float:
-	return _rng.randf_range(perimeter_inner, perimeter_outer)
+	return _rng.randf_range(arena_half_extent - perimeter_edge_margin_max,
+			arena_half_extent - perimeter_edge_margin_min)
 
 
 func _plant_edge_prop(pos: Vector3, slot: int) -> void:
@@ -285,6 +293,16 @@ func _plant_edge_prop(pos: Vector3, slot: int) -> void:
 		_spawn_prop(accent, pos, _rng.randf_range(1.2, 1.7))
 	else:
 		_spawn_prop(_perimeter_main(), pos, _rng.randf_range(1.0, 1.4))
+
+
+## Mitad del cuadrado donde caen los props interiores, en metros.
+func _interior_half_extent() -> float:
+	return arena_half_extent - interior_edge_margin
+
+
+## Mitad del cuadrado donde se sortean los centros de meseta, en metros.
+func _mesa_half_extent() -> float:
+	return arena_half_extent - mesa_edge_margin
 
 
 func _perimeter_main() -> PackedScene:
@@ -335,12 +353,11 @@ func _pick_mesa_sites() -> void:
 		var spot := node as Node3D
 		if spot != null and not (spot is Interactable) and owner_arena_contains(spot):
 			authored.append(Vector2(spot.position.x, spot.position.z))
+	var half := _mesa_half_extent()
 	for attempt in mesa_count * 40:
 		if _mesa_sites.size() >= mesa_count:
 			break
-		var candidate := Vector2(
-				_rng.randf_range(-mesa_half_extent, mesa_half_extent),
-				_rng.randf_range(-mesa_half_extent, mesa_half_extent))
+		var candidate := Vector2(_rng.randf_range(-half, half), _rng.randf_range(-half, half))
 		if candidate.length() < mesa_min_spacing:
 			continue
 		if mask_enabled and not (_mask.clear_of(candidate, mesa_clearance)
@@ -387,10 +404,10 @@ func _build_mesas() -> void:
 			# Alinea la rampa con una de las 4 caras planas de la plataforma.
 			var side_idx := _rng.randi_range(0, 3)
 			var local_offsets: Array[Vector3] = [
-				Vector3(4.95, 0.0, 0.0),
-				Vector3(0.0, 0.0, 4.95),
-				Vector3(-4.95, 0.0, 0.0),
-				Vector3(0.0, 0.0, -4.95)
+				Vector3(mesa_ramp_offset, 0.0, 0.0),
+				Vector3(0.0, 0.0, mesa_ramp_offset),
+				Vector3(-mesa_ramp_offset, 0.0, 0.0),
+				Vector3(0.0, 0.0, -mesa_ramp_offset)
 			]
 			var local_rot_y: Array[float] = [PI, PI * 0.5, 0.0, -PI * 0.5]
 			var world_pos: Vector3 = plat.transform * (local_offsets[side_idx] * scale)
