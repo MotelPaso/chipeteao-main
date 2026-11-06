@@ -18,8 +18,8 @@ extends CharacterBody3D
 ## modifica al derrapar; sin esa marca la comparten todas las instancias y
 ## el derrape encoge a toda la party.
 
-## Cambiaron los puntos de la partida (la emite el nodo Wallet); el HUD la
-## conecta por nombre.
+## Cambiaron los puntos de la partida (reemite la del nodo Wallet); el HUD
+## la conecta por nombre.
 signal points_changed(total: int)
 ## Se emite al EMPEZAR un derrape, con su dirección; lo escucha el
 ## Cinturón eléctrico (ItemBag).
@@ -136,6 +136,7 @@ func _ready() -> void:
 	_cache_slot_actions()
 	_apply_character(CharacterCatalog.by_id_or_default(Coop.character_for_slot(player_index)))
 	health.died.connect(_on_health_died)
+	_wallet.points_changed.connect(_on_wallet_points_changed)
 	# Después de _apply_character: la cámara pasa el modelo nuevo del rig a
 	# la capa visual del slot.
 	_camera.setup()
@@ -434,6 +435,10 @@ func _on_health_died() -> void:
 	# caída del rig ignora la pausa y se ve bajo la pantalla de fin.
 	set_physics_process(false)
 	seal_rig.play_death()
+
+
+func _on_wallet_points_changed(total: int) -> void:
+	points_changed.emit(total)
 
 
 func _enter_downed() -> void:
