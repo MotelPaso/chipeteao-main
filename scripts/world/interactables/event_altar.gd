@@ -12,77 +12,38 @@ extends Interactable
 ## Gratis a propósito: el precio es no elegir, y un desastre es una de las
 ## respuestas posibles.
 
-@export var glass_color: Color = Color(0.7, 0.78, 1.0)
-
 ## Aviso mientras ya corre un clima: invocar funciona igual y lo REEMPLAZA.
 const BUSY_PROMPT: String = "[E] Invocar (reemplaza el evento actual)"
 const READY_PROMPT: String = "[E] Invocar un evento"
-## Dos frecuencias desafinadas (Hz) para que el cristal no lata como un metrónomo.
-const SWIRL_X_HZ: float = 1.3
-const SWIRL_Z_HZ: float = 1.7
+@export_group("Cristal")
+## Color del cristal y de su luz: tiñe Visual/Glass (conserva su transparencia) y Visual/Glow.
+@export var glass_color: Color = Color(0.7, 0.78, 1.0)
+## Velocidad del remolino del cristal en X, en radianes por segundo (desafinada con la de Z para que no lata como un metrónomo).
+@export var swirl_x_speed: float = 1.3
+## Velocidad del remolino del cristal en Z, en radianes por segundo.
+@export var swirl_z_speed: float = 1.7
+## Cuánto se estira el cristal en el remolino, como fracción de su tamaño.
+@export var swirl_amount: float = 0.07
 
-var _glass: MeshInstance3D = null
 var _time: float = 0.0
 var _spent: bool = false
 
+## El material del cristal es local a la escena: cada altar tiene el suyo.
+@onready var _glass: MeshInstance3D = $Visual/Glass
+@onready var _glow: OmniLight3D = $Visual/Glow
+
 
 func _ready() -> void:
-	# El anillo de detección va ANTES de super(), que conecta body_entered.
-	var shape := CollisionShape3D.new()
-	var cylinder := CylinderShape3D.new()
-	cylinder.radius = 2.2
-	cylinder.height = 3.5
-	shape.shape = cylinder
-	shape.position.y = 1.75
-	add_child(shape)
 	super()
-	_build_visual()
-
-
-func _build_visual() -> void:
-	var pedestal := MeshInstance3D.new()
-	var stone := BoxMesh.new()
-	stone.size = Vector3(1.1, 1.0, 1.1)
-	pedestal.mesh = stone
-	var rock := StandardMaterial3D.new()
-	rock.albedo_color = Color(0.28, 0.29, 0.34)
-	rock.roughness = 0.9
-	pedestal.material_override = rock
-	pedestal.position.y = 0.5
-	add_child(pedestal)
-	_glass = MeshInstance3D.new()
-	var orb := SphereMesh.new()
-	orb.radius = 0.45
-	orb.height = 0.9
-	# Teselado explícito (el del motor es 64 x 32, ~4.2k triángulos).
-	orb.radial_segments = 16
-	orb.rings = 8
-	_glass.mesh = orb
-	# Material propio de cada altar.
-	var glass := StandardMaterial3D.new()
-	glass.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	glass.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	glass.albedo_color = Color(glass_color, 0.75)
-	glass.emission_enabled = true
-	glass.emission = glass_color
-	glass.emission_energy_multiplier = 1.8
-	_glass.material_override = glass
-	_glass.position.y = 1.45
-	add_child(_glass)
-	var light := OmniLight3D.new()
-	light.light_color = glass_color
-	light.light_energy = 2.0
-	light.omni_range = 7.0
-	light.position.y = 1.45
-	add_child(light)
+	_paint()
 
 
 func _physics_process(delta: float) -> void:
 	_time += delta
-	if _glass != null and available:
+	if available:
 		_glass.scale = Vector3(
-				1.0 + sin(_time * SWIRL_X_HZ) * 0.07, 1.0,
-				1.0 + cos(_time * SWIRL_Z_HZ) * 0.07)
+				1.0 + sin(_time * swirl_x_speed) * swirl_amount, 1.0,
+				1.0 + cos(_time * swirl_z_speed) * swirl_amount)
 	if available and player_in_range:
 		# Se recalcula en cada frame con alguien en rango: la respuesta cambia
 		# sola cuando un clima empieza o termina.
@@ -121,3 +82,11 @@ func _interact(_player: Node) -> void:
 	_emit_completed()
 	sink_away()
 
+
+## Pinta el cristal (conservando su transparencia) y su luz con glass_color.
+func _paint() -> void:
+	var material := _glass.material_override as StandardMaterial3D
+	if material != null:
+		material.albedo_color = Color(glass_color, material.albedo_color.a)
+		material.emission = glass_color
+	_glow.light_color = glass_color

@@ -8,8 +8,6 @@ extends Interactable
 ## Gratis a propósito: el traficante vende una elección de tres por puntos;
 ## la caja es la que te encuentras, y su precio es caminar hasta ella.
 
-@export var paw_color: Color = Color(0.7, 0.95, 0.6)
-
 ## Títulos de las cartas. La opción 0 es el CAMBIO: el harness siempre aprieta
 ## la primera, así que la rama interesante tiene que ser esa.
 const SWAP_TITLE: String = "Cambiar por %s"
@@ -17,62 +15,35 @@ const KEEP_TITLE: String = "Quedarme con %s"
 const CHOICE_TITLE: String = "La caja se abre sola"
 const NO_PET_LINE: String = "Sin mascota"
 
+@export_group("Caja")
+## Color de la huella: tiñe la tapa (Visual/Lid) y el símbolo (Visual/Paw).
+@export var paw_color: Color = Color(0.7, 0.95, 0.6)
+## Velocidad del vaivén de la tapa, en radianes por segundo.
+@export var bob_speed: float = 2.2
+## Altura del vaivén de la tapa, en metros.
+@export var bob_height: float = 0.05
+
 var _spent: bool = false
-var _lid: MeshInstance3D = null
 var _time: float = 0.0
+## Altura de reposo de la tapa, la de la escena.
+var _lid_rest_y: float = 0.0
+
+## El material de la tapa es local a la escena: cada caja tiene el suyo.
+@onready var _lid: MeshInstance3D = $Visual/Lid
+@onready var _paw: Label3D = $Visual/Paw
 
 
 func _ready() -> void:
-	# El anillo de detección va ANTES de super(), que conecta body_entered.
-	var shape := CollisionShape3D.new()
-	var cylinder := CylinderShape3D.new()
-	cylinder.radius = 2.0
-	cylinder.height = 3.0
-	shape.shape = cylinder
-	shape.position.y = 1.5
-	add_child(shape)
 	super()
 	add_to_group(&"pet_boxes")
-	_build_visual()
-
-
-func _build_visual() -> void:
-	var crate := MeshInstance3D.new()
-	var box := BoxMesh.new()
-	box.size = Vector3(1.3, 1.0, 1.3)
-	crate.mesh = box
-	var wood := StandardMaterial3D.new()
-	wood.albedo_color = Color(0.42, 0.3, 0.2)
-	crate.material_override = wood
-	crate.position.y = 0.5
-	add_child(crate)
-	_lid = MeshInstance3D.new()
-	var lid_mesh := BoxMesh.new()
-	lid_mesh.size = Vector3(1.42, 0.16, 1.42)
-	_lid.mesh = lid_mesh
-	var lid_material := StandardMaterial3D.new()
-	lid_material.albedo_color = paw_color
-	lid_material.emission_enabled = true
-	lid_material.emission = paw_color
-	lid_material.emission_energy_multiplier = 0.8
-	_lid.material_override = lid_material
-	_lid.position.y = 1.05
-	add_child(_lid)
-	var paw := Label3D.new()
-	paw.text = "●"
-	paw.billboard = BaseMaterial3D.BILLBOARD_ENABLED
-	paw.no_depth_test = true
-	paw.font_size = 44
-	paw.outline_size = 10
-	paw.modulate = paw_color
-	paw.position.y = 1.5
-	add_child(paw)
+	_lid_rest_y = _lid.position.y
+	_paint()
 
 
 func _physics_process(delta: float) -> void:
 	_time += delta
-	if _lid != null and available:
-		_lid.position.y = 1.05 + sin(_time * 2.2) * 0.05
+	if available:
+		_lid.position.y = _lid_rest_y + sin(_time * bob_speed) * bob_height
 
 
 func _interact(player: Node) -> void:
@@ -149,3 +120,11 @@ func _roll_pet(player: Node) -> String:
 		return ""
 	return candidates[randi() % candidates.size()]
 
+
+## Pinta la tapa y el símbolo de la huella con paw_color.
+func _paint() -> void:
+	var material := _lid.material_override as StandardMaterial3D
+	if material != null:
+		material.albedo_color = paw_color
+		material.emission = paw_color
+	_paw.modulate = paw_color

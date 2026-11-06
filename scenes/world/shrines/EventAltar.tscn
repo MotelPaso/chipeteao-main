@@ -1,6 +1,32 @@
-[gd_scene load_steps=2 format=3 uid="uid://cevntaltr1k2p0"]
+[gd_scene load_steps=7 format=3 uid="uid://cevntaltr1k2p0"]
 
 [ext_resource type="Script" path="res://scripts/world/interactables/event_altar.gd" id="1_evtaltar"]
+
+[sub_resource type="CylinderShape3D" id="CylinderShape3D_zone"]
+height = 3.5
+radius = 2.2
+
+[sub_resource type="BoxMesh" id="BoxMesh_pedestal"]
+size = Vector3(1.1, 1, 1.1)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_rock"]
+albedo_color = Color(0.28, 0.29, 0.34, 1)
+roughness = 0.9
+
+[sub_resource type="SphereMesh" id="SphereMesh_orb"]
+radius = 0.45
+height = 0.9
+radial_segments = 16
+rings = 8
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_glass"]
+resource_local_to_scene = true
+shading_mode = 0
+transparency = 1
+albedo_color = Color(0.7, 0.78, 1, 0.75)
+emission_enabled = true
+emission = Color(0.7, 0.78, 1, 1)
+emission_energy_multiplier = 1.8
 
 [node name="EventAltar" type="Area3D"]
 collision_layer = 0
@@ -12,3 +38,25 @@ prompt_height = 3.0
 meta_stat_id = "shrines_used"
 sink_duration = 0.55
 marker_kind = &"event_altar"
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.75, 0)
+shape = SubResource("CylinderShape3D_zone")
+
+[node name="Visual" type="Node3D" parent="."]
+
+[node name="Pedestal" type="MeshInstance3D" parent="Visual"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.5, 0)
+material_override = SubResource("StandardMaterial3D_rock")
+mesh = SubResource("BoxMesh_pedestal")
+
+[node name="Glass" type="MeshInstance3D" parent="Visual"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.45, 0)
+material_override = SubResource("StandardMaterial3D_glass")
+mesh = SubResource("SphereMesh_orb")
+
+[node name="Glow" type="OmniLight3D" parent="Visual"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.45, 0)
+light_color = Color(0.7, 0.78, 1, 1)
+light_energy = 2.0
+omni_range = 7.0

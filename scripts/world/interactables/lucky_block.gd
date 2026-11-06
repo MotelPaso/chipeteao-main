@@ -7,14 +7,6 @@ extends Interactable
 ## Los premios son una tabla con pesos y una rama por premio: uno nuevo es
 ## una fila más una rama, nunca un caso especial en otro sitio.
 
-@export var block_color: Color = Color(1.0, 0.85, 0.2)
-## Alcance de enemy_explosion en metros, y fracción de la vida máxima que pierde un jefe en vez de morir.
-@export var explosion_radius: float = 12.0
-@export var boss_hp_fraction: float = 0.15
-@export var gem_count: int = 25
-@export var gem_spread: float = 6.0
-@export var points_reward: int = 80
-
 ## La tabla. Los pesos son relativos; el pozo es el más raro porque es el
 ## único que le hace una pregunta al jugador.
 const LUCKY_REWARDS: Array[Dictionary] = [
@@ -26,8 +18,6 @@ const LUCKY_REWARDS: Array[Dictionary] = [
 	{"id": "well", "weight": 0.7},
 ]
 
-## Probabilidad (0-1) de que el pozo pague un power-up en vez del objeto mejor.
-const WELL_POWERUP_CHANCE: float = 0.3
 ## Objetos que ofrece el pozo, más la carta de "quedarse con todo". DOS, no
 ## tres: la UI de cartas tiene tres huecos y descarta el sobrante sin avisar,
 ## y el que caería sería justo la opción de rechazar.
@@ -37,6 +27,31 @@ const WELL_NOTHING: String = "Nada"
 const WELL_NOTHING_LINE: String = "Te quedas con todo"
 const WELL_GIVE_LINE: String = "Lo cambias por algo mejor"
 
+@export_group("Bloque")
+## Color del bloque: tiñe su material (Visual/Block), su luz (Visual/Glow) y las chispas de la explosión.
+@export var block_color: Color = Color(1.0, 0.85, 0.2)
+## Velocidad del vaivén del bloque, en radianes por segundo.
+@export var bob_speed: float = 2.0
+## Altura del vaivén del bloque, en metros.
+@export var bob_height: float = 0.06
+## Giro del bloque, en radianes por segundo.
+@export var spin_speed: float = 0.9
+@export_group("Premios")
+## Alcance de enemy_explosion, en metros.
+@export var explosion_radius: float = 12.0
+## Fracción de la vida máxima (0-1) que pierde un jefe en enemy_explosion, en vez de morir.
+@export var boss_hp_fraction: float = 0.15
+## Gemas de XP que suelta gem_rain.
+@export var gem_count: int = 25
+## Distancia máxima a la que caen las gemas de gem_rain, en metros.
+@export var gem_spread: float = 6.0
+## Puntos de partida que da el premio points.
+@export var points_reward: int = 80
+## Dónde cae el cofre de free_chest respecto del bloque, en metros.
+@export var free_chest_offset: Vector3 = Vector3(1.6, 0.0, 0.0)
+## Probabilidad (0-1) de que el pozo pague un power-up en vez del objeto mejor.
+@export_range(0.0, 1.0) var well_powerup_chance: float = 0.3
+
 ## Cola del harness (ArenaProbe, BONK_LUCKY_REWARD): ids de premio que pagan
 ## los próximos bloques en vez de tirar. ESTÁTICA porque la tirada es
 ## estática y la cola tiene que sobrevivir entre bloques. La última entrada
@@ -45,61 +60,26 @@ static var _forced_rewards: Array[String] = []
 
 var _spent: bool = false
 var _time: float = 0.0
-var _body: MeshInstance3D = null
+## Altura de reposo del bloque, la de la escena.
+var _block_rest_y: float = 0.0
+
+## El material del bloque es local a la escena: cada bloque tiene el suyo.
+@onready var _block: MeshInstance3D = $Visual/Block
+@onready var _glow: OmniLight3D = $Visual/Glow
 
 
 func _ready() -> void:
-	# El anillo de detección va ANTES de super(), que conecta body_entered.
-	var shape := CollisionShape3D.new()
-	var cylinder := CylinderShape3D.new()
-	cylinder.radius = 1.9
-	cylinder.height = 2.6
-	shape.shape = cylinder
-	shape.position.y = 1.3
-	add_child(shape)
 	super()
 	add_to_group(&"lucky_blocks")
-	_build_visual()
-
-
-func _build_visual() -> void:
-	_body = MeshInstance3D.new()
-	var cube := BoxMesh.new()
-	cube.size = Vector3(0.9, 0.9, 0.9)
-	_body.mesh = cube
-	# Material propio de cada bloque.
-	var gold := StandardMaterial3D.new()
-	gold.albedo_color = block_color
-	gold.metallic = 0.55
-	gold.roughness = 0.35
-	gold.emission_enabled = true
-	gold.emission = block_color
-	gold.emission_energy_multiplier = 0.7
-	_body.material_override = gold
-	_body.position.y = 0.65
-	add_child(_body)
-	var mark := Label3D.new()
-	mark.text = "?"
-	mark.billboard = BaseMaterial3D.BILLBOARD_ENABLED
-	mark.no_depth_test = true
-	mark.font_size = 64
-	mark.outline_size = 14
-	mark.modulate = Color(0.25, 0.18, 0.05)
-	mark.position.y = 0.65
-	add_child(mark)
-	var light := OmniLight3D.new()
-	light.light_color = block_color
-	light.light_energy = 1.6
-	light.omni_range = 6.0
-	light.position.y = 1.0
-	add_child(light)
+	_block_rest_y = _block.position.y
+	_paint()
 
 
 func _physics_process(delta: float) -> void:
 	_time += delta
-	if _body != null and available:
-		_body.position.y = 0.65 + sin(_time * 2.0) * 0.06
-		_body.rotate_y(delta * 0.9)
+	if available:
+		_block.position.y = _block_rest_y + sin(_time * bob_speed) * bob_height
+		_block.rotate_y(delta * spin_speed)
 
 
 func _interact(player: Node) -> void:
@@ -209,7 +189,7 @@ func _reward_points(player: Node) -> void:
 
 ## Un cofre gratis junto al bloque.
 func _reward_chest() -> void:
-	Chest.spawn_free(get_tree(), global_position + Vector3(1.6, 0.0, 0.0))
+	Chest.spawn_free(get_tree(), global_position + free_chest_offset)
 
 
 func _reward_powerup(player: Node) -> void:
@@ -259,7 +239,7 @@ func _on_well_pick(option: Dictionary, player: Node) -> void:
 	if bag == null or not bag.remove_item(given):
 		print("Lucky block: well (nada)")
 		return
-	if randf() < WELL_POWERUP_CHANCE:
+	if randf() < well_powerup_chance:
 		_reward_powerup(player)
 		print("Lucky block: well (%s -> power-up)" % given)
 		return
@@ -279,3 +259,11 @@ static func _next_rarity_item(rarity_name: String) -> String:
 	var better := mini(index + 1, UpgradePool.RARITIES.size() - 1)
 	return ItemCatalog.roll_id(String(UpgradePool.RARITIES[better].name))
 
+
+## Pinta el material del bloque y su luz con block_color.
+func _paint() -> void:
+	var material := _block.material_override as StandardMaterial3D
+	if material != null:
+		material.albedo_color = block_color
+		material.emission = block_color
+	_glow.light_color = block_color
