@@ -1,32 +1,24 @@
 class_name Sarcognath
 extends BossBase
-## Ash Dunes boss: a massive entombed jackal-sarcophagus construct that
-## hover-stalks the player. Moveset on the Rotking state-machine pattern:
-## a Sweep Beam (telegraphed rotating warning line, then a radial laser
-## that scythes through an arc — run with it, hop the line, or stand in
-## the uncovered gap), Sand Coffins (a ring of eruption discs around the
-## player with one gap slot plus one disc on their feet — find the gap),
-## and a once-per-HP-threshold Entomb that roots a player caught on its
-## disc (Player.apply_root; weapons keep firing). Title/tier/curse/payout
-## plumbing lives on BossBase; the Elder rematch comes via apply_tier().
+## Sarcognato, jefe de las Dunas de Ceniza: un enorme sarcófago-chacal que
+## acecha flotando. Moveset con el patrón de máquina de estados del Rotking:
+## Rayo de barrido (línea de aviso que gira y después un láser radial que
+## barre un arco: corre con él, salta la línea o párate en el hueco),
+## Ataúdes de arena (un anillo de discos alrededor del raider con un hueco y
+## un disco extra a sus pies: encuentra el hueco) y Sepultar, una vez por
+## umbral de vida, que inmoviliza a quien quede en su disco
+## (Player.apply_root; las armas siguen disparando). Título, grados y pago
+## viven en BossBase; la revancha Elder llega por apply_tier().
+## Colores de aviso (Sepultar) e impacto: grupo Telegrafía de Sarcognath.tscn;
+## líneas del barrido: nodos WarnLine y Beam; púas: SandSpikes.tscn.
 
 enum State { ENTRANCE, PURSUE, SWEEP, COFFINS, ENTOMB }
 
-const TELEGRAPH_COLOR := Color(0.25, 0.95, 0.8)
-const BEAM_COLOR := Color(0.15, 1.0, 0.85)
-const SAND_COLOR := Color(0.95, 0.72, 0.28)
-const SAND_IMPACT_COLOR := Color(1.0, 0.86, 0.5)
-## Cut-sandstone skin for the shared spike-cluster cue.
-const SPIKE_COLOR := Color(0.74, 0.6, 0.38)
-const SPIKE_ROUGHNESS: float = 0.9
-const SPIKE_BOTTOM_RADIUS: float = 0.2
-const SPIKE_LENGTH: float = 1.2
-const SPIKE_SINK_DEPTH: float = 1.3
-
+@export_group("Llegada")
+## Segundos del estado de llegada antes de empezar a pelear.
 @export var entrance_duration: float = 1.0
-## Arrival ring: sized by hand here (the Sarcognath has no melee radius to
-## derive it from, unlike the other bosses).
-const ENTRANCE_RING_RADIUS: float = 3.0
+## Radio en metros del anillo de destello de la llegada.
+@export var entrance_ring_radius: float = 3.0
 
 @export_group("Sweep Beam")
 @export var sweep_windup: float = 1.0
@@ -37,18 +29,34 @@ const ENTRANCE_RING_RADIUS: float = 3.0
 @export var sweep_tick_interval: float = 0.5
 @export var sweep_cooldown: float = 8.0
 @export var sweep_max_range: float = 14.0
-## Angular half-width of the beam's hit wedge.
+## Medio ancho angular de la cuña de golpe del rayo.
 @export var sweep_hit_half_angle_deg: float = 7.0
-## The beam scythes at chest height: feet higher than this above the
-## boss's footing (a timed jump, a mesa) pass over it.
+## El rayo barre a la altura del pecho: unos pies más altos que esto sobre
+## los del jefe (un salto a tiempo, una mesa) le pasan por encima.
 @export var sweep_height_window: float = 1.2
 @export var beam_height: float = 0.9
+## Segundos de espera al aparecer antes del primer barrido.
+@export var first_sweep_delay: float = 3.0
+## Grados que avanza la línea de aviso hacia el arco durante la carga.
+@export var warn_lead_deg: float = 12.0
+## Grosor en metros de la línea de aviso al empezar la carga.
+@export var warn_width_start: float = 0.04
+## Grosor en metros de la línea de aviso al terminar la carga.
+@export var warn_width_end: float = 0.16
 
 @export_group("Sand Coffins")
 @export var coffin_interval: float = 6.0
+## Fracción de coffin_interval que espera la primera tanda al aparecer (0-1).
+@export var first_coffin_fraction: float = 0.6
+## Color de los discos de aviso de los ataúdes (Sepultar usa telegraph_color).
+@export var coffin_telegraph_color: Color = Color(0.95, 0.72, 0.28)
+## Fuerza del temblor de cámara cuando caen los ataúdes (0-1).
+@export var coffin_shake_strength: float = 0.2
+## Segundos del temblor de cámara cuando caen los ataúdes.
+@export var coffin_shake_duration: float = 0.4
 @export var coffin_windup: float = 1.0
-## Evenly spaced ring slots around the player; one random slot stays empty
-## (the escape gap) and one extra disc lands on the player's feet.
+## Huecos repartidos en anillo alrededor del raider; uno al azar queda vacío
+## (el escape) y un disco extra cae a sus pies.
 @export var coffin_ring_slots: int = 5
 @export var coffin_ring_radius: float = 2.6
 @export var coffin_radius: float = 1.6
@@ -58,8 +66,8 @@ const ENTRANCE_RING_RADIUS: float = 3.0
 @export var coffin_height_window: float = 1.5
 
 @export_group("Entomb")
-## HP ratios (descending) that each trigger exactly one Entomb cast as the
-## boss drops through them.
+## Fracciones de vida (de mayor a menor) que disparan un Sepultar cada una
+## cuando el jefe las cruza.
 @export var entomb_thresholds: Array[float] = [0.66, 0.33]
 @export var entomb_windup: float = 1.2
 @export var entomb_radius: float = 2.0
@@ -67,36 +75,40 @@ const ENTRANCE_RING_RADIUS: float = 3.0
 @export var entomb_root_duration: float = 1.5
 @export var entomb_height_window: float = 1.5
 
+@export_group("Flotación")
+## Velocidad del vaivén vertical (radianes por segundo).
+@export var hover_speed: float = 2.0
+## Amplitud del vaivén vertical en metros.
+@export var hover_amplitude: float = 0.09
+
 var _state: State = State.ENTRANCE
 var _state_timer: float = 0.0
-var _entrance_played: bool = false
-var _sweep_cooldown_timer: float = 3.0  # first sweep lands early
+var _sweep_cooldown_timer: float = 0.0
 var _sweep_firing: bool = false
 var _sweep_angle: float = 0.0
 var _sweep_sign: float = 1.0
-## Burn cadence PER raider (instance id -> seconds until this body can be
-## burned again). The beam is an area attack, so two raiders standing in it
-## must both burn on their own sweep_tick_interval instead of sharing one.
+## Ritmo de quemadura POR raider (instance id -> segundos hasta volver a
+## quemarlo). El rayo es un ataque de área: dos raiders dentro se queman
+## cada uno a su propio sweep_tick_interval en vez de compartir uno.
 var _sweep_tick_cd: Dictionary[int, float] = {}
 var _coffin_timer: float = 0.0
 var _coffin_spots: Array[Vector3] = []
 var _entomb_spot: Vector3 = Vector3.ZERO
 var _thresholds_remaining: Array[float] = []
 var _pending_entombs: int = 0
-var _warn_line: BeamVisual
-var _beam: BeamVisual
-var _hum_held: bool = false
 var _hover_time: float = 0.0
 var _hover_base: float = 0.0
+
+@onready var _warn_line: BeamVisual = $WarnLine
+@onready var _beam: BeamVisual = $Beam
 
 
 func _ready() -> void:
 	super()
 	_state_timer = entrance_duration
-	_coffin_timer = coffin_interval * 0.6
+	_sweep_cooldown_timer = first_sweep_delay
+	_coffin_timer = coffin_interval * first_coffin_fraction
 	_thresholds_remaining = entomb_thresholds.duplicate()
-	_warn_line = BeamVisual.create(self, TELEGRAPH_COLOR, 0.06)
-	_beam = BeamVisual.create(self, BEAM_COLOR, 0.3)
 	_hover_base = _visual.position.y
 	_health.damaged.connect(_on_damaged)
 	_health.died.connect(_on_sarcognath_died)
@@ -104,16 +116,12 @@ func _ready() -> void:
 
 func _behavior_tick(delta: float) -> void:
 	_hover_time += delta
-	_visual.position.y = _hover_base + sin(_hover_time * 2.0) * 0.09
+	_visual.position.y = _hover_base + sin(_hover_time * hover_speed) * hover_amplitude
 	_sweep_cooldown_timer = maxf(_sweep_cooldown_timer - delta, 0.0)
 	if _state == State.PURSUE:
 		_coffin_timer = maxf(_coffin_timer - delta, 0.0)
 		return
-	if _state == State.ENTRANCE and not _entrance_played:
-		# Deferred off _ready so the spawner has assigned the real spawn
-		# position before the arrival ring appears.
-		_entrance_played = true
-		_play_entrance()
+	_tick_entrance(_state == State.ENTRANCE)
 	_state_timer -= delta
 	if _state == State.SWEEP:
 		_tick_sweep(delta)
@@ -131,7 +139,7 @@ func _behavior_tick(delta: float) -> void:
 
 
 func _movement_intent(seek: Vector3, _distance: float) -> Vector3:
-	# Attacks (and the entrance) pause the hover-stalk.
+	# Los ataques (y la entrada) pausan el acecho flotante.
 	return seek if _state == State.PURSUE else Vector3.ZERO
 
 
@@ -139,7 +147,7 @@ func _facing_direction(steer: Vector3, seek: Vector3) -> Vector3:
 	if _state == State.ENTRANCE:
 		return Vector3.ZERO
 	if _state == State.SWEEP:
-		# The crest tracks its own beam while it scythes.
+		# La cresta sigue a su propio rayo mientras barre.
 		return Vector3(cos(_sweep_angle), 0.0, sin(_sweep_angle))
 	return seek if seek.length_squared() > 0.0001 else steer
 
@@ -164,13 +172,13 @@ func _scale_attack_damage(multiplier: float) -> void:
 	entomb_damage *= multiplier
 
 
-## Rises out of a flash ring with the second roar voice.
+## Se alza de un anillo de destello con la segunda voz de rugido.
 func _play_entrance() -> void:
 	Sfx.play(&"boss_roar_2")
-	_play_boss_entrance(ENTRANCE_RING_RADIUS, SAND_IMPACT_COLOR)
+	_play_boss_entrance(entrance_ring_radius, impact_color)
 
 
-# --- Sweep Beam -------------------------------------------------------------
+# --- Rayo de barrido -----------------------------------------------------------
 
 func _start_sweep(player: Node3D) -> void:
 	_state = State.SWEEP
@@ -179,29 +187,29 @@ func _start_sweep(player: Node3D) -> void:
 	_sweep_sign = 1.0 if randf() < 0.5 else -1.0
 	var to_player := player.global_position - global_position
 	var player_angle := atan2(to_player.z, to_player.x)
-	# Start half the arc behind the player's bearing so the beam crosses
-	# their spot mid-sweep: stand still and get clipped, or move with it,
-	# hop the line, or step into the 240 degrees it never covers.
+	# Empieza medio arco antes del rumbo del raider para que el rayo cruce su
+	# punto a mitad del barrido: quieto te alcanza; muévete con él, salta la
+	# línea o métete en los 240 grados que nunca cubre.
 	_sweep_angle = player_angle - _sweep_sign * deg_to_rad(sweep_arc_deg) * 0.5
 
 
 func _tick_sweep(delta: float) -> void:
 	var origin := global_position + Vector3.UP * beam_height
 	if not _sweep_firing:
-		# Warning line: creeps a few degrees into the coming arc (reads as
-		# rotation direction) and thickens as the windup runs out.
+		# Línea de aviso: avanza unos grados hacia el arco que viene (se lee
+		# como sentido de giro) y engorda a medida que se acaba la carga.
 		var progress := 1.0 - clampf(_state_timer / sweep_windup, 0.0, 1.0)
-		var warn_angle := _sweep_angle + progress * deg_to_rad(12.0) * _sweep_sign
+		var warn_angle := _sweep_angle + progress * deg_to_rad(warn_lead_deg) * _sweep_sign
 		var warn_to := origin \
 				+ Vector3(cos(warn_angle), 0.0, sin(warn_angle)) * sweep_length
-		_warn_line.span(origin, warn_to, lerpf(0.04, 0.16, progress))
+		_warn_line.span(origin, warn_to, lerpf(warn_width_start, warn_width_end, progress))
 		return
 	_sweep_angle += deg_to_rad(sweep_arc_deg) / sweep_duration * delta * _sweep_sign
 	var beam_to := origin \
 			+ Vector3(cos(_sweep_angle), 0.0, sin(_sweep_angle)) * sweep_length
 	_beam.span(origin, beam_to)
-	# Every raider the wedge crosses burns, each on their own cadence: the
-	# laser is 120 degrees of area, not a single-target attack.
+	# Todo raider que cruza la cuña se quema, cada uno a su ritmo: el láser es
+	# un área de 120 grados, no un ataque a un solo objetivo.
 	for player: Node3D in Coop.alive_players(get_tree()):
 		var id := player.get_instance_id()
 		var cooldown := maxf(float(_sweep_tick_cd.get(id, 0.0)) - delta, 0.0)
@@ -215,8 +223,8 @@ func _tick_sweep(delta: float) -> void:
 		player_health.take_damage(sweep_tick_damage, false, self)
 
 
-## True while the player stands in the beam's current wedge: inside its
-## reach, inside its angular width, and not above the height window.
+## True mientras el raider está en la cuña actual del rayo: dentro de su
+## alcance, de su ancho angular y por debajo de la ventana de altura.
 func _sweep_contact(player: Node3D) -> bool:
 	var to_player := player.global_position - global_position
 	var height := to_player.y
@@ -237,7 +245,7 @@ func _advance_sweep_phase() -> void:
 		_state_timer = sweep_duration
 		_sweep_tick_cd.clear()
 		_warn_line.clear()
-		_acquire_hum()
+		_beam.start_hum()
 		return
 	_end_sweep()
 
@@ -246,24 +254,23 @@ func _end_sweep() -> void:
 	_state = State.PURSUE
 	_sweep_firing = false
 	_sweep_cooldown_timer = sweep_cooldown
-	# Dropped here rather than kept: ids of raiders who left (or died) would
-	# otherwise linger in the map for the rest of the fight.
+	# Se vacía en vez de conservarse: los ids de raiders que se fueron (o
+	# murieron) quedarían en el mapa el resto de la pelea.
 	_sweep_tick_cd.clear()
 	_beam.clear()
-	_release_hum()
 
 
-# --- Sand Coffins -----------------------------------------------------------
+# --- Ataúdes de arena ----------------------------------------------------------
 
 func _start_coffins(player: Node3D) -> void:
 	_state = State.COFFINS
 	_state_timer = coffin_windup
 	_coffin_timer = coffin_interval
 	_coffin_spots.clear()
-	# Clamped like the ring slots: a player standing past the arena edge
-	# (clamped climbers, knockback) would otherwise get a disc off-field.
+	# Recortado como los huecos del anillo: un raider fuera del borde de la
+	# arena (trepadores recortados, empujones) recibiría un disco fuera del campo.
 	var base := _clamp_to_arena(player.global_position)
-	_coffin_spots.append(base)  # the on-player disc forces a move
+	_coffin_spots.append(base)  # el disco sobre el raider obliga a moverse
 	var base_angle := randf() * TAU
 	var gap_slot := randi_range(0, coffin_ring_slots - 1)
 	for i in coffin_ring_slots:
@@ -273,83 +280,51 @@ func _start_coffins(player: Node3D) -> void:
 		_coffin_spots.append(_clamp_to_arena(base
 				+ Vector3(cos(slot_angle), 0.0, sin(slot_angle)) * coffin_ring_radius))
 	for spot: Vector3 in _coffin_spots:
-		Telegraph.spawn_disc(self, spot, coffin_radius, coffin_windup, SAND_COLOR)
+		Telegraph.spawn_disc(self, spot, coffin_radius, coffin_windup, coffin_telegraph_color)
 
 
 func _resolve_coffins() -> void:
 	_state = State.PURSUE
-	Juice.shake(0.2, 0.4)
+	Juice.shake(coffin_shake_strength, coffin_shake_duration)
 	for spot: Vector3 in _coffin_spots:
-		_spawn_sand_spikes(spot)
-	# Against the marked SPOTS and the whole party: the raider the ring was
-	# drawn around may no longer be the nearest one by now.
+		_spawn_spike_cluster(spot, coffin_radius * 0.5)
+	# Contra los PUNTOS marcados y todo el equipo: el raider alrededor del que
+	# se dibujó el anillo puede ya no ser el más cercano.
 	damage_players_in_discs(_coffin_spots, coffin_radius, coffin_height_window,
 			coffin_damage, self)
 
 
-# --- Entomb -----------------------------------------------------------------
+# --- Sepultar ------------------------------------------------------------------
 
 func _start_entomb(player: Node3D) -> void:
 	_state = State.ENTOMB
 	_state_timer = entomb_windup
 	_pending_entombs -= 1
-	# Marked on the player's feet: keep moving and it whiffs entirely.
+	# Marcado a los pies del raider: si sigue moviéndose, falla del todo.
 	_entomb_spot = _clamp_to_arena(player.global_position)
-	Telegraph.spawn_disc(self, _entomb_spot, entomb_radius, entomb_windup, TELEGRAPH_COLOR)
+	Telegraph.spawn_disc(self, _entomb_spot, entomb_radius, entomb_windup, telegraph_color)
 
 
 func _resolve_entomb() -> void:
 	_state = State.PURSUE
-	Telegraph.spawn_disc(self, _entomb_spot, entomb_radius, 0.2, SAND_IMPACT_COLOR)
-	_spawn_sand_spikes(_entomb_spot)
-	Juice.shake(0.15, 0.35)
-	# Anyone caught on the marked disc is rooted, not just the nearest
-	# raider: the mark is the promise, the same one everybody could see.
-	for caught: Node3D in damage_players_in_disc(_entomb_spot, entomb_radius,
-			entomb_height_window, entomb_damage, self):
+	_spawn_spike_cluster(_entomb_spot, coffin_radius * 0.5)
+	# Todo el que quede en el disco marcado queda inmovilizado, no solo el más
+	# cercano: la marca es la promesa que todos pudieron ver.
+	for caught: Node3D in _resolve_ground_hit([_entomb_spot], entomb_radius,
+			entomb_height_window, entomb_damage):
 		var body := caught as Player
 		if body != null:
 			body.apply_root(entomb_root_duration)
 
 
-# --- shared bits ------------------------------------------------------------
+# --- piezas compartidas --------------------------------------------------------
 
 func _on_damaged(_amount: float, current: float) -> void:
 	var ratio := current / _health.max_hp
-	# A big hit can drop through both thresholds at once; each still yields
-	# its own Entomb cast, chained one ENTOMB state at a time.
-	while not _thresholds_remaining.is_empty() and ratio <= _thresholds_remaining[0]:
-		_thresholds_remaining.remove_at(0)
-		_pending_entombs += 1
+	# Cada umbral cruzado da su propio Sepultar, encadenados de a un estado ENTOMB.
+	_pending_entombs += _consume_thresholds(_thresholds_remaining, ratio)
 
 
 func _on_sarcognath_died() -> void:
 	_warn_line.clear()
 	_beam.clear()
-	_release_hum()
-
-
-func _exit_tree() -> void:
-	# Freed mid-sweep (run teardown): never leak a hum reference.
-	_release_hum()
-
-
-func _acquire_hum() -> void:
-	if _hum_held:
-		return
-	_hum_held = true
-	Sfx.acquire_loop(&"laser_hum")
-
-
-func _release_hum() -> void:
-	if not _hum_held:
-		return
-	_hum_held = false
-	Sfx.release_loop(&"laser_hum")
-
-
-## Sandstone spike cluster popping out of the ground and sinking back: the
-## Rotking's silhouette recolored to cut sandstone (BossBase owns the cue).
-func _spawn_sand_spikes(center: Vector3) -> void:
-	_spawn_spike_cluster(center, coffin_radius * 0.5, SPIKE_COLOR,
-			SPIKE_ROUGHNESS, SPIKE_BOTTOM_RADIUS, SPIKE_LENGTH, SPIKE_SINK_DEPTH)

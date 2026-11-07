@@ -1,8 +1,9 @@
-[gd_scene load_steps=18 format=3]
+[gd_scene load_steps=19 format=3]
 
 [ext_resource type="Script" path="res://scripts/enemies/grubthing.gd" id="1_grub"]
 [ext_resource type="Script" path="res://scripts/systems/health.gd" id="2_health"]
 [ext_resource type="PackedScene" path="res://scenes/systems/XpGem.tscn" id="3_gem"]
+[ext_resource type="PackedScene" path="res://scenes/enemies/GrubGlob.tscn" id="4_glob"]
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_larva"]
 albedo_color = Color(0.87, 0.83, 0.66, 1)
@@ -99,6 +100,13 @@ move_speed = 2.6
 turn_speed = 6.0
 separation_strength = 0.0
 xp_gem_scene = ExtResource("3_gem")
+points_value = 25
+possessable = false
+telegraph_color = Color(0.72, 0.85, 0.3, 1)
+impact_color = Color(0.9, 0.95, 0.55, 1)
+impact_shake_strength = 0.15
+impact_shake_duration = 0.35
+glob_visual_scene = ExtResource("4_glob")
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.8, 0)

@@ -1,70 +1,71 @@
 class_name Sunspitter
 extends EnemyBase
-## Ash Dunes ranged: a squat scarab that holds a standoff band, aims a
-## thin warning line at the player that thickens over the windup, then
-## locks a continuous amber beam that ticks damage while an unbroken line
-## of sight lasts — any world geometry (mesa, rock, obelisk) blocks the
-## beam short, so cover is the counterplay. Afterwards it skitters
-## sideways while the beam recharges. The sight ray masks world layer 1
-## only (enemies live on layer 2, so they never block or burn) and damage
-## goes to whichever raider the ray actually reached — the target it locked
-## onto when aiming, or a companion who stepped into the line to shield
-## them. Nothing else can be hurt by the beam.
+## Escupesol (Dunas de Ceniza), a distancia: un escarabajo que mantiene una
+## banda de distancia, apunta una línea de aviso (nodo AimLine) que engorda
+## durante la carga y después fija un rayo ámbar continuo (nodo Beam) que
+## daña por pulsos mientras dure la línea de visión. Cualquier geometría del
+## mundo (mesa, roca, obelisco) corta el rayo, así que la cobertura es la
+## respuesta. Después se escabulle de lado mientras recarga. El rayo de
+## visión solo ve la capa 1 (mundo + jugadores; los enemigos están en la 2 y
+## nunca bloquean ni se queman) y daña al raider que el rayo alcanzó: el que
+## fijó al apuntar, o un compañero que se cruzó para cubrirlo. Los colores y
+## grosores de las dos líneas están en sus nodos de Sunspitter.tscn.
 
 enum State { SKITTER, AIM, FIRE }
 
-const AIM_COLOR := Color(1.0, 0.62, 0.18)
-const BEAM_COLOR := Color(1.0, 0.42, 0.1)
-
-@export_group("Standoff Band")
+@export_group("Banda de distancia")
+## Distancia en metros por debajo de la cual retrocede.
 @export var band_inner: float = 10.0
+## Distancia en metros por encima de la cual avanza.
 @export var band_outer: float = 14.0
 
-@export_group("Beam")
+@export_group("Rayo")
+## Distancia máxima en metros a la que empieza a apuntar.
 @export var fire_range: float = 17.0
+## Segundos de carga con la línea de aviso antes de disparar.
 @export var aim_windup: float = 0.8
+## Segundos que dura el rayo encendido.
 @export var beam_duration: float = 1.5
+## Daño de cada pulso del rayo.
 @export var beam_tick_damage: float = 4.0
+## Segundos entre pulsos de daño del rayo.
 @export var beam_tick_interval: float = 0.5
+## Segundos de recarga después de cada rayo.
 @export var beam_cooldown: float = 3.0
-## Beam endpoints: leaves at the eye and tracks the player's chest.
+## Segundos de espera al aparecer antes de poder apuntar.
+@export var first_beam_delay: float = 1.2
+## Altura en metros del ojo, de donde sale el rayo.
 @export var muzzle_height: float = 0.55
+## Altura en metros del pecho del raider, adonde va el rayo.
 @export var target_height: float = 0.9
+## Grosor en metros de la línea de aviso al empezar la carga.
+@export var aim_width_start: float = 0.03
+## Grosor en metros de la línea de aviso al terminar la carga.
+@export var aim_width_end: float = 0.14
 
 var _state: State = State.SKITTER
 var _state_timer: float = 0.0
-# Spawn grace so a fresh ring spawn doesn't lase the instant it lands.
-var _cooldown_timer: float = 1.2
+var _cooldown_timer: float = 0.0
 var _tick_timer: float = 0.0
-# Sideways-skitter direction; flips after every beam for variety.
+# Dirección del escabullirse de lado; se invierte tras cada rayo.
 var _strafe_sign: float = 1.0
-## Raider locked in when AIM starts. The warning line promises ONE victim,
-## so the beam has to keep burning that one instead of re-picking the
-## nearest body every tick (in co-op the nearest changes constantly).
+## Raider fijado al empezar a apuntar. La línea de aviso promete UNA
+## víctima, así que el rayo sigue quemando a esa en vez de elegir al más
+## cercano en cada tick (en co-op el más cercano cambia todo el tiempo).
 var _target: Node3D = null
-var _aim_line: BeamVisual
-var _beam: BeamVisual
-var _hum_held: bool = false
-## The sight ray's query, built once with the same factory call (world
-## layer 1 only) and re-aimed per cast: _beam_sight runs every tick the
-## spitter aims, fires, or waits on a blocked line, and used to allocate a
-## fresh query object each time. Only from/to ever change on it.
+## Consulta del rayo de visión (solo capa 1), creada una vez y reapuntada en
+## cada lanzamiento: _beam_sight corre en cada tick de apuntar, disparar o
+## esperar con la línea bloqueada. Solo cambian from y to.
 var _sight_query: PhysicsRayQueryParameters3D = \
 		PhysicsRayQueryParameters3D.create(Vector3.ZERO, Vector3.ZERO, 1)
 
-
-func _init() -> void:
-	# Not possessable (iteration 56): its beam gates on group "player", so
-	# a possessed one would keep attacking the party it now belongs to.
-	# Only contact fighters, whose _combat_tick damages whatever Health it
-	# is handed, can switch sides.
-	possessable = false
+@onready var _aim_line: BeamVisual = $AimLine
+@onready var _beam: BeamVisual = $Beam
 
 
 func _ready() -> void:
 	super()
-	_aim_line = BeamVisual.create(self, AIM_COLOR, 0.05)
-	_beam = BeamVisual.create(self, BEAM_COLOR, 0.22)
+	_cooldown_timer = first_beam_delay
 	_health.died.connect(_on_sunspitter_died)
 	_strafe_sign = 1.0 if get_instance_id() % 2 == 0 else -1.0
 
@@ -73,8 +74,8 @@ func _behavior_tick(delta: float) -> void:
 	_cooldown_timer = maxf(_cooldown_timer - delta, 0.0)
 	if _state == State.SKITTER:
 		return
-	# The locked target leaving (death, teardown) aborts the shot rather
-	# than silently transferring it to whoever is closest now.
+	# Si el objetivo fijado se va (muerte, cierre) el tiro se aborta en vez
+	# de pasar en silencio al que esté más cerca ahora.
 	if not _target_is_valid():
 		_abort_attack()
 		return
@@ -85,19 +86,14 @@ func _behavior_tick(delta: float) -> void:
 		_tick_fire(_target, delta)
 
 
-func _target_is_valid() -> bool:
-	return _target != null and is_instance_valid(_target) \
-			and _target.is_inside_tree() and _target.is_in_group("player")
-
-
 func _movement_intent(seek: Vector3, distance: float) -> Vector3:
 	if _state != State.SKITTER:
-		return Vector3.ZERO  # plants itself to aim and fire
+		return Vector3.ZERO  # se planta para apuntar y disparar
 	if distance > band_outer:
 		return seek
 	if distance < band_inner:
 		return -seek
-	# Inside the band: sideways skitter while the beam recharges.
+	# Dentro de la banda: se escabulle de lado mientras recarga.
 	return seek.cross(Vector3.UP) * _strafe_sign
 
 
@@ -108,20 +104,29 @@ func _facing_direction(steer: Vector3, seek: Vector3) -> Vector3:
 func _combat_tick(player: Node3D, distance: float) -> void:
 	if _state != State.SKITTER or _cooldown_timer > 0.0:
 		return
-	# The lower bound keeps the beam math away from the on-our-head case.
+	# El mínimo aleja la geometría del rayo del caso "encima de su cabeza".
 	if distance > fire_range or distance < 1.0:
 		return
 	if _beam_sight(player, null) == null:
-		return  # never aims into a wall
+		return  # nunca apunta hacia una pared
 	_state = State.AIM
 	_state_timer = aim_windup
 	_target = player
 
 
+func _apply_elite_damage(multiplier: float) -> void:
+	beam_tick_damage *= multiplier
+
+
+func _target_is_valid() -> bool:
+	return _target != null and is_instance_valid(_target) \
+			and _target.is_inside_tree() and _target.is_in_group("player")
+
+
 func _tick_aim(player: Node3D) -> void:
-	# Warning line thickens over the windup — the width is the countdown.
+	# La línea de aviso engorda durante la carga: el grosor es la cuenta.
 	var progress := 1.0 - clampf(_state_timer / aim_windup, 0.0, 1.0)
-	_beam_sight(player, _aim_line, lerpf(0.03, 0.14, progress))
+	_beam_sight(player, _aim_line, lerpf(aim_width_start, aim_width_end, progress))
 	if _state_timer <= 0.0:
 		_begin_fire()
 
@@ -136,10 +141,9 @@ func _tick_fire(player: Node3D, delta: float) -> void:
 		return
 	_tick_timer += beam_tick_interval
 	if burned == null:
-		return  # blocked tick is consumed, not banked
-	# Whoever the ray actually reached takes it: a raider stepping into the
-	# line body-blocks for the target, which is what the cover mechanic
-	# promises. Before, the beam burned the tracked player THROUGH them.
+		return  # un pulso bloqueado se consume, no se acumula
+	# Lo recibe quien el rayo alcanzó de verdad: un raider que se cruza en la
+	# línea cubre al objetivo, que es lo que promete la cobertura.
 	var player_health := Health.find_in(burned)
 	if player_health != null and not player_health.is_dead:
 		player_health.take_damage(beam_tick_damage, false, self)
@@ -148,9 +152,9 @@ func _tick_fire(player: Node3D, delta: float) -> void:
 func _begin_fire() -> void:
 	_state = State.FIRE
 	_state_timer = beam_duration
-	_tick_timer = 0.0  # first tick lands on the first beam frame
+	_tick_timer = 0.0  # el primer pulso cae en el primer frame del rayo
 	_aim_line.clear()
-	_acquire_hum()
+	_beam.start_hum()
 
 
 func _end_fire() -> void:
@@ -159,15 +163,13 @@ func _end_fire() -> void:
 	_strafe_sign = -_strafe_sign
 	_target = null
 	_beam.clear()
-	_release_hum()
 
 
-## Raycasts muzzle -> player chest against layer 1 (world + player;
-## enemies are layer 2, invisible to it). Paints `line` — when given — up
-## to whatever the ray struck, and returns THE RAIDER THE RAY REACHED, or
-## null when geometry cut it short. Returning the body rather than a bare
-## "clear?" flag is what makes cover honest in co-op: a second raider
-## stepping into the line is who gets burned.
+## Lanza un rayo del ojo al pecho del raider contra la capa 1 (mundo +
+## jugadores; los enemigos están en la 2 y no lo ven). Si recibe `line` la
+## pinta hasta donde pegó el rayo, y devuelve EL RAIDER QUE ALCANZÓ, o null
+## si la geometría lo cortó. Devolver el cuerpo y no un "¿despejado?" es lo
+## que hace honesta la cobertura en co-op: quema al que se cruzó.
 func _beam_sight(player: Node3D, line: BeamVisual, thickness: float = -1.0) -> Node3D:
 	var from := global_position + Vector3.UP * muzzle_height
 	var to := player.global_position + Vector3.UP * target_height
@@ -186,41 +188,16 @@ func _beam_sight(player: Node3D, line: BeamVisual, thickness: float = -1.0) -> N
 	return burned
 
 
-func _apply_elite_damage(multiplier: float) -> void:
-	beam_tick_damage *= multiplier
-
-
 func _abort_attack() -> void:
-	# Re-armed for ANY interrupted attack, not just a fired one: an aim
-	# aborted because its target left used to fall back to SKITTER with a
-	# spent cooldown, so the next raider in range was lased instantly.
+	# Se rearma ante CUALQUIER ataque interrumpido, no solo uno disparado:
+	# si no, el siguiente raider en rango recibiría el rayo al instante.
 	if _state != State.SKITTER:
 		_cooldown_timer = maxf(_cooldown_timer, beam_cooldown)
 	_state = State.SKITTER
 	_target = null
 	_aim_line.clear()
 	_beam.clear()
-	_release_hum()
 
 
 func _on_sunspitter_died() -> void:
 	_abort_attack()
-
-
-func _exit_tree() -> void:
-	# Freed mid-beam (map change, cap culls): never leak a hum reference.
-	_release_hum()
-
-
-func _acquire_hum() -> void:
-	if _hum_held:
-		return
-	_hum_held = true
-	Sfx.acquire_loop(&"laser_hum")
-
-
-func _release_hum() -> void:
-	if not _hum_held:
-		return
-	_hum_held = false
-	Sfx.release_loop(&"laser_hum")

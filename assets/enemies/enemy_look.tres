@@ -1,0 +1,6 @@
+[gd_resource type="Resource" script_class="EnemyLookPalette" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/enemies/enemy/enemy_look_palette.gd" id="1_look"]
+
+[resource]
+script = ExtResource("1_look")

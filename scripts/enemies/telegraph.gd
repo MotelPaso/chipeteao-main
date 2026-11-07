@@ -1,13 +1,12 @@
 class_name Telegraph
 extends RefCounted
-## Ground-telegraph front door: a flat emissive disc that grows from its
-## center to full radius over the wind-up (the fill level reads as a
-## countdown) while its glow ramps up, then fades out. The signature is
-## unchanged for every caster, but the disc is now a pooled TelegraphDisc
-## (Pools) instead of a per-cast mesh+material build; it still lives at the
-## scene root so the cue survives its caster dying mid-telegraph, and it
-## releases itself after the fade. Purely visual — attack timing and
-## damage stay in the caller.
+## Puerta de entrada de los avisos en el suelo: un disco emisivo plano que
+## crece desde el centro hasta el radio completo durante la carga (lo lleno
+## se lee como cuenta regresiva) mientras sube su brillo, y luego se
+## desvanece. El disco es un TelegraphDisc del pool, vive en la raíz de la
+## escena (sobrevive si quien lo lanzó muere a mitad del aviso) y vuelve
+## solo al pool tras desvanecerse. Solo es visual: el momento del ataque y
+## el daño los decide quien lo llama.
 
 
 static func spawn_disc(_host: Node, center: Vector3, radius: float,

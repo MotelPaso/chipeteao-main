@@ -1,7 +1,7 @@
 extends StaticBody3D
-## Practice target: damageable via its Health child, leaves the "enemies"
-## group on death and respawns at full HP after a delay so weapon testing
-## is repeatable.
+## Muñeco de práctica: recibe daño por su hijo Health, sale del grupo
+## "enemies" al morir y reaparece con la vida llena tras una espera, para
+## probar armas una y otra vez.
 
 @export var respawn_delay: float = 3.0
 
@@ -19,8 +19,8 @@ func _on_died() -> void:
 	_mesh.visible = false
 	_collision.set_deferred("disabled", true)
 	await get_tree().create_timer(respawn_delay).timeout
-	# A SceneTreeTimer outlives its awaiter: a map change during the delay
-	# would resume this coroutine on a freed dummy.
+	# El SceneTreeTimer sobrevive a quien lo espera: un cambio de mapa durante
+	# la espera reanudaría esta corrutina sobre un muñeco liberado.
 	if not is_instance_valid(self) or not is_inside_tree():
 		return
 	_respawn()
