@@ -165,11 +165,13 @@ const FULL_MOON_TAG: String = "full_moon"
 @export_group("Lluvia de enemigos")
 ## Segundos entre tandas.
 @export var enemy_rain_interval: float = 1.5
-## Enemigos mínimos y máximos por tanda.
+## Enemigos mínimos por tanda.
 @export var enemy_rain_min_drops: int = 3
+## Enemigos máximos por tanda.
 @export var enemy_rain_max_drops: int = 6
-## Distancia mínima y máxima (metros) de cada caída al jugador.
+## Distancia mínima (metros) de cada caída al jugador.
 @export var enemy_rain_min_distance: float = 12.0
+## Distancia máxima (metros) de cada caída al jugador.
 @export var enemy_rain_max_distance: float = 25.0
 ## Radio (metros) del aviso en el suelo de cada caída.
 @export var enemy_rain_telegraph_radius: float = 1.4
@@ -183,8 +185,9 @@ const FULL_MOON_TAG: String = "full_moon"
 @export var acid_pool_radius: float = 2.0
 ## Segundos que dura cada charco.
 @export var acid_pool_lifetime: float = 6.0
-## Distancia mínima y máxima (metros) de un charco al jugador.
+## Distancia mínima (metros) de un charco al jugador.
 @export var acid_pool_min_distance: float = 2.0
+## Distancia MÁXIMA (metros) de un charco al jugador.
 @export var acid_pool_spawn_range: float = 20.0
 ## Daño por segundo del ácido a un jugador dentro de un charco.
 @export var acid_pool_damage_per_second: float = 4.0
@@ -200,8 +203,9 @@ const FULL_MOON_TAG: String = "full_moon"
 @export var tsunami_base: int = 40
 ## Enemigos extra de la ola por minuto de etapa.
 @export var tsunami_per_minute: int = 4
-## Distancia mínima y máxima (metros) de la ola al jugador.
+## Distancia mínima (metros) de la ola al jugador.
 @export var tsunami_arc_min: float = 40.0
+## Distancia máxima (metros) de la ola al jugador.
 @export var tsunami_arc_max: float = 60.0
 ## Medio ancho del arco del que viene la ola (radianes; 0.52 son unos 30
 ## grados a cada lado).
@@ -222,8 +226,9 @@ const FULL_MOON_TAG: String = "full_moon"
 @export_group("Meteoritos")
 ## Segundos entre meteoritos.
 @export var meteor_interval: float = 0.8
-## Distancia mínima y máxima (metros) de un meteorito al jugador.
+## Distancia mínima (metros) de un meteorito al jugador.
 @export var meteor_min_distance: float = 3.0
+## Distancia MÁXIMA (metros) de un meteorito al jugador.
 @export var meteor_range: float = 20.0
 ## Radio (metros) de cada impacto.
 @export var meteor_radius: float = 3.0

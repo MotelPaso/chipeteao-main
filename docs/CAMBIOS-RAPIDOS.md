@@ -174,17 +174,17 @@ Lo que no cambia por mapa se edita en `scripts/systems/enemy_spawner.gd`.
 | Qué quieres cambiar | Dónde | Qué propiedad |
 | --- | --- | --- |
 | Cuándo sale el primer evento y la pausa entre eventos | `scenes/world/RunSystems.tscn` > WorldDirector (grupo «Eventos») | `first_event_at`, `event_gap_min`, `event_gap_max`, `event_gap_floor` |
-| Qué tan seguido sale cada evento, su aviso y su baliza | `scripts/world/run/world_director.gd` > su fila en `EVENT_LIBRARY` | `weight`, `announce`, `beacon_color`, `beacon_time` |
+| Qué tan seguido sale cada evento, su aviso y su baliza | `scripts/world/run/world_director.gd` > su fila en `EVENT_LIBRARY` | `weight`, `announce`, `beacon_color` (quítalo y no hay baliza; el vendedor usa el `color` de su fila en `VENDOR_LIBRARY` de `vendor.gd`), `beacon_time` (sin él, hasta que se use) |
 | Máximo de vendedores o manantiales a la vez | `world_director.gd` > fila `vendor` / `spring` | `cap` |
 | Tope y ritmo de los altares | RunSystems.tscn > WorldDirector (grupo «Altares») | `altar_cap_base`, `altar_cap_minutes` |
-| Aspecto del pilar de baliza | `scenes/world/director/Beacon.tscn` > Pillar / Light / raíz | `height`, `light_energy`, `pulse_half_time` |
+| Aspecto del pilar de baliza | `scenes/world/director/Beacon.tscn` > Pillar (su malla) / Light / raíz | `height` y radios de la malla (el pilar se apoya solo en el suelo), `light_energy`, `pulse_half_time`, `pillar_alpha`; el color sale de la fila del evento (`beacon_color`), no del material |
 | Cofre de suministros (rareza mínima, suerte) | `scenes/world/director/SupplyChest.tscn` > SupplyChest | `min_rarity`, `luck_bonus` |
 | Aviso, tinte del cielo, nombre en el HUD y partículas de un clima | `scripts/world/run/director/weather_director.gd` > su fila en `WEATHER_CATALOG` | `announce`, `sun_color`, `sun_energy`, `ambient_color`, `fx_color`, `display_name` |
 | Duración de un clima y probabilidades de desastre, lluvia y luna | RunSystems.tscn > WorldDirector > Weather | `weather_duration_overrides`, `disaster_chance`, `rain_chance`, `sky_event_chance` |
 | Ácido, meteoritos y tsunami (daño, radio, frecuencia) | RunSystems.tscn > WorldDirector > Weather (grupos por clima) | `acid_pool_*`, `meteor_*`, `tsunami_*` |
 | Bonos de la luna llena y de la lluvia dorada | RunSystems.tscn > WorldDirector > Weather | `full_moon_xp_bonus`, `full_moon_luck_bonus`, `golden_points_multiplier` |
 | Portales, ruletas, cofres y cajas al inicio de cada etapa | RunSystems.tscn > WorldDirector > StageFixtures | `portal_count`, `roulette_count`, `extra_start_chests_min/max`, `start_pet_box_chance` |
-| Colores y recarga de los pares de portales | `scenes/world/director/PortalShrine.tscn` > PortalShrine | `pair_colors`, `cooldown` |
+| Colores, recarga y avisos de los pares de portales | `scenes/world/director/PortalShrine.tscn` > PortalShrine | `pair_colors`, `cooldown`, `prompt_text`, `recharging_prompt` |
 | Color y tamaño del portal de salida | `scenes/world/director/ExitPortal.tscn` > ExitPortal | `portal_color`, `ring_radius` |
 
 ## Altares, cofres y secretos del mapa
@@ -194,11 +194,12 @@ lo que cambies ahí vale para todos los que no tengan su propio valor en la esce
 
 | Qué quieres cambiar | Dónde | Qué propiedad |
 | --- | --- | --- |
-| Tamaño, color y altura del aviso «[E] …» | `interactable.gd` (grupo «Aviso flotante») | `prompt_font_size`, `prompt_outline_size`, `prompt_color`, `prompt_height` |
+| Tamaño y color del aviso «[E] …» | `interactable.gd` (grupo «Aviso flotante») | `prompt_font_size`, `prompt_outline_size`, `prompt_color` |
+| Altura del aviso «[E] …» de un interactuable | la escena del interactuable > raíz (grupo «Aviso flotante») | `prompt_height` (cada escena guarda el suyo) |
 | Cuánto tarda en hundirse algo gastado | la escena del interactuable > raíz (grupo «Gastado») | `sink_duration`, `sink_depth`, `spent_color` |
 | Brillo de los cofres según la rareza | `scenes/world/chests/Chest.tscn` > Chest (grupo «Brillo por rareza») | `glow_energy_by_rarity`, `free_glow_energy`, `free_tint` |
 | Salto de apertura y textos del cofre | `Chest.tscn` > Chest (grupos «Apertura», «Textos») | `open_duration`, `open_hop_height`, `paid_prompt`, `opened_announce` |
-| Color del anillo de un altar de carga o del altar demoníaco | `scenes/world/shrines/ChargeShrine.tscn` / `CurseShrine.tscn` > raíz (grupo «Anillo») | `accent_color` |
+| Color del anillo de un altar de carga o del altar demoníaco | `scenes/world/shrines/ChargeShrine.tscn` / `CurseShrine.tscn` > raíz (grupo «Anillo») | `accent_color`; el color de su baliza es aparte: `beacon_color` de la fila `charge_altar` / `demonic_altar` en `EVENT_LIBRARY` (`world_director.gd`) |
 | Tiempo de carga y tamaño del don | `ChargeShrine.tscn` / `CurseShrine.tscn` > raíz (grupo «Carga») | `channel_time`, `boon_scale` |
 | Costo de dificultad de los pactos | `CurseShrine.tscn` > CurseShrine (grupo «Pactos») | `difficulty_scale` (1 = lo que dice `PACT_LIBRARY` en `curse_shrine.gd`) |
 | Premios y aspecto del bloque de la suerte | `scenes/world/chests/LuckyBlock.tscn` > LuckyBlock | `points_reward`, `gem_count`, `explosion_radius`, `block_color` |

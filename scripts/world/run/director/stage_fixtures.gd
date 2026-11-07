@@ -21,8 +21,9 @@ const LUCKY_BLOCK_SCENE := preload("res://scenes/world/chests/LuckyBlock.tscn")
 ## Probabilidad (0-1) de quitar cada cofre o altar de la escena en esta
 ## etapa (el primer cofre de suelo siempre se queda).
 @export var poi_skip_chance: float = 0.3
-## Cofres extra al empezar la etapa: un número al azar entre mínimo y máximo.
+## Cofres extra al empezar la etapa, como mínimo (se sortea entre mínimo y máximo).
 @export var extra_start_chests_min: int = 0
+## Cofres extra al empezar la etapa, como máximo.
 @export var extra_start_chests_max: int = 2
 ## Probabilidad (0-1) de que cada cofre de inicio (de la escena o extra) sea gratis.
 @export var free_start_chest_chance: float = 0.15

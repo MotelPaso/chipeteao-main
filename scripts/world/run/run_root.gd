@@ -280,8 +280,8 @@ func _free_stage_props() -> void:
 				if parent != null:
 					parent.remove_child(node)
 				node.free()
-	# Cofres, portales, ruletas y manantiales no tienen grupo propio: son
-	# Interactables colgados de la arena, y el recorrido de abajo los atrapa.
+	# Cofres, portales, ruletas y manantiales no están en STAGE_PROP_GROUPS:
+	# son Interactables colgados de la arena, y los libera el recorrido de abajo.
 	# Las balizas las libera el director en on_stage_ended.
 	var arena := arena_root()
 	if arena != null:

@@ -4,7 +4,13 @@
 [ext_resource type="PackedScene" path="res://scenes/world/director/PortalVisual.tscn" id="2_visual"]
 
 [node name="ExitPortal" type="Area3D"]
+collision_layer = 0
+collision_mask = 1
+monitorable = false
 script = ExtResource("1_exit")
+prompt_text = "[E] Cruzar al siguiente mapa"
+prompt_height = 4.2
+marker_kind = &"exit"
 
 [node name="Visual" parent="." instance=ExtResource("2_visual")]
 ring_half_thickness = 0.16

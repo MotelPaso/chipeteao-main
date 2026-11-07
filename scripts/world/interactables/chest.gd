@@ -90,7 +90,8 @@ func _physics_process(_delta: float) -> void:
 ## Deja un cofre GRATIS en `at`, colgado de la arena (RunRoot.stage_parent)
 ## y no de quien lo suelta, para que siga ahí aunque ese nodo se libere.
 ## `bonus_luck` va a luck_bonus y `floor_rarity` (si no está vacío) a
-## min_rarity antes de que entre al árbol. Devuelve null si no hay arena.
+## min_rarity antes de que entre al árbol. Sin arena cuelga de la escena
+## actual; devuelve null solo sin árbol o si la escena no es un Chest.
 ## Lo usan los altares, el bloque de la suerte y EnemyLoot (cofre shiny y
 ## anillo del jefe).
 static func spawn_free(tree: SceneTree, at: Vector3, bonus_luck: float = 0.0,

@@ -28,26 +28,34 @@ extends Node3D
 @export var hill_color: Color = Color(0.16, 0.26, 0.17)
 ## Color del anillo lejano: más hondo en la niebla y un tono más oscuro.
 @export var far_hill_color: Color = Color(0.13, 0.21, 0.15)
-## Colinas del anillo cercano y del lejano. Cambiar la cantidad mueve los
-## POIs de la partida con la misma semilla (ver _build_hill_ring).
+# Franjas de los anillos: MÚLTIPLOS de la mitad del lado de la arena, que
+# el scatter publica por el grupo "arena_bounds" (la fuente única del tamaño
+# de arena), así un cambio de tamaño no mete colinas en el campo. Cambiar la
+# cantidad de colinas mueve los POIs de la partida con la misma semilla (ver
+# _build_hill_ring).
+## Colinas del anillo cercano (cambiarlo mueve los POIs de la misma semilla).
 @export var hill_count: int = 22
+## Colinas del anillo lejano (cambiarlo mueve los POIs de la misma semilla).
 @export var far_hill_count: int = 14
-## Franjas de los anillos como MÚLTIPLOS de la mitad del lado de la arena,
-## que el scatter publica por el grupo "arena_bounds" (la fuente única del
-## tamaño de arena): así un cambio de tamaño no mete colinas en el campo.
+## Borde interior del anillo cercano, en mitades del lado de la arena.
 @export var near_ring_min_factor: float = 1.6
+## Borde exterior del anillo cercano, en mitades del lado de la arena.
 @export var near_ring_max_factor: float = 2.1
+## Borde interior del anillo lejano, en mitades del lado de la arena.
 @export var far_ring_min_factor: float = 2.6
+## Borde exterior del anillo lejano, en mitades del lado de la arena.
 @export var far_ring_max_factor: float = 3.4
-## Rango de altura visible de una colina, en metros. Cada arena pone su
-## máximo en la escena; el valor por defecto es el del bosque.
+## Altura visible mínima de una colina, en metros.
 @export var hill_height_min: float = 6.0
+## Altura visible máxima de una colina, en metros; cada arena pone la suya en la escena (el valor por defecto es el del bosque).
 @export var hill_height_max: float = 20.0
-## Rango de media anchura de una colina, en metros.
+## Media anchura mínima de una colina, en metros.
 @export var hill_width_min: float = 18.0
+## Media anchura máxima de una colina, en metros.
 @export var hill_width_max: float = 46.0
-## Profundidad de una colina como fracción de su media anchura (rango).
+## Profundidad mínima de una colina, como fracción de su media anchura (0-1).
 @export var hill_depth_ratio_min: float = 0.7
+## Profundidad máxima de una colina, como fracción de su media anchura (0-1).
 @export var hill_depth_ratio_max: float = 1.0
 ## Desvío al azar del ángulo de cada colina en su anillo, en radianes.
 @export var hill_angle_jitter: float = 0.12

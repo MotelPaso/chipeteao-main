@@ -24,12 +24,12 @@ const POI_PLATFORM_Y: float = 0.5
 ## Semiancho (metros) que se usa si la arena no publica el suyo.
 const DEFAULT_HALF_EXTENT: float = 80.0
 
-## Distancias del reparto (metros). El director las copia de sus exports
-## del grupo "Reparto del mapa" al crear el layout.
-var bounds_margin: float = 14.0
-var min_distance_from_spawn: float = 16.0
-var min_distance_between: float = 18.0
-var min_distance_from_keepouts: float = 12.0
+## Distancias del reparto (metros). Sin valor propio: el director les copia
+## sus exports del grupo "Reparto de POI" al crear el layout; edítalas ahí.
+var bounds_margin: float
+var min_distance_from_spawn: float
+var min_distance_between: float
+var min_distance_from_keepouts: float
 
 ## Arena de la etapa; null entre etapas.
 var arena: Node3D = null

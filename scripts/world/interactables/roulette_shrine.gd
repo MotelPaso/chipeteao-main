@@ -62,10 +62,6 @@ var _wheel: MeshInstance3D = null
 var _ui: RouletteUi = null
 
 
-func _init() -> void:
-	marker_kind = &"roulette"
-
-
 func _ready() -> void:
 	super()
 	_wheel = get_node_or_null("Visual/Wheel") as MeshInstance3D

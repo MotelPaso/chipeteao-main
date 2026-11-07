@@ -15,8 +15,9 @@ extends Node3D
 ## todos los tamaños de charco.
 const BASE_RADIUS: float = 1.0
 
-## Radio, duración y daño por segundo no están aquí: los manda WorldDirector
-## en play() (acid_pool_radius, acid_pool_lifetime, ACID_DAMAGE_PER_SECOND).
+## Radio, duración y daño por segundo no están aquí: los manda el nodo
+## Weather (weather_director.gd) en play() con sus exports acid_pool_radius,
+## acid_pool_lifetime y acid_pool_damage_per_second.
 @export_group("Daño")
 ## Segundos entre aplicaciones de daño; por frame, los números de daño taparían la barra de vida.
 @export var tick_interval: float = 0.5

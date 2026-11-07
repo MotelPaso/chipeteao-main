@@ -78,7 +78,7 @@ static func drop_bounty_chest(body: EnemyBase) -> void:
 
 
 ## Cofres de recompensa sin abrir en el mapa. Uno abierto sigue en el grupo
-## mientras se hunde (Chest._sink lo libera al terminar su tween), así que
+## mientras se hunde (Interactable.sink_away lo libera al terminar), así que
 ## decide `available`, no la pertenencia.
 static func unopened_bounty_chests(tree: SceneTree) -> int:
 	var count := 0

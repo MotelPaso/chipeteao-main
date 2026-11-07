@@ -110,11 +110,6 @@ var _time: float = 0.0
 var _sign_rest_y: float = 0.0
 
 
-func _init() -> void:
-	marker_kind = &"vendor"
-	prompt_height = 3.0
-
-
 func _ready() -> void:
 	super()
 	# NO en el grupo "altars": el WorldDirector cuenta ese grupo para su tope de

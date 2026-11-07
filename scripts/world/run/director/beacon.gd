@@ -2,8 +2,10 @@ extends Node3D
 ## Baliza de evento: pilar de luz alto y sin sombreado que se ve desde toda
 ## la arena, con un pulso suave para que se lea como invitación y no como
 ## amenaza. El WorldDirector la levanta sobre cada evento con el color de
-## su fila de EVENT_LIBRARY. El tamaño del pilar y de la luz está en los
-## nodos Pillar y Light de Beacon.tscn.
+## su fila de EVENT_LIBRARY. El tamaño del pilar (radios y `height` de su
+## malla) y la luz están en los nodos Pillar y Light de Beacon.tscn; el
+## pilar se apoya solo en el suelo según su altura. El color y la opacidad
+## del material los pone este script (color, pillar_alpha).
 
 ## Color del pilar y de la luz; el director lo pone antes de añadirla.
 @export var color: Color = Color.WHITE:
@@ -25,6 +27,11 @@ extends Node3D
 
 
 func _ready() -> void:
+	# El cilindro crece hacia los dos lados de su centro: subirlo media
+	# altura deja su base en el suelo con cualquier `height`.
+	var mesh := _pillar.mesh as CylinderMesh
+	if mesh != null:
+		_pillar.position.y = mesh.height * 0.5
 	_apply_color()
 	var pulse := create_tween().set_loops()
 	pulse.tween_property(_pillar, "scale", Vector3(pulse_width, 1.0, pulse_width),
