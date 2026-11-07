@@ -9,6 +9,8 @@
 [ext_resource type="PackedScene" path="res://scenes/ui/PauseMenu.tscn" id="7_pausemenu"]
 [ext_resource type="Script" uid="uid://355twc54duoj" path="res://scripts/world/run/world_director.gd" id="8_director"]
 [ext_resource type="Script" uid="uid://dl7cxjlsx8uhj" path="res://scripts/systems/fog_of_war.gd" id="9_fog"]
+[ext_resource type="Script" uid="uid://dxhi11f116ra8" path="res://scripts/world/run/director/weather_director.gd" id="10_weather"]
+[ext_resource type="Script" uid="uid://dmb3y3asfkd04" path="res://scripts/world/run/director/stage_fixtures.gd" id="11_fixtures"]
 
 [node name="RunSystems" type="Node3D" unique_id=2086446746]
 script = ExtResource("1_runsys")
@@ -20,7 +22,12 @@ script = ExtResource("3_runmgr")
 
 [node name="WorldDirector" type="Node" parent="." unique_id=1873970074]
 script = ExtResource("8_director")
-first_event_at = 60.0
+
+[node name="Weather" type="Node" parent="WorldDirector"]
+script = ExtResource("10_weather")
+
+[node name="StageFixtures" type="Node" parent="WorldDirector"]
+script = ExtResource("11_fixtures")
 
 [node name="UpgradeCardUI" parent="." unique_id=1865859061 instance=ExtResource("4_cardui")]
 

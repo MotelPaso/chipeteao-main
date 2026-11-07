@@ -24,6 +24,8 @@ extends Node
 ## El director no declara class_name: su EVENT_LIBRARY y su WEATHER_CATALOG
 ## solo se alcanzan por el recurso del script.
 const WORLD_DIRECTOR := preload("res://scripts/world/run/world_director.gd")
+## El clima vive en su propio nodo (WeatherDirector), también sin class_name.
+const WEATHER_DIRECTOR := preload("res://scripts/world/run/director/weather_director.gd")
 ## Se lee como TEXTO para sacar los brazos `match stat:` de _apply_effect: no
 ## hay reflexión para un bloque match, y copiar la lista aquí serían dos
 ## verdades que se separan con el próximo stat.
@@ -118,7 +120,7 @@ func _id_libraries() -> Array[Array]:
 		["MAP_LIBRARY", MapCatalog.MAP_LIBRARY, "id"],
 		["QUEST_LIBRARY", QuestCatalog.QUEST_LIBRARY, "id"],
 		["EVENT_LIBRARY", WORLD_DIRECTOR.EVENT_LIBRARY, "id"],
-		["WEATHER_CATALOG", WORLD_DIRECTOR.WEATHER_CATALOG, "id"],
+		["WEATHER_CATALOG", WEATHER_DIRECTOR.WEATHER_CATALOG, "id"],
 		["PACT_LIBRARY", CurseShrine.PACT_LIBRARY, "id"],
 	]
 
@@ -310,18 +312,27 @@ func _check_director_methods() -> void:
 		declared[String(method.get("name", ""))] = true
 	for row: Dictionary in WORLD_DIRECTOR.EVENT_LIBRARY:
 		rows += 1
+		if not row.has("method"):
+			if not (row.get("scene") is PackedScene):
+				failures.append("event '%s' has neither a method nor a scene"
+						% String(row.get("id", "?")))
+			continue
 		var method := String(row.get("method", ""))
 		if not declared.has(method):
 			failures.append("event '%s' method '%s' is not declared on WorldDirector"
 					% [String(row.get("id", "?")), method])
-	for row: Dictionary in WORLD_DIRECTOR.WEATHER_CATALOG:
+	var weather_declared: Dictionary[String, bool] = {}
+	var weather_script: Script = WEATHER_DIRECTOR
+	for method: Dictionary in weather_script.get_script_method_list():
+		weather_declared[String(method.get("name", ""))] = true
+	for row: Dictionary in WEATHER_DIRECTOR.WEATHER_CATALOG:
 		for key: String in ["start", "tick", "stop"]:
 			var method := String(row.get(key, ""))
 			if method.is_empty():
 				continue  # tick y stop son opcionales; vacío = ninguno
 			rows += 1
-			if not declared.has(method):
-				failures.append("weather '%s' %s '%s' is not declared on WorldDirector"
+			if not weather_declared.has(method):
+				failures.append("weather '%s' %s '%s' is not declared on WeatherDirector"
 						% [String(row.get("id", "?")), key, method])
 	_report("director_methods", rows, failures)
 

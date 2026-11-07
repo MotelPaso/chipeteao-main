@@ -1,56 +1,49 @@
 extends Node3D
-## Root of RunSystems.tscn: the map-independent run block — Player,
-## RunManager, WorldDirector, upgrade-card UI, HUD, and the run-end
-## screen, with run_ended already wired to the end screen inside this
-## scene. Arenas keep their own EnemySpawner and AmbientBed (the boss
-## timetable and the wind differ per biome).
+## Raíz de RunSystems.tscn: el bloque de la partida que no depende del
+## mapa (Player, RunManager, WorldDirector, cartas, HUD, pantalla final,
+## menú de pausa y niebla), con run_ended ya conectado a la pantalla final
+## dentro de esta escena. Cada arena trae su propio EnemySpawner y
+## AmbientBed.
 ##
-## Since iteration 49 this block is instanced ONCE, by Run.tscn, and
-## survives every stage change: that is what makes level, weapons, tomes,
-## items and points carry from map to map without copying anything. It no
-## longer knows which map is being played (RunRoot publishes that into
-## GameConfig) and it no longer settles a map tier (tiers are gone).
+## Run.tscn lo instancia UNA vez y sobrevive a cada cambio de etapa: por
+## eso nivel, armas, tomos, objetos y puntos pasan de un mapa a otro sin
+## copiar nada. No sabe qué mapa se juega: RunRoot lo publica en GameConfig.
 
-## Radius of the ring co-op slots 1..N-1 spawn on, around the scene's
-## slot-0 spawn point. Generated instead of tabulated: a fixed table of
-## three offsets indexed with a modulo silently sat two raiders on the
-## same point the moment the party grew past it.
+## Radio (metros) del anillo donde aparecen los jugadores 2 a 4 en co-op,
+## alrededor del punto de aparición del jugador 1.
 @export var coop_spawn_radius: float = 1.8
 
-## Preloaded (not the bare class_name) so headless runs that never built
-## the editor's class cache still resolve it.
+## Con preload y no por class_name, para que las corridas headless que
+## nunca construyeron la caché de clases del editor lo encuentren.
 const SplitScreenView := preload("res://scripts/systems/split_screen.gd")
 const PLAYER_SCENE := preload("res://scenes/player/Player.tscn")
 
 
-## The run block owns the run reset. It enters the tree BEFORE the arena
-## RunRoot builds afterwards, so a stage's scatter and director always see
-## a clean RunState, and the Daily Hunt stream is re-seeded at one fixed
-## point instead of however many frames earlier the menu happened to call
-## it. reset() is idempotent, so the select screen's own call stays
-## harmless.
+## El bloque de la partida reinicia RunState. Entra al árbol ANTES de la
+## arena que RunRoot construye después, así el scatter y el director de
+## cada etapa ven un RunState limpio, y la semilla de la Cacería Diaria se
+## fija en un solo punto. reset() es idempotente: la llamada del menú de
+## selección no estorba.
 func _enter_tree() -> void:
 	RunState.reset()
 
 
 func _ready() -> void:
-	# Items, altars and the run root reach this block through the group
+	# Los objetos, los altares y RunRoot llegan a este bloque por el grupo
 	# (vacuum_pickups, place_party).
 	add_to_group("run_systems")
 	if Coop.is_coop():
 		_spawn_party()
 	get_tree().call_group("hud", "show_stage_tag", RunState.stage_index, RunState.lap)
-	# Iteration 38: leveling no longer vacuums the floor. The gem/orb
-	# vacuum() hooks stay for the Magnet item, which fires them on its own
-	# timer (see vacuum_pickups).
+	# Subir de nivel no aspira el suelo: los vacuum() de gemas y orbes
+	# quedan para el objeto Imán (ver vacuum_pickups).
 
 
-## Stage hook (RunRoot, through the "run_systems" group): puts the whole
-## party down at the new arena's spawn point — standing raiders and downed
-## bodies alike, since a downed raider travels with the party. Reuses the
-## same ring geometry the co-op boot uses, so a party never lands stacked
-## on one point, and re-anchors each body's void rescue: the anchor
-## recorded at _ready belongs to a map that no longer exists.
+## Entrada de etapa (RunRoot, por el grupo "run_systems"): pone a todo el
+## grupo en el punto de aparición de la arena nueva, de pie o caídos (un
+## caído viaja con el grupo). Usa el mismo anillo que el arranque co-op,
+## así nadie cae encima de otro, y vuelve a anclar el rescate del vacío de
+## cada cuerpo: el ancla anterior es de un mapa que ya no existe.
 func place_party(origin: Vector3) -> void:
 	var bodies: Array[Node] = []
 	for group: String in ["player", "downed_players"]:
@@ -61,9 +54,8 @@ func place_party(origin: Vector3) -> void:
 		var body := bodies[i] as Node3D
 		if body == null:
 			continue
-		# The ring offset moves the body sideways, so its ground height has
-		# to be re-read there: slot 0 is on the spawn pad, slot 3 may be a
-		# metre and a half off it.
+		# El anillo mueve el cuerpo hacia un lado, así que la altura del
+		# suelo se vuelve a leer en ese punto.
 		var at := origin + _coop_spawn_offset(i)
 		var terrain := Terrain.find(get_tree())
 		if terrain != null:
@@ -73,19 +65,19 @@ func place_party(origin: Vector3) -> void:
 			body.call("anchor_here")
 
 
-## Magnet-item hook (and any future "hoover the floor" effect): every live
-## XP gem and health orb force-homes to the nearest player at once,
-## regardless of pickup radius. Idempotent on gems already homing.
+## Entrada del objeto Imán (y de cualquier efecto que aspire el suelo):
+## toda gema de XP y orbe de vida vivos van al jugador más cercano, sin
+## importar el radio de recogida. No afecta a las gemas que ya van en camino.
 func vacuum_pickups() -> void:
 	get_tree().call_group(XpGem.LIVE_GROUP, "vacuum")
 	get_tree().call_group(HealthOrb.LIVE_GROUP, "vacuum")
 
 
-## Co-op boot: the scene's Player becomes slot 0; slots 1..N-1 are extra
-## Player.tscn instances offset around the same spawn, then the whole
-## screen becomes a SplitScreen of per-player views. Runs inside this
-## _ready (parent readies after children), so RunManager's and the HUD's
-## deferred party binds see the full roster on the same frame.
+## Arranque co-op: el Player de la escena es el puesto 0; los puestos
+## 1..N-1 son instancias extra de Player.tscn alrededor del mismo punto, y
+## la pantalla pasa a ser un SplitScreen con una vista por jugador. Corre
+## dentro de este _ready (el padre está listo después de los hijos), así
+## RunManager y el HUD ven al grupo completo en el mismo frame.
 func _spawn_party() -> void:
 	var first := get_node("Player") as Player
 	var players: Array = [first]
@@ -93,18 +85,17 @@ func _spawn_party() -> void:
 		var extra := PLAYER_SCENE.instantiate() as Player
 		extra.name = "Player%d" % (slot + 1)
 		extra.player_index = slot
-		# Position BEFORE add_child: Player._ready records its spawn point
-		# (void-rescue anchor) the moment it enters the tree.
+		# La posición va ANTES de add_child: Player._ready guarda su punto
+		# de aparición (ancla del rescate del vacío) al entrar al árbol.
 		extra.position = first.position + _coop_spawn_offset(slot)
 		add_child(extra)
 		players.append(extra)
 	add_child(SplitScreenView.build(players))
 
 
-## Slot `slot`'s offset on the spawn ring: one even share of the circle
-## per party member, so no two slots can land on the same point.
-## Slot 0 lands ON the spawn point; the rest ring around it, one even
-## share of the circle each, so no two slots can land on the same spot.
+## Desplazamiento del puesto `slot` en el anillo de aparición. El puesto 0
+## cae justo en el punto; los demás se reparten el círculo en partes
+## iguales, así dos puestos nunca coinciden.
 func _coop_spawn_offset(slot: int) -> Vector3:
 	if slot <= 0:
 		return Vector3.ZERO

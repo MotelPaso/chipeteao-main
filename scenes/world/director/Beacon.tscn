@@ -1,0 +1,33 @@
+[gd_scene load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://scripts/world/run/director/beacon.gd" id="1_beacon"]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_pillar"]
+resource_local_to_scene = true
+transparency = 1
+blend_mode = 1
+shading_mode = 0
+albedo_color = Color(1, 1, 1, 0.35)
+emission_enabled = true
+emission = Color(1, 1, 1, 1)
+emission_energy_multiplier = 1.6
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_pillar"]
+top_radius = 0.55
+bottom_radius = 0.25
+height = 22.0
+radial_segments = 16
+rings = 0
+
+[node name="Beacon" type="Node3D"]
+script = ExtResource("1_beacon")
+
+[node name="Pillar" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 11, 0)
+material_override = SubResource("StandardMaterial3D_pillar")
+mesh = SubResource("CylinderMesh_pillar")
+
+[node name="Light" type="OmniLight3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.6, 0)
+light_energy = 2.4
+omni_range = 9.0

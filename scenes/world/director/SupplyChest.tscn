@@ -1,0 +1,7 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="PackedScene" uid="uid://cchst4lut7qb3" path="res://scenes/world/chests/Chest.tscn" id="1_chest"]
+
+[node name="SupplyChest" instance=ExtResource("1_chest")]
+luck_bonus = 0.4
+min_rarity = "Rare"
