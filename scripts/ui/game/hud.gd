@@ -18,7 +18,7 @@ extends CanvasLayer
 ##   track_objective(node)             WorldDirector (portal de salida)
 ##   show_stage_tag(stage_index, lap)  RunRoot y RunSystems
 ##   on_stage_started(arena)           WorldDirector, al empezar cada etapa
-##   set_quake_offset(shift)           WorldDirector (terremoto)
+##   set_quake_offset(shift)           WeatherDirector (terremoto)
 ## El soak (scenes/tests/arena_probe.gd) lee `offset` de este nodo por el grupo "hud".
 
 @export_group("Vida")
