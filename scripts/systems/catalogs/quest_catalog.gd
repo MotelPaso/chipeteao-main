@@ -1,20 +1,34 @@
 class_name QuestCatalog
 extends RefCounted
-## Static catalog of launch quests (GDD 8): the challenges that pay out
-## Shards. Data-driven like the other catalogs — a new quest is one row.
-## Row fields:
-##   id:     identifier (English, keys SaveData completion) — never shown.
-##   display_name/description: the quest-log lines, in player language.
-##   stat:   SaveData counter stat id the quest watches (see the canonical
-##           id list in save_data.gd). Lifetime counters accumulate across
-##           runs; max_level and best_run_minutes are single-run
-##           high-water marks, so those quests read "in one run".
-##   target: counter value that completes the quest (evaluated on run end;
-##           claiming the reward stays manual, in the quest log).
-##   reward: Shards granted on claim (10-80, scaled to difficulty).
+## Catálogo de misiones: los desafíos que pagan esquirlas. Una misión nueva es
+## una fila aquí.
+##
+## Se puede cambiar libremente: display_name, description, target, reward.
+## Llave interna, NUNCA la cambies: id (SaveData guarda las misiones
+## completadas y reclamadas por id). Borrar una fila es seguro: los ids
+## guardados que ya no están en el catálogo se ignoran.
+## stat nombra un contador de SaveData (lista en save_data.gd). Los contadores
+## con prefijo llevan un id de otro catálogo dentro del nombre y dejan de
+## avanzar en silencio si ese id cambia:
+##   runs_as_<id> / wins_as_<id>: id de CharacterCatalog.
+##   runs_on_<id> / victories_<id>: id de MapCatalog.
+##   slain_<id>: secret_boss_id de la escena de un jefe secreto.
+##   kills_<script>: nombre del archivo del script del enemigo, sin .gd.
+##   evo_<id> / used_weapon_<id>: id de WeaponCatalog.
+##
+## Campos de cada fila:
+##   id: llave interna (ver arriba). Nunca se muestra.
+##   display_name, description: líneas del registro de misiones.
+##   stat: contador de SaveData que vigila la misión. Los contadores de toda
+##       la vida se acumulan entre incursiones; max_level, best_run_minutes y
+##       best_endless_minutes son máximos de una sola incursión, por eso esas
+##       misiones dicen «en una incursión».
+##   target: valor del contador que completa la misión (se evalúa al terminar
+##       la incursión; reclamar el premio es manual, en el registro).
+##   reward: esquirlas que da al reclamarla.
 
 const QUEST_LIBRARY: Array[Dictionary] = [
-	# Kill milestones (lifetime).
+	# Bajas (toda la vida).
 	{
 		"id": "kills_100", "display_name": "Cien caídos",
 		"description": "Derrota a 100 enemigos.",
@@ -35,7 +49,7 @@ const QUEST_LIBRARY: Array[Dictionary] = [
 		"description": "Derrota a 5000 enemigos.",
 		"stat": "total_kills", "target": 5000, "reward": 80,
 	},
-	# Boss kills (lifetime).
+	# Jefes abatidos (toda la vida).
 	{
 		"id": "bosses_1", "display_name": "Matarreyes",
 		"description": "Abate a tu primer jefe.",
@@ -51,7 +65,7 @@ const QUEST_LIBRARY: Array[Dictionary] = [
 		"description": "Abate a 15 jefes.",
 		"stat": "bosses_killed", "target": 15, "reward": 70,
 	},
-	# Survival marks (best single run).
+	# Supervivencia (mejor incursión).
 	{
 		"id": "survive_5", "display_name": "Cinco y vivo",
 		"description": "Sobrevive 5 minutos en una incursión.",
@@ -67,7 +81,7 @@ const QUEST_LIBRARY: Array[Dictionary] = [
 		"description": "Sobrevive 15 minutos en una incursión.",
 		"stat": "best_run_minutes", "target": 15, "reward": 50,
 	},
-	# Level marks (best single run).
+	# Nivel (mejor incursión).
 	{
 		"id": "level_10", "display_name": "Estirón",
 		"description": "Llega al nivel 10 en una incursión.",
@@ -83,7 +97,7 @@ const QUEST_LIBRARY: Array[Dictionary] = [
 		"description": "Llega al nivel 30 en una incursión.",
 		"stat": "max_level", "target": 30, "reward": 50,
 	},
-	# Victories (lifetime).
+	# Victorias (toda la vida).
 	{
 		"id": "wins_1", "display_name": "Viste el amanecer",
 		"description": "Gana una incursión.",
@@ -94,7 +108,7 @@ const QUEST_LIBRARY: Array[Dictionary] = [
 		"description": "Gana 3 incursiones.",
 		"stat": "victories", "target": 3, "reward": 80,
 	},
-	# Runs finished (lifetime; a run counts once it ends, win or lose).
+	# Incursiones terminadas (toda la vida; cuenta al terminar, se gane o se pierda).
 	{
 		"id": "runs_3", "display_name": "Agarrando el ritmo",
 		"description": "Termina 3 incursiones.",
@@ -110,7 +124,7 @@ const QUEST_LIBRARY: Array[Dictionary] = [
 		"description": "Termina 25 incursiones.",
 		"stat": "runs_finished", "target": 25, "reward": 60,
 	},
-	# Shrines (lifetime).
+	# Altares (toda la vida).
 	{
 		"id": "shrines_3", "display_name": "Devoto",
 		"description": "Usa 3 altares.",
@@ -121,7 +135,7 @@ const QUEST_LIBRARY: Array[Dictionary] = [
 		"description": "Usa 10 altares.",
 		"stat": "shrines_used", "target": 10, "reward": 35,
 	},
-	# Chests (lifetime).
+	# Cofres (toda la vida).
 	{
 		"id": "chests_3", "display_name": "Levantatapas",
 		"description": "Abre 3 cofres.",
@@ -132,19 +146,13 @@ const QUEST_LIBRARY: Array[Dictionary] = [
 		"description": "Abre 10 cofres.",
 		"stat": "chests_opened", "target": 10, "reward": 35,
 	},
-	# Per-character flavor.
+	# Por personaje.
 	{
 		"id": "rook_win", "display_name": "La prueba de Rook",
 		"description": "Gana una incursión con Rook.",
 		"stat": "wins_as_rook", "target": 1, "reward": 40,
 	},
-	{
-		"id": "vex_runs_5", "display_name": "La rutina de Vex",
-		"description": "Termina 5 incursiones con Vex.",
-		"stat": "runs_as_vex", "target": 5, "reward": 30,
-	},
-	# Per-map flavor (Ash Dunes opens after the first victory, so these
-	# double as the reward trail for using the new unlock).
+	# Por mapa.
 	{
 		"id": "dunes_run_1", "display_name": "Andadunas",
 		"description": "Termina una incursión en las Dunas de Ceniza.",
@@ -155,7 +163,6 @@ const QUEST_LIBRARY: Array[Dictionary] = [
 		"description": "Termina 3 incursiones en las Dunas de Ceniza.",
 		"stat": "runs_on_ash_dunes", "target": 3, "reward": 50,
 	},
-	# Gloomfen (iteration 37; opens after the first Ash Dunes victory).
 	{
 		"id": "fen_run_1", "display_name": "Hacia el fango",
 		"description": "Termina una incursión en la Ciénaga Lóbrega.",
@@ -171,11 +178,10 @@ const QUEST_LIBRARY: Array[Dictionary] = [
 		"description": "Abate al Espectro de la Ciénaga 5 veces.",
 		"stat": "kills_fenwraith", "target": 5, "reward": 80,
 	},
-	# Map tiers (win-gated ladders; any map counts).
+	# Vueltas al circuito de mapas.
 	{
-		# Iteration 50: the tier ladder became LAPS of the map list. The ids
-		# and the stat keys are kept so a save that already earned them
-		# stays earned; only what they mean changed.
+		# Los ids tier*_win y los contadores any_t*_win no se renombran: los
+		# guardados que ya completaron estas misiones las conservan así.
 		"id": "tier2_win", "display_name": "Segunda vuelta",
 		"description": "Completa una vuelta entera al circuito de mapas.",
 		"stat": "any_t2_win", "target": 1, "reward": 70,
@@ -185,7 +191,7 @@ const QUEST_LIBRARY: Array[Dictionary] = [
 		"description": "Completa dos vueltas enteras al circuito de mapas.",
 		"stat": "any_t3_win", "target": 1, "reward": 120,
 	},
-	# Weapon evolutions (iteration 38): reach the evolve level on a weapon.
+	# Evoluciones de arma.
 	{
 		"id": "evolve_1", "display_name": "Trascendencia",
 		"description": "Evoluciona un arma subiéndola lo suficiente de nivel.",
@@ -196,7 +202,7 @@ const QUEST_LIBRARY: Array[Dictionary] = [
 		"description": "Evoluciona 4 armas a lo largo de tus incursiones.",
 		"stat": "evolutions_total", "target": 4, "reward": 90,
 	},
-	# Meta modes (iteration 36): the Armory, the Daily Hunt, and Endless.
+	# Modos meta: Armería, Cacería diaria y modo pseudo-infinito.
 	{
 		"id": "relic_1", "display_name": "Primera reliquia",
 		"description": "Compra un rango de reliquia en la Armería.",
@@ -213,8 +219,8 @@ const QUEST_LIBRARY: Array[Dictionary] = [
 		"stat": "daily_runs", "target": 7, "reward": 80,
 	},
 	{
-		# Iteration 50: "endless" is now the pseudo-infinite time a run
-		# spent past its stage gates, which is what the mode is for.
+		# best_endless_minutes mide el tiempo que una incursión pasó en modo
+		# pseudo-infinito después de superar una etapa.
 		"id": "endless_20", "display_name": "Más allá del amanecer",
 		"description": "Quédate 20 minutos en modo pseudo-infinito tras superar una etapa.",
 		"stat": "best_endless_minutes", "target": 20, "reward": 80,
@@ -224,8 +230,8 @@ const QUEST_LIBRARY: Array[Dictionary] = [
 		"description": "Quédate 25 minutos en modo pseudo-infinito tras superar una etapa.",
 		"stat": "best_endless_minutes", "target": 25, "reward": 150,
 	},
-	# Hidden minibosses (GDD 6 secrets). Descriptions stay vague on purpose:
-	# the quest log teases that a secret exists without mapping the trigger.
+	# Minijefes ocultos. Las descripciones son vagas a propósito: el registro
+	# insinúa que hay un secreto sin decir cómo se activa.
 	{
 		"id": "secret_grubthing", "display_name": "Lo que acecha abajo",
 		"description": "Derrota a lo que duerme bajo el Bosque Hueco.",
@@ -239,12 +245,13 @@ const QUEST_LIBRARY: Array[Dictionary] = [
 ]
 
 
-## Lazily built id -> row index (see CatalogIndex): the quest log resolves
-## one row per listed quest and SaveData one per completion check.
+## Índice id -> fila armado al primer uso (ver CatalogIndex): el registro
+## resuelve una fila por misión listada y SaveData una por misión completada
+## o reclamada.
 static var _by_id: Dictionary[String, Dictionary] = {}
 
 
-## Row for the given id, or an empty Dictionary if unknown.
+## Fila con ese id, o un Dictionary vacío si no existe.
 static func by_id(quest_id: String) -> Dictionary:
 	if _by_id.is_empty():
 		_by_id = CatalogIndex.build(QUEST_LIBRARY)
