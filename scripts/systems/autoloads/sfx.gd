@@ -11,6 +11,8 @@ extends Node
 ## sature, y todo sale por un bus "Sfx" creado en código (sin ventana, los
 ## reproductores mezclan en el driver falso).
 ## Procesa siempre, para que cartas y avisos finales suenen en pausa.
+## Se carga desde scenes/systems/Sfx.tscn (Inspector: voces y variación de
+## tono); cada sonido se edita en SOUND_LIBRARY, abajo.
 ## Orden del RNG: play() tira randf_range solo para ids con variación de
 ## tono y solo si pasa el límite por segundo; ese orden lo usan los soaks
 ## con semilla.
@@ -21,78 +23,94 @@ const BUS_NAME := &"Sfx"
 ## tengan un solo dueño; el autoload Settings solo les pone volumen.
 const AMBIENT_BUS_NAME := &"Ambient"
 
-const STREAMS: Dictionary[StringName, AudioStream] = {
-	&"hit_soft": preload("res://assets/audio/sfx/hit_soft.wav"),
-	&"hit_crit": preload("res://assets/audio/sfx/hit_crit.wav"),
-	&"enemy_die": preload("res://assets/audio/sfx/enemy_die.wav"),
-	&"gem_pickup": preload("res://assets/audio/sfx/gem_pickup.wav"),
-	&"heal": preload("res://assets/audio/sfx/heal.wav"),
-	&"level_up": preload("res://assets/audio/sfx/level_up.wav"),
-	&"card_pick": preload("res://assets/audio/sfx/card_pick.wav"),
-	&"player_hurt": preload("res://assets/audio/sfx/player_hurt.wav"),
-	&"dodge": preload("res://assets/audio/sfx/dodge.wav"),
-	&"slide": preload("res://assets/audio/sfx/slide.wav"),
-	&"shrine_channel": preload("res://assets/audio/sfx/shrine_channel.wav"),
-	&"shrine_done": preload("res://assets/audio/sfx/shrine_done.wav"),
-	&"chest_open": preload("res://assets/audio/sfx/chest_open.wav"),
-	&"boss_roar": preload("res://assets/audio/sfx/boss_roar.wav"),
-	&"boss_roar_2": preload("res://assets/audio/sfx/boss_roar_2.wav"),
-	&"boss_die": preload("res://assets/audio/sfx/boss_die.wav"),
-	&"streak": preload("res://assets/audio/sfx/streak.wav"),
-	&"laser_hum": preload("res://assets/audio/sfx/laser_hum.wav"),
-	&"burrow_pop": preload("res://assets/audio/sfx/burrow_pop.wav"),
-	&"secret_fanfare": preload("res://assets/audio/sfx/secret_fanfare.wav"),
+## Edita aquí cada sonido: una fila por id, el id es la llave que pasan
+## Sfx.play(&"id") y acquire_loop(&"id") (renombrarlo rompe a quien lo
+## llama). Campos:
+##   stream:     el .wav (los genera scripts/tools/generate_sfx.gd).
+##   volume_db:  volumen base en dB; el volume_db_offset de play() se suma.
+##   rate_limit: OPCIONAL, tope de reproducciones por segundo móvil (sin el
+##               campo, sin tope), para que la horda no sature.
+##   jitter:     OPCIONAL, true = variación de tono al azar
+##               (default_pitch_jitter) cuando play() no pide otra.
+##   loop:       OPCIONAL, true = id de play_loop(): en _ready se hace una
+##               copia en bucle, porque los wav generados no traen metadatos.
+const SOUND_LIBRARY: Dictionary[StringName, Dictionary] = {
+	&"hit_soft": {
+		"stream": preload("res://assets/audio/sfx/hit_soft.wav"), "volume_db": -14.0,
+		"rate_limit": 10, "jitter": true,
+	},
+	&"hit_crit": {
+		"stream": preload("res://assets/audio/sfx/hit_crit.wav"), "volume_db": -7.0,
+		"rate_limit": 10, "jitter": true,
+	},
+	&"enemy_die": {
+		"stream": preload("res://assets/audio/sfx/enemy_die.wav"), "volume_db": -10.0,
+		"rate_limit": 12, "jitter": true,
+	},
+	&"gem_pickup": {
+		"stream": preload("res://assets/audio/sfx/gem_pickup.wav"), "volume_db": -12.0,
+		"rate_limit": 10, "jitter": true,
+	},
+	&"heal": {
+		"stream": preload("res://assets/audio/sfx/heal.wav"), "volume_db": -7.0,
+		"rate_limit": 4, "jitter": true,
+	},
+	&"level_up": {
+		"stream": preload("res://assets/audio/sfx/level_up.wav"), "volume_db": -4.0,
+	},
+	&"card_pick": {
+		"stream": preload("res://assets/audio/sfx/card_pick.wav"), "volume_db": -6.0,
+	},
+	&"player_hurt": {
+		"stream": preload("res://assets/audio/sfx/player_hurt.wav"), "volume_db": -5.0,
+		"rate_limit": 6,
+	},
+	&"dodge": {
+		"stream": preload("res://assets/audio/sfx/dodge.wav"), "volume_db": -8.0,
+	},
+	&"slide": {
+		"stream": preload("res://assets/audio/sfx/slide.wav"), "volume_db": -10.0,
+	},
+	&"shrine_channel": {
+		"stream": preload("res://assets/audio/sfx/shrine_channel.wav"), "volume_db": -10.0,
+		"loop": true,
+	},
+	&"shrine_done": {
+		"stream": preload("res://assets/audio/sfx/shrine_done.wav"), "volume_db": -5.0,
+	},
+	&"chest_open": {
+		"stream": preload("res://assets/audio/sfx/chest_open.wav"), "volume_db": -5.0,
+	},
+	&"boss_roar": {
+		"stream": preload("res://assets/audio/sfx/boss_roar.wav"), "volume_db": -3.0,
+	},
+	&"boss_roar_2": {
+		"stream": preload("res://assets/audio/sfx/boss_roar_2.wav"), "volume_db": -3.0,
+	},
+	&"boss_die": {
+		"stream": preload("res://assets/audio/sfx/boss_die.wav"), "volume_db": -2.0,
+	},
+	&"streak": {
+		"stream": preload("res://assets/audio/sfx/streak.wav"), "volume_db": -6.0,
+	},
+	&"laser_hum": {
+		"stream": preload("res://assets/audio/sfx/laser_hum.wav"), "volume_db": -16.0,
+		"loop": true,
+	},
+	&"burrow_pop": {
+		"stream": preload("res://assets/audio/sfx/burrow_pop.wav"), "volume_db": -8.0,
+		"rate_limit": 8, "jitter": true,
+	},
+	&"secret_fanfare": {
+		"stream": preload("res://assets/audio/sfx/secret_fanfare.wav"), "volume_db": -3.0,
+	},
 }
-
-## Ids para play_loop(): en _ready se hace una copia LOOP_FORWARD de cada
-## uno, porque los wav generados no traen metadatos de bucle.
-const LOOP_IDS: Array[StringName] = [&"shrine_channel", &"laser_hum"]
 
 ## Voces para sonidos de un disparo; los que se solapan rotan entre ellas.
 @export var pool_size: int = 12
-## Variación de tono al azar por defecto (fracción: 0.08 = ±8%) para
-## jittered_ids.
+## Variación de tono al azar (fracción: 0.08 = ±8%) de los ids con
+## "jitter" en SOUND_LIBRARY.
 @export var default_pitch_jitter: float = 0.08
-## Ids repetitivos que reciben default_pitch_jitter cuando play() se llama
-## sin variación explícita.
-@export var jittered_ids: Array[StringName] = [
-	&"hit_soft", &"hit_crit", &"enemy_die", &"gem_pickup", &"burrow_pop", &"heal",
-]
-## Tope de reproducciones por segundo móvil, por id; los que no están no
-## tienen tope.
-@export var rate_limits: Dictionary[StringName, int] = {
-	&"hit_soft": 10,
-	&"hit_crit": 10,
-	&"enemy_die": 12,
-	&"gem_pickup": 10,
-	&"burrow_pop": 8,
-	&"heal": 4,
-	&"player_hurt": 6,
-}
-## Volumen base por id, en dB, para que el hit_soft constante quede muy por
-## debajo de los avisos raros; el volume_db_offset de play() se suma encima.
-@export var id_volume_db: Dictionary[StringName, float] = {
-	&"hit_soft": -14.0,
-	&"hit_crit": -7.0,
-	&"enemy_die": -10.0,
-	&"gem_pickup": -12.0,
-	&"heal": -7.0,
-	&"level_up": -4.0,
-	&"card_pick": -6.0,
-	&"player_hurt": -5.0,
-	&"dodge": -8.0,
-	&"slide": -10.0,
-	&"shrine_channel": -10.0,
-	&"shrine_done": -5.0,
-	&"chest_open": -5.0,
-	&"boss_roar": -3.0,
-	&"boss_roar_2": -3.0,
-	&"boss_die": -2.0,
-	&"streak": -6.0,
-	&"laser_hum": -16.0,
-	&"burrow_pop": -8.0,
-	&"secret_fanfare": -3.0,
-}
 
 
 ## Ventana móvil de un segundo con las marcas de tiempo de un id con tope.
@@ -109,7 +127,7 @@ var _rate_state: Dictionary[StringName, RateWindow] = {}
 var _loop_players: Dictionary[StringName, AudioStreamPlayer] = {}
 ## Dueños vivos de cada bucle por id (varios láseres comparten un zumbido).
 var _loop_refcounts: Dictionary[StringName, int] = {}
-## COPIAS en bucle de los streams de LOOP_IDS; ver _ready.
+## COPIAS en bucle de los streams con "loop" en SOUND_LIBRARY; ver _ready.
 var _loop_streams: Dictionary[StringName, AudioStream] = {}
 
 
@@ -125,8 +143,10 @@ func _ready() -> void:
 		add_child(voice)
 		_pool.append(voice)
 		_started_at.append(-1000.0)
-	for id: StringName in LOOP_IDS:
-		var wav := STREAMS.get(id) as AudioStreamWAV
+	for id: StringName in SOUND_LIBRARY:
+		if not bool(SOUND_LIBRARY[id].get("loop", false)):
+			continue
+		var wav := _stream_of(id) as AudioStreamWAV
 		if wav == null:
 			continue
 		# Bucle sobre una COPIA: el stream precargado es la entrada global
@@ -155,7 +175,7 @@ func _exit_tree() -> void:
 ## pitch_jitter < 0 significa "el del id" (default_pitch_jitter para
 ## jittered_ids, ninguno para el resto); pasa una fracción para forzarlo.
 func play(id: StringName, volume_db_offset: float = 0.0, pitch_jitter: float = -1.0) -> void:
-	var stream := STREAMS.get(id) as AudioStream
+	var stream := _stream_of(id)
 	if stream == null:
 		push_warning("Sfx: unknown sound id '%s'" % id)
 		return
@@ -213,7 +233,7 @@ func loop_refcount(id: StringName) -> int:
 
 ## Las voces en bucle viven fuera del pool de un disparo y nunca se roban.
 func _start_loop_voice(id: StringName) -> void:
-	var stream := _loop_streams.get(id, STREAMS.get(id)) as AudioStream
+	var stream := _loop_streams.get(id, _stream_of(id)) as AudioStream
 	if stream == null:
 		push_warning("Sfx: unknown loop id '%s'" % id)
 		return
@@ -269,7 +289,8 @@ func _alloc_voice() -> int:
 ## en el instante `now`. Recibe el reloj como parámetro para que un harness
 ## pueda probar el tope sobre un segundo simulado.
 func _rate_check(id: StringName, now: float) -> bool:
-	if not rate_limits.has(id):
+	var limit := int(SOUND_LIBRARY.get(id, {}).get("rate_limit", 0))
+	if limit <= 0:
 		return true
 	if not _rate_state.has(id):
 		_rate_state[id] = RateWindow.new()
@@ -277,7 +298,7 @@ func _rate_check(id: StringName, now: float) -> bool:
 	var times := window.times
 	while not times.is_empty() and now - times[0] > 1.0:
 		times.pop_front()
-	if times.size() >= rate_limits[id]:
+	if times.size() >= limit:
 		return false
 	times.append(now)
 	return true
@@ -286,14 +307,20 @@ func _rate_check(id: StringName, now: float) -> bool:
 func _rolled_pitch(id: StringName, override_jitter: float) -> float:
 	var jitter := override_jitter
 	if jitter < 0.0:
-		jitter = default_pitch_jitter if jittered_ids.has(id) else 0.0
+		var jittered := bool(SOUND_LIBRARY.get(id, {}).get("jitter", false))
+		jitter = default_pitch_jitter if jittered else 0.0
 	if jitter <= 0.0:
 		return 1.0
 	return 1.0 + randf_range(-jitter, jitter)
 
 
 func _id_volume(id: StringName) -> float:
-	return id_volume_db[id] if id_volume_db.has(id) else 0.0
+	return float(SOUND_LIBRARY.get(id, {}).get("volume_db", 0.0))
+
+
+## El stream de la fila de `id`, o null si el id no existe.
+func _stream_of(id: StringName) -> AudioStream:
+	return SOUND_LIBRARY.get(id, {}).get("stream") as AudioStream
 
 
 ## Reloj real (inmune a la pausa y a time_scale) para marcas y ventanas.
