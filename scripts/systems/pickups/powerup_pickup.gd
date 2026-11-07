@@ -11,6 +11,10 @@ extends Area3D
 ##
 ## Su vida es corta a propósito: al final de una etapa el mapa ya tiene
 ## docenas de marcadores, y uno que esperara para siempre solo sumaría ruido.
+##
+## La forma, el tamaño, la altura, el brillo y la luz se ajustan en
+## PowerUpPickup.tscn (nodos CollisionShape3D, Gem, Glyph y Light); el script
+## solo los tiñe con el color y el glifo de la fila.
 
 ## Segundos antes de que se desvanezca sin recoger. La estrella tiene el
 ## suyo, más largo: se mueve y hay que darle tiempo para alcanzarla.
@@ -30,12 +34,6 @@ extends Area3D
 ## el que rebotar.
 @export var roam_probe: float = 3.0
 
-## Radio que el raider tiene que pisar, en metros. Generoso: es un premio,
-## no una prueba de precisión, y el raider suele pasar corriendo.
-const PICKUP_RADIUS: float = 1.6
-const GEM_SIZE: float = 0.42
-const GLYPH_FONT_SIZE: int = 48
-const GLYPH_HEIGHT: float = 1.15
 ## Segundos del desvanecimiento antes de que el nodo se libere.
 const FADE_TIME: float = 0.45
 ## Ciclo arcoíris del tinte de la estrella, en vueltas completas por segundo.
@@ -47,10 +45,12 @@ var roaming: bool = false
 
 var _row: Dictionary = {}
 var _color: Color = Color.WHITE
-var _gem: MeshInstance3D = null
-var _glyph: Label3D = null
-var _light: OmniLight3D = null
+## Material propio de esta instancia (resource_local_to_scene en la
+## escena): la estrella anima su albedo sin teñir a los demás power-ups.
 var _material: StandardMaterial3D = null
+## Altura de reposo de la gema, la que guarda la escena; la flotación oscila
+## alrededor de ella.
+var _gem_rest_y: float = 0.0
 var _time: float = 0.0
 var _left: float = 0.0
 var _ground_y: float = 0.0
@@ -60,6 +60,10 @@ var _heading: Vector2 = Vector2.RIGHT
 var _bounces: int = 0
 var _taken: bool = false
 var _bounds: Node = null
+
+@onready var _gem: MeshInstance3D = $Gem
+@onready var _glyph: Label3D = $Glyph
+@onready var _light: OmniLight3D = $Light
 
 
 ## DEBE correr antes de que el nodo entre al árbol: todo lo de abajo se
@@ -92,13 +96,7 @@ func _ready() -> void:
 	# Area3D. Godot rechaza escribirlas mientras hay una señal en vuelo, y la
 	# escena ya las aplicó cuando corre _ready. (No choca con nada y solo
 	# detecta la capa del jugador: nunca empuja a un raider ni frena un tiro.)
-	var shape := CollisionShape3D.new()
-	var sphere := SphereShape3D.new()
-	sphere.radius = PICKUP_RADIUS
-	shape.shape = sphere
-	shape.position.y = 0.6
-	add_child(shape)
-	_build_visual()
+	_tint_visual()
 	_heading = Vector2(randf() * 2.0 - 1.0, randf() * 2.0 - 1.0).normalized()
 	if _heading.length_squared() < 0.01:
 		_heading = Vector2.RIGHT
@@ -106,39 +104,15 @@ func _ready() -> void:
 	body_entered.connect(_on_body_entered)
 
 
-func _build_visual() -> void:
-	_gem = MeshInstance3D.new()
-	var mesh := SphereMesh.new()
-	mesh.radius = GEM_SIZE
-	mesh.height = GEM_SIZE * 2.4
-	mesh.radial_segments = 6
-	mesh.rings = 3
-	_gem.mesh = mesh
-	# Material por instancia: la estrella anima su albedo, y un recurso
-	# compartido teñiría a todos los demás power-ups del mapa.
-	_material = StandardMaterial3D.new()
+## Pinta la gema, el glifo y la luz con la fila; todo lo demás viene de la
+## escena.
+func _tint_visual() -> void:
+	_gem_rest_y = _gem.position.y
+	_material = _gem.material_override as StandardMaterial3D
 	_material.albedo_color = _color
-	_material.emission_enabled = true
 	_material.emission = _color
-	_material.emission_energy_multiplier = 2.2
-	_gem.material_override = _material
-	_gem.position.y = 0.75
-	add_child(_gem)
-	_glyph = Label3D.new()
 	_glyph.text = String(_row.get("glyph", "?"))
-	_glyph.billboard = BaseMaterial3D.BILLBOARD_ENABLED
-	_glyph.no_depth_test = true
-	_glyph.font_size = GLYPH_FONT_SIZE
-	_glyph.outline_size = 12
-	_glyph.modulate = Color(1.0, 1.0, 1.0)
-	_glyph.position.y = GLYPH_HEIGHT
-	add_child(_glyph)
-	_light = OmniLight3D.new()
 	_light.light_color = _color
-	_light.light_energy = 1.6
-	_light.omni_range = 5.0
-	_light.position.y = 0.8
-	add_child(_light)
 
 
 func _physics_process(delta: float) -> void:
@@ -150,13 +124,12 @@ func _physics_process(delta: float) -> void:
 	if _left <= 0.0:
 		_expire()
 		return
-	if _gem != null:
-		_gem.rotate_y(spin_speed * delta)
+	_gem.rotate_y(spin_speed * delta)
 	if roaming:
 		_tick_roam(delta)
 		_tick_star_tint()
-	elif _gem != null:
-		_gem.position.y = 0.75 + sin(_time * TAU * bob_hz) * bob_height
+	else:
+		_gem.position.y = _gem_rest_y + sin(_time * TAU * bob_hz) * bob_height
 
 
 ## La estrella cruza el mapa en vez de esperar. Rebota en todo lo que la
@@ -189,13 +162,10 @@ func _tick_roam(delta: float) -> void:
 
 
 func _tick_star_tint() -> void:
-	if _material == null:
-		return
 	var tint := Color.from_hsv(fmod(_time * STAR_HUE_HZ, 1.0), 0.75, 1.0)
 	_material.albedo_color = tint
 	_material.emission = tint
-	if _light != null:
-		_light.light_color = tint
+	_light.light_color = tint
 
 
 func _walkable(xz: Vector2) -> bool:
