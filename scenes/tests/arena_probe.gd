@@ -1031,15 +1031,15 @@ func _request_settled_shot(delay: float, tag: String) -> void:
 	_camera.request_in(delay, "%s_%s" % [_periodic_shot_stem(), tag])
 
 
-## Drawn frames, not physics ticks: the meter times what a player waits for.
+## Frames dibujados, no ticks de física: el medidor cronometra lo que espera un jugador.
 func _process(_delta: float) -> void:
 	_perf.tick()
 
 
 func _physics_process(delta: float) -> void:
 	_frames += 1
-	# A mortal soak is over the moment RunManager says so; the countdown
-	# only exists so the fold's own log lines land before the quit.
+	# Un soak mortal termina apenas RunManager lo dice; la cuenta regresiva solo
+	# existe para que las líneas de log del cierre lleguen antes de salir.
 	if _run_end_left >= 0:
 		_run_end_left -= 1
 		if _run_end_left < 0:
@@ -1062,8 +1062,8 @@ func _physics_process(delta: float) -> void:
 	_watch_airborne(delta)
 	_watch_blocked_cell(delta)
 	if _frames % 120 == 0:
-		# APPENDED to, never reordered: verificar.sh parses level= off the
-		# last one of these.
+		# Solo se le AGREGAN campos al final, nunca se reordena: verificar.sh lee
+		# level= de la última de estas líneas.
 		print(("frame %d paused=%s run_time=%.1f active=%s enemies=%d level=%d"
 				+ " airborne=%d explored=%.2f possessed=%d/%d") % [
 				_frames, get_tree().paused, RunState.run_time, RunState.run_active,
@@ -1078,12 +1078,11 @@ func _physics_process(delta: float) -> void:
 		var ui := node as CanvasLayer
 		if ui != null and ui.visible and ui.has_method("_on_card_pressed"):
 			card_ui_open = true
-			# BEFORE the press, and only for the first picker of the soak:
-			# this harness answers a card the frame it appears, so the one
-			# screen a level-up puts in front of the player would never be
-			# photographed otherwise. The press is NOT delayed — the shot
-			# is asked for, the card is answered, and the camera saves
-			# whatever the next drawn frame holds.
+			# ANTES del clic, y solo para el primer selector del soak: este arnés
+			# responde la carta el mismo frame en que aparece, así que la única
+			# pantalla que un level-up pone frente al jugador nunca se fotografiaría.
+			# El clic NO se retrasa: se pide la foto, se responde la carta y la cámara
+			# guarda lo que tenga el siguiente frame dibujado.
 			if not _card_shot_taken:
 				_card_shot_taken = true
 				_request_shot("card")
@@ -1093,12 +1092,12 @@ func _physics_process(delta: float) -> void:
 		_drive_walk(delta)
 
 
-## --- power-up switches (iteration 53) ---------------------------------------
+## --- variables de power-ups ------------------------------------------------
 
-## BONK_POWERUP_NOW / BONK_STAR_NOW. The re-grant is what makes a short
-## soak useful: one twenty-second window would leave a 120 s soak running
-## eighty seconds of ordinary play, and the acceptance checks below only
-## mean something while the effect is on.
+## BONK_POWERUP_NOW / BONK_STAR_NOW. La renovación es lo que hace útil un soak
+## corto: una sola ventana de veinte segundos dejaría a un soak de 120 s con
+## ochenta segundos de juego normal, y las revisiones de aceptación solo
+## significan algo con el efecto activo.
 func _tick_powerup_switches() -> void:
 	if RunState.run_time < _powerup_at:
 		return
@@ -1117,19 +1116,19 @@ func _tick_powerup_switches() -> void:
 		_star_dropped = true
 		var spawner := get_tree().get_first_node_in_group("enemy_spawner")
 		if spawner != null and spawner.has_method("spawn_powerup_pickup"):
-			# At the raider's feet and STATIONARY: the roaming star is
-			# deliberately hard to intercept, and this switch exists to
-			# prove the pickup and its effect work, not the chase.
+			# A los pies del raider y QUIETA: la estrella que deambula es difícil de
+			# alcanzar a propósito, y esta variable existe para probar el pickup y su
+			# efecto, no la persecución.
 			var star := spawner.call("spawn_powerup_pickup",
 					lead.global_position + Vector3.UP * 0.6, "star") as Node3D
 			if star != null:
 				star.set("roaming", false)
 
 
-## Vuelo has to be FLOWN to be tested: the power-up only does anything
-## while the jump action is held. Gated on the switch that granted it —
-## every other soak keeps the ordinary walk, because a tour that hopped
-## every fifteen seconds would be a different tour.
+## Vuelo hay que VOLARLO para probarlo: el power-up solo hace algo mientras
+## se mantiene la acción de salto. Depende de la variable que lo entregó:
+## los demás soaks conservan la caminata normal, porque un recorrido que
+## salta cada quince segundos sería otro recorrido.
 func _tick_flight_hold() -> void:
 	if _powerup_now != "flight":
 		return
@@ -1141,8 +1140,8 @@ func _tick_flight_hold() -> void:
 	_send_action(0, &"jump", want_hold)
 
 
-## BONK_ITEM_NOW: grants the listed items once, then keeps the tour
-## dashing so the electric belt has something to fire on.
+## BONK_ITEM_NOW: da los ítems de la lista una vez y luego mantiene al
+## recorrido haciendo dash para que el cinturón eléctrico tenga con qué disparar.
 func _tick_item_now(delta: float) -> void:
 	if _item_now.is_empty():
 		return
@@ -1178,9 +1177,9 @@ func _tick_item_now(delta: float) -> void:
 		_send_action(0, &"sprint", true)
 
 
-## BONK_ZENKAI_TEST: hit the raider down to 5% of max HP, shield it for a
-## few seconds so nothing finishes the job, then heal it full. That dip and
-## recovery is exactly the pair of signals Zenkai arms and triggers on.
+## BONK_ZENKAI_TEST: baja al raider al 5% de su vida máxima, lo protege unos
+## segundos para que nada lo remate y luego lo cura entero. Esa caída y
+## recuperación son justo las dos señales con que Zenkai se arma y se dispara.
 func _tick_zenkai_test(delta: float) -> void:
 	if not _zenkai_test:
 		return
@@ -1196,11 +1195,10 @@ func _tick_zenkai_test(delta: float) -> void:
 				return
 			_zenkai_stage = 1
 			_zenkai_left = ZENKAI_TEST_SHIELD
-			# Invulnerability OFF for the blow itself: the arming signal is
-			# damaged(), and a refused hit never emits it. Saved and put
-			# back rather than forced: the flag belongs to PowerUps._sync
-			# (Inmortalidad), and combining this switch with that power-up
-			# used to cancel it until the next apply or expiry.
+			# Invulnerabilidad APAGADA para el golpe: la señal que arma es damaged(), y
+			# un golpe rechazado nunca la emite. Se guarda y se restaura en vez de
+			# forzarla: la bandera pertenece a PowerUps._sync (Inmortalidad), y
+			# combinar esta variable con ese power-up no debe cancelarlo.
 			_zenkai_invulnerable = health.invulnerable
 			health.invulnerable = false
 			health.take_damage(health.max_hp * 0.95)
@@ -1215,11 +1213,8 @@ func _tick_zenkai_test(delta: float) -> void:
 			print("ArenaProbe: zenkai test healed")
 
 
-## BONK_WEATHER_NOW: one forced summon. Through start_sky_event, which is
-## the same forced entry the event altar uses — it stops whatever is
-## running and ignores the cadence gap.
-## Watches the director's one weather slot and reports the HUD offset the
-## moment it empties.
+## Vigila el único espacio de clima del director e informa el desplazamiento
+## del HUD apenas se vacía.
 func _watch_weather_end() -> void:
 	var director := get_tree().get_first_node_in_group("world_director")
 	if director == null:
@@ -1233,21 +1228,17 @@ func _watch_weather_end() -> void:
 		_request_settled_shot(SHOT_SETTLE, "weather_%s" % now)
 	if not _weather_seen.is_empty():
 		_report_hud_offset()
-		# Golden rain is the one row that writes a POINTS SOURCE on every
-		# raider and a run-wide price discount; both have to be back to
-		# 1.00 the frame it clears, on the downed raider too.
+		# La lluvia dorada es la única fila que escribe una FUENTE DE PUNTOS en cada
+		# raider y un descuento de precios de toda la partida; ambos deben volver a
+		# 1.00 el frame en que termina, también en el raider caído.
 		if _weather_seen == "golden_rain":
 			_report_points_sources()
 	_weather_seen = now
 
 
-## The earthquake shifts the HUD CanvasLayer and has to put it back. Read
-## at every "Weather ended:" so a soak can prove it, and printed even when
-## the weather was not the quake: a non-zero offset after ANY weather is a
-## leak, and only checking after the quake would miss it.
-## The party's points multipliers, one field per slot. Printed when a
-## points-writing weather clears: a source left behind is invisible in
-## every other log, and pays the wrong number for the rest of the run.
+## Los multiplicadores de puntos del grupo, un campo por slot. Se imprime
+## cuando termina un clima que escribe puntos: una fuente olvidada no se ve
+## en ningún otro log y paga mal el resto de la partida.
 func _report_points_sources() -> void:
 	var line := "Points sources:"
 	for body: Node3D in _party_bodies():
@@ -1258,6 +1249,10 @@ func _report_points_sources() -> void:
 	print(line)
 
 
+## El terremoto desplaza el CanvasLayer del HUD y tiene que devolverlo. Se lee
+## en cada "Weather ended:" para que un soak lo pruebe, y se imprime aunque el
+## clima no sea el terremoto: un desplazamiento distinto de cero tras CUALQUIER
+## clima es una fuga.
 func _report_hud_offset() -> void:
 	for node: Node in get_tree().get_nodes_in_group("hud"):
 		var hud := node as CanvasLayer
@@ -1266,6 +1261,9 @@ func _report_hud_offset() -> void:
 			return
 
 
+## BONK_WEATHER_NOW: una invocación forzada. Por start_sky_event, la misma
+## entrada forzada que usa el altar de eventos: corta lo que esté activo e
+## ignora la pausa entre climas.
 func _tick_weather_now() -> void:
 	if _weather_forced or _weather_now.is_empty() or RunState.run_time < WEATHER_NOW_AT:
 		return
@@ -1273,10 +1271,10 @@ func _tick_weather_now() -> void:
 	get_tree().call_group("world_director", "start_sky_event", _weather_now)
 
 
-## BONK_POI_NOW: one ring of requested POIs beside the raider. The
-## director offers these on its own cadence, which needs many minutes to
-## produce all four — this exists so one short soak can prove every stall
-## and the box actually work end to end.
+## BONK_POI_NOW: un anillo con los POI pedidos junto al raider. El director
+## los ofrece a su propio ritmo, que tarda muchos minutos en producirlos
+## todos; esto existe para que un soak corto pruebe de punta a punta cada
+## puesto y la caja.
 func _tick_poi_now() -> void:
 	if _poi_spawned or _poi_now.is_empty() or RunState.run_time < POI_NOW_AT:
 		return
@@ -1300,7 +1298,7 @@ func _tick_poi_now() -> void:
 		print("ArenaProbe: placed POI %s" % _poi_now[i])
 
 
-## One POI by name, or null when the name is not one this switch knows.
+## Un POI por nombre, o null si el nombre no es uno que esta variable conozca.
 func _build_poi(poi: String) -> Node3D:
 	match poi:
 		"pet_box":
@@ -1311,13 +1309,13 @@ func _build_poi(poi: String) -> Node3D:
 			return load("res://scenes/world/chests/LuckyBlock.tscn").instantiate() as Node3D
 		"vendor_items", "vendor_powerups", "vendor_animals":
 			var vendor := load("res://scenes/world/Vendor.tscn").instantiate() as Node3D
-			# Set before it enters the tree: Vendor._ready reads it.
+			# Se define antes de entrar al árbol: Vendor._ready lo lee.
 			vendor.set("kind", poi.trim_prefix("vendor_"))
 			return vendor
 	return null
 
 
-## BONK_POINTS: a starting purse for slot 0. Deferred so the Player exists.
+## BONK_POINTS: una bolsa inicial para el slot 0. Diferido para que exista el Player.
 func _grant_points(amount: int) -> void:
 	var lead := _lead_player()
 	if lead != null and lead.has_method("add_points"):
@@ -1325,10 +1323,10 @@ func _grant_points(amount: int) -> void:
 		print("ArenaProbe: granted %d points" % amount)
 
 
-## Time stop: while the spawner holds a freeze, sample a few frozen bodies
-## every frame and report at the thaw. `moved` and `damage_events` are the
-## two ways a freeze can be a lie — a body that kept walking, or one that
-## still landed a hit — and both must come out zero.
+## Tiempo detenido: mientras el spawner mantiene un congelamiento, muestrea
+## unos cuerpos congelados por frame e informa al descongelar. `moved` y
+## `damage_events` son las dos formas en que un congelamiento miente (un
+## cuerpo que siguió caminando, o uno que aún pegó) y ambas deben dar cero.
 func _watch_time_stop() -> void:
 	var spawner := get_tree().get_first_node_in_group("enemy_spawner")
 	var frozen := spawner != null and spawner.has_method("is_frozen") \
@@ -1348,8 +1346,8 @@ func _watch_time_stop() -> void:
 		_freeze_active = false
 		print("Time stop: sampled=%d moved=%d damage_events=%d"
 				% [_freeze_sampled, _freeze_moved, _freeze_damage_events])
-		# A separate line, never a field on the one above: that format is
-		# the verification interface of three soaks and is frozen.
+		# Línea aparte, nunca un campo de la de arriba: ese formato es la interfaz
+		# de verificación de tres soaks y está congelado.
 		print("Time stop worms: sampled=%d moved=%d loose=%d"
 				% [_worms_sampled, _worms_moved, _worms_loose])
 		return
@@ -1369,11 +1367,10 @@ func _watch_time_stop() -> void:
 		_freeze_positions[id] = body.global_position
 
 
-## Every Duneburrower under the spawner, frozen or not: a burrowed one is
-## in NO group, so it can only be found by walking the spawner's children.
-## `_erupt` is the duck-type — the probe cannot name the script without
-## hard-coupling to it, the same way the airborne detector cannot name its
-## state enum.
+## Cada Duneburrower bajo el spawner, congelado o no: uno enterrado no está
+## en NINGÚN grupo, así que solo se encuentra recorriendo los hijos del
+## spawner. `_erupt` es el duck-typing: el probe no puede nombrar el script
+## sin acoplarse a él, igual que el detector de vuelo con su enum de estado.
 func _watch_frozen_worms(spawner: Node, frozen: Array) -> void:
 	if spawner == null:
 		return
@@ -1388,9 +1385,9 @@ func _watch_frozen_worms(spawner: Node, frozen: Array) -> void:
 			continue
 		var health := Health.find_in(body)
 		if health != null and health.is_dead:
-			# A body that died inside the window is deliberately let go
-			# (EnemyBase._on_died restores its processing), so its death
-			# slide is not a freeze that leaked.
+			# Un cuerpo que murió dentro de la ventana se suelta a propósito
+			# (EnemyBase._on_died le devuelve el procesamiento), así que su deslizamiento
+			# al morir no es un congelamiento que se escapó.
 			continue
 		var id := body.get_instance_id()
 		var state: Variant = body.get("_state")
@@ -1403,9 +1400,9 @@ func _watch_frozen_worms(spawner: Node, frozen: Array) -> void:
 		_worm_positions[id] = body.global_position
 
 
-## Counts enemy-sourced damage on the lead raider while a freeze runs.
-## Connected once and left connected: the raider's Health outlives every
-## freeze, and reconnecting per window would double-count.
+## Cuenta el daño de origen enemigo al raider líder mientras dura un
+## congelamiento. Se conecta una vez y queda conectado: el Health del raider
+## sobrevive a cada congelamiento, y reconectar por ventana contaría doble.
 func _connect_lead_health() -> void:
 	if _lead_health != null and is_instance_valid(_lead_health):
 		return
@@ -1422,10 +1419,10 @@ func _on_lead_damaged(_amount: float, _current: float) -> void:
 		_freeze_damage_events += 1
 
 
-## The LEADER is the body with player_index 0, never "the first node in
-## the group" (iteration 57): with two raiders the group order is spawn
-## order, and every helper that steers, godmodes or reads "the raider"
-## would silently follow whoever happened to be first.
+## El LÍDER es el cuerpo con player_index 0, nunca "el primer nodo del grupo":
+## con dos raiders el orden del grupo es el orden de aparición, y cada
+## ayudante que guía, da godmode o lee "el raider" seguiría en silencio al
+## que quedó primero.
 func _lead_player() -> Node3D:
 	for node: Node in get_tree().get_nodes_in_group("player"):
 		var body := node as Node3D
@@ -1434,19 +1431,18 @@ func _lead_player() -> Node3D:
 	return null
 
 
-## One pass over the live horde: bodies that have been rising off the floor
-## long enough are the "flying enemies" bug, and each one warns once.
-## Runs even while the tree is paused (the counters simply stop moving,
-## because nothing moves), and prunes itself against the live group so a
-## freed body cannot keep a stale timer alive.
+## Una pasada por la horda viva: los cuerpos que llevan bastante tiempo
+## subiendo sin tocar el suelo son el bug de "enemigos voladores", y cada uno
+## avisa una vez. Corre aunque el árbol esté pausado (los contadores no
+## avanzan, porque nada se mueve) y se poda contra el grupo vivo para que un
+## cuerpo liberado no mantenga un temporizador viejo.
 func _watch_airborne(delta: float) -> void:
 	if get_tree().paused:
 		return
 	var live: Dictionary[int, bool] = {}
-	# "possessed" as well as "enemies": iteration 56 moved servants OUT of
-	# the enemies group, which quietly took up to max_possessed bodies per
-	# carrier out of a detector whose whole point is that it cannot be
-	# tuned into silence.
+	# "possessed" además de "enemies": los sirvientes no están en el grupo
+	# enemies, y dejarlos fuera sacaría hasta max_possessed cuerpos por portador
+	# de un detector cuya razón de ser es que no se pueda silenciar.
 	var bodies: Array[Node] = get_tree().get_nodes_in_group("enemies")
 	bodies.append_array(get_tree().get_nodes_in_group(&"possessed"))
 	for node: Node in bodies:
@@ -1475,9 +1471,9 @@ func _watch_airborne(delta: float) -> void:
 			_rising_for.erase(id)
 
 
-## True while this body is climbing the air under its own upward velocity
-## and is NOT one of the two bodies allowed to: an enemy in its climb state
-## (scrambling up a wall or a prop) or a Duneburrower mid-eruption.
+## True mientras este cuerpo sube por el aire con su propia velocidad hacia
+## arriba y NO es uno de los dos que pueden: un enemigo en su estado de
+## trepar (subiendo un muro o un prop) o un Duneburrower en plena erupción.
 func _is_rising(body: CharacterBody3D) -> bool:
 	if body.is_on_floor() or body.velocity.y <= AIRBORNE_RISE_SPEED:
 		return false
@@ -1489,17 +1485,18 @@ func _is_rising(body: CharacterBody3D) -> bool:
 	return true
 
 
-## Metres between a body and the ground under it.
+## Metros entre un cuerpo y el suelo bajo él.
 func _height_above_ground(at: Vector3) -> float:
 	var terrain := Terrain.find(get_tree())
 	return at.y - (terrain.height_at(at.x, at.z) if terrain != null else 0.0)
 
 
-## (a) Walks every boundary a blocked cell shares with a WALKABLE one in
-## SWEEP_STEP increments, straddling the boundary line with the player
-## capsule. A sample that touches no world geometry is an opening: a hole
-## the raider can walk through into ground the mask calls unreachable.
-## Never loosen this — the rock placement in scatter.gd is what has to give.
+## (a) Recorre cada borde que una celda bloqueada comparte con una CAMINABLE
+## en pasos de SWEEP_STEP, con la cápsula del jugador a caballo sobre la
+## línea del borde. Una muestra que no toca geometría del mundo es una
+## abertura: un hueco por el que el raider entra a suelo que la máscara da
+## por inalcanzable. Nunca aflojes esto: lo que tiene que ceder es la
+## colocación de rocas (scatter.gd y rock_formation.gd).
 func _run_mask_sweep() -> void:
 	var bounds := _arena_bounds()
 	if bounds == null:
@@ -1514,12 +1511,11 @@ func _run_mask_sweep() -> void:
 	var query := PhysicsShapeQueryParameters3D.new()
 	query.shape = capsule
 	query.collision_mask = WORLD_COLLISION_LAYER
-	# Raiders share layer 1 with the world; a body standing on a boundary
-	# would otherwise answer for the rock that is missing there.
-	# Raiders AND the terrain: the ground is layer-1 geometry, so with a
-	# heightmap under it every sample would touch something and the sweep
-	# would report a perfect map it never actually tested. Rocks, props and
-	# walls still count, which is what the sweep is for.
+	# Se excluyen los raiders, que comparten la capa 1 con el mundo: un cuerpo
+	# parado en un borde respondería por la roca que falta ahí. Y el terreno:
+	# el suelo es geometría de capa 1, así que con un heightmap debajo cada
+	# muestra tocaría algo y el barrido informaría un mapa perfecto que nunca
+	# probó. Rocas, props y muros siguen contando, que es para lo que existe.
 	var excluded := _raider_rids()
 	var terrain := Terrain.find(get_tree())
 	if terrain != null:
@@ -1540,9 +1536,9 @@ func _run_mask_sweep() -> void:
 			for i in steps + 1:
 				var spot := edge + along * ((float(i) / float(steps) - 0.5) * cell_size)
 				samples += 1
-				# Centred over the GROUND at that spot, not at an absolute
-				# height: on a hill the old fixed 0.9 m sat inside the
-				# terrain, on a hollow floor it floated over the rocks.
+				# Centrada sobre el SUELO en ese punto, no a una altura absoluta: en una
+				# loma una altura fija quedaría dentro del terreno y en una hondonada
+				# flotaría sobre las rocas.
 				var ground := terrain.height_at(spot.x, spot.y) if terrain != null else 0.0
 				query.transform = Transform3D(Basis(),
 						Vector3(spot.x, ground + SWEEP_CAPSULE_CENTER_Y, spot.y))
@@ -1559,12 +1555,12 @@ func _run_mask_sweep() -> void:
 				% [openings, samples, cells.size()])
 
 
-## (b) The lead raider standing ON THE FLOOR PLATE inside a blocked cell for
-## BLOCKED_CELL_GRACE seconds straight. Height is what separates "walked in
-## through a gap" from "is on top of a rock, a platform or a mesa that sits
-## in a blocked cell", which is fine — the timer only runs at floor level,
-## while the right to report belongs to the ENTRY, so a stuck raider that
-## keeps hopping still warns once and not once per landing.
+## (b) El raider líder parado EN EL SUELO dentro de una celda bloqueada
+## durante BLOCKED_CELL_GRACE segundos seguidos. La altura separa "entró por
+## un hueco" de "está sobre una roca, una plataforma o una meseta en una
+## celda bloqueada", que está bien: el temporizador solo corre a nivel del
+## suelo y el aviso pertenece a la ENTRADA, así que un raider atascado que
+## sigue saltando avisa una vez y no una por aterrizaje.
 func _watch_blocked_cell(delta: float) -> void:
 	if get_tree().paused:
 		return
@@ -1601,8 +1597,8 @@ func _leave_blocked_cell() -> void:
 	_blocked_reported = false
 
 
-## The arena's own bounds node (scatter.gd), through the group like every
-## other cross-scene lookup here. Cached: both mask guards ask every frame.
+## El nodo de límites de la arena (scatter.gd), por el grupo como toda
+## búsqueda entre escenas aquí. En caché: ambos guardias preguntan cada frame.
 func _arena_bounds() -> Node3D:
 	if is_instance_valid(_bounds):
 		return _bounds
@@ -1614,9 +1610,9 @@ func _arena_bounds() -> Node3D:
 	return null
 
 
-## Duck-typed on purpose: scatter.gd has no class_name, so the return
-## crosses as a Variant and every element is re-checked before it lands in
-## a typed array.
+## Duck-typing a propósito: scatter.gd no tiene class_name, así que el
+## retorno llega como Variant y cada elemento se revisa antes de entrar a un
+## arreglo tipado.
 func _blocked_cells(bounds: Node3D) -> Array[Vector2i]:
 	var cells: Array[Vector2i] = []
 	var raw: Variant = bounds.call("blocked_cells")
@@ -1628,8 +1624,8 @@ func _blocked_cells(bounds: Node3D) -> Array[Vector2i]:
 	return cells
 
 
-## Physics RIDs of every raider, standing or downed: the sweep asks about
-## world geometry, and a raider is on the same collision layer as it.
+## RIDs de física de cada raider, de pie o caído: el barrido pregunta por la
+## geometría del mundo, y un raider está en su misma capa de colisión.
 func _raider_rids() -> Array[RID]:
 	var rids: Array[RID] = []
 	var groups: Array[StringName] = [&"player", &"downed_players"]
@@ -1648,9 +1644,9 @@ func _lead_raider() -> CharacterBody3D:
 	return lead
 
 
-## A blocking UI that never closes (roulette, run end) freezes run_time while
-## the frame counter keeps climbing, so the soak looks healthy while running
-## nothing. Report it once, loudly enough for a grep.
+## Una UI bloqueante que nunca se cierra (ruleta, fin de partida) congela
+## run_time mientras el contador de frames sigue subiendo, así que el soak
+## parece sano sin correr nada. Se informa una vez, fuerte para un grep.
 func _watch_for_wedge(delta: float, card_ui_open: bool) -> void:
 	if not get_tree().paused or card_ui_open:
 		_paused_for = 0.0
@@ -1658,9 +1654,8 @@ func _watch_for_wedge(delta: float, card_ui_open: bool) -> void:
 	_paused_for += delta
 	if _paused_for >= PAUSE_WEDGE_WARN and not _wedge_reported:
 		_wedge_reported = true
-		# Only the VISIBLE blockers: every screen in the group is a member
-		# whether or not it is on screen, so listing all of them points at
-		# the wrong culprit.
+		# Solo los bloqueantes VISIBLES: toda pantalla del grupo es miembro esté o
+		# no en pantalla, y listarlas todas apunta al culpable equivocado.
 		var blockers: Array[String] = []
 		for node: Node in get_tree().get_nodes_in_group("ui_blocking"):
 			var shown: Variant = node.get("visible")
@@ -1670,27 +1665,27 @@ func _watch_for_wedge(delta: float, card_ui_open: bool) -> void:
 				% [_paused_for, blockers])
 
 
-## XZ of a world position. Every distance this tour measures is flat:
-## with relief, height differences are not travel.
+## XZ de una posición del mundo. Toda distancia de este recorrido es plana:
+## con relieve, las diferencias de altura no son avance.
 func _flat(at: Vector3) -> Vector2:
 	return Vector2(at.x, at.z)
 
 
-## Steers the lead raider toward the current waypoint by HOLDING THE REAL
-## MOVE ACTIONS. Writing velocity directly does not work: Player rebuilds it
-## from Input.get_vector() every physics frame and then calls
-## move_and_slide(), so a written velocity is overwritten before it moves
-## anything. Pressing the actions also means the soak exercises the real
-## input path (slide, sprint gating, free-orbit basis) instead of bypassing it.
+## Guía al raider líder hacia el punto actual MANTENIENDO LAS ACCIONES REALES
+## DE MOVIMIENTO. Escribir velocity no sirve: Player la reconstruye desde
+## Input.get_vector() en cada frame de física y luego llama move_and_slide(),
+## así que una velocidad escrita se pisa antes de mover nada. Apretar las
+## acciones además ejercita el camino real de entrada (deslizar, condición de
+## sprint, base de órbita libre) en vez de saltárselo.
 func _drive_walk(delta: float) -> void:
 	var lead := _lead_raider()
 	if lead == null:
 		_release_move()
 		_release_holds()
 		return
-	# A downed teammate within REVIVE_NOTICE_RANGE outranks the current
-	# target, the linger and the exit rush: the party leaves together or
-	# the co-op rule this soak exists to prove never runs.
+	# Un compañero caído dentro de REVIVE_NOTICE_RANGE supera al objetivo
+	# actual, la espera y la carrera a la salida: el grupo sale junto o la
+	# regla co-op que este soak existe para probar nunca corre.
 	if _drive_rescue(lead, delta):
 		return
 	if _linger_left > 0.0:
@@ -1702,18 +1697,18 @@ func _drive_walk(delta: float) -> void:
 			_press_interact()
 		return
 	_leg_time_left -= delta
-	# "Arrived" means the game's own condition — inside the target's Area3D,
-	# which is what gates the prompt and the interact — not a fixed radius.
-	# A chest on a rise sits 4-5 m away horizontally and would never satisfy
-	# a distance test while being perfectly interactable.
+	# "Llegó" es la condición del propio juego (dentro del Area3D del objetivo,
+	# que habilita el aviso y la interacción), no un radio fijo. Un cofre en
+	# una loma queda a 4-5 m en horizontal y nunca pasaría una prueba de
+	# distancia aun siendo interactuable.
 	var reached := _flat(lead.global_position).distance_to(_flat(_waypoint)) <= WAYPOINT_REACHED
 	if is_instance_valid(_target) and _target.player_in_range:
 		reached = true
 	if _waypoint == Vector3.ZERO or _leg_time_left <= 0.0 or reached:
 		if reached:
 			_legs_reached += 1
-			# Stand still on arrival: Charge altars need an uninterrupted
-			# channel and chests need the interact press to land.
+			# Quieto al llegar: los altares Charge necesitan una canalización sin
+			# cortes y los cofres necesitan que llegue la pulsación de interactuar.
 			_linger_left = LINGER_TIME
 			_interact_timer = 0.0
 			_release_move()
@@ -1728,9 +1723,9 @@ func _drive_walk(delta: float) -> void:
 	_unstick(lead, delta)
 
 
-## Hops when horizontal progress stalls. Ledges, ramps and the mask walls
-## all read as "walking into something"; without a jump the tour can never
-## reach the chests parked on verticality spots.
+## Salta cuando se estanca el avance horizontal. Bordes, rampas y muros de
+## máscara se leen todos como "caminar contra algo"; sin salto el recorrido
+## nunca llega a los cofres puestos en puntos de verticalidad.
 func _unstick(lead: CharacterBody3D, delta: float) -> void:
 	_stall_check -= delta
 	if _stall_check > 0.0:
@@ -1745,9 +1740,9 @@ func _unstick(lead: CharacterBody3D, delta: float) -> void:
 	Input.action_release.bind(jump).call_deferred()
 
 
-## Converts a world-space heading into held move actions. Player builds its
-## wish direction as `transform.basis * Vector3(input.x, 0, input.y)`, so the
-## heading has to come back through the body's own basis.
+## Convierte un rumbo del mundo en acciones de movimiento mantenidas. Player
+## arma su dirección deseada como `transform.basis * Vector3(input.x, 0, input.y)`,
+## así que el rumbo tiene que volver por la base del propio cuerpo.
 func _hold_move_toward(body: CharacterBody3D, to: Vector3, slot: int = 0) -> void:
 	var heading := to - body.global_position
 	heading.y = 0.0
@@ -1775,11 +1770,11 @@ func _release_move(slot: int = 0) -> void:
 		Input.action_release(Coop.action(slot, base))
 
 
-## Synthesizes a real "interact" press so shrines, chests, portals and
-## secret triggers resolve through their own _unhandled_input path.
-## The release has to land on a LATER frame than the press: both parsed in
-## one flush and the action never reads as "just pressed", which is exactly
-## what Interactable._unhandled_input tests for.
+## Sintetiza una pulsación real de "interact" para que altares, cofres,
+## portales y disparadores secretos se resuelvan por su propio
+## _unhandled_input (Interactable._unhandled_input). La liberación tiene que
+## caer en un frame POSTERIOR a la pulsación: con ambas en el mismo vaciado
+## la acción nunca se lee como "recién apretada".
 func _press_interact() -> void:
 	if _debug:
 		var touching: Array[String] = []
@@ -1800,13 +1795,13 @@ func _send_interact(pressed: bool) -> void:
 	_send_action(0, &"interact", pressed)
 
 
-## One synthesized action press for a SLOT (iteration 57). A PARSED
-## InputEventAction, not Input.action_press: an _unhandled_input handler
-## only ever sees the parsed kind, and Input.is_action_just_pressed sees
-## both. In co-op the slot decides the action SET (p0_* vs p1_*), which
-## is what makes a revive work: Player._tick_downed polls the RESCUER's
-## own interact action, so a press sent as slot 0 can never revive
-## anybody if slot 1 is the one standing next to the body.
+## Una pulsación sintetizada para un SLOT. Un InputEventAction PARSEADO, no
+## Input.action_press: un handler _unhandled_input solo ve el parseado, e
+## Input.is_action_just_pressed ve ambos. En co-op el slot decide el SET de
+## acciones (p0_* o p1_*), y eso hace funcionar el revivir: PlayerRevive.tick
+## consulta la acción de interactuar del RESCATADOR, así que una pulsación
+## enviada como slot 0 nunca revive a nadie si el que está junto al cuerpo es
+## el slot 1.
 func _send_action(slot: int, base: StringName, pressed: bool) -> void:
 	var event := InputEventAction.new()
 	event.action = Coop.action(slot, base)
@@ -1814,17 +1809,16 @@ func _send_action(slot: int, base: StringName, pressed: bool) -> void:
 	Input.parse_input_event(event)
 
 
-## HOLD mode: keeps an action pressed across frames until it is released.
-## A revive needs Player.revive_time (3 s) of CONTINUOUS hold, which the
-## press/release-next-frame pattern can never produce.
+## Modo MANTENER: deja una acción apretada entre frames hasta soltarla. Un
+## revivir necesita PlayerRevive.revive_time (3 s) mantenido SIN PAUSA, algo
+## que el patrón apretar/soltar-al-frame-siguiente no logra.
 ##
-## Re-ASSERTED every frame against the real Input state, not cached as a
-## bool: the tour's own interact tap queues its release with
-## call_deferred, and that release can land AFTER a hold started on the
-## same frame. Trusting a cached flag there left the leader "holding" an
-## action that was already up — the raider stood over its downed teammate
-## for the rest of the soak while the revive bar decayed, which is a
-## harness livelock that reads exactly like a game bug.
+## Se REAFIRMA cada frame contra el estado real de Input, no se guarda como
+## bool: el toque de interactuar del propio recorrido encola su liberación
+## con call_deferred, y esa liberación puede caer DESPUÉS de que empezó un
+## mantener en el mismo frame. Con una bandera en caché el líder "mantendría"
+## una acción ya suelta y quedaría parado sobre su compañero caído mientras
+## la barra de revivir decae: una traba del arnés que parece bug del juego.
 func _hold_action(slot: int, base: StringName, held: bool) -> void:
 	var key := "%d/%s" % [slot, base]
 	if held:
@@ -1838,8 +1832,8 @@ func _hold_action(slot: int, base: StringName, held: bool) -> void:
 	_send_action(slot, base, false)
 
 
-## Drops every held action. Called when the thing being held goes away,
-## so a hold cannot outlive its reason.
+## Suelta toda acción mantenida. Se llama cuando lo que se mantenía
+## desaparece, para que un mantener no sobreviva a su razón.
 func _release_holds() -> void:
 	for key: String in _held.keys():
 		if not bool(_held[key]):
@@ -1849,33 +1843,29 @@ func _release_holds() -> void:
 	_held.clear()
 
 
-## Next destination: the nearest still-available Interactable that this tour
-## has not just visited, so a soak actually spends points on chests and
-## charges altars; a random walkable point once they are all spent or all
-## recently tried.
+## Próximo destino: el Interactable disponible más cercano que este recorrido
+## no visitó recién, para que un soak gaste puntos en cofres y cargue altares;
+## un punto caminable al azar cuando todos están gastados o probados hace poco.
 func _pick_waypoint(from: Vector3) -> void:
 	_leg_time_left = LEG_TIMEOUT
-	# The tour is allowed to work a small area — that is where the loot
-	# is — but not forever. A horde that drops faster than the walk
-	# consumes kept the raider inside a 20 m bubble for a whole 1200 s
-	# soak (measured: 54 chests dropped, 18 opened, explored frozen at
-	# 0.06 while the marker count climbed). After BUBBLE_LEGS legs that
-	# never left BUBBLE_RADIUS of where the streak began, the next
-	# waypoint is a ROAM whatever is lying at the raider's feet.
-	# ...but NOT while the exit rush is on. A forced roam there sends the
-	# tour away from the one target the rush exists to reach, and the
-	# portal lands 40 m or more from the party by design: measured, a
-	# 720 s stage soak that never crossed with 16 of its 22 legs timing
-	# out. Nothing outranks the rush except a downed teammate.
+	# El recorrido puede trabajar un área chica (ahí está el botín), pero no
+	# para siempre: una horda que suelta más rápido de lo que la caminata
+	# consume puede dejar al raider en una burbuja de 20 m todo un soak, con la
+	# exploración congelada. Tras BUBBLE_LEGS tramos que nunca salieron de
+	# BUBBLE_RADIUS desde donde empezó la racha, el próximo punto es un PASEO al
+	# azar, haya lo que haya a los pies del raider.
+	# ...pero NO durante la carrera a la salida. Un paseo forzado ahí aleja al
+	# recorrido del único objetivo que la carrera existe para alcanzar, y el
+	# portal cae a 40 m o más del grupo a propósito. Nada supera a la carrera
+	# salvo un compañero caído.
 	var roaming_forced := false if _exit_rush else _bubble_expired(from)
-	# A power-up on the ground outranks everything nearby (iteration 53):
-	# it is free, it expires in 45 s, and walking into it is the whole
-	# interaction — no press, no linger. Only if one is CLOSE, though: a
-	# tour that crossed the map for every drop would stop touring.
-	# It does NOT outrank the exit rush: with a drop every few seconds the
-	# detour kept re-winning for the whole 300 s the exit portal was open
-	# and the party never crossed — which is the one thing the rush
-	# exists to guarantee.
+	# Un power-up en el suelo supera a todo lo cercano: es gratis, vence en
+	# 45 s y pasar por encima es toda la interacción (sin pulsar, sin esperar).
+	# Solo si está CERCA: un recorrido que cruzara el mapa por cada drop dejaría
+	# de recorrer.
+	# NO supera a la carrera a la salida: con un drop cada pocos segundos el
+	# desvío ganaría siempre y el grupo nunca cruzaría, que es lo único que la
+	# carrera existe para garantizar.
 	var pickup := _nearest_pickup(from) if not _exit_rush and not roaming_forced else null
 	if pickup != null:
 		_target = null
