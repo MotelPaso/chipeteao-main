@@ -2,14 +2,17 @@ class_name TelegraphDisc
 extends MeshInstance3D
 ## Disco de aviso en el suelo, reusado por Pools: se llena desde el centro,
 ## sube su brillo y se desvanece. El cilindro de radio 1 se escala al radio
-## pedido. La opacidad y el brillo iniciales salen del material de
-## TelegraphDisc.tscn; el material es local a la escena, así cada instancia
-## del pool anima su propia copia de alfa y emisión.
+## pedido. La opacidad inicial sale del material de TelegraphDisc.tscn; el
+## material es local a la escena, así cada instancia del pool anima su propia
+## copia de alfa y emisión.
 
 @export_group("Animación")
+## Brillo de la emisión al empezar la carga. Va aquí y no en el material:
+## Godot no guarda la emisión de un material sin sombreado en el .tscn.
+@export var start_energy: float = 1.2
 ## Fracción del radio con la que aparece el disco antes de crecer (0-1).
 @export var start_scale: float = 0.2
-## Brillo de la emisión al terminar la carga (el inicial está en el material).
+## Brillo de la emisión al terminar la carga.
 @export var peak_energy: float = 2.6
 ## Segundos que tarda en desvanecerse tras la carga.
 @export var fade_time: float = 0.15
@@ -18,14 +21,12 @@ extends MeshInstance3D
 
 var _tween: Tween = null
 var _start_alpha: float = 0.45
-var _start_energy: float = 1.2
 
 
 func _ready() -> void:
 	var material := material_override as StandardMaterial3D
 	if material != null:
 		_start_alpha = material.albedo_color.a
-		_start_energy = material.emission_energy_multiplier
 
 
 ## Contrato de nodo del pool: sin crecer ni desvanecerse lo del aviso anterior.
@@ -43,7 +44,7 @@ func show_disc(center: Vector3, radius: float, duration: float, color: Color) ->
 		return
 	material.albedo_color = Color(color.r, color.g, color.b, _start_alpha)
 	material.emission = color
-	material.emission_energy_multiplier = _start_energy
+	material.emission_energy_multiplier = start_energy
 	global_position = center + Vector3.UP * lift
 	scale = Vector3(start_scale * radius, 1.0, start_scale * radius)
 	_kill_tween()

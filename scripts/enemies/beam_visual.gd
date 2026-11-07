@@ -9,8 +9,11 @@ extends MeshInstance3D
 ## visual: el raycast, el impacto y el daño los resuelve quien lo usa.
 
 @export_group("Aspecto")
-## Color del rayo y de su emisión; la opacidad (0.8) y el brillo (2.2) salen del material de BeamVisual.tscn.
+## Color del rayo y de su emisión; la opacidad (0.8) sale del material de BeamVisual.tscn.
 @export var color: Color = Color.WHITE
+## Brillo de la emisión. Va aquí y no en el material: Godot no guarda la
+## emisión de un material sin sombreado en el .tscn.
+@export var emission_energy: float = 2.2
 ## Grosor en metros cuando span() no recibe uno.
 @export var default_thickness: float = 0.1
 
@@ -28,7 +31,9 @@ func _ready() -> void:
 		return
 	material = material.duplicate() as StandardMaterial3D
 	material.albedo_color = Color(color.r, color.g, color.b, material.albedo_color.a)
+	material.emission_enabled = true
 	material.emission = color
+	material.emission_energy_multiplier = emission_energy
 	material_override = material
 
 
