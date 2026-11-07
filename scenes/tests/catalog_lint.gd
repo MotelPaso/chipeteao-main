@@ -28,8 +28,6 @@ const WORLD_DIRECTOR := preload("res://scripts/world/run/world_director.gd")
 ## hay reflexión para un bloque match, y copiar la lista aquí serían dos
 ## verdades que se separan con el próximo stat.
 const PLAYER_STATS_PATH := "res://scripts/systems/player_stats.gd"
-## Carpetas de scripts del juego.
-const SCRIPT_ROOTS: Array[String] = ["res://scripts"]
 ## Carpetas donde se buscan asignaciones `marker_kind = &"..."`, en .gd y .tscn.
 const MARKER_ROOTS: Array[String] = ["res://scripts", "res://scenes"]
 ## Escenas donde se buscan los `secret_boss_id` de los jefes secretos.
