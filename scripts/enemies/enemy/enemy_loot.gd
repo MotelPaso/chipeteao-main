@@ -5,7 +5,6 @@ extends RefCounted
 ## los cambia): puntos, power-up, charco de lluvia ácida y cofres. Todo
 ## estático; EnemyBase._on_died lo llama en un orden fijo (orden del RNG).
 
-const CHEST_SCENE := preload("res://scenes/world/chests/Chest.tscn")
 ## Máximo de cofres de recompensa shiny SIN abrir a la vez en el mapa. Edita
 ## aquí. No caducan y su probabilidad crece con la dificultad; cada uno es un
 ## Area3D, una caja sólida que la horda trepa y un marcador de mapa. Pasado
@@ -94,30 +93,14 @@ static func bounty_chests_at_cap(tree: SceneTree) -> bool:
 	return unopened_bounty_chests(tree) >= BOUNTY_CHEST_CAP
 
 
-## Suelta un cofre gratis en `at`, colgado de la RAÍZ de la escena para
-## sobrevivir al cadáver de `body`; devuelve null si no hay escena donde
-## soltarlo (cierre de la partida) o si la raíz de Chest.tscn no es un Chest.
-## Por aquí pasan el cofre shiny y el anillo del jefe (EnemyBase.spawn_chest).
-## Todo cofre soltado por un CUERPO es gratis: ya se pagó al matarlo.
-## `min_rarity` vacío conserva el piso de la escena.
+## Suelta un cofre gratis en `at` (Chest.spawn_free), colgado de la arena
+## para sobrevivir al cadáver de `body`; devuelve null si no hay dónde
+## soltarlo. Por aquí pasan el cofre shiny y el anillo del jefe
+## (EnemyBase.spawn_chest). Todo cofre soltado por un CUERPO es gratis: ya se
+## pagó al matarlo. `min_rarity` vacío conserva el piso de la escena.
 static func spawn_chest(body: Node, at: Vector3, luck_bonus: float,
 		min_rarity: String = "") -> Chest:
-	var parent := RunRoot.stage_parent(body.get_tree())
-	if parent == null:
-		parent = body.get_parent()
-	if parent == null:
-		return null
-	var chest := CHEST_SCENE.instantiate() as Chest
-	if chest == null:
-		push_warning("EnemyBase: Chest scene root is not a Chest.")
-		return null
-	if not min_rarity.is_empty():
-		chest.min_rarity = min_rarity
-	chest.luck_bonus = luck_bonus
-	chest.free_open = true
-	parent.add_child(chest)
-	chest.global_position = at
-	return chest
+	return Chest.spawn_free(body.get_tree(), at, luck_bonus, min_rarity)
 
 
 ## Un orbe de vida del pool en `at`, salvo en el tope global de orbes vivos.
