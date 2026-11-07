@@ -1,7 +1,9 @@
 class_name MapOverlay
 extends Control
-## El mapa de Tab: una superposición del tamaño de la celda con toda la
-## etapa, el equipo de este jugador, el grupo y lo que llevan.
+## El mapa de Tab (MapOverlay.tscn): una superposición del tamaño de la celda
+## con toda la etapa, el equipo de este jugador, el grupo y lo que llevan.
+## Los paneles, la leyenda y el encabezado son nodos de la escena; el mapa en
+## sí se dibuja en _draw dentro del rectángulo de %MapArea.
 ##
 ## NO pausa. Un bullet-heaven no tiene un momento seguro para leer un menú,
 ## así que la horda sigue mientras el mapa está abierto: mirarlo es una
@@ -9,41 +11,102 @@ extends Control
 ## algo que SÍ es dueño de la pausa pausa el árbol (el selector de cartas, el
 ## menú de pausa) o cuando el jugador de esta ranura ya no está.
 ##
-## Una instancia por jugador, creada por el HUD en su propia CanvasLayer (capa
-## 8: sobre el HUD, bajo el selector de cartas) y anclada a la celda de
-## pantalla dividida de ese jugador.
+## Una instancia por jugador, creada por el HUD (ViewWidgets) en su propia
+## CanvasLayer (capa 8: sobre el HUD, bajo el selector de cartas) y anclada a
+## la celda de pantalla dividida de ese jugador.
 ##
-## Foco: cada Control de aquí es FOCUS_NONE. Tab es el `ui_focus_next` de
-## Godot, y un solo Control con foco en este árbol se comería la tecla antes
-## de que el interruptor la vea.
+## Foco: ningún Control de aquí toma foco. Tab es el `ui_focus_next` de Godot,
+## y un solo Control con foco en este árbol se comería la tecla antes de que
+## el interruptor la vea.
+##
+## El soak lee `slot` y marker_count() por el grupo "map_overlay".
+
+## Filas del panel de estadísticas, en orden. `property` es la propiedad de
+## PlayerStats que se muestra (se lee POR NOMBRE: si se renombra allá, la fila
+## muestra empty_text). `show` dice cómo se escribe:
+##   "multiplier"    multiplicador que parte en 1.0, como +N%   (1.25 -> +25%)
+##   "fraction"      fracción que parte en 0, como +N%          (0.1 -> +10%)
+##   "flat"          número entero con signo                    (3 -> +3)
+##   "attack_speed"  el multiplicador de enfriamiento leído como velocidad de
+##                   ataque y en POSITIVO (GLOSARIO regla 7): 0.8 -> +25%.
+const STAT_ROWS: Array[Dictionary] = [
+	{"label": "Daño", "property": "damage_multiplier", "show": "multiplier"},
+	{"label": "Velocidad de ataque", "property": "cooldown_multiplier", "show": "attack_speed"},
+	{"label": "Área", "property": "area_multiplier", "show": "multiplier"},
+	{"label": "Velocidad", "property": "move_speed_multiplier", "show": "multiplier"},
+	{"label": "Prob. de crítico", "property": "crit_chance", "show": "fraction"},
+	{"label": "Daño crítico", "property": "crit_damage", "show": "multiplier"},
+	{"label": "Robo de vida", "property": "lifesteal", "show": "fraction"},
+	{"label": "Armadura", "property": "armor", "show": "flat"},
+	{"label": "Evasión", "property": "evasion", "show": "fraction"},
+	{"label": "Espinas", "property": "thorns", "show": "flat"},
+	{"label": "Suerte", "property": "luck", "show": "flat"},
+	{"label": "HP máx.", "property": "bonus_max_hp", "show": "flat"},
+	{"label": "Proyectiles", "property": "projectile_bonus", "show": "flat"},
+	{"label": "Duración", "property": "duration_multiplier", "show": "multiplier"},
+	{"label": "XP", "property": "xp_multiplier", "show": "multiplier"},
+	{"label": "Saltos", "property": "extra_jumps", "show": "flat"},
+]
 
 ## Qué jugador es dueño de este mapa (ranura 0-3). Lo asigna el HUD.
 @export var slot: int = 0
-
-## Fracción de la celda que ocupa el mapa (0-1); los paneles usan el resto.
-const MAP_SHARE: float = 0.6
-## Margen alrededor de todo, en píxeles.
-const PAD: float = 18.0
-## Separación entre el mapa y la columna de paneles, en píxeles.
-const GUTTER: float = 14.0
 ## Segundos entre refrescos mientras el mapa está abierto. Mientras está
 ## oculto no se refresca NADA.
-const REFRESH: float = 0.1
-## Tamaño de la muestra de color de la leyenda, en píxeles.
-const SWATCH := Vector2(12.0, 12.0)
-const HEADER_FONT_SIZE: int = 20
-const SECTION_FONT_SIZE: int = 15
-const BODY_FONT_SIZE: int = 13
+@export var refresh_seconds: float = 0.1
+@export_group("Mapa")
+## Fondo del marco del mapa.
+@export var frame_color: Color = Color(0.05, 0.055, 0.08, 0.9)
+## Píxeles que el marco sobresale alrededor del mapa.
+@export var frame_margin: float = 3.0
+## Grosor del borde del marco, en píxeles.
+@export var border_width: float = 2.0
+## Cuánto se oscurece el turquesa de UiTheme.ACCENT para el borde (0-1).
+@export var border_darken: float = 0.2
+@export_group("Leyenda")
+## Tamaño de la muestra de color de cada fila, en píxeles.
+@export var swatch_size: Vector2 = Vector2(12.0, 12.0)
+## Tamaño de letra de la leyenda, en píxeles.
+@export var legend_font_size: int = 13
+## Color del texto de la leyenda.
+@export var legend_text_color: Color = UiTheme.TEXT_FAINT
+## Separación entre la muestra y su texto, en píxeles.
+@export var legend_row_separation: int = 6
+@export_group("Encabezado")
+## Espacio extra entre las letras del encabezado, en píxeles.
+@export var header_letter_spacing: int = 3
+@export_group("Textos")
+## Texto de un panel sin nada que mostrar.
+@export var empty_text: String = "—"
+## Encabezado: la etapa (desde 1).
+@export var stage_format: String = "Etapa %d"
+## Se agrega al encabezado desde la segunda vuelta.
+@export var lap_format: String = " · Vuelta %d"
+## Encabezado completo: etapa (y vuelta), minutos y segundos de la partida.
+@export var header_format: String = "%s — %02d:%02d"
+## Fila de un power-up activo: nombre y segundos restantes.
+@export var powerup_row_format: String = "%s  %ds"
+## Panel de mascota cuando no lleva ninguna.
+@export var no_pet_text: String = "Sin mascota"
+## Panel de mascota: nombre, su arma y, abajo, la estadística que da.
+@export var pet_format: String = "%s  %s\n%s"
+## Fila de estadística: nombre y valor.
+@export var stat_row_format: String = "%s  %s"
+## Fila de un jugador: número, personaje, vida, nivel y puntos.
+@export var player_row_format: String = "J%d  %s  %s  %s  %d pts"
+## Fila de una ranura sin cuerpo: número y personaje.
+@export var missing_player_format: String = "J%d  %s  —"
+## Vida en la fila de un jugador: actual y máxima.
+@export var player_hp_format: String = "%d/%d"
+## Fila de un objeto con varias copias.
+@export var item_copies_format: String = "%s ×%d"
+## Fila de un arma: nombre y nivel o rango.
+@export var weapon_row_format: String = "%s  %s"
+## Rango de un arma que pasó su primer hito.
+@export var tier_format: String = "★%d"
+## Fila de un tomo: nombre y pilas.
+@export var tome_row_format: String = "%s %s"
 
 var _map: MapDraw = null
-var _dim: ColorRect = null
-var _header: Label = null
-var _legend: VBoxContainer = null
-var _powerups_body: Label = null
-var _pet_body: Label = null
-var _stats_body: Label = null
-var _players_body: Label = null
-var _items_body: Label = null
 var _refresh_left: float = 0.0
 ## Minimap.composite_key() de la última composición de este mapa; vacío =
 ## desconocido, así que el próximo refresco compone sin condiciones.
@@ -52,16 +115,73 @@ var _composited: Array = []
 ## para ese sí/no de cada cuadro: todo lo que lee al jugador vuelve a buscarlo.
 var _seen_raider: Node3D = null
 
+@onready var _header: Label = %Header
+@onready var _legend: VBoxContainer = %Legend
+@onready var _map_area: Control = %MapArea
+@onready var _powerups_section: MapSection = %PowerUps
+@onready var _pet_section: MapSection = %Pet
+@onready var _stats_section: MapSection = %Stats
+@onready var _players_section: MapSection = %Players
+@onready var _items_section: MapSection = %Items
+
 
 func _ready() -> void:
+	# Procesa aunque el árbol esté pausado: así se oculta cuando otro menú
+	# pausa la partida.
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	add_to_group(&"map_overlay")
-	visible = false
-	mouse_filter = Control.MOUSE_FILTER_IGNORE
-	focus_mode = Control.FOCUS_NONE
+	_header.add_theme_font_override("font", UiTheme.spaced_font(header_letter_spacing))
 	_map = MapDraw.new(get_tree())
 	_map.build_background()
-	_build_ui()
+	_build_legend()
+
+
+func _process(delta: float) -> void:
+	# Oculto cuando otra cosa es dueña de la pantalla. Se revisa ANTES del
+	# interruptor para que una pulsación en el mismo cuadro que una muerte no
+	# abra el mapa sobre la pantalla de fin.
+	if not RunState.run_active or get_tree().paused or not _has_raider():
+		if visible:
+			visible = false
+		return
+	if Input.is_action_just_pressed(Coop.action(slot, &"map_overlay")):
+		visible = not visible
+		if visible and _map != null:
+			# Se refresca AQUÍ y no en el próximo tick: el mapa debe estar al
+			# día en el mismo cuadro en que aparece.
+			_refresh_left = refresh_seconds
+			_map.collect_markers()
+			_composite_if_changed()
+			_refresh_panels()
+			queue_redraw()
+	if not visible or _map == null:
+		return
+	_refresh_left -= delta
+	if _refresh_left > 0.0:
+		return
+	_refresh_left = refresh_seconds
+	# Métodos simples, sin Control: un soak headless ejercita todo el camino
+	# del mapa aunque _draw() nunca se despache.
+	_map.collect_markers()
+	_composite_if_changed()
+	_refresh_panels()
+	queue_redraw()
+
+
+## Dibuja el mapa cuadrado dentro de %MapArea. Lo dibuja este nodo, así que
+## queda bajo sus hijos, Dim incluido.
+func _draw() -> void:
+	if _map == null:
+		return
+	var area := _map_area.get_rect()
+	var side := minf(area.size.x, area.size.y)
+	if side <= 0.0:
+		return
+	var rect := Rect2(area.position, Vector2(side, side))
+	draw_rect(rect.grow(frame_margin), frame_color, true)
+	_map.draw_into(self, rect)
+	draw_rect(rect.grow(frame_margin), UiTheme.ACCENT.darkened(border_darken), false,
+			border_width)
 
 
 ## Gancho de etapa, reenviado por el HUD desde WorldDirector.on_stage_started.
@@ -81,38 +201,6 @@ func marker_count() -> int:
 	return _map.marker_count() if _map != null else 0
 
 
-func _process(delta: float) -> void:
-	# Oculto cuando otra cosa es dueña de la pantalla. Se revisa ANTES del
-	# interruptor para que una pulsación en el mismo cuadro que una muerte no
-	# abra el mapa sobre la pantalla de fin.
-	if not RunState.run_active or get_tree().paused or not _has_raider():
-		if visible:
-			visible = false
-		return
-	if Input.is_action_just_pressed(Coop.action(slot, &"map_overlay")):
-		visible = not visible
-		if visible and _map != null:
-			# Se refresca AQUÍ y no en el próximo tick: el mapa debe estar al
-			# día en el mismo cuadro en que aparece.
-			_refresh_left = REFRESH
-			_map.collect_markers()
-			_composite_if_changed()
-			_refresh_panels()
-			queue_redraw()
-	if not visible or _map == null:
-		return
-	_refresh_left -= delta
-	if _refresh_left > 0.0:
-		return
-	_refresh_left = REFRESH
-	# Métodos simples, sin Control: un soak headless ejercita todo el camino
-	# del mapa aunque _draw() nunca se despache.
-	_map.collect_markers()
-	_composite_if_changed()
-	_refresh_panels()
-	queue_redraw()
-
-
 ## La misma puerta que la del minimapa (Minimap._composite_if_changed): el
 ## MapDraw propio de este mapa guarda la textura de su última composición,
 ## oculto o no, así que al abrirse solo recompone si la niebla cambió.
@@ -124,76 +212,6 @@ func _composite_if_changed() -> void:
 	_map.composite()
 
 
-## --- armado ---------------------------------------------------------------
-
-func _build_ui() -> void:
-	_dim = ColorRect.new()
-	_dim.color = Color(UiTheme.BG_DEEP, 0.88)
-	_dim.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	_own(_dim)
-	add_child(_dim)
-	_header = Label.new()
-	_header.position = Vector2(PAD, PAD)
-	UiTheme.style_title(_header, HEADER_FONT_SIZE, UiTheme.TEXT_BRIGHT, 3, 6)
-	_own(_header)
-	add_child(_header)
-	_legend = VBoxContainer.new()
-	_legend.add_theme_constant_override("separation", 3)
-	_own(_legend)
-	add_child(_legend)
-	_build_legend()
-	var column := VBoxContainer.new()
-	column.add_theme_constant_override("separation", 10)
-	column.set_anchors_preset(Control.PRESET_TOP_RIGHT)
-	column.grow_horizontal = Control.GROW_DIRECTION_BEGIN
-	_own(column)
-	add_child(column)
-	_powerups_body = _add_section(column, "Power-ups")
-	_pet_body = _add_section(column, "Mascota")
-	_stats_body = _add_section(column, "Estadísticas")
-	_players_body = _add_section(column, "Jugadores")
-	_items_body = _add_section(column, "Objetos")
-	_anchor_column(column)
-
-
-## Un panel con título y un cuerpo de varias líneas; devuelve el Label del cuerpo.
-func _add_section(column: VBoxContainer, title: String) -> Label:
-	var panel := PanelContainer.new()
-	panel.add_theme_stylebox_override("panel",
-			UiTheme.flat(UiTheme.PANEL_BG, UiTheme.RADIUS_SMALL))
-	_own(panel)
-	column.add_child(panel)
-	var box := VBoxContainer.new()
-	box.add_theme_constant_override("separation", 4)
-	_own(box)
-	panel.add_child(box)
-	var header := Label.new()
-	header.text = title
-	header.add_theme_font_size_override("font_size", SECTION_FONT_SIZE)
-	header.add_theme_font_override("font", UiTheme.spaced_font(2))
-	header.add_theme_color_override("font_color", UiTheme.ACCENT)
-	_own(header)
-	box.add_child(header)
-	var body := Label.new()
-	body.add_theme_font_size_override("font_size", BODY_FONT_SIZE)
-	body.add_theme_color_override("font_color", UiTheme.TEXT_DIM)
-	body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_own(body)
-	box.add_child(body)
-	return body
-
-
-func _anchor_column(column: VBoxContainer) -> void:
-	column.anchor_left = MAP_SHARE
-	column.anchor_right = 1.0
-	column.anchor_top = 0.0
-	column.anchor_bottom = 1.0
-	column.offset_left = GUTTER
-	column.offset_top = PAD
-	column.offset_right = -PAD
-	column.offset_bottom = -PAD
-
-
 ## Filas de la leyenda directo de MapDraw.MARKER_LABELS: un tipo agregado ahí
 ## aparece aquí sin tocar nada.
 func _build_legend() -> void:
@@ -202,63 +220,50 @@ func _build_legend() -> void:
 		if style.is_empty():
 			continue
 		var row := HBoxContainer.new()
-		row.add_theme_constant_override("separation", 6)
+		row.add_theme_constant_override("separation", legend_row_separation)
 		_own(row)
 		_legend.add_child(row)
 		var swatch := ColorRect.new()
 		swatch.color = style["color"]
-		swatch.custom_minimum_size = SWATCH
+		swatch.custom_minimum_size = swatch_size
 		_own(swatch)
 		row.add_child(swatch)
 		var label := Label.new()
 		label.text = MapDraw.MARKER_LABELS[kind]
-		label.add_theme_font_size_override("font_size", BODY_FONT_SIZE)
-		label.add_theme_color_override("font_color", UiTheme.TEXT_FAINT)
+		label.add_theme_font_size_override("font_size", legend_font_size)
+		label.add_theme_color_override("font_color", legend_text_color)
 		_own(label)
 		row.add_child(label)
 
 
-## Cada Control que crea este mapa: nunca toma foco (Tab es ui_focus_next) ni
-## recibe el mouse (el mundo sigue vivo detrás).
+## Cada Control que crea este mapa en código: nunca toma foco (Tab es
+## ui_focus_next) ni recibe el mouse (el mundo sigue vivo detrás).
 func _own(control: Control) -> void:
 	control.focus_mode = Control.FOCUS_NONE
 	control.mouse_filter = Control.MOUSE_FILTER_IGNORE
 
 
-## --- contenido ------------------------------------------------------------
-
 func _refresh_panels() -> void:
 	var seconds := int(RunState.run_time)
-	var title := "Etapa %d" % (RunState.stage_index + 1)
+	var title := stage_format % (RunState.stage_index + 1)
 	if RunState.lap > 0:
-		title += " · Vuelta %d" % (RunState.lap + 1)
-	_header.text = "%s — %02d:%02d" % [title, seconds / 60, seconds % 60]
-	_legend.position = Vector2(PAD, size.y - PAD - _legend.size.y)
+		title += lap_format % (RunState.lap + 1)
+	_header.text = header_format % [title, seconds / 60, seconds % 60]
 	# Una sola búsqueda para los cuatro paneles que leen al jugador de esta
 	# ranura: nada entre medio puede cambiar un cuerpo de grupo.
-	var raider := _raider()
-	_powerups_body.text = _powerups_text(raider)
-	_pet_body.text = _pet_text(raider)
-	_stats_body.text = _stats_text(raider)
-	_players_body.text = _players_text()
-	_items_body.text = _items_text(raider)
+	var raider := PartySlots.raider_at(get_tree(), slot)
+	_powerups_section.set_body(_powerups_text(raider))
+	_pet_section.set_body(_pet_text(raider))
+	_stats_section.set_body(_stats_text(raider))
+	_players_section.set_body(_players_text())
+	_items_section.set_body(_items_text(raider))
 
 
-## El jugador de esta ranura, de pie o caído; null si la ranura está vacía.
-func _raider() -> Node3D:
-	for group: String in ["player", "downed_players"]:
-		for node: Node in get_tree().get_nodes_in_group(group):
-			var body := node as Node3D
-			if body != null and int(body.get("player_index")) == slot:
-				return body
-	return null
-
-
-## `_raider() != null`, preguntado cada cuadro aunque el mapa esté oculto,
-## sin las dos búsquedas de grupo cuando el último cuerpo visto sigue
-## respondiendo: dentro del árbol, en uno de los dos grupos y con esta ranura.
-## Un cuerpo así es uno que encontraría la búsqueda de _raider(), así que no
-## podría dar null; si no se cumple, decide la búsqueda completa y se recuerda.
+## `PartySlots.raider_at(slot) != null`, preguntado cada cuadro aunque el mapa
+## esté oculto, sin las dos búsquedas de grupo cuando el último cuerpo visto
+## sigue respondiendo: dentro del árbol, en uno de los dos grupos y con esta
+## ranura. Un cuerpo así es uno que la búsqueda encontraría, así que no podría
+## dar null; si no se cumple, decide la búsqueda completa y se recuerda.
 ## is_inside_tree() es obligatorio: un nodo conserva sus grupos al salir del
 ## árbol, pero las listas de grupo del árbol lo sueltan.
 func _has_raider() -> bool:
@@ -269,7 +274,7 @@ func _has_raider() -> bool:
 				or _seen_raider.is_in_group(&"downed_players")) \
 			and int(_seen_raider.get("player_index")) == slot:
 		return true
-	_seen_raider = _raider()
+	_seen_raider = PartySlots.raider_at(get_tree(), slot)
 	return _seen_raider != null
 
 
@@ -278,40 +283,39 @@ func _has_raider() -> bool:
 func _powerups_text(raider: Node3D) -> String:
 	var powerups := PowerUps.find_in(raider)
 	if powerups == null:
-		return "—"
+		return empty_text
 	var rows: PackedStringArray = PackedStringArray()
 	for live: Dictionary in powerups.active():
-		rows.append("%s  %ds" % [PowerUpCatalog.display_name_of(String(live.id)),
+		rows.append(powerup_row_format % [PowerUpCatalog.display_name_of(String(live.id)),
 				ceili(float(live.time_left))])
-	return "\n".join(rows) if not rows.is_empty() else "—"
+	return "\n".join(rows) if not rows.is_empty() else empty_text
 
 
-## La capa de estadísticas derivadas, como la lee el jugador.
-## `cooldown_multiplier` se muestra como VELOCIDAD DE ATAQUE y en POSITIVO
-## (GLOSARIO regla 7): 0.8 es "+20% de velocidad de ataque", nunca "-20% de
-## enfriamiento". Solo cambia la redacción, no el multiplicador.
+## La capa de estadísticas derivadas, como la lee el jugador (ver STAT_ROWS).
 func _stats_text(body: Node3D) -> String:
 	var stats := PlayerStats.find_in(body) if body != null else null
 	if stats == null:
-		return "—"
+		return empty_text
 	var rows: PackedStringArray = PackedStringArray()
-	rows.append("Daño  %s" % _percent(stats.damage_multiplier - 1.0))
-	rows.append("Velocidad de ataque  %s" % _percent(1.0 / maxf(stats.cooldown_multiplier, 0.01) - 1.0))
-	rows.append("Área  %s" % _percent(stats.area_multiplier - 1.0))
-	rows.append("Velocidad  %s" % _percent(stats.move_speed_multiplier - 1.0))
-	rows.append("Prob. de crítico  %s" % _percent(stats.crit_chance))
-	rows.append("Daño crítico  %s" % _percent(stats.crit_damage - 1.0))
-	rows.append("Robo de vida  %s" % _percent(stats.lifesteal))
-	rows.append("Armadura  %s" % _flat(stats.armor))
-	rows.append("Evasión  %s" % _percent(stats.evasion))
-	rows.append("Espinas  %s" % _flat(stats.thorns))
-	rows.append("Suerte  %s" % _flat(stats.luck))
-	rows.append("HP máx.  %s" % _flat(stats.bonus_max_hp))
-	rows.append("Proyectiles  %s" % _flat(float(stats.projectile_bonus)))
-	rows.append("Duración  %s" % _percent(stats.duration_multiplier - 1.0))
-	rows.append("XP  %s" % _percent(stats.xp_multiplier - 1.0))
-	rows.append("Saltos  %s" % _flat(float(stats.extra_jumps)))
+	for row: Dictionary in STAT_ROWS:
+		rows.append(stat_row_format % [String(row.label), _stat_value(stats, row)])
 	return "\n".join(rows)
+
+
+func _stat_value(stats: PlayerStats, row: Dictionary) -> String:
+	var raw: Variant = stats.get(String(row.property))
+	if raw == null:
+		return empty_text
+	var value := float(raw)
+	match String(row.show):
+		"multiplier":
+			return _percent(value - 1.0)
+		"attack_speed":
+			return _percent(1.0 / maxf(value, 0.01) - 1.0)
+		"fraction":
+			return _percent(value)
+		_:
+			return _flat(value)
 
 
 func _percent(fraction: float) -> String:
@@ -327,30 +331,21 @@ func _flat(amount: float) -> String:
 func _players_text() -> String:
 	var rows: PackedStringArray = PackedStringArray()
 	for player_slot: int in maxi(Coop.player_count, 1):
-		var body := _raider_at(player_slot)
+		var body := PartySlots.raider_at(get_tree(), player_slot)
 		var name_text := String(CharacterCatalog.by_id_or_default(
-				Coop.character_for_slot(player_slot)).get("display_name", "—"))
+				Coop.character_for_slot(player_slot)).get("display_name", empty_text))
 		if body == null:
-			rows.append("J%d  %s  —" % [player_slot + 1, name_text])
+			rows.append(missing_player_format % [player_slot + 1, name_text])
 			continue
 		var health := Health.find_in(body)
-		var hp := "%d/%d" % [ceili(health.current_hp), roundi(health.max_hp)] \
-				if health != null else "—"
+		var hp := player_hp_format % [ceili(health.current_hp), roundi(health.max_hp)] \
+				if health != null else empty_text
 		var points: Variant = body.get("points")
-		rows.append("J%d  %s  %s  %s  %d pts" % [
+		rows.append(player_row_format % [
 				player_slot + 1, name_text, hp,
 				UiTheme.LEVEL_ABBREV % RunState.level,
 				int(points) if points != null else 0])
 	return "\n".join(rows)
-
-
-func _raider_at(player_slot: int) -> Node3D:
-	for group: String in ["player", "downed_players"]:
-		for node: Node in get_tree().get_nodes_in_group(group):
-			var body := node as Node3D
-			if body != null and int(body.get("player_index")) == player_slot:
-				return body
-	return null
 
 
 ## La línea de la mascota: nombre, su arma y la estadística que da. Se
@@ -358,14 +353,14 @@ func _raider_at(player_slot: int) -> Node3D:
 ## información cuando hay una caja de mascota en el mapa.
 func _pet_text(body: Node3D) -> String:
 	if body == null:
-		return "—"
+		return empty_text
 	var pet_id: Variant = body.get("pet_id")
 	if pet_id == null or String(pet_id).is_empty():
-		return "Sin mascota"
+		return no_pet_text
 	var row := PetCatalog.by_id(String(pet_id))
 	if row.is_empty():
-		return "Sin mascota"
-	return "%s  %s\n%s" % [String(row.display_name),
+		return no_pet_text
+	return pet_format % [String(row.display_name),
 			PetCatalog.weapon_display_name(row), String(row.get("stat_label", ""))]
 
 
@@ -374,7 +369,7 @@ func _pet_text(body: Node3D) -> String:
 ## nombres completos porque aquí hay espacio.
 func _items_text(body: Node3D) -> String:
 	if body == null:
-		return "—"
+		return empty_text
 	var rows: PackedStringArray = PackedStringArray()
 	var bag := ItemBag.find_in(body)
 	if bag != null:
@@ -382,7 +377,7 @@ func _items_text(body: Node3D) -> String:
 			var row := ItemCatalog.by_id(item_id)
 			var display := String(row.get("display_name", item_id))
 			var copies := bag.count(item_id)
-			rows.append(display if copies <= 1 else "%s ×%d" % [display, copies])
+			rows.append(display if copies <= 1 else item_copies_format % [display, copies])
 	var mount := body.get_node_or_null("Weapons")
 	if mount != null:
 		for child: Node in mount.get_children():
@@ -391,27 +386,13 @@ func _items_text(body: Node3D) -> String:
 				continue
 			var display := weapon.evolved_name if weapon.evolved and not weapon.evolved_name.is_empty() \
 					else UpgradePool.weapon_display_name(weapon.name)
-			var tag := ("★%d" % weapon.ascension_tier) if weapon.ascension_tier > 0 \
+			var tag := (tier_format % weapon.ascension_tier) if weapon.ascension_tier > 0 \
 					else (UiTheme.WEAPON_LEVEL_ABBREV % weapon.upgrade_level)
-			rows.append("%s  %s" % [display, tag])
+			rows.append(weapon_row_format % [display, tag])
 	var stats := PlayerStats.find_in(body)
 	if stats != null:
 		for tome_id: String in stats.carried_tome_ids():
 			var tome := Tome.by_id(tome_id)
-			rows.append("%s %s" % [String(tome.get("display_name", tome_id)),
+			rows.append(tome_row_format % [String(tome.get("display_name", tome_id)),
 					Tome.stack_label(stats.stack_count(tome_id))])
-	return "\n".join(rows) if not rows.is_empty() else "—"
-
-
-## --- dibujo ---------------------------------------------------------------
-
-func _draw() -> void:
-	if _map == null:
-		return
-	var side := minf(size.x * MAP_SHARE - PAD * 2.0, size.y - PAD * 2.0 - HEADER_FONT_SIZE * 2.0)
-	if side <= 0.0:
-		return
-	var rect := Rect2(Vector2(PAD, PAD + HEADER_FONT_SIZE * 2.0), Vector2(side, side))
-	draw_rect(rect.grow(3.0), Color(0.05, 0.055, 0.08, 0.9), true)
-	_map.draw_into(self, rect)
-	draw_rect(rect.grow(3.0), UiTheme.ACCENT.darkened(0.2), false, 2.0)
+	return "\n".join(rows) if not rows.is_empty() else empty_text

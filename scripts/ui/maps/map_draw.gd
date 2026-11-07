@@ -99,9 +99,6 @@ const FOG_ALPHA: float = 0.85
 ## Píxeles del mapa por metro de arena. 0.5 da 240 px para una arena de
 ## 240 m: de sobra para un minimapa de 150 px y nítido en el mapa de Tab.
 const PIXELS_PER_METER: float = 0.5
-## Segundos entre recolecciones de marcadores. Sin uso: cada consumidor
-## lleva su propio REFRESH.
-const MARKER_INTERVAL: float = 0.1
 
 ## Media extensión, en metros, de la arena que cubre este mapa.
 var half_extent: float = 120.0

@@ -11,6 +11,7 @@ extends Node
 ## Precargado y no por class_name: así lo resuelven también las corridas
 ## headless que no construyeron la caché de clases del editor.
 const SplitScreenView := preload("res://scripts/systems/split_screen.gd")
+const OVERLAY_SCENE := preload("res://scenes/ui/maps/MapOverlay.tscn")
 
 ## Margen superior del minimapa, en píxeles, en las celdas que NO tocan el
 ## borde superior de la ventana (las de arriba usan el de MinimapSlot, que deja
@@ -52,7 +53,7 @@ func build(player_count: int) -> void:
 		var layer := CanvasLayer.new()
 		layer.layer = overlay_layer
 		add_child(layer)
-		var overlay := MapOverlay.new()
+		var overlay: MapOverlay = OVERLAY_SCENE.instantiate()
 		overlay.slot = slot
 		_anchor_to_cell(overlay, cell)
 		layer.add_child(overlay)
