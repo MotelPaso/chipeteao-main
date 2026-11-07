@@ -67,7 +67,7 @@ func _init() -> void:
 
 func _ready() -> void:
 	visible = false
-	add_to_group("ui_blocking")
+	add_to_group(BlockingUi.GROUP)
 	_apply_styles()
 	# El contenedor reacomoda un frame DESPUÉS del cambio de texto y fuente
 	# del título, así que el tamaño que lee _play_entrance todavía es el
@@ -81,7 +81,7 @@ func _ready() -> void:
 	_quit_button.pressed.connect(_on_quit_pressed)
 
 
-## Contrato del PauseMenu (grupo "ui_blocking"): la pantalla de fin es dueña
+## Contrato de BlockingUi (grupo BlockingUi.GROUP): la pantalla de fin es dueña
 ## de la pausa mientras está arriba, así que Esc no abre la pausa encima.
 func is_blocking() -> bool:
 	return visible
