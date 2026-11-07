@@ -1,40 +1,34 @@
 class_name PerfMeter
 extends RefCounted
-## Frame-cost meter the soak harness carries (iteration 64).
+## Medidor del costo por frame que lleva el arnés de soak.
 ##
-## WHY IT EXISTS. Every soak runs with --fixed-fps 60, which advances game
-## time by exactly 1/60 s per frame and then runs the next frame as fast as
-## the machine allows. So a headless soak's WALL time per frame is the CPU
-## cost of one frame of the game — scripts, physics, scene tree — with the
-## renderer stubbed out, and a windowed soak's is the same plus the GPU.
-## Nothing measured that before: the HUD's FPS badge only tells a player
-## the number, never which frame cost what or how big the horde was then.
+## POR QUÉ EXISTE. Todo soak corre con --fixed-fps 60: el tiempo de juego
+## avanza 1/60 s por frame y el siguiente frame corre tan rápido como pueda
+## la máquina. Así, el tiempo REAL por frame de un soak headless es el costo
+## de CPU de un frame (scripts, física, árbol de escena) sin renderer, y el
+## de un soak con ventana suma la GPU. La insignia de FPS del HUD solo da el
+## número, no qué frame costó cuánto ni qué tan grande era la horda.
 ##
-## WHAT IT PRINTS. A `Perf` line every WINDOW_FRAMES drawn frames (the
-## window's own percentiles beside the horde and node counts, so a slow
-## window can be read against what was on screen), and one `Perf summary`
-## on the way out. Times are milliseconds of wall clock between two
-## consecutive _process calls of the harness. Performance.TIME_PROCESS and
-## TIME_PHYSICS_PROCESS are NOT used: in the first soak that sampled them
-## the physics one read 280 ms for twenty seconds of 0.6 ms frames — it
-## does not describe the frame it is read in.
+## QUÉ IMPRIME. Una línea `Perf` cada WINDOW_FRAMES frames dibujados (los
+## percentiles de esa ventana junto a la horda y los conteos de nodos, para
+## leer una ventana lenta contra lo que había en pantalla) y un `Perf summary`
+## al salir. Los tiempos son milisegundos de reloj real entre dos _process
+## seguidos del arnés. No usa Performance.TIME_PROCESS ni
+## TIME_PHYSICS_PROCESS: no describen el frame en que se leen.
 ##
-## WITH A WINDOW the wall clock includes the GPU, but on a Mac it is only
-## trustworthy FULLSCREEN: a windowed frame went through the compositor's
-## sync even under --disable-vsync (one windowed soak read 8.28 ms at p50
-## with one enemy and with sixty-four — a 120 Hz panel's refresh), while
-## --fullscreen ran uncapped. RenderingServer's measured GPU render time is
-## not used either: it read 0.00 for every window on Metal.
+## CON VENTANA el reloj real incluye la GPU, pero en Mac solo es confiable
+## en PANTALLA COMPLETA: un frame en ventana pasa por la sincronización del
+## compositor aun con --disable-vsync, y --fullscreen corre sin tope. Tampoco
+## usa el tiempo de GPU de RenderingServer: en Metal marca 0.00.
 ##
-## It only MEASURES. Nothing here changes the run or what a soak asserts.
+## Solo MIDE. Nada aquí cambia la partida ni lo que afirma un soak.
 
-## Drawn frames per Perf line: 10 s of game time under --fixed-fps 60.
+## Frames dibujados por línea Perf: 10 s de juego con --fixed-fps 60.
 const WINDOW_FRAMES: int = 600
-## Frames skipped before anything is recorded: the boot frame alone loads
-## the run scene and every preload behind it, and would own the maximum
-## of every soak.
+## Frames que se saltan antes de registrar: el frame de arranque carga la
+## escena de la partida y todos sus preloads, y sería el máximo de cada soak.
 const WARMUP_FRAMES: int = 30
-## A frame slower than this is a hitch a player feels (two 60 Hz vsyncs).
+## Un frame más lento que esto (ms) es un tirón que el jugador nota (dos vsync de 60 Hz).
 const HITCH_MS: float = 33.3
 
 var _last_usec: int = 0
@@ -49,7 +43,7 @@ func _init(tree: SceneTree) -> void:
 	_tree = tree
 
 
-## Called from the harness's _process, once per drawn frame.
+## Lo llama el _process del arnés, una vez por frame dibujado.
 func tick() -> void:
 	var now := Time.get_ticks_usec()
 	if _last_usec == 0:
@@ -85,7 +79,7 @@ func _print_window() -> void:
 	_window.clear()
 
 
-## Printed once, from the harness's _exit_tree.
+## Se imprime una vez, desde el _exit_tree del arnés.
 func summary() -> void:
 	if _all.is_empty():
 		print("Perf summary: frames=0")
@@ -100,7 +94,7 @@ func summary() -> void:
 
 
 
-## [avg, p50, p95, p99, max] of a frame-time sample.
+## [promedio, p50, p95, p99, máximo] de una muestra de tiempos de frame.
 static func _stats(sample: PackedFloat32Array) -> Array[float]:
 	var sorted := sample.duplicate()
 	sorted.sort()
