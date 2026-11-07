@@ -98,7 +98,7 @@ void fragment() {
 
 @export_group("Anillo de subida de nivel")
 ## Color del anillo que se expande a los pies del raider al subir de nivel.
-@export var level_pulse_color: Color = Color(0.35, 0.95, 0.6)
+@export var level_pulse_color: Color = UiTheme.XP_GREEN
 ## Segundos que tarda el anillo en expandirse y desvanecerse.
 @export var level_pulse_duration: float = 0.5
 ## Opacidad inicial (0-1) del anillo.

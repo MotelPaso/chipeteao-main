@@ -61,10 +61,10 @@ const EVENT_LIBRARY: Array[Dictionary] = [
 		"announce": "¡Una jauría shiny te huele el rastro!",
 	},
 	{
-		# Las gemas tienen su propia duración; la baliza se apaga antes.
+		# Las gemas tienen su propia duración; la baliza se apaga antes. Verde de XP, como las gemas.
 		"id": "essence_rift", "weight": 1.0, "method": &"_event_essence_rift",
 		"announce": "Se abre una grieta de esencia...",
-		"beacon_color": Color(0.35, 0.95, 0.6), "beacon_time": 30.0,
+		"beacon_color": UiTheme.XP_GREEN, "beacon_time": 30.0,
 	},
 	{
 		"id": "charge_altar", "weight": 1.6, "altar": true, "scene": CHARGE_SHRINE_SCENE,
