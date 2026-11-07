@@ -28,47 +28,6 @@ const KIND_CHOICE := "choice"
 ## del título están en el nodo LevelLabel de UpgradeCardUI.tscn.
 @export var title_letter_spacing: int = 4
 
-@export_group("Apertura")
-## Segundos entre pausar el árbol y mostrar las cartas: un respiro para que se
-## lea el pulso de subida de nivel. Mantenlo bajo ~0.25.
-@export var reveal_delay: float = 0.2
-## Segundos que tarda en subir el fondo oscuro.
-@export var dim_fade_time: float = 0.15
-## Escala desde la que crece el título al abrir.
-@export var title_start_scale: float = 0.9
-## Segundos que tarda el título en llegar a su tamaño, con un rebote al final.
-@export var title_grow_time: float = 0.22
-
-@export_group("Reparto")
-## Escala desde la que crece cada carta al repartirse.
-@export var deal_start_scale: float = 0.8
-## Segundos que tarda cada carta en llegar a su tamaño, con un rebote al final.
-@export var deal_time: float = 0.22
-## Segundos entre la entrada de una carta y la siguiente.
-@export var deal_stagger: float = 0.06
-## Parte del tiempo de entrada en la que la carta pasa de invisible a opaca (0-1).
-@export var deal_fade_share: float = 0.7
-
-@export_group("Reparto encadenado")
-## Escala inicial de cada carta cuando la oferta cambia con el selector ya
-## abierto (elecciones seguidas).
-@export var quick_deal_start_scale: float = 0.92
-## Segundos que tarda cada carta en llegar a su tamaño en ese cambio rápido.
-@export var quick_deal_time: float = 0.14
-## Segundos entre una carta y la siguiente en ese cambio rápido.
-@export var quick_deal_stagger: float = 0.03
-
-@export_group("Elección")
-## Segundos del golpe de la carta elegida y la caída de las demás, antes de
-## servir la siguiente elección.
-@export var pick_time: float = 0.16
-## Escala a la que sube la carta elegida.
-@export var pick_scale: float = 1.12
-## Escala a la que bajan las cartas no elegidas.
-@export var loser_scale: float = 0.9
-## Opacidad final de las cartas no elegidas (0-1).
-@export var loser_alpha: float = 0.2
-
 @export_group("Aviso del Tomo del Azar")
 ## Título del aviso de botín que lista las stats que movió el Tomo del Azar.
 @export var gamble_toast_title: String = "Azar"
@@ -84,6 +43,8 @@ const KIND_CHOICE := "choice"
 @export var accept_hint_text: String = "Elegir"
 
 @onready var _dim: ColorRect = %Dim
+## Tiempos y escalas del reparto y de la elección (nodo Motion de esta escena).
+@onready var _motion: UpgradePickMotion = $Motion
 @onready var _level_label: Label = %LevelLabel
 @onready var _cards: Array[UpgradeCard] = [%Card1 as UpgradeCard, %Card2 as UpgradeCard,
 		%Card3 as UpgradeCard]
@@ -107,13 +68,9 @@ var _side: String = ""
 ## true durante la animación de elección: ignora más clics, así un doble clic
 ## nunca aplica dos mejoras de la misma oferta.
 var _picking: bool = false
-## Co-op: el raider dueño de esta elección. La XP y el nivel son de todo el
-## grupo, así que las elecciones rotan entre los que siguen en pie.
-## Solo: siempre el único jugador.
+## El raider dueño de esta elección (ver PickRecipients).
 var _recipient: Node = null
-var _recipient_rotation: int = 0
-var _deal_tween: Tween = null
-var _pick_tween: Tween = null
+var _recipients := PickRecipients.new()
 
 
 func _ready() -> void:
@@ -256,7 +213,7 @@ func _open(title: String, requested_recipient: Node = null) -> bool:
 	# las cartas aparecen tras un respiro para que se lea el pulso de nivel. El
 	# temporizador corre en pausa e ignora la escala de tiempo del hit-stop.
 	_opening = true
-	var timer := get_tree().create_timer(reveal_delay, true, false, true)
+	var timer := get_tree().create_timer(_motion.reveal_delay, true, false, true)
 	timer.timeout.connect(_reveal, CONNECT_ONE_SHOT)
 	return true
 
@@ -275,39 +232,10 @@ func _reveal() -> void:
 	_deal(false)
 
 
-## Entrada de las cartas: el fondo oscuro sube y cada carta visible crece desde
-## una escala menor, una tras otra y con un rebote al final (quick = el cambio en
-## el lugar entre elecciones encadenadas). Idempotente: al reiniciar mata el
-## reparto anterior.
+## Reparte la oferta en pantalla (quick = cambio en el lugar entre elecciones
+## encadenadas) y enfoca la primera carta.
 func _deal(quick: bool) -> void:
-	if _deal_tween != null and _deal_tween.is_valid():
-		_deal_tween.kill()
-	_deal_tween = create_tween().set_parallel()
-	_deal_tween.set_ignore_time_scale(true)
-	if not quick:
-		_dim.modulate.a = 0.0
-		_deal_tween.tween_property(_dim, "modulate:a", 1.0, dim_fade_time)
-		_level_label.pivot_offset = _level_label.size * 0.5
-		_level_label.scale = Vector2.ONE * title_start_scale
-		_deal_tween.tween_property(_level_label, "scale", Vector2.ONE, title_grow_time) \
-				.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-	else:
-		_dim.modulate.a = 1.0
-	var start_scale := quick_deal_start_scale if quick else deal_start_scale
-	var duration := quick_deal_time if quick else deal_time
-	var stagger := quick_deal_stagger if quick else deal_stagger
-	for i in _cards.size():
-		var card := _cards[i]
-		if not card.visible:
-			continue
-		card.pivot_offset = card.size * 0.5
-		card.scale = Vector2.ONE * start_scale
-		card.modulate = Color(1.0, 1.0, 1.0, 0.0)
-		var delay := stagger * i
-		_deal_tween.tween_property(card, "modulate:a", 1.0, duration * deal_fade_share) \
-				.set_delay(delay)
-		_deal_tween.tween_property(card, "scale", Vector2.ONE, duration) \
-				.set_delay(delay).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	_motion.deal(_dim, _level_label, _cards, quick)
 	_focus_first_card()
 
 
@@ -403,29 +331,10 @@ func _toast_gamble(boons: Array[Dictionary], player: Node) -> void:
 			gamble_toast_color, int(index) if index != null else 0)
 
 
-## La carta elegida da un golpe hacia arriba y las demás caen y se apagan; tras
-## el respiro la cola sigue igual (primero niveles, después elecciones extra).
+## Gesto de la carta elegida; tras él la cola sigue igual (primero niveles,
+## después elecciones extra).
 func _animate_pick(index: int) -> void:
-	if _pick_tween != null and _pick_tween.is_valid():
-		_pick_tween.kill()
-	_pick_tween = create_tween().set_parallel()
-	_pick_tween.set_ignore_time_scale(true)
-	for i in _cards.size():
-		var card := _cards[i]
-		if not card.visible:
-			continue
-		# BaseButton emite button_up antes que pressed, así que el tween de hover
-		# de attach_motion sigue escribiendo `scale` cuando empieza el golpe. Se
-		# mata, o los dos pelean por la propiedad y el gesto tartamudea.
-		UiTheme.kill_meta_tween(card, &"ui_motion_tween")
-		card.pivot_offset = card.size * 0.5
-		if i == index:
-			_pick_tween.tween_property(card, "scale", Vector2.ONE * pick_scale,
-					pick_time).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
-		else:
-			_pick_tween.tween_property(card, "scale", Vector2.ONE * loser_scale, pick_time)
-			_pick_tween.tween_property(card, "modulate:a", loser_alpha, pick_time)
-	_pick_tween.chain().tween_callback(_after_pick)
+	_motion.pick(_cards, index, _after_pick)
 
 
 func _after_pick() -> void:
@@ -446,47 +355,18 @@ func _after_pick() -> void:
 	_close()
 
 
-## Rotación por RANURA del grupo, no por posición en la lista de vivos: el
-## contador nombra una ranura (0..player_count-1) y la elección va a ese raider
-## si está en pie, si no a la siguiente ranura en pie. Rotar sobre la lista de
-## vivos cambiaría el reparto cada vez que alguien cae o revive (cambia el
-## módulo), y un raider podría recibir el doble de cartas que otro en una
-## partida con muchas caídas.
 func _pick_recipient() -> Node:
-	var players: Array[Node] = get_tree().get_nodes_in_group("player")
-	if players.is_empty():
-		return null
-	if not Coop.is_coop():
-		return players[0]
-	for i in Coop.player_count:
-		var slot := (_recipient_rotation + i) % Coop.player_count
-		for node: Node in players:
-			if int(node.get("player_index")) != slot:
-				continue
-			# La siguiente elección empieza a buscar una ranura después de esta,
-			# así un raider caído cede el turno sin mover el orden de los demás.
-			_recipient_rotation = slot + 1
-			return node
-	return null
+	return _recipients.next(get_tree())
 
 
 ## El raider dueño de esta elección, resuelto una vez y reutilizado: _roll() y
 ## _on_card_pressed() nunca pueden contestar distinto (la oferta se arma con las
-## armas de un cuerpo y debe caer en ese mismo cuerpo). Si no hay, usa la RANURA
-## MÁS BAJA en pie, no get_first_node_in_group, cuyo orden cambia cada vez que
-## alguien cae y revive.
+## armas de un cuerpo y debe caer en ese mismo cuerpo).
 func _resolve_recipient() -> Node:
 	if _recipient != null and is_instance_valid(_recipient) and _recipient.is_inside_tree():
 		return _recipient
-	var best: Node = null
-	var best_slot := Coop.MAX_PLAYERS
-	for node: Node in get_tree().get_nodes_in_group("player"):
-		var slot := int(node.get("player_index"))
-		if slot < best_slot:
-			best_slot = slot
-			best = node
-	_recipient = best
-	return best
+	_recipient = PickRecipients.lowest_slot(get_tree())
+	return _recipient
 
 
 ## Mata los brillos en bucle de las cartas legendarias (ver UpgradeCard.stop_shine).

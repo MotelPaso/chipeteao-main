@@ -1,7 +1,8 @@
 [gd_scene format=3 uid="uid://c52x8kekju83l"]
 
 [ext_resource type="Script" uid="uid://x86tvc5e0d4i" path="res://scripts/ui/game/upgrade_card_ui.gd" id="1_cardui"]
-[ext_resource type="PackedScene" path="res://scenes/ui/UpgradeCard.tscn" id="2_card"]
+[ext_resource type="PackedScene" path="res://scenes/ui/upgrade_card_ui/UpgradeCard.tscn" id="2_card"]
+[ext_resource type="Script" path="res://scripts/ui/game/upgrade_card_ui/pick_motion.gd" id="3_motion"]
 
 [sub_resource type="Shader" id="Shader_radialdim"]
 code = "shader_type canvas_item;
@@ -21,6 +22,9 @@ shader = SubResource("Shader_radialdim")
 process_mode = 3
 layer = 10
 script = ExtResource("1_cardui")
+
+[node name="Motion" type="Node" parent="."]
+script = ExtResource("3_motion")
 
 [node name="Dim" type="ColorRect" parent="." unique_id=1199190599]
 unique_name_in_owner = true
