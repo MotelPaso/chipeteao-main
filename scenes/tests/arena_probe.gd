@@ -1883,8 +1883,8 @@ func _pick_waypoint(from: Vector3) -> void:
 			print("ArenaProbe: heading to %s at %.1fm (available=%s)"
 					% [target.name, _flat(from).distance_to(_flat(_waypoint)), target.available])
 		return
-	# Prefer the arena's own walkable mask so waypoints never sit inside the
-	# blocked cells the irregular-arena mask carves out (iteration 44).
+	# Prefiere la máscara caminable de la propia arena, para que ningún punto
+	# caiga dentro de las celdas bloqueadas que recorta la máscara irregular.
 	for node: Node in get_tree().get_nodes_in_group("arena_bounds"):
 		if node.has_method("random_walkable_point"):
 			var point: Variant = node.call("random_walkable_point")
@@ -1897,11 +1897,10 @@ func _pick_waypoint(from: Vector3) -> void:
 	_waypoint = Vector3(_rng.randf_range(-half, half), from.y, _rng.randf_range(-half, half))
 
 
-## BONK_SWAP_MENU: fires a stage swap on the frame a closable blocking
-## menu owns the pause, then reports whether the tree came back. Those
-## layers hang off the ARENA, so the swap frees them without their
-## _close() ever running — and _close() is the only place either one
-## hands the pause back.
+## BONK_SWAP_MENU: dispara un cambio de etapa el frame en que un menú
+## bloqueante cerrable tiene la pausa, y luego informa si el árbol volvió.
+## Esas capas cuelgan de la ARENA, así que el cambio las libera sin que corra
+## su _close(), y _close() es el único lugar donde devuelven la pausa.
 func _tick_swap_menu(delta: float) -> void:
 	if not _swap_menu:
 		return
@@ -1927,10 +1926,10 @@ func _tick_swap_menu(delta: float) -> void:
 	get_tree().call_group("run_root", "advance_stage")
 
 
-## Counts the SAIYAN-tagged boons on the leader. Reads the private list
-## rather than adding an accessor to shipped code: the harness already
-## duck-types into private state elsewhere (_climbing, _state), and the
-## number only exists to prove a tag contract nothing else can observe.
+## Cuenta los bonos con etiqueta SAIYAN en el líder. Lee la lista privada en
+## vez de agregar un accesor al código del juego: el arnés ya lee estado
+## privado por duck-typing en otros lados (_climbing, _state), y el número
+## solo existe para probar un contrato de etiqueta que nada más puede observar.
 func _watch_saiyan_boons() -> void:
 	if not _saiyan_watch:
 		return
@@ -1950,11 +1949,11 @@ func _watch_saiyan_boons() -> void:
 	_saiyan_max = maxi(_saiyan_max, tagged)
 
 
-## --- co-op party (iteration 57) ---------------------------------------------
+## --- grupo co-op ------------------------------------------------------------
 
-## Everything the extra slots need, once per physics frame: the forced
-## down, the followers' own walking, and the down/revive bookkeeping the
-## soak reports at the end.
+## Todo lo que necesitan los slots extra, una vez por frame de física: la
+## caída forzada, la caminata de los seguidores y la cuenta de caídas y
+## revividas que el soak informa al final.
 func _tick_party(delta: float) -> void:
 	_watch_party_downs()
 	if _players <= 1:
@@ -1963,10 +1962,10 @@ func _tick_party(delta: float) -> void:
 	_tick_followers(delta)
 
 
-## BONK_DOWN_NOW: a lethal hit on slot 1, on a cadence. Left to chance, a
-## down needs the horde to single out the follower, which a soak cannot
-## be asked to wait for — and without a down there is no revive to prove.
-## Slot 1 is mortal precisely because _apply_godmode only covers slot 0.
+## BONK_DOWN_NOW: un golpe letal al slot 1, a un ritmo fijo. Al azar, una
+## caída necesita que la horda elija al seguidor, algo que un soak no puede
+## esperar, y sin caída no hay revivir que probar. El slot 1 es mortal justo
+## porque _apply_godmode solo cubre el slot 0.
 func _tick_forced_down() -> void:
 	if _down_now_at < 0.0 or RunState.run_time < _down_next:
 		return
@@ -1977,18 +1976,18 @@ func _tick_forced_down() -> void:
 	var health := Health.find_in(body)
 	if health == null or health.is_dead:
 		return
-	# Invulnerability off for the blow itself, the same way the zenkai
-	# test does it: a refused hit never reaches _on_health_died.
+	# Invulnerabilidad apagada para el golpe, igual que en la prueba zenkai: un
+	# golpe rechazado nunca llega a Player._on_health_died.
 	health.invulnerable = false
 	health.take_damage(health.max_hp * 2.0)
 	print("ArenaProbe: forced down p1 at %.1fs" % RunState.run_time)
 
 
-## Slots 1+ FOLLOW and never interact. Two raiders both touring would
-## double the interaction counts every existing gate in verificar.sh was
-## calibrated against, and the point of the co-op soak is the co-op RULES
-## (party spawn, split screen, shared XP, downs, revives), not a second
-## tour.
+## Los slots 1+ SIGUEN y nunca interactúan. Dos raiders recorriendo
+## duplicarían las cuentas de interacción con que se calibró cada gate de
+## verificar.sh, y el soak co-op existe para las REGLAS co-op (aparición del
+## grupo, pantalla dividida, XP compartida, caídas, revividas), no para un
+## segundo recorrido.
 func _tick_followers(delta: float) -> void:
 	var lead := _lead_raider()
 	for slot: int in range(1, _players):
@@ -2002,9 +2001,9 @@ func _tick_followers(delta: float) -> void:
 			_follow_left[slot] = 0.0
 			_hold_move_toward(body, lead.global_position, slot)
 			continue
-		# Close enough: short random legs, so the follower is not a statue
-		# parked on the leader's head. Its own movement code, the horde's
-		# interest in it and the split-screen view all keep running.
+		# Lo bastante cerca: tramos cortos al azar, para que el seguidor no sea una
+		# estatua sobre la cabeza del líder. Su código de movimiento, el interés de
+		# la horda en él y la vista de pantalla dividida siguen corriendo.
 		var left := float(_follow_left.get(slot, 0.0)) - delta
 		if left <= 0.0:
 			left = FOLLOW_LEG_TIME
@@ -2016,9 +2015,9 @@ func _tick_followers(delta: float) -> void:
 				_follow_to.get(slot, body.global_position) as Vector3, slot)
 
 
-## Counts the transitions in and out of "downed_players". A revive is
-## only counted when the body came BACK to the party: a corpse that left
-## the group because the run ended is not a rescue.
+## Cuenta las entradas y salidas de "downed_players". Una revivida solo
+## cuenta cuando el cuerpo VOLVIÓ al grupo: un cuerpo que salió del grupo
+## porque terminó la partida no es un rescate.
 func _watch_party_downs() -> void:
 	var live: Dictionary[int, bool] = {}
 	for node: Node in get_tree().get_nodes_in_group(&"downed_players"):
@@ -2036,8 +2035,8 @@ func _watch_party_downs() -> void:
 			_party_revives += 1
 
 
-## The downed body the leader should go stand up, or null. Deliberately
-## short-ranged: a rescue that crossed the map would replace the tour.
+## El cuerpo caído que el líder debe ir a levantar, o null. De corto alcance a
+## propósito: un rescate que cruzara el mapa reemplazaría al recorrido.
 func _nearest_downed(from: Vector3) -> Node3D:
 	var best: Node3D = null
 	var best_distance := REVIVE_NOTICE_RANGE * REVIVE_NOTICE_RANGE
@@ -2056,11 +2055,11 @@ func _nearest_downed(from: Vector3) -> Node3D:
 	return best
 
 
-## THE rule that outranks everything, _exit_rush included: a party does
-## not walk out on its own corpse. Returns true while it owns the walk.
-## The hold is what matters — Player._tick_downed wants revive_time
-## seconds of CONTINUOUS interact from the RESCUER's own action set, which
-## a press-and-release-next-frame can never produce.
+## LA regla que supera a todo, _exit_rush incluido: un grupo no abandona a
+## su caído. Devuelve true mientras controla la caminata.
+## Lo que importa es mantener: PlayerRevive.tick pide revive_time segundos de
+## interactuar SIN PAUSA desde el set de acciones del RESCATADOR, algo que
+## apretar y soltar al frame siguiente nunca logra.
 func _drive_rescue(lead: CharacterBody3D, delta: float) -> bool:
 	var body := _nearest_downed(lead.global_position)
 	if body == null:
@@ -2072,7 +2071,7 @@ func _drive_rescue(lead: CharacterBody3D, delta: float) -> bool:
 	if body != _rescue_target:
 		_rescue_target = body
 		_rescue_time = 0.0
-		# Drop whatever the tour was doing, the way the exit rush does.
+		# Deja lo que estuviera haciendo el recorrido, como la carrera a la salida.
 		_target = null
 		_linger_left = 0.0
 		_leg_time_left = LEG_TIMEOUT
@@ -2084,13 +2083,11 @@ func _drive_rescue(lead: CharacterBody3D, delta: float) -> bool:
 		_rescue_given_up[body.get_instance_id()] = RunState.run_time
 		_rescue_target = null
 		_hold_action(0, &"interact", false)
-		# A PRINT and not a warning: giving up on a body that cannot be
-		# reached right now is a decision this tour is allowed to make —
-		# the horde shoves the leader off, the corpse is behind a rock —
-		# and the raider is picked up on a later pass (measured: a body
-		# abandoned at 165 s was standing again by 250 s). The gate that
-		# matters is verificar.sh's "at least one Player revived:", which
-		# a rescue that never works still fails.
+		# Un PRINT y no un aviso: abandonar un cuerpo que ahora no se alcanza es una
+		# decisión que este recorrido puede tomar (la horda empuja al líder, el
+		# cuerpo está detrás de una roca), y el raider se levanta en una pasada
+		# posterior. El gate que importa es "at least one Player revived:" de
+		# verificar.sh, que un rescate que nunca funciona sigue haciendo fallar.
 		print("ArenaProbe: gave up rescuing %s after %.0fs"
 				% [body.name, _rescue_time])
 		_pick_waypoint(lead.global_position)
@@ -2106,11 +2103,10 @@ func _drive_rescue(lead: CharacterBody3D, delta: float) -> bool:
 	return true
 
 
-## Legs the tour may spend inside one bubble before it is made to roam,
-## and how big that bubble is. Eight legs is more than a chest cluster
-## takes and far less than the 70 legs the pinned 1200 s soak spent in
-## one; 25 m is a little over the pickup detour, so a streak of pickups
-## counts as one bubble.
+## Tramos que el recorrido puede pasar dentro de una burbuja antes de que se
+## le obligue a pasear, y el tamaño (metros) de esa burbuja. Ocho tramos es
+## más de lo que toma un grupo de cofres; 25 m es un poco más que el desvío
+## por pickups, así que una racha de pickups cuenta como una burbuja.
 const BUBBLE_LEGS: int = 8
 const BUBBLE_RADIUS: float = 25.0
 var _bubble_origin: Vector3 = Vector3.ZERO
@@ -2118,9 +2114,9 @@ var _bubble_legs: int = 0
 var _bubble_started: bool = false
 
 
-## True when this leg must be a ROAM because the last BUBBLE_LEGS all
-## stayed inside BUBBLE_RADIUS of where the streak began. Resets the
-## streak as it fires, so the tour goes back to normal afterwards.
+## True cuando este tramo debe ser un PASEO porque los últimos BUBBLE_LEGS
+## quedaron dentro de BUBBLE_RADIUS desde donde empezó la racha. Reinicia la
+## racha al dispararse, así el recorrido vuelve a la normalidad después.
 func _bubble_expired(from: Vector3) -> bool:
 	if not _bubble_started or _flat(from).distance_to(_flat(_bubble_origin)) > BUBBLE_RADIUS:
 		_bubble_started = true
@@ -2137,7 +2133,7 @@ func _bubble_expired(from: Vector3) -> bool:
 	return true
 
 
-## Nearest live power-up pickup within PICKUP_DETOUR of `from`, or null.
+## El pickup de power-up vivo más cercano dentro de PICKUP_DETOUR de `from`, o null.
 func _nearest_pickup(from: Vector3) -> Node3D:
 	var best: Node3D = null
 	var best_distance := PICKUP_DETOUR * PICKUP_DETOUR
@@ -2153,14 +2149,15 @@ func _nearest_pickup(from: Vector3) -> Node3D:
 	return best
 
 
-## Nearest available interactable not tried within REVISIT_COOLDOWN. Without
-## that cooldown the tour ping-pongs between the two closest points forever
-## (a spent-but-still-`available` altar stays the nearest thing on the map).
+## El interactuable disponible más cercano no probado dentro de
+## REVISIT_COOLDOWN. Sin esa espera el recorrido rebota para siempre entre
+## los dos puntos más cercanos (un altar gastado pero aún `available` sigue
+## siendo lo más cercano del mapa).
 func _nearest_interactable(from: Vector3) -> Interactable:
-	# Once the stage is cleared (and the dwell is over) the exit portal
-	# outranks everything: a tour that keeps shopping for chests never
-	# crosses a stage, and crossing is what this harness has to prove.
-	# Distance and the revisit cooldown are deliberately ignored.
+	# Con la etapa completada (y la espera terminada) el portal de salida supera
+	# a todo: un recorrido que sigue comprando cofres nunca cruza una etapa, y
+	# cruzar es lo que este arnés tiene que probar. La distancia y la espera de
+	# revisita se ignoran a propósito.
 	if RunState.stage_cleared and _dwell_left <= 0.0:
 		for node: Node in _all_interactables(get_tree().current_scene):
 			var way_out := node as ExitPortal
