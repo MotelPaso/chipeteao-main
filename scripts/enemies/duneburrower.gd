@@ -9,14 +9,11 @@ extends EnemyBase
 
 enum State { SURFACED, BURROWED, ERUPTING }
 
-const TELEGRAPH_COLOR := Color(0.95, 0.7, 0.25)
 ## Grupo al que se une MIENTRAS está enterrado: enterrarse lo saca de
 ## "enemies", y lo que tiene que alcanzar a todo cuerpo vivo (primero que
 ## nada el tiempo detenido del spawner) se saltaría justo al único enemigo
 ## que todavía puede herirte desde la arena. Lo lee EnemySpawner.
 const BURROWED_GROUP: StringName = &"burrowed"
-const IMPACT_COLOR := Color(1.0, 0.85, 0.45)
-const SAND_BURST_COLOR := Color(0.8, 0.66, 0.4)
 
 @export_group("Cycle")
 ## Segundos de persecución vulnerable tras cada erupción antes de enterrarse.
@@ -35,6 +32,24 @@ const SAND_BURST_COLOR := Color(0.8, 0.66, 0.4)
 ## Erupción desde el suelo: un raider más alto que esto sobre el punto de
 ## ataque (una cornisa de mesa) no recibe el golpe.
 @export var erupt_height_window: float = 1.5
+
+@export_group("Telegrafía")
+## Color del disco de aviso de la erupción.
+@export var telegraph_color: Color = Color(0.95, 0.7, 0.25)
+## Color del destello de impacto de la erupción.
+@export var impact_color: Color = Color(1.0, 0.85, 0.45)
+## Segundos que dura el destello de impacto.
+@export var impact_flash_time: float = 0.2
+## Fuerza del temblor de cámara de la erupción (0-1).
+@export var impact_shake_strength: float = 0.1
+## Segundos del temblor de cámara de la erupción.
+@export var impact_shake_duration: float = 0.3
+## Tope de trauma del temblor (0-1): muchas erupciones juntas no sacuden más que esto.
+@export var impact_shake_cap: float = 0.4
+## Color de las esquirlas de arena de la erupción.
+@export var sand_burst_color: Color = Color(0.8, 0.66, 0.4)
+## Cantidad de esquirlas de arena de la erupción.
+@export var sand_burst_count: int = 7
 
 var _state: State = State.SURFACED
 var _state_timer: float = 0.0
@@ -128,7 +143,7 @@ func _begin_eruption() -> void:
 	# El disco marca dónde va a salir el gusano (bajo el raider al disparar);
 	# salir de él durante la carga evita todo el daño.
 	_strike_point = global_position
-	Telegraph.spawn_disc(self, _strike_point, erupt_radius, erupt_windup, TELEGRAPH_COLOR)
+	Telegraph.spawn_disc(self, _strike_point, erupt_radius, erupt_windup, telegraph_color)
 
 
 func _erupt() -> void:
@@ -154,10 +169,10 @@ func _erupt() -> void:
 	_mound.visible = false
 	_visual.visible = true
 	_play_erupt_pop()
-	Telegraph.spawn_disc(self, _strike_point, erupt_radius, 0.2, IMPACT_COLOR)
+	Telegraph.spawn_disc(self, _strike_point, erupt_radius, impact_flash_time, impact_color)
 	Sfx.play(&"burrow_pop")
-	Juice.shake(0.1, 0.3, 0.4)
-	Juice.burst(_strike_point + Vector3.UP * 0.5, SAND_BURST_COLOR, 7)
+	Juice.shake(impact_shake_strength, impact_shake_duration, impact_shake_cap)
+	Juice.burst(_strike_point + Vector3.UP * 0.5, sand_burst_color, sand_burst_count)
 	# El disco es una promesa de área: todo el que esté encima recibe el golpe.
 	damage_players_in_disc(_strike_point, erupt_radius, erupt_height_window,
 			erupt_damage, self)

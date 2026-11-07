@@ -7,17 +7,10 @@ extends BossBase
 ## revientan en púas de corteza) y una Invocación de esbirros cada vez que
 ## su vida cruza un umbral exportado. Título, grados, pago y recorte de
 ## arena viven en BossBase; el spawner sube la revancha Elder con apply_tier().
+## Colores de aviso e impacto: grupo Telegrafía de Rotking.tscn; púas de
+## corteza: BarkSpikes.tscn.
 
 enum State { ENTRANCE, PURSUE, SMASH, ROOT_BURST, SUMMON }
-
-const TELEGRAPH_COLOR := Color(1.0, 0.55, 0.12)
-const IMPACT_COLOR := Color(1.0, 0.8, 0.35)
-## Piel de corteza para el grupo de púas compartido.
-const SPIKE_COLOR := Color(0.36, 0.26, 0.16)
-const SPIKE_ROUGHNESS: float = 0.95
-const SPIKE_BOTTOM_RADIUS: float = 0.16
-const SPIKE_LENGTH: float = 1.1
-const SPIKE_SINK_DEPTH: float = 1.2
 
 @export var entrance_duration: float = 0.9
 
@@ -56,7 +49,6 @@ const SPIKE_SINK_DEPTH: float = 1.2
 
 var _state: State = State.ENTRANCE
 var _state_timer: float = 0.0
-var _entrance_played: bool = false
 var _smash_cooldown_timer: float = 0.0
 var _smash_resolved: bool = false
 var _root_burst_timer: float = 0.0
@@ -83,11 +75,7 @@ func _behavior_tick(delta: float) -> void:
 	if _state == State.PURSUE:
 		_root_burst_timer = maxf(_root_burst_timer - delta, 0.0)
 		return
-	if _state == State.ENTRANCE and not _entrance_played:
-		# Fuera de _ready para que el spawner ya haya puesto la posición real
-		# antes de que aparezca el anillo de llegada.
-		_entrance_played = true
-		_play_entrance()
+	_tick_entrance(_state == State.ENTRANCE)
 	_state_timer -= delta
 	if _state_timer > 0.0:
 		return
@@ -133,14 +121,14 @@ func _combat_tick(player: Node3D, distance: float) -> void:
 ## Llegada con golpe al suelo: la silueta sale de un anillo de destello.
 func _play_entrance() -> void:
 	Sfx.play(&"boss_roar")
-	_play_boss_entrance(smash_radius * 0.75, IMPACT_COLOR)
+	_play_boss_entrance(smash_radius * 0.75, impact_color)
 
 
 func _start_smash() -> void:
 	_state = State.SMASH
 	_state_timer = smash_windup
 	_smash_resolved = false
-	Telegraph.spawn_disc(self, global_position, smash_radius, smash_windup, TELEGRAPH_COLOR)
+	Telegraph.spawn_disc(self, global_position, smash_radius, smash_windup, telegraph_color)
 	_play_cue_lean(-0.38, smash_windup)
 
 
@@ -148,13 +136,10 @@ func _resolve_smash() -> void:
 	_smash_resolved = true
 	_state_timer = smash_recover
 	_smash_cooldown_timer = smash_cooldown
-	Telegraph.spawn_disc(self, global_position, smash_radius, 0.2, IMPACT_COLOR)
-	Juice.shake(0.2, 0.4)
 	_play_cue_lean(0.0, 0.25)
-	# La onda se dibuja para todo el equipo, así que golpea a todo el equipo;
-	# nombrarse como atacante deja que las espinas respondan.
-	damage_players_in_disc(global_position, smash_radius, smash_height_window,
-			smash_damage, self)
+	# La onda se dibuja para todo el equipo, así que golpea a todo el equipo.
+	_resolve_ground_hit([global_position], smash_radius, smash_height_window,
+			smash_damage)
 
 
 func _start_root_burst(player: Node3D) -> void:
@@ -170,18 +155,18 @@ func _start_root_burst(player: Node3D) -> void:
 		_root_spots.append(_clamp_to_arena(base
 				+ Vector3(cos(spot_angle), 0.0, sin(spot_angle)) * root_burst_spread))
 	for spot: Vector3 in _root_spots:
-		Telegraph.spawn_disc(self, spot, root_burst_radius, root_burst_windup, TELEGRAPH_COLOR)
+		Telegraph.spawn_disc(self, spot, root_burst_radius, root_burst_windup, telegraph_color)
 
 
 func _resolve_root_burst() -> void:
 	_state = State.PURSUE
-	Juice.shake(0.2, 0.4)
 	for spot: Vector3 in _root_spots:
-		_spawn_spikes(spot)
+		_spawn_spike_cluster(spot, root_burst_radius * 0.5)
 	# Contra los PUNTOS marcados, no contra el más cercano ahora: los discos
-	# eran la promesa, y un golpe máximo por raider aunque se solapen.
-	damage_players_in_discs(_root_spots, root_burst_radius, spike_height_window,
-			root_burst_damage, self)
+	# eran la promesa, y un golpe máximo por raider aunque se solapen. Sin
+	# destello: las púas son el impacto.
+	_resolve_ground_hit(_root_spots, root_burst_radius, spike_height_window,
+			root_burst_damage, false)
 
 
 func _start_summon() -> void:
@@ -226,19 +211,9 @@ func _resolve_summon() -> void:
 
 func _on_damaged(_amount: float, current: float) -> void:
 	var ratio := current / _health.max_hp
-	# Un golpe grande puede cruzar varios umbrales a la vez; cada uno da su
-	# propia oleada, encadenadas de a un estado SUMMON.
-	while not _thresholds_remaining.is_empty() and ratio <= _thresholds_remaining[0]:
-		_thresholds_remaining.remove_at(0)
-		_pending_summons += 1
+	# Cada umbral cruzado da su propia oleada, encadenadas de a un estado SUMMON.
+	_pending_summons += _consume_thresholds(_thresholds_remaining, ratio)
 
 
 func _play_cue_lean(target_x: float, duration: float) -> void:
 	_play_cue(_visual, "rotation:x", target_x, duration)
-
-
-## Erupción rápida: un grupo de conos de corteza sale del suelo y se hunde
-## (BossBase anima; estas constantes son la piel de corteza).
-func _spawn_spikes(center: Vector3) -> void:
-	_spawn_spike_cluster(center, root_burst_radius * 0.5, SPIKE_COLOR,
-			SPIKE_ROUGHNESS, SPIKE_BOTTOM_RADIUS, SPIKE_LENGTH, SPIKE_SINK_DEPTH)

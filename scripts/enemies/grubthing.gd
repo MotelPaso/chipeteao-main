@@ -6,21 +6,19 @@ extends SecretBossBase
 ## embestida (disco de aterrizaje marcado al que se lanza; sal de él) y
 ## Escupitajo (tres bolas lentas en arco, cada una con su disco de
 ## salpicadura marcado). El pago, la barra de vida y el desbloqueo del
-## personaje al morir viven en SecretBossBase.
+## personaje al morir viven en SecretBossBase. Colores de aviso e impacto:
+## grupo Telegrafía de Grubthing.tscn; la bola del escupitajo: GrubGlob.tscn.
 
 enum State { ENTRANCE, PURSUE, HOP_WINDUP, HOP_LEAP, HOP_RECOVER, SPIT }
 
-const TELEGRAPH_COLOR := Color(0.72, 0.85, 0.3)
-const IMPACT_COLOR := Color(0.9, 0.95, 0.55)
-const GLOB_COLOR := Color(0.62, 0.78, 0.3)
-const ENTRANCE_RING_RADIUS: float = 2.4
-## Altura máxima del arco cosmético del escupitajo, y el tamaño de la bola.
-const GLOB_ARC_HEIGHT: float = 2.2
-const GLOB_VISUAL_RADIUS: float = 0.24
 ## Distancia plana al punto de aterrizaje que termina un salto antes de tiempo.
 const HOP_ARRIVAL_EPSILON: float = 0.35
 
+@export_group("Llegada")
+## Segundos del estado de llegada antes de empezar a pelear.
 @export var entrance_duration: float = 0.8
+## Radio en metros del anillo de destello de la llegada.
+@export var entrance_ring_radius: float = 2.4
 
 @export_group("Lunging Hop")
 ## Distancia al raider que dispara un salto (sin mínimo: también salta en el sitio).
@@ -42,16 +40,23 @@ const HOP_ARRIVAL_EPSILON: float = 0.35
 @export var spit_max_range: float = 16.0
 @export var spit_interval: float = 5.5
 @export var spit_windup: float = 1.0
+## Fracción de spit_interval que espera el primer escupitajo al aparecer (0-1).
+@export var first_spit_fraction: float = 0.5
 @export var glob_count: int = 3
 @export var glob_radius: float = 1.5
 @export var glob_damage: float = 10.0
 ## La primera bola va al punto del raider; las demás se esparcen en este rango.
 @export var glob_scatter: float = 2.4
 @export var glob_height_window: float = 1.5
+## Segundos del destello de cada salpicadura.
+@export var glob_flash_time: float = 0.18
+## Bola cosmética que vuela de la boca al disco (GrubGlob.tscn).
+@export var glob_visual_scene: PackedScene
+## Altura máxima en metros del arco de la bola.
+@export var glob_arc_height: float = 2.2
 
 var _state: State = State.ENTRANCE
 var _state_timer: float = 0.0
-var _entrance_played: bool = false
 var _hop_cooldown_timer: float = 0.0
 var _hop_target: Vector3 = Vector3.ZERO
 var _base_move_speed: float = 0.0
@@ -62,7 +67,7 @@ var _glob_spots: Array[Vector3] = []
 func _ready() -> void:
 	super()
 	_state_timer = entrance_duration
-	_spit_timer = spit_interval * 0.5
+	_spit_timer = spit_interval * first_spit_fraction
 	_base_move_speed = move_speed
 
 
@@ -76,11 +81,7 @@ func _behavior_tick(delta: float) -> void:
 	if _state == State.PURSUE:
 		_spit_timer = maxf(_spit_timer - delta, 0.0)
 		return
-	if _state == State.ENTRANCE and not _entrance_played:
-		# Fuera de _ready para que el disparador ya haya puesto la posición
-		# real antes de que aparezca el anillo de llegada.
-		_entrance_played = true
-		_play_entrance()
+	_tick_entrance(_state == State.ENTRANCE)
 	if _state == State.HOP_LEAP:
 		# Llegar antes igual se resuelve sobre el disco marcado.
 		var to_target := _hop_target - global_position
@@ -136,7 +137,7 @@ func _combat_tick(player: Node3D, distance: float) -> void:
 func _play_entrance() -> void:
 	Sfx.play(&"burrow_pop")
 	Sfx.play(&"boss_roar", -3.0)
-	_play_boss_entrance(ENTRANCE_RING_RADIUS, IMPACT_COLOR)
+	_play_boss_entrance(entrance_ring_radius, impact_color)
 
 
 # --- Salto embestida -----------------------------------------------------------
@@ -147,7 +148,7 @@ func _start_hop(player: Node3D) -> void:
 	_hop_target = _clamp_to_arena(player.global_position)
 	# Un solo disco cubre la carga y el vuelo, así la promesa dura hasta caer.
 	Telegraph.spawn_disc(self, _hop_target, hop_radius,
-			hop_windup + hop_leap_time, TELEGRAPH_COLOR)
+			hop_windup + hop_leap_time, telegraph_color)
 	_play_cue_squash(Vector3(1.18, 0.62, 1.18), hop_windup)
 
 
@@ -172,15 +173,12 @@ func _resolve_hop() -> void:
 	_state_timer = hop_recover
 	_hop_cooldown_timer = hop_cooldown
 	move_speed = _base_move_speed
-	Telegraph.spawn_disc(self, _hop_target, hop_radius, 0.2, IMPACT_COLOR)
-	Juice.shake(0.15, 0.35)
 	Sfx.play(&"burrow_pop", -2.0)
 	# La señal de aplastarse de abajo mata el tween del arco; un salto que
 	# llegó ANTES de tiempo dejaría el rig en el aire, así que se baja a mano.
 	_visual.position.y = 0.0
 	_play_cue_squash(Vector3.ONE, 0.25)
-	damage_players_in_disc(_hop_target, hop_radius, hop_height_window,
-			hop_damage, self)
+	_resolve_ground_hit([_hop_target], hop_radius, hop_height_window, hop_damage)
 
 
 # --- Escupitajo ----------------------------------------------------------------
@@ -200,7 +198,7 @@ func _start_spit(player: Node3D) -> void:
 		_glob_spots.append(_clamp_to_arena(spot))
 	var mouth := global_position + Vector3.UP * 1.1
 	for spot: Vector3 in _glob_spots:
-		Telegraph.spawn_disc(self, spot, glob_radius, spit_windup, TELEGRAPH_COLOR)
+		Telegraph.spawn_disc(self, spot, glob_radius, spit_windup, telegraph_color)
 		_launch_glob_visual(mouth, spot + Vector3.UP * 0.1, spit_windup)
 	_play_cue_squash(Vector3(0.92, 1.16, 0.92), 0.25)
 
@@ -209,7 +207,7 @@ func _resolve_spit() -> void:
 	_state = State.PURSUE
 	_play_cue_squash(Vector3.ONE, 0.25)
 	for spot: Vector3 in _glob_spots:
-		Telegraph.spawn_disc(self, spot, glob_radius, 0.18, IMPACT_COLOR)
+		Telegraph.spawn_disc(self, spot, glob_radius, glob_flash_time, impact_color)
 	# Un golpe máximo POR RAIDER donde las salpicaduras se solapan.
 	damage_players_in_discs(_glob_spots, glob_radius, glob_height_window,
 			glob_damage, self)
@@ -219,31 +217,16 @@ func _resolve_spit() -> void:
 ## la carga y se libera sola. El daño sigue en la resolución del disco.
 func _launch_glob_visual(from: Vector3, to: Vector3, duration: float) -> void:
 	var scene_root := RunRoot.stage_parent(get_tree())
-	if scene_root == null:
+	if scene_root == null or glob_visual_scene == null:
 		return
-	var glob := MeshInstance3D.new()
-	var mesh := SphereMesh.new()
-	mesh.radius = GLOB_VISUAL_RADIUS
-	mesh.height = GLOB_VISUAL_RADIUS * 2.0
-	# Teselado explícito: la SphereMesh por defecto (64 x 32) son 4.224
-	# triángulos para una bola de 0.24 m. 12 x 6 deja la silueta a 1 cm de
-	# redonda, la regla de todos los rigs de enemigo.
-	mesh.radial_segments = 12
-	mesh.rings = 6
-	var material := StandardMaterial3D.new()
-	material.albedo_color = GLOB_COLOR
-	material.emission_enabled = true
-	material.emission = GLOB_COLOR
-	material.emission_energy_multiplier = 0.8
-	mesh.material = material
-	glob.mesh = mesh
+	var glob := glob_visual_scene.instantiate() as Node3D
 	scene_root.add_child(glob)
 	glob.global_position = from
 	# Arco cuadrático: interpolación lineal más una elevación parabólica
 	# 4t(1-t) (máxima a mitad de vuelo, cero en ambos extremos).
 	var slide := func(t: float) -> void:
 		var pos := from.lerp(to, t)
-		pos.y += GLOB_ARC_HEIGHT * 4.0 * t * (1.0 - t)
+		pos.y += glob_arc_height * 4.0 * t * (1.0 - t)
 		glob.global_position = pos
 	var tween := glob.create_tween()
 	tween.tween_method(slide, 0.0, 1.0, duration)

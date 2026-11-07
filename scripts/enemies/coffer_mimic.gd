@@ -6,19 +6,21 @@ extends SecretBossBase
 ## Muerde cuerpo a cuerpo (breve carga marcada sobre el punto del mordisco)
 ## y cada tanto se Entierra (solo asoma la tapa, con armadura extra) antes
 ## de salir con una onda de choque marcada. El pago, la barra de vida y el
-## desbloqueo del personaje al morir viven en SecretBossBase.
+## desbloqueo del personaje al morir viven en SecretBossBase. Colores de
+## aviso e impacto: grupo Telegrafía de CofferMimic.tscn.
 
 enum State { ENTRANCE, PURSUE, SNAP_WINDUP, SNAP_RECOVER, BURIED }
 
-const TELEGRAPH_COLOR := Color(0.98, 0.75, 0.25)
-const IMPACT_COLOR := Color(1.0, 0.88, 0.5)
-const ENTRANCE_RING_RADIUS: float = 2.4
 ## Ángulo de la tapa enterrado: cerrada del todo, solo se ve arena.
 const LID_CLOSED_ANGLE: float = 0.0
 ## Cuánto se abren las fauces durante la carga del mordisco.
 const LID_GAPE_ANGLE: float = 1.15
 
+@export_group("Llegada")
+## Segundos del estado de llegada antes de empezar a pelear.
 @export var entrance_duration: float = 0.8
+## Radio en metros del anillo de destello de la llegada.
+@export var entrance_ring_radius: float = 2.4
 
 @export_group("Scuttle")
 ## La move_speed del chasis es la de la ráfaga; en las pausas se queda quieto.
@@ -35,6 +37,8 @@ const LID_GAPE_ANGLE: float = 1.15
 @export var snap_recover: float = 0.55
 @export var snap_cooldown: float = 2.2
 @export var snap_height_window: float = 1.3
+## Segundos del destello del mordisco (más corto que el impacto común).
+@export var snap_flash_time: float = 0.15
 
 @export_group("Bury")
 @export var bury_interval: float = 8.0
@@ -54,7 +58,6 @@ const LID_GAPE_ANGLE: float = 1.15
 
 var _state: State = State.ENTRANCE
 var _state_timer: float = 0.0
-var _entrance_played: bool = false
 var _scuttle_timer: float = 0.0
 var _scuttle_resting: bool = false
 var _snap_cooldown_timer: float = 0.0
@@ -90,11 +93,7 @@ func _behavior_tick(delta: float) -> void:
 			_scuttle_resting = not _scuttle_resting
 			_scuttle_timer = scuttle_rest_time if _scuttle_resting else scuttle_burst_time
 		return
-	if _state == State.ENTRANCE and not _entrance_played:
-		# Fuera de _ready para que el disparador ya haya puesto la posición
-		# real antes de que aparezca el anillo de llegada.
-		_entrance_played = true
-		_play_entrance()
+	_tick_entrance(_state == State.ENTRANCE)
 	_state_timer -= delta
 	if _state_timer > 0.0:
 		return
@@ -135,7 +134,7 @@ func _combat_tick(player: Node3D, distance: float) -> void:
 func _play_entrance() -> void:
 	Sfx.play(&"burrow_pop")
 	Sfx.play(&"boss_roar_2", -3.0)
-	_play_boss_entrance(ENTRANCE_RING_RADIUS, IMPACT_COLOR)
+	_play_boss_entrance(entrance_ring_radius, impact_color)
 
 
 # --- Mordisco ------------------------------------------------------------------
@@ -144,7 +143,7 @@ func _start_snap(player: Node3D) -> void:
 	_state = State.SNAP_WINDUP
 	_state_timer = snap_windup
 	_snap_point = _clamp_to_arena(player.global_position)
-	Telegraph.spawn_disc(self, _snap_point, snap_radius, snap_windup, TELEGRAPH_COLOR)
+	Telegraph.spawn_disc(self, _snap_point, snap_radius, snap_windup, telegraph_color)
 	_play_lid(LID_GAPE_ANGLE, snap_windup)
 
 
@@ -152,7 +151,7 @@ func _resolve_snap() -> void:
 	_state = State.SNAP_RECOVER
 	_state_timer = snap_recover
 	_snap_cooldown_timer = snap_cooldown
-	Telegraph.spawn_disc(self, _snap_point, snap_radius, 0.15, IMPACT_COLOR)
+	Telegraph.spawn_disc(self, _snap_point, snap_radius, snap_flash_time, impact_color)
 	Sfx.play(&"hit_crit", -3.0)
 	_play_lid(_lid_rest_angle, 0.12)
 	# Contra el punto marcado del mordisco y todo el equipo: el raider que
@@ -173,7 +172,7 @@ func _start_bury() -> void:
 	Sfx.play(&"burrow_pop", -2.0)
 	# Todo el tiempo enterrado se lee como la cuenta de la onda.
 	Telegraph.spawn_disc(self, global_position, shockwave_radius,
-			bury_duration, TELEGRAPH_COLOR)
+			bury_duration, telegraph_color)
 	_play_lid(LID_CLOSED_ANGLE, 0.15)
 	_play_cue(_visual, "position:y", -bury_sink_depth, 0.25,
 			Tween.TRANS_QUAD, Tween.EASE_IN)
@@ -186,17 +185,15 @@ func _resolve_bury() -> void:
 	if _buried_armor_applied:
 		_buried_armor_applied = false
 		_health.armor -= bury_armor_bonus
-	Telegraph.spawn_disc(self, global_position, shockwave_radius, 0.2, IMPACT_COLOR)
 	Sfx.play(&"burrow_pop")
-	Juice.shake(0.15, 0.35)
 	_play_cue(_visual, "position:y", 0.0, 0.2, Tween.TRANS_BACK, Tween.EASE_OUT)
 	# Enterrarse cerró la tapa; al salir hay que abrirla a su ángulo de
 	# reposo o el cofre sigue peleando sellado el resto de la partida.
 	_play_lid(_lid_rest_angle, 0.2)
 	# El anillo de la onda se marca para todos, así que lo recibe todo el que
 	# esté dentro.
-	damage_players_in_disc(global_position, shockwave_radius,
-			shockwave_height_window, shockwave_damage, self)
+	_resolve_ground_hit([global_position], shockwave_radius,
+			shockwave_height_window, shockwave_damage)
 
 
 ## Un slot para la tapa, así un mordisco durante un entierro (o al revés)

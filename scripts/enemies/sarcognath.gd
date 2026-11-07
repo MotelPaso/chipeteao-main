@@ -9,23 +9,16 @@ extends BossBase
 ## umbral de vida, que inmoviliza a quien quede en su disco
 ## (Player.apply_root; las armas siguen disparando). Título, grados y pago
 ## viven en BossBase; la revancha Elder llega por apply_tier().
+## Colores de aviso (Sepultar) e impacto: grupo Telegrafía de Sarcognath.tscn;
+## líneas del barrido: nodos WarnLine y Beam; púas: SandSpikes.tscn.
 
 enum State { ENTRANCE, PURSUE, SWEEP, COFFINS, ENTOMB }
 
-const TELEGRAPH_COLOR := Color(0.25, 0.95, 0.8)
-const SAND_COLOR := Color(0.95, 0.72, 0.28)
-const SAND_IMPACT_COLOR := Color(1.0, 0.86, 0.5)
-## Piel de arenisca tallada para el grupo de púas compartido.
-const SPIKE_COLOR := Color(0.74, 0.6, 0.38)
-const SPIKE_ROUGHNESS: float = 0.9
-const SPIKE_BOTTOM_RADIUS: float = 0.2
-const SPIKE_LENGTH: float = 1.2
-const SPIKE_SINK_DEPTH: float = 1.3
-
+@export_group("Llegada")
+## Segundos del estado de llegada antes de empezar a pelear.
 @export var entrance_duration: float = 1.0
-## Anillo de llegada: fijo a mano (el Sarcognath no tiene un radio cuerpo a
-## cuerpo del cual sacarlo, a diferencia de los otros jefes).
-const ENTRANCE_RING_RADIUS: float = 3.0
+## Radio en metros del anillo de destello de la llegada.
+@export var entrance_ring_radius: float = 3.0
 
 @export_group("Sweep Beam")
 @export var sweep_windup: float = 1.0
@@ -55,6 +48,12 @@ const ENTRANCE_RING_RADIUS: float = 3.0
 @export var coffin_interval: float = 6.0
 ## Fracción de coffin_interval que espera la primera tanda al aparecer (0-1).
 @export var first_coffin_fraction: float = 0.6
+## Color de los discos de aviso de los ataúdes (Sepultar usa telegraph_color).
+@export var coffin_telegraph_color: Color = Color(0.95, 0.72, 0.28)
+## Fuerza del temblor de cámara cuando caen los ataúdes (0-1).
+@export var coffin_shake_strength: float = 0.2
+## Segundos del temblor de cámara cuando caen los ataúdes.
+@export var coffin_shake_duration: float = 0.4
 @export var coffin_windup: float = 1.0
 ## Huecos repartidos en anillo alrededor del raider; uno al azar queda vacío
 ## (el escape) y un disco extra cae a sus pies.
@@ -84,7 +83,6 @@ const ENTRANCE_RING_RADIUS: float = 3.0
 
 var _state: State = State.ENTRANCE
 var _state_timer: float = 0.0
-var _entrance_played: bool = false
 var _sweep_cooldown_timer: float = 0.0
 var _sweep_firing: bool = false
 var _sweep_angle: float = 0.0
@@ -123,11 +121,7 @@ func _behavior_tick(delta: float) -> void:
 	if _state == State.PURSUE:
 		_coffin_timer = maxf(_coffin_timer - delta, 0.0)
 		return
-	if _state == State.ENTRANCE and not _entrance_played:
-		# Fuera de _ready para que el spawner ya haya puesto la posición real
-		# antes de que aparezca el anillo de llegada.
-		_entrance_played = true
-		_play_entrance()
+	_tick_entrance(_state == State.ENTRANCE)
 	_state_timer -= delta
 	if _state == State.SWEEP:
 		_tick_sweep(delta)
@@ -181,7 +175,7 @@ func _scale_attack_damage(multiplier: float) -> void:
 ## Se alza de un anillo de destello con la segunda voz de rugido.
 func _play_entrance() -> void:
 	Sfx.play(&"boss_roar_2")
-	_play_boss_entrance(ENTRANCE_RING_RADIUS, SAND_IMPACT_COLOR)
+	_play_boss_entrance(entrance_ring_radius, impact_color)
 
 
 # --- Rayo de barrido -----------------------------------------------------------
@@ -286,14 +280,14 @@ func _start_coffins(player: Node3D) -> void:
 		_coffin_spots.append(_clamp_to_arena(base
 				+ Vector3(cos(slot_angle), 0.0, sin(slot_angle)) * coffin_ring_radius))
 	for spot: Vector3 in _coffin_spots:
-		Telegraph.spawn_disc(self, spot, coffin_radius, coffin_windup, SAND_COLOR)
+		Telegraph.spawn_disc(self, spot, coffin_radius, coffin_windup, coffin_telegraph_color)
 
 
 func _resolve_coffins() -> void:
 	_state = State.PURSUE
-	Juice.shake(0.2, 0.4)
+	Juice.shake(coffin_shake_strength, coffin_shake_duration)
 	for spot: Vector3 in _coffin_spots:
-		_spawn_sand_spikes(spot)
+		_spawn_spike_cluster(spot, coffin_radius * 0.5)
 	# Contra los PUNTOS marcados y todo el equipo: el raider alrededor del que
 	# se dibujó el anillo puede ya no ser el más cercano.
 	damage_players_in_discs(_coffin_spots, coffin_radius, coffin_height_window,
@@ -308,18 +302,16 @@ func _start_entomb(player: Node3D) -> void:
 	_pending_entombs -= 1
 	# Marcado a los pies del raider: si sigue moviéndose, falla del todo.
 	_entomb_spot = _clamp_to_arena(player.global_position)
-	Telegraph.spawn_disc(self, _entomb_spot, entomb_radius, entomb_windup, TELEGRAPH_COLOR)
+	Telegraph.spawn_disc(self, _entomb_spot, entomb_radius, entomb_windup, telegraph_color)
 
 
 func _resolve_entomb() -> void:
 	_state = State.PURSUE
-	Telegraph.spawn_disc(self, _entomb_spot, entomb_radius, 0.2, SAND_IMPACT_COLOR)
-	_spawn_sand_spikes(_entomb_spot)
-	Juice.shake(0.15, 0.35)
+	_spawn_spike_cluster(_entomb_spot, coffin_radius * 0.5)
 	# Todo el que quede en el disco marcado queda inmovilizado, no solo el más
 	# cercano: la marca es la promesa que todos pudieron ver.
-	for caught: Node3D in damage_players_in_disc(_entomb_spot, entomb_radius,
-			entomb_height_window, entomb_damage, self):
+	for caught: Node3D in _resolve_ground_hit([_entomb_spot], entomb_radius,
+			entomb_height_window, entomb_damage):
 		var body := caught as Player
 		if body != null:
 			body.apply_root(entomb_root_duration)
@@ -329,20 +321,10 @@ func _resolve_entomb() -> void:
 
 func _on_damaged(_amount: float, current: float) -> void:
 	var ratio := current / _health.max_hp
-	# Un golpe grande puede cruzar los dos umbrales a la vez; cada uno da su
-	# propio Sepultar, encadenados de a un estado ENTOMB.
-	while not _thresholds_remaining.is_empty() and ratio <= _thresholds_remaining[0]:
-		_thresholds_remaining.remove_at(0)
-		_pending_entombs += 1
+	# Cada umbral cruzado da su propio Sepultar, encadenados de a un estado ENTOMB.
+	_pending_entombs += _consume_thresholds(_thresholds_remaining, ratio)
 
 
 func _on_sarcognath_died() -> void:
 	_warn_line.clear()
 	_beam.clear()
-
-
-## Púas de arenisca que salen del suelo y se hunden: la silueta del Rotking
-## con piel de arenisca tallada (BossBase anima).
-func _spawn_sand_spikes(center: Vector3) -> void:
-	_spawn_spike_cluster(center, coffin_radius * 0.5, SPIKE_COLOR,
-			SPIKE_ROUGHNESS, SPIKE_BOTTOM_RADIUS, SPIKE_LENGTH, SPIKE_SINK_DEPTH)

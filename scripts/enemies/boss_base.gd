@@ -13,9 +13,34 @@ extends EnemyBase
 ## suelo caigan en el piso.
 @export var arena_clamp_margin: float = 4.0
 
+@export_group("Llegada compartida")
+## Segundos que dura el anillo de destello de la llegada.
+@export var entrance_ring_time: float = 0.45
+## Segundos que tarda la silueta en crecer hasta su tamaño.
+@export var entrance_pop_time: float = 0.55
+## Escala con la que aparece la silueta antes de crecer (0-1).
+@export var entrance_start_scale: float = 0.15
+
+@export_group("Telegrafía")
+## Color de los discos de aviso de los ataques de suelo; cada jefe fija el suyo en su escena.
+@export var telegraph_color: Color = Color(1.0, 0.55, 0.12)
+## Color del destello de impacto y del anillo de llegada; cada jefe fija el suyo en su escena.
+@export var impact_color: Color = Color(1.0, 0.8, 0.35)
+## Segundos que dura el destello de impacto en el suelo.
+@export var impact_flash_time: float = 0.2
+## Fuerza del temblor de cámara de _resolve_ground_hit (0-1).
+@export var impact_shake_strength: float = 0.2
+## Segundos del temblor de cámara de _resolve_ground_hit.
+@export var impact_shake_duration: float = 0.4
+
+@export_group("Púas de suelo")
+## Escena del grupo de púas que revienta el suelo (SpikeCluster); vacío = sin púas.
+@export var spike_cluster_scene: PackedScene
+
 @export_group("Reward")
 ## Pago al morir: un anillo de boss_gem_count gemas de boss_gem_value XP.
 @export var boss_gem_count: int = 8
+## XP de cada gema del anillo de pago.
 @export var boss_gem_value: int = 5
 ## Orbes de vida garantizados al morir (sujetos al tope global de HealthOrb).
 @export var health_orb_count: int = 2
@@ -33,10 +58,6 @@ extends EnemyBase
 ## demoníaca; un piso encima les quitaría la tirada.
 @export var chest_min_rarity: String = ""
 
-## Llegada compartida: anillo en el suelo y la silueta que crece hasta su tamaño.
-const ENTRANCE_RING_DURATION: float = 0.45
-const ENTRANCE_POP_DURATION: float = 0.55
-const ENTRANCE_START_SCALE: float = 0.15
 ## Anillo donde caen los cofres de la muerte, y la suerte extra que suma
 ## cada altar demoníaco usado en la partida a su tirada de rareza.
 const CHEST_RING_RADIUS: float = 3.5
@@ -60,6 +81,7 @@ var _bounds: Node3D = null
 ## Veces que apply_tier corrió en esta instancia. Solo diagnóstico: debe
 ## pasar una sola vez y se acumula si no.
 var _tier_stacks: int = 0
+var _entrance_played: bool = false
 
 
 func _ready() -> void:
@@ -158,14 +180,54 @@ func _kill_cue() -> void:
 		_cue_tween.kill()
 
 
+## Llama a _play_entrance() una sola vez, en el primer tick del estado de
+## llegada. Va fuera de _ready para que el spawner ya haya puesto la posición
+## real antes de que aparezca el anillo.
+func _tick_entrance(in_entrance: bool) -> void:
+	if in_entrance and not _entrance_played:
+		_entrance_played = true
+		_play_entrance()
+
+
+## Virtual: rugido y anillo de llegada del jefe concreto.
+func _play_entrance() -> void:
+	pass
+
+
 ## Llegada de jefe compartida: un anillo de destello en el suelo mientras la
 ## silueta aparece de la nada. Cada jefe elige el tamaño, el color y su rugido.
 func _play_boss_entrance(ring_radius: float, ring_color: Color) -> void:
 	Telegraph.spawn_disc(self, global_position, ring_radius,
-			ENTRANCE_RING_DURATION, ring_color)
-	_visual.scale = Vector3.ONE * ENTRANCE_START_SCALE
-	_play_cue(_visual, "scale", Vector3.ONE, ENTRANCE_POP_DURATION,
+			entrance_ring_time, ring_color)
+	_visual.scale = Vector3.ONE * entrance_start_scale
+	_play_cue(_visual, "scale", Vector3.ONE, entrance_pop_time,
 			Tween.TRANS_BACK, Tween.EASE_OUT)
+
+
+## Quita de `remaining` (fracciones de vida de mayor a menor) las que
+## `ratio` ya cruzó y devuelve cuántas fueron: un golpe grande puede cruzar
+## varias a la vez.
+func _consume_thresholds(remaining: Array[float], ratio: float) -> int:
+	var crossed := 0
+	while not remaining.is_empty() and ratio <= remaining[0]:
+		remaining.remove_at(0)
+		crossed += 1
+	return crossed
+
+
+# --- golpes de suelo -----------------------------------------------------------
+
+## Golpe de suelo estándar: destello de impact_color en cada punto (si
+## `flash`), temblor de cámara impact_shake_* y daño a todo raider dentro de
+## algún disco, con el jefe como atacante para que las espinas respondan.
+## Devuelve los raiders golpeados.
+func _resolve_ground_hit(spots: Array[Vector3], radius: float, height_window: float,
+		damage: float, flash: bool = true) -> Array[Node3D]:
+	if flash:
+		for spot: Vector3 in spots:
+			Telegraph.spawn_disc(self, spot, radius, impact_flash_time, impact_color)
+	Juice.shake(impact_shake_strength, impact_shake_duration)
+	return damage_players_in_discs(spots, radius, height_window, damage, self)
 
 
 # --- posiciones seguras en la arena -------------------------------------------
@@ -209,57 +271,16 @@ func _safe_arena_point(point: Vector3, tries: int = 6) -> Vector3:
 
 # --- púas de suelo compartidas ------------------------------------------------
 
-## Púas por grupo y los tiempos de su salida, iguales para todo jefe que
-## hace erupcionar el suelo.
-const SPIKE_COUNT: int = 5
-const SPIKE_RISE_TIME: float = 0.12
-const SPIKE_HOLD_TIME: float = 0.35
-const SPIKE_SINK_TIME: float = 0.25
-## Profundidad extra a la que se hunde el grupo, bajo donde empezó enterrado.
-const SPIKE_EXTRA_SINK: float = 0.1
-
-
-## Un grupo de conos que revienta el suelo y se vuelve a hundir: las raíces
-## del Rotking y las losas del Sarcognath, misma silueta con otra piel. Se
-## libera con su propio tween, así sobrevive si el jefe muere a mitad.
-func _spawn_spike_cluster(center: Vector3, spread_radius: float, color: Color,
-		roughness: float, bottom_radius: float, spike_length: float,
-		sink_depth: float) -> void:
+## Instancia spike_cluster_scene en la raíz de la escena y la hace reventar en
+## `center`, con las púas repartidas a `spread_radius`. El grupo se libera
+## solo, así sobrevive si el jefe muere a mitad.
+func _spawn_spike_cluster(center: Vector3, spread_radius: float) -> void:
 	var scene_root := RunRoot.stage_parent(get_tree())
-	if scene_root == null:
+	if scene_root == null or spike_cluster_scene == null:
 		return
-	var cluster := Node3D.new()
+	var cluster := spike_cluster_scene.instantiate() as SpikeCluster
 	scene_root.add_child(cluster)
-	var spike_mesh := CylinderMesh.new()
-	spike_mesh.top_radius = 0.0
-	spike_mesh.bottom_radius = bottom_radius
-	spike_mesh.height = spike_length
-	# Teselado explícito: los valores por defecto (64 lados, 4 anillos) hacen
-	# cada cono de 0.2 m de 704 triángulos. 12 lados dejan la silueta a 7 mm
-	# de redonda, y los anillos solo subdividen el lado recto, así 0 se ve igual.
-	spike_mesh.radial_segments = 12
-	spike_mesh.rings = 0
-	var material := StandardMaterial3D.new()
-	material.albedo_color = color
-	material.roughness = roughness
-	spike_mesh.material = material
-	for i in SPIKE_COUNT:
-		var spike := MeshInstance3D.new()
-		spike.mesh = spike_mesh
-		var spike_angle := TAU * float(i) / float(SPIKE_COUNT)
-		spike.position = Vector3(cos(spike_angle), 0.0, sin(spike_angle)) * spread_radius
-		spike.rotation = Vector3(randf_range(-0.2, 0.2), 0.0, randf_range(-0.2, 0.2))
-		cluster.add_child(spike)
-	# Empieza enterrado en la losa del suelo, sale y se vuelve a hundir.
-	cluster.global_position = center - Vector3.UP * sink_depth
-	var tween := cluster.create_tween()
-	tween.tween_property(cluster, "global_position:y", center.y + 0.05, SPIKE_RISE_TIME) \
-			.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-	tween.tween_interval(SPIKE_HOLD_TIME)
-	tween.tween_property(cluster, "global_position:y",
-			center.y - sink_depth - SPIKE_EXTRA_SINK, SPIKE_SINK_TIME) \
-			.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
-	tween.tween_callback(cluster.queue_free)
+	cluster.erupt(center, spread_radius)
 
 
 func _is_walkable(point: Vector3) -> bool:
