@@ -13,6 +13,10 @@ extends WeaponBase
 @export var slash_radius: float = 1.51
 ## Color de la medialuna del corte.
 @export var slash_color: Color = Color(0.991721, 0.64353454, 0.27002934, 1)
+## Giro de la medialuna durante el corte, en grados.
+@export var slash_sweep_deg: float = 100.0
+## Altura sobre el origen del blanco a la que se dibuja el corte, en metros.
+@export var slash_lift: float = 0.3
 
 @export_group("Multitud")
 ## Segundos entre las estocadas extra (projectile_count y Tomo de Multitud); con el enfriamiento corto, VOLLEY_WINDOW las comprime.
@@ -55,5 +59,5 @@ func _play_slash(target: Node3D) -> void:
 		return
 	var aim := flat_dir_or(target.global_position - global_position,
 			-global_transform.basis.z)
-	slash.play(target.global_position + Vector3.UP * 0.3, aim, slash_radius,
-			slash_color, 100.0, slash_time, _stab_left)
+	slash.play(target.global_position + Vector3.UP * slash_lift, aim, slash_radius,
+			slash_color, slash_sweep_deg, slash_time, _stab_left)

@@ -8,11 +8,12 @@ extends WeaponBase
 
 ## Ancho total de la franja del latigazo; su largo es attack_range. Los dos crecen con los tomos de área.
 @export var strip_width: float = 1.2
-## Porcentaje de velocidad que pierden los enemigos azotados (30 = conservan el 70%).
+## Porcentaje de velocidad que pierden los enemigos azotados (30 = conservan el 70%); la carta «Espinas aferradas» (+8) y la evolución «Guirnalda sepulcral» (+25) lo suben.
 @export var slow_percent: float = 30.0
+## Segundos que dura la ralentización (el Tomo de Persistencia la alarga).
 @export var slow_duration: float = 1.5
-## Color de la franja del latigazo.
-@export var crack_color: Color = Color(0.5, 0.85, 0.3)
+## Altura sobre el portador desde la que sale la franja del latigazo, en metros (su color está en WhipCrack.tscn).
+@export var crack_height: float = 0.9
 
 @export_group("Multitud")
 ## Segundos entre los latigazos extra del Tomo de Multitud; un látigo no puede estar en dos lugares a la vez.
@@ -61,4 +62,4 @@ func _spawn_crack_visual(lash_dir: Vector3, length: float) -> void:
 	var crack := Pools.acquire_scene(Pools.WHIP_CRACK_SCENE) as WhipCrack
 	if crack == null:
 		return
-	crack.play(global_position + Vector3.UP * 0.9, lash_dir, length, crack_color)
+	crack.play(global_position + Vector3.UP * crack_height, lash_dir, length)

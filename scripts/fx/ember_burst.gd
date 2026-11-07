@@ -6,9 +6,13 @@ extends Node3D
 ## son recursos compartidos de la escena; cada instancia se desvanece con
 ## MeshInstance3D.transparency.
 
-const SHELL_TIME: float = 0.35
-const SCORCH_TIME: float = 1.1
+@export_group("Tiempos")
+## Segundos que tarda la cáscara en crecer hasta el radio y desvanecerse.
+@export var shell_time: float = 0.35
+## Segundos que tarda en desvanecerse la quemadura del suelo.
+@export var scorch_time: float = 1.1
 
+@export_group("Brasas")
 ## Radio de estallido para el que está pensada la ráfaga de brasas de la
 ## escena; las brasas se escalan contra él, así una detonación de 6 m de un
 ## build de área no es una burbuja hueca con un soplo de chispas en el centro.
@@ -43,11 +47,11 @@ func play(center: Vector3, radius: float) -> void:
 	_embers.restart()
 	_tween = create_tween()
 	_tween.set_parallel(true)
-	_tween.tween_property(_shell, "scale", Vector3.ONE * radius, SHELL_TIME) \
+	_tween.tween_property(_shell, "scale", Vector3.ONE * radius, shell_time) \
 			.set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
-	_tween.tween_property(_shell, "transparency", 1.0, SHELL_TIME) \
+	_tween.tween_property(_shell, "transparency", 1.0, shell_time) \
 			.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
-	_tween.tween_property(_scorch, "transparency", 1.0, SCORCH_TIME) \
+	_tween.tween_property(_scorch, "transparency", 1.0, scorch_time) \
 			.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
 	_tween.chain().tween_interval(0.2)
 	_tween.chain().tween_callback(_release)

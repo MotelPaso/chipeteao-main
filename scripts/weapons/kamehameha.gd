@@ -50,7 +50,7 @@ const BEAM_VOLUME_DB: float = -12.0
 
 func fire(target: Node3D) -> void:
 	var origin := global_position + Vector3.UP * muzzle_height
-	var center_dir := flat_dir_or(target.global_position + Vector3.UP * 0.8 - origin,
+	var center_dir := flat_dir_or(body_aim_point(target) - origin,
 			-global_transform.basis.z)
 	fire_volley(maxi(effective_projectile_count(), 1), center_dir, _blast,
 			extra_stagger, extra_fan_deg)

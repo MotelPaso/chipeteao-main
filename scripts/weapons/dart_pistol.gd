@@ -2,15 +2,13 @@ extends WeaponBase
 ## Pistola de dardos: dispara dardos rápidos que persiguen un poco al blanco
 ## adquirido. Con más de un proyectil, los extra salen en abanico alrededor
 ## de la puntería. Sin modelo en la mano: el disparo se lee por el trazador
-## brillante y un fogonazo del pool en el marcador Muzzle en cada ráfaga.
+## brillante y un fogonazo del pool en el marcador Muzzle en cada ráfaga
+## (su aspecto está en MuzzleFlash.tscn, grupo «Fogonazo»).
 
+## Escena del dardo que se dispara (Projectile.tscn).
 @export var projectile_scene: PackedScene
-## Color del fogonazo de la boca.
-@export var flash_color: Color = Color(1.0, 0.8, 0.35)
 ## Grados entre dardos vecinos cuando hay más de uno.
 @export var fan_spread_deg: float = 8.0
-## Altura sobre el origen del blanco a la que se apunta, para pegar en el cuerpo y no en los pies.
-@export var aim_height: float = 0.8
 ## Los dardos vuelan este múltiplo de attack_range, así los blancos al borde del alcance igual reciben.
 @export var range_grace: float = 1.3
 
@@ -23,7 +21,7 @@ func fire(target: Node3D) -> void:
 		return
 	# Caso degenerado (blanco encima de la boca): se dispara hacia donde miramos.
 	var base_dir := aim_dir_or(
-			target.global_position + Vector3.UP * aim_height - _muzzle.global_position,
+			body_aim_point(target) - _muzzle.global_position,
 			-global_transform.basis.z)
 	var count := maxi(effective_projectile_count(), 1)
 	for i in count:
@@ -32,7 +30,7 @@ func fire(target: Node3D) -> void:
 	# Un fogonazo por ráfaga, salgan los dardos que salgan.
 	var flash := Pools.acquire_scene(Pools.MUZZLE_FLASH_SCENE) as MuzzleFlash
 	if flash != null:
-		flash.play(_muzzle.global_position, flash_color, 0.5)
+		flash.play(_muzzle.global_position, MuzzleFlash.Style.MUZZLE)
 
 
 func _spawn_dart(direction: Vector3, target: Node3D) -> void:

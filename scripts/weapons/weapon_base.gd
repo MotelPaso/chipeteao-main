@@ -20,6 +20,10 @@ const UP_COLINEAR_DOT: float = 0.99
 ## Multitud: el escalonado se comprime para que la cola de una ráfaga no se
 ## monte sobre la siguiente.
 const VOLLEY_WINDOW: float = 0.6
+## Edita aquí: altura sobre el origen de un enemigo a la que apuntan todas
+## las armas y la persecución de los proyectiles, en metros (el cuerpo, no
+## los pies).
+const AIM_HEIGHT: float = 0.8
 
 @export_group("Estadísticas")
 ## Daño por golpe. Valor de respaldo; cada arma fija el suyo en su escena. Lo suben «Afilado», «Temple», «Ritmo de batalla», evoluciones y ascensos.
@@ -393,6 +397,11 @@ static func flat_dir_or(vector: Vector3, fallback: Vector3) -> Vector3:
 	vector.y = 0.0
 	return vector.normalized() if vector.length_squared() > DEGENERATE_LENGTH_SQ \
 			else fallback
+
+
+## Punto del cuerpo de `target` al que se apunta: AIM_HEIGHT sobre su origen.
+static func body_aim_point(target: Node3D) -> Vector3:
+	return target.global_position + Vector3.UP * AIM_HEIGHT
 
 
 ## Vector "arriba" válido para construir una base con `direction`: una

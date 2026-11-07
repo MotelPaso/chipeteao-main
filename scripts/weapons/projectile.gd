@@ -15,8 +15,6 @@ extends Area3D
 @export var homing_turn_speed: float = 3.5
 ## Cuántos enemigos distintos puede dañar antes de desaparecer (el Arco de caza lo sube por disparo).
 @export var pierce_remaining: int = 1
-## Altura sobre el origen del blanco a la que apunta la persecución, para converger en el cuerpo.
-@export var aim_height: float = 0.8
 ## El trazador nace estirado este factor a lo largo y vuelve a 1 (sensación de estela).
 @export var spawn_stretch: float = 2.4
 
@@ -117,7 +115,7 @@ func _relax_tracer(delta: float) -> void:
 
 
 func _steer_toward_target(delta: float) -> void:
-	var to_target := _target.global_position + Vector3.UP * aim_height - global_position
+	var to_target := WeaponBase.body_aim_point(_target) - global_position
 	if to_target.length_squared() < WeaponBase.DEGENERATE_LENGTH_SQ:
 		return
 	var forward := -global_transform.basis.z

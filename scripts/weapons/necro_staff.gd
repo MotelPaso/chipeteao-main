@@ -118,7 +118,7 @@ func _tick_bolts(delta: float) -> void:
 		if bolt.left <= 0.0 or target_gone:
 			_kill_bolt(i)
 			continue
-		var aim := bolt.target.global_position + Vector3.UP * 0.8
+		var aim := body_aim_point(bolt.target)
 		var span := aim - bolt.visual.global_position
 		var step := bolt_speed * delta
 		if span.length() <= maxf(step, bolt_hit_radius):

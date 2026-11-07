@@ -4,6 +4,7 @@ extends WeaponBase
 ## burst_radius. El visual es un EmberBurst del pool: cáscara emisiva que se
 ## expande, una quemadura en el suelo que se desvanece y brasas que suben.
 
+## Radio del estallido, en metros (los tomos de área lo escalan); la evolución «Lanza solar» lo multiplica.
 @export var burst_radius: float = 2.5
 
 @export_group("Multitud")

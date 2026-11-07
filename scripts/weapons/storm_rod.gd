@@ -50,7 +50,7 @@ func _zap(target: Node3D) -> void:
 		if current == null:
 			return
 		hit_ids[current.get_instance_id()] = true
-		var strike_point := current.global_position + Vector3.UP * 0.8
+		var strike_point := body_aim_point(current)
 		_spawn_beam(previous_point, strike_point)
 		var health := Health.find_in(current)
 		if health != null and not health.is_dead:

@@ -3,6 +3,7 @@ extends WeaponBase
 ## vuelve al jugador, cortando todo lo que cruza a la ida y a la vuelta
 ## (BoomerangProjectile maneja el vuelo de ida y vuelta).
 
+## Escena del bumerán que se lanza.
 @export var projectile_scene: PackedScene
 ## Multiplicador de la distancia de vuelo antes de dar la vuelta ("Vuelo
 ## lejano" lo sube; los tomos de área también estiran el recorrido).

@@ -8,10 +8,12 @@ extends Node3D
 ## del mismo nodo, y una escala no uniforme en la raíz las aplastaría en
 ## manchas que laten con el charco.
 
-const THROB_TIME: float = 0.35
-const FADE_TIME: float = 0.3
-## Esfera de emisión de burbujas a radio 1, a juego con el disco de la escena.
-const BUBBLE_EMISSION_RATIO: float = 0.85
+## Segundos de cada mitad del latido (hincharse o volver).
+@export var throb_time: float = 0.35
+## Segundos que tarda el charco en desvanecerse al expirar.
+@export var fade_time: float = 0.3
+## Radio de la esfera de burbujas como fracción del radio del charco (0.85 cae dentro del disco).
+@export var bubble_emission_ratio: float = 0.85
 
 @onready var _disc: MeshInstance3D = $Disc
 @onready var _rim: MeshInstance3D = $Rim
@@ -47,20 +49,20 @@ func play(center: Vector3, radius: float) -> void:
 	# burbuja sigue redonda sea cual sea el radio del charco.
 	var bubble_material := _bubbles.process_material as ParticleProcessMaterial
 	if bubble_material != null:
-		bubble_material.emission_sphere_radius = radius * BUBBLE_EMISSION_RATIO
+		bubble_material.emission_sphere_radius = radius * bubble_emission_ratio
 	_bubbles.restart()
 	_bubbles.emitting = true
 	var rest := Vector3(radius, 1.0, radius)
 	var swollen := Vector3(radius * 1.06, 1.4, radius * 1.06)
 	_throb = create_tween().set_loops()
 	_throb.set_parallel(true)
-	_throb.tween_property(_disc, "scale", swollen, THROB_TIME) \
+	_throb.tween_property(_disc, "scale", swollen, throb_time) \
 			.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
-	_throb.tween_property(_rim, "scale", swollen, THROB_TIME) \
+	_throb.tween_property(_rim, "scale", swollen, throb_time) \
 			.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
-	_throb.chain().tween_property(_disc, "scale", rest, THROB_TIME) \
+	_throb.chain().tween_property(_disc, "scale", rest, throb_time) \
 			.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
-	_throb.parallel().tween_property(_rim, "scale", rest, THROB_TIME) \
+	_throb.parallel().tween_property(_rim, "scale", rest, throb_time) \
 			.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 
 
@@ -73,9 +75,9 @@ func expire() -> void:
 	_bubbles.emitting = false
 	_fade = create_tween()
 	_fade.set_parallel(true)
-	_fade.tween_property(_disc, "transparency", 1.0, FADE_TIME) \
+	_fade.tween_property(_disc, "transparency", 1.0, fade_time) \
 			.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
-	_fade.tween_property(_rim, "transparency", 1.0, FADE_TIME) \
+	_fade.tween_property(_rim, "transparency", 1.0, fade_time) \
 			.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
 	_fade.chain().tween_callback(_release)
 

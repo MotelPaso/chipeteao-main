@@ -4,10 +4,16 @@ extends WeaponBase
 ## ataque se lee por una medialuna SlashArc del pool que cruza el arco de
 ## golpe, más una chispa pequeña en cada enemigo alcanzado.
 
+## Apertura del tajo, en grados: daña a los enemigos dentro de este abanico.
 @export var arc_angle_deg: float = 150.0
+## Segundos que dura la medialuna del tajo.
 @export var swing_time: float = 0.25
 ## Color de la medialuna del tajo.
 @export var slash_color: Color = Color(0.75, 0.85, 1.0)
+## Radio de la medialuna como fracción del alcance del tajo (0-1).
+@export var slash_radius_scale: float = 0.9
+## Giro de la medialuna como fracción de arc_angle_deg (0-1).
+@export var slash_sweep_scale: float = 0.8
 ## Color de la chispa en cada enemigo alcanzado.
 @export var spark_color: Color = Color(0.7, 0.8, 1.0)
 
@@ -47,5 +53,5 @@ func _play_swing(center_dir: Vector3) -> void:
 	var slash := Pools.acquire_scene(Pools.SLASH_ARC_SCENE) as SlashArc
 	if slash == null:
 		return
-	slash.play(global_position, center_dir, attack_range * area_scale() * 0.9,
-			slash_color, arc_angle_deg * 0.8, swing_time)
+	slash.play(global_position, center_dir, attack_range * area_scale() * slash_radius_scale,
+			slash_color, arc_angle_deg * slash_sweep_scale, swing_time)

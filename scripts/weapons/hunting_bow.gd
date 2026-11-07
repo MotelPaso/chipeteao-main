@@ -4,17 +4,14 @@ extends WeaponBase
 ## Projectile). Con más de un proyectil, la ráfaga sale en abanico alrededor
 ## de la puntería. Sin modelo en la mano: el disparo se lee por el trazador
 ## grueso de la flecha y un destello de carga en el Nock que crece y estalla
-## al soltar.
+## al soltar (su aspecto está en MuzzleFlash.tscn, grupo «Destello de carga»).
 
+## Escena de la flecha que se dispara (Arrow.tscn).
 @export var projectile_scene: PackedScene
-## Color del destello de carga.
-@export var glint_color: Color = Color(0.75, 0.95, 0.55)
 ## Máximo de enemigos que daña una flecha antes de desaparecer ("Puntas con púas" lo sube).
 @export var pierce_count: int = 3
 ## Grados entre flechas vecinas cuando hay más de una.
 @export var fan_spread_deg: float = 7.0
-## Altura sobre el origen del blanco a la que se apunta, para pegar en el cuerpo y no en los pies.
-@export var aim_height: float = 0.8
 ## Las flechas vuelan este múltiplo de attack_range, así los blancos al borde del alcance igual reciben.
 @export var range_grace: float = 1.15
 
@@ -27,7 +24,7 @@ func fire(target: Node3D) -> void:
 		return
 	# Caso degenerado (blanco encima del Nock): se dispara hacia donde miramos.
 	var base_dir := aim_dir_or(
-			target.global_position + Vector3.UP * aim_height - _nock.global_position,
+			body_aim_point(target) - _nock.global_position,
 			-global_transform.basis.z)
 	var count := maxi(effective_projectile_count(), 1)
 	for i: int in count:
@@ -37,7 +34,7 @@ func fire(target: Node3D) -> void:
 	# estalla cuando salen las flechas.
 	var glint := Pools.acquire_scene(Pools.MUZZLE_FLASH_SCENE) as MuzzleFlash
 	if glint != null:
-		glint.play(_nock.global_position, glint_color, 0.4, 0.14, 0.1)
+		glint.play(_nock.global_position, MuzzleFlash.Style.GLINT)
 
 
 func _spawn_arrow(direction: Vector3, target: Node3D) -> void:

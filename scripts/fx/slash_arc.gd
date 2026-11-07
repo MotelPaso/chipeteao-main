@@ -7,14 +7,16 @@ extends MeshInstance3D
 ## instancia se construyen en _ready y se reusan; play() solo anima
 ## transformada y transparencia.
 
-## Apertura de la medialuna en la malla, en grados; el giro de play() completa
-## visualmente el resto del arco del ataque.
-const ARC_DEG: float = 110.0
+## Tramos de la tira de triángulos de la medialuna.
 const SEGMENTS: int = 14
-## Grosor máximo de la medialuna a mitad del arco (fracción del radio exterior unitario).
-const THICKNESS: float = 0.55
-## Alfa máximo por vértice (moderado, para que los telégrafos se lean a través).
-const PEAK_ALPHA: float = 0.7
+
+@export_group("Forma")
+## Apertura de la medialuna en la malla, en grados; el giro de play() completa el resto del arco del ataque.
+@export var arc_deg: float = 110.0
+## Grosor máximo a mitad del arco, como fracción del radio exterior (0-1).
+@export var thickness: float = 0.55
+## Opacidad máxima por vértice (0-1); moderada para que los telégrafos se lean a través.
+@export var peak_alpha: float = 0.7
 
 var _material: StandardMaterial3D = null
 var _tween: Tween = null
@@ -73,17 +75,17 @@ func _release() -> void:
 func _build_crescent() -> ArrayMesh:
 	var vertices := PackedVector3Array()
 	var colors := PackedColorArray()
-	var half := deg_to_rad(ARC_DEG) * 0.5
+	var half := deg_to_rad(arc_deg) * 0.5
 	for i: int in SEGMENTS + 1:
 		var t := float(i) / float(SEGMENTS)
 		var angle := -half + t * half * 2.0
 		# Afinado en seno: grosor completo a mitad del arco, puntas en los extremos.
 		var taper := sin(t * PI)
-		var inner := 1.0 - THICKNESS * taper
+		var inner := 1.0 - thickness * taper
 		var dir := Vector3(sin(angle), 0.0, -cos(angle))
 		vertices.append(dir * inner)
 		vertices.append(dir)
-		var alpha := PEAK_ALPHA * taper
+		var alpha := peak_alpha * taper
 		colors.append(Color(1, 1, 1, alpha * 0.35))  # borde interior, más suave
 		colors.append(Color(1, 1, 1, alpha))
 	return FxMesh.strip(vertices, colors)
