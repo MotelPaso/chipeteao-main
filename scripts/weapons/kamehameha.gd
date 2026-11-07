@@ -1,96 +1,73 @@
 extends WeaponBase
-## Kamehameha (iteration 43): a long-cooldown energy beam blasted toward
-## the nearest enemy, hitting EVERY enemy inside a long, wide lane for
-## heavy damage. Knob mapping:
-##   damage        — per enemy caught in the beam (through deal_damage)
-##   cooldown      — charge time between beams (long by design)
-##   attack_range  — targeting reach; the beam itself is beam_length long
-## Visual: a glowing cylinder laid along the lane that flares and fades,
-## plus a shake and a short hit-stop on release.
+## Kamehameha: un rayo de energía de enfriamiento largo lanzado hacia el
+## enemigo más cercano, que golpea fuerte a TODO enemigo dentro de un carril
+## largo y ancho. Cómo usa los ajustes de WeaponBase:
+##   damage        — daño por enemigo atrapado en el rayo (por deal_damage)
+##   cooldown      — tiempo de carga entre rayos (largo a propósito)
+##   attack_range  — alcance para elegir blanco; el rayo mide beam_length
+## La evolución «Resplandor Final» multiplica damage, beam_width y cooldown.
+## Visual: un cilindro brillante (beam_mesh, en Kamehameha.tscn) tendido a lo
+## largo del carril que destella y se desvanece, más una sacudida y una pausa
+## breve al soltarlo.
 
-@export var beam_length: float = 18.0
-@export var beam_width: float = 2.4
-@export var beam_color: Color = Color(0.45, 0.75, 1.0)
-@export var flash_time: float = 0.45
-@export var muzzle_height: float = 1.1
-
-## The beam borrows the boss roar until the sfx catalog grows its own beam
-## id; trimmed hard because that stinger is mixed for a once-a-run entrance
-## and this weapon fires it every few seconds.
+## El rayo usa el rugido de jefe mientras el catálogo de sonidos no tenga uno
+## propio; bajado fuerte porque ese sonido está mezclado para una entrada por
+## partida y esta arma dispara cada pocos segundos.
 const BEAM_VOLUME_DB: float = -12.0
 
-## Seconds between the beams a Tome of Multitude adds. Wider than the melee
-## staggers on purpose: each blast is a heavy, readable event, and two of
-## them overlapping in the same lane would just be one thicker beam.
-const EXTRA_BEAM_STAGGER: float = 0.12
-## Yaw between neighboring beams. The lane is long, so a narrow fan already
-## separates the far ends by several meters.
-const EXTRA_BEAM_FAN_DEG: float = 14.0
-## The whole staggered chain has to end inside this fraction of one
-## cooldown; with this weapon's long charge the clamp rarely bites, but a
-## haste-stacked build would otherwise still be firing when it recharges.
-const BEAM_CHAIN_WINDOW: float = 0.6
+@export_group("Rayo")
+## Largo del carril, en metros; la carta «Rayo más largo» lo sube.
+@export var beam_length: float = 18.0
+## Ancho total del carril, en metros; la evolución «Resplandor Final» lo multiplica.
+@export var beam_width: float = 2.4
+## Segundos que dura el destello del rayo.
+@export var flash_time: float = 0.45
+## Altura sobre el montaje desde la que sale el rayo, en metros.
+@export var muzzle_height: float = 1.1
+## Malla y material del rayo (color, transparencia, brillo); cilindro unitario que se estira al carril.
+@export var beam_mesh: Mesh
+## Grosor con que nace el rayo, como fracción de su ancho final.
+@export var beam_start_width: float = 0.3
+## Fracción de flash_time que tarda el rayo en llegar a su ancho final.
+@export var beam_grow_fraction: float = 0.3
 
-var _beam_mesh: CylinderMesh = null
+@export_group("Sensación")
+## Fuerza de la sacudida de cámara por ráfaga.
+@export var shake_strength: float = 0.2
+## Segundos de la sacudida de cámara por ráfaga.
+@export var shake_time: float = 0.35
+## Escala de tiempo de la pausa breve cuando el rayo golpea a alguien (0-1).
+@export var hit_stop_scale: float = 0.1
+## Segundos de la pausa breve cuando el rayo golpea a alguien.
+@export var hit_stop_time: float = 0.05
 
-
-func _ready() -> void:
-	_beam_mesh = CylinderMesh.new()
-	_beam_mesh.top_radius = 1.0
-	_beam_mesh.bottom_radius = 1.0
-	_beam_mesh.height = 1.0
-	# Explicit tessellation: a straight beam gains nothing from height rings,
-	# and 16 sides read as round at its width.
-	_beam_mesh.radial_segments = 16
-	_beam_mesh.rings = 1
-	var material := StandardMaterial3D.new()
-	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	material.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
-	material.albedo_color = Color(beam_color, 0.85)
-	material.emission_enabled = true
-	material.emission = beam_color
-	material.emission_energy_multiplier = 2.5
-	_beam_mesh.material = material
+@export_group("Multitud")
+## Segundos entre los rayos extra del Tomo de Multitud; dos solapados en el mismo carril serían un solo rayo más grueso.
+@export var extra_stagger: float = 0.12
+## Grados entre rayos vecinos; el carril es largo, así que un abanico estrecho ya separa varios metros las puntas.
+@export var extra_fan_deg: float = 14.0
 
 
 func fire(target: Node3D) -> void:
 	var origin := global_position + Vector3.UP * muzzle_height
-	var center_dir := flat_dir_or(target.global_position + Vector3.UP * 0.8 - origin,
+	var center_dir := flat_dir_or(body_aim_point(target) - origin,
 			-global_transform.basis.z)
-	var count := maxi(effective_projectile_count(), 1)
-	var step := minf(EXTRA_BEAM_STAGGER,
-			effective_cooldown() * BEAM_CHAIN_WINDOW / float(maxi(count - 1, 1)))
-	for i: int in count:
-		var yaw := deg_to_rad(EXTRA_BEAM_FAN_DEG) * (float(i) - float(count - 1) * 0.5)
-		var beam_dir := center_dir.rotated(Vector3.UP, yaw)
-		if i == 0:
-			_blast(beam_dir)
-		else:
-			# Pausable and stepped in physics: an extra beam must not fire
-			# while the upgrade UI holds the tree, and damage belongs on the
-			# same tick the rest of the combat runs on.
-			get_tree().create_timer(step * float(i), false, true).timeout \
-					.connect(_blast.bind(beam_dir))
-	# Feedback belongs to the shot, not to the visual helper: a beam that
-	# stopped calling _play_beam would otherwise go silent unnoticed. One
-	# roar and one shake per volley, however many beams fan out — this
-	# stinger is already trimmed hard for a once-every-few-seconds cast.
+	fire_volley(maxi(effective_projectile_count(), 1), center_dir, _blast,
+			extra_stagger, extra_fan_deg)
+	# Un rugido y una sacudida por ráfaga, salgan los rayos que salgan; van
+	# aquí, con el disparo, y no en el helper visual.
 	Sfx.play(&"boss_roar_2", BEAM_VOLUME_DB)
-	Juice.shake(0.2, 0.35)
+	Juice.shake(shake_strength, shake_time)
 
 
-## One beam down `direction`. The staggered extras land here a beat later,
-## when this weapon may already have left the tree with a removed raider.
+## Un rayo por `direction`.
 func _blast(direction: Vector3) -> void:
-	if not is_inside_tree():
-		return
 	var origin := global_position + Vector3.UP * muzzle_height
 	var length := beam_length * area_scale()
 	var half_width := beam_width * 0.5 * area_scale()
 	var hits := 0
-	# The lane is measured from the body, not the muzzle: the beam sweeps
-	# the ground line the player is standing on.
+	# El carril se mide desde el cuerpo, no desde la boca: el rayo barre la
+	# línea del suelo donde está parado el jugador.
 	for body: Node3D in enemies_in_lane(global_position, direction, length, half_width):
 		var health := Health.find_in(body)
 		if health != null:
@@ -98,19 +75,21 @@ func _blast(direction: Vector3) -> void:
 			hits += 1
 	_play_beam(origin, direction, length, half_width)
 	if hits > 0:
-		Juice.hit_stop(0.1, 0.05)
+		Juice.hit_stop(hit_stop_scale, hit_stop_time)
 
 
 func _play_beam(origin: Vector3, direction: Vector3, length: float, half_width: float) -> void:
-	var beam := spawn_fx_mesh(_beam_mesh)
-	# Cylinder axis is Y: lay it along the lane, centered halfway out.
+	var beam := spawn_fx_mesh(beam_mesh)
+	# El eje del cilindro es Y: se tiende a lo largo del carril, centrado a mitad de camino.
 	beam.global_position = origin + direction * length * 0.5
 	beam.look_at(beam.global_position + direction, safe_up(direction))
 	beam.rotate_object_local(Vector3.RIGHT, PI * 0.5)
-	beam.scale = Vector3(half_width * 0.3, length, half_width * 0.3)
+	beam.scale = Vector3(half_width * beam_start_width, length, half_width * beam_start_width)
+	# Se anima la transparencia del nodo, no el material compartido de la escena.
 	var tween := beam.create_tween()
 	tween.set_parallel(true)
-	tween.tween_property(beam, "scale", Vector3(half_width, length, half_width), flash_time * 0.3) \
+	tween.tween_property(beam, "scale", Vector3(half_width, length, half_width),
+			flash_time * beam_grow_fraction) \
 			.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 	tween.tween_property(beam, "transparency", 1.0, flash_time) \
 			.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
