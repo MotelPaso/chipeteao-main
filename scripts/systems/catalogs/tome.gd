@@ -2,7 +2,7 @@ class_name Tome
 extends RefCounted
 ## Catálogo estático de Tomos: objetos pasivos acumulables cuyos efectos de
 ## stats alimentan la capa PlayerStats del jugador. Un tomo nuevo es una fila
-## aquí, igual que en UpgradePool.WEAPON_LIBRARY.
+## aquí, igual que un arma en WeaponCatalog.WEAPON_LIBRARY.
 ##
 ## Edita aquí: una fila por tomo.
 ## Se puede cambiar sin romper nada:
@@ -13,8 +13,8 @@ extends RefCounted
 ##   glyph:    2 letras de la casilla del HUD mientras no hay sprite. Se
 ##             DECLARA, no sale de display_name: todos empiezan con
 ##             «Tomo de» y el resto choca (Persistencia/Peligro darían «PE»).
-##             Único entre esta tabla, WEAPON_LIBRARY, EVOLUTION_LIBRARY e
-##             ITEM_LIBRARY: la franja mezcla las cuatro.
+##             No debe repetirse entre armas, evoluciones, tomos, objetos,
+##             power-ups ni mascotas (el lint glyphs_unique lo revisa).
 ##   description: texto de la carta; el "%d" se llena con el amount del
 ##             PRIMER efecto, escalado por la rareza.
 ##   effects:  lista de {stat, amount}. amount es por copia a potencia

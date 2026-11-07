@@ -70,6 +70,8 @@ func _ready() -> void:
 	_check_id_format()
 	_check_quest_stats()
 	_check_text_numbers()
+	_check_text_values()
+	_check_item_kinds_unique()
 	_check_sfx_ids()
 	if _checks_failed == 0:
 		print("Catalog lint: ok checks=%d" % _checks_run)
@@ -579,6 +581,63 @@ func _check_text_numbers() -> void:
 			failures.append("relic '%s' amount_text '%s' does not show amount %s"
 					% [String(row.get("id", "?")), amount_text, str(row.get("amount", 0.0))])
 	_report("text_numbers", rows, failures)
+
+
+## Las filas que RowText arma: cada campo de text_values existe en la fila
+## ("amount" pide un primer efecto con amount) y la descripción tiene un %d
+## por campo. Un campo que falta se dibuja como 0 sin avisar a nadie.
+func _check_text_values() -> void:
+	var failures: Array[String] = []
+	var rows := 0
+	var sources: Array[Array] = [
+		["ITEM_LIBRARY", ItemCatalog.ITEM_LIBRARY],
+		["POWERUP_LIBRARY", PowerUpCatalog.POWERUP_LIBRARY],
+	]
+	for entry: Array in sources:
+		var library_name := String(entry[0])
+		var library: Array[Dictionary] = entry[1]
+		for row: Dictionary in library:
+			rows += 1
+			var owner_text := "%s/%s" % [library_name, String(row.get("id", "?"))]
+			var names: Array = row.get("text_values", [])
+			for field: Variant in names:
+				if not _row_has_text_field(row, String(field)):
+					failures.append("%s text_values names '%s', which the row does not have"
+							% [owner_text, String(field)])
+			var slots := String(row.get("description", "")).replace("%%", "").count("%d")
+			if slots != names.size():
+				failures.append("%s description has %d %%d but text_values lists %d fields"
+						% [owner_text, slots, names.size()])
+	_report("text_values", rows, failures)
+
+
+## Si `field` es un número que RowText.value_of() puede leer de la fila.
+func _row_has_text_field(row: Dictionary, field: String) -> bool:
+	if field == "amount":
+		var effects: Array = row.get("effects", [])
+		return not effects.is_empty() and (effects[0] as Dictionary).has("amount")
+	return row.has(field)
+
+
+## Cada `kind` de comportamiento en una sola fila de ITEM_LIBRARY:
+## ItemCatalog.kind_row() lee los números de la PRIMERA fila del tipo, así que
+## una segunda fila mostraría sus números en el texto y jugaría con los de la
+## primera.
+func _check_item_kinds_unique() -> void:
+	var failures: Array[String] = []
+	var rows := 0
+	var seen: Dictionary[String, String] = {}
+	for row: Dictionary in ItemCatalog.ITEM_LIBRARY:
+		var kind := String(row.get("kind", ""))
+		if kind.is_empty():
+			continue
+		rows += 1
+		var item_id := String(row.get("id", "?"))
+		if seen.has(kind):
+			failures.append("kind '%s' is on both '%s' and '%s'" % [kind, seen[kind], item_id])
+			continue
+		seen[kind] = item_id
+	_report("item_kinds_unique", rows, failures)
 
 
 ## Cada id de sonido escrito a mano: los `&"x"` de una llamada a Sfx

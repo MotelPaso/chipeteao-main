@@ -14,8 +14,9 @@ extends RefCounted
 ##   duration:      segundos, antes del duration_multiplier del raider.
 ##   weight:        peso de la tirada. La estrella es ~2% del total a propósito.
 ##   color:         tinte de la gema en el suelo, la casilla del HUD y el aviso.
-##   glyph:         dos letras para el arte provisional (únicas entre los
-##                  glifos de armas, tomos, objetos y power-ups).
+##   glyph:         dos letras para el arte provisional. No debe repetirse
+##                  entre armas, evoluciones, tomos, objetos, power-ups ni
+##                  mascotas (el lint glyphs_unique lo revisa).
 ##   icon:          OPCIONAL, textura explícita; si falta se usa
 ##                  res://assets/icons/powerups/<id>.png.
 ##   effects:       [{stat, amount}] que recibe PlayerStats.add_timed_boon.
