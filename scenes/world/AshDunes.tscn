@@ -24,6 +24,7 @@
 [ext_resource type="AudioStream" path="res://assets/audio/ambient/desert_wind.wav" id="18_wind"]
 [ext_resource type="PackedScene" path="res://scenes/world/secrets/HummingSkull.tscn" id="24_skull"]
 [ext_resource type="Script" path="res://scripts/world/run/terrain.gd" id="90_terrain"]
+[ext_resource type="Resource" path="res://assets/world/rock_style_ash_dunes.tres" id="91_rockstyle"]
 
 [sub_resource type="Shader" id="Shader_sand"]
 code = "shader_type spatial;
@@ -266,7 +267,6 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 29.9, 0, -37.5)
 
 [node name="DuneScatter" type="Node3D" parent="."]
 script = ExtResource("6_scatter")
-scatter_seed = 90417
 tree_scene = ExtResource("7_cactus")
 rock_scene = ExtResource("9_dunerock")
 stump_scene = ExtResource("10_bonepile")
@@ -280,11 +280,7 @@ perimeter_step = 10.0
 perimeter_rock_every = 6
 mesa_platform_scene = ExtResource("12_mesaplatform")
 mesa_ramp_scene = ExtResource("11_mesaramp")
-formation_rock_color = Color(0.55, 0.3, 0.21, 1)
-formation_cap_color = Color(0.78, 0.62, 0.42, 1)
-formation_cap_strength = 0.55
-formation_strata = 0.1
-formation_terrace = 0.5
+formation_style = ExtResource("91_rockstyle")
 
 [node name="Terrain" type="StaticBody3D" parent="."]
 script = ExtResource("90_terrain")

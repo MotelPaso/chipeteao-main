@@ -1,0 +1,23 @@
+[gd_resource type="Resource" script_class="RockFormationStyle" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/world/run/scatter/rock_formation_style.gd" id="1_style"]
+
+[resource]
+script = ExtResource("1_style")
+rock_color = Color(0.27, 0.3, 0.29, 1)
+cap_color = Color(0.22, 0.33, 0.2, 1)
+cap_strength = 0.75
+strata_strength = 0.03
+mesh_step = 2.0
+margin_min = 1.0
+margin_max = 2.0
+cliff_height = 2.6
+cliff_run = 2.0
+peak_height = 4.0
+peak_run = 7.0
+spire_height = 2.4
+max_height = 8.0
+lift_variation = 0.35
+crag_height = 0.6
+terrace_step = 1.6
+terrace_strength = 0.0
