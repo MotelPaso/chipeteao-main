@@ -1,70 +1,67 @@
 class_name PowerUps
 extends Node
-## Per-raider power-up holder (iteration 53), mounted on the Player beside
-## ItemBag and Stats. Owns WHAT IS ACTIVE and for how long; the effects
-## themselves ride existing channels wherever one exists:
-##   stat rows      -> PlayerStats.add_timed_boon, tagged so a refresh
-##                     replaces itself instead of stacking with itself
+## Power-ups de un raider, montado en el Player junto a ItemBag y Stats. Sabe
+## QUÉ está activo y por cuánto tiempo; los efectos usan canales que ya
+## existen siempre que se puede:
+##   filas de stats -> PlayerStats.add_timed_boon, con etiqueta para que una
+##                     renovación se reemplace a sí misma y no se acumule
 ##   immortal       -> Health.invulnerable
 ##   reflect        -> Health.reflect_fraction
-##   gold           -> Player.set_points_source (a named factor, not a
-##                     second wallet)
-##   vampire        -> lifesteal boon + permanent_max_hp banked HERE
-##   flight         -> Player reads has("flight") each physics tick
-##   time_stop      -> EnemySpawner.freeze_enemies through the group
-##   star           -> every other row at once, on the STAR's own clock
+##   gold           -> Player.set_points_source (un factor con nombre, no
+##                     una segunda billetera)
+##   vampire        -> boon de robo de vida + permanent_max_hp guardado AQUÍ
+##   flight         -> el Player lee has("flight") en cada tick de física
+##   time_stop      -> EnemySpawner.freeze_enemies por el grupo
+##   star           -> todas las demás filas a la vez, con el reloj de la
+##                     ESTRELLA
 ##
-## Different power-ups STACK; the same one REFRESHES. That is the whole
-## rule, and it is why every kind-driven consumer is re-synced from
-## has(kind) after any change instead of being toggled on expiry: with
-## stacking, "the immortality ran out" and "I am no longer immortal" are
-## different questions (a star can still be running).
+## Power-ups distintos se ACUMULAN; el mismo se RENUEVA. Por eso cada
+## consumidor por tipo se resincroniza desde has(kind) tras cualquier cambio
+## en vez de apagarse al expirar: con acumulación, "se acabó la inmortalidad"
+## y "ya no soy inmortal" son preguntas distintas (puede seguir una estrella).
 ##
-## Nothing here is per-frame work when nothing is active: the expiry poll
-## returns immediately on an empty list.
+## Sin nada activo no hay trabajo por frame: el sondeo de expiración vuelve
+## de inmediato con la lista vacía.
 
 signal active_changed
 
-## Points multiplier while Fiebre del oro runs, and the name it registers
-## under on the Player (part C2 adds a second source, hence named factors).
-@export var gold_points_multiplier: float = 2.0
-## Max HP banked per kill while Modo vampiro runs.
-@export var vampire_hp_per_kill: float = 1.0
-## Damage returned to the attacker while Reflejo runs, as a fraction.
-@export var reflect_fraction: float = 1.0
-
+## Nombre con que «Fiebre del oro» registra su multiplicador de puntos en el
+## Player (fuentes con nombre). Los números de cada power-up (multiplicador
+## de oro, HP por baja del vampiro, fracción de Reflejo) viven en su fila de
+## PowerUpCatalog.
 const POINTS_SOURCE := "powerup_gold"
-## Tag prefix for the timed boons a row owns, so a re-pick can clear its
-## own and only its own.
+## Prefijo de etiqueta de los boons temporales de una fila, para que volver a
+## tomarla limpie los suyos y solo los suyos.
 const BOON_TAG_PREFIX := "powerup:"
 
-## Permanent max HP banked by Modo vampiro. A STORED TOTAL, re-added by
-## PlayerStats.recompute on every rebuild — never added onto a derived
-## value, which _reset_derived would wipe on the next recompute.
+## HP máx. permanente guardado por «Modo vampiro». Es un TOTAL GUARDADO que
+## PlayerStats.recompute vuelve a sumar en cada reconstrucción; nunca se suma
+## sobre un valor derivado, que _reset_derived borraría.
 var permanent_max_hp: float = 0.0
 
-## Live rows: {id, kind, expires_at}. Ordered by pickup.
+## Filas vivas: {id, kind, expires_at}, en orden de recolección.
 var _active: Array[Dictionary] = []
-## Raised by RunState.stage_changed, consumed on the next physics frame:
-## the new arena's nodes are built by then, so _sync writes to the live
-## spawner instead of the one that was just freed.
+## Lo levanta RunState.stage_changed y se consume en el siguiente frame de
+## física: para entonces la arena nueva ya existe, y _sync escribe en el
+## spawner vivo y no en el que se acaba de liberar.
 var _stage_changed: bool = false
-
-
-## The component rides the raider across a stage change; the nodes it
-## publishes to do not. Flagged rather than synced on the spot, because
-## the arena is still being built when this fires.
-func _ready() -> void:
-	RunState.stage_changed.connect(func(_index: int, _map_id: String) -> void:
-		_stage_changed = true)
-## One recompute per frame no matter how many kills land in it.
+## Un recompute por frame, por muchas bajas que caigan en él.
 var _recompute_queued: bool = false
-## Edge detection for the one consumer that needs a "just ended" moment
-## rather than a state (the raider may be over a rock when flight stops).
+## Detección de flanco para el único consumidor que necesita el momento
+## "recién terminó" y no un estado (el raider puede estar sobre una roca
+## cuando se acaba el vuelo).
 var _was_flying: bool = false
 
 
-## Finds the PowerUps component on a body, or null.
+## El componente cruza el cambio de etapa con el raider; los nodos a los que
+## publica no. Se marca en vez de sincronizar en el acto porque la arena aún
+## se está construyendo cuando llega la señal.
+func _ready() -> void:
+	RunState.stage_changed.connect(func(_index: int, _map_id: String) -> void:
+		_stage_changed = true)
+
+
+## El componente PowerUps de un cuerpo, o null.
 static func find_in(body: Node) -> PowerUps:
 	if body == null:
 		return null
@@ -74,10 +71,10 @@ static func find_in(body: Node) -> PowerUps:
 	return null
 
 
-## Grants a power-up. THE door: the toast, the log and the announce all
-## live here, so a new source (kill drop, spring, vendor, roulette later)
-## only has to call this. The star recurses once per component row, which
-## is why the announcement is done here and not in _apply_row.
+## Otorga un power-up. LA puerta: el aviso, el log y el anuncio viven aquí,
+## así una fuente nueva (drop, manantial, vendedor, ruleta) solo llama a
+## esto. La estrella aplica cada fila componente, y por eso el anuncio se
+## hace aquí y no en _apply_row.
 func apply(powerup_id: String) -> void:
 	var row := PowerUpCatalog.by_id(powerup_id)
 	if row.is_empty():
@@ -85,19 +82,19 @@ func apply(powerup_id: String) -> void:
 		return
 	var duration := float(row.duration) * _duration_multiplier()
 	if String(row.get("kind", "")) == "star":
-		# Everything at once, all of it on the star's shorter clock: the
-		# star IS the jackpot, not a way to get twenty-second buffs.
+		# Todo a la vez y con el reloj corto de la estrella: la estrella ES el
+		# premio gordo, no una forma de tener buffs de veinte segundos.
 		for component: Dictionary in PowerUpCatalog.star_components():
 			_apply_row(component, duration)
 	_apply_row(row, duration)
 	_sync()
 	_announce(row, duration)
-	# One-line log (RunManager convention) for headless soaks.
+	# Log de una línea (convención de RunManager) para los soaks headless.
 	print("Power-up picked: %s" % powerup_id)
 
 
-## Live power-ups as {id, kind, time_left}, in pickup order (the HUD row
-## and the Tab overlay both read this).
+## Power-ups vivos como {id, kind, time_left}, en orden de recolección (los
+## leen la fila del HUD y el mapa de Tab).
 func active() -> Array[Dictionary]:
 	var rows: Array[Dictionary] = []
 	for entry: Dictionary in _active:
@@ -107,11 +104,8 @@ func active() -> Array[Dictionary]:
 	return rows
 
 
-## True while any live row carries this behavior kind. The star turns them
-## all on, so consumers ask this and never "is the star running".
-## Seconds left on the longest live row of `kind`, or 0.0 when none is
-## running. The counterpart to has() for consumers that need the clock
-## rather than the flag.
+## Segundos que le quedan a la fila viva más larga de `kind`, o 0.0 si no
+## corre ninguna. Es la contraparte de has() para quien necesita el reloj.
 func _remaining(kind: String) -> float:
 	var left := 0.0
 	for entry: Dictionary in _active:
@@ -120,6 +114,9 @@ func _remaining(kind: String) -> float:
 	return left
 
 
+## True mientras alguna fila viva tenga este tipo de comportamiento. La
+## estrella los enciende todos, así que los consumidores preguntan esto y
+## nunca "¿corre la estrella?".
 func has(kind: String) -> bool:
 	for entry: Dictionary in _active:
 		if String(entry.kind) == kind:
@@ -138,12 +135,12 @@ func count() -> int:
 	return _active.size()
 
 
-## ItemBag.on_weapon_kill relays every kill this raider's weapons make.
-## Modo vampiro is the only listener today.
+## ItemBag.on_weapon_kill reenvía cada baja de las armas de este raider. Hoy
+## solo escucha «Modo vampiro».
 func on_kill() -> void:
 	if not has("vampire"):
 		return
-	permanent_max_hp += vampire_hp_per_kill
+	permanent_max_hp += _live_value("vampire", "max_hp_per_kill")
 	_request_recompute()
 
 
@@ -151,8 +148,8 @@ func _physics_process(_delta: float) -> void:
 	if _active.is_empty():
 		return
 	if _stage_changed:
-		# The arena (and its spawner) was replaced under us: re-publish
-		# every kind-driven state to the nodes that were just built.
+		# La arena (y su spawner) se reemplazó: vuelve a publicar cada estado
+		# por tipo en los nodos recién construidos.
 		_stage_changed = false
 		_sync()
 	var expired := false
@@ -164,10 +161,9 @@ func _physics_process(_delta: float) -> void:
 		_sync()
 
 
-## Registers (or refreshes) one row for `duration` seconds and issues its
-## stat boons. A refresh NEVER shortens: picking the same power-up up
-## again while eight seconds are left and the roll is shorter would
-## otherwise be a downgrade.
+## Registra (o renueva) una fila por `duration` segundos y emite sus boons
+## de stats. Renovar NUNCA acorta: tomar el mismo power-up con ocho segundos
+## restantes y una duración menor sería una pérdida.
 func _apply_row(row: Dictionary, duration: float) -> void:
 	var powerup_id := String(row.id)
 	var expires_at := RunState.run_time + duration
@@ -185,50 +181,60 @@ func _apply_row(row: Dictionary, duration: float) -> void:
 	var stats := PlayerStats.find_in(get_parent())
 	if stats != null:
 		var tag := BOON_TAG_PREFIX + powerup_id
-		# Its own boons first: without this a refresh would stack a second
-		# copy of every effect and the first expiry would take back half.
+		# Primero sus propios boons: sin esto una renovación sumaría una
+		# segunda copia de cada efecto y la primera expiración quitaría la mitad.
 		stats.clear_timed_boons(tag)
 		for effect: Dictionary in row.get("effects", [] as Array):
 			stats.add_timed_boon(String(effect.stat), float(effect.amount),
 					expires_at - RunState.run_time, tag)
 	if String(row.get("kind", "")) == "time_stop":
-		# Through the group like every cross-scene call here; the spawner
-		# owns the frozen set and its own thaw clock.
-		get_tree().call_group("enemy_spawner", "freeze_enemies", duration)
-		get_tree().call_group("hud", "announce_major", "¡TIEMPO DETENIDO!")
+		# Por el grupo, como toda llamada entre escenas aquí; el spawner es
+		# dueño del conjunto congelado, de su reloj de deshielo y de los dos
+		# avisos (true = anunciar el comienzo).
+		get_tree().call_group("enemy_spawner", "freeze_enemies", duration, true)
 
 
-## Pushes every kind-driven state from the CURRENT set of live rows.
-## Idempotent and cheap, and called after any change: toggling consumers
-## on expiry instead would turn immortality off while a star still runs.
+## Publica cada estado por tipo desde el conjunto ACTUAL de filas vivas.
+## Idempotente y barato, y se llama tras cualquier cambio: apagar los
+## consumidores al expirar quitaría la inmortalidad con una estrella activa.
 func _sync() -> void:
 	var body := get_parent()
 	var health := Health.find_in(body)
 	if health != null:
 		health.invulnerable = has("immortal")
-		health.reflect_fraction = reflect_fraction if has("reflect") else 0.0
+		health.reflect_fraction = _live_value("reflect", "reflect_fraction") \
+				if has("reflect") else 0.0
 	if body != null and body.has_method("set_points_source"):
 		if has("gold"):
-			body.call("set_points_source", POINTS_SOURCE, gold_points_multiplier)
+			body.call("set_points_source", POINTS_SOURCE, _live_value("gold", "points_multiplier"))
 		else:
 			body.call("clear_points_source", POINTS_SOURCE)
-	# time_stop is a kind-driven consumer like every other one here, and
-	# it lives on a node that does NOT survive a stage change: the arena's
-	# spawner is freed with its arena and the next one is born with an
-	# empty freeze clock, while this component (and the HUD tile counting
-	# it down) rode across on the raider. Re-pushed from the live row, so
-	# the freeze crosses with the party. freeze_enemies takes the MAX, so
-	# saying it again is free.
+	# time_stop vive en un nodo que NO sobrevive al cambio de etapa: el
+	# spawner se libera con su arena y el siguiente nace con el reloj de
+	# congelado vacío, mientras este componente (y la casilla del HUD) cruzan
+	# con el raider. Se vuelve a empujar desde la fila viva para que el
+	# congelado cruce con la party; freeze_enemies toma el MÁXIMO, así que
+	# repetirlo no cuesta nada.
 	var freeze_left := _remaining("time_stop")
 	if freeze_left > 0.0:
 		get_tree().call_group("enemy_spawner", "freeze_enemies", freeze_left)
 	var flying := has("flight")
 	if _was_flying and not flying and body != null and body.has_method("end_flight"):
-		# An edge, not a state: the raider may be hanging over a blocked
-		# cell and has to be put down somewhere walkable.
+		# Un flanco, no un estado: el raider puede estar sobre una celda
+		# bloqueada y hay que dejarlo en un lugar caminable.
 		body.call("end_flight")
 	_was_flying = flying
 	active_changed.emit()
+
+
+## Un número de la fila de catálogo del primer power-up vivo de este tipo
+## (la estrella enciende las filas normales, así que también vale con ella);
+## 0.0 si no hay ninguno.
+func _live_value(kind: String, field: String) -> float:
+	for entry: Dictionary in _active:
+		if String(entry.kind) == kind:
+			return float(PowerUpCatalog.by_id(String(entry.id)).get(field, 0.0))
+	return 0.0
 
 
 func _announce(row: Dictionary, duration: float) -> void:
@@ -250,8 +256,8 @@ func _duration_multiplier() -> float:
 	return stats.duration_multiplier if stats != null else 1.0
 
 
-## Coalesced: an area weapon can bank a dozen vampire kills in one frame
-## and each one would otherwise rebuild the whole stat layer.
+## Agrupado: un arma de área puede sumar una docena de bajas vampiro en un
+## frame, y cada una reconstruiría toda la capa de stats.
 func _request_recompute() -> void:
 	if _recompute_queued:
 		return

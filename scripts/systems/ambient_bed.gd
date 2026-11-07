@@ -1,23 +1,22 @@
 class_name AmbientBed
 extends AudioStreamPlayer
-## Barely-audible looping ambience (a synthesized wind bed from
-## scripts/tools/generate_sfx.gd — each arena assigns its biome's wav)
-## that kills the dead silence in the arenas.
-## Forces a seamless forward loop on its OWN copy of the imported wav —
-## the generated files carry no loop metadata, and the loaded resource is
-## shared process-wide — routes into the "Ambient" bus (created
-## by the Sfx autoload before any scene loads, volume owned by the
-## Settings autoload), and keeps breathing while the card UI or run-end
-## screen has the tree paused.
+## Ambiente en bucle apenas audible (un viento sintetizado por
+## scripts/tools/generate_sfx.gd; cada arena asigna el wav de su bioma) que
+## quita el silencio muerto de las arenas.
+## Fuerza un bucle continuo sobre SU PROPIA copia del wav importado (los
+## archivos generados no traen metadatos de bucle y el recurso cargado es
+## compartido), sale por el bus "Ambient" (lo crea el autoload Sfx antes de
+## cargar cualquier escena; su volumen lo maneja Settings) y sigue sonando
+## mientras la UI de cartas o la pantalla final pausan el árbol.
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	bus = Sfx.AMBIENT_BUS_NAME
 	var wav := stream as AudioStreamWAV
 	if wav != null and wav.loop_mode == AudioStreamWAV.LOOP_DISABLED:
-		# On a COPY: `stream` is the process-wide ResourceLoader entry, so
-		# looping it in place would make every other use of the same wav
-		# (a one-shot gust, say) loop forever and hold a voice for good.
+		# Sobre una COPIA: `stream` es la entrada global de ResourceLoader, y
+		# ponerla en bucle haría que todo otro uso del mismo wav sonara en
+		# bucle para siempre.
 		wav = wav.duplicate() as AudioStreamWAV
 		wav.loop_mode = AudioStreamWAV.LOOP_FORWARD
 		wav.loop_begin = 0
@@ -27,7 +26,7 @@ func _ready() -> void:
 		play()
 
 
-## Explicit stop so the playback is already marked released when the Sfx
-## autoload's shutdown flush (see sfx.gd _exit_tree) runs after us.
+## Parada explícita, para que la reproducción ya esté liberada cuando corra
+## después la limpieza de cierre del autoload Sfx (ver _exit_tree de sfx.gd).
 func _exit_tree() -> void:
 	stop()

@@ -1,9 +1,45 @@
-[gd_scene load_steps=2 format=3 uid="uid://cpwrup1ck2p0a"]
+[gd_scene load_steps=5 format=3 uid="uid://cpwrup1ck2p0a"]
 
 [ext_resource type="Script" path="res://scripts/systems/pickups/powerup_pickup.gd" id="1_pickup"]
+
+[sub_resource type="SphereShape3D" id="SphereShape3D_pickup"]
+radius = 1.6
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_gem"]
+resource_local_to_scene = true
+emission_enabled = true
+emission_energy_multiplier = 2.2
+
+[sub_resource type="SphereMesh" id="SphereMesh_gem"]
+radius = 0.42
+height = 1.008
+radial_segments = 6
+rings = 3
 
 [node name="PowerUpPickup" type="Area3D"]
 collision_layer = 0
 collision_mask = 1
 monitorable = false
 script = ExtResource("1_pickup")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.6, 0)
+shape = SubResource("SphereShape3D_pickup")
+
+[node name="Gem" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.75, 0)
+material_override = SubResource("StandardMaterial3D_gem")
+mesh = SubResource("SphereMesh_gem")
+
+[node name="Glyph" type="Label3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.15, 0)
+billboard = 1
+no_depth_test = true
+text = "?"
+font_size = 48
+outline_size = 12
+
+[node name="Light" type="OmniLight3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.8, 0)
+light_energy = 1.6
+omni_range = 5.0
