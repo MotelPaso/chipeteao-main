@@ -8,10 +8,20 @@ extends Area3D
 ## cuerpos y nadie detecta áreas, así que ser detectable solo costaría
 ## trabajo de física. NodePool guarda el valor al soltarla y lo restaura al
 ## reusarla.
+## Grupos: "enemy_bolts" lo pone EnemyBolt.tscn (el HUD de diagnóstico cuenta
+## las saetas vivas) y "enemy_projectiles" lo pone este script en _ready y en
+## pool_reset (EnemySpawner congela y descongela las saetas en vuelo). Los dos
+## se leen por nombre: no renombrarlos.
 
+@export_group("Vuelo")
+## Velocidad en metros por segundo.
 @export var speed: float = 10.0
-@export var damage: float = 8.0
+## Metros que recorre antes de volver al pool sin tocar nada.
 @export var max_distance: float = 30.0
+
+## Daño del golpe. Lo fija quien dispara en cada tiro (bolt_damage del
+## Skirmisher o del Fenwraith), después del reset del pool.
+var damage: float = 8.0
 
 ## El enemigo que la disparó, para que un golpe reflejado tenga a quién
 ## volver. Se limpia en cada reuso: una saeta del pool con el lanzador
@@ -24,10 +34,6 @@ var launcher: Node3D = null
 var frozen: bool = false
 
 var _travelled: float = 0.0
-## Daño por defecto de la escena, restaurado al reusarla (quien dispara lo
-## pisa en cada tiro DESPUÉS del reset del pool, así el daño de un shiny no
-## pasa a la siguiente saeta).
-var _default_damage: float = 8.0
 ## Se marca en cuanto la saeta se gasta. Pools.release DIFIERE el cambio de
 ## padre, así que el Area3D sigue detectando durante el resto del vaciado de
 ## señales: sin esta bandera dos raiders que entran en el mismo paso de
@@ -41,12 +47,10 @@ func _ready() -> void:
 	# libera), y el tiempo detenido tiene que encontrar cada saeta en vuelo
 	# sin recorrer todo el árbol.
 	add_to_group(&"enemy_projectiles")
-	_default_damage = damage
 
 
 ## Contrato de nodo del pool: vuelo nuevo en cada reuso.
 func pool_reset() -> void:
-	damage = _default_damage
 	_travelled = 0.0
 	_spent = false
 	frozen = false
