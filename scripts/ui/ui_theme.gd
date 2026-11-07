@@ -35,6 +35,10 @@ const TILE_BG := Color(0.07, 0.075, 0.11)
 const DIM := Color(0.03, 0.03, 0.05, 0.75)
 ## Destello (modulate) de "no alcanza" (ver reject).
 const REJECT_FLASH := Color(1.0, 0.42, 0.42)
+## Verde de la experiencia: barra de XP del HUD. Las gemas (XpGem.tscn), el
+## pulso de subida de nivel (juice.gd) y la baliza de essence_rift
+## (world_director.gd) guardan el mismo verde por su cuenta.
+const XP_GREEN := Color(0.35, 0.95, 0.6)
 
 ## Radio de las esquinas (píxeles): paneles y cartas, chips y botones.
 const RADIUS := 10
