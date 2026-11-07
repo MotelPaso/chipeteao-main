@@ -1,39 +1,39 @@
 class_name OddStump
 extends SecretTrigger
-## Hollow Woods secret (GDD 6): among the decorative stumps sits one with
-## a single glowing mushroom on top. Each interact makes it grumble louder
-## (floating flavor line + a volume-ramped rumble and a bigger shudder);
-## the third wakes what sleeps underneath. The awaken/spawn flow lives on
-## SecretTrigger.
+## Secreto del Bosque Hueco: entre los tocones decorativos hay uno con un solo
+## hongo brillante encima. Cada interacción lo hace gruñir más fuerte (frase
+## flotante, un retumbe con más volumen y una sacudida mayor); la tercera
+## despierta lo que duerme debajo. El despertar vive en SecretTrigger.
 
-## Interacts needed to wake the miniboss.
+@export_group("Tocón")
+## Interacciones necesarias para despertar al minijefe.
 @export var required_interacts: int = 3
-## Flavor line per interact (index = interact number - 1; the list's last
-## line repeats if the count somehow exceeds it).
+## Frase por interacción (índice = número de interacción - 1; si se acaban, se repite la última).
 @export var grumble_lines: Array[String] = [
 	"Un gruñido sordo sube por las raíces...",
 	"El gruñido crece. El hongo tiembla de rabia.",
 	"¡Las raíces revientan!",
 ]
+## Sonido (id de Sfx) de cada gruñido.
 @export var grumble_sound: StringName = &"burrow_pop"
-## First grumble's volume offset; each further interact adds the step, so
-## the stump audibly grumbles louder every time.
+## Volumen del primer gruñido, en dB.
 @export var grumble_volume_start_db: float = -10.0
+## dB que suma cada interacción siguiente, para que gruña más fuerte cada vez.
 @export var grumble_volume_step_db: float = 5.0
+@export_group("Sacudida")
+## Cuánto crece la sacudida con cada interacción, como fracción del tamaño.
+@export var shudder_step: float = 0.05
+## Segundos que tarda en aplastarse.
+@export var shudder_in_time: float = 0.08
+## Segundos que tarda en volver a su forma.
+@export var shudder_out_time: float = 0.22
 
-## Interacts landed so far (test hook).
+## Interacciones hechas hasta ahora (lo lee el harness).
 var interact_count: int = 0
-
-@onready var _visual: Node3D = $Visual
 
 var _shudder_tween: Tween
 
-
-## Prompt and banner defaults live here, next to the other Interactable
-## defaults; the scene only overrides them per instance.
-func _init() -> void:
-	prompt_text = "[E] Hurgar el tocón raro"
-	awaken_text = "¡Algo gordo y furioso se abre paso entre las raíces!"
+@onready var _visual: Node3D = $Visual
 
 
 func _interact(_player: Node) -> void:
@@ -48,13 +48,13 @@ func _interact(_player: Node) -> void:
 		_awaken()
 
 
-## Quick squash pulse that grows with each poke, selling the rising anger.
+## Pulso de aplastamiento que crece con cada golpe, para que se note la rabia.
 func _play_shudder() -> void:
-	var punch := 1.0 + 0.05 * float(interact_count)
+	var punch := 1.0 + shudder_step * float(interact_count)
 	if _shudder_tween != null and _shudder_tween.is_valid():
 		_shudder_tween.kill()
 	_visual.scale = Vector3.ONE
 	_shudder_tween = create_tween()
-	_shudder_tween.tween_property(_visual, "scale", Vector3(punch, 2.0 - punch, punch), 0.08)
-	_shudder_tween.tween_property(_visual, "scale", Vector3.ONE, 0.22) \
+	_shudder_tween.tween_property(_visual, "scale", Vector3(punch, 2.0 - punch, punch), shudder_in_time)
+	_shudder_tween.tween_property(_visual, "scale", Vector3.ONE, shudder_out_time) \
 			.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)

@@ -1,30 +1,67 @@
 class_name SecretTrigger
 extends Interactable
-## Base for the hidden-boss triggers (GDD 6): a disguised world object
-## that, once its activation condition is met (subclass-defined), spends
-## itself and spawns its miniboss nearby with a warning banner — the one
-## awaken flow both secrets share. One use per run (consume pattern);
-## scene reload resets it naturally. No meta stat: the quest counters ride
-## on the miniboss KILL (SecretBossBase), not on the trigger.
+## Base de los disparadores de jefe oculto: un objeto disfrazado del mundo
+## que, al cumplirse su condición (la define la subclase), se gasta y hace
+## aparecer su minijefe cerca con un cartel de aviso. Un uso por partida; la
+## escena se reinicia sola al recargar. Sin contador propio: las misiones
+## cuentan la MUERTE del minijefe (SecretBossBase).
 ##
-## NEVER a map marker (iteration 52): `marker_kind` stays empty on purpose.
-## A secret you can read off the Tab map is not a secret — finding these is
-## the whole mechanic.
+## NUNCA es un marcador de mapa: `marker_kind` queda vacío a propósito,
+## porque encontrarlos es la mecánica entera.
 
-## Hidden miniboss scene (root must extend BossBase) this trigger awakens.
+@export_group("Secreto")
+## Escena del minijefe oculto (su raíz debe extender BossBase).
 @export var miniboss_scene: PackedScene
-## Where the miniboss lands, relative to the trigger (world axes) — point
-## it toward open ground/arena center.
+## Dónde aparece el minijefe respecto del disparador (ejes del mundo, metros); apúntalo a terreno abierto.
 @export var spawn_offset: Vector3 = Vector3(4.0, 0.1, -4.0)
-## Boss-warning banner line shown through the "boss_ui" group on awaken.
+## Línea del cartel de aviso (grupo "boss_ui") al despertar.
 @export var awaken_text: String = "Algo oculto se remueve..."
+@export_group("Frase flotante")
+## Tamaño de letra de la frase flotante (show_flavor), en píxeles.
+@export var flavor_font_size: int = 48
+## Grosor del contorno de la frase, en píxeles.
+@export var flavor_outline_size: int = 12
+## Color de la frase.
+@export var flavor_color: Color = Color(0.9, 0.98, 0.7)
+## Altura a la que aparece la frase sobre el disparador, en metros.
+@export var flavor_height: float = 2.2
+## Metros que sube la frase mientras dura.
+@export var flavor_rise: float = 1.0
+## Segundos que dura la frase.
+@export var flavor_time: float = 1.4
+## Segundos que espera la frase antes de empezar a desvanecerse.
+@export var flavor_fade_delay: float = 0.9
+## Segundos que tarda en desvanecerse.
+@export var flavor_fade_time: float = 0.5
 
-## The awakened miniboss instance (null until spawned; test hook).
+## El minijefe despertado (null hasta que aparece; lo lee el harness).
 var spawned_boss: BossBase = null
 
 
-## Spends the trigger and brings out the miniboss. Idempotent guard on
-## `available` so a subclass can never double-awaken.
+## Frase flotante corta sobre el disparador. Va colgada de la arena para que
+## sobreviva a los cambios de estado del disparador.
+func show_flavor(line: String) -> void:
+	var scene_root := RunRoot.stage_parent(get_tree())
+	if scene_root == null:
+		return
+	var label := Label3D.new()
+	label.text = line
+	label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	label.no_depth_test = true
+	label.font_size = flavor_font_size
+	label.outline_size = flavor_outline_size
+	label.modulate = flavor_color
+	scene_root.add_child(label)
+	label.global_position = global_position + Vector3.UP * flavor_height
+	var tween := label.create_tween()
+	tween.set_parallel(true)
+	tween.tween_property(label, "position:y", label.position.y + flavor_rise, flavor_time)
+	tween.tween_property(label, "modulate:a", 0.0, flavor_fade_time).set_delay(flavor_fade_delay)
+	tween.chain().tween_callback(label.queue_free)
+
+
+## Gasta el disparador y saca al minijefe. El guardia sobre `available`
+## impide que una subclase lo despierte dos veces.
 func _awaken() -> void:
 	if not available:
 		return
@@ -38,8 +75,8 @@ func _awaken() -> void:
 func _spawn_miniboss() -> void:
 	if miniboss_scene == null:
 		return
-	# The ARENA, not current_scene (iteration 49): a miniboss belongs to
-	# the stage that woke it, and follows the map when the party leaves.
+	# Va colgado de la ARENA, no de current_scene: el minijefe es de la etapa
+	# que lo despertó.
 	var scene_root := RunRoot.stage_parent(get_tree())
 	if scene_root == null:
 		return
@@ -52,27 +89,5 @@ func _spawn_miniboss() -> void:
 	spawned_boss = boss
 	scene_root.add_child(boss)
 	boss.global_position = global_position + spawn_offset
-	# One-line log (spawner convention) so headless runs can confirm it.
+	# Línea de log para las corridas headless.
 	print("Secret miniboss awakened: %s" % boss.boss_title)
-
-
-## Short floating flavor line above the trigger (the damage-popup styling,
-## warmer color); parented to the scene root so it outlives state changes.
-func show_flavor(line: String) -> void:
-	var scene_root := RunRoot.stage_parent(get_tree())
-	if scene_root == null:
-		return
-	var label := Label3D.new()
-	label.text = line
-	label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
-	label.no_depth_test = true
-	label.font_size = 48
-	label.outline_size = 12
-	label.modulate = Color(0.9, 0.98, 0.7)
-	scene_root.add_child(label)
-	label.global_position = global_position + Vector3.UP * 2.2
-	var tween := label.create_tween()
-	tween.set_parallel(true)
-	tween.tween_property(label, "position:y", label.position.y + 1.0, 1.4)
-	tween.tween_property(label, "modulate:a", 0.0, 0.5).set_delay(0.9)
-	tween.chain().tween_callback(label.queue_free)

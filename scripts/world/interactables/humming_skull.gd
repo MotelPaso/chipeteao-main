@@ -1,36 +1,39 @@
 class_name HummingSkull
 extends SecretTrigger
-## Ash Dunes secret (GDD 6): a bone pile whose skull carries a faint teal
-## glow and hums. Press E inside the ring to LISTEN: a channel that only
-## advances while the player stands still — any real movement (or stepping
-## out of the ring) cancels it back to zero — and completes after
-## listen_time seconds, unearthing the miniboss. The awaken/spawn flow
-## lives on SecretTrigger.
+## Secreto de Dunas de Ceniza: una pila de huesos cuyo cráneo brilla turquesa
+## y zumba. Con E dentro del anillo se ESCUCHA: un canal que solo avanza si el
+## raider que apretó se queda quieto (moverse o salir lo reinicia a cero) y
+## que al cumplir listen_time despierta al minijefe. El despertar vive en
+## SecretTrigger.
 
-## Glow breathing rates: slow while dormant, fluttering during a listen.
-const GLOW_IDLE_HZ: float = 1.6
-const GLOW_LISTEN_HZ: float = 9.0
-const GLOW_SWING: float = 0.25
-
-## Seconds of stand-still listening needed to trigger.
+@export_group("Escucha")
+## Segundos de escucha quieto para despertarlo.
 @export var listen_time: float = 4.0
-## Flat player speed above this counts as moving (cancels the channel).
+## Velocidad horizontal (m/s) por encima de la cual el raider cuenta como en movimiento.
 @export var still_speed_limit: float = 0.2
-## Movement inside this initial window is forgiven (progress just doesn't
-## accrue), so pressing E while gliding to a stop isn't an instant cancel.
+## Segundos iniciales en los que moverse no cancela (solo no suma), para apretar E mientras frenas.
 @export var start_grace: float = 0.4
-@export var cancel_prompt: String = "[E] El zumbido se apartó — no te muevas"
-## Shared with the charge altars, so it goes through the ref-counted
-## _hold_loop/_drop_loop pair: whoever stops first must not silence the
-## other emitters still holding it.
+## Loop de Sfx compartido con los altares de carga (va con contador por _hold_loop/_drop_loop).
 @export var hum_loop: StringName = &"shrine_channel"
+@export_group("Textos")
+## Aviso mientras escucha; %d%% es el porcentaje.
+@export var listening_prompt: String = "Escuchando... %d%%"
+## Aviso tras cancelar la escucha por moverse.
+@export var cancel_prompt: String = "[E] El zumbido se apartó — no te muevas"
+@export_group("Brillo")
+## Velocidad del latido de la luz en reposo, en radianes por segundo.
+@export var glow_idle_speed: float = 1.6
+## Velocidad del latido mientras se escucha, en radianes por segundo.
+@export var glow_listen_speed: float = 9.0
+## Cuánto varía la luz al latir, como fracción de su energía (0-1).
+@export var glow_swing: float = 0.25
 
-## True while the listening channel runs (test hook).
+## true mientras corre la escucha (lo lee el harness).
 var listening: bool = false
-## Accrued stand-still seconds (resets on cancel; test hook).
+## Segundos quieto acumulados (vuelve a 0 al cancelar; lo lee el harness).
 var progress: float = 0.0
 
-## The raider who pressed interact: the channel measures THEIR stillness.
+## El raider que apretó: el canal mide SU quietud, no la del más cercano.
 var _listener: Node3D = null
 var _listen_age: float = 0.0
 var _idle_prompt: String
@@ -38,14 +41,6 @@ var _glow_base_energy: float = 1.0
 var _time: float = 0.0
 
 @onready var _glow_light: OmniLight3D = $Visual/GlowLight
-
-
-## Prompt and banner defaults live here, next to meta_stat_id and
-## complete_sound (Interactable's convention). The scene only overrides
-## them when one placed instance has to say something different.
-func _init() -> void:
-	prompt_text = "[E] Escuchar el cráneo zumbante"
-	awaken_text = "El zumbido era un cebo: ¡la arena vomita un cofre!"
 
 
 func _ready() -> void:
@@ -56,15 +51,14 @@ func _ready() -> void:
 
 func _physics_process(delta: float) -> void:
 	_time += delta
-	# The glow breathes slowly while dormant and flutters during a listen.
-	var rate := GLOW_LISTEN_HZ if listening else GLOW_IDLE_HZ
-	_glow_light.light_energy = _glow_base_energy * (1.0 + GLOW_SWING * sin(_time * rate))
+	# El brillo respira lento en reposo y aletea durante la escucha.
+	var rate := glow_listen_speed if listening else glow_idle_speed
+	_glow_light.light_energy = _glow_base_energy * (1.0 + glow_swing * sin(_time * rate))
 	if not listening:
 		return
 	_listen_age += delta
-	# The LISTENER's stillness, not the nearest body's: measuring the
-	# closest raider made the secret impossible in co-op, because a
-	# team-mate jogging past (without even entering the ring) cancelled it.
+	# La quietud de QUIEN ESCUCHA: en co-op, un compañero que pasa corriendo
+	# no cancela.
 	if not is_instance_valid(_listener):
 		_cancel_listen()
 		return
@@ -78,7 +72,7 @@ func _physics_process(delta: float) -> void:
 			_cancel_listen()
 		return
 	progress += delta
-	set_prompt("Escuchando... %d%%" % roundi(clampf(progress / listen_time, 0.0, 1.0) * 100.0))
+	set_prompt(listening_prompt % roundi(clampf(progress / listen_time, 0.0, 1.0) * 100.0))
 	if progress >= listen_time:
 		_complete_listen()
 
@@ -99,8 +93,8 @@ func _on_range_exited() -> void:
 		_cancel_listen()
 
 
-## Moving (or leaving the ring) wipes the channel entirely — unlike the
-## Charge Shrine there is no resume; listening restarts from silence.
+## Moverse (o salir del anillo) borra el canal entero: a diferencia del altar
+## de carga no hay reanudar, la escucha empieza de cero.
 func _cancel_listen() -> void:
 	listening = false
 	_listener = null

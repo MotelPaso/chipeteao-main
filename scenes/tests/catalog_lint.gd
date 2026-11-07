@@ -28,8 +28,10 @@ const WORLD_DIRECTOR := preload("res://scripts/world/run/world_director.gd")
 ## hay reflexión para un bloque match, y copiar la lista aquí serían dos
 ## verdades que se separan con el próximo stat.
 const PLAYER_STATS_PATH := "res://scripts/systems/player_stats.gd"
-## Carpetas donde se buscan asignaciones `marker_kind = &"..."`.
+## Carpetas de scripts del juego.
 const SCRIPT_ROOTS: Array[String] = ["res://scripts"]
+## Carpetas donde se buscan asignaciones `marker_kind = &"..."`, en .gd y .tscn.
+const MARKER_ROOTS: Array[String] = ["res://scripts", "res://scenes"]
 ## Escenas donde se buscan los `secret_boss_id` de los jefes secretos.
 const SCENE_ROOTS: Array[String] = ["res://scenes"]
 ## Scripts de enemigos: EnemyBase cuenta las bajas en kills_<nombre del script>.
@@ -442,13 +444,13 @@ func _check_marker_labels() -> void:
 	_report("marker_labels", rows, failures)
 
 
-## Cada asignación `marker_kind = &"..."` del código, como
-## [tipo, "archivo.gd:línea"]. Se lee como texto porque los tipos se asignan
-## en _init() de escenas que este lint nunca instancia.
+## Cada asignación `marker_kind = &"..."` del código y de las escenas, como
+## [tipo, "archivo:línea"]. Se lee como texto porque los tipos se asignan en
+## _init() o en .tscn que este lint nunca instancia.
 func _assigned_marker_kinds() -> Array[Array]:
 	var found: Array[Array] = []
 	var pattern := RegEx.create_from_string('marker_kind\\s*=\\s*&"([a-z_]+)"')
-	for path: String in _gd_files(SCRIPT_ROOTS):
+	for path: String in _gd_files(MARKER_ROOTS) + _gd_files(MARKER_ROOTS, ".tscn"):
 		var file := FileAccess.open(path, FileAccess.READ)
 		if file == null:
 			continue

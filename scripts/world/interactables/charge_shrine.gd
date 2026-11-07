@@ -1,83 +1,25 @@
 class_name ChargeShrine
 extends Interactable
-## Charge altar (iteration 47 rules): charges BY ITSELF while any raider
-## stands inside the ring — no button. The ring is wide (three times the
-## old one) and MARKS ITSELF as you approach: within twice its radius it
-## brightens and pulses, so an altar reads as an invitation from across
-## the field instead of only once you are already standing in it.
+## Altar de carga: se carga SOLO mientras algún raider está dentro del anillo,
+## sin botón. Salir del anillo pausa la carga y volver a entrar la reanuda;
+## un altar que nadie toca espera para siempre. Con un raider cerca
+## (approach_band_scale radios) el anillo brilla y late para invitar desde lejos.
 ##
-## What changed in iteration 47, and why:
-##   - No spawn surges. Calling a burst down on the altar punished the one
-##     thing the altar asks you to do (stand still), so the ritual is now
-##     free and the pressure comes from the run's own ramp.
-##   - No timeouts and no forfeits. Leaving the ring PAUSES the charge and
-##     stepping back in resumes it; an untouched altar waits forever.
-##     There is no longer any difference between a scene-placed altar and
-##     one the WorldDirector raised: the old `idle_lifetime > 0` flag was
-##     the single discriminator for three different behaviors and it made
-##     two altars that look identical behave differently.
-##   - Every altar sinks after it pays (spent_lifetime), director-spawned
-##     or authored into the arena alike, so a spent one stops advertising
-##     a prize it no longer has.
-##   - Completing opens a CHOICE of three boons on the card picker instead
-##     of rolling one at random; the raider who held the ring picks, and
-##     the boon lands on the whole party (PlayerStats.add_altar_boon),
-##     independent of level-up cards. Master Keys still speed the fill and
-##     enlarge the boon.
+## Al completar abre una elección de tres dones en el selector de cartas: la
+## elige el raider que sostuvo el anillo y el don llega a toda la party
+## (PlayerStats.add_altar_boon). Las Llaves maestras aceleran la carga y
+## agrandan el don. Todo altar se hunde tras pagar (spent_lifetime).
 
-## Seconds of in-ring time needed to complete.
-@export var channel_time: float = 8.0
-## Seconds a SPENT altar lingers before sinking away. Every altar sinks
-## once it has paid — there is no permanent-scenery exception any more.
-@export var spent_lifetime: float = 8.0
-## Boon size multiplier (the demonic altar pays more).
-@export var boon_scale: float = 1.0
-@export var completed_text: String = "El altar zumba: %s para todos"
-## Card-picker title and ribbon tag for the choice this altar opens.
-@export var choice_title: String = "El altar te ofrece un don"
-@export var choice_tag: String = "Bendición"
-@export_group("Master Key")
-@export var key_speed_per_copy: float = 0.2
-@export var key_boon_per_copy: float = 0.2
-
-## Sfx loop held while channeling (ref-counted through _hold_loop, so the
-## Humming Skull can hold the same voice at the same time).
-const CHANNEL_LOOP: StringName = &"shrine_channel"
-
-## Idle bob/spin of the crystal, and the faster pulse while charging.
-const CRYSTAL_SPIN: float = 1.4
-const CRYSTAL_BOB_HZ: float = 2.1
-const CRYSTAL_BOB_HEIGHT: float = 0.12
-const CRYSTAL_PULSE_HZ: float = 9.0
-const CRYSTAL_PULSE_AMOUNT: float = 0.12
-## Fallback ring radius when the scene ships no cylindrical zone shape.
-## Matches ChargeShrine.tscn, so a malformed altar still looks right.
-const DEFAULT_ZONE_RADIUS: float = 9.3
-## The progress disc sits just inside the ring: derived from the zone
-## shape, never a constant of its own — the two used to be separate
-## numbers and the disc quietly stopped matching the ring it fills.
-const PROGRESS_DISC_SHARE: float = 0.97
-## A raider within this many ring radii marks the altar (brighter, pulsing).
-const APPROACH_BAND_SCALE: float = 2.0
-const MARK_PULSE_HZ: float = 3.4
-## Ring/disc emission at rest, while marked, and while charging.
-const RING_ENERGY_IDLE: float = 1.1
-const RING_ENERGY_MARKED: float = 3.0
-const RING_ENERGY_CHANNEL: float = 3.6
-const RING_ALPHA_IDLE: float = 0.55
-const RING_ALPHA_MARKED: float = 0.85
-const PROGRESS_DISC_ALPHA: float = 0.26
-## Boons offered on completion.
+## Dones ofrecidos al completar (la UI de cartas tiene tres huecos).
 const ALTAR_CHOICE_COUNT: int = 3
-## Prompt shown after an interrupted charge. There is no button anywhere on
-## this altar (see _init), so the resume line points back at the ring
-## instead of promising a key nobody can press.
-const RESUME_TEXT: String = "Vuelve a entrar para reanudar (%d%%)"
+## Radio de respaldo si la escena no trae una zona cilíndrica, en metros.
+const DEFAULT_ZONE_RADIUS: float = 9.3
+## Id del objeto que acelera la carga y agranda el don (ItemCatalog).
+const MASTER_KEY_ID: String = "master_key"
 
-## Flat boons a charge can land on: {stat, amount, name, label}.
-## `stat` is a PlayerStats id; `name` titles the card (glosario: caja baja
-## tipo oración) and `label` carries exactly one "%d", filled with the
-## rarity-free, key-scaled amount.
+## Dones planos que puede dar un altar: {stat, amount, name, label}. `stat`
+## es un id de PlayerStats; `name` titula la carta (caja baja tipo oración)
+## y `label` lleva exactamente un "%d" con la cantidad ya escalada.
 const ALTAR_BOONS: Array[Dictionary] = [
 	{"stat": "damage", "amount": 10.0, "name": "Furia", "label": "daño +%d%%"},
 	{"stat": "cooldown", "amount": 6.0, "name": "Ritmo",
@@ -91,70 +33,186 @@ const ALTAR_BOONS: Array[Dictionary] = [
 		"label": "prob. de crítico +%d%%"},
 	{"stat": "xp_gain", "amount": 8.0, "name": "Sabiduría",
 		"label": "ganancia de XP +%d%%"},
-	# The demonic altar scales this one past 1, so the label has to hold
-	# for both counts ("+1 proyectil(es)" reads as a set, not a typo).
+	# El altar demoníaco escala este por encima de 1: la etiqueta vale para
+	# ambos números.
 	{"stat": "projectiles", "amount": 1.0, "name": "Multitud",
 		"label": "+%d proyectil(es)"},
-	# Iteration 48 stats. "Salto" is capped inside PlayerStats
-	# (MAX_EXTRA_JUMPS), so a lucky run cannot stack it into flight.
+	# PlayerStats limita los saltos (MAX_EXTRA_JUMPS).
 	{"stat": "jumps", "amount": 1.0, "name": "Impulso", "label": "+%d salto(s)"},
 	{"stat": "powerup_chance", "amount": 10.0, "name": "Fortuna menor",
 		"label": "prob. de power-up +%d%%"},
 ]
 
+@export_group("Carga")
+## Segundos dentro del anillo para completar la carga.
+@export var channel_time: float = 8.0
+## Segundos que espera un altar gastado antes de hundirse.
+@export var spent_lifetime: float = 8.0
+## Loop de Sfx mientras se carga; va con contador (_hold_loop) porque el Cráneo zumbante usa la misma voz.
+@export var channel_loop: StringName = &"shrine_channel"
+## Multiplicador del tamaño del don (el altar demoníaco paga más).
+@export var boon_scale: float = 1.0
+@export_group("Llave maestra")
+## Velocidad de carga extra por cada Llave maestra (0.2 = +20 % por copia).
+@export var key_speed_per_copy: float = 0.2
+## Tamaño extra del don por cada Llave maestra (0.2 = +20 % por copia).
+@export var key_boon_per_copy: float = 0.2
+@export_group("Textos")
+## Aviso mientras carga; %d%% es el porcentaje.
+@export var charging_prompt: String = "Cargando... %d%%"
+## Aviso tras salir a mitad de carga; %d%% es el porcentaje guardado (no hay botón: manda de vuelta al anillo).
+@export var resume_prompt: String = "Vuelve a entrar para reanudar (%d%%)"
+## Título de la elección que abre el altar en el selector de cartas.
+@export var choice_title: String = "El altar te ofrece un don"
+## Etiqueta (cinta) de las cartas de la elección.
+@export var choice_tag: String = "Bendición"
+## Descripción de cada carta de don; %s es la etiqueta del don.
+@export var boon_description: String = "%s para toda la party"
+## Anuncio al recibir el don; %s es la etiqueta del don.
+@export var completed_text: String = "El altar zumba: %s para todos"
+@export_group("Anillo")
+## Color del anillo, del disco de progreso y de las cartas; tiñe los materiales de Ring y ProgressDisc (el resto del material sale de la escena).
+@export var accent_color: Color = Color(0.4, 0.8, 1.0)
+## Un raider en pie a menos de estos radios de zona marca el altar (brilla y late).
+@export var approach_band_scale: float = 2.0
+## Velocidad del latido del anillo marcado, en radianes por segundo.
+@export var mark_pulse_speed: float = 3.4
+## Energía de emisión del anillo y del disco en reposo.
+@export var ring_energy_idle: float = 1.1
+## Energía máxima del latido con un raider cerca.
+@export var ring_energy_marked: float = 3.0
+## Energía mientras carga.
+@export var ring_energy_channel: float = 3.6
+## Opacidad del anillo en reposo (0-1).
+@export_range(0.0, 1.0) var ring_alpha_idle: float = 0.55
+## Opacidad máxima del anillo marcado o cargando (0-1).
+@export_range(0.0, 1.0) var ring_alpha_marked: float = 0.85
+## Opacidad del disco de progreso (0-1).
+@export_range(0.0, 1.0) var disc_alpha: float = 0.26
+@export_group("Cristal")
+## Giro del cristal, en radianes por segundo.
+@export var crystal_spin_speed: float = 1.4
+## Velocidad del vaivén del cristal, en radianes por segundo.
+@export var crystal_bob_speed: float = 2.1
+## Altura del vaivén del cristal, en metros.
+@export var crystal_bob_height: float = 0.12
+## Velocidad del pulso del cristal mientras carga, en radianes por segundo.
+@export var crystal_pulse_speed: float = 9.0
+## Cuánto crece el cristal en el pulso, como fracción de su tamaño.
+@export var crystal_pulse_amount: float = 0.12
+
 var channeling: bool = false
 var progress: float = 0.0
 var _time: float = 0.0
 var _leaving: bool = false
-var _crystal: MeshInstance3D = null
-var _progress_disc: MeshInstance3D = null
-var _ring: MeshInstance3D = null
 var _crystal_rest_y: float = 0.0
-## Radius of this altar's own zone shape; the ring visuals, the approach
-## band and the progress disc all derive from it.
+## Radio de la zona de este altar; de él sale la banda de acercamiento.
 var _zone_radius: float = DEFAULT_ZONE_RADIUS
-## Per-instance materials for the ring and the disc (see _own_material).
+## Materiales propios del anillo y el disco (ver _own_material).
 var _ring_material: StandardMaterial3D = null
 var _disc_material: StandardMaterial3D = null
-## Last energy/alpha _tick_marking wrote into those materials (NAN = never,
-## so the first tick always writes). An idle altar sits at the same values
-## for minutes, and every material write re-uploads its uniforms; nothing
-## else writes these two materials, so skipping a same-value write draws
-## exactly what rewriting it did.
+## Última energía/alfa escritas por _tick_marking (NAN = nunca). Un altar
+## quieto repite los mismos valores por minutos y cada escritura vuelve a
+## subir el material; saltar la escritura repetida dibuja lo mismo.
 var _marked_energy: float = NAN
 var _marked_alpha: float = NAN
 
-
-func _init() -> void:
-	meta_stat_id = "shrines_used"
-	marker_kind = &"altar"
-	# Proximity charges the altar; there is no button, so the prompt must
-	# not offer one. Scenes MUST NOT override this (a scene value wins over
-	# _init and used to put a dead "[E] ..." line back on the label).
-	prompt_text = "Quédate dentro para cargar"
+## El altar demoníaco no tiene cristal ni anillo; el disco está en las dos escenas.
+@onready var _crystal: MeshInstance3D = get_node_or_null("Visual/Crystal") as MeshInstance3D
+@onready var _ring: MeshInstance3D = get_node_or_null("Visual/Ring") as MeshInstance3D
+@onready var _progress_disc: MeshInstance3D = $Visual/ProgressDisc
 
 
 func _ready() -> void:
 	super()
-	# The WorldDirector caps how many UNSPENT altars may stand at once and
-	# has no other way to find the ones an arena shipped; groups over node
-	# paths, as everywhere else.
+	# El WorldDirector limita los altares SIN GASTAR a la vez y encuentra los
+	# de la arena por este grupo.
 	add_to_group("altars")
 	_zone_radius = _measure_zone_radius()
-	_crystal = get_node_or_null("Visual/Crystal") as MeshInstance3D
 	if _crystal != null:
 		_crystal_rest_y = _crystal.position.y
-	_ring = get_node_or_null("Visual/Ring") as MeshInstance3D
-	_ring_material = _own_material(_ring, RING_ALPHA_IDLE, RING_ENERGY_IDLE)
-	_progress_disc = get_node_or_null("Visual/ProgressDisc") as MeshInstance3D
-	if _progress_disc == null:
-		_progress_disc = _build_progress_disc()
-	_disc_material = _own_material(_progress_disc, PROGRESS_DISC_ALPHA, RING_ENERGY_IDLE)
+	_ring_material = _own_material(_ring, ring_alpha_idle, ring_energy_idle)
+	_disc_material = _own_material(_progress_disc, disc_alpha, ring_energy_idle)
 
 
-## Radius of this altar's charge zone, read off the scene's own shape so
-## the ring visuals, the approach band and the disc can never drift from
-## the area the player is actually standing in.
+func _physics_process(delta: float) -> void:
+	if _leaving:
+		return
+	_time += delta
+	if _crystal != null:
+		_crystal.rotate_y(delta * crystal_spin_speed)
+		_crystal.position.y = _crystal_rest_y + sin(_time * crystal_bob_speed) * crystal_bob_height
+		var pulse := crystal_pulse_amount * sin(_time * crystal_pulse_speed) if channeling else 0.0
+		_crystal.scale = Vector3.ONE * (1.0 + pulse)
+	_tick_marking()
+	if not channeling:
+		# Una carga pausada se reanuda por cercanía, y body_entered NO vuelve
+		# a dispararse para un raider reanimado en el sitio (su cuerpo nunca
+		# salió del área). Por eso se sondea el anillo aquí. player_in_range
+		# va primero: si es false, la lista de vivos está vacía seguro y se
+		# evita armarla en cada frame.
+		if available and player_in_range and not live_players_in_range().is_empty():
+			_on_range_entered()
+		return
+	# Un raider caído nunca sale del Area3D: sin esta comprobación un cuerpo
+	# sostendría el ritual.
+	if live_players_in_range().is_empty():
+		_on_range_exited()
+		return
+	progress += delta * _charge_speed()
+	_progress_disc.visible = true
+	var fraction := clampf(progress / channel_time, 0.001, 1.0)
+	_progress_disc.scale = Vector3(fraction, 1.0, fraction)
+	set_prompt(charging_prompt % roundi(fraction * 100.0))
+	if progress >= channel_time:
+		_complete()
+
+
+## Tamaño de un don: la cantidad base, la escala de este altar y las Llaves
+## maestras de quien carga. Nunca menos de 1.
+func boon_amount(base: float, keys: int) -> float:
+	var amount := base * _effective_boon_scale() * (1.0 + key_boon_per_copy * float(keys))
+	return maxf(roundf(amount), 1.0)
+
+
+## Don plano para toda la party. Los caídos también cuentan (dejan el grupo
+## "player" al caer, pero el don es para toda la partida).
+func grant_boon(stat: String, amount: float) -> void:
+	for group: String in ["player", "downed_players"]:
+		for node: Node in get_tree().get_nodes_in_group(group):
+			var stats := PlayerStats.find_in(node)
+			if stats != null:
+				stats.add_altar_boon(stat, amount)
+
+
+func _interact(_player: Node) -> void:
+	pass  # la cercanía hace todo; el botón no hace nada
+
+
+## Sin botón: entrar empieza (o reanuda) la carga.
+func _on_range_entered() -> void:
+	if not available or channeling or _leaving:
+		return
+	channeling = true
+	# Con contador: otro altar o el Cráneo zumbante pueden sostener la misma
+	# voz a la vez.
+	_hold_loop(channel_loop)
+	_emit_started()
+
+
+## Salir a mitad de carga solo la PAUSA: el progreso se guarda y volver a
+## entrar la reanuda.
+func _on_range_exited() -> void:
+	if not channeling:
+		return
+	channeling = false
+	_drop_loop()
+	_emit_cancelled()
+	set_prompt(resume_prompt % roundi(clampf(progress / channel_time, 0.0, 1.0) * 100.0))
+
+
+## Radio de la zona de carga, leído de la forma de la escena para que la
+## banda de acercamiento coincida con el área real.
 func _measure_zone_radius() -> float:
 	for child: Node in get_children():
 		var shape_node := child as CollisionShape3D
@@ -166,104 +224,40 @@ func _measure_zone_radius() -> float:
 	return DEFAULT_ZONE_RADIUS
 
 
-## A material this altar owns. Both the ring and the disc are tinted and
-## pulsed every frame, and a .tscn [sub_resource] is ONE object shared by
-## every instance of the scene (project convention), so writing through
-## the scene's own material would pulse every altar in the arena at once.
+## Copia propia del material de la escena de `target`, teñida con
+## accent_color (el resto del material sale de la escena). Cada altar
+## necesita la suya: el anillo y el disco laten por instancia, y un
+## [sub_resource] de la escena lo comparten todas las instancias.
 func _own_material(target: MeshInstance3D, alpha: float,
 		energy: float) -> StandardMaterial3D:
 	if target == null:
 		return null
-	var material := StandardMaterial3D.new()
-	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	material.albedo_color = Color(_accent_color(), alpha)
-	material.emission_enabled = true
-	material.emission = _accent_color()
+	var source := target.get_active_material(0) as StandardMaterial3D
+	if source == null:
+		push_warning("ChargeShrine: %s has no StandardMaterial3D to tint" % target.name)
+		return null
+	var material := source.duplicate() as StandardMaterial3D
+	material.albedo_color = Color(accent_color, alpha)
+	material.emission = accent_color
 	material.emission_energy_multiplier = energy
 	target.material_override = material
 	return material
 
 
-## Flat disc that grows with the charge (built here for altar scenes
-## that don't ship one, e.g. the demonic obelisk).
-func _build_progress_disc() -> MeshInstance3D:
-	var disc := MeshInstance3D.new()
-	var mesh := CylinderMesh.new()
-	var radius := _zone_radius * PROGRESS_DISC_SHARE
-	mesh.top_radius = radius
-	mesh.bottom_radius = radius
-	mesh.height = 0.04
-	# Same 64 sides as the scene's ProgressDisc (a 9 m disc has to stay
-	# round against its ring); no height rings on a 4 cm slab.
-	mesh.radial_segments = 64
-	mesh.rings = 1
-	disc.mesh = mesh
-	disc.position.y = 0.06
-	disc.scale = Vector3(0.001, 1.0, 0.001)
-	disc.visible = false
-	add_child(disc)
-	return disc
-
-
-## Ring/disc color; the demonic altar overrides it red.
-func _accent_color() -> Color:
-	return Color(0.4, 0.8, 1.0)
-
-
-func _physics_process(delta: float) -> void:
-	if _leaving:
-		return
-	_time += delta
-	if _crystal != null:
-		_crystal.rotate_y(delta * CRYSTAL_SPIN)
-		_crystal.position.y = _crystal_rest_y + sin(_time * CRYSTAL_BOB_HZ) * CRYSTAL_BOB_HEIGHT
-		var pulse := CRYSTAL_PULSE_AMOUNT * sin(_time * CRYSTAL_PULSE_HZ) if channeling else 0.0
-		_crystal.scale = Vector3.ONE * (1.0 + pulse)
-	_tick_marking()
-	if not channeling:
-		# A banked charge restarts on proximity, and body_entered will NOT
-		# fire again for a raider revived on the spot (the corpse never
-		# left the Area3D, so the cancel below came from the live-players
-		# check, not from an exit). Polling the ring here is what keeps
-		# such an altar from sitting on its resume prompt forever.
-		# player_in_range first: it is true whenever the backing array holds
-		# anybody (Interactable keeps the two in step), and the live list is
-		# a subset of that array, so an empty ring can skip the two arrays
-		# live_players_in_range() would build every frame for nothing.
-		if available and player_in_range and not live_players_in_range().is_empty():
-			_on_range_entered()
-		return
-	# A downed raider never leaves the Area3D, so body_exited alone would
-	# let a corpse hold the ritual.
-	if live_players_in_range().is_empty():
-		_on_range_exited()
-		return
-	progress += delta * _charge_speed()
-	_progress_disc.visible = true
-	var fraction := clampf(progress / channel_time, 0.001, 1.0)
-	_progress_disc.scale = Vector3(fraction, 1.0, fraction)
-	set_prompt("Cargando... %d%%" % roundi(fraction * 100.0))
-	if progress >= channel_time:
-		_complete()
-
-
-## The ring reads at three distances: dim at rest, bright and pulsing once
-## a raider is inside the approach band, brightest while charging. Without
-## this an altar was invisible until you were already standing in it, which
-## is exactly the walk nobody made.
+## El anillo se lee a tres distancias: tenue en reposo, brillante y latiendo
+## con un raider dentro de la banda de acercamiento, y al máximo cargando.
 func _tick_marking() -> void:
 	if _ring_material == null and _disc_material == null:
 		return
-	var energy := RING_ENERGY_IDLE
-	var alpha := RING_ALPHA_IDLE
+	var energy := ring_energy_idle
+	var alpha := ring_alpha_idle
 	if channeling:
-		energy = RING_ENERGY_CHANNEL
-		alpha = RING_ALPHA_MARKED
+		energy = ring_energy_channel
+		alpha = ring_alpha_marked
 	elif available and _player_near():
-		var beat := 0.5 + 0.5 * sin(_time * MARK_PULSE_HZ)
-		energy = lerpf(RING_ENERGY_IDLE, RING_ENERGY_MARKED, beat)
-		alpha = lerpf(RING_ALPHA_IDLE, RING_ALPHA_MARKED, beat)
+		var beat := 0.5 + 0.5 * sin(_time * mark_pulse_speed)
+		energy = lerpf(ring_energy_idle, ring_energy_marked, beat)
+		alpha = lerpf(ring_alpha_idle, ring_alpha_marked, beat)
 	if energy == _marked_energy and alpha == _marked_alpha:
 		return
 	_marked_energy = energy
@@ -275,54 +269,24 @@ func _tick_marking() -> void:
 		_disc_material.emission_energy_multiplier = energy
 
 
-## Any raider still standing within the approach band. Live players only:
-## a corpse lying in the band is not somebody walking up to the altar.
+## Algún raider en pie dentro de la banda de acercamiento (un cuerpo caído
+## en la banda no es alguien que se acerca).
 func _player_near() -> bool:
-	var band := _zone_radius * APPROACH_BAND_SCALE
+	var band := _zone_radius * approach_band_scale
 	var band_sq := band * band
-	# "Anybody inside the band" is "the nearest is inside the band": same
-	# standing-raider filter and the same distance expression as the old
-	# alive_players() walk, without the Array it built per altar per frame.
+	# "Alguien dentro de la banda" equivale a "el más cercano está dentro".
 	var nearest := Coop.nearest_player(get_tree(), global_position)
 	return nearest != null \
 			and global_position.distance_squared_to(nearest.global_position) <= band_sq
 
 
-## Master Keys held by the raider(s) still standing in the ring: the best
-## count wins (a downed body's bag no longer counts).
+## Llaves maestras de los raiders en pie del anillo: cuenta la mayor.
 func _keys_in_ring() -> int:
-	return best_item_count_in_range("master_key")
+	return best_item_count_in_range(MASTER_KEY_ID)
 
 
 func _charge_speed() -> float:
 	return 1.0 + key_speed_per_copy * float(_keys_in_ring())
-
-
-## No button: stepping in starts (or resumes) the charge.
-func _on_range_entered() -> void:
-	if not available or channeling or _leaving:
-		return
-	channeling = true
-	# Ref-counted: another altar (or the Humming Skull, which shares the
-	# id) channeling at the same time keeps its own hold on the voice.
-	_hold_loop(CHANNEL_LOOP)
-	_emit_started()
-
-
-## Stepping out mid-charge only PAUSES it (iteration 47): the banked
-## progress stays and stepping back in resumes it. Nothing is forfeited
-## and nothing sinks — an altar you walked away from is still an altar.
-func _on_range_exited() -> void:
-	if not channeling:
-		return
-	channeling = false
-	_drop_loop()
-	_emit_cancelled()
-	set_prompt(RESUME_TEXT % roundi(clampf(progress / channel_time, 0.0, 1.0) * 100.0))
-
-
-func _interact(_player: Node) -> void:
-	pass  # proximity does everything; the interact button is a no-op
 
 
 func _complete() -> void:
@@ -330,9 +294,8 @@ func _complete() -> void:
 	_drop_loop()
 	progress = channel_time
 	var keys := _keys_in_ring()
-	# Resolved BEFORE consume(): the prize belongs to whoever held the ring,
-	# and in co-op the card picker must be told so instead of falling back
-	# to its round-robin.
+	# Se resuelve ANTES de consume(): el premio es de quien sostuvo el anillo,
+	# y en co-op el selector de cartas tiene que saberlo.
 	var recipient := nearest_live_player()
 	consume()
 	set_physics_process(false)
@@ -342,19 +305,17 @@ func _complete() -> void:
 	dim_visuals()
 	_offer_reward(keys, recipient)
 	_emit_completed()
-	# Every altar clears the field once it has paid.
 	if spent_lifetime > 0.0:
-		# NOT process_always: the choice above holds the tree paused, and a
-		# timer that ignored the pause would sink (and free) this altar
-		# while its own menu was still on screen.
+		# Sin process_always: la elección pausa el árbol, y un temporizador
+		# que ignorara la pausa hundiría el altar con su menú abierto.
 		get_tree().create_timer(spent_lifetime, false).timeout.connect(
 				_leave.bind("se apaga: ya rindió su premio"))
 
 
-## Opens the payoff menu on the card picker (group "upgrade_ui"), which
-## owns the pause contract, the queue and the co-op title. Deliberately
-## NOT a menu of its own: a second blocking UI is a second way to wedge a
-## run, and the soak harness only knows how to answer this one.
+## Abre la elección en el selector de cartas (grupo "upgrade_ui"), dueño de la
+## pausa, la cola y el título co-op. No es un menú propio: una segunda UI
+## bloqueante es otra forma de trabar la partida, y el harness solo sabe
+## responder esta.
 func _offer_reward(keys: int, recipient: Node) -> void:
 	var options := _reward_options(keys)
 	if options.is_empty():
@@ -363,8 +324,8 @@ func _offer_reward(keys: int, recipient: Node) -> void:
 			recipient, _on_choice_picked.bind(keys, recipient), choice_tag)
 
 
-## Virtual: the options this altar offers. Charge altars draw
-## ALTAR_CHOICE_COUNT DISTINCT boons; the demonic altar offers pacts.
+## Virtual: las opciones de este altar. El de carga saca ALTAR_CHOICE_COUNT
+## dones DISTINTOS; el demoníaco ofrece pactos.
 func _reward_options(keys: int) -> Array[Dictionary]:
 	var pool := ALTAR_BOONS.duplicate()
 	pool.shuffle()
@@ -375,8 +336,8 @@ func _reward_options(keys: int) -> Array[Dictionary]:
 		var label := String(boon.label) % roundi(amount)
 		options.append({
 			"title": String(boon.name),
-			"description": label + " para toda la party",
-			"color": _accent_color(),
+			"description": boon_description % label,
+			"color": accent_color,
 			"label": label,
 			"stat": String(boon.stat),
 			"amount": amount,
@@ -384,7 +345,7 @@ func _reward_options(keys: int) -> Array[Dictionary]:
 	return options
 
 
-## The card picker hands the chosen option back here.
+## El selector de cartas devuelve aquí la opción elegida.
 func _on_choice_picked(option: Dictionary, keys: int, recipient: Node) -> void:
 	if not is_inside_tree():
 		return
@@ -392,58 +353,29 @@ func _on_choice_picked(option: Dictionary, keys: int, recipient: Node) -> void:
 	if label.is_empty():
 		return
 	get_tree().call_group("hud", "announce", completed_text % label)
-	# One-line log (RunManager convention) for headless soaks.
+	# Línea de log para los soaks (verificar.sh cuenta "Altar charged:").
 	print("Altar charged: %s -> %s" % [name, label])
 
 
-## Virtual: applies one chosen option and returns the text to announce.
-## The demonic altar overrides this to pay a pact's benefit AND its cost.
+## Virtual: aplica la opción elegida y devuelve el texto a anunciar. El
+## altar demoníaco paga el beneficio Y el costo del pacto.
 func _grant_choice(option: Dictionary, _keys: int, _recipient: Node) -> String:
 	grant_boon(String(option.stat), float(option.amount))
 	return String(option.label)
 
 
-## One boon's size at grant time: the base amount, this altar's scale and
-## the charger's Master Keys. Never below 1, so a rounded-down boon is
-## still a boon.
-func boon_amount(base: float, keys: int) -> float:
-	var amount := base * _effective_boon_scale() * (1.0 + key_boon_per_copy * float(keys))
-	return maxf(roundf(amount), 1.0)
-
-
-## Boon multiplier at grant time. Virtual so the demonic altar can fold in
-## its Demon Blood scaling WITHOUT writing to the exported knob (mutating
-## boon_scale and dividing it back left float drift and broke the moment
-## any path returned early).
+## Escala del don al entregarlo. Virtual para que el altar demoníaco sume la
+## Sangre de demonio sin escribir en el export.
 func _effective_boon_scale() -> float:
 	return boon_scale
 
 
-## Party-wide flat boon (co-op shares altar stats by design). Downed
-## raiders are still in the party: they left the "player" group on the way
-## down, and altar boons are PERMANENT for the run, so skipping them would
-## hand them a deficit nothing ever repays.
-func grant_boon(stat: String, amount: float) -> void:
-	for group: String in ["player", "downed_players"]:
-		for node: Node in get_tree().get_nodes_in_group(group):
-			var stats := PlayerStats.find_in(node)
-			if stats != null:
-				stats.add_altar_boon(stat, amount)
-
-
-## Sink-and-shrink exit; frees itself. Only a spent altar takes it now.
+## Se hunde, se encoge y se libera (sink_away). Solo lo toma un altar gastado.
 func _leave(reason: String) -> void:
 	if _leaving:
 		return
 	_leaving = true
 	available = false
 	_refresh_prompt()
-	set_physics_process(false)
-	var tween := create_tween()
-	tween.set_parallel(true)
-	tween.tween_property(self, "position:y", position.y - 2.5, 0.6) \
-			.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
-	tween.tween_property(self, "scale", Vector3.ONE * 0.2, 0.6) \
-			.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_IN)
-	tween.chain().tween_callback(queue_free)
+	sink_away()
 	print("Altar left: %s %s" % [name, reason])
