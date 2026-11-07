@@ -60,7 +60,7 @@ extends CanvasLayer
 ## Contador de bajas.
 @export var kills_format: String = "Bajas: %d"
 ## Puntos del jugador 1.
-@export var points_format: String = "%d pts"
+@export var points_format: String = UiTheme.POINTS_AMOUNT
 ## Dificultad de la partida en porcentaje (%% es el signo %).
 @export var difficulty_format: String = "Dificultad +%d%%"
 ## Etiqueta de etapa en la primera vuelta; empieza en E1.

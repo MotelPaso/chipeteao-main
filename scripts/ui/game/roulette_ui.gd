@@ -50,7 +50,7 @@ extends ModalPanel
 ## Botón de girar; %d es el precio del próximo giro.
 @export var spin_template: String = "GIRAR — %d pts"
 ## Línea cuando el raider no alcanza a pagar el giro.
-@export var broke_line: String = "No te alcanzan los puntos."
+@export var broke_line: String = UiTheme.POINTS_SHORT
 ## Línea del resultado; %s es el texto del resultado.
 @export var result_template: String = "▶ %s"
 ## Texto de cada fila; %s es el texto del resultado (la sangría va aquí).

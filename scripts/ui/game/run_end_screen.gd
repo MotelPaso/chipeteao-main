@@ -131,8 +131,8 @@ func _earning_lines() -> Array[String]:
 		# también flexiona el participio ("1 misión completada" / "3 misiones
 		# completadas"), así que la cantidad elige la frase.
 		var quest_phrase := "misión completada" if quest_count == 1 else "misiones completadas"
-		lines.append("+%d esquirlas · %d %s — reclámalas en el registro" % [
-				SaveData.last_reward_shards, quest_count, quest_phrase])
+		lines.append("%s · %d %s — reclámalas en el registro" % [
+				UiTheme.SHARDS_GAIN % SaveData.last_reward_shards, quest_count, quest_phrase])
 	# Línea del marcador de la Cacería diaria.
 	if GameConfig.daily_mode:
 		lines.append("Puntaje diario: %d — mejor de hoy: %d" % [
