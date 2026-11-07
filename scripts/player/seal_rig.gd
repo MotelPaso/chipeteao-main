@@ -1,98 +1,93 @@
 class_name SealRig
 extends Node3D
-## Visual rig for the player's body model: purely cosmetic — the gameplay
-## capsule/collision stays on Player. WHICH body is per-character catalog
-## data (setup(), called from Player._apply_character): a row with no model
-## fields falls back to the seal (assets/models/foca.glb). Owns the
-## per-character tint (one material duplicate per spawn shared by every
-## surface whose material name carries the row's tint prefix), hides the
-## model's baked SUELO floor plane, and layers cheap procedural motion on
-## the Model child: idle breathing, movement lean/bob, jump stretch, slide
-## squash (flat + nose-down), and the pause-immune death face-plant. No
-## skeletal animations exist in any model; everything here is transform
-## math on cached targets — zero per-frame allocations.
+## Rig visual del cuerpo del raider; solo cosmético (la colisión vive en
+## Player). El modelo sale de la fila del personaje (setup(), lo llama
+## Player._apply_character) y sin modelo es la foca (DEFAULT_MODEL_SCENE).
+## Maneja el tinte del personaje, oculta el piso horneado SUELO del modelo y
+## suma movimiento procedural al hijo Model: respiración, inclinación y
+## rebote al moverse, estiramiento al saltar, aplastado al derrapar y la
+## caída de cara al morir (ignora la pausa). Ningún modelo trae animaciones:
+## todo es matemática de transformaciones, sin reservar memoria por frame.
 
-## Prefix of the material resource_name that receives the character tint
-## (the GLB exporter suffixes it, e.g. "Azul personaje.001"). Each model
-## names its tintable materials its own way; a character row overrides
-## this via tint_material_prefix.
+## Prefijo del resource_name del material que recibe el tinte (el exportador
+## de GLB agrega sufijos, p. ej. "Azul personaje.001"). Cada modelo nombra
+## los suyos; una fila de personaje lo cambia con tint_material_prefix.
 const TINT_MATERIAL_PREFIX := "Azul personaje"
 
-## Body loaded when a character row names no model: the seal WRAPPER scene,
-## which bakes the seal's own yaw flip and 0.6 scale, so the fallback needs
-## no rig-side special case (a raw .glb row would pass a model_scale).
+## Cuerpo cuando la fila no nombra modelo: la escena envoltorio de la foca,
+## que ya trae su giro y su escala 0.6 (un .glb crudo pediría model_scale).
 const DEFAULT_MODEL_SCENE := "res://assets/models/foca_character.tscn"
 
-## Display name of the model any export junk hides by (the seal's baked
-## floor plane). Purely cosmetic garbage; other models may not name one.
+## Nombre del nodo basura que se oculta (el piso horneado de la foca); otros
+## modelos pueden no tenerlo.
 const HIDDEN_NODE_NAME := "SUELO"
 
-@export_group("Idle")
-## Breathing scale-Y pulse amplitude (0.02 = +-2%).
+@export_group("Reposo")
+## Amplitud de la respiración sobre la escala Y (0.02 = ±2 %).
 @export var breathe_amount: float = 0.02
+## Velocidad de la respiración, en radianes por segundo.
 @export var breathe_speed: float = 2.2
 
-@export_group("Movement")
-## Max lean (radians) into the horizontal movement direction at full speed.
+@export_group("Movimiento")
+## Inclinación máxima hacia donde se mueve, en radianes, a velocidad completa.
 @export var lean_max: float = 0.14
-## Bob height at full ground speed.
+## Altura del rebote a velocidad completa sobre el suelo, en metros.
 @export var bob_amount: float = 0.05
+## Velocidad del rebote, en radianes por segundo.
 @export var bob_speed: float = 9.0
-## Speed treated as "full" for lean/bob normalization.
+## Velocidad horizontal, en m/s, a la que inclinación y rebote llegan al máximo; número propio, no sigue a Player.move_speed.
 @export var reference_speed: float = 6.0
-## Vertical velocity that maps to full jump stretch.
+## Velocidad vertical, en m/s, que da el estiramiento máximo al saltar o caer; número propio, no sigue a Player.jump_velocity.
 @export var stretch_reference: float = 8.0
-## Max jump stretch on scale Y (0.12 = +12%, width shrinks to match).
+## Estiramiento máximo de la escala Y en el aire (0.12 = +12 %; el ancho se achica a la par).
 @export var stretch_max: float = 0.12
 
-@export_group("Slide")
-## Scale Y while sliding (flatter than the capsule's 0.5 height ratio
-## reads better on the wide seal body).
+@export_group("Derrape")
+## Escala Y durante el derrape (más plana que la cápsula: se lee mejor en la foca ancha).
 @export var slide_squash: float = 0.55
-## Extra widening on X/Z while squashed.
+## Ensanchamiento en X/Z durante el aplastado (multiplicador).
 @export var slide_spread: float = 1.15
-## Nose-down pitch (radians) while sliding.
+## Inclinación de la nariz hacia abajo durante el derrape, en radianes.
 @export var slide_pitch: float = 0.22
 
-@export_group("Death")
-## Height above the model origin the face-plant lifts the body to while
-## it rests on the floor — body shapes differ, the wide seal reads right
-## on 0.55.
-@export var death_lift: float = 0.55
+@export_group("Suavizado")
+## Rapidez con que inclinación, rebote y estiramiento alcanzan su objetivo (fracción cerrada por segundo, ver _damp).
+@export var motion_damp_rate: float = 10.0
+## Rapidez del aplastado del derrape (fracción cerrada por segundo); algo mayor para que se lea como un golpe.
+@export var squash_damp_rate: float = 14.0
 
-## Convergence rates for the smoothed motion state, in "fraction closed per
-## second" (see _damp): lean/bob/stretch settle quickly, the slide squash a
-## touch faster so the flatten reads as an impact.
-const MOTION_DAMP_RATE: float = 10.0
-const SQUASH_DAMP_RATE: float = 14.0
+@export_group("Muerte")
+## Cuánto se levanta el cuerpo al caer de cara, en metros sobre el origen del modelo (0.55 apoya bien la foca).
+@export var death_lift: float = 0.55
+## Duración de la caída de cara al morir, en segundos.
+@export var death_duration: float = 0.5
 
 @onready var _model: Node3D = $Model
 
-## The player body whose velocity drives lean/bob; null outside a player
-## (test harnesses) keeps the rig idle-only.
+## Cuerpo cuya velocidad mueve la inclinación y el rebote; null fuera de un
+## jugador (harness de prueba) deja el rig solo respirando.
 var _body: CharacterBody3D = null
-## The single tint material instance shared by all tint-prefix surfaces.
+## La única instancia del material de tinte, compartida por las superficies
+## con el prefijo.
 var _tint_material: StandardMaterial3D = null
-## resource_name prefix of the CURRENT model's tintable materials.
+## Prefijo de resource_name de los materiales teñibles del modelo ACTUAL.
 var _tint_prefix: String = TINT_MATERIAL_PREFIX
 var _slide_ratio: float = 1.0
 var _phase: float = 0.0
 var _dead: bool = false
-## Smoothed motion state (lerped toward targets each frame).
+## Estado de movimiento suavizado (se acerca a su objetivo cada frame).
 var _lean: Vector2 = Vector2.ZERO
 var _bob: float = 0.0
 var _stretch: float = 0.0
 var _squash_blend: float = 0.0
-## The pause-immune face-plant, kept so a revive can cancel it (see
-## reset_death): a live tween writes the same _model properties _process
-## rewrites every frame, and the two fight over the model.
+## Tween de la caída de cara (ignora la pausa), guardado para que revivir lo
+## cancele: escribe las mismas propiedades de _model que _process.
 var _death_tween: Tween = null
 
 
-## Framerate-independent smoothing weight for `lerp(a, b, _damp(rate, d))`.
-## The obvious `rate * delta` is the Euler approximation of this: its error
-## grows with delta, so the rig's response time drifts with the framerate
-## (and below 10 fps it saturates at 1.0 and stops smoothing altogether).
+## Peso de suavizado independiente del framerate para
+## `lerp(a, b, _damp(rate, d))`. `rate * delta` es su aproximación de Euler:
+## su error crece con delta y el rig respondería distinto según los fps.
 static func _damp(rate: float, delta: float) -> float:
 	return 1.0 - exp(-rate * delta)
 
@@ -101,11 +96,9 @@ func _ready() -> void:
 	_body = get_parent() as CharacterBody3D
 
 
-## Cosmetic body swap with a CharacterCatalog row's model data. Empty
-## scene path = the default seal; the scale MULTIPLIES what the model
-## scene already carries (1.0 / non-positive = no rescaling — the wrapper
-## scenes bake their own transform, raw .glb rows declare one); an empty
-## tint prefix falls back to the seal's "Azul personaje".
+## Cambia el cuerpo por el modelo de una fila de CharacterCatalog. Ruta
+## vacía = la foca; la escala MULTIPLICA la que ya trae la escena del modelo
+## (1.0 o no positiva = sin cambio); prefijo vacío = "Azul personaje".
 func setup(model_scene: String, model_scale: float, tint_prefix: String) -> void:
 	_clear_model()
 	_tint_material = null
@@ -113,8 +106,8 @@ func setup(model_scene: String, model_scale: float, tint_prefix: String) -> void
 	var path := model_scene if not model_scene.is_empty() else DEFAULT_MODEL_SCENE
 	var packed := load(path) as PackedScene
 	if packed == null:
-		# Cosmetic only: the gameplay body never depended on the rig, so a
-		# bad path costs an invisible character and one warning.
+		# Solo cosmético: el cuerpo de juego no depende del rig, así que una
+		# ruta rota cuesta un personaje invisible y un aviso.
 		push_warning("SealRig: model scene '%s' does not load" % path)
 		return
 	var model := packed.instantiate()
@@ -133,18 +126,16 @@ func setup(model_scene: String, model_scale: float, tint_prefix: String) -> void
 		(node as MeshInstance3D).visible = false
 
 
-## Throws out the previous body so a re-setup swaps cleanly; queue_free
-## keeps it safe from a freed-node window since setup runs inside the
-## spawn's own _ready chain.
+## Descarta el cuerpo anterior para que un nuevo setup cambie limpio.
+## queue_free y no free: setup corre dentro de la cadena de _ready del spawn.
 func _clear_model() -> void:
 	for child: Node in _model.get_children():
 		child.queue_free()
 
 
-## Per-character tint: ONE duplicate of the model's shared tint-prefix
-## material, recolored and overridden onto every surface that used it
-## (the seal's body, base, arms). Eyes/tusks/gel keep their imported
-## materials.
+## Tinte del personaje: UN duplicado del material compartido con el prefijo,
+## recoloreado y puesto en cada superficie que lo usaba (cuerpo, base y
+## brazos de la foca). Ojos, colmillos y gel mantienen sus materiales.
 func apply_tint(tint: Color) -> void:
 	for node: Node in _model.find_children("*", "MeshInstance3D", true, false):
 		var mesh_node := node as MeshInstance3D
@@ -162,13 +153,13 @@ func apply_tint(tint: Color) -> void:
 		_tint_material.albedo_color = tint
 
 
-## Current tint color (test harnesses), or transparent black before tinting.
+## Color de tinte actual (para los harness), o negro transparente antes de teñir.
 func tint_color() -> Color:
 	return _tint_material.albedo_color if _tint_material != null else Color(0, 0, 0, 0)
 
 
-## Player slide hook: ratio is collision height / default height (1 = no
-## slide). Mapped to a flatter squash plus a nose-down tilt on the seal.
+## Gancho del derrape de Player: ratio = altura de la cápsula / altura
+## normal (1 = sin derrape). Se traduce en aplastado y nariz hacia abajo.
 func set_slide_ratio(ratio: float) -> void:
 	_slide_ratio = clampf(ratio, 0.1, 1.0)
 
@@ -177,9 +168,9 @@ func _process(delta: float) -> void:
 	if _dead:
 		return
 	_phase += delta
-	var smoothing := _damp(MOTION_DAMP_RATE, delta)
+	var smoothing := _damp(motion_damp_rate, delta)
 
-	# Movement-driven targets (all zero when idle or outside a player).
+	# Objetivos según el movimiento (todos en cero quieto o fuera de un jugador).
 	var target_lean := Vector2.ZERO
 	var speed_factor := 0.0
 	var target_stretch := 0.0
@@ -192,36 +183,34 @@ func _process(delta: float) -> void:
 		if not _body.is_on_floor():
 			target_stretch = clampf(absf(local_velocity.y) / stretch_reference, 0.0, 1.0) \
 					* stretch_max
-			speed_factor = 0.0  # no ground bob mid-air
+			speed_factor = 0.0  # sin rebote en el aire
 	_lean = _lean.lerp(target_lean, smoothing)
 	_stretch = lerpf(_stretch, target_stretch, smoothing)
 	_bob = lerpf(_bob, bob_amount * speed_factor, smoothing)
-	# Slide ratio 0.5 (the capsule's crouch) maps to a full squash blend.
+	# Ratio 0.5 (la cápsula agachada) da el aplastado completo.
 	_squash_blend = lerpf(_squash_blend, clampf((1.0 - _slide_ratio) * 2.0, 0.0, 1.0),
-			_damp(SQUASH_DAMP_RATE, delta))
+			_damp(squash_damp_rate, delta))
 
-	# Compose scale: breathe * jump stretch * slide squash (volume-ish kept).
+	# Escala final: respiración * estiramiento * aplastado (conserva más o
+	# menos el volumen).
 	var breathe := 1.0 + sin(_phase * breathe_speed) * breathe_amount
 	var scale_y := breathe * (1.0 + _stretch) * lerpf(1.0, slide_squash, _squash_blend)
 	var scale_xz := (1.0 - _stretch * 0.5) * lerpf(1.0, slide_spread, _squash_blend)
 	_model.scale = Vector3(scale_xz, scale_y, scale_xz)
 
-	# Lean INTO the motion (forward run = nose-down pitch, strafing = roll
-	# toward the strafe) plus the slide nose-dive; bob rides on top when
-	# grounded. Signs: the model's nose points down -Z, so a NEGATIVE pitch
-	# dips it — the same sign the slide dive already uses — and running
-	# forward gives local_velocity.z < 0, hence _lean.y straight through.
-	# Likewise strafing right gives _lean.x > 0 and needs a negative roll to
-	# drop the head toward +X.
+	# Inclinación HACIA el movimiento (avanzar baja la nariz, el lateral rola
+	# hacia ese lado) más la nariz del derrape; el rebote va encima en el suelo.
+	# Signos: la nariz apunta a -Z, así que una inclinación NEGATIVA la baja
+	# (igual que el derrape), y avanzar da local_velocity.z < 0: _lean.y va
+	# directo. Moverse a la derecha da _lean.x > 0 y pide un giro negativo.
 	_model.rotation.x = _lean.y - slide_pitch * _squash_blend
 	_model.rotation.z = -_lean.x
 	_model.position.y = absf(sin(_phase * bob_speed)) * _bob
 
 
-## Death face-plant, adapted from the old capsule tween: the model pivots
-## at its ground-level origin, tipping nose-first onto the floor with a
-## bounce, lifted so the body rests on the ground instead of clipping in.
-## Pause-immune — RunManager pauses the tree right after death.
+## Caída de cara al morir: el modelo pivota en su origen a ras del suelo,
+## cae de nariz con rebote y se levanta lo justo para apoyarse en el piso.
+## Ignora la pausa: RunManager pausa el árbol justo después de morir.
 func play_death() -> void:
 	if _dead:
 		return
@@ -230,24 +219,22 @@ func play_death() -> void:
 	_death_tween = create_tween()
 	_death_tween.set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
 	_death_tween.set_parallel(true)
-	_death_tween.tween_property(_model, "rotation:x", -TAU * 0.25, 0.5) \
+	_death_tween.tween_property(_model, "rotation:x", -TAU * 0.25, death_duration) \
 			.set_trans(Tween.TRANS_BOUNCE).set_ease(Tween.EASE_OUT)
-	_death_tween.tween_property(_model, "position:y", death_lift, 0.5) \
+	_death_tween.tween_property(_model, "position:y", death_lift, death_duration) \
 			.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
-	_death_tween.tween_property(_model, "scale", Vector3(1.0, 1.0, 0.8), 0.5) \
+	_death_tween.tween_property(_model, "scale", Vector3(1.0, 1.0, 0.8), death_duration) \
 			.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 
 
-## Co-op revive: undo the face-plant and hand the model back to the
-## procedural motion loop (which rewrites rotation/scale/position every
-## frame, so a simple snap is enough).
+## Revivir en co-op: deshace la caída y devuelve el modelo al movimiento
+## procedural (que reescribe rotación, escala y posición cada frame).
 func reset_death() -> void:
 	if not _dead:
 		return
 	_dead = false
-	# Kill FIRST: the face-plant is pause-immune and 0.5 s long, so a fast
-	# revive would leave it writing rotation/position/scale on top of the
-	# snap below and of _process, flickering the seal between poses.
+	# Matar el tween PRIMERO: ignora la pausa y dura death_duration, así que
+	# tras un rescate rápido seguiría escribiendo encima y la foca parpadearía.
 	_kill_death_tween()
 	_model.rotation = Vector3.ZERO
 	_model.position.y = 0.0
