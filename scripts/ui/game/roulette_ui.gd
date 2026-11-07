@@ -26,7 +26,7 @@ extends ModalPanel
 ## Tamaño mínimo de cada fila de resultado, en píxeles.
 @export var row_size: Vector2 = Vector2(260.0, 26.0)
 ## Fondo de cada fila.
-@export var row_bg: Color = Color(0.07, 0.075, 0.11, 0.9)
+@export var row_bg: Color = Color(UiTheme.TILE_BG, 0.9)
 ## Cuánto se aclara el color del resultado en el texto de su fila (0-1).
 @export var row_text_lighten: float = 0.15
 ## Opacidad del borde de cada fila (0-1).

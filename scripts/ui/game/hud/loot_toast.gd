@@ -16,7 +16,7 @@ extends PanelContainer
 @export var slide_distance: float = 26.0
 @export_group("Aspecto")
 ## Color de fondo de la tarjeta; el borde y el brillo toman el color del premio.
-@export var background_color: Color = Color(0.07, 0.075, 0.11, 0.92)
+@export var background_color: Color = Color(UiTheme.TILE_BG, 0.92)
 ## Grosor del borde, en píxeles.
 @export var border_width: int = 2
 ## Radio de las esquinas, en píxeles.

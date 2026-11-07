@@ -24,7 +24,7 @@ const ICON_LIBRARY_PETS := "pets"
 
 @export_group("Recuadro")
 ## Color de fondo de la casilla.
-@export var background_color: Color = Color(0.07, 0.075, 0.11, 0.9)
+@export var background_color: Color = Color(UiTheme.TILE_BG, 0.9)
 ## Grosor del borde, en píxeles; el borde toma el color de la entrada.
 @export var border_width: int = 2
 ## Radio de las esquinas, en píxeles.
