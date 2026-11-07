@@ -8,13 +8,16 @@ extends Node3D
 ##
 ## Una por raider: Player.set_pet() libera la vieja antes de crear la nueva.
 
-## Rigidez del seguimiento y del giro, en 1/segundos de suavizado
-## exponencial (ver _physics_process): más alto es más rápido, y no depende
-## de la frecuencia de física.
+@export_group("Seguimiento")
+## Rigidez del seguimiento, en 1/segundos de suavizado exponencial: más alto
+## es más rápido, y no depende de la frecuencia de física.
 @export var follow_speed: float = 6.0
+## Rigidez del giro, en 1/segundos de suavizado exponencial (como follow_speed).
 @export var turn_speed: float = 6.0
 ## Posición respecto del dueño, en metros (rota con él).
 @export var follow_offset: Vector3 = Vector3(-1.4, 0.0, 1.2)
+@export_group("")
+
 var pet_id: String = ""
 var _row: Dictionary = {}
 var _weapon: WeaponBase = null

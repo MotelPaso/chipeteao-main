@@ -8,10 +8,13 @@ extends Node
 ## armas leen los multiplicadores con los helpers de WeaponBase, la armadura
 ## se empuja al Health hermano y UpgradePool lee la suerte al sortear rarezas.
 
+@export_group("Base")
 ## Multiplicador de daño crítico antes de cualquier bono del Tomo de Ruina.
 @export var base_crit_damage: float = 5.0
 ## Suerte base (puntos de inclinación de rareza) antes de cualquier bono.
 @export var base_luck: float = 0.0
+
+@export_group("Topes")
 ## Por mucha velocidad de ataque acumulada, el multiplicador global de
 ## enfriamiento nunca baja de esto.
 @export var min_cooldown_multiplier: float = 0.25
@@ -22,6 +25,7 @@ extends Node
 ## fracción de HP sea menor que esto al esquivar. Hoy ningún personaje usa
 ## el tipo "evasion_execute", así que no ajusta nada.
 @export var execute_threshold: float = 0.25
+@export_group("")
 
 ## Pisos de los multiplicadores que un debuff podría llevar a cero (o
 ## menos): un raider maldito sigue pegando, moviéndose, ganando XP y con

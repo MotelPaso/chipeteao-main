@@ -16,12 +16,16 @@ const LIVE_GROUP: StringName = &"health_orbs"
 ## Tope global de orbes vivos; en el tope, quien suelta se salta el drop.
 const SOFT_CAP: int = 6
 
+@export_group("Curación")
 ## Fracción (0-1) del HP máx. del jugador que cura al recogerlo.
 @export var heal_fraction: float = 0.15
-## Amplitud del pulso de escala en reposo (0.08 = ±8%) y su velocidad, el
-## latido que lo hace verse vivo.
+
+@export_group("Pulso")
+## Amplitud del pulso de escala en reposo, el latido que lo hace verse vivo (0.08 = ±8%).
 @export var pulse_amount: float = 0.08
+## Velocidad del pulso de escala en reposo, en radianes por segundo.
 @export var pulse_speed: float = 5.0
+@export_group("")
 
 
 ## True si la arena ya tiene SOFT_CAP orbes vivos. Quien suelta lo revisa
