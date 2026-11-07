@@ -160,13 +160,9 @@ func _raise_servant(scene_path: String, at: Vector3, corpse: EnemyBase) -> void:
 	var servant := scene.instantiate() as EnemyBase
 	if servant == null:
 		return
-	# Se copia del cadáver para que un tanque poseído siga pegando como
-	# tanque; lo demás son los valores de la escena, así esto no necesita
-	# conocer los exports de cada enemigo.
-	var contact: Variant = corpse.get("contact_damage")
-	if contact != null:
-		servant.set("contact_damage", contact)
-	servant.move_speed = corpse.move_speed
+	# El cadáver copia lo que lo hace pegar como él (un tanque poseído sigue
+	# pegando como tanque); lo demás son los valores de la escena.
+	corpse._copy_combat_stats_to(servant)
 	RunRoot.stage_parent(get_tree()).add_child(servant)
 	servant.global_position = at
 	servant.make_possessed(carrier, possess_duration * duration_scale())
