@@ -414,11 +414,25 @@ func spawn_fx_mesh(mesh: Mesh) -> MeshInstance3D:
 	var node := MeshInstance3D.new()
 	node.mesh = mesh
 	node.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	_fx_parent().add_child(node)
+	return node
+
+
+## Como spawn_fx_mesh, pero instancia una escena de efecto (LightningBeam.tscn)
+## que se coloca y se libera sola.
+func spawn_fx_scene(scene: PackedScene) -> Node3D:
+	var node := scene.instantiate() as Node3D
+	_fx_parent().add_child(node)
+	return node
+
+
+## Dónde cuelgan los efectos de un solo uso: la arena de la etapa actual, o
+## la raíz del árbol si no hay etapa.
+func _fx_parent() -> Node:
 	var parent_node: Node = RunRoot.stage_parent(get_tree())
 	if parent_node == null:
 		parent_node = get_tree().root
-	parent_node.add_child(node)
-	return node
+	return parent_node
 
 
 # --- evolución -------------------------------------------------------------

@@ -13,48 +13,37 @@ extends WeaponBase
 ## Nunca dispara solo: fire() está vacío y el proceso de física apagado. La
 ## bolsa llama a zap_chain() cuando el raider derrapa; ese es todo el gatillo.
 
-## Daño del primer golpe sin copias extra; cada copia extra suma el 35%.
-@export var belt_damage: float = 25.0
-@export var damage_per_extra_copy: float = 0.35
-## Rebotes después del primer blanco: 2 + copias.
-@export var base_bounces: int = 2
-## Qué tan lejos del raider puede estar el primer blanco, y cuánto alcanza
-## cada rebote desde el último cuerpo golpeado.
-@export var first_range: float = 10.0
-@export var bounce_range: float = 8.0
+# --- edita aquí --------------------------------------------------------------
+# BeltBolt no tiene escena (ItemBag lo crea con BeltBolt.new()), así que sus
+# ajustes son estas constantes y no aparecen en el Inspector. El alcance del
+# primer blanco es ItemBag.belt_first_range, y el aspecto del rayo está en
+# scenes/fx/LightningBeam.tscn, grupo «Cinturón eléctrico».
 
-## Aspecto del rayo: mismo desvanecido que el del Pararrayos.
-@export var beam_radius: float = 0.05
-@export var beam_fade_time: float = 0.22
-@export var beam_fade_scale: float = 3.0
-const BEAM_COLOR := Color(1.0, 0.95, 0.45)
-## Por debajo de este largo un rayo es un punto: no se dibuja.
+## Daño del primer golpe con una sola copia del cinturón.
+const BELT_DAMAGE: float = 25.0
+## Daño extra por cada copia después de la primera (0.35 = +35%).
+const DAMAGE_PER_EXTRA_COPY: float = 0.35
+## Rebotes después del primer blanco; cada copia del cinturón suma uno más.
+const BASE_BOUNCES: int = 2
+## Alcance de cada rebote desde el último cuerpo golpeado, en metros.
+const BOUNCE_RANGE: float = 8.0
+## Por debajo de este largo, en metros, un rayo es un punto y no se dibuja.
 const MIN_BEAM_LENGTH: float = 0.2
-## Altura a la que se dibuja el rayo, para que se lea como un relámpago a la
-## altura del pecho y no como una línea que raspa el suelo.
+## Altura a la que se dibuja el rayo, en metros: a la altura del pecho y no raspando el suelo.
 const BEAM_HEIGHT: float = 0.9
+# --- fin de edita aquí -------------------------------------------------------
 
-var _beam_mesh: CylinderMesh = null
+const LIGHTNING_BEAM_SCENE: PackedScene = preload("res://scenes/fx/LightningBeam.tscn")
+
+## Alcance hasta el primer blanco, en metros. ItemBag lo escribe con su
+## belt_first_range al crear el rayo; este valor es solo el respaldo.
+var first_range: float = 10.0
 
 
 func _ready() -> void:
 	# Nunca con reloj propio: WeaponBase._physics_process buscaría blanco cada
 	# enfriamiento y llamaría a fire(), y esta arma solo existe para el derrape.
 	set_physics_process(false)
-	_beam_mesh = CylinderMesh.new()
-	_beam_mesh.top_radius = beam_radius
-	_beam_mesh.bottom_radius = beam_radius
-	_beam_mesh.height = 1.0
-	_beam_mesh.radial_segments = 6
-	_beam_mesh.rings = 0
-	var material := StandardMaterial3D.new()
-	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	material.albedo_color = BEAM_COLOR
-	material.emission_enabled = true
-	material.emission = BEAM_COLOR
-	material.emission_energy_multiplier = 2.4
-	_beam_mesh.material = material
 
 
 ## Contrato de WeaponBase. Vacío a propósito: ver el comentario de la clase.
@@ -72,8 +61,9 @@ func zap_chain(origin: Vector3, copies: int) -> int:
 	var struck: Array[Node3D] = []
 	var from := origin
 	var reach := first_range
-	var remaining := base_bounces + copies + 1
-	damage = belt_damage * (1.0 + damage_per_extra_copy * float(maxi(copies - 1, 0)))
+	var remaining := BASE_BOUNCES + copies + 1
+	# deal_damage lee `damage`: se fija en cada derrape según las copias.
+	damage = BELT_DAMAGE * (1.0 + DAMAGE_PER_EXTRA_COPY * float(maxi(copies - 1, 0)))
 	while remaining > 0:
 		var target := _nearest_unstruck(from, reach, struck)
 		if target == null:
@@ -87,7 +77,7 @@ func zap_chain(origin: Vector3, copies: int) -> int:
 			deal_damage(health)
 			hits += 1
 		from = target.global_position
-		reach = bounce_range
+		reach = BOUNCE_RANGE
 		remaining -= 1
 	return hits
 
@@ -109,25 +99,11 @@ func _nearest_unstruck(from: Vector3, reach: float, struck: Array[Node3D]) -> No
 	return best
 
 
-## Un segmento de rayo que se desvanece y se libera. El eje del cilindro es Y:
-## se apunta -Z al punto lejano y luego se dobla Y sobre él, con la guarda de
-## "arriba" degenerado compartida.
+## Un segmento de rayo a la altura del pecho entre dos cuerpos.
 func _spawn_beam(from: Vector3, to: Vector3) -> void:
 	var start := from + Vector3.UP * BEAM_HEIGHT
 	var end := to + Vector3.UP * BEAM_HEIGHT
-	var span := end - start
-	var length := span.length()
-	if length < MIN_BEAM_LENGTH:
+	if (end - start).length() < MIN_BEAM_LENGTH:
 		return
-	var beam := spawn_fx_mesh(_beam_mesh)
-	beam.global_position = (start + end) * 0.5
-	var direction := span / length
-	beam.look_at(end, safe_up(direction))
-	beam.rotate_object_local(Vector3.RIGHT, PI * 0.5)
-	beam.scale = Vector3(1.0, length, 1.0)
-	beam.transparency = 0.0
-	var tween := beam.create_tween()
-	tween.tween_property(beam, "transparency", 1.0, beam_fade_time)
-	tween.parallel().tween_property(beam, "scale",
-			Vector3(beam_fade_scale, length, beam_fade_scale), beam_fade_time)
-	tween.tween_callback(beam.queue_free)
+	var beam := spawn_fx_scene(LIGHTNING_BEAM_SCENE) as LightningBeam
+	beam.play(start, end, LightningBeam.Style.BELT)
