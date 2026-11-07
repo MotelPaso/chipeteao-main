@@ -6,6 +6,8 @@ extends MagnetPickup
 ## escala en reposo. Un tope suave global evita que una pelea de jefe
 ## alfombre la arena de curas; como el chasis deja el grupo vivo antes de
 ## cada liberación al pool, el tope solo cuenta orbes que están en el suelo.
+## El alcance, la vida, el giro y la flotación del chasis (menos que una gema
+## de XP) se ajustan en HealthOrb.tscn, en el Inspector del nodo raíz.
 
 ## Todo orbe vivo (soltado y sin recoger) está en este grupo: quien suelta
 ## orbes lo cuenta para el tope y la aspiradora de subida de nivel los
@@ -20,17 +22,6 @@ const SOFT_CAP: int = 6
 ## latido que lo hace verse vivo.
 @export var pulse_amount: float = 0.08
 @export var pulse_speed: float = 5.0
-
-
-## Ajuste del chasis compartido para el orbe: menos alcance y menos vida
-## que una gema de XP, y un giro más lento. Se pone aquí porque el chasis es
-## compartido; un valor guardado en HealthOrb.tscn igual ganaría (las
-## propiedades de la escena se aplican después de _init).
-func _init() -> void:
-	magnet_radius = 3.5
-	lifetime = 45.0
-	spin_speed = 1.8
-	bob_amplitude = 0.1
 
 
 ## True si la arena ya tiene SOFT_CAP orbes vivos. Quien suelta lo revisa
