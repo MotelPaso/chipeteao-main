@@ -26,7 +26,7 @@ extends ModalPanel
 ## Tamaño mínimo de cada fila de resultado, en píxeles.
 @export var row_size: Vector2 = Vector2(260.0, 26.0)
 ## Fondo de cada fila.
-@export var row_bg: Color = Color(0.07, 0.075, 0.11, 0.9)
+@export var row_bg: Color = Color(UiTheme.TILE_BG, 0.9)
 ## Cuánto se aclara el color del resultado en el texto de su fila (0-1).
 @export var row_text_lighten: float = 0.15
 ## Opacidad del borde de cada fila (0-1).
@@ -50,7 +50,7 @@ extends ModalPanel
 ## Botón de girar; %d es el precio del próximo giro.
 @export var spin_template: String = "GIRAR — %d pts"
 ## Línea cuando el raider no alcanza a pagar el giro.
-@export var broke_line: String = "No te alcanzan los puntos."
+@export var broke_line: String = UiTheme.POINTS_SHORT
 ## Línea del resultado; %s es el texto del resultado.
 @export var result_template: String = "▶ %s"
 ## Texto de cada fila; %s es el texto del resultado (la sangría va aquí).

@@ -31,15 +31,3 @@ func next(tree: SceneTree) -> Node:
 			return node
 	return null
 
-
-## El raider en pie con la RANURA MÁS BAJA, o null. No usa
-## get_first_node_in_group, cuyo orden cambia cada vez que alguien cae y revive.
-static func lowest_slot(tree: SceneTree) -> Node:
-	var best: Node = null
-	var best_slot := Coop.MAX_PLAYERS
-	for node: Node in tree.get_nodes_in_group("player"):
-		var slot := int(node.get("player_index"))
-		if slot < best_slot:
-			best_slot = slot
-			best = node
-	return best

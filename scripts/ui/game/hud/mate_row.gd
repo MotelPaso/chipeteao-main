@@ -8,11 +8,11 @@ extends HBoxContainer
 
 @export_group("Textos")
 ## Etiqueta del jugador; %d es su número (1-4).
-@export var tag_format: String = "J%d"
+@export var tag_format: String = UiTheme.PLAYER_TAG
 ## Etiqueta mientras está caído (vida en 0).
 @export var knocked_out_format: String = "J%d K.O."
 ## Puntos del compañero.
-@export var points_format: String = "%d pts"
+@export var points_format: String = UiTheme.POINTS_AMOUNT
 ## Conteo de power-ups activos del compañero.
 @export var powerups_format: String = "◈%d"
 @export_group("Aspecto")

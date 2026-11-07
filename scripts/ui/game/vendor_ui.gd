@@ -34,11 +34,11 @@ extends ModalPanel
 ## Línea bajo el estante mientras no hay compra.
 @export var hint_line: String = "Elige lo que te llevas."
 ## Línea cuando el raider no alcanza a pagar la carta que eligió.
-@export var broke_line: String = "No te alcanzan los puntos."
+@export var broke_line: String = UiTheme.POINTS_SHORT
 ## Línea tras la venta; %s es el nombre de lo comprado.
 @export var sold_template: String = "¡Trato hecho! %s"
 ## Precio en cada carta; %d son los puntos.
-@export var price_template: String = "%d pts"
+@export var price_template: String = UiTheme.POINTS_AMOUNT
 ## Línea en lugar del estante cuando no hay nada que vender.
 @export var empty_shelf_line: String = "El vendedor no tiene nada para ti."
 ## Indicación del botón de aceptar.

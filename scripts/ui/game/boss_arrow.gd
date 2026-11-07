@@ -91,7 +91,7 @@ func _process(delta: float) -> void:
 ## La cámara con la que apuntar: la inyectada; si no, la del viewport raíz
 ## (solo); si no, la primera vista de pantalla dividida viva. Ese último
 ## respaldo mantiene viva la flecha en co-op: cada cámara de jugador se
-## desactiva en favor de una cámara por SubViewport (player.gd/SplitScreen),
+## desactiva en favor de una cámara por SubViewport (player_camera.gd/SplitScreen),
 ## así que el viewport raíz NO tiene cámara activa en toda la partida.
 func _resolve_camera(delta: float) -> Camera3D:
 	if is_instance_valid(_camera):

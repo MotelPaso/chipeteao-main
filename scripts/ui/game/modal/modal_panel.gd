@@ -29,7 +29,7 @@ const HEADLESS_LEAVE_DELAY := 3.0
 
 @export_group("Textos")
 ## Línea de puntos del raider; %d son sus puntos.
-@export var points_template: String = "Tienes %d pts"
+@export var points_template: String = UiTheme.POINTS_BALANCE
 ## Texto del botón que cierra el panel; también va en la indicación de cancelar.
 @export var close_text: String = "Salir"
 

@@ -12,7 +12,7 @@ extends Label
 ## Texto del indicador; %d son los cuadros por segundo.
 @export var text_format: String = "%d FPS"
 ## Fondo de la pastilla.
-@export var background_color: Color = Color(0.07, 0.075, 0.11, 0.85)
+@export var background_color: Color = Color(UiTheme.TILE_BG, 0.85)
 ## Borde de la pastilla.
 @export var border_color: Color = Color(0.3, 0.33, 0.4)
 

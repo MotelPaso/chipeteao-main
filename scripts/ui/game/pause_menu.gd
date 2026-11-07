@@ -11,8 +11,6 @@ extends CanvasLayer
 ## les suelta la pausa. Un miembro del grupo sin is_blocking() cuenta como
 ## bloqueante: si alguien olvida el contrato, falla del lado SEGURO.
 
-const CHARACTER_SELECT_SCENE_PATH := "res://scenes/ui/CharacterSelect.tscn"
-
 @export_group("Panel")
 ## Margen interior del panel, en píxeles (horizontal, vertical).
 @export var panel_margin: Vector2 = Vector2(40.0, 26.0)
@@ -171,7 +169,7 @@ func _on_extract_pressed() -> void:
 ## menú primero cierra la ventana en la que un Esc durante el fundido llamaría a
 ## _close() y le daría a la partida abandonada un frame vivo y sin pausa.
 func _on_quit_pressed() -> void:
-	if not ScreenFade.leave_run(CHARACTER_SELECT_SCENE_PATH):
+	if not ScreenFade.leave_run(ScenePaths.CHARACTER_SELECT):
 		return  # ya hay un corte en curso; no se tocó nada
 	visible = false
 	_kill_open_tween()

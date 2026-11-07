@@ -18,7 +18,7 @@ extends CanvasLayer
 ##   track_objective(node)             WorldDirector (portal de salida)
 ##   show_stage_tag(stage_index, lap)  RunRoot y RunSystems
 ##   on_stage_started(arena)           WorldDirector, al empezar cada etapa
-##   set_quake_offset(shift)           WorldDirector (terremoto)
+##   set_quake_offset(shift)           WeatherDirector (terremoto)
 ## El soak (scenes/tests/arena_probe.gd) lee `offset` de este nodo por el grupo "hud".
 
 @export_group("Vida")
@@ -44,9 +44,8 @@ extends CanvasLayer
 ## Escala más alta de la barra durante el latido.
 @export var low_hp_pulse_scale: Vector2 = Vector2(1.03, 1.08)
 @export_group("Experiencia")
-## Color de la barra de XP. Es el mismo verde de las gemas de XP (XpGem.tscn):
-## si cambias uno, cambia el otro.
-@export var xp_color: Color = Color(0.35, 0.95, 0.6)
+## Color de la barra de XP (UiTheme.XP_GREEN, el verde de las gemas de XP).
+@export var xp_color: Color = UiTheme.XP_GREEN
 ## Fondo de la franja de XP.
 @export var xp_trough_color: Color = Color(0.04, 0.045, 0.07, 0.85)
 ## Línea inferior de la franja de XP.
@@ -60,7 +59,7 @@ extends CanvasLayer
 ## Contador de bajas.
 @export var kills_format: String = "Bajas: %d"
 ## Puntos del jugador 1.
-@export var points_format: String = "%d pts"
+@export var points_format: String = UiTheme.POINTS_AMOUNT
 ## Dificultad de la partida en porcentaje (%% es el signo %).
 @export var difficulty_format: String = "Dificultad +%d%%"
 ## Etiqueta de etapa en la primera vuelta; empieza en E1.

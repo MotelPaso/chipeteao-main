@@ -365,7 +365,7 @@ func _pick_recipient() -> Node:
 func _resolve_recipient() -> Node:
 	if _recipient != null and is_instance_valid(_recipient) and _recipient.is_inside_tree():
 		return _recipient
-	_recipient = PickRecipients.lowest_slot(get_tree())
+	_recipient = PartySlots.lowest_standing(get_tree())
 	return _recipient
 
 
