@@ -70,6 +70,9 @@ const BURST_ANGLE_JITTER: float = 0.35
 ## Techo duro de la probabilidad de élite, suba lo que suba la dificultad:
 ## pasado esto una élite deja de ser un evento.
 const ELITE_CHANCE_CAP: float = 0.6
+## Media placa usable, en metros, solo si la escena no tiene nodo en el grupo
+## "arena_bounds" (las arenas lo tienen: es su scatter).
+const FALLBACK_HALF_EXTENT: float = 78.0
 
 @export_group("Escenas y fases")
 ## Tabla de fases de spawn de esta arena (ver PhasePreset).
@@ -121,9 +124,6 @@ const ELITE_CHANCE_CAP: float = 0.6
 @export var min_radius: float = 18.0
 ## Radio máximo del anillo de spawn, en metros.
 @export var max_radius: float = 25.0
-## Media placa del suelo usable, en metros. Solo respaldo: en _ready se
-## calcula con el arena_half_extent del grupo "arena_bounds" (el scatter).
-@export var arena_half_extent: float = 78.0
 ## Metros que se restan al borde de la arena para que un spawn caiga sobre el suelo.
 @export var arena_edge_margin: float = 2.0
 ## Distancia mínima de un spawn a cualquier raider en pie, en metros. Debe
@@ -220,8 +220,9 @@ const ELITE_CHANCE_CAP: float = 0.6
 @export var elder_spawn_minute: float = 11.0
 ## Multiplicador de stats del Ancestral (y base de los jefes recurrentes).
 @export var elder_stat_multiplier: float = 1.8
-## Título del Ancestral en el HUD; cada arena pone el suyo.
-@export var elder_title: String = "Rey Pútrido Ancestral"
+## Título del Ancestral en el HUD; cada arena pone el suyo (este vale solo
+## para una arena que no lo ponga).
+@export var elder_title: String = "Jefe Ancestral"
 ## Minutos entre jefes recurrentes tras el Ancestral (0 = ninguno).
 @export var boss_repeat_minutes: float = 4.0
 ## Cuánto más fuerte es cada jefe recurrente que el anterior (multiplicador).
@@ -234,8 +235,9 @@ const ELITE_CHANCE_CAP: float = 0.6
 @export var boss_relief_interval_multiplier: float = 2.0
 ## Segundos de respiro tras la muerte de un jefe.
 @export var boss_relief_duration: float = 15.0
-## Aviso del HUD cuando aparece un jefe; cada arena pone el suyo.
-@export var boss_warning_text: String = "Una presencia monstruosa se acerca..."
+## Aviso del HUD cuando aparece un jefe; cada arena pone el suyo (este vale
+## solo para una arena que no lo ponga).
+@export var boss_warning_text: String = "Se acerca un jefe..."
 
 @export_group("Eventos de cielo")
 ## Eclipse: cuántas veces más rápido llega el flujo (divide el intervalo).
@@ -287,6 +289,9 @@ var _endless_minute_logged: int = -1
 ## Nodo de límites de arena (el scatter): también responde is_walkable()
 ## para la máscara irregular de la arena.
 var _bounds: Node3D = null
+## Media placa donde puede caer un spawn, en metros: el arena_half_extent del
+## scatter menos arena_edge_margin, fijado en _ready.
+var _arena_half_extent: float = FALLBACK_HALF_EXTENT
 ## Solo lo activa el gancho del harness (force_elite_spawns).
 var _force_elite_spawns: bool = false
 ## Spawns descartados este minuto por falta de espacio, y el minuto que se
@@ -304,7 +309,7 @@ func _ready() -> void:
 	add_to_group("enemy_spawner")
 	_bounds = get_tree().get_first_node_in_group("arena_bounds") as Node3D
 	if _bounds != null:
-		arena_half_extent = float(_bounds.get("arena_half_extent")) - arena_edge_margin
+		_arena_half_extent = float(_bounds.get("arena_half_extent")) - arena_edge_margin
 	_drops.read_boost_switch()
 	_validate_phase_scenes()
 
@@ -830,14 +835,14 @@ func _band_position(center: Vector3, min_r: float, max_r: float, angle: float) -
 	for attempt in RING_ATTEMPTS:
 		var heading := angle + TAU * float(attempt) / float(RING_ATTEMPTS)
 		pos = center + Vector3(cos(heading), 0.0, sin(heading)) * randf_range(min_r, max_r)
-		if absf(pos.x) > arena_half_extent or absf(pos.z) > arena_half_extent:
+		if absf(pos.x) > _arena_half_extent or absf(pos.z) > _arena_half_extent:
 			continue
 		# El espacio libre es parte de "¿sirve este punto?": girar por la
 		# banda es justo como se resuelve un hueco bloqueado.
 		if _walkable(pos) and has_player_clearance(pos):
 			break
-	pos.x = clampf(pos.x, -arena_half_extent, arena_half_extent)
-	pos.z = clampf(pos.z, -arena_half_extent, arena_half_extent)
+	pos.x = clampf(pos.x, -_arena_half_extent, _arena_half_extent)
+	pos.z = clampf(pos.z, -_arena_half_extent, _arena_half_extent)
 	return pos
 
 
