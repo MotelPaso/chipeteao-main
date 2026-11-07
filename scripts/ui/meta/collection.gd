@@ -45,16 +45,19 @@ const BESTIARY: Array[Dictionary] = [
 ]
 
 @export_group("Filas")
-## Título de sección (RAIDERS, ARSENAL, BESTIARIO): tamaño de fuente
-## (píxeles), color y espaciado entre letras (píxeles).
+## Tamaño de fuente de los títulos de sección (RAIDERS, ARSENAL, BESTIARIO), en píxeles.
 @export var section_font_size: int = 16
+## Color de los títulos de sección.
 @export var section_color: Color = UiTheme.ACCENT_AMBER
+## Espacio extra entre las letras de los títulos de sección, en píxeles.
 @export var section_spacing: int = 3
-## Título de cada fila: tamaño de fuente (píxeles) y color si está descubierta.
+## Tamaño de fuente del título de cada fila, en píxeles.
 @export var title_font_size: int = 15
+## Color del título de una fila descubierta.
 @export var title_color: Color = UiTheme.TEXT_BRIGHT
-## Detalle bajo el título: tamaño de fuente (píxeles) y color si está descubierta.
+## Tamaño de fuente del detalle bajo el título, en píxeles.
 @export var detail_font_size: int = 11
+## Color del detalle de una fila descubierta.
 @export var detail_color: Color = UiTheme.TEXT_DIM
 ## Color del título y del detalle de una fila sin descubrir.
 @export var hidden_text_color: Color = UiTheme.TEXT_FAINT

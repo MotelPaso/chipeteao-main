@@ -45,11 +45,13 @@ const CARD_SCENE: PackedScene = preload("res://scenes/ui/meta/character_select/C
 @export var entrance_scale_time: float = 0.26
 ## Escala desde la que entra cada sección.
 @export var entrance_start_scale: float = 0.96
-## Escala del botón Iniciar al pasar el mouse y al presionarlo.
+## Escala del botón Iniciar al pasar el mouse.
 @export var start_hover_grow: float = 1.05
+## Escala del botón Iniciar al presionarlo.
 @export var start_press_squash: float = 0.93
-## Golpe del saldo de esquirlas al cambiar: escala y duración (segundos).
+## Escala máxima del golpe del saldo de esquirlas al cambiar.
 @export var shards_pop_peak: float = 1.12
+## Duración del golpe del saldo de esquirlas, en segundos.
 @export var shards_pop_time: float = 0.22
 
 @export_group("Textos")

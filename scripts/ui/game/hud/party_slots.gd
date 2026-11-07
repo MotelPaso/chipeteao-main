@@ -1,7 +1,8 @@
 class_name PartySlots
 extends RefCounted
 ## Búsquedas de jugadores por ranura (player_index, de 0 a Coop.MAX_PLAYERS - 1)
-## que comparten el HUD, el mapa de Tab y la flecha del jefe.
+## que comparten el HUD, el mapa de Tab, la flecha del jefe y el selector de
+## cartas.
 ## Un jugador caído sale del grupo "player" y entra a "downed_players", y uno
 ## reanimado vuelve al FINAL de "player": el orden de los grupos cambia en la
 ## partida, así que siempre se busca por player_index.

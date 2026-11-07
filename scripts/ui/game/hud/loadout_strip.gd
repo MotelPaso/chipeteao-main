@@ -19,6 +19,7 @@ const TILE_SCENE := preload("res://scenes/ui/hud/LoadoutTile.tscn")
 ## "l Azar"). El prefijo en inglés queda para filas sin traducir.
 const TOME_NAME_PREFIXES: Array[String] = ["Tome of ", "Tomo del ", "Tomo de "]
 
+@export_group("Franja")
 ## Qué muestra esta franja: el equipo (armas, tomos y mascota) o la bolsa (objetos).
 @export var contents: Contents = Contents.BUILD
 ## Segundos entre consultas del equipo del jugador.

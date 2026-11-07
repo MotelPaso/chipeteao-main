@@ -11,7 +11,6 @@ extends RefCounted
 ## Es estático y nunca va en una escena: edita los valores aquí.
 
 # --- paleta ------------------------------------------------------------------
-const BG_DEEP := Color(0.045, 0.05, 0.08)
 const PANEL_BG := Color(0.09, 0.1, 0.145, 0.96)
 const CARD_BG := Color(0.115, 0.125, 0.17, 0.98)
 const CARD_BG_HOVER := Color(0.16, 0.175, 0.24, 0.98)
@@ -31,8 +30,6 @@ const OUTLINE_DARK := Color(0.03, 0.035, 0.06, 0.92)
 ## Fondo oscuro de chips y filas del HUD y de los modales, opaco: cada uso le
 ## pone su alfa con Color(UiTheme.TILE_BG, alfa).
 const TILE_BG := Color(0.07, 0.075, 0.11)
-## Atenuado de pantalla detrás de un panel modal.
-const DIM := Color(0.03, 0.03, 0.05, 0.75)
 ## Destello (modulate) de "no alcanza" (ver reject).
 const REJECT_FLASH := Color(1.0, 0.42, 0.42)
 ## Verde de la experiencia: barra de XP del HUD, anillo de subida de nivel

@@ -4,6 +4,7 @@ extends PanelContainer
 ## líneas. El aspecto (fondo, colores y tamaños de letra) vive en
 ## MapSection.tscn; cada instancia en MapOverlay.tscn solo pone su `title`.
 
+@export_group("Panel")
 ## Título del panel, tal como lo ve el jugador.
 @export var title: String = ""
 ## Espacio extra entre las letras del título, en píxeles.

@@ -7,13 +7,14 @@ extends Label
 ## (PerfProbe): esta es una opción del juego y solo muestra los FPS.
 ## El color del texto es el de la escena; el script agrega la pastilla.
 
+@export_group("Insignia")
 ## Segundos entre lecturas.
 @export var refresh_seconds: float = 0.25
 ## Texto del indicador; %d son los cuadros por segundo.
 @export var text_format: String = "%d FPS"
-## Fondo de la pastilla.
+## Color de fondo de la pastilla.
 @export var background_color: Color = Color(UiTheme.TILE_BG, 0.85)
-## Borde de la pastilla.
+## Color del borde de la pastilla.
 @export var border_color: Color = Color(0.3, 0.33, 0.4)
 
 var _refresh_left: float = 0.0

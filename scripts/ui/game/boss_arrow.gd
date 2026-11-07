@@ -20,6 +20,7 @@ extends Node2D
 ## cada cuadro, y en solo no corre nunca (el viewport raíz tiene su cámara).
 const CAMERA_RESCAN := 0.5
 
+@export_group("Color")
 ## Barra de la que la flecha toma su color de relleno (Fill), para que el
 ## ámbar del jefe tenga un solo dueño: BossBar.fill_color.
 @export var color_source: BossBar

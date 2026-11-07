@@ -10,8 +10,8 @@ spacing_glyph = 2
 
 [node name="RunEndScreen" type="CanvasLayer"]
 process_mode = 3
+layer = 20
 script = ExtResource("1_runend")
-editor_description = "La capa de dibujo sale de UiLayers.RUN_END (scripts/ui/ui_layers.gd): cámbiala allí."
 
 [node name="Root" type="Control" parent="."]
 unique_name_in_owner = true

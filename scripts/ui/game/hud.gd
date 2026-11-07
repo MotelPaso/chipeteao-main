@@ -29,7 +29,7 @@ extends CanvasLayer
 ## Fracción de vida (0-1) desde la que la barra usa hp_full_color. La misma
 ## rampa colorea las barras de los compañeros (%MatePanel).
 @export var hp_full_ratio: float = 0.6
-## Radio de las esquinas del relleno de la barra de vida, en píxeles.
+## Radio base de la barra de vida (px): el relleno usa este valor - 1 y el fondo + 1.
 @export var hp_corner_radius: int = 8
 ## Texto sobre la barra: vida actual y máxima.
 @export var hp_format: String = "%d / %d"

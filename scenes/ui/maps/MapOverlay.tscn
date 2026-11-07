@@ -4,6 +4,7 @@
 [ext_resource type="PackedScene" path="res://scenes/ui/maps/MapSection.tscn" id="2_section"]
 
 [node name="MapOverlay" type="Control" unique_id=1633279274]
+process_mode = 3
 visible = false
 layout_mode = 3
 anchors_preset = 15

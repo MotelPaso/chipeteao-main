@@ -27,8 +27,9 @@ signal slots_rebuilt
 @export var count_usable_border: Color = UiTheme.BORDER_DIM
 ## Borde de una cantidad sin controles suficientes.
 @export var count_unusable_border: Color = UiTheme.BORDER_LOCKED
-## Grosor del borde (píxeles) de la cantidad elegida y de las demás.
+## Grosor del borde de la cantidad elegida, en píxeles.
 @export var count_selected_border_width: int = 3
+## Grosor del borde de las demás cantidades, en píxeles.
 @export var count_idle_border_width: int = 2
 
 @export_group("Botones de slot")
@@ -40,11 +41,13 @@ signal slots_rebuilt
 @export var slot_hover_grow: float = 1.05
 ## Cuánto se aclara el tinte del raider para el texto del slot en edición (0-1).
 @export_range(0.0, 1.0) var slot_editing_lighten: float = 0.35
-## Texto y borde de los slots que no se están editando.
+## Color del texto de los slots que no se están editando.
 @export var slot_idle_color: Color = UiTheme.TEXT_NORMAL
+## Color del borde de los slots que no se están editando.
 @export var slot_idle_border: Color = UiTheme.BORDER_DIM
-## Grosor del borde (píxeles) del slot en edición y de los demás.
+## Grosor del borde del slot en edición, en píxeles.
 @export var slot_editing_border_width: int = 3
+## Grosor del borde de los demás slots, en píxeles.
 @export var slot_idle_border_width: int = 2
 
 @export_group("Textos")

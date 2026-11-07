@@ -13,6 +13,7 @@ extends Node
 const SplitScreenView := preload("res://scripts/systems/split_screen.gd")
 const OVERLAY_SCENE := preload("res://scenes/ui/maps/MapOverlay.tscn")
 
+@export_group("Minimapa")
 ## Margen superior del minimapa, en píxeles, en las celdas que NO tocan el
 ## borde superior de la ventana (las de arriba usan el de MinimapSlot, que deja
 ## libre la columna de bajas y FPS).

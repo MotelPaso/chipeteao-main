@@ -18,6 +18,24 @@ const SLIDER_TRACK_COLOR := Color(0.05, 0.06, 0.09, 0.9)
 const VOLUME_MIN := 0.0
 const VOLUME_MAX := 100.0
 
+@export_group("Textos")
+## Indicación del botón de aceptar, bajo Volver.
+@export var accept_hint_text: String = "Elegir"
+## Indicación del botón de cancelar, bajo Volver.
+@export var cancel_hint_text: String = "Volver"
+## Valor junto al slider de sensibilidad (%.2f = multiplicador).
+@export var sensitivity_format: String = "%.2fx"
+## Valor junto a los sliders de volumen (%d = porcentaje; %% es el signo %).
+@export var volume_format: String = "%d%%"
+
+@export_group("Entrada")
+## Escala desde la que crece el panel al abrirse.
+@export var open_start_scale: float = 0.94
+## Duración del fundido de entrada del panel, en segundos.
+@export var open_fade_time: float = 0.14
+## Duración del crecimiento con rebote del panel, en segundos.
+@export var open_grow_time: float = 0.2
+
 @onready var _panel: PanelContainer = %Panel
 @onready var _sfx_slider: HSlider = %SfxSlider
 @onready var _ambient_slider: HSlider = %AmbientSlider
@@ -55,7 +73,7 @@ func _ready() -> void:
 	_link_focus()
 	# Indicaciones de botones bajo Volver; siguen al último dispositivo usado.
 	_back_button.get_parent().add_child(InputHints.build([
-			["ui_accept", "Elegir"], ["ui_cancel", "Volver"]]))
+			["ui_accept", accept_hint_text], ["ui_cancel", cancel_hint_text]]))
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -73,12 +91,12 @@ func open() -> void:
 	if _open_tween != null and _open_tween.is_valid():
 		_open_tween.kill()
 	_panel.pivot_offset = _panel.size * 0.5
-	_panel.scale = Vector2(0.94, 0.94)
+	_panel.scale = Vector2.ONE * open_start_scale
 	_panel.modulate.a = 0.0
 	_open_tween = create_tween().set_parallel()
 	_open_tween.set_ignore_time_scale(true)
-	_open_tween.tween_property(_panel, "modulate:a", 1.0, 0.14)
-	_open_tween.tween_property(_panel, "scale", Vector2.ONE, 0.2) \
+	_open_tween.tween_property(_panel, "modulate:a", 1.0, open_fade_time)
+	_open_tween.tween_property(_panel, "scale", Vector2.ONE, open_grow_time) \
 			.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 
 
@@ -157,7 +175,7 @@ func _aim_at_chosen_quality() -> void:
 
 
 func _refresh_sensitivity_label(value: float) -> void:
-	_sensitivity_value.text = "%.2fx" % value
+	_sensitivity_value.text = sensitivity_format % value
 
 
 func _on_sfx_changed(value: float) -> void:
@@ -173,8 +191,8 @@ func _on_ambient_changed(value: float) -> void:
 ## Los volúmenes se leen como porcentaje junto a su slider, igual que el
 ## multiplicador de sensibilidad: las tres filas terminan en un número.
 func _refresh_volume_labels() -> void:
-	_sfx_value.text = "%d%%" % roundi(_sfx_slider.value)
-	_ambient_value.text = "%d%%" % roundi(_ambient_slider.value)
+	_sfx_value.text = volume_format % roundi(_sfx_slider.value)
+	_ambient_value.text = volume_format % roundi(_ambient_slider.value)
 
 
 func _on_sensitivity_changed(value: float) -> void:

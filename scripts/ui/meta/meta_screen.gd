@@ -16,19 +16,39 @@ extends Control
 ## compartidos que llama una subclase: payoff() (reclamar / comprar),
 ## reject() (no alcanza) y rebuild().
 
-## Destello de la fila (modulate) al pagar.
-const PAYOFF_FLASH := Color(1.7, 1.45, 0.85)
 ## Margen interno (píxeles) de la tarjeta de cada fila: lados y arriba/abajo.
 const CARD_MARGIN_H := 16.0
 const CARD_MARGIN_V := 10.0
 ## Solo animan su entrada las filas que caben en pantalla; una lista de 40
 ## filas se abriría como una presentación de diapositivas.
 const ENTRANCE_ROWS := 8
-## Duración (segundos) del conteo del saldo.
-const COUNT_TIME := 0.4
 ## Píxeles que se desplaza la lista con ui_up / ui_down cuando no hay un
 ## botón de fila al que mover el foco (ver _input).
 const SCROLL_STEP := 110
+
+@export_group("Textos")
+## Indicación del botón de aceptar, bajo Volver.
+@export var accept_hint_text: String = "Elegir"
+## Indicación del botón de cancelar, bajo Volver.
+@export var back_hint_text: String = "Volver"
+
+@export_group("Animación")
+## Duración de la aparición de cada fila en la entrada, en segundos.
+@export var entrance_fade_time: float = 0.18
+## Retraso extra entre una fila y la siguiente en la entrada, en segundos.
+@export var entrance_stagger: float = 0.04
+## Duración del conteo animado del saldo de esquirlas, en segundos.
+@export var count_time: float = 0.4
+## Escala máxima del golpe de la insignia de saldo al cambiar.
+@export var badge_pop_scale: float = 1.2
+## Duración del golpe de la insignia de saldo, en segundos.
+@export var badge_pop_time: float = 0.3
+## Brillo (modulate) de la fila al pagar (reclamar o comprar).
+@export var payoff_flash_color: Color = Color(1.7, 1.45, 0.85)
+## Duración de la subida del destello de pago, en segundos.
+@export var payoff_flash_in_time: float = 0.08
+## Duración de la bajada del destello de pago, en segundos.
+@export var payoff_flash_out_time: float = 0.2
 
 @onready var _badge_label: Label = %BadgeLabel
 @onready var _list: VBoxContainer = %List
@@ -48,7 +68,7 @@ func _ready() -> void:
 	_back_button.pressed.connect(_on_back_pressed)
 	# Indicaciones de botones bajo Volver; siguen al último dispositivo usado.
 	_back_button.get_parent().add_child(InputHints.build([
-			["ui_accept", "Elegir"], ["ui_cancel", "Volver"]]))
+			["ui_accept", accept_hint_text], ["ui_cancel", back_hint_text]]))
 	if _scroll != null:
 		# Un control que recorre los botones de las filas debe ver el enfocado.
 		_scroll.follow_focus = true
@@ -140,9 +160,9 @@ func _count_balance(before: int, after: int) -> void:
 		_count_tween.kill()
 	_count_tween = create_tween()
 	_count_tween.set_ignore_time_scale(true)
-	_count_tween.tween_method(_set_badge_step, float(before), float(after), COUNT_TIME)
+	_count_tween.tween_method(_set_badge_step, float(before), float(after), count_time)
 	_count_tween.tween_callback(refresh_badge)  # termina en el saldo real
-	UiTheme.pop(_badge_label, 1.2, 0.3)
+	UiTheme.pop(_badge_label, badge_pop_scale, badge_pop_time)
 
 
 func _set_badge_step(value: float) -> void:
@@ -162,8 +182,8 @@ func payoff(row: Control, before: int, after: int, sound: StringName) -> void:
 		return
 	var flash := create_tween()
 	flash.set_ignore_time_scale(true)
-	flash.tween_property(row, "modulate", PAYOFF_FLASH, 0.08)
-	flash.tween_property(row, "modulate", Color.WHITE, 0.2)
+	flash.tween_property(row, "modulate", payoff_flash_color, payoff_flash_in_time)
+	flash.tween_property(row, "modulate", Color.WHITE, payoff_flash_out_time)
 	flash.tween_callback(rebuild)
 
 
@@ -250,8 +270,8 @@ func play_entrance() -> void:
 	for i in rows.size():
 		var settled := rows[i].modulate
 		rows[i].modulate = Color(settled.r, settled.g, settled.b, 0.0)
-		tween.tween_property(rows[i], "modulate:a", settled.a, 0.18) \
-				.set_delay(0.04 * i)
+		tween.tween_property(rows[i], "modulate:a", settled.a, entrance_fade_time) \
+				.set_delay(entrance_stagger * i)
 
 
 # --- cromo compartido de las filas ------------------------------------
