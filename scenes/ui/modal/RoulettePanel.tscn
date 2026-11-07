@@ -1,0 +1,24 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="PackedScene" path="res://scenes/ui/modal/ModalPanel.tscn" id="1_base"]
+[ext_resource type="Script" path="res://scripts/ui/game/roulette_ui.gd" id="2_roulette"]
+
+[node name="RoulettePanel" instance=ExtResource("1_base")]
+editor_description = "Menú de la ruleta. Textos, colores y tiempos del barrido en el Inspector de este nodo (roulette_ui.gd)."
+script = ExtResource("2_roulette")
+
+[node name="Title" parent="Root/Center/Panel/VBox" index="0"]
+theme_override_font_sizes/font_size = 36
+
+[node name="Outcomes" type="GridContainer" parent="Root/Center/Panel/VBox/Body" index="0"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_constants/h_separation = 18
+theme_override_constants/v_separation = 4
+columns = 2
+
+[node name="SpinButton" type="Button" parent="Root/Center/Panel/VBox/Buttons" index="0"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(200, 46)
+layout_mode = 2
+editor_description = "El texto sale de spin_template en el script."
