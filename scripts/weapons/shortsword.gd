@@ -4,6 +4,7 @@ extends WeaponBase
 ## ataque se lee por una medialuna SlashArc del pool que cruza el arco de
 ## golpe, más una chispa pequeña en cada enemigo alcanzado.
 
+@export_group("Tajo")
 ## Apertura del tajo, en grados: daña a los enemigos dentro de este abanico.
 @export var arc_angle_deg: float = 150.0
 ## Segundos que dura la medialuna del tajo.

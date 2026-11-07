@@ -137,7 +137,7 @@ const ITEM_LIBRARY: Array[Dictionary] = [
 		"id": "electric_belt", "display_name": "Cinturón eléctrico", "rarity": "Legendary",
 		"glyph": "CL", "kind": "shock_dash",
 		# El 4 sale de BeltBolt (belt_bolt.gd): el primer blanco más
-		# base_bounces (2) más 1 por la copia. Mantén el texto igual a eso.
+		# BASE_BOUNCES (2) más 1 por la copia. Mantén el texto igual a eso.
 		"description": "Al derrapar, un rayo salta entre 4 enemigos (uno más por copia)",
 	},
 	{

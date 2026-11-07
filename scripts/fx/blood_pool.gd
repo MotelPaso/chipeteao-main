@@ -8,6 +8,7 @@ extends Node3D
 ## del mismo nodo, y una escala no uniforme en la raíz las aplastaría en
 ## manchas que laten con el charco.
 
+@export_group("Animación")
 ## Segundos de cada mitad del latido (hincharse o volver).
 @export var throb_time: float = 0.35
 ## Segundos que tarda el charco en desvanecerse al expirar.

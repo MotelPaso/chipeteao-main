@@ -7,6 +7,7 @@ extends Area3D
 ## vuelta para su segundo golpe. Vuelve a Pools al ser atrapada, si pierde al
 ## jugador o tras max_lifetime; pool_reset() rearma tramos y registro.
 
+@export_group("Vuelo")
 ## Velocidad de vuelo, en metros por segundo.
 @export var speed: float = 14.0
 ## Radianes por segundo del giro puramente visual del nodo Spinner.

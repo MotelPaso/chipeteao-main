@@ -20,20 +20,28 @@ enum State { ENTRANCE, PURSUE, SWEEP, COFFINS, ENTOMB }
 ## Radio en metros del anillo de destello de la llegada.
 @export var entrance_ring_radius: float = 3.0
 
-@export_group("Sweep Beam")
+@export_group("Rayo de barrido")
+## Segundos de carga con la línea de aviso antes de que dispare el láser.
 @export var sweep_windup: float = 1.0
+## Segundos que tarda el láser en recorrer todo el arco.
 @export var sweep_duration: float = 3.0
+## Ancho del arco que barre el láser, en grados.
 @export var sweep_arc_deg: float = 120.0
+## Largo del láser y de la línea de aviso, en metros.
 @export var sweep_length: float = 15.0
+## Daño por quemadura a cada raider que toca el láser (valor base; apply_tier lo escala).
 @export var sweep_tick_damage: float = 8.0
+## Segundos entre quemaduras al mismo raider.
 @export var sweep_tick_interval: float = 0.5
+## Segundos de espera entre un barrido y el siguiente.
 @export var sweep_cooldown: float = 8.0
+## Distancia máxima al raider, en metros, para empezar un barrido.
 @export var sweep_max_range: float = 14.0
-## Medio ancho angular de la cuña de golpe del rayo.
+## Medio ancho angular de la cuña de golpe del rayo, en grados.
 @export var sweep_hit_half_angle_deg: float = 7.0
-## El rayo barre a la altura del pecho: unos pies más altos que esto sobre
-## los del jefe (un salto a tiempo, una mesa) le pasan por encima.
+## Metros sobre los pies del jefe por encima de los cuales el láser no golpea (un salto a tiempo lo pasa).
 @export var sweep_height_window: float = 1.2
+## Altura en metros desde la que salen el láser y la línea de aviso.
 @export var beam_height: float = 0.9
 ## Segundos de espera al aparecer antes del primer barrido.
 @export var first_sweep_delay: float = 3.0
@@ -44,7 +52,8 @@ enum State { ENTRANCE, PURSUE, SWEEP, COFFINS, ENTOMB }
 ## Grosor en metros de la línea de aviso al terminar la carga.
 @export var warn_width_end: float = 0.16
 
-@export_group("Sand Coffins")
+@export_group("Ataúdes de arena")
+## Segundos de espera entre una tanda de ataúdes y la siguiente.
 @export var coffin_interval: float = 6.0
 ## Fracción de coffin_interval que espera la primera tanda al aparecer (0-1).
 @export var first_coffin_fraction: float = 0.6
@@ -54,25 +63,35 @@ enum State { ENTRANCE, PURSUE, SWEEP, COFFINS, ENTOMB }
 @export var coffin_shake_strength: float = 0.2
 ## Segundos del temblor de cámara cuando caen los ataúdes.
 @export var coffin_shake_duration: float = 0.4
+## Segundos de aviso entre los discos y la caída de los ataúdes.
 @export var coffin_windup: float = 1.0
-## Huecos repartidos en anillo alrededor del raider; uno al azar queda vacío
-## (el escape) y un disco extra cae a sus pies.
+## Huecos del anillo alrededor del raider; uno al azar queda vacío (el escape) y un disco extra cae a sus pies.
 @export var coffin_ring_slots: int = 5
+## Radio en metros del anillo de ataúdes alrededor del raider.
 @export var coffin_ring_radius: float = 2.6
+## Radio de cada ataúd y de su disco de aviso, en metros.
 @export var coffin_radius: float = 1.6
+## Daño de los ataúdes a cada raider alcanzado (valor base; apply_tier lo escala).
 @export var coffin_damage: float = 12.0
+## Distancia mínima al raider, en metros, para lanzar ataúdes.
 @export var coffin_min_range: float = 3.0
+## Distancia máxima al raider, en metros, para lanzar ataúdes.
 @export var coffin_max_range: float = 18.0
+## Metros sobre el suelo por encima de los cuales los ataúdes no golpean.
 @export var coffin_height_window: float = 1.5
 
-@export_group("Entomb")
-## Fracciones de vida (de mayor a menor) que disparan un Sepultar cada una
-## cuando el jefe las cruza.
+@export_group("Sepultar")
+## Fracciones de vida (0-1, de mayor a menor) que disparan un Sepultar cada una al cruzarlas.
 @export var entomb_thresholds: Array[float] = [0.66, 0.33]
+## Segundos de aviso entre el disco y el golpe.
 @export var entomb_windup: float = 1.2
+## Radio del disco de Sepultar, en metros.
 @export var entomb_radius: float = 2.0
+## Daño a cada raider dentro del disco (valor base; apply_tier lo escala).
 @export var entomb_damage: float = 10.0
+## Segundos que queda inmovilizado el raider atrapado (sus armas siguen disparando).
 @export var entomb_root_duration: float = 1.5
+## Metros sobre el suelo por encima de los cuales Sepultar no golpea.
 @export var entomb_height_window: float = 1.5
 
 @export_group("Flotación")

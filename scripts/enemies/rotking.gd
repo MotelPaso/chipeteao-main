@@ -12,39 +12,56 @@ extends BossBase
 
 enum State { ENTRANCE, PURSUE, SMASH, ROOT_BURST, SUMMON }
 
+@export_group("Llegada")
+## Segundos que el jefe se queda quieto al aparecer antes de perseguir.
 @export var entrance_duration: float = 0.9
 
-@export_group("Smash")
+@export_group("Aplastón")
+## Distancia al raider, en metros, a la que empieza el Aplastón.
 @export var smash_range: float = 3.5
+## Radio de la onda de choque y de su disco de aviso, en metros.
 @export var smash_radius: float = 4.0
+## Daño de la onda a cada raider dentro del radio (valor base; apply_tier lo escala).
 @export var smash_damage: float = 25.0
+## Segundos de aviso entre el disco y el golpe.
 @export var smash_windup: float = 0.7
+## Segundos quieto después del golpe antes de volver a perseguir.
 @export var smash_recover: float = 0.8
+## Segundos de espera entre un Aplastón y el siguiente.
 @export var smash_cooldown: float = 3.0
-## El golpe es una onda de suelo: un raider más alto que esto sobre los pies
-## del jefe (un salto a tiempo, una cornisa) no la recibe.
+## Metros sobre los pies del jefe por encima de los cuales la onda no golpea (un salto a tiempo la esquiva).
 @export var smash_height_window: float = 1.2
 
-@export_group("Root Burst")
+@export_group("Estallido de raíces")
+## Segundos de espera entre un Estallido de raíces y el siguiente.
 @export var root_burst_interval: float = 6.0
+## Segundos de aviso entre los discos y las púas.
 @export var root_burst_windup: float = 0.9
+## Radio de cada punto de púas y de su disco de aviso, en metros.
 @export var root_burst_radius: float = 1.5
+## Daño de las púas a cada raider alcanzado, una vez aunque los discos se solapen (valor base; apply_tier lo escala).
 @export var root_burst_damage: float = 15.0
-## Distancia de los dos puntos laterales al del raider; quedan en línea con
-## él y dejan un pasillo de escape perpendicular.
+## Distancia en metros de los dos puntos laterales al del raider; quedan en línea y dejan un pasillo de escape.
 @export var root_burst_spread: float = 2.6
+## Distancia mínima al raider, en metros, para usar el Estallido.
 @export var root_burst_min_range: float = 3.5
+## Distancia máxima al raider, en metros, para usar el Estallido.
 @export var root_burst_max_range: float = 16.0
+## Metros sobre el suelo por encima de los cuales las púas no golpean.
 @export var spike_height_window: float = 1.5
 
-@export_group("Summon")
-## Fracciones de vida (de mayor a menor) que disparan una oleada cada una
-## cuando el jefe las cruza.
+@export_group("Invocación")
+## Fracciones de vida (0-1, de mayor a menor) que disparan una oleada de esbirros cada una al cruzarlas.
 @export var summon_thresholds: Array[float] = [0.75, 0.5, 0.25]
+## Escena del esbirro que invoca (su raíz debe extender EnemyBase).
 @export var summon_scene: PackedScene
+## Mínimo de esbirros por oleada.
 @export var summon_count_min: int = 4
+## Máximo de esbirros por oleada.
 @export var summon_count_max: int = 6
+## Radio en metros del anillo donde aparecen los esbirros.
 @export var summon_ring_radius: float = 3.2
+## Segundos del rugido de invocación; los esbirros salen al terminar.
 @export var summon_duration: float = 1.1
 
 var _state: State = State.ENTRANCE

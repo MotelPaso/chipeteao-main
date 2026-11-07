@@ -22,9 +22,6 @@ roughness = 0.35
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_teal"]
 shading_mode = 0
 albedo_color = Color(0.3, 1, 0.85, 1)
-emission_enabled = true
-emission = Color(0.15, 0.95, 0.78, 1)
-emission_energy_multiplier = 2.4
 
 [sub_resource type="CylinderMesh" id="CylinderMesh_hoverbase"]
 material = SubResource("StandardMaterial3D_stone_dark")
@@ -159,7 +156,6 @@ armor = 4.0
 
 [node name="WarnLine" parent="." instance=ExtResource("4_beam")]
 color = Color(0.25, 0.95, 0.8, 1)
-default_thickness = 0.06
 
 [node name="Beam" parent="." instance=ExtResource("4_beam")]
 color = Color(0.15, 1, 0.85, 1)

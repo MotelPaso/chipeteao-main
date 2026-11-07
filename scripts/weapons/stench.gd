@@ -20,7 +20,7 @@ extends FieldWeapon
 @export var slow_duration: float = 2.0
 
 @export_group("Nube")
-## Malla y material de la nube (color, transparencia, brillo); radio 1, se escala al radio del pulso.
+## Malla y material de la nube (color y opacidad en albedo_color); radio 1, se escala al radio del pulso.
 @export var cloud_mesh: Mesh
 ## Cuánto debajo del montaje del arma nace la nube, en metros.
 @export var cloud_drop: float = 0.3

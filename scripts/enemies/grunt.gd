@@ -4,11 +4,14 @@ extends EnemyBase
 ## persecución, la separación y la muerte) y daña al raider por contacto,
 ## con un tiempo de espera entre golpes.
 
+@export_group("Cuerpo a cuerpo")
+## Daño de cada golpe al raider; los shiny y las variantes del cielo lo multiplican.
 @export var contact_damage: float = 5.0
+## Segundos entre golpes.
 @export var attack_cooldown: float = 0.8
+## Distancia al raider, en metros, a la que golpea.
 @export var attack_range: float = 1.3
-## Tope de altura: un raider más alto que esto sobre los pies del esbirro
-## (una cornisa, un salto a tiempo) queda fuera de su alcance.
+## Metros sobre los pies del esbirro por encima de los cuales el raider queda fuera de su alcance.
 @export var melee_height_window: float = 1.6
 
 var _attack_timer: float = 0.0

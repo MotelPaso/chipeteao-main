@@ -5,6 +5,7 @@ extends WeaponBase
 ## brillante y un fogonazo del pool en el marcador Muzzle en cada ráfaga
 ## (su aspecto está en MuzzleFlash.tscn, grupo «Fogonazo»).
 
+@export_group("Dardos")
 ## Escena del dardo que se dispara (Projectile.tscn).
 @export var projectile_scene: PackedScene
 ## Grados entre dardos vecinos cuando hay más de uno.

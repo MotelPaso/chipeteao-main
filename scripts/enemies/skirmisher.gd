@@ -5,21 +5,34 @@ extends EnemyBase
 ## dentro) y lanza saetas lentas y esquivables con un ritmo fijo. Siempre
 ## mira al raider, incluso al retroceder, para que se lea como tirador.
 
+@export_group("Distancia")
+## Metros por debajo de los cuales retrocede del raider.
 @export var band_inner: float = 8.0
+## Metros por encima de los cuales avanza hacia el raider; entre las dos bandas se planta.
 @export var band_outer: float = 12.0
+
+@export_group("Disparo")
+## Segundos entre saetas.
 @export var fire_cooldown: float = 3.0
+## Segundos de espera al aparecer antes del primer disparo, para que no dispare al aterrizar.
+@export var first_shot_delay: float = 1.0
+## Distancia máxima al raider, en metros, para disparar.
 @export var fire_range: float = 18.0
-## Daño de cada saeta. Las saetas son el desgaste dominante de la partida
-## una vez que se aprende a esquivar el contacto, así que subirlo pesa más
-## de lo que parece.
+## Daño de cada saeta; es el desgaste dominante de la partida, así que subirlo pesa más de lo que parece.
 @export var bolt_damage: float = 6.0
+## Escena de la saeta (EnemyBolt, sale de Pools).
 @export var bolt_scene: PackedScene
-## Las saetas salen a la altura de la mano y van al pecho del raider.
+## Altura en metros desde la que salen las saetas (la mano).
 @export var muzzle_height: float = 1.2
+## Altura en metros sobre los pies del raider a la que apuntan las saetas (el pecho).
 @export var target_height: float = 0.9
 
-# Espera inicial para que uno recién aparecido no dispare al aterrizar.
-var _fire_timer: float = 1.0
+var _fire_timer: float = 0.0
+
+
+func _ready() -> void:
+	super()
+	_fire_timer = first_shot_delay
 
 
 func _behavior_tick(delta: float) -> void:
