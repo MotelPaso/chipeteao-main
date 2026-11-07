@@ -1,50 +1,51 @@
 extends Node
-## Still camera for the arena's GROUND (iteration 63): boots a run, freezes
-## it on its first frames, hides every CanvasLayer and photographs the
-## terrain and the mask rock formations from fixed vantage points. Exists
-## because the soak camera (BONK_SHOT_DIR on ArenaProbe) sees only what the
-## walking raider happens to face, and a change to how the blocked regions
-## LOOK needs the same formations shot from the same spots before and after.
+## Cámara fija para el SUELO de la arena: arranca una partida, la congela en
+## sus primeros frames, oculta cada CanvasLayer y fotografía el terreno y las
+## formaciones de roca (RockFormation, una por región bloqueada de la máscara)
+## desde puntos fijos. Existe porque la cámara del soak (BONK_SHOT_DIR en
+## ArenaProbe) solo ve hacia donde mira el raider, y un cambio en cómo SE VEN
+## las regiones bloqueadas necesita las mismas formaciones desde los mismos
+## lugares antes y después.
 ##
 ##   BONK_ARENA=res://scenes/world/AshDunes.tscn BONK_GAME_SEED=7 \
 ##   BONK_SHOT_DIR="$TMPDIR/terrain/dunes" \
 ##   godot --path . --resolution 1280x720 res://scenes/tests/TerrainShots.tscn
 ##
-## Env switches:
-##   BONK_ARENA=res://...   biome (default: Hollow Woods), as in ArenaProbe
-##   BONK_GAME_SEED=<int>   the run's stream, which seeds mask and relief —
-##                          the switch that makes two shots comparable
-##   BONK_SHOT_DIR=<dir>    where the PNGs go (REQUIRED; nothing is saved
-##                          inside the project)
-##   BONK_SAVE_PATH=<path>  scratch save, as in every harness
+## Variables de entorno:
+##   BONK_ARENA=res://...   bioma (por defecto: Hollow Woods), como en ArenaProbe
+##   BONK_GAME_SEED=<int>   flujo aleatorio de la partida, que siembra máscara y
+##                          relieve: la variable que hace comparables dos fotos
+##   BONK_SHOT_DIR=<dir>    dónde van los PNG (OBLIGATORIA; nada se guarda
+##                          dentro del proyecto)
+##   BONK_SAVE_PATH=<path>  guardado temporal, como en todo arnés
 ##
-## Shots, in order:
-##   map.png               orthographic, straight down, fog off: the layout
-##   aerial.png            3/4 view of the whole arena, fog off
-##   spawn.png             eye level from the party spawn, fog ON
-##   formation_<n>.png     eye level, 26 m off one of the blocked regions
-##                         nearest the spawn, fog ON — what a raider walking
-##                         up to it sees
-##   drone_<n>.png         the same region from 18 m up, fog ON
+## Fotos, en orden:
+##   map.png               ortográfica, desde arriba, sin niebla: la distribución
+##   aerial.png            vista 3/4 de toda la arena, sin niebla
+##   spawn.png             a la altura de los ojos desde el spawn del grupo, CON niebla
+##   formation_<n>.png     a la altura de los ojos, a 26 m de una de las regiones
+##                         bloqueadas más cercanas al spawn, CON niebla: lo que ve
+##                         un raider que camina hacia ella
+##   drone_<n>.png         la misma región desde 18 m de altura, CON niebla
 ##
-## Prints `Terrain shots: <map> formations=<n> props=<n> meshes=<n> blocked=<n>` and
-## quits. Headless it saves nothing and says so, like ShotCamera.
+## Imprime `Terrain shots: <map> formations=<n> props=<n> meshes=<n> blocked=<n>` y
+## sale. En headless no guarda nada y lo avisa, como ShotCamera.
 
 const DEFAULT_ARENA := "res://scenes/world/HollowWoods.tscn"
 const DEFAULT_SAVE_PATH := "user://terrain_shots_save.json"
 const RUN_SCENE := "res://scenes/world/Run.tscn"
-## Frames the run gets before it is frozen: the arena is dressed inside
-## the add_child, but shadows and the first fade need a few drawn frames.
+## Frames que corre la partida antes de congelarla: la arena se viste dentro
+## del add_child, pero las sombras y el primer fundido necesitan unos frames.
 const WARMUP_FRAMES: int = 20
-## Drawn frames between moving the camera and saving: the directional
-## shadow cascades are fitted to the camera and lag it by a frame or two.
+## Frames dibujados entre mover la cámara y guardar: las cascadas de sombra
+## direccional se ajustan a la cámara y van uno o dos frames atrasadas.
 const SETTLE_FRAMES: int = 4
-## Formations photographed at eye level, nearest the spawn first.
+## Formaciones fotografiadas a la altura de los ojos, la más cercana al spawn primero.
 const FORMATION_SHOTS: int = 4
-## Eye-level shots stand this far off the region's nearest cell centre.
+## Distancia (metros) desde el centro de celda más cercano de la región a la cámara.
 const FORMATION_STANDOFF: float = 26.0
-## Camera height above the ground at eye level: the player's spring arm
-## (1.75 m pivot, 5 m arm) puts its lens roughly here.
+## Altura de la cámara sobre el suelo (metros) a la altura de los ojos: el
+## spring arm del jugador (pivote a 1.75 m, brazo de 5 m) deja su lente más o menos aquí.
 const EYE_HEIGHT: float = 3.2
 const DRONE_HEIGHT: float = 18.0
 const PLAYER_FOV: float = 70.0
@@ -85,8 +86,8 @@ func _ready() -> void:
 func _shoot() -> void:
 	for frame in WARMUP_FRAMES:
 		await get_tree().process_frame
-	# Frozen: nothing spawns, nothing walks into the frame. Rendering goes
-	# on while paused, and this node is PROCESS_MODE_ALWAYS in its scene.
+	# Congelada: nada aparece ni entra caminando al cuadro. El render sigue en
+	# pausa, y este nodo es PROCESS_MODE_ALWAYS en su escena.
 	get_tree().paused = true
 	_hide_canvas_layers(get_tree().root)
 	var bounds := get_tree().get_first_node_in_group(&"arena_bounds") as Node3D
@@ -107,7 +108,7 @@ func _shoot() -> void:
 	_set_fog(false)
 	_camera.projection = Camera3D.PROJECTION_ORTHOGONAL
 	_camera.size = terrain.size + 10.0
-	# North (-Z) up, the same orientation as the minimap.
+	# Norte (-Z) arriba, igual que el minimapa.
 	_camera.look_at_from_position(Vector3(0.0, 160.0, 0.0), Vector3.ZERO, Vector3.FORWARD)
 	await _save("map")
 	_camera.projection = Camera3D.PROJECTION_PERSPECTIVE
@@ -147,8 +148,8 @@ func _shoot() -> void:
 	get_tree().quit(0)
 
 
-## Connected regions of blocked cells (4-neighbour), nearest the spawn
-## first: {centroid, near (the cell centre closest to the spawn), cells}.
+## Regiones conexas de celdas bloqueadas (4 vecinos), la más cercana al spawn
+## primero: {centroid, near (el centro de celda más cercano al spawn), cells}.
 func _formations(bounds: Node3D) -> Array[Dictionary]:
 	var raw: Variant = bounds.call(&"blocked_cells")
 	var blocked: Dictionary[Vector2i, bool] = {}
@@ -185,8 +186,8 @@ func _formations(bounds: Node3D) -> Array[Dictionary]:
 	return out
 
 
-## A walkable spot FORMATION_STANDOFF off `near`, toward the spawn first and
-## then around the compass. INF when the region is boxed in.
+## Un punto caminable a FORMATION_STANDOFF de `near`, primero hacia el spawn y
+## luego girando por la rosa de los vientos. INF si la región está encerrada.
 func _standoff(bounds: Node3D, near: Vector2) -> Vector2:
 	var toward := (-near).normalized() if near.length() > 0.1 else Vector2.UP
 	for turn in 8:
@@ -229,9 +230,9 @@ func _find_world_environment(node: Node) -> WorldEnvironment:
 	return null
 
 
-## MeshInstance3D nodes under the scatter (interior props, rock formations, the
-## perimeter line, the mesas): the before/after of "not so many", and a
-## fair proxy for what the scatter costs the renderer.
+## Nodos MeshInstance3D bajo el scatter (props interiores, formaciones de roca,
+## la línea del perímetro, las mesetas): mide el antes/después de la cantidad
+## y aproxima lo que el scatter le cuesta al renderer.
 func _count_meshes(node: Node) -> int:
 	var count := 1 if node is MeshInstance3D else 0
 	for child: Node in node.get_children():
