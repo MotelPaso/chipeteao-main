@@ -4,25 +4,14 @@ extends Label
 ## (es hijo de %TimerLabel, así viaja con él). Se lee del director (grupo
 ## "world_director", propiedad active_weather) en vez de que él lo empuje: el
 ## chip es una vista. El color del texto de la escena es el de un grupo de
-## clima sin color propio.
+## clima sin color propio. El nombre sale de la columna display_name de
+## WeatherDirector.WEATHER_CATALOG (weather_director.gd); un id sin fila se
+## muestra tal cual.
 
 ## Segundos entre lecturas del clima.
 @export var refresh_seconds: float = 0.2
 ## Texto del chip: nombre del clima y segundos restantes.
 @export var text_format: String = "%s %ds"
-## Nombre para el jugador por id de clima (los ids de WEATHER_CATALOG en
-## world_director.gd). Un id sin fila aquí se muestra con su id.
-@export var weather_names: Dictionary[String, String] = {
-	"blood_moon": "Luna de sangre",
-	"eclipse": "Eclipse",
-	"full_moon": "Luna llena",
-	"enemy_rain": "Lluvia de enemigos",
-	"radioactive_rain": "Lluvia radiactiva",
-	"golden_rain": "Lluvia dorada",
-	"enemy_tsunami": "Tsunami",
-	"earthquake": "Terremoto",
-	"meteor_shower": "Lluvia de meteoritos",
-}
 ## Color del texto por GRUPO de clima (moon, rain, disaster), no por id: tres
 ## colores se leen como tres tipos de peligro; nueve se leerían como decoración.
 @export var group_colors: Dictionary[String, Color] = {
@@ -64,6 +53,10 @@ func _refresh() -> void:
 		return
 	_signature = signature
 	visible = true
-	text = text_format % [weather_names.get(weather_id, weather_id), seconds]
+	text = text_format % [_display_name(weather_id), seconds]
 	add_theme_color_override("font_color",
 			group_colors.get(String(weather.get("group", "")), _default_color))
+
+
+func _display_name(weather_id: String) -> String:
+	return String(WeatherDirector.weather_row(weather_id).get("display_name", weather_id))
