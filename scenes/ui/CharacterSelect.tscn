@@ -3,6 +3,7 @@
 [ext_resource type="Script" uid="uid://ddfplghyqfu1e" path="res://scripts/ui/meta/character_select.gd" id="1_charselect"]
 [ext_resource type="PackedScene" path="res://scenes/ui/SettingsPanel.tscn" id="2_settingspanel"]
 [ext_resource type="Material" path="res://assets/ui/menu_backdrop.tres" id="3_backdrop"]
+[ext_resource type="PackedScene" path="res://scenes/ui/meta/character_select/CoopLobby.tscn" id="4_lobby"]
 
 [sub_resource type="FontVariation" id="FontVariation_title"]
 spacing_glyph = 10
@@ -86,6 +87,10 @@ layout_mode = 2
 size_flags_horizontal = 3
 theme_override_constants/separation = 12
 
+[node name="CoopLobby" parent="Layout/VBox/ContentScroll/Content" instance=ExtResource("4_lobby")]
+unique_name_in_owner = true
+layout_mode = 2
+
 [node name="CardsGrid" type="GridContainer" parent="Layout/VBox/ContentScroll/Content" unique_id=1996494530]
 unique_name_in_owner = true
 layout_mode = 2
@@ -110,12 +115,34 @@ layout_mode = 2
 theme_override_font_sizes/font_size = 22
 text = "Iniciar incursión"
 
+[node name="DailyButton" type="Button" parent="Layout/VBox/ButtonRow"]
+unique_name_in_owner = true
+editor_description = "Con una marca hoy, character_select.gd agrega la mejor marca al texto (daily_best_format)."
+custom_minimum_size = Vector2(150, 52)
+layout_mode = 2
+theme_override_font_sizes/font_size = 20
+text = "Cacería diaria"
+
 [node name="QuestsButton" type="Button" parent="Layout/VBox/ButtonRow" unique_id=518393122]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(150, 52)
 layout_mode = 2
 theme_override_font_sizes/font_size = 20
 text = "Misiones"
+
+[node name="CollectionButton" type="Button" parent="Layout/VBox/ButtonRow"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(150, 52)
+layout_mode = 2
+theme_override_font_sizes/font_size = 20
+text = "Colección"
+
+[node name="ArmoryButton" type="Button" parent="Layout/VBox/ButtonRow"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(150, 52)
+layout_mode = 2
+theme_override_font_sizes/font_size = 20
+text = "Armería"
 
 [node name="SettingsButton" type="Button" parent="." unique_id=269148445]
 unique_name_in_owner = true
