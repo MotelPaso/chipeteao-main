@@ -13,7 +13,10 @@ extends Node
 ##   shock_dash    — al derrapar, un rayo encadenado (BeltBolt)
 ##   saiyan        — cada N bajas, un aura temporal de stats
 ##   zenkai        — sobrevivir con poco HP sube todo para siempre
-##   hook          — un contador que leen otros sistemas (altares, portales)
+## Los demás kinds (demonic_boost, charge_boost, portal_recharge) son
+## contadores que leen los santuarios con count()/count_kind().
+## Los números de cada comportamiento viven en la fila del objeto en
+## ItemCatalog (ItemCatalog.kind_row), junto al texto que los muestra.
 ## Las armas reportan golpes y bajas por WeaponBase.deal_damage.
 ## Las mascotas NO van aquí: el raider tiene una sola mascota, en
 ## Player.set_pet(), y solo la dan la caja de mascota y el traficante.
@@ -23,81 +26,31 @@ extends Node
 
 signal items_changed(item_id: String, count: int)
 
-@export_group("Magnet")
-## Segundos entre tirones con un imán; cada copia extra lo multiplica.
-@export var magnet_base_interval: float = 24.0
-@export var magnet_interval_per_extra: float = 0.8
-@export_group("Fart Bag")
-## Daño de veneno por segundo por copia, y duración base en segundos (se
-## multiplica por la stat de duración).
-@export var poison_dps_per_copy: float = 3.0
-@export var poison_duration: float = 3.0
-@export_group("Titan Blood")
-@export var titan_scale_per_copy: float = 0.08
-@export var titan_max_scale: float = 2.2
-@export_group("Superhero Mask")
-## Arañas por baja por copia, su alcance de vuelo y su veneno.
-@export var spiders_per_copy: int = 2
-@export var spider_range: float = 16.0
-@export var spider_poison_dps: float = 4.0
-@export var spider_poison_duration: float = 2.5
-@export var spider_color: Color = Color(0.55, 0.2, 0.75)
-## Techo de arañas lanzadas en un solo frame de física. Un arma de área
-## puede matar una docena de cuerpos de un golpe, y cada cadáver vaciaría el
-## pool de dardos y volvería a recorrer toda la horda buscando blancos.
-@export var max_spiders_per_frame: int = 12
+## Etiqueta de los boons temporales del aura, para que volver a dispararla
+## REEMPLACE su copia en vez de sumar una segunda aura encima. El harness la
+## busca por este texto (arena_probe.gd, SAIYAN_TAG).
+const SAIYAN_TAG: String = "saiyan"
+
+@export_group("Textos")
+## Aviso del HUD cuando la Sangre sayayin enciende el aura.
+@export var saiyan_aura_text: String = "¡Aura sayayin!"
+## Aviso del HUD cuando se dispara Zenkai; %d = el bono total en %.
+@export var zenkai_text: String = "¡Zenkai! Todo +%d%%"
 
 ## Acumulaciones de Zenkai, que PlayerStats lee como un canal permanente de
 ## todas las stats. Pública porque es justo lo que la capa de stats necesita.
 var zenkai_stacks: int = 0
-
-@export_group("Electric belt")
-## El daño del primer rayo y el aumento por copia viven en BeltBolt; esto es
-## solo hasta dónde busca la cadena su primer blanco, en metros.
-@export var belt_first_range: float = 10.0
-@export_group("Saiyan blood")
-@export var kills_per_aura: int = 40
-## Cada copia extra acorta la cuenta; nunca baja del piso, o el aura sería
-## permanente y dejaría de leerse como un evento.
-@export var aura_kills_per_copy_scale: float = 0.85
-@export var aura_kills_floor: int = 15
-@export var aura_duration: float = 12.0
-@export var aura_damage: float = 40.0
-@export var aura_cooldown: float = 25.0
-@export var aura_move_speed: float = 20.0
-@export_group("Zenkai")
-## Se arma por debajo de esta fracción del HP máx. y se dispara al volver
-## por encima de la otra. Dos umbrales y no uno: al raider hay que sacarlo
-## de verdad, no que oscile sobre una sola línea.
-@export var zenkai_arm_ratio: float = 0.1
-@export var zenkai_trigger_ratio: float = 0.5
-
-## Etiqueta de los boons temporales del aura, para que volver a dispararla
-## REEMPLACE su copia en vez de sumar una segunda aura encima.
-const SAIYAN_TAG: String = "saiyan"
-const AURA_TINT := Color(1.0, 0.85, 0.25)
 
 var _belt: BeltBolt = null
 var _saiyan_kills: int = 0
 var _aura_left: float = 0.0
 var _aura_overlays: Array[MeshInstance3D] = []
 var _zenkai_armed: bool = false
-
 var _counts: Dictionary[String, int] = {}
 var _magnet_timer: float = 0.0
 ## Presupuesto de arañas: la cuenta y el frame de física al que pertenece.
 var _spiders_this_frame: int = 0
 var _spider_frame: int = -1
-
-
-## El ItemBag de un cuerpo, o null.
-static func find_in(body: Node) -> ItemBag:
-	if body == null:
-		return null
-	for child in body.get_children():
-		if child is ItemBag:
-			return child
-	return null
 
 
 func _ready() -> void:
@@ -113,6 +66,35 @@ func _ready() -> void:
 		# otra es lo que separa "bajé" de "me recuperé".
 		health.damaged.connect(_on_health_damaged)
 		health.hp_changed.connect(_on_health_hp_changed)
+
+
+func _physics_process(delta: float) -> void:
+	if _aura_left > 0.0:
+		_aura_left -= delta
+		if _aura_left <= 0.0:
+			_apply_aura_shell(false)
+	# Casi todos los raiders no llevan nada casi toda la partida: se salta la
+	# búsqueda por tipo.
+	if _counts.is_empty() or count_kind("magnet") <= 0:
+		return
+	_magnet_timer -= delta
+	if _magnet_timer > 0.0:
+		return
+	_magnet_timer = _magnet_interval()
+	get_tree().call_group("run_systems", "vacuum_pickups")
+	var body := get_parent() as Node3D
+	if body != null:
+		Juice.sparkle(body.global_position + Vector3.UP * 1.0)
+
+
+## El ItemBag de un cuerpo, o null.
+static func find_in(body: Node) -> ItemBag:
+	if body == null:
+		return null
+	for child in body.get_children():
+		if child is ItemBag:
+			return child
+	return null
 
 
 func count(item_id: String) -> int:
@@ -189,39 +171,6 @@ func remove_item(item_id: String) -> bool:
 	return true
 
 
-func _physics_process(delta: float) -> void:
-	if _aura_left > 0.0:
-		_aura_left -= delta
-		if _aura_left <= 0.0:
-			_apply_aura_shell(false)
-	# Casi todos los raiders no llevan nada casi toda la partida: se salta la
-	# búsqueda por tipo.
-	if _counts.is_empty() or count_kind("magnet") <= 0:
-		return
-	_magnet_timer -= delta
-	if _magnet_timer > 0.0:
-		return
-	_magnet_timer = _magnet_interval()
-	get_tree().call_group("run_systems", "vacuum_pickups")
-	var body := get_parent() as Node3D
-	if body != null:
-		Juice.sparkle(body.global_position + Vector3.UP * 1.0)
-
-
-func _magnet_interval() -> float:
-	return magnet_base_interval * pow(magnet_interval_per_extra, float(count_kind("magnet") - 1))
-
-
-## El sello crece con cada Sangre de titán; con techo para que el brazo de
-## cámara siga funcionando.
-func _apply_titan_scale() -> void:
-	var rig := get_parent().get_node_or_null("SealRig") as Node3D
-	if rig == null:
-		return
-	var factor := minf(1.0 + titan_scale_per_copy * float(count_kind("titan")), titan_max_scale)
-	rig.scale = Vector3.ONE * factor
-
-
 ## Gancho de WeaponBase: un arma de este raider acaba de golpear a `target`.
 func on_weapon_hit(target: Node3D) -> void:
 	var stacks := count_kind("poison_on_hit")
@@ -230,16 +179,80 @@ func on_weapon_hit(target: Node3D) -> void:
 	var enemy := target as EnemyBase
 	if enemy == null:
 		return
+	var row := ItemCatalog.kind_row("poison_on_hit")
 	var stats := PlayerStats.find_in(get_parent())
-	var duration := poison_duration * (stats.duration_multiplier if stats != null else 1.0)
-	enemy.apply_poison(poison_dps_per_copy * float(stacks), duration)
+	var duration := float(row.poison_duration) \
+			* (stats.duration_multiplier if stats != null else 1.0)
+	enemy.apply_poison(float(row.poison_dps_per_copy) * float(stacks), duration)
+
+
+## Gancho de WeaponBase: un arma de este raider acaba de matar algo en `at`.
+## Reenvía la baja a los power-ups, cuenta para la Sangre sayayin y, con
+## Máscara de superhéroe, lanza arañas desde el cadáver hacia otros enemigos.
+func on_weapon_kill(at: Vector3, weapon: WeaponBase) -> void:
+	# Los power-ups usan el mismo gancho: este ya es EL aviso de "un arma mía
+	# mató algo", y darle uno propio a «Modo vampiro» sería un segundo cableado
+	# en WeaponBase.
+	var powerups := PowerUps.find_in(get_parent())
+	if powerups != null:
+		powerups.on_kill()
+	_tick_saiyan_kill()
+	var stacks := count_kind("spiders")
+	if stacks <= 0 or weapon == null:
+		return
+	var row := ItemCatalog.kind_row("spiders")
+	var wanted := mini(int(row.spiders_per_copy) * stacks, _spider_budget(row))
+	if wanted <= 0:
+		return
+	var targets := _nearest_enemies(at, wanted)
+	if targets.is_empty():
+		return
+	var stats := PlayerStats.find_in(get_parent())
+	var duration := float(row.spider_poison_duration) \
+			* (stats.duration_multiplier if stats != null else 1.0)
+	var spider_range := float(row.spider_range)
+	var spider_color: Color = row.spider_color
+	for i in wanted:
+		var target := targets[i % targets.size()]
+		var spider := Pools.acquire_scene(Pools.DART_SCENE) as Projectile
+		if spider == null:
+			return
+		_spiders_this_frame += 1
+		spider.global_position = at + Vector3.UP * 0.6
+		var aim := target.global_position + Vector3.UP * 0.6
+		_aim_spider(spider, aim)
+		spider.launch(weapon, spider_range, target)
+		# Projectile lee un extra_on_hit asignado como "esto viene de un
+		# objeto" y retiene los ganchos de baja: una baja de araña no lanza
+		# más arañas.
+		spider.extra_on_hit = _poison_spider_victim.bind(duration)
+		spider.tint(spider_color)
+
+
+func _magnet_interval() -> float:
+	var row := ItemCatalog.kind_row("magnet")
+	return float(row.pull_interval) \
+			* pow(float(row.interval_per_extra_copy), float(count_kind("magnet") - 1))
+
+
+## El sello crece con cada Sangre de titán, con techo max_scale para que el
+## brazo de cámara siga funcionando.
+func _apply_titan_scale() -> void:
+	var rig := get_parent().get_node_or_null("SealRig") as Node3D
+	if rig == null:
+		return
+	var row := ItemCatalog.kind_row("titan")
+	var growth := float(row.growth_percent) / 100.0
+	var factor := minf(1.0 + growth * float(count_kind("titan")), float(row.max_scale))
+	rig.scale = Vector3.ONE * factor
 
 
 ## --- Cinturón eléctrico -----------------------------------------------------
 
 ## El derrape ES el disparador. La cadena parte de la posición del RAIDER,
 ## nunca de este nodo: ItemBag extiende Node y no tiene transform, así que un
-## hijo Node3D suyo quedaría en el origen del mundo.
+## hijo Node3D suyo quedaría en el origen del mundo. El daño, los rebotes y
+## los alcances del rayo viven en BeltBolt.
 func _on_slide_started(_direction: Vector3) -> void:
 	var copies := count_kind("shock_dash")
 	if copies <= 0:
@@ -250,7 +263,6 @@ func _on_slide_started(_direction: Vector3) -> void:
 	if _belt == null or not is_instance_valid(_belt):
 		_belt = BeltBolt.new()
 		_belt.name = "BeltBolt"
-		_belt.first_range = belt_first_range
 		# Bajo la BOLSA, no bajo el montaje Weapons: todo lo que enumera armas
 		# recorre ese montaje, y un rayo ahí aparecería en la franja del HUD,
 		# contaría contra el tope de armas y entraría al pool de mejoras.
@@ -266,8 +278,10 @@ func _on_slide_started(_direction: Vector3) -> void:
 
 ## Bajas necesarias para la próxima aura con estas copias.
 func _aura_threshold(copies: int) -> int:
-	var wanted := float(kills_per_aura) * pow(aura_kills_per_copy_scale, float(copies - 1))
-	return maxi(roundi(wanted), aura_kills_floor)
+	var row := ItemCatalog.kind_row("saiyan")
+	var wanted := float(int(row.kills_per_aura)) \
+			* pow(float(row.kills_scale_per_extra_copy), float(copies - 1))
+	return maxi(roundi(wanted), int(row.kills_floor))
 
 
 func _tick_saiyan_kill() -> void:
@@ -285,22 +299,23 @@ func _start_aura(copies: int) -> void:
 	var stats := PlayerStats.find_in(get_parent())
 	if stats == null:
 		return
+	var row := ItemCatalog.kind_row("saiyan")
 	var scale := float(copies)
+	var duration := float(row.aura_duration)
 	# CON ETIQUETA, y limpiada primero: add_timed_boon AGREGA y solo
 	# clear_timed_boons quita por etiqueta. Sin esta línea una segunda aura
-	# dentro de los doce segundos se sumaría a la primera y la primera
-	# expiración quitaría solo la mitad. El mismo patrón que
-	# PowerUps._apply_row.
+	# dentro de la primera se sumaría a ella y la primera expiración
+	# quitaría solo la mitad. El mismo patrón que PowerUps._apply_row.
 	stats.clear_timed_boons(SAIYAN_TAG)
-	stats.add_timed_boon("damage", aura_damage * scale, aura_duration, SAIYAN_TAG)
-	stats.add_timed_boon("cooldown", aura_cooldown * scale, aura_duration, SAIYAN_TAG)
-	stats.add_timed_boon("move_speed", aura_move_speed * scale, aura_duration, SAIYAN_TAG)
-	_aura_left = aura_duration
+	stats.add_timed_boon("damage", float(row.aura_damage) * scale, duration, SAIYAN_TAG)
+	stats.add_timed_boon("cooldown", float(row.aura_attack_speed) * scale, duration, SAIYAN_TAG)
+	stats.add_timed_boon("move_speed", float(row.aura_move_speed) * scale, duration, SAIYAN_TAG)
+	_aura_left = duration
 	_apply_aura_shell(true)
 	var body := get_parent() as Node3D
 	if body != null:
-		Juice.burst(body.global_position + Vector3.UP * 1.0, AURA_TINT, 24)
-	get_tree().call_group("hud", "announce", "¡Aura sayayin!")
+		Juice.burst(body.global_position + Vector3.UP * 1.0, row.aura_color as Color, 24)
+	get_tree().call_group("hud", "announce", saiyan_aura_text)
 	print("Saiyan aura: kills=%d" % _aura_threshold(copies))
 
 
@@ -320,12 +335,13 @@ func _apply_aura_shell(on: bool) -> void:
 	var rig := get_parent().get_node_or_null("SealRig") as Node3D
 	if rig == null:
 		return
+	var tint: Color = ItemCatalog.kind_row("saiyan").aura_color
 	var shell := StandardMaterial3D.new()
 	shell.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	shell.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	shell.albedo_color = Color(AURA_TINT, 0.4)
+	shell.albedo_color = Color(tint, 0.4)
 	shell.emission_enabled = true
-	shell.emission = AURA_TINT
+	shell.emission = tint
 	shell.emission_energy_multiplier = 2.0
 	for node: Node in rig.find_children("*", "MeshInstance3D", true, false):
 		var mesh := node as MeshInstance3D
@@ -342,7 +358,8 @@ func _on_health_damaged(_amount: float, current: float) -> void:
 	if count_kind("zenkai") <= 0:
 		return
 	var health := Health.find_in(get_parent())
-	if health != null and current <= health.max_hp * zenkai_arm_ratio:
+	var arm_ratio := float(ItemCatalog.kind_row("zenkai").arm_below_hp_percent) / 100.0
+	if health != null and current <= health.max_hp * arm_ratio:
 		_zenkai_armed = true
 
 
@@ -356,7 +373,8 @@ func _on_health_hp_changed(current: float, max_hp: float) -> void:
 	var stats := PlayerStats.find_in(get_parent())
 	if stats != null and stats.is_recomputing():
 		return
-	if current < max_hp * zenkai_trigger_ratio:
+	var row := ItemCatalog.kind_row("zenkai")
+	if current < max_hp * (float(row.trigger_above_hp_percent) / 100.0):
 		return
 	_zenkai_armed = false
 	zenkai_stacks += count_kind("zenkai")
@@ -364,8 +382,7 @@ func _on_health_hp_changed(current: float, max_hp: float) -> void:
 	# estar por leer, y recomputar en el acto volvería a entrar en ella.
 	_request_recompute.call_deferred()
 	get_tree().call_group("hud", "announce",
-			"¡Zenkai! Todo +%d%%" % roundi(float(zenkai_stacks)
-					* PlayerStats.ZENKAI_PERCENT_PER_STACK))
+			zenkai_text % roundi(float(zenkai_stacks) * float(row.percent_per_stack)))
 	print("Zenkai triggered: stacks=%d" % zenkai_stacks)
 
 
@@ -375,53 +392,16 @@ func _request_recompute() -> void:
 		stats.recompute()
 
 
-## Gancho de WeaponBase: un arma de este raider acaba de matar algo en `at`.
-## Reenvía la baja a los power-ups, cuenta para la Sangre sayayin y, con
-## Máscara de superhéroe, lanza arañas desde el cadáver hacia otros enemigos.
-func on_weapon_kill(at: Vector3, weapon: WeaponBase) -> void:
-	# Los power-ups usan el mismo gancho: este ya es EL aviso de "un arma mía
-	# mató algo", y darle uno propio a «Modo vampiro» sería un segundo cableado
-	# en WeaponBase.
-	var powerups := PowerUps.find_in(get_parent())
-	if powerups != null:
-		powerups.on_kill()
-	_tick_saiyan_kill()
-	var stacks := count_kind("spiders")
-	if stacks <= 0 or weapon == null:
-		return
-	var wanted := mini(spiders_per_copy * stacks, _spider_budget())
-	if wanted <= 0:
-		return
-	var targets := _nearest_enemies(at, wanted)
-	if targets.is_empty():
-		return
-	var stats := PlayerStats.find_in(get_parent())
-	var duration := spider_poison_duration * (stats.duration_multiplier if stats != null else 1.0)
-	for i in wanted:
-		var target := targets[i % targets.size()]
-		var spider := Pools.acquire_scene(Pools.DART_SCENE) as Projectile
-		if spider == null:
-			return
-		_spiders_this_frame += 1
-		spider.global_position = at + Vector3.UP * 0.6
-		var aim := target.global_position + Vector3.UP * 0.6
-		_aim_spider(spider, aim)
-		spider.launch(weapon, spider_range, target)
-		# Projectile lee un extra_on_hit asignado como "esto viene de un
-		# objeto" y retiene los ganchos de baja: una baja de araña no lanza
-		# más arañas.
-		spider.extra_on_hit = _poison_spider_victim.bind(duration)
-		spider.tint(spider_color)
-
+## --- Máscara de superhéroe --------------------------------------------------
 
 ## Arañas que aún se permiten en este frame de física (la cuenta se reinicia
-## cuando pregunta un frame nuevo).
-func _spider_budget() -> int:
+## cuando pregunta un frame nuevo). `row` es la fila de la Máscara.
+func _spider_budget(row: Dictionary) -> int:
 	var frame := int(Engine.get_physics_frames())
 	if frame != _spider_frame:
 		_spider_frame = frame
 		_spiders_this_frame = 0
-	return maxi(max_spiders_per_frame - _spiders_this_frame, 0)
+	return maxi(int(row.max_spiders_per_frame) - _spiders_this_frame, 0)
 
 
 ## Apunta una araña del pool hacia `aim`. Hay dos casos degenerados: el
@@ -441,7 +421,7 @@ func _aim_spider(spider: Projectile, aim: Vector3) -> void:
 func _poison_spider_victim(body: Node3D, duration: float) -> void:
 	var enemy := body as EnemyBase
 	if enemy != null:
-		enemy.apply_poison(spider_poison_dps, duration)
+		enemy.apply_poison(float(ItemCatalog.kind_row("spiders").spider_poison_dps), duration)
 
 
 ## Hasta `limit` enemigos vivos más cercanos a `at`, el más cercano primero

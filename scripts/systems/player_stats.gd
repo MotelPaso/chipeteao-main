@@ -30,6 +30,13 @@ const MIN_DAMAGE_MULTIPLIER: float = 0.1
 const MIN_MOVE_MULTIPLIER: float = 0.2
 const MIN_DURATION_MULTIPLIER: float = 0.1
 const MIN_XP_MULTIPLIER: float = 0.1
+## Techo de saltos extra. No es gusto: el raider no tiene más control en el
+## aire que air_acceleration, y pasado esto la verticalidad de una arena
+## (mesetas, plataformas, el borde) deja de ser un obstáculo.
+const MAX_EXTRA_JUMPS: int = 5
+## Cada tipo que _apply_character_passive sabe correr; una fila fuera de esta
+## lista se rechaza al asignarla, no una vez por recompute.
+const PASSIVE_KINDS: Array[String] = ["per_level", "evasion_execute", "speed_to_damage"]
 
 # Valores derivados: cámbialos con add_tome()/recompute(), nunca a mano.
 var damage_multiplier: float = 1.0
@@ -37,6 +44,8 @@ var cooldown_multiplier: float = 1.0
 var area_multiplier: float = 1.0
 var move_speed_multiplier: float = 1.0
 var crit_chance: float = 0.0
+## Derivado: recompute() lo parte de base_crit_damage (el valor real, aunque
+## aquí diga 2.0 antes del primer recompute en _ready).
 var crit_damage: float = 2.0
 var lifesteal: float = 0.0
 var armor: float = 0.0
@@ -70,11 +79,6 @@ var extra_jumps: int = 0
 ## EnemySpawner.roll_powerup_drop y lo venden los altares («Fortuna menor»).
 var powerup_drop_chance: float = 0.0
 
-## Techo de saltos extra. No es gusto: el raider no tiene más control en el
-## aire que air_acceleration, y pasado esto la verticalidad de una arena
-## (mesetas, plataformas, el borde) deja de ser un obstáculo.
-const MAX_EXTRA_JUMPS: int = 5
-
 ## id de tomo -> una potencia de rareza por copia recogida. recompute()
 ## deriva todo de aquí: es la única fuente de verdad.
 var _tome_stacks: Dictionary[String, PackedFloat32Array] = {}
@@ -84,13 +88,6 @@ var _gamble_boons: Array[Dictionary] = []
 ## Boons de altar: efectos fijos permanentes que dan los altares de carga y
 ## demoníacos y la ruleta, aparte de cartas y tomos.
 var _altar_boons: Array[Dictionary] = []
-## Zenkai: % por acumulación por copia, y las stats que sube. max_hp y
-## luck son canales fijos, así que el mismo número se lee como +8 HP y +8 de
-## suerte por acumulación y no como porcentaje — aceptado, porque lo
-## contrario sería una segunda tabla para dos campos.
-const ZENKAI_PERCENT_PER_STACK: float = 8.0
-const ZENKAI_STATS: Array[String] = [
-	"damage", "cooldown", "area", "move_speed", "crit_chance", "max_hp", "luck"]
 
 
 ## Boons temporales (manantiales, maldiciones de la ruleta, power-ups):
@@ -109,9 +106,6 @@ var _timed_boons: Array[Dictionary] = []
 ##                      a un atacante no jefe debilitado (_on_dodged). Hoy
 ##                      ningún personaje lo usa.
 ## Un id de stat vacío con un tipo por nivel = sin pasiva.
-## Cada tipo que _apply_character_passive sabe correr; una fila fuera de esta
-## lista se rechaza al asignarla, no una vez por recompute.
-const PASSIVE_KINDS: Array[String] = ["per_level", "evasion_execute", "speed_to_damage"]
 var _passive_kind: String = "per_level"
 var _passive_stat: String = ""
 var _passive_amount: float = 0.0
@@ -120,6 +114,8 @@ var _passive_base: float = 0.0
 ## Parte de bonus_max_hp ya aplicada al Health, para que cada recompute
 ## ajuste por la diferencia en vez de volver a sumar todo el bono.
 var _applied_bonus_max_hp: float = 0.0
+## True mientras corre recompute() (ver is_recomputing).
+var _recomputing: bool = false
 
 
 func _ready() -> void:
@@ -198,7 +194,7 @@ func add_tome(tome_id: String, potency: float) -> Array[Dictionary]:
 ## Estática y pura, para que un harness pueda verificar la distribución.
 ## Orden del RNG: un shuffle por tirada, en el momento de tomar el tomo.
 static func roll_gamble_boons(potency: float) -> Array[Dictionary]:
-	var count := 1 + clampi(UpgradePool.potency_rank(potency), 0, 3)
+	var count := Tome.gamble_boon_count(potency)
 	var pool := Tome.GAMBLE_BOONS.duplicate()
 	pool.shuffle()
 	var boons: Array[Dictionary] = []
@@ -300,9 +296,6 @@ func set_character_passive(stat: String, amount: float, kind: String = "per_leve
 ## raider se curó" de "la capa de stats se reconstruyó".
 func is_recomputing() -> bool:
 	return _recomputing
-
-
-var _recomputing: bool = false
 
 
 ## Reconstruye cada stat derivada desde los tomos guardados, la pasiva y las
@@ -466,9 +459,13 @@ func _apply_zenkai() -> void:
 	var stacks := bag.zenkai_stacks
 	if stacks <= 0:
 		return
-	var percent := float(stacks) * ZENKAI_PERCENT_PER_STACK
-	for stat: String in ZENKAI_STATS:
-		_apply_effect(stat, percent)
+	# El % por acumulación y las stats viven en la fila de Zenkai
+	# (ItemCatalog). max_hp y luck son canales fijos: ahí el mismo número se
+	# lee como puntos, no como %.
+	var row := ItemCatalog.kind_row("zenkai")
+	var percent := float(stacks) * float(row.percent_per_stack)
+	for stat: Variant in (row.stats as Array):
+		_apply_effect(String(stat), percent)
 
 
 ## Totales permanentes que guardan los power-ups («Modo vampiro» sube el HP

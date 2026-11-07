@@ -25,14 +25,10 @@ extends Node
 
 signal active_changed
 
-## Multiplicador de puntos mientras corre «Fiebre del oro». Se registra en el
-## Player con el nombre POINTS_SOURCE (fuentes con nombre).
-@export var gold_points_multiplier: float = 2.0
-## HP máx. que se guarda por baja mientras corre «Modo vampiro».
-@export var vampire_hp_per_kill: float = 1.0
-## Fracción del daño (0-1) que vuelve al atacante mientras corre «Reflejo».
-@export var reflect_fraction: float = 1.0
-
+## Nombre con que «Fiebre del oro» registra su multiplicador de puntos en el
+## Player (fuentes con nombre). Los números de cada power-up (multiplicador
+## de oro, HP por baja del vampiro, fracción de Reflejo) viven en su fila de
+## PowerUpCatalog.
 const POINTS_SOURCE := "powerup_gold"
 ## Prefijo de etiqueta de los boons temporales de una fila, para que volver a
 ## tomarla limpie los suyos y solo los suyos.
@@ -49,6 +45,12 @@ var _active: Array[Dictionary] = []
 ## física: para entonces la arena nueva ya existe, y _sync escribe en el
 ## spawner vivo y no en el que se acaba de liberar.
 var _stage_changed: bool = false
+## Un recompute por frame, por muchas bajas que caigan en él.
+var _recompute_queued: bool = false
+## Detección de flanco para el único consumidor que necesita el momento
+## "recién terminó" y no un estado (el raider puede estar sobre una roca
+## cuando se acaba el vuelo).
+var _was_flying: bool = false
 
 
 ## El componente cruza el cambio de etapa con el raider; los nodos a los que
@@ -57,12 +59,6 @@ var _stage_changed: bool = false
 func _ready() -> void:
 	RunState.stage_changed.connect(func(_index: int, _map_id: String) -> void:
 		_stage_changed = true)
-## Un recompute por frame, por muchas bajas que caigan en él.
-var _recompute_queued: bool = false
-## Detección de flanco para el único consumidor que necesita el momento
-## "recién terminó" y no un estado (el raider puede estar sobre una roca
-## cuando se acaba el vuelo).
-var _was_flying: bool = false
 
 
 ## El componente PowerUps de un cuerpo, o null.
@@ -144,7 +140,7 @@ func count() -> int:
 func on_kill() -> void:
 	if not has("vampire"):
 		return
-	permanent_max_hp += vampire_hp_per_kill
+	permanent_max_hp += _live_value("vampire", "max_hp_per_kill")
 	_request_recompute()
 
 
@@ -206,10 +202,11 @@ func _sync() -> void:
 	var health := Health.find_in(body)
 	if health != null:
 		health.invulnerable = has("immortal")
-		health.reflect_fraction = reflect_fraction if has("reflect") else 0.0
+		health.reflect_fraction = _live_value("reflect", "reflect_fraction") \
+				if has("reflect") else 0.0
 	if body != null and body.has_method("set_points_source"):
 		if has("gold"):
-			body.call("set_points_source", POINTS_SOURCE, gold_points_multiplier)
+			body.call("set_points_source", POINTS_SOURCE, _live_value("gold", "points_multiplier"))
 		else:
 			body.call("clear_points_source", POINTS_SOURCE)
 	# time_stop vive en un nodo que NO sobrevive al cambio de etapa: el
@@ -228,6 +225,16 @@ func _sync() -> void:
 		body.call("end_flight")
 	_was_flying = flying
 	active_changed.emit()
+
+
+## Un número de la fila de catálogo del primer power-up vivo de este tipo
+## (la estrella enciende las filas normales, así que también vale con ella);
+## 0.0 si no hay ninguno.
+func _live_value(kind: String, field: String) -> float:
+	for entry: Dictionary in _active:
+		if String(entry.kind) == kind:
+			return float(PowerUpCatalog.by_id(String(entry.id)).get(field, 0.0))
+	return 0.0
 
 
 func _announce(row: Dictionary, duration: float) -> void:
