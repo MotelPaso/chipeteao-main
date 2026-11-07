@@ -2,6 +2,17 @@
 
 [ext_resource type="Script" uid="uid://bif85y24tbdrx" path="res://scripts/ui/game/hud.gd" id="1_hud"]
 [ext_resource type="Script" uid="uid://c20282trxwai5" path="res://scripts/ui/game/boss_arrow.gd" id="2_bossarrow"]
+[ext_resource type="Script" uid="uid://bj5xrekbsuexf" path="res://scripts/ui/game/hud/weather_badge.gd" id="3_weather"]
+[ext_resource type="Script" uid="uid://q8kpxd2afqro" path="res://scripts/ui/game/hud/boss_bar.gd" id="4_bossbar"]
+[ext_resource type="Script" uid="uid://xnpcg702rmmq" path="res://scripts/ui/game/hud/streak_popup.gd" id="5_streak"]
+[ext_resource type="Script" uid="uid://cqaevs3kv0x6p" path="res://scripts/ui/game/hud/announce_banner.gd" id="6_announce"]
+[ext_resource type="Script" uid="uid://ffegaivy5dg0" path="res://scripts/ui/game/hud/perf_probe.gd" id="7_probe"]
+[ext_resource type="Script" uid="uid://dnqu1vc26stbn" path="res://scripts/ui/game/hud/loadout_strip.gd" id="8_strip"]
+[ext_resource type="Script" uid="uid://bqjscrj8cpxsp" path="res://scripts/ui/game/hud/mate_panel.gd" id="9_mates"]
+[ext_resource type="Script" uid="uid://b5025415oihxr" path="res://scripts/ui/game/hud/fps_badge.gd" id="10_fps"]
+[ext_resource type="PackedScene" path="res://scenes/ui/hud/LootToast.tscn" id="11_loot"]
+[ext_resource type="Script" uid="uid://ry5jc7hbci8u" path="res://scripts/ui/game/hud/powerup_row.gd" id="12_powerups"]
+[ext_resource type="Script" uid="uid://dbqt1k5sw738v" path="res://scripts/ui/game/hud/view_widgets.gd" id="13_views"]
 
 [node name="HUD" type="CanvasLayer" unique_id=214834967]
 layer = 5
@@ -33,7 +44,7 @@ offset_left = -397.0
 offset_top = -88.67999
 offset_right = -354.0
 offset_bottom = -60.679993
-theme_override_colors/font_color = Color(0.94, 0.95, 0.97, 1)
+theme_override_colors/font_color = Color(0.96, 0.97, 0.99, 1)
 theme_override_font_sizes/font_size = 20
 text = "Nv 1"
 
@@ -45,9 +56,24 @@ offset_top = 4.0
 offset_right = 81.0
 offset_bottom = 36.0
 grow_horizontal = 2
-theme_override_colors/font_color = Color(0.94, 0.95, 0.97, 1)
+theme_override_colors/font_color = Color(0.96, 0.97, 0.99, 1)
 theme_override_font_sizes/font_size = 20
 text = "00:00"
+
+[node name="WeatherBadge" type="Label" parent="TimerLabel" unique_id=1493541020]
+unique_name_in_owner = true
+visible = false
+layout_mode = 1
+anchors_preset = -1
+anchor_top = 1.0
+anchor_bottom = 1.0
+offset_top = 16.0
+offset_bottom = 16.0
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.96, 0.97, 0.99, 1)
+text = "Luna de sangre 36s"
+horizontal_alignment = 1
+script = ExtResource("3_weather")
 
 [node name="StageLabel" type="Label" parent="." unique_id=1608730742]
 unique_name_in_owner = true
@@ -65,7 +91,7 @@ theme_override_colors/font_color = Color(0.96, 0.78, 0.3, 1)
 theme_override_colors/font_outline_color = Color(0.1, 0.07, 0.02, 0.9)
 theme_override_constants/outline_size = 4
 theme_override_font_sizes/font_size = 14
-text = "G2"
+text = "E1"
 horizontal_alignment = 1
 vertical_alignment = 1
 
@@ -83,7 +109,7 @@ theme_override_colors/font_color = Color(0.9, 0.36, 0.32, 1)
 theme_override_colors/font_outline_color = Color(0.08, 0.03, 0.03, 0.9)
 theme_override_constants/outline_size = 4
 theme_override_font_sizes/font_size = 14
-text = "Maldito x1"
+text = "Dificultad +15%"
 
 [node name="KillsLabel" type="Label" parent="." unique_id=80650438]
 unique_name_in_owner = true
@@ -95,9 +121,9 @@ offset_top = 6.0
 offset_right = -6.0
 offset_bottom = 34.0
 grow_horizontal = 0
-theme_override_colors/font_color = Color(0.94, 0.95, 0.97, 1)
+theme_override_colors/font_color = Color(0.96, 0.97, 0.99, 1)
 theme_override_font_sizes/font_size = 20
-text = "Kills: 0"
+text = "Bajas: 0"
 
 [node name="PointsLabel" type="Label" parent="." unique_id=5030772]
 unique_name_in_owner = true
@@ -111,7 +137,7 @@ offset_top = -92.0
 offset_right = -19.0
 offset_bottom = -64.0
 grow_horizontal = 0
-theme_override_colors/font_color = Color(0.98, 0.84, 0.4, 1)
+theme_override_colors/font_color = Color(0.98, 0.76, 0.28, 1)
 theme_override_font_sizes/font_size = 20
 text = "0 pts"
 
@@ -130,6 +156,46 @@ mouse_filter = 2
 max_value = 800.0
 value = 800.0
 show_percentage = false
+script = ExtResource("4_bossbar")
+
+[node name="Tick1" type="ColorRect" parent="BossBar" unique_id=153493330]
+layout_mode = 1
+anchors_preset = -1
+anchor_left = 0.25
+anchor_right = 0.25
+anchor_bottom = 1.0
+offset_left = -1.0
+offset_top = 4.0
+offset_right = 1.0
+offset_bottom = -4.0
+mouse_filter = 2
+color = Color(0, 0, 0, 0.5)
+
+[node name="Tick2" type="ColorRect" parent="BossBar" unique_id=2043913942]
+layout_mode = 1
+anchors_preset = -1
+anchor_left = 0.5
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = -1.0
+offset_top = 4.0
+offset_right = 1.0
+offset_bottom = -4.0
+mouse_filter = 2
+color = Color(0, 0, 0, 0.5)
+
+[node name="Tick3" type="ColorRect" parent="BossBar" unique_id=343052421]
+layout_mode = 1
+anchors_preset = -1
+anchor_left = 0.75
+anchor_right = 0.75
+anchor_bottom = 1.0
+offset_left = -1.0
+offset_top = 4.0
+offset_right = 1.0
+offset_bottom = -4.0
+mouse_filter = 2
+color = Color(0, 0, 0, 0.5)
 
 [node name="BossNameLabel" type="Label" parent="BossBar" unique_id=1828101216]
 unique_name_in_owner = true
@@ -157,13 +223,13 @@ offset_top = 210.0
 offset_right = 200.0
 offset_bottom = 264.0
 grow_horizontal = 2
-theme_override_colors/font_color = Color(1, 0.86, 0.25, 1)
 theme_override_colors/font_outline_color = Color(0.28, 0.09, 0.02, 0.95)
 theme_override_constants/outline_size = 12
 theme_override_font_sizes/font_size = 44
 text = "¡TRITURANDO!"
 horizontal_alignment = 1
 vertical_alignment = 1
+script = ExtResource("5_streak")
 
 [node name="AnnounceLabel" type="Label" parent="." unique_id=1984146509]
 unique_name_in_owner = true
@@ -176,7 +242,6 @@ offset_top = 108.0
 offset_right = 450.0
 offset_bottom = 190.0
 grow_horizontal = 2
-theme_override_colors/font_color = Color(1, 0.72, 0.3, 1)
 theme_override_colors/font_outline_color = Color(0.08, 0.05, 0.02, 0.9)
 theme_override_constants/outline_size = 8
 theme_override_font_sizes/font_size = 26
@@ -184,6 +249,7 @@ text = "Una presencia monstruosa se acerca..."
 horizontal_alignment = 1
 vertical_alignment = 1
 text_overrun_behavior = 3
+script = ExtResource("6_announce")
 
 [node name="HpBar" type="ProgressBar" parent="." unique_id=1742065830]
 unique_name_in_owner = true
@@ -222,14 +288,122 @@ text = "100 / 100"
 horizontal_alignment = 1
 vertical_alignment = 1
 
-[node name="BossArrow" type="Node2D" parent="." unique_id=624056684]
+[node name="BossArrow" type="Node2D" parent="." unique_id=624056684 node_paths=PackedStringArray("color_source")]
+unique_name_in_owner = true
 visible = false
 script = ExtResource("2_bossarrow")
+color_source = NodePath("../BossBar")
 
 [node name="Backing" type="Polygon2D" parent="BossArrow" unique_id=1950640898]
 color = Color(0.07, 0.05, 0.02, 0.85)
 polygon = PackedVector2Array(26, 0, -16.5, -17.5, -9, 0, -16.5, 17.5)
 
 [node name="Fill" type="Polygon2D" parent="BossArrow" unique_id=2084245472]
-color = Color(0.98, 0.62, 0.16, 1)
 polygon = PackedVector2Array(20, 0, -12, -13, -6, 0, -12, 13)
+
+[node name="PerfProbe" type="Label" parent="." unique_id=561860748]
+unique_name_in_owner = true
+visible = false
+modulate = Color(1, 1, 1, 0.85)
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -560.0
+offset_top = 46.0
+offset_right = -12.0
+offset_bottom = 120.0
+theme_override_font_sizes/font_size = 12
+horizontal_alignment = 2
+script = ExtResource("7_probe")
+
+[node name="BuildStrip" type="HBoxContainer" parent="." unique_id=685484247]
+unique_name_in_owner = true
+anchors_preset = 2
+anchor_top = 1.0
+anchor_bottom = 1.0
+offset_left = 16.0
+offset_top = -84.0
+offset_right = 16.0
+offset_bottom = -36.0
+grow_vertical = 0
+mouse_filter = 1
+theme_override_constants/separation = 6
+script = ExtResource("8_strip")
+
+[node name="BagStrip" type="HBoxContainer" parent="." unique_id=2136025266]
+unique_name_in_owner = true
+anchors_preset = 3
+anchor_left = 1.0
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -16.0
+offset_top = -84.0
+offset_right = -16.0
+offset_bottom = -36.0
+grow_horizontal = 0
+grow_vertical = 0
+mouse_filter = 1
+theme_override_constants/separation = 6
+script = ExtResource("8_strip")
+contents = 1
+
+[node name="MatePanel" type="VBoxContainer" parent="." unique_id=394820517]
+unique_name_in_owner = true
+offset_left = 16.0
+offset_top = 96.0
+offset_right = 16.0
+offset_bottom = 96.0
+theme_override_constants/separation = 6
+script = ExtResource("9_mates")
+
+[node name="FpsBadge" type="Label" parent="." unique_id=467810910]
+unique_name_in_owner = true
+visible = false
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -16.0
+offset_top = 88.0
+offset_right = -16.0
+offset_bottom = 88.0
+grow_horizontal = 0
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.96, 0.97, 0.99, 1)
+theme_override_font_sizes/font_size = 13
+text = "60 FPS"
+script = ExtResource("10_fps")
+
+[node name="LootToast" parent="." unique_id=763941494 instance=ExtResource("11_loot")]
+unique_name_in_owner = true
+
+[node name="PowerUpRow" type="HBoxContainer" parent="." unique_id=1342551449]
+unique_name_in_owner = true
+anchors_preset = 7
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_top = -104.0
+offset_bottom = -104.0
+grow_horizontal = 2
+grow_vertical = 0
+mouse_filter = 1
+theme_override_constants/separation = 6
+alignment = 1
+script = ExtResource("12_powerups")
+
+[node name="ViewWidgets" type="Node" parent="." unique_id=386425940]
+unique_name_in_owner = true
+script = ExtResource("13_views")
+
+[node name="MinimapSlot" type="Control" parent="ViewWidgets" unique_id=827944634]
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -164.0
+offset_top = 122.0
+offset_right = -14.0
+offset_bottom = 272.0
+grow_horizontal = 0
+mouse_filter = 2

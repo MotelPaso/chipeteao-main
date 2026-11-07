@@ -1,33 +1,29 @@
 class_name MapDraw
 extends RefCounted
-## The map both the minimap and the Tab overlay draw (iteration 52). One
-## helper, two consumers: the picture, the fog compositing and the marker
-## collection are identical for a 150 px corner widget and a half-screen
-## overlay, and writing them twice is how the two would drift apart.
+## El mapa que dibujan el minimapa y el mapa de Tab. Un ayudante, dos
+## consumidores: la imagen, la niebla y los marcadores son idénticos para un
+## widget de 150 px en una esquina y un mapa de media pantalla, y escribirlos
+## dos veces es cómo se separarían.
 ##
-## Split of work, on purpose:
-##   - build_background(arena)  once per stage: the terrain's own picture,
-##     darkened where the arena mask blocks the ground.
-##   - composite()              on the fog tick: background x fog into one
-##     RGBA8 texture the consumer just blits.
-##   - collect_markers()        on a 10 Hz timer: who is where, filtered
-##     by what the fog has revealed.
-## Every one of those is a plain method with no Control involved, so a
-## headless soak exercises the whole thing whether or not _draw() is ever
-## dispatched under the dummy renderer.
+## Reparto del trabajo:
+##   - build_background(arena)  una vez por etapa: la imagen del terreno,
+##     oscurecida donde la máscara de la arena bloquea el suelo.
+##   - composite()              en el tick de la niebla: fondo por niebla en
+##     una textura RGBA8 que el consumidor solo copia.
+##   - collect_markers()        cada 0.1 s: quién está dónde, filtrado por lo
+##     que la niebla ya reveló.
+## Ninguno usa un Control, así que un soak headless ejercita todo aunque
+## _draw() nunca se despache con el renderizador falso.
 
-## THE marker table. A kind that is not here does not appear on the map,
-## which is why `secret_trigger.gd` deliberately keeps an empty
-## marker_kind: secrets stay secret.
-##   color:          the dot's colour.
+## LA tabla de marcadores. Un nodo aparece en el mapa si está en el grupo
+## "map_markers" y su map_marker_kind() devuelve un tipo de esta tabla; un
+## tipo que no está aquí no se dibuja (por eso `secret_trigger.gd` deja vacío
+## su marker_kind: los secretos siguen secretos).
+##   color:          color del marcador.
 ##   shape:          "dot" | "square" | "triangle" | "diamond".
-##   size:           radius in map pixels at the overlay's scale.
-##   always_visible: drawn even where the fog is still unexplored. Only
-##                   the party and the way out: everything else is
-##                   something you have to find.
-## The last five rows are RESERVED for part C — power-ups, vendors, lucky
-## blocks, the pet box and the event altar. C only has to set
-## `marker_kind` on its node; nothing here changes.
+##   size:           radio en píxeles del mapa, a la escala del mapa de Tab.
+##   always_visible: se dibuja aunque la niebla no se haya explorado. Solo el
+##                   grupo y la salida: lo demás hay que encontrarlo.
 const MARKER_STYLES: Dictionary[StringName, Dictionary] = {
 	&"player": {"color": Color(0.45, 0.95, 1.0), "shape": "triangle",
 		"size": 4.0, "always_visible": true},
@@ -51,26 +47,25 @@ const MARKER_STYLES: Dictionary[StringName, Dictionary] = {
 		"size": 3.0, "always_visible": false},
 	&"exit": {"color": Color(1.0, 0.82, 0.35), "shape": "diamond",
 		"size": 6.0, "always_visible": true},
-	# Power-up on the ground (iteration 53). It draws in its own row's
-	# colour through map_marker_color(), so a roaming star reads as a
-	# different thing from a dropped Furia.
+	# Power-up en el suelo. Se dibuja con el color de su propia fila vía
+	# map_marker_color(), para distinguir una estrella de una Furia.
 	&"powerup": {"color": Color(0.95, 0.95, 0.4), "shape": "dot",
 		"size": 3.0, "always_visible": false},
-	# Stalls and the pet box (iteration 54). A vendor draws in its own
-	# kind's colour through map_marker_color() — but only once the fog has
-	# found it, so the map never spoils which stall arrived.
+	# Puestos y caja de mascota. Un puesto se dibuja con el color de su tipo
+	# vía map_marker_color(), pero solo cuando la niebla ya lo reveló: el mapa
+	# no adelanta qué puesto llegó.
 	&"vendor": {"color": Color(0.9, 0.75, 0.5), "shape": "square",
 		"size": 3.5, "always_visible": false},
 	&"pet_box": {"color": Color(0.7, 0.95, 0.6), "shape": "square",
 		"size": 3.5, "always_visible": false},
-	# --- reserved for part C2 (see ARQUITECTURA, «Marcadores de mapa») ---
+	# Bloque de la suerte y altar de eventos.
 	&"lucky_block": {"color": Color(1.0, 0.6, 0.85), "shape": "square",
 		"size": 3.0, "always_visible": false},
 	&"event_altar": {"color": Color(0.8, 0.85, 1.0), "shape": "dot",
 		"size": 3.5, "always_visible": false},
 }
 
-## Player-facing name per kind, for the overlay's legend.
+## Nombre para el jugador por tipo, para la leyenda del mapa de Tab.
 const MARKER_LABELS: Dictionary[StringName, String] = {
 	&"player": "Jugadores",
 	&"boss": "Jefe",
@@ -87,36 +82,32 @@ const MARKER_LABELS: Dictionary[StringName, String] = {
 	&"lucky_block": "Bloques de la suerte",
 }
 
-## Kinds that deliberately get NO legend row. Each is a VARIANT of a kind
-## that already has one — a free chest is a chest, a demonic or greed
-## altar is an altar — and one line per variant would turn a legend you
-## read at a glance into a taxonomy. Named here instead of left implicit
-## so the catalog lint can tell a deliberate omission from a forgotten
-## one: any other kind missing from MARKER_LABELS is a bug.
+## Tipos que a propósito NO tienen fila en la leyenda: cada uno es una
+## VARIANTE de un tipo que ya la tiene (un cofre gratis es un cofre; un altar
+## demoníaco o de codicia es un altar). Se nombran aquí para que el lint de
+## catálogos distinga una omisión a propósito de un olvido: cualquier otro
+## tipo sin fila en MARKER_LABELS es un error.
 const LEGEND_VARIANTS: Dictionary[StringName, bool] = {
 	&"chest_free": true,
 	&"altar_demonic": true,
 	&"altar_greed": true,
 }
 
-## Alpha the unexplored ground is dimmed to in the composite. Not fully
-## opaque: the shape of the map is a hint, what is ON it is the reward.
+## Cuánto se oscurece el suelo sin explorar en la composición (0-1). No es
+## opaco del todo: la forma del mapa es una pista, lo que hay ENCIMA es el premio.
 const FOG_ALPHA: float = 0.85
-## Map pixels per metre of arena. 0.5 gives 240 px for a 240 m arena,
-## which is plenty for a 150 px minimap and sharp enough at overlay size.
+## Píxeles del mapa por metro de arena. 0.5 da 240 px para una arena de
+## 240 m: de sobra para un minimapa de 150 px y nítido en el mapa de Tab.
 const PIXELS_PER_METER: float = 0.5
-## Seconds between marker collections. Markers move (players, bosses); a
-## 10 Hz refresh is invisible to the eye and free.
-const MARKER_INTERVAL: float = 0.1
 
-## Half-extent, in metres, of the arena this map covers.
+## Media extensión, en metros, de la arena que cubre este mapa.
 var half_extent: float = 120.0
-## The stage's ground picture, before fog.
+## La imagen del suelo de la etapa, antes de la niebla.
 var background: Image = null
-## background x fog, ready to draw.
+## Fondo por niebla, listo para dibujar.
 var texture: ImageTexture = null
-## Latest marker snapshot: {position: Vector2 (world XZ), kind, color,
-## heading (radians, players only)}.
+## Última instantánea de marcadores: {position: Vector2 (XZ del mundo),
+## kind, color, heading (radianes, solo jugadores)}.
 var markers: Array[Dictionary] = []
 
 var _composite: Image = null
@@ -127,10 +118,10 @@ func _init(tree: SceneTree) -> void:
 	_tree = tree
 
 
-## Builds the stage's ground picture. Called once per stage, from whatever
-## the consumer's stage hook is. A null terrain is not an error here —
-## a HUD can be built before the first arena exists — it just yields a
-## flat slate the composite still works on.
+## Construye la imagen del suelo de la etapa. Se llama una vez por etapa,
+## desde el gancho de etapa del consumidor. Un terreno nulo no es un error
+## (un HUD puede existir antes de la primera arena): queda una pizarra plana
+## sobre la que la composición igual funciona.
 func build_background(_arena: Node3D = null) -> void:
 	var terrain := Terrain.find(_tree)
 	var bounds := _tree.get_first_node_in_group(&"arena_bounds")
@@ -150,13 +141,11 @@ func build_background(_arena: Node3D = null) -> void:
 	composite()
 
 
-## Paints the arena mask's blocked cells darker, so the map shows the
-## irregular shape of the stage instead of a clean square.
-## Decided per PIXEL, by the cell its centre falls in. It used to paint each
-## cell as a square of round(cell_size * scale) pixels, which only works
-## while a cell is a whole number of pixels: at 5 m cells (iteration 63)
-## and 0.5 px/m a cell is 2.5 px, and the rounded squares overlapped into
-## darker stripes.
+## Oscurece las celdas bloqueadas de la máscara de la arena, para que el mapa
+## muestre la forma irregular de la etapa y no un cuadrado limpio. Se decide
+## por PÍXEL, según la celda donde cae su centro: una celda puede medir una
+## fracción de píxeles (5 m a 0.5 px/m son 2.5 px), y pintar cuadrados
+## redondeados por celda dejaría franjas más oscuras donde se solapan.
 func _darken_blocked_cells(bounds: Node) -> void:
 	if bounds == null or background == null or not bounds.has_method(&"blocked_cells"):
 		return
@@ -169,8 +158,8 @@ func _darken_blocked_cells(bounds: Node) -> void:
 	if blocked.is_empty():
 		return
 	var cell_size := float(bounds.call(&"cell_size")) if bounds.has_method(&"cell_size") else 10.0
-	# The grid's own origin, through the scatter's arithmetic, so the two
-	# can never disagree about where a cell starts.
+	# El origen de la propia grilla, con la aritmética del scatter, para que
+	# los dos nunca discrepen sobre dónde empieza una celda.
 	var corner: Vector2 = bounds.call(&"cell_center", Vector2i.ZERO)
 	corner -= Vector2.ONE * cell_size * 0.5
 	var pixels := background.get_width()
@@ -183,8 +172,8 @@ func _darken_blocked_cells(bounds: Node) -> void:
 				background.set_pixel(px, py, background.get_pixel(px, py).darkened(0.55))
 
 
-## background x fog into the drawable texture. Called on the fog's own
-## tick by the consumer, never per frame.
+## Fondo por niebla en la textura dibujable. El consumidor lo llama en el
+## tick de la niebla, nunca cada cuadro.
 func composite() -> void:
 	if background == null:
 		return
@@ -198,8 +187,8 @@ func composite() -> void:
 		for px in pixels:
 			var tint := background.get_pixel(px, py)
 			if fog_image != null and fog_pixels > 0:
-				# Nearest fog pixel: the fog grid is coarser than the map,
-				# and interpolating a binary state only smears its edge.
+				# Píxel de niebla más cercano: la grilla de niebla es más gruesa
+				# que el mapa, e interpolar un estado binario solo emborrona su borde.
 				var fx := mini(px * fog_pixels / pixels, fog_pixels - 1)
 				var fy := mini(py * fog_pixels / pixels, fog_pixels - 1)
 				if fog_image.get_pixel(fx, fy).r < 0.5:
@@ -211,8 +200,8 @@ func composite() -> void:
 		texture.update(_composite)
 
 
-## Snapshot of every live marker, filtered by the fog. Players and the
-## exit portal are always in; everything else has to have been found.
+## Instantánea de cada marcador vivo, filtrada por la niebla. Los jugadores
+## y el portal de salida siempre están; lo demás hay que haberlo encontrado.
 func collect_markers() -> void:
 	markers = []
 	var fog := FogOfWar.find(_tree)
@@ -225,7 +214,7 @@ func collect_markers() -> void:
 		var kind: StringName = body.call(&"map_marker_kind")
 		if kind.is_empty() or not MARKER_STYLES.has(kind):
 			continue
-		# A spent altar or an opened chest is not somewhere to walk to.
+		# Un altar gastado o un cofre abierto no son un lugar adonde ir.
 		var available: Variant = body.get("available")
 		if available is bool and not bool(available):
 			continue
@@ -240,8 +229,8 @@ func collect_markers() -> void:
 			"position": at,
 			"kind": kind,
 			"color": color,
-			# Players draw as an arrow pointing where they face; everything
-			# else ignores this.
+			# Los jugadores se dibujan como una flecha hacia donde miran; los
+			# demás ignoran este campo.
 			"heading": body.global_rotation.y,
 		})
 
@@ -250,9 +239,9 @@ func marker_count() -> int:
 	return markers.size()
 
 
-## World XZ -> a point inside `rect`, north up. THE projection both
-## consumers use, so a marker can never land somewhere the ground does
-## not.
+## XZ del mundo -> un punto dentro de `rect`, con el norte arriba. LA
+## proyección que usan ambos consumidores, para que un marcador nunca caiga
+## donde no está el suelo.
 func to_screen(xz: Vector2, rect: Rect2) -> Vector2:
 	var span := maxf(half_extent * 2.0, 0.001)
 	return rect.position + Vector2(
@@ -260,9 +249,9 @@ func to_screen(xz: Vector2, rect: Rect2) -> Vector2:
 			(xz.y + half_extent) / span * rect.size.y)
 
 
-## Draws the composite and every marker into `rect` of `canvas`. Both
-## consumers call this from their own _draw; everything it needs was
-## computed by the methods above.
+## Dibuja la composición y cada marcador dentro de `rect` de `canvas`. Ambos
+## consumidores lo llaman desde su propio _draw; todo lo que necesita ya lo
+## calcularon los métodos de arriba.
 func draw_into(canvas: CanvasItem, rect: Rect2, marker_scale: float = 1.0) -> void:
 	if texture != null:
 		canvas.draw_texture_rect(texture, rect, false)
@@ -281,8 +270,8 @@ func draw_into(canvas: CanvasItem, rect: Rect2, marker_scale: float = 1.0) -> vo
 						at + Vector2(0.0, size), at + Vector2(-size, 0.0)]), color)
 			"triangle":
 				var heading: float = marker["heading"]
-				# The raider's arrow points where they are looking: on a
-				# 240 m map, "which way am I facing" is most of the value.
+				# La flecha del jugador apunta hacia donde mira: en un mapa de
+				# 240 m, saber hacia dónde miras es casi todo el valor.
 				var tip := at + Vector2(sin(heading), -cos(heading)) * size * 1.6
 				var left := at + Vector2(sin(heading + 2.4), -cos(heading + 2.4)) * size
 				var right := at + Vector2(sin(heading - 2.4), -cos(heading - 2.4)) * size

@@ -1,60 +1,67 @@
+class_name BossArrow
 extends Node2D
-## Screen-edge objective indicator: while any "boss"-group body is alive but
-## off-screen (or behind the camera plane), an amber arrow clamped inside
-## the screen edges points toward it, so players can re-find a fight they
-## kited away from. Tracks the nearest live boss — dead bosses leave the
-## group the moment they die, which hides the arrow with no extra wiring —
-## and works for the hidden minibosses (same group). Lives inside the HUD
-## layer; every camera/viewport lookup is guarded, so headless runs and
-## camera-less scenes never crash.
+## Indicador de objetivo en el borde de la pantalla: mientras un cuerpo del
+## grupo "boss" vive fuera de la pantalla (o detrás de la cámara), una flecha
+## ámbar pegada a los bordes apunta hacia él, para volver a encontrar una
+## pelea que quedó atrás. Sigue al jefe vivo más cercano (un jefe muerto sale
+## del grupo al morir, lo que oculta la flecha sin más cables) y sirve para
+## los minijefes ocultos (mismo grupo). Vive en la capa del HUD; toda consulta
+## de cámara o viewport está protegida, así que las corridas headless y las
+## escenas sin cámara no fallan.
 ##
-## One arrow serves the whole window today. SplitScreen can instead give
-## each cell its own with bind_view(camera, carrier); until it does, the
-## co-op fallback aims through the first split-screen camera it finds and
-## offsets the result by that cell's corner.
+## Hoy una sola flecha sirve a toda la ventana. SplitScreen podría darle una a
+## cada celda con bind_view(camera, carrier); mientras no lo haga, en co-op
+## apunta con la primera cámara de pantalla dividida que encuentra y desplaza
+## el resultado por la esquina de esa celda.
+## El HUD le reenvía track_objective desde el grupo "boss_ui".
 
-## Distance (px) the arrow tip keeps from the screen edges.
-@export var edge_margin: float = 56.0
-## Inset (px) inside the viewport that still counts as "on-screen": keeps
-## the arrow from flickering while a boss rides the exact frame edge.
-@export var on_screen_inset: float = 24.0
-## World-space aim height above the boss origin (chest, not feet).
-@export var aim_height: float = 1.2
-
-## Seconds between attempts to find a split-screen camera while none is
-## resolved. The scan walks the tree, so it never runs per frame — and
-## never runs at all in solo, where the root viewport has its own camera.
+## Segundos entre intentos de encontrar una cámara de pantalla dividida
+## mientras no hay ninguna. La búsqueda recorre el árbol, así que nunca corre
+## cada cuadro, y en solo no corre nunca (el viewport raíz tiene su cámara).
 const CAMERA_RESCAN := 0.5
 
-## Injected view (see bind_view): the camera this arrow aims through and
-## the raider it measures distances from. Both null = solo fallbacks.
+## Barra de la que la flecha toma su color de relleno (Fill), para que el
+## ámbar del jefe tenga un solo dueño: BossBar.fill_color.
+@export var color_source: BossBar
+@export_group("Posición")
+## Distancia (px) que la punta de la flecha guarda de los bordes de la pantalla.
+@export var edge_margin: float = 56.0
+## Margen (px) dentro del viewport que aún cuenta como "en pantalla": evita
+## que la flecha parpadee mientras un jefe va justo por el borde.
+@export var on_screen_inset: float = 24.0
+## Altura (metros) sobre el origen del jefe a la que se apunta (pecho, no pies).
+@export var aim_height: float = 1.2
+
+## Vista inyectada (ver bind_view): la cámara por la que apunta esta flecha y
+## el jugador desde el que mide distancias. Ambos nulos = respaldos de solo.
 var _camera: Camera3D = null
 var _carrier: Node3D = null
-## Cached co-op fallback camera, re-scanned at most every CAMERA_RESCAN.
+## Cámara de respaldo en co-op, buscada a lo más cada CAMERA_RESCAN.
 var _fallback_camera: Camera3D = null
 var _rescan_left: float = 0.0
-## Non-boss target shown while no boss is alive (see track_objective).
+## Objetivo que no es jefe, mostrado mientras no vive ninguno (ver track_objective).
 var _objective: Node3D = null
 
 
 func _ready() -> void:
 	visible = false
+	if color_source != null:
+		($Fill as Polygon2D).color = color_source.fill_color
 
 
-## Split-screen entry point: one arrow per view, each aiming through THAT
-## view's camera and measuring from THAT view's raider. Without it the
-## arrow falls back to the root viewport's camera (solo) and to the lowest
-## standing slot.
+## Entrada para pantalla dividida: una flecha por vista, cada una apunta con
+## la cámara de ESA vista y mide desde SU jugador. Sin ella la flecha usa la
+## cámara del viewport raíz (solo) y el jugador de pie con la ranura más baja.
 func bind_view(camera: Camera3D, carrier: Node3D) -> void:
 	_camera = camera
 	_carrier = carrier
 
 
-## Points the arrow at something that is not a boss (iteration 49: the
-## stage's exit portal). A live boss always wins — a fight you have to
-## finish outranks a door you can take whenever you like — so this is a
-## fallback target, not an override. Cleared by passing null, and dropped
-## on its own once the node is gone (the portal is consumed when used).
+## Apunta la flecha a algo que no es un jefe (el portal de salida de la
+## etapa). Un jefe vivo siempre gana (una pelea pendiente pesa más que una
+## puerta que puedes usar cuando quieras), así que esto es un objetivo de
+## respaldo, no un reemplazo. Se borra pasando null, y se suelta solo cuando
+## el nodo desaparece (el portal se consume al usarse).
 func track_objective(node: Node3D) -> void:
 	_objective = node
 
@@ -74,18 +81,18 @@ func _process(delta: float) -> void:
 			camera.is_position_behind(target), view.get_visible_rect().size)
 	visible = bool(placement["visible"])
 	if visible:
-		# Placement is in the CAMERA's viewport space; in split-screen that
-		# is one cell of the window, so it shifts by the cell's origin.
+		# La posición está en el espacio del viewport de la CÁMARA; en
+		# pantalla dividida eso es una celda de la ventana, así que se desplaza
+		# por el origen de la celda.
 		position = (placement["position"] as Vector2) + _view_origin(view)
 		rotation = float(placement["angle"])
 
 
-## The camera to aim through: the injected one, else the root viewport's
-## (solo), else the first live split-screen view. That last fallback is
-## what keeps the arrow alive in co-op at all: every player camera is
-## deactivated in favour of a per-SubViewport follow camera
-## (player.gd/SplitScreen), so the root viewport has NO active camera and
-## the plain get_camera_3d() answer is null for the whole run.
+## La cámara con la que apuntar: la inyectada; si no, la del viewport raíz
+## (solo); si no, la primera vista de pantalla dividida viva. Ese último
+## respaldo mantiene viva la flecha en co-op: cada cámara de jugador se
+## desactiva en favor de una cámara por SubViewport (player.gd/SplitScreen),
+## así que el viewport raíz NO tiene cámara activa en toda la partida.
 func _resolve_camera(delta: float) -> Camera3D:
 	if is_instance_valid(_camera):
 		return _camera
@@ -114,59 +121,50 @@ func _find_split_view_camera() -> Camera3D:
 	return null
 
 
-## Window-space origin of a viewport: zero for the root, the cell's own
-## corner for a SubViewport hosted in a SubViewportContainer.
+## Origen de un viewport en la ventana: cero para el raíz, la esquina de la
+## celda para un SubViewport dentro de un SubViewportContainer.
 func _view_origin(view: Viewport) -> Vector2:
 	var container := view.get_parent() as SubViewportContainer
 	return container.global_position if container != null else Vector2.ZERO
 
 
-## The body distances are measured from: the injected carrier, else the
-## LOWEST STANDING SLOT. Never get_first_node_in_group("player") — a
-## downed raider leaves the group and a revived one re-enters at the back,
-## so that order changes mid-run and the arrow would jump between bosses
-## for no reason the players can see.
+## El cuerpo desde el que se miden distancias: el inyectado; si no, el jugador
+## DE PIE con la ranura más baja. Nunca get_first_node_in_group("player"): un
+## jugador caído sale del grupo y uno reanimado vuelve al final, así que ese
+## orden cambia en la partida y la flecha saltaría entre jefes sin razón visible.
 func _resolve_reference() -> Node3D:
 	if is_instance_valid(_carrier):
 		return _carrier
 	var tree := get_tree()
 	if tree == null:
 		return null
-	var best: Node3D = null
-	var best_slot := Coop.MAX_PLAYERS
-	for node: Node in tree.get_nodes_in_group(&"player"):
-		var body := node as Node3D
-		if body == null:
-			continue
-		var slot := int(body.get("player_index"))
-		if slot < best_slot:
-			best_slot = slot
-			best = body
-	return best
+	return PartySlots.lowest_standing(tree)
 
 
-## Pure screen math, separated so a headless harness can verify it: given
-## the camera-unprojected target, whether the target sits behind the
-## camera plane, and the viewport size, returns {"visible": bool,
-## "position": Vector2, "angle": float}. Off-screen targets clamp to the
-## edge_margin rect along the ray from the screen center; the arrow's art
-## points +X, so the angle of that ray is also the node rotation.
+## Matemática de pantalla pura, aparte para que un arnés headless la
+## verifique. Recibe el objetivo proyectado por la cámara, si está detrás del
+## plano de la cámara y el tamaño del viewport; devuelve {"visible": bool,
+## "position": Vector2, "angle": float}. Un objetivo fuera de pantalla se
+## recorta al rectángulo de edge_margin sobre el rayo desde el centro; el arte
+## de la flecha apunta a +X, así que el ángulo del rayo es también la rotación
+## del nodo.
 func compute_placement(unprojected: Vector2, behind: bool,
 		viewport_size: Vector2) -> Dictionary:
 	var center := viewport_size * 0.5
 	var pos := unprojected
 	if behind:
-		# unproject mirrors targets behind the camera plane; mirror back
-		# through the center so the arrow points the way you would turn.
+		# unproject refleja los objetivos detrás del plano de la cámara; se
+		# reflejan de vuelta por el centro para que la flecha apunte hacia
+		# donde girarías.
 		pos = center * 2.0 - pos
 	if not behind and Rect2(Vector2.ZERO, viewport_size) \
 			.grow(-on_screen_inset).has_point(pos):
 		return {"visible": false, "position": Vector2.ZERO, "angle": 0.0}
 	var dir := pos - center
 	if dir.length_squared() < 0.0001:
-		dir = Vector2.DOWN  # dead-center behind the camera: "it's behind you"
+		dir = Vector2.DOWN  # justo detrás de la cámara: "está detrás de ti"
 	dir = dir.normalized()
-	# Scale the center ray to the first margin-rect edge it crosses.
+	# Escala el rayo central hasta el primer borde del rectángulo de margen que cruza.
 	var half := center - Vector2(edge_margin, edge_margin)
 	half.x = maxf(half.x, 4.0)
 	half.y = maxf(half.y, 4.0)
@@ -178,15 +176,10 @@ func compute_placement(unprojected: Vector2, behind: bool,
 	return {"visible": true, "position": center + dir * t, "angle": dir.angle()}
 
 
-## Nearest in-tree member of the "boss" group, measured from `reference`
-## when there is one (two bosses alive is rare but possible: miniboss plus
-## the timetable boss). A null reference keeps every boss at distance 0,
-## so the first one in the group wins — enough for a camera-less harness.
-## What the arrow points at right now: the nearest live boss, else the
-## tracked objective while it still exists.
-## The reference only ranks bosses against each other, so with the group
-## empty — most of a run — neither its party scan nor the boss scan runs:
-## both would end in the null this skips straight to.
+## Lo que la flecha señala ahora: el jefe vivo más cercano; si no hay, el
+## objetivo seguido mientras exista. La referencia solo ordena a los jefes
+## entre sí, así que con el grupo "boss" vacío (casi toda la partida) no se
+## busca ni al jugador de referencia ni a los jefes.
 func _current_target() -> Node3D:
 	if get_tree().get_node_count_in_group(&"boss") > 0:
 		var boss := _nearest_live_boss(_resolve_reference())
@@ -199,6 +192,10 @@ func _current_target() -> Node3D:
 	return _objective
 
 
+## Miembro del grupo "boss" dentro del árbol más cercano a `reference`, si la
+## hay (dos jefes vivos es raro pero posible: minijefe más el jefe del
+## horario). Con referencia nula todos están a distancia 0 y gana el primero
+## del grupo, suficiente para un arnés sin cámara.
 func _nearest_live_boss(reference: Node3D) -> Node3D:
 	var tree := get_tree()
 	if tree == null:
