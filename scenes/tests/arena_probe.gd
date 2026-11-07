@@ -504,28 +504,24 @@ var _freeze_moved: int = 0
 var _freeze_damage_events: int = 0
 ## instance id -> posición en que este cuerpo se muestreó congelado por última vez.
 var _freeze_positions: Dictionary[int, Vector3] = {}
-## Burrower accounting for the same window, on its own line. A Duneburrower
-## UNDERGROUND has left the "enemies" group on purpose, so the spawner's
-## frozen set never contained it and `moved` above could not see it: the one
-## enemy that can still hurt the party through a time stop was the only one
-## the freeze detector was blind to. Walked off the spawner's children
-## instead of a group, so this reads the same before and after the fix.
+## Cuenta de gusanos en la misma ventana, en su propia línea. Un Duneburrower
+## BAJO TIERRA sale del grupo "enemies" a propósito, así que el conjunto
+## congelado del spawner no lo contiene y `moved` de arriba no lo ve. Se
+## recorren los hijos del spawner en vez de un grupo para verlo igual.
 var _worms_sampled: int = 0
 var _worms_moved: int = 0
-## Samples in which a BURROWED worm was not in the spawner's frozen set.
-## The state assertion, and the one that does not depend on luck: `moved`
-## needs the worm to actually be sliding at the moment it is sampled,
-## `loose` only needs it to be underground while time is stopped, which
-## is the whole defect.
+## Muestras en que un gusano BURROWED no estaba en el conjunto congelado del
+## spawner. Es la aserción de estado, la que no depende de la suerte: `moved`
+## necesita que el gusano se esté deslizando justo al muestrearlo, `loose`
+## solo que esté bajo tierra mientras el tiempo está detenido.
 var _worms_loose: int = 0
 var _worm_positions: Dictionary[int, Vector3] = {}
-## Duneburrower.State.BURROWED, by value: the probe cannot name the enum
-## without hard-coupling to that script, and the order is stable
-## (SURFACED, BURROWED, ERUPTING) — the same assumption the airborne
-## detector already makes for ERUPTING.
+## Duneburrower.State.BURROWED, por valor: el probe no puede nombrar el enum
+## sin acoplarse a ese script, y el orden es estable (SURFACED, BURROWED,
+## ERUPTING), la misma suposición que hace el detector de vuelo con ERUPTING.
 const BURROWER_BURROWED: int = 1
-## Health of the lead raider, connected once so enemy damage during a
-## freeze can be counted.
+## Health del raider líder, conectado una vez para contar el daño enemigo
+## durante un congelamiento.
 var _lead_health: Health = null
 
 var _bounds: Node3D = null
@@ -536,30 +532,28 @@ var _blocked_reported: bool = false
 
 
 func _ready() -> void:
-	# BEFORE anything else: RunState.stage_changed fires for stage 1 from
-	# inside the add_child() below and asks this camera for a frame, so a
-	# handle created further down would be null when the first shot is due.
+	# ANTES que todo: RunState.stage_changed se emite para la etapa 1 dentro del
+	# add_child() de abajo y le pide un frame a esta cámara, así que si se crea
+	# más abajo sería null cuando toca la primera foto.
 	_camera = ShotCamera.new(get_viewport())
 	_perf = PerfMeter.new(get_tree())
-	# Never fold a soak into the real save: re-point SaveData at a scratch
-	# file (fresh defaults) before the arena boots. BONK_SAVE_PATH wins
-	# when it is set (iteration 57), so tools/verificar.sh can hand every
-	# soak its OWN fresh file — the shared user://soak_save.json carried
-	# the bestiary and used-weapon counters one soak credited into the
-	# next one, which is a difference between runs nobody asked for.
+	# Nunca mezclar un soak con el guardado real: SaveData apunta a un archivo
+	# temporal (valores por defecto) antes de arrancar la arena. BONK_SAVE_PATH
+	# gana si está definido, para que tools/verificar.sh le dé a cada soak su
+	# PROPIO archivo nuevo: el compartido user://soak_save.json arrastra el
+	# bestiario y los contadores de armas usadas de un soak al siguiente.
 	var save_override := OS.get_environment(SaveData.SAVE_PATH_ENV)
 	SaveData.save_path = save_override if not save_override.is_empty() \
 			else DEFAULT_SAVE_PATH
 	SaveData.load_from_disk()
-	# Settings applied the PLAYER's graphics preset at boot, before this
-	# re-point: a windowed soak would render at whatever the real save says
-	# while the log reported the scratch save's preset.
+	# Settings aplicó el preset gráfico del JUGADOR al arrancar, antes de este
+	# cambio de archivo: un soak con ventana renderizaría con lo que diga el
+	# guardado real mientras el log informa el preset del guardado temporal.
 	Settings.apply_graphics()
 	print("ArenaProbe: save=%s" % SaveData.save_path)
-	# BONK_CHARACTER=<id> picks the raider (default: the config's choice).
-	# An unknown id is an ERROR, not a shrug: a soak meant to exercise one
-	# raider silently running the default one reports a green run about
-	# code it never touched.
+	# BONK_CHARACTER=<id> elige el raider (por defecto: lo que diga la config).
+	# Un id desconocido es ERROR, no se ignora: un soak pensado para un raider
+	# que corre en silencio el de por defecto da verde sobre código que no tocó.
 	var character := OS.get_environment("BONK_CHARACTER")
 	if not character.is_empty():
 		if CharacterCatalog.by_id(character).is_empty():
@@ -567,9 +561,9 @@ func _ready() -> void:
 		else:
 			GameConfig.selected_character_id = character
 	print("ArenaProbe: character=%s" % GameConfig.selected_character_id)
-	# BONK_ARENA is a SCENE PATH for backwards compatibility, but what it
-	# selects now is the starting biome: the probe always boots Run.tscn,
-	# which owns the run and swaps arenas per stage.
+	# BONK_ARENA es una RUTA DE ESCENA por compatibilidad, pero lo que elige es
+	# el bioma inicial: el probe siempre arranca Run.tscn, que es dueño de la
+	# partida y cambia de arena en cada etapa.
 	var path := OS.get_environment("BONK_ARENA")
 	if path.is_empty():
 		path = DEFAULT_ARENA
@@ -580,23 +574,23 @@ func _ready() -> void:
 		get_tree().quit(1)
 		return
 	RunState.stage_changed.connect(_on_stage_changed)
-	# BEFORE the run is instantiated: Player._apply_character reads it while
-	# the raider spawns, so a switch set afterwards would arrive too late.
+	# ANTES de instanciar la partida: Player._apply_character lo lee mientras
+	# aparece el raider, así que si se define después llega tarde.
 	var weapon_id := OS.get_environment("BONK_WEAPON")
 	if not weapon_id.is_empty():
 		Player.starting_weapon_override = weapon_id
 		print("ArenaProbe: weapon=%s" % weapon_id)
-	# BEFORE the run is instantiated, for the same reason as the weapon:
-	# RunSystems._spawn_party reads Coop.player_count inside its own
-	# _ready, so a party configured after this line is a solo run.
+	# ANTES de instanciar la partida, por la misma razón que el arma:
+	# RunSystems._spawn_party lee Coop.player_count en su propio _ready, así que
+	# un grupo configurado después de esta línea es una partida solo.
 	_configure_party()
-	# BEFORE the run is instantiated: the preset reaches the first stage's
-	# sun through RunState.stage_changed, which fires inside add_child.
-	# An unknown value is an ERROR, like BONK_CHARACTER: a soak meant to
-	# run on Media silently running on Alta is a green log about nothing.
-	# Written to SaveData without Settings.set_graphics_quality, so nothing
-	# is persisted: a manual soak on the shared scratch save must not leave
-	# the next one on a preset nobody asked for.
+	# ANTES de instanciar la partida: el preset llega al sol de la primera
+	# etapa por RunState.stage_changed, que se emite dentro de add_child.
+	# Un valor desconocido es ERROR, como BONK_CHARACTER: un soak pensado para
+	# Media que corre en Alta en silencio es un log verde sobre nada.
+	# Se escribe en SaveData sin Settings.set_graphics_quality, así que nada se
+	# persiste: un soak manual con el guardado temporal compartido no debe
+	# dejar al siguiente en un preset que nadie pidió.
 	var graphics := OS.get_environment("BONK_GRAPHICS")
 	if not graphics.is_empty():
 		if not graphics.is_valid_int() \
@@ -608,10 +602,10 @@ func _ready() -> void:
 			Settings.apply_graphics()
 			print("ArenaProbe: graphics=%d" % SaveData.graphics_quality)
 	add_child(scene.instantiate())
-	# Mortal soaks end at death (iteration 57): RunManager pauses the tree
-	# and the run-end screen has no headless self-play, so without this
-	# the probe would sit in its own WEDGE warning for the rest of its
-	# frame budget. Through the group, like every other cross-scene reach.
+	# Los soaks mortales terminan con la muerte: RunManager pausa el árbol y la
+	# pantalla de fin no se juega sola en headless, así que sin esto el probe se
+	# quedaría en su aviso de TRABA el resto de sus frames. Por el grupo, como
+	# todo acceso entre escenas.
 	var manager := get_tree().get_first_node_in_group("run_manager")
 	if manager != null and manager.has_signal("run_ended"):
 		manager.connect("run_ended", _on_run_ended)
@@ -622,9 +616,9 @@ func _ready() -> void:
 		_rng.seed = int(seed_text)
 	else:
 		_rng.randomize()
-	# BONK_GODMODE=1: an idle raider dies inside a minute, which hides every
-	# late system (bosses, hordes, altars); a huge HP pool lets a soak run
-	# the full clock. Purely a harness switch — never shipped behavior.
+	# BONK_GODMODE=1: un raider ocioso muere en menos de un minuto, lo que
+	# oculta todo sistema tardío (jefes, hordas, altares); una vida enorme deja
+	# correr el reloj completo. Solo interruptor del arnés, nunca del juego.
 	if OS.get_environment("BONK_GODMODE") == "1":
 		_apply_godmode.call_deferred()
 	if OS.get_environment("BONK_ELITE_BOOST") == "1":
@@ -653,8 +647,7 @@ func _ready() -> void:
 			_item_now.append(entry.strip_edges())
 	_zenkai_test = OS.get_environment("BONK_ZENKAI_TEST") == "1"
 	_swap_menu = OS.get_environment("BONK_SWAP_MENU") == "1"
-	# Watched only where it can happen, so every other soak keeps its log
-	# exactly as it was.
+	# Se vigila solo donde puede pasar, para que el log de los demás soaks no cambie.
 	for entry: String in _item_now:
 		if entry.begins_with("saiyan_blood"):
 			_saiyan_watch = true
@@ -673,18 +666,18 @@ func _ready() -> void:
 		LuckyBlock.force_rewards(wanted)
 		print("ArenaProbe: lucky rewards %s" % ", ".join(wanted))
 	print("ArenaProbe: arena=%s walk=%s" % [path.get_file(), _walking])
-	# Counted off the GROUPS, not off the switch: the number that matters
-	# is how many raiders RunSystems actually spawned, and a party that
-	# quietly came up one short is exactly what this line exists to show.
+	# Se cuenta en los GRUPOS, no en la variable: importa cuántos raiders creó
+	# de verdad RunSystems, y un grupo que quedó corto es justo lo que esta
+	# línea existe para mostrar.
 	_report_party.call_deferred()
 
 
-## Stage bookkeeping the tour needs: the dwell that lets the
-## pseudo-infinite ramp log a minute before the party leaves, and the sky
-## event fired a beat after every stage change. That sky event is a TEST,
-## not scenery: the WorldDirector survives the swap and re-caches the new
-## arena's Sun in on_stage_started, and a blood moon that tints nothing is
-## how a stale light reference would show up in a soak log.
+## Lo que el recorrido necesita de cada etapa: la espera que deja a la rampa
+## pseudo-infinita registrar un minuto antes de que el grupo salga, y el
+## evento de cielo disparado poco después de cada cambio. Ese evento es una
+## PRUEBA, no decorado: WorldDirector.on_stage_started hace que
+## WeatherDirector.begin_stage vuelva a buscar el Sun de la arena nueva, y
+## una luna de sangre que no tiñe nada delata una referencia vieja a la luz.
 func _tick_stage_flow(delta: float) -> void:
 	if RunState.stage_cleared and not _stage_cleared_seen:
 		_stage_cleared_seen = true
@@ -694,9 +687,9 @@ func _tick_stage_flow(delta: float) -> void:
 	_dwell_left = maxf(_dwell_left - delta, 0.0)
 	if RunState.stage_cleared and _dwell_left <= 0.0 and not _exit_rush:
 		_exit_rush = true
-		# Abandon whatever the tour was doing. The exit portal lands at
-		# least 40 m away and the soak has a fixed clock; finishing the
-		# current linger and leg first can burn 25 s of it on a chest.
+		# Abandona lo que estuviera haciendo el recorrido. El portal de salida cae
+		# a 40 m o más y el soak tiene reloj fijo; terminar la espera y el tramo
+		# actuales puede gastar 25 s en un cofre.
 		_linger_left = 0.0
 		_leg_time_left = 0.0
 	if _sky_probe_left > 0.0:
@@ -705,8 +698,8 @@ func _tick_stage_flow(delta: float) -> void:
 			get_tree().call_group("world_director", "start_sky_event", "blood_moon")
 
 
-## MapCatalog id whose arena scene is `scene_path`; the default map when
-## the path is unknown, so a typo soaks the forest instead of crashing.
+## Id de MapCatalog cuya escena de arena es `scene_path`; el mapa por defecto
+## si la ruta no existe, así un error de tipeo prueba el bosque en vez de caerse.
 func _map_id_for_scene(scene_path: String) -> String:
 	for row: Dictionary in MapCatalog.MAP_LIBRARY:
 		if String(row.scene_path) == scene_path:
@@ -714,9 +707,9 @@ func _map_id_for_scene(scene_path: String) -> String:
 	return MapCatalog.DEFAULT_ID
 
 
-## A stage change replaces the whole arena: every id-keyed piece of state
-## in this harness now points at freed nodes, and the new map has its own
-## mask, so the sweep has to run again against it.
+## Un cambio de etapa reemplaza toda la arena: cada estado por id de este
+## arnés apunta a nodos liberados, y el mapa nuevo tiene su propia máscara,
+## así que el barrido tiene que volver a correr.
 func _on_stage_changed(stage_index: int, map_id: String) -> void:
 	_target = null
 	_visited.clear()
@@ -733,19 +726,18 @@ func _on_stage_changed(stage_index: int, map_id: String) -> void:
 	_request_settled_shot(SHOT_SETTLE, "stage%d" % (stage_index + 1))
 
 
-## BONK_ELITE_BOOST=1: every spawn rolls shiny. Through the group, like
-## every other cross-scene call in this project.
+## BONK_ELITE_BOOST=1: todo spawn sale brillante. Por el grupo, como toda
+## llamada entre escenas del proyecto.
 func _apply_elite_boost() -> void:
 	get_tree().call_group("enemy_spawner", "force_elite_spawns", true)
 	print("ArenaProbe: elite boost on")
 
 
-## The leader gets the ten-million pool; the followers get
-## FOLLOWER_GODMODE_HP, which is a pool they can still be knocked out of.
-## Godmoding the whole party would make BONK_DOWN_NOW unable to land and
-## the down/revive path — the one co-op rule no solo soak can reach —
-## impossible to exercise. The leader stays immortal because a dead leader
-## ends the tour.
+## El líder recibe la reserva de diez millones; los seguidores reciben
+## FOLLOWER_GODMODE_HP, de la que todavía pueden caer. Con todo el grupo
+## inmortal BONK_DOWN_NOW no podría pegar y el camino de caída y revivir (la
+## regla co-op que ningún soak solo alcanza) no se ejercitaría. El líder
+## sigue inmortal porque un líder muerto termina el recorrido.
 func _apply_godmode() -> void:
 	for body: Node3D in _party_bodies():
 		var health := Health.find_in(body)
@@ -758,12 +750,12 @@ func _apply_godmode() -> void:
 			% FOLLOWER_GODMODE_HP)
 
 
-## BONK_PLAYERS: freezes the party into Coop BEFORE Run.tscn is
-## instanced. Every slot is on the keyboard device: a soak has no pads,
-## and Coop._rebuild_slot_actions duplicates the keyboard events per slot,
-## so p0_* and p1_* end up as separate action sets bound to the same keys
-## — which is exactly what the probe needs, since it synthesizes actions
-## by name instead of pressing anything.
+## BONK_PLAYERS: fija el grupo en Coop ANTES de instanciar Run.tscn. Todos los
+## slots usan el teclado: un soak no tiene mandos, y
+## Coop._rebuild_slot_actions duplica los eventos de teclado por slot, así
+## que p0_* y p1_* quedan como sets de acciones separados con las mismas
+## teclas. Es justo lo que necesita el probe, que sintetiza acciones por
+## nombre en vez de apretar teclas.
 func _configure_party() -> void:
 	var count_text := OS.get_environment("BONK_PLAYERS")
 	if not count_text.is_valid_int():
@@ -780,8 +772,8 @@ func _configure_party() -> void:
 	if second.is_empty():
 		second = _next_character_id(slot0)
 	characters.append(second)
-	# Slots 2 and 3 (unused by verificar.sh today, but the switch takes
-	# 1-4) keep walking the catalog so no two slots share a raider.
+	# Los slots 2 y 3 (verificar.sh no los usa, pero la variable acepta 1-4)
+	# siguen recorriendo el catálogo para que dos slots no compartan raider.
 	while characters.size() < _players:
 		characters.append(_next_character_id(characters[characters.size() - 1]))
 	var devices: Array[int] = []
@@ -790,9 +782,9 @@ func _configure_party() -> void:
 	Coop.configure(_players, devices, characters)
 
 
-## The catalog row after `character_id`, wrapping. Deliberately not a
-## random pick: a soak that changes raiders between runs changes what it
-## is measuring.
+## La fila del catálogo después de `character_id`, dando la vuelta. No es al
+## azar a propósito: un soak que cambia de raider entre partidas cambia lo
+## que mide.
 func _next_character_id(character_id: String) -> String:
 	var rows := CharacterCatalog.CHARACTER_LIBRARY
 	for i in rows.size():
@@ -801,22 +793,22 @@ func _next_character_id(character_id: String) -> String:
 	return String(rows[0].id)
 
 
-## Party size read off the GROUPS after RunSystems._spawn_party has run,
-## never off the switch: a party that came up one short (a slot that
-## failed to spawn, a raider that died on frame one) is exactly what this
-## line exists to show, and the switch would report the wish.
+## Tamaño del grupo leído de los GRUPOS después de RunSystems._spawn_party,
+## nunca de la variable: un grupo que quedó corto (un slot que no apareció,
+## un raider que murió en el primer frame) es justo lo que esta línea
+## muestra, y la variable informaría el deseo.
 func _report_party() -> void:
 	var bodies := _party_bodies()
 	var slot1 := "none"
 	if _body_in_slot(1) != null:
-		# Player keeps no id of its own; Coop is where the slot's raider
-		# was decided, and reading it back proves the party was configured
-		# before RunSystems spawned it.
+		# Player no guarda id propio; Coop es donde se decidió el raider del slot,
+		# y leerlo de vuelta prueba que el grupo se configuró antes de que
+		# RunSystems lo creara.
 		slot1 = Coop.character_for_slot(1)
 	print("ArenaProbe: players=%d slot1=%s" % [bodies.size(), slot1])
 
 
-## Every raider, standing or downed, sorted by slot.
+## Cada raider, de pie o caído, ordenado por slot.
 func _party_bodies() -> Array[Node3D]:
 	var bodies: Array[Node3D] = []
 	for group: StringName in [&"player", &"downed_players"]:
@@ -829,7 +821,7 @@ func _party_bodies() -> Array[Node3D]:
 	return bodies
 
 
-## The raider in a given slot, standing or downed, or null.
+## El raider de un slot, de pie o caído, o null.
 func _body_in_slot(slot: int) -> Node3D:
 	for body: Node3D in _party_bodies():
 		if int(body.get("player_index")) == slot:
@@ -837,53 +829,52 @@ func _body_in_slot(slot: int) -> Node3D:
 	return null
 
 
-## RunManager.run_ended: a mortal soak is FINISHED here. Quitting a beat
-## later lets the fold's own lines ("Run ended:", "Run stages:",
-## "Meta saved:") land in the log first.
+## RunManager.run_ended: un soak mortal TERMINA aquí. Salir un momento
+## después deja que las líneas del cierre ("Run ended:", "Run stages:",
+## "Meta saved:") lleguen antes al log.
 func _on_run_ended(victory: bool) -> void:
 	_run_ended_at = RunState.run_time
 	_run_end_left = RUN_END_QUIT_FRAMES
 	print("Probe: run ended victory=%s" % victory)
 
 
-## Printed once, on the way out: a summary the soak script can read.
+## Se imprime una vez, al salir: un resumen que el script del soak puede leer.
 func _exit_tree() -> void:
 	_camera.final_shot()
 	_perf.summary()
 	print("Probe bounty chests: max=%d cap=%d" % [_bounty_chests_max,
 			EnemyBase.BOUNTY_CHEST_CAP])
-	# One-line log (RunManager convention) for headless soaks.
+	# Log de una línea (convención de RunManager) para soaks headless.
 	print("Probe legs: reached=%d timed_out=%d" % [_legs_reached, _legs_timed_out])
 	var explored := _explored_seen
 	print("Probe fog: explored=%.2f" % explored)
-	# Inmortalidad is only proved by an enemy having TRIED: the counter
-	# lives on Health, so a soak that never got hit reports 0 and the
-	# acceptance check fails, which is the point.
+	# Inmortalidad solo se prueba si un enemigo lo INTENTÓ: el contador vive en
+	# Health, así que un soak que nunca recibió golpes informa 0 y la revisión
+	# de aceptación falla, que es la idea.
 	print("Immortal blocked: %d" % _blocked_hits_seen)
-	# Co-op accounting. Zero/zero in a solo soak, which is the honest
-	# reading: nothing went down and nothing was stood up.
+	# Cuenta co-op. Cero/cero en un soak solo, que es la lectura honesta: nada
+	# cayó y nada se levantó.
 	print("Party: downs=%d revives=%d" % [_party_downs, _party_revives])
 	print("Party pets: %s" % _party_pets_seen)
 	if _saiyan_watch:
-		# One aura is SAIYAN_BOONS_PER_AURA boons. More than that at once
-		# means a re-trigger stacked with the aura it was supposed to
-		# replace, and the first expiry takes back only part of it.
+		# Un aura son SAIYAN_BOONS_PER_AURA bonos. Más a la vez significa que un
+		# re-disparo se apiló con el aura que debía reemplazar, y la primera
+		# expiración devuelve solo una parte.
 		print("Saiyan boons: max=%d of %d" % [_saiyan_max, SAIYAN_BOONS_PER_AURA])
-	# Skipped under BONK_STAGE_FAST: that soak resets the fog every minute
-	# when it crosses a stage, so its coverage says nothing about the walk.
-	# Skipped under BONK_POWERUP_NOW for the same reason: that switch holds
-	# ONE power-up on for the whole soak, which is a state no real run ever
-	# reaches. Under time_stop the horde never walks into weapon range, so
-	# nothing dies, no XP drops and the tour crawls (measured: level 2 and
-	# 107 live bodies at 360 s). Coverage there measures the switch, not the
-	# walk. The gate keeps its full force where it was calibrated: every
-	# soak tools/verificar.sh runs, none of which sets either switch.
-	# Third exemption, and a SEMANTIC one rather than a switch (iteration
-	# 57): a finished run cannot explore. A mortal soak ends at the
-	# raider's death, so the fraction it reached says how long it lived,
-	# not how well the tour walks. The skip is never silent — the line
-	# below is what says so, and tools/verificar.sh fails any GODMODE soak
-	# that prints it, because a godmoded run has no business ending.
+	# Se omite con BONK_STAGE_FAST: ese soak reinicia la niebla cada minuto al
+	# cruzar una etapa, así que su cobertura no dice nada de la caminata.
+	# Se omite con BONK_POWERUP_NOW por lo mismo: esa variable mantiene UN
+	# power-up todo el soak, un estado que ninguna partida real alcanza. Con
+	# time_stop la horda nunca entra en rango de las armas, nada muere, no cae
+	# XP y el recorrido se arrastra; la cobertura mide la variable, no la
+	# caminata. El gate conserva toda su fuerza donde se calibró: en cada soak
+	# de tools/verificar.sh, ninguno de los cuales define esas variables.
+	# Tercera excepción, SEMÁNTICA y no de variable: una partida terminada no
+	# puede explorar. Un soak mortal termina con la muerte del raider, así que
+	# su fracción dice cuánto vivió, no qué tan bien camina el recorrido. La
+	# omisión nunca es silenciosa: la línea de abajo lo dice, y
+	# tools/verificar.sh hace fallar cualquier soak GODMODE que la imprima,
+	# porque una partida con godmode no tiene por qué terminar.
 	if _run_ended_at >= 0.0:
 		print("Probe fog: skipped (run ended at %.1fs)" % _run_ended_at)
 	elif not _stage_fast and _powerup_now.is_empty() and explored < FOG_MIN_EXPLORED:
@@ -892,12 +883,11 @@ func _exit_tree() -> void:
 
 
 
-## One field per slot: the companion each raider is carrying. Sampled
-## WHILE THE RUN IS ALIVE, like the fog fraction, because _exit_tree runs
-## during teardown when the raiders are already gone (the first version
-## of this line reported "none" for a party that had two pets).
-## The vendor and the pet box both hand a pet to whoever paid, and in
-## co-op that is the only way to see the payout landed on the buyer.
+## Un campo por slot: la mascota que lleva cada raider. Se muestrea CON LA
+## PARTIDA VIVA, como la fracción de niebla, porque _exit_tree corre en el
+## cierre cuando los raiders ya no están.
+## El vendedor y la caja de mascota le dan la mascota a quien pagó, y en
+## co-op es la única forma de ver que el pago llegó al comprador.
 func _party_pets_text() -> String:
 	var text := ""
 	for body: Node3D in _party_bodies():
@@ -927,10 +917,10 @@ func _explored_fraction() -> float:
 	return _explored_seen
 
 
-## Opens the Tab map every MAP_OVERLAY_INTERVAL seconds and closes it
-## MAP_OVERLAY_HOLD later. Not decoration: the overlay is a Control that
-## composites an image and walks the marker group, and this is the only
-## thing that ever exercises that path in a soak.
+## Abre el mapa de Tab cada MAP_OVERLAY_INTERVAL segundos y lo cierra
+## MAP_OVERLAY_HOLD después. No es adorno: el mapa es un Control que compone
+## una imagen y recorre el grupo de marcadores, y esto es lo único que
+## ejercita ese camino en un soak.
 func _tick_map_overlay(delta: float) -> void:
 	if _map_overlay_open:
 		if _map_overlay_report_left > 0.0:
@@ -960,10 +950,10 @@ func _release_map_overlay() -> void:
 	_send_action(0, &"map_overlay", false)
 
 
-## Marker count of slot 0's overlay, MAP_OVERLAY_REPORT_DELAY after the
-## press: the overlay refreshes in its own idle _process, which lands
-## after this physics frame, so reading it sooner reported the map as it
-## was before it opened (markers=0).
+## Cantidad de marcadores del mapa del slot 0, MAP_OVERLAY_REPORT_DELAY después
+## de la pulsación: el mapa se refresca en su propio _process idle, que cae
+## después de este frame de física, y leerlo antes informa el mapa de antes
+## de abrirse (markers=0).
 func _report_map_markers() -> void:
 	var markers := 0
 	for node: Node in get_tree().get_nodes_in_group(&"map_overlay"):
@@ -973,20 +963,19 @@ func _report_map_markers() -> void:
 	print("Map overlay: open markers=%d" % markers)
 
 
-## --- screenshots (iteration 60) ---------------------------------------------
+## --- capturas ---------------------------------------------------------------
 
-## The periodic shot's name. A Callable because the stem carries the run
-## clock, which is only known at the moment the shot comes due.
+## Nombre de la foto periódica. Es un Callable porque el nombre lleva el
+## reloj de la partida, que solo se conoce cuando toca la foto.
 func _periodic_shot_stem() -> String:
 	return "shot_%.1fs" % RunState.run_time
 
 
-## The run events worth a frame each, read off the TREE rather than off the
-## log lines the systems print — a print is not something another node can
-## subscribe to. A vendor is a new member of its own group; the pet box and
-## the lucky block announce themselves through the Interactable signal both
-## of them already emit; a power-up is an id the leader did not carry on
-## the previous sample.
+## Los eventos de la partida que valen un frame cada uno, leídos del ÁRBOL y
+## no de los print de los sistemas (un print no es algo a lo que otro nodo se
+## pueda suscribir). Un vendedor es un miembro nuevo de su grupo; la caja de
+## mascota y el lucky block se anuncian con la señal de Interactable que ya
+## emiten; un power-up es un id que el líder no llevaba en la muestra anterior.
 func _watch_shot_events() -> void:
 	if not _camera.enabled():
 		return
@@ -1011,9 +1000,9 @@ func _watch_shot_events() -> void:
 	_shot_powerups = live
 
 
-## One connection per node in `group`, so the shot lands when the thing is
-## USED and not when it spawns: an unopened box is not a picture of a box
-## being opened.
+## Una conexión por nodo de `group`, para que la foto caiga cuando la cosa se
+## USA y no cuando aparece: una caja sin abrir no es la foto de una caja
+## abriéndose.
 func _watch_shot_interactables(group: StringName, tag: String) -> void:
 	for node: Node in get_tree().get_nodes_in_group(group):
 		var id := node.get_instance_id()
@@ -1025,17 +1014,15 @@ func _watch_shot_interactables(group: StringName, tag: String) -> void:
 			spot.interaction_completed.connect(_request_shot.bind(tag))
 
 
-## Queues one event shot, named for the run time it happened at.
+## Encola una foto de evento, nombrada con el tiempo de partida en que ocurrió.
 func _request_shot(tag: String) -> void:
 	_camera.request("%s_%s" % [_periodic_shot_stem(), tag])
 
 
-## Seconds a "what it looks like" shot waits after its event. The overlay
-## opens on the frame after the Tab press, a weather tint ramps in over
-## about a second and a stage change is behind ScreenFade's cut, so a
-## picture taken on the event frame shows the moment BEFORE it every time
-## — which is how the first pass of this session photographed a map that
-## was not open yet.
+## Segundos que espera una foto de "cómo se ve" tras su evento. El mapa se abre
+## el frame después de Tab, el tinte del clima entra en cerca de un segundo y
+## un cambio de etapa va detrás del corte de ScreenFade, así que una foto del
+## frame del evento muestra siempre el momento ANTERIOR.
 const SHOT_SETTLE: float = 1.5
 const SHOT_SETTLE_MAP: float = 0.6
 
