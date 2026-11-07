@@ -244,8 +244,8 @@ func _tick_shake(delta: float) -> void:
 		return
 	_shake_time += delta * shake_noise_speed
 	_sync_shake_cameras(_feel_cameras())
-	# h/v_offset sobreviven al SpringArm3D (que reescribe el transform del
-	# hijo cada frame) y nunca rotan el rig.
+	# h/v_offset sobreviven al nodo CameraRig del Player (un SpringArm3D que
+	# reescribe el transform del hijo cada frame) y nunca rotan el rig.
 	var amount := pow(_trauma, 1.5) * shake_max_offset
 	var offset_h := _noise_x.get_noise_1d(_shake_time) * amount
 	var offset_v := _noise_y.get_noise_1d(_shake_time) * amount

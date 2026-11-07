@@ -21,10 +21,10 @@ extends Node
 ## filas es un fallo: una comprobación que recorre una lista vacía pasa por la
 ## razón equivocada (así pasaría inadvertida una constante renombrada).
 
-## El director no declara class_name: su EVENT_LIBRARY y su WEATHER_CATALOG
-## solo se alcanzan por el recurso del script.
+## El director no declara class_name: su EVENT_LIBRARY solo se alcanza por
+## el recurso del script.
 const WORLD_DIRECTOR := preload("res://scripts/world/run/world_director.gd")
-## El clima vive en su propio nodo (WeatherDirector), también sin class_name.
+## El clima vive en su propio nodo (WeatherDirector), dueño de WEATHER_CATALOG.
 const WEATHER_DIRECTOR := preload("res://scripts/world/run/director/weather_director.gd")
 ## Se lee como TEXTO para sacar los brazos `match stat:` de _apply_effect: no
 ## hay reflexión para un bloque match, y copiar la lista aquí serían dos

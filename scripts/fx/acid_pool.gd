@@ -91,7 +91,7 @@ func _build_visual() -> void:
 
 
 ## Forma el charco en `center`. `pool_radius` (metros), `seconds` y `dps`
-## vienen del clima (WorldDirector), donde se ajustan para todos los charcos.
+## vienen del nodo Weather (WeatherDirector), donde se ajustan para todos.
 func play(center: Vector3, pool_radius: float, seconds: float, dps: float) -> void:
 	global_position = center
 	_radius = pool_radius

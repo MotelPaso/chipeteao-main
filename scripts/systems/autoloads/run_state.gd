@@ -73,8 +73,8 @@ const DIFFICULTY_XP_SHARE: float = 0.75
 ## pacto. Cada una es una fracción (0.1 = +10%) y tiene exactamente un
 ## consumidor, nombrado aquí para que ninguna quede como dato muerto:
 ##   elite_chance_bonus      -> EnemySpawner.elite_chance()
-##   sky_duration_multiplier -> duración del evento de cielo (WorldDirector)
-##   event_chance_bonus      -> probabilidad de evento de cielo (WorldDirector)
+##   sky_duration_multiplier -> duración del evento de cielo (WeatherDirector)
+##   event_chance_bonus      -> probabilidad de evento de cielo (WeatherDirector)
 ##   disaster_chance_bonus   -> tirada de desastre del WorldDirector (lo
 ##                              primero que se tira en un tick de evento).
 var elite_chance_bonus: float = 0.0

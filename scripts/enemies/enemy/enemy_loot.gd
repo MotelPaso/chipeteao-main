@@ -32,7 +32,8 @@ static func award_points(body: EnemyBase) -> void:
 
 
 ## Lluvia radiactiva: todo cadáver deja un charco mientras dura. El director
-## lleva el tope y el espaciado y se niega solo si el clima no está activo.
+## lo pasa a su nodo Weather (WeatherDirector.spawn_acid_pool), que lleva el
+## tope y el espaciado y se niega solo si el clima no está activo.
 static func drop_acid_pool(body: Node3D) -> void:
 	var director := body.get_tree().get_first_node_in_group("world_director")
 	if director != null and director.has_method("spawn_acid_pool"):

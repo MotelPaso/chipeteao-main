@@ -190,7 +190,7 @@ func _pay_cost(cost: Dictionary) -> float:
 		"events":
 			RunState.event_chance_bonus += fraction
 		"disasters":
-			# Lo lee WorldDirector._maybe_weather.
+			# Lo lee WeatherDirector.maybe_roll.
 			RunState.disaster_chance_bonus += fraction
 		_:
 			push_warning("CurseShrine: unknown cost kind '%s'" % cost.kind)

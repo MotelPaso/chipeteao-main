@@ -25,8 +25,8 @@ class CameraPair:
 
 	## Todo lo que la vista hereda de la cámara del jugador. Los
 	## desplazamientos h/v importan tanto como el transform: Juice escribe en
-	## ellos toda la sacudida (sobreviven a que el SpringArm3D reescriba el
-	## transform del hijo).
+	## ellos toda la sacudida (sobreviven a que el nodo CameraRig, un
+	## SpringArm3D, reescriba el transform del hijo).
 	func sync() -> void:
 		follow.global_transform = source.global_transform
 		follow.fov = source.fov

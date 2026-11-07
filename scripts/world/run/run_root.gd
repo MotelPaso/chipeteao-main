@@ -269,7 +269,7 @@ func _free_enemies() -> void:
 
 ## Objetos del mundo de la etapa que NO son hijos de la escena de arena: lo
 ## que el director y el mundo soltaron durante la etapa. Cuelgan de la arena
-## (world_director._stage_parent), así que casi todos morirían con ella,
+## (StageLayout.stage_parent()), así que casi todos morirían con ella,
 ## pero el barrido corre ANTES de liberar la arena, y una etapa que filtra
 ## uno de estos es justo lo que el barrido detecta.
 func _free_stage_props() -> void:
