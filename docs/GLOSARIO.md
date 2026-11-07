@@ -7,18 +7,18 @@ Lo que NO se traduce nunca: los `id` de catálogo, los `node_name`, los nombres 
 2. Tuteo siempre. Imperativos: Elige, Presiona, Sobrevive, Derrota, Abate, Gana, Termina. Nunca tercera persona en logros («Viste el amanecer», no «Vio el amanecer»).
 3. Caja baja tipo oración en TODO nombre de arma, tomo (salvo la palabra del tomo), objeto, carta, misión, evolución, reliquia y enemigo: «Espada corta», «Ritmo de batalla», «Cien caídos». Nada de Title Case inglés.
 4. Llevan mayúscula inicial en las dos partes solo: topónimos (Bosque Hueco, Dunas de Ceniza, Ciénaga Lóbrega), nombres de tomo («Tomo de Furia»), nombres propios de jefe (Rey Pútrido, Cofre Mímico, Espectro de la Ciénaga) y de evolución con genitivo (Mandoble del Caudillo, Resplandor Final).
-5. Nombres de personaje intactos por regla 4 del brief: Juno, Nyx, Doc, Otto, Vex, Rook, Ash, Miro, Bogg, Kael, Torren, Wisp, **Bramble**, **Boxeador**, **PNG gucci morty** y **Backyardigan**. Bramble NO se traduce. Los tres nombres de la iteración 54 son palabras textuales del compañero de equipo y se copian tal cual: «Boxeador» ya está en español y NO se vuelve «Boxer», y «PNG gucci morty» conserva sus minúsculas y su sigla en mayúsculas — la regla 3 (caja baja tipo oración) nunca aplica a nombres de personaje. Si un nombre no cabe en su carta se **envuelve**, nunca se recorta: un nombre propio con puntos suspensivos es un nombre distinto.
+5. Nombres de personaje intactos: Rook, Ash, **Yandere-chan**, Wisp, **Electro Gato**, Doc, **Moka**, Bogg, **Goku**, **Boxeador**, **PNG gucci morty** y **Backyardigan** (la lista viva es `CHARACTER_ROWS` en `scripts/systems/catalogs/character_catalog.gd`). Son palabras textuales del equipo y se copian tal cual: «Boxeador» ya está en español y NO se vuelve «Boxer», «Yandere-chan» conserva su guion y «PNG gucci morty» sus minúsculas y su sigla en mayúsculas — la regla 3 (caja baja tipo oración) nunca aplica a nombres de personaje. El `id` de cada uno es otra cosa: inglés/ASCII en `snake_case` (`yandere_chan`, `electro_gato`), y no se traduce. Si un nombre no cabe en su carta se **envuelve**, nunca se recorta: un nombre propio con puntos suspensivos es un nombre distinto.
 6. Cuatro escalas distintas, cuatro palabras: level = Nivel / «Nv %d» (el raider); **etapa = Etapa / insignia «E%d»** (el mapa dentro de la partida); **vuelta = Vuelta / «V%d»** (loops completos al circuito de mapas); rank de reliquia = Rango. **«Grado» / «G%d» quedó retirado en la iteración 50**: los grados de mapa desaparecieron junto con el selector, y la dificultad ahora sale de cuán lejos llegó la partida, no de un menú. Si ves «Grado» en notas viejas, está muerto.
 7. cooldown = «velocidad de ataque», y **siempre como bonificación positiva** (iteración 46): un enfriamiento que baja se escribe como una velocidad que sube («Enfriamiento de X -15%» → «Velocidad de ataque de X +15%»), incluido el texto de reliquias («-1.5%» → «+1.5%») y de pasivas. La matemática interna sigue siendo un multiplicador de enfriamiento (`cooldown_multiplier`, `cooldown_scale`): solo cambia lo que lee el jugador, porque «enfriamiento» obligaba a leer un número que baja como algo bueno. La palabra «enfriamiento» ya no aparece en ninguna cadena visible. «Recarga» sigue reservada a los portales («Recharging... %d s» → «Recargando... %d s», «Portals recharge» → «los portales se recargan»); usarla para cooldown crearía una sola palabra para dos sistemas.
 8. Marcadores %d %s %.1f %.2f %02d %% \n: mismo número y mismo orden que el original, sin excepción. Ninguna cadena pierde o gana marcadores.
 9. Mayúsculas con tilde (MORISTE, EN PAUSA, ARMERÍA, COLECCIÓN, MÁX, COMÚN, ÉPICO, RECLAMADA) y apertura obligatoria de ¿ y ¡.
-10. RAREZAS: nunca traducir RARITIES[].name ni el campo "rarity" de item_catalog. Es id en 9 archivos. Traducir solo en pantalla con rarity_display() (ver bloque «rarezas»).
-11. IDs, node_name, grupos, StringName &"...", rutas res://, claves de SaveData y todo print()/push_warning() quedan en inglés y sin tocar.
-12. hud.gd:231 hace trim_prefix("Tome of "). Con tomos en español debe ser, EN ESTE ORDEN: .trim_prefix("Tomo del ").trim_prefix("Tomo de ") — al revés «Tomo del Azar» quedaría como «l Azar».
-13. Cartas por arma (`upgrade_pool.gd`, `_entries_for_weapon`): en español el sustantivo va delante. Mantener concatenación, no % : "Daño de " + display + " +%d%%", "Velocidad de ataque de " + display + " +%d%%", "Alcance de " + display + " +%d%%", y las dos de dos stats. Así el conteo de marcadores no cambia.
-14. run_end_screen.gd:82 pasa 3 argumentos. Traducir a "+%d esquirlas · %d %s — reclámalas en el registro" y cambiar el tercer argumento por la frase completa: "misión completada" si quest_count == 1, si no "misiones completadas". Prohibido «misión%s» (da «misiónes») y prohibido dejar «(s)» suelto.
-15. `evolution_catalog.gd` busca el `display_name` traducido en `UpgradePool.WEAPON_LIBRARY`, nunca capitaliza el id: «¡%s evolucionó a %s!» y, desde la iteración 46, «¡%s asciende!» para los hitos posteriores (ascender = subir un escalón de arma cada 10 niveles; no es «evolucionar», que sigue siendo el cambio de nombre y de forma).
-16. Co-op: character_select.gd:190/234/237/238 ya está en español peninsular. Corregir a control / mouse / J1 según la tabla ui_chrome. player.gd:508/511 ya está correcto: no tocar.
+10. RAREZAS: nunca traducir `Rarity.TIERS[].name` ni el campo "rarity" de item_catalog: son ids que llavean precios, tiradas y pisos. Traducir solo en pantalla con `Rarity.display_name()` (`scripts/systems/catalogs/rarity.gd`; ver bloque «Rarezas»).
+11. IDs, node_name, grupos, StringName &"...", rutas res://, claves de SaveData, identificadores de código y todo print()/push_warning()/push_error() quedan en inglés y sin tocar. **Los comentarios del código y los tooltips `##` del Inspector sí van en español (es-419)**, con las mismas reglas de este glosario: el equipo los lee para editar valores a mano.
+12. La tira de equipamiento del HUD recorta el prefijo del tomo para su sigla con `TOME_NAME_PREFIXES` (`scripts/ui/game/hud/loadout_strip.gd`), EN ESTE ORDEN: «Tomo del » antes que «Tomo de » — al revés «Tomo del Azar» quedaría como «l Azar». Un prefijo nuevo se añade ahí respetando el orden del más largo al más corto.
+13. Cartas por arma (`UpgradePool.WEAPON_STAT_CARDS`): las descripciones genéricas **no nombran el arma** («Aumenta el daño en un %d%%»); la carta muestra el arma en su propia etiqueta. Así el texto y el conteo de marcadores no dependen del nombre del arma.
+14. La pantalla final (`run_end_screen.gd`) dice "+%d esquirlas · %d %s — reclámalas en el registro", y el tercer argumento es la frase completa: «misión completada» si es una, si no «misiones completadas». Prohibido «misión%s» (da «misiónes») y prohibido dejar «(s)» suelto.
+15. `evolution_catalog.gd` busca el `display_name` traducido en `WeaponCatalog.WEAPON_LIBRARY`, nunca capitaliza el id: «¡%s evolucionó a %s!» y «¡%s asciende!» para los hitos posteriores (ascender = subir un escalón de arma cada 10 niveles; no es «evolucionar», que sigue siendo el cambio de nombre y de forma). Los dos textos son consts de `scripts/systems/catalogs/evolution_ceremony.gd`. Bug conocido: hoy el primer %s del banner de evolución sale con el nombre ya evolucionado; lo correcto es el nombre base primero.
+16. Co-op: los textos del lobby (`scripts/ui/meta/character_select/coop_lobby.gd`) usan control / mouse / J1 según la tabla ui_chrome («J1 teclado+mouse · J2 control»).
 17. La ruleta es RULETA (RULETA DE LA FORTUNA + «[E] Girar la ruleta» + «Altar de la ruleta»); nunca «rueda», que en México es la vuelta al mundo.
 18. Compuestos: verbo + sustantivo en plural (Perforacorazones, Matarreyes, Cazacoronas, Levantatapas); mata- no elide nunca. Escupesol va en singular (quitasol, girasol).
 19. Los glifos de dos letras de item_catalog.gd se re-siglan al nombre español (tabla en «terminos»); un glifo «WS» sobre «Piedra de afilar» se lee como bug.
@@ -27,25 +27,20 @@ Lo que NO se traduce nunca: los `id` de catálogo, los `node_name`, los nombres 
 
 ## Personajes (no se traducen)
 
-| Inglés | Español |
+| id (llave, no se traduce) | Nombre visible |
 |---|---|
-| Rook | Rook |
-| Vex | Vex |
-| Ash | Ash |
-| Juno | Juno |
-| Bramble | Bramble |
-| Otto | Otto |
-| Nyx | Nyx |
-| Wisp | Wisp |
-| Torren | Torren |
-| Doc | Doc |
-| Miro | Miro |
-| Bogg | Bogg |
-| Kael | Kael |
-| Bramble | Bramble |
-| Boxeador | Boxeador |
-| PNG gucci morty | PNG gucci morty |
-| Backyardigan | Backyardigan |
+| `rook` | Rook |
+| `ash` | Ash |
+| `yandere_chan` | Yandere-chan |
+| `wisp` | Wisp |
+| `electro_gato` | Electro Gato |
+| `doc` | Doc |
+| `moka` | Moka |
+| `bogg` | Bogg |
+| `goku` | Goku |
+| `boxer` | Boxeador |
+| `gucci_morty` | PNG gucci morty |
+| `backyardigan` | Backyardigan |
 
 ## Armas
 
@@ -277,7 +272,6 @@ Lo que NO se traduce nunca: los `id` de catálogo, los `node_name`, los nombres 
 | Lid Lifter | Levantatapas |
 | Treasure Route | Ruta del tesoro |
 | Rook's Proof | La prueba de Rook |
-| Vex's Routine | La rutina de Vex |
 | Dune Strider | Andadunas |
 | Sandblasted | Curtido por la arena |
 | Into the Murk | Hacia el fango |
@@ -565,7 +559,7 @@ evolución.
 
 ## Rarezas
 
-> **Cuidado:** `UpgradePool.RARITIES[].name` y el campo `rarity` de `ItemCatalog` son **claves de lógica**, no texto. Se leen como id en los precios de cofre (`RunState.CHEST_BASE_PRICES`), en la tirada de objetos y en varios santuarios. Se traducen **solo al pintarlos**, con `UpgradePool.rarity_display()`.
+> **Cuidado:** `Rarity.TIERS[].name` y el campo `rarity` de `ItemCatalog` son **claves de lógica**, no texto. Se leen como id en los precios de cofre (`RunState.CHEST_BASE_PRICES`), en la tirada de objetos y en varios santuarios. Se traducen **solo al pintarlos**, con `Rarity.display_name()`.
 
 | Inglés | Español |
 |---|---|
@@ -577,7 +571,7 @@ evolución.
 | RARE | RARO |
 | EPIC | ÉPICO |
 | LEGENDARY | LEGENDARIO |
-| SOLUCIÓN: función de presentación | Añadir a upgrade_pool.gd: const RARITY_ES := {"Common":"Común","Rare":"Raro","Epic":"Épico","Legendary":"Legendario"} y static func rarity_display(n:String)->String: return RARITY_ES.get(n,n). Usarla SOLO al pintar: upgrade_card_ui.gd:190 (con .to_upper()), chest.gd:68/70/115 y roulette_shrine.gd:101. |
+| Función de presentación | La tabla es `Rarity.DISPLAY_NAMES` en `scripts/systems/catalogs/rarity.gd` y la función `Rarity.display_name(nombre)` (`UpgradePool.rarity_display` reenvía ahí). Usarla SOLO al pintar (con `.to_upper()` donde va en mayúsculas); nada compara contra su resultado. |
 
 ## Interfaz
 
@@ -946,7 +940,6 @@ evolución.
 | `Open 3 chests.` | Abre 3 cofres. |
 | `Open 10 chests.` | Abre 10 cofres. |
 | `Win a run as Rook.` | Gana una incursión con Rook. |
-| `Finish 5 runs as Vex.` | Termina 5 incursiones con Vex. |
 | `Finish a run in Ash Dunes.` | Termina una incursión en las Dunas de Ceniza. |
 | `Finish 3 runs in Ash Dunes.` | Termina 3 incursiones en las Dunas de Ceniza. |
 | `Finish a run in the Gloomfen.` | Termina una incursión en la Ciénaga Lóbrega. |
