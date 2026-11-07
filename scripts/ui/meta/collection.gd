@@ -44,6 +44,41 @@ const BESTIARY: Array[Dictionary] = [
 	{"id": "coffer_mimic", "display_name": "Cofre Mímico", "flavor": "la cosa sepulcral de las dunas"},
 ]
 
+@export_group("Filas")
+## Título de sección (RAIDERS, ARSENAL, BESTIARIO): tamaño de fuente
+## (píxeles), color y espaciado entre letras (píxeles).
+@export var section_font_size: int = 16
+@export var section_color: Color = UiTheme.ACCENT_AMBER
+@export var section_spacing: int = 3
+## Título de cada fila: tamaño de fuente (píxeles) y color si está descubierta.
+@export var title_font_size: int = 15
+@export var title_color: Color = UiTheme.TEXT_BRIGHT
+## Detalle bajo el título: tamaño de fuente (píxeles) y color si está descubierta.
+@export var detail_font_size: int = 11
+@export var detail_color: Color = UiTheme.TEXT_DIM
+## Color del título y del detalle de una fila sin descubrir.
+@export var hidden_text_color: Color = UiTheme.TEXT_FAINT
+## Modulate de una fila sin descubrir (atenuada).
+@export var hidden_row_modulate: Color = Color(1.0, 1.0, 1.0, 0.55)
+
+@export_group("Textos")
+## Insignia de arriba (%d = descubiertos, %d = total, %d = porcentaje).
+@export var badge_format: String = "Colección: %d / %d — %d%%"
+## Detalle de un raider sin desbloquear.
+@export var hidden_raider_text: String = "Un raider que sigue allá afuera..."
+## Detalle de un arma que nunca se llevó.
+@export var hidden_weapon_text: String = "Un arma sin reclamar..."
+## Detalle de una evolución descubierta (%s = arma, %d = nivel, %s = flavor).
+@export var evo_found_format: String = "%s Nv %d: %s"
+## Detalle de una evolución sin descubrir de un arma ya llevada (%d = nivel).
+@export var evo_hint_format: String = "sube el arma al nivel %d para evolucionarla"
+## Detalle de una evolución sin descubrir de un arma nunca llevada.
+@export var evo_unknown_text: String = "una forma evolucionada te espera"
+## Detalle de un enemigo abatido (%s = flavor, %d = bajas).
+@export var kills_format: String = "%s — %d abatidos"
+## Detalle de un enemigo que nunca se abatió.
+@export var hidden_beast_text: String = "Algo que aún no enfrentas..."
+
 
 ## La insignia cuenta descubrimientos, no esquirlas.
 func _tracks_shards() -> bool:
@@ -61,7 +96,7 @@ func _build_rows(list_node: VBoxContainer) -> void:
 			list_node.add_child(_row(String(character.display_name),
 					String(character.blurb), Color(character.tint)))
 		else:
-			list_node.add_child(_hidden_row("Un raider que sigue allá afuera..."))
+			list_node.add_child(_hidden_row(hidden_raider_text))
 	list_node.add_child(_section_header("ARSENAL"))
 	for weapon: Dictionary in UpgradePool.WEAPON_LIBRARY:
 		total += 2  # el arma y su evolución cuentan por separado
@@ -72,7 +107,7 @@ func _build_rows(list_node: VBoxContainer) -> void:
 			list_node.add_child(_row(String(weapon.display_name),
 					String(weapon.flavor), UiTheme.SHARD_BLUE))
 		else:
-			list_node.add_child(_hidden_row("Un arma sin reclamar..."))
+			list_node.add_child(_hidden_row(hidden_weapon_text))
 		var recipe := EvolutionCatalog.by_weapon_id(weapon_id)
 		if recipe.is_empty():
 			total -= 1  # esta arma no tiene evolución
@@ -80,16 +115,15 @@ func _build_rows(list_node: VBoxContainer) -> void:
 		if SaveData.stat("evo_" + weapon_id) > 0:
 			found += 1
 			list_node.add_child(_evo_row(String(recipe.evolved_name),
-					"%s Nv %d: %s" % [String(weapon.display_name),
+					evo_found_format % [String(weapon.display_name),
 							EvolutionCatalog.EVOLVE_AT_LEVEL, String(recipe.flavor)],
 					true))
 		elif carried:
 			list_node.add_child(_evo_row(UNKNOWN,
-					"sube el arma al nivel %d para evolucionarla"
-							% EvolutionCatalog.EVOLVE_AT_LEVEL,
+					evo_hint_format % EvolutionCatalog.EVOLVE_AT_LEVEL,
 					false))
 		else:
-			list_node.add_child(_evo_row(UNKNOWN, "una forma evolucionada te espera", false))
+			list_node.add_child(_evo_row(UNKNOWN, evo_unknown_text, false))
 	list_node.add_child(_section_header("BESTIARIO"))
 	for beast: Dictionary in BESTIARY:
 		total += 1
@@ -97,20 +131,20 @@ func _build_rows(list_node: VBoxContainer) -> void:
 		if kills > 0:
 			found += 1
 			list_node.add_child(_row(String(beast.display_name),
-					"%s — %d abatidos" % [String(beast.flavor), kills],
+					kills_format % [String(beast.flavor), kills],
 					UiTheme.ACCENT_RED.lightened(0.15)))
 		else:
-			list_node.add_child(_hidden_row("Algo que aún no enfrentas..."))
+			list_node.add_child(_hidden_row(hidden_beast_text))
 	var percent := roundi(100.0 * float(found) / float(maxi(total, 1)))
-	_badge_label.text = "Colección: %d / %d — %d%%" % [found, total, percent]
+	_badge_label.text = badge_format % [found, total, percent]
 
 
 func _section_header(title: String) -> Label:
 	var header := Label.new()
 	header.text = title
-	header.add_theme_font_override("font", UiTheme.spaced_font(3))
-	header.add_theme_font_size_override("font_size", 16)
-	header.add_theme_color_override("font_color", UiTheme.ACCENT_AMBER)
+	header.add_theme_font_override("font", UiTheme.spaced_font(section_spacing))
+	header.add_theme_font_size_override("font_size", section_font_size)
+	header.add_theme_color_override("font_color", section_color)
 	return header
 
 
@@ -136,14 +170,14 @@ func _build_row(title: String, detail: String, accent: Color,
 	row.add_theme_stylebox_override("panel", MetaScreen.card_style(
 			accent if discovered else UiTheme.BORDER_LOCKED, glow))
 	if not discovered:
-		row.modulate = Color(1.0, 1.0, 1.0, 0.55)
+		row.modulate = hidden_row_modulate
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 2)
 	row.add_child(box)
-	var title_label := MetaScreen.label(title, 15,
-			UiTheme.TEXT_BRIGHT if discovered else UiTheme.TEXT_FAINT)
+	var title_label := MetaScreen.label(title, title_font_size,
+			title_color if discovered else hidden_text_color)
 	box.add_child(title_label)
-	var detail_label := MetaScreen.label(detail, 11,
-			UiTheme.TEXT_DIM if discovered else UiTheme.TEXT_FAINT)
+	var detail_label := MetaScreen.label(detail, detail_font_size,
+			detail_color if discovered else hidden_text_color)
 	box.add_child(detail_label)
 	return row

@@ -15,6 +15,29 @@ const CLAIMED_MODULATE := Color(1.0, 1.0, 1.0, 0.45)
 ## Tres estados de fila que se excluyen entre sí.
 enum RowState { IN_PROGRESS, CLAIMABLE, CLAIMED }
 
+@export_group("Filas")
+## Nombre de la misión: tamaño de fuente (píxeles) y color.
+@export var name_font_size: int = 16
+@export var name_color: Color = UiTheme.TEXT_BRIGHT
+## Descripción de la misión: tamaño de fuente (píxeles) y color.
+@export var description_font_size: int = 12
+@export var description_color: Color = UiTheme.TEXT_DIM
+## Recompensa "+N esquirlas" a la derecha: tamaño de fuente (píxeles) y color.
+@export var reward_font_size: int = 14
+@export var reward_color: Color = UiTheme.SHARD_BLUE
+## Contador "x/y" junto a la barra: tamaño de fuente (píxeles) y color.
+@export var progress_font_size: int = 12
+@export var progress_color: Color = Color(0.72, 0.74, 0.78)
+## Sello de misión reclamada: tamaño de fuente (píxeles) y color.
+@export var claimed_font_size: int = 12
+@export var claimed_color: Color = UiTheme.TEXT_FAINT
+
+@export_group("Textos")
+## Botón de una misión completa sin reclamar.
+@export var claim_text: String = "Reclamar"
+## Sello de una misión ya reclamada.
+@export var claimed_text: String = "RECLAMADA"
+
 
 ## Primero las reclamables, luego las en curso en orden de catálogo y al
 ## final las reclamadas, atenuadas.
@@ -67,8 +90,9 @@ func _build_info(quest: Dictionary, state: RowState) -> VBoxContainer:
 	var info := VBoxContainer.new()
 	info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	info.add_theme_constant_override("separation", 3)
-	info.add_child(MetaScreen.label(String(quest.display_name), 16, UiTheme.TEXT_BRIGHT))
-	info.add_child(MetaScreen.label(String(quest.description), 12, UiTheme.TEXT_DIM))
+	info.add_child(MetaScreen.label(String(quest.display_name), name_font_size, name_color))
+	info.add_child(MetaScreen.label(String(quest.description), description_font_size,
+			description_color))
 	info.add_child(_progress_line(SaveData.stat(String(quest.stat)), int(quest.target),
 			state != RowState.IN_PROGRESS))
 	return info
@@ -81,19 +105,19 @@ func _build_side(quest: Dictionary, state: RowState,
 	var side := VBoxContainer.new()
 	side.alignment = BoxContainer.ALIGNMENT_CENTER
 	side.add_theme_constant_override("separation", 4)
-	var reward := MetaScreen.label(UiTheme.SHARDS_GAIN % int(quest.reward), 14,
-			UiTheme.SHARD_BLUE)
+	var reward := MetaScreen.label(UiTheme.SHARDS_GAIN % int(quest.reward),
+			reward_font_size, reward_color)
 	reward.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	side.add_child(reward)
 	if state == RowState.CLAIMABLE:
 		var claim := Button.new()
-		claim.text = "Reclamar"
+		claim.text = claim_text
 		claim.custom_minimum_size = Vector2(110.0, 34.0)
 		claim.pressed.connect(_on_claim_pressed.bind(String(quest.id), row))
 		UiTheme.style_button(claim, UiTheme.ACCENT_AMBER, true)
 		side.add_child(claim)
 	elif state == RowState.CLAIMED:
-		var done := MetaScreen.label("RECLAMADA", 12, UiTheme.TEXT_FAINT)
+		var done := MetaScreen.label(claimed_text, claimed_font_size, claimed_color)
 		done.add_theme_font_override("font", UiTheme.spaced_font(2))
 		done.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		side.add_child(done)
@@ -115,6 +139,6 @@ func _progress_line(current: int, target: int, complete: bool) -> HBoxContainer:
 			UiTheme.ACCENT_AMBER if complete else UiTheme.SHARD_BLUE.darkened(0.15),
 			5, 2)
 	line.add_child(bar)
-	line.add_child(MetaScreen.label("%d/%d" % [mini(current, target), target], 12,
-			Color(0.72, 0.74, 0.78)))
+	line.add_child(MetaScreen.label("%d/%d" % [mini(current, target), target],
+			progress_font_size, progress_color))
 	return line

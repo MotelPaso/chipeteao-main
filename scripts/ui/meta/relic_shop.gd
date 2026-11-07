@@ -7,6 +7,29 @@ extends MetaScreen
 ## (MetaScreen.payoff), igual que reclamar una misión; un rango que no
 ## alcanza recibe el vaivén de rechazo compartido.
 
+@export_group("Filas")
+## Nombre de la reliquia: tamaño de fuente (píxeles) y color.
+@export var name_font_size: int = 16
+@export var name_color: Color = UiTheme.TEXT_BRIGHT
+## Línea de efecto: tamaño de fuente (píxeles) y color.
+@export var effect_font_size: int = 12
+@export var effect_color: Color = UiTheme.TEXT_DIM
+## Rombos de rango: tamaño de fuente (píxeles), color con algún rango
+## comprado y color sin ninguno.
+@export var pips_font_size: int = 14
+@export var pips_owned_color: Color = UiTheme.ACCENT_AMBER
+@export var pips_empty_color: Color = UiTheme.TEXT_FAINT
+## Sello de rango máximo: tamaño de fuente (píxeles) y color.
+@export var maxed_font_size: int = 13
+@export var maxed_color: Color = UiTheme.ACCENT_AMBER
+
+@export_group("Textos")
+## Rombo de un rango comprado y de uno que falta.
+@export var pip_owned: String = "◆"
+@export var pip_empty: String = "◇"
+## Sello de una reliquia en su rango máximo.
+@export var maxed_text: String = "MÁX"
+
 
 func _build_rows(list_node: VBoxContainer) -> void:
 	for relic: Dictionary in RelicCatalog.RELIC_LIBRARY:
@@ -38,21 +61,21 @@ func _build_row(relic: Dictionary) -> PanelContainer:
 	info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	info.add_theme_constant_override("separation", 3)
 	columns.add_child(info)
-	info.add_child(MetaScreen.label(String(relic.display_name), 16, UiTheme.TEXT_BRIGHT))
-	info.add_child(MetaScreen.label(_effect_line(relic), 12, UiTheme.TEXT_DIM))
+	info.add_child(MetaScreen.label(String(relic.display_name), name_font_size, name_color))
+	info.add_child(MetaScreen.label(_effect_line(relic), effect_font_size, effect_color))
 	# Rombos de rango: llenos los comprados, huecos los que faltan.
 	var pips := ""
 	for i in max_ranks:
-		pips += "◆" if i < rank else "◇"
-	info.add_child(MetaScreen.label(pips, 14,
-			UiTheme.ACCENT_AMBER if rank > 0 else UiTheme.TEXT_FAINT))
+		pips += pip_owned if i < rank else pip_empty
+	info.add_child(MetaScreen.label(pips, pips_font_size,
+			pips_owned_color if rank > 0 else pips_empty_color))
 
 	var side := VBoxContainer.new()
 	side.alignment = BoxContainer.ALIGNMENT_CENTER
 	side.add_theme_constant_override("separation", 4)
 	columns.add_child(side)
 	if capped:
-		var done := MetaScreen.label("MÁX", 13, UiTheme.ACCENT_AMBER)
+		var done := MetaScreen.label(maxed_text, maxed_font_size, maxed_color)
 		done.add_theme_font_override("font", UiTheme.spaced_font(2))
 		done.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		side.add_child(done)
