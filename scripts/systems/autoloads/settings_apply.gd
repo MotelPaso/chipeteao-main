@@ -14,7 +14,8 @@ extends Node
 const MIN_VOLUME_DB := -40.0
 const MAX_VOLUME_DB := 0.0
 ## Segundos sin mover un deslizador antes de guardar el cambio a disco.
-@export var save_debounce: float = 0.8
+## Edita aquí: este autoload no tiene escena, así que no sale en el Inspector.
+const SAVE_DEBOUNCE: float = 0.8
 
 ## --- Calidad gráfica --------------------------------------------------------
 ## Índice = SaveData.graphics_quality: 0 Alta, 1 Media, 2 Baja.
@@ -214,10 +215,10 @@ static func _apply_fullscreen(on: bool) -> void:
 
 func _request_save() -> void:
 	# Timer.start(0) es un error en Godot; un retardo cero significa "guarda ya".
-	if save_debounce <= 0.0:
+	if SAVE_DEBOUNCE <= 0.0:
 		SaveData.save()
 		return
-	_save_timer.start(save_debounce)
+	_save_timer.start(SAVE_DEBOUNCE)
 
 
 func _on_save_timeout() -> void:

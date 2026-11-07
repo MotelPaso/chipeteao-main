@@ -6,7 +6,10 @@ extends Node
 ## nivel y el empujón de FOV al derrapar. Todo sigue andando en pausa (este
 ## nodo procesa siempre; las restauraciones corren con el árbol pausado) y
 ## sin ventana (las búsquedas de cámara y escena están resguardadas).
+## Se carga desde scenes/systems/Juice.tscn: sus ajustes se editan en el
+## Inspector de esa escena (o aquí, en los valores por defecto).
 
+## Shader de la viñeta de daño. Su color se edita aquí: el `tint` (rojo).
 const VIGNETTE_SHADER: String = """
 shader_type canvas_item;
 
@@ -19,54 +22,92 @@ void fragment() {
 }
 """
 
-@export_group("Camera Shake")
+@export_group("Sacudida de cámara")
 ## Desplazamiento máximo de la cámara, en metros, con trauma completo.
 @export var shake_max_offset: float = 0.4
 ## Velocidad de muestreo del ruido de la sacudida; más alto = más nervioso.
 @export var shake_noise_speed: float = 10.0
+## Trauma (0-1) que suma cada baja de la horda.
 @export var kill_shake_strength: float = 0.05
-## Las muertes de la horda acumulan trauma solo hasta este techo (0-1),
-## así una matanza se siente como un retumbe y no como un terremoto.
+## Segundos que tarda en apagarse la sacudida de una baja.
+@export var kill_shake_duration: float = 0.25
+## Las bajas de la horda acumulan trauma solo hasta este techo (0-1), así
+## una matanza se siente como un retumbe y no como un terremoto.
 @export var kill_shake_cap: float = 0.18
+## Trauma (0-1) que suma un golpe recibido por el jugador.
 @export var hurt_shake_strength: float = 0.08
+## Segundos que tarda en apagarse la sacudida de un golpe recibido.
+@export var hurt_shake_duration: float = 0.3
+## Techo de trauma (0-1) que pueden acumular los golpes recibidos.
 @export var hurt_shake_cap: float = 0.3
+## Trauma (0-1) de la muerte de un jefe.
 @export var boss_death_shake_strength: float = 0.35
-
-@export_group("Hit Stop")
-@export var crit_stop_scale: float = 0.3
-@export var crit_stop_duration: float = 0.05
+## Segundos que tarda en apagarse la sacudida de la muerte de un jefe.
+@export var boss_death_shake_duration: float = 0.6
+## Trauma (0-1) de un golpe crítico.
 @export var crit_shake_strength: float = 0.1
+## Segundos que tarda en apagarse la sacudida de un crítico.
+@export var crit_shake_duration: float = 0.25
+
+@export_group("Hit-stop")
+## Escala de tiempo (0-1) durante el micro hit-stop de un crítico.
+@export var crit_stop_scale: float = 0.3
+## Segundos reales que dura el hit-stop de un crítico.
+@export var crit_stop_duration: float = 0.05
 ## Segundos mínimos entre golpes de crítico: una build de críticos rápidos
 ## no debe encadenar el juego en cámara lenta permanente.
 @export var crit_punch_cooldown: float = 0.35
+## Escala de tiempo (0-1) durante el hit-stop de la muerte de un jefe.
 @export var boss_death_stop_scale: float = 0.4
+## Segundos reales que dura el hit-stop de la muerte de un jefe.
 @export var boss_death_stop_duration: float = 0.5
 
-@export_group("Hit Flash")
+@export_group("Destello de golpe")
+## Segundos que dura el destello blanco de un cuerpo golpeado.
 @export var flash_duration: float = 0.08
+## Color y opacidad (alfa) del destello; el brillo usa el mismo color.
+@export var flash_color: Color = Color(1.0, 1.0, 1.0, 0.7)
+## Intensidad del brillo (emisión) del destello.
+@export var flash_emission_energy: float = 2.2
 
-@export_group("Damage Vignette")
+@export_group("Viñeta de daño")
+## Opacidad máxima (0-1) de la viñeta roja al recibir un golpe. El color
+## está en VIGNETTE_SHADER (uniform tint), arriba.
 @export var vignette_strength: float = 0.5
+## Segundos que tarda la viñeta en desvanecerse.
 @export var vignette_fade_time: float = 0.45
 
-@export_group("Slide FOV")
+@export_group("FOV al derrapar")
+## Grados que se abre el FOV de la cámara al derrapar.
 @export var fov_kick_amount: float = 5.0
+## Segundos que tarda en abrirse el FOV.
 @export var fov_kick_in_time: float = 0.1
+## Segundos que tarda en volver el FOV al soltar el derrape.
 @export var fov_kick_out_time: float = 0.15
 
-@export_group("Bursts")
+@export_group("Ráfagas")
+## Partículas de la ráfaga de muerte de un enemigo: mínimo y máximo.
 @export var death_burst_min: int = 4
 @export var death_burst_max: int = 6
-## No lo subas por encima del `amount` de DeathBurst.tscn (24): la ráfaga
-## se recorta a su buffer en vez de reasignarlo a mitad de la muerte.
+## Partículas de la ráfaga de muerte de un jefe. No lo subas por encima del
+## `amount` de DeathBurst.tscn (24): la ráfaga se recorta a su buffer.
 @export var boss_burst_amount: int = 24
+## Partículas y color del destello dorado de cofres y santuarios.
 @export var sparkle_amount: int = 6
 @export var sparkle_color: Color = Color(1.0, 0.84, 0.3)
 
-@export_group("Level Pulse")
+@export_group("Anillo de subida de nivel")
+## Color del anillo que se expande a los pies del raider al subir de nivel.
 @export var level_pulse_color: Color = Color(0.35, 0.95, 0.6)
+## Segundos que tarda el anillo en expandirse y desvanecerse.
 @export var level_pulse_duration: float = 0.5
-
+## Opacidad inicial (0-1) del anillo.
+@export var level_ring_alpha: float = 0.85
+## Intensidad del brillo (emisión) del anillo.
+@export var level_ring_emission_energy: float = 2.4
+## Escala del anillo al nacer y al terminar (x/z = ancho, y = grosor).
+@export var level_ring_start_scale: Vector3 = Vector3(0.4, 0.55, 0.4)
+@export var level_ring_end_scale: Vector3 = Vector3(4.6, 0.25, 4.6)
 
 ## Cámaras que mueve la capa de sensación. La pantalla dividida registra
 ## aquí la cámara propia (origen) de cada jugador, que es la que SplitScreen
@@ -156,10 +197,10 @@ func _ready() -> void:
 	_flash_material = StandardMaterial3D.new()
 	_flash_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	_flash_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	_flash_material.albedo_color = Color(1.0, 1.0, 1.0, 0.7)
+	_flash_material.albedo_color = flash_color
 	_flash_material.emission_enabled = true
-	_flash_material.emission = Color(1.0, 1.0, 1.0)
-	_flash_material.emission_energy_multiplier = 2.2
+	_flash_material.emission = Color(flash_color, 1.0)
+	_flash_material.emission_energy_multiplier = flash_emission_energy
 	_build_vignette()
 	RunState.leveled_up.connect(_on_leveled_up)
 
@@ -367,13 +408,13 @@ func burst(at: Vector3, color: Color, amount: int) -> void:
 # --- Momentos de sensación (ajustes arriba; las llamadas son de una línea) --
 
 func enemy_died(at: Vector3, color: Color) -> void:
-	shake(kill_shake_strength, 0.25, kill_shake_cap)
+	shake(kill_shake_strength, kill_shake_duration, kill_shake_cap)
 	burst(at, color, randi_range(death_burst_min, death_burst_max))
 	Sfx.play(&"enemy_die")
 
 
 func boss_died(at: Vector3, color: Color) -> void:
-	shake(boss_death_shake_strength, 0.6)
+	shake(boss_death_shake_strength, boss_death_shake_duration)
 	hit_stop(boss_death_stop_scale, boss_death_stop_duration)
 	burst(at, color, boss_burst_amount)
 	Sfx.play(&"boss_die")
@@ -385,12 +426,12 @@ func crit_punch() -> void:
 	if _crit_cd_left > 0.0:
 		return
 	_crit_cd_left = crit_punch_cooldown
-	shake(crit_shake_strength, 0.25)
+	shake(crit_shake_strength, crit_shake_duration)
 	hit_stop(crit_stop_scale, crit_stop_duration)
 
 
 func player_hurt() -> void:
-	shake(hurt_shake_strength, 0.3, hurt_shake_cap)
+	shake(hurt_shake_strength, hurt_shake_duration, hurt_shake_cap)
 	_pulse_vignette()
 	Sfx.play(&"player_hurt")
 
@@ -480,7 +521,9 @@ func _kill_fov_tween(kick: FovKick) -> void:
 
 func _build_vignette() -> void:
 	var layer := CanvasLayer.new()
-	layer.layer = 4  # sobre la escena 3D y bajo el HUD (capa 5 en HUD.tscn)
+	# Sobre la escena 3D y bajo el HUD: debe quedar menor que la capa 5 de
+	# HUD.tscn.
+	layer.layer = 4
 	add_child(layer)
 	var shader := Shader.new()
 	shader.code = VIGNETTE_SHADER
@@ -542,14 +585,14 @@ func _spawn_level_ring(at: Vector3) -> void:
 	ring.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	scene_root.add_child(ring)
 	ring.global_position = at
-	ring.scale = Vector3(0.4, 0.55, 0.4)
+	ring.scale = level_ring_start_scale
 	# Atado al ANILLO, no a este autoload: el anillo muere con la escena, y un
 	# tween de Juice lo sobreviviría (salir al menú durante el pulso
 	# animaría un objeto liberado).
 	var tween := ring.create_tween()
 	tween.set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
 	tween.set_parallel(true)
-	tween.tween_property(ring, "scale", Vector3(4.6, 0.25, 4.6), level_pulse_duration) \
+	tween.tween_property(ring, "scale", level_ring_end_scale, level_pulse_duration) \
 			.set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
 	tween.tween_property(material, "albedo_color:a", 0.0, level_pulse_duration) \
 			.set_ease(Tween.EASE_IN)
@@ -570,11 +613,10 @@ func _build_level_ring_assets() -> void:
 	_level_ring_material = StandardMaterial3D.new()
 	_level_ring_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	_level_ring_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	_level_ring_material.albedo_color = Color(level_pulse_color.r, level_pulse_color.g,
-			level_pulse_color.b, 0.85)
+	_level_ring_material.albedo_color = Color(level_pulse_color, level_ring_alpha)
 	_level_ring_material.emission_enabled = true
 	_level_ring_material.emission = level_pulse_color
-	_level_ring_material.emission_energy_multiplier = 2.4
+	_level_ring_material.emission_energy_multiplier = level_ring_emission_energy
 
 
 # --- Matemática compartida -----------------------------------------------------

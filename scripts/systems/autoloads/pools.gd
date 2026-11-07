@@ -50,10 +50,6 @@ const POOLS: Array[Dictionary] = [
 	{"name": "acid_pool", "scene": ACID_POOL_SCENE, "warm": 8, "cap": 48},
 ]
 
-## Override opcional (warm, cap) por nombre para experimentos; las filas que
-## no aparecen usan los valores de POOLS.
-@export var pool_size_overrides: Dictionary[String, Vector2i] = {}
-
 var _pools_by_path: Dictionary[String, NodePool] = {}
 
 
@@ -128,8 +124,6 @@ func _register(pool_name: String, packed: PackedScene, size: Vector2i) -> void:
 	if packed == null:
 		push_error("Pools: pool '%s' has no scene; skipped." % pool_name)
 		return
-	if pool_size_overrides.has(pool_name):
-		size = pool_size_overrides[pool_name]
 	var pool := NodePool.new()
 	pool.name = pool_name
 	pool.scene = packed
