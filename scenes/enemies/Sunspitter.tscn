@@ -1,8 +1,9 @@
-[gd_scene load_steps=12 format=3]
+[gd_scene load_steps=13 format=3]
 
 [ext_resource type="Script" path="res://scripts/enemies/sunspitter.gd" id="1_sunspitter"]
 [ext_resource type="Script" path="res://scripts/systems/health.gd" id="2_health"]
 [ext_resource type="PackedScene" path="res://scenes/systems/XpGem.tscn" id="3_gem"]
+[ext_resource type="PackedScene" path="res://scenes/enemies/BeamVisual.tscn" id="4_beam"]
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_shell"]
 albedo_color = Color(0.78, 0.55, 0.22, 1)
@@ -100,3 +101,12 @@ mesh = SubResource("SphereMesh_eye")
 [node name="Health" type="Node" parent="."]
 script = ExtResource("2_health")
 max_hp = 16.0
+
+[node name="AimLine" parent="." instance=ExtResource("4_beam")]
+color = Color(1, 0.62, 0.18, 1)
+default_thickness = 0.05
+
+[node name="Beam" parent="." instance=ExtResource("4_beam")]
+color = Color(1, 0.42, 0.1, 1)
+default_thickness = 0.22
+hum_loop = &"laser_hum"

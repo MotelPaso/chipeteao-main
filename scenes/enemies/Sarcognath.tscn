@@ -1,8 +1,9 @@
-[gd_scene load_steps=18 format=3]
+[gd_scene load_steps=19 format=3]
 
 [ext_resource type="Script" path="res://scripts/enemies/sarcognath.gd" id="1_sarcognath"]
 [ext_resource type="Script" path="res://scripts/systems/health.gd" id="2_health"]
 [ext_resource type="PackedScene" path="res://scenes/systems/XpGem.tscn" id="3_gem"]
+[ext_resource type="PackedScene" path="res://scenes/enemies/BeamVisual.tscn" id="4_beam"]
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_stone"]
 albedo_color = Color(0.68, 0.6, 0.46, 1)
@@ -149,3 +150,12 @@ mesh = SubResource("SphereMesh_eye")
 script = ExtResource("2_health")
 max_hp = 900.0
 armor = 4.0
+
+[node name="WarnLine" parent="." instance=ExtResource("4_beam")]
+color = Color(0.25, 0.95, 0.8, 1)
+default_thickness = 0.06
+
+[node name="Beam" parent="." instance=ExtResource("4_beam")]
+color = Color(0.15, 1, 0.85, 1)
+default_thickness = 0.3
+hum_loop = &"laser_hum"

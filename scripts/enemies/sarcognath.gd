@@ -13,7 +13,6 @@ extends BossBase
 enum State { ENTRANCE, PURSUE, SWEEP, COFFINS, ENTOMB }
 
 const TELEGRAPH_COLOR := Color(0.25, 0.95, 0.8)
-const BEAM_COLOR := Color(0.15, 1.0, 0.85)
 const SAND_COLOR := Color(0.95, 0.72, 0.28)
 const SAND_IMPACT_COLOR := Color(1.0, 0.86, 0.5)
 ## Piel de arenisca tallada para el grupo de púas compartido.
@@ -43,9 +42,19 @@ const ENTRANCE_RING_RADIUS: float = 3.0
 ## los del jefe (un salto a tiempo, una mesa) le pasan por encima.
 @export var sweep_height_window: float = 1.2
 @export var beam_height: float = 0.9
+## Segundos de espera al aparecer antes del primer barrido.
+@export var first_sweep_delay: float = 3.0
+## Grados que avanza la línea de aviso hacia el arco durante la carga.
+@export var warn_lead_deg: float = 12.0
+## Grosor en metros de la línea de aviso al empezar la carga.
+@export var warn_width_start: float = 0.04
+## Grosor en metros de la línea de aviso al terminar la carga.
+@export var warn_width_end: float = 0.16
 
 @export_group("Sand Coffins")
 @export var coffin_interval: float = 6.0
+## Fracción de coffin_interval que espera la primera tanda al aparecer (0-1).
+@export var first_coffin_fraction: float = 0.6
 @export var coffin_windup: float = 1.0
 ## Huecos repartidos en anillo alrededor del raider; uno al azar queda vacío
 ## (el escape) y un disco extra cae a sus pies.
@@ -67,10 +76,16 @@ const ENTRANCE_RING_RADIUS: float = 3.0
 @export var entomb_root_duration: float = 1.5
 @export var entomb_height_window: float = 1.5
 
+@export_group("Flotación")
+## Velocidad del vaivén vertical (radianes por segundo).
+@export var hover_speed: float = 2.0
+## Amplitud del vaivén vertical en metros.
+@export var hover_amplitude: float = 0.09
+
 var _state: State = State.ENTRANCE
 var _state_timer: float = 0.0
 var _entrance_played: bool = false
-var _sweep_cooldown_timer: float = 3.0  # el primer barrido llega antes
+var _sweep_cooldown_timer: float = 0.0
 var _sweep_firing: bool = false
 var _sweep_angle: float = 0.0
 var _sweep_sign: float = 1.0
@@ -83,20 +98,19 @@ var _coffin_spots: Array[Vector3] = []
 var _entomb_spot: Vector3 = Vector3.ZERO
 var _thresholds_remaining: Array[float] = []
 var _pending_entombs: int = 0
-var _warn_line: BeamVisual
-var _beam: BeamVisual
-var _hum_held: bool = false
 var _hover_time: float = 0.0
 var _hover_base: float = 0.0
+
+@onready var _warn_line: BeamVisual = $WarnLine
+@onready var _beam: BeamVisual = $Beam
 
 
 func _ready() -> void:
 	super()
 	_state_timer = entrance_duration
-	_coffin_timer = coffin_interval * 0.6
+	_sweep_cooldown_timer = first_sweep_delay
+	_coffin_timer = coffin_interval * first_coffin_fraction
 	_thresholds_remaining = entomb_thresholds.duplicate()
-	_warn_line = BeamVisual.create(self, TELEGRAPH_COLOR, 0.06)
-	_beam = BeamVisual.create(self, BEAM_COLOR, 0.3)
 	_hover_base = _visual.position.y
 	_health.damaged.connect(_on_damaged)
 	_health.died.connect(_on_sarcognath_died)
@@ -104,7 +118,7 @@ func _ready() -> void:
 
 func _behavior_tick(delta: float) -> void:
 	_hover_time += delta
-	_visual.position.y = _hover_base + sin(_hover_time * 2.0) * 0.09
+	_visual.position.y = _hover_base + sin(_hover_time * hover_speed) * hover_amplitude
 	_sweep_cooldown_timer = maxf(_sweep_cooldown_timer - delta, 0.0)
 	if _state == State.PURSUE:
 		_coffin_timer = maxf(_coffin_timer - delta, 0.0)
@@ -191,10 +205,10 @@ func _tick_sweep(delta: float) -> void:
 		# Línea de aviso: avanza unos grados hacia el arco que viene (se lee
 		# como sentido de giro) y engorda a medida que se acaba la carga.
 		var progress := 1.0 - clampf(_state_timer / sweep_windup, 0.0, 1.0)
-		var warn_angle := _sweep_angle + progress * deg_to_rad(12.0) * _sweep_sign
+		var warn_angle := _sweep_angle + progress * deg_to_rad(warn_lead_deg) * _sweep_sign
 		var warn_to := origin \
 				+ Vector3(cos(warn_angle), 0.0, sin(warn_angle)) * sweep_length
-		_warn_line.span(origin, warn_to, lerpf(0.04, 0.16, progress))
+		_warn_line.span(origin, warn_to, lerpf(warn_width_start, warn_width_end, progress))
 		return
 	_sweep_angle += deg_to_rad(sweep_arc_deg) / sweep_duration * delta * _sweep_sign
 	var beam_to := origin \
@@ -237,7 +251,7 @@ func _advance_sweep_phase() -> void:
 		_state_timer = sweep_duration
 		_sweep_tick_cd.clear()
 		_warn_line.clear()
-		_acquire_hum()
+		_beam.start_hum()
 		return
 	_end_sweep()
 
@@ -250,7 +264,6 @@ func _end_sweep() -> void:
 	# murieron) quedarían en el mapa el resto de la pelea.
 	_sweep_tick_cd.clear()
 	_beam.clear()
-	_release_hum()
 
 
 # --- Ataúdes de arena ----------------------------------------------------------
@@ -326,27 +339,6 @@ func _on_damaged(_amount: float, current: float) -> void:
 func _on_sarcognath_died() -> void:
 	_warn_line.clear()
 	_beam.clear()
-	_release_hum()
-
-
-func _exit_tree() -> void:
-	# Liberado a mitad del barrido (cierre de partida): nunca dejar una
-	# referencia del zumbido colgada.
-	_release_hum()
-
-
-func _acquire_hum() -> void:
-	if _hum_held:
-		return
-	_hum_held = true
-	Sfx.acquire_loop(&"laser_hum")
-
-
-func _release_hum() -> void:
-	if not _hum_held:
-		return
-	_hum_held = false
-	Sfx.release_loop(&"laser_hum")
 
 
 ## Púas de arenisca que salen del suelo y se hunden: la silueta del Rotking

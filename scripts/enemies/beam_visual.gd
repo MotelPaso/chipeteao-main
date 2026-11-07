@@ -1,35 +1,41 @@
 class_name BeamVisual
 extends MeshInstance3D
 ## Segmento de rayo: una caja unitaria estirada entre dos puntos del mundo,
-## sin sombreado y emisiva. Lo usan las líneas de aviso y los láseres
-## (Sunspitter, barrido del Sarcognath). Es top_level: cuelga del enemigo y
-## se libera con él, pero sus extremos son coordenadas globales. Solo es
+## sin sombreado y emisiva (material en BeamVisual.tscn). Se usa como instancia de
+## BeamVisual.tscn dentro de la escena de cada enemigo (líneas de aviso y
+## láseres del Sunspitter y del barrido del Sarcognath), y cada instancia
+## guarda su color, su grosor y su zumbido. Es top_level: cuelga del enemigo
+## y se libera con él, pero sus extremos son coordenadas globales. Solo es
 ## visual: el raycast, el impacto y el daño los resuelve quien lo usa.
 
-var default_thickness: float = 0.1
+@export_group("Aspecto")
+## Color del rayo y de su emisión; la opacidad (0.8) y el brillo (2.2) salen del material de BeamVisual.tscn.
+@export var color: Color = Color.WHITE
+## Grosor en metros cuando span() no recibe uno.
+@export var default_thickness: float = 0.1
+
+@export_group("Sonido")
+## Bucle de Sfx que suena mientras el rayo dispara (vacío = mudo); ver start_hum().
+@export var hum_loop: StringName = &""
+
+var _hum_held: bool = false
 
 
-## Crea un rayo oculto bajo `host` con `color`. Quien lo usa anima el grosor
-## (la línea de aviso que engorda como cuenta regresiva) con span().
-static func create(host: Node, color: Color, thickness: float) -> BeamVisual:
-	var beam := BeamVisual.new()
-	beam.top_level = true
-	beam.visible = false
-	beam.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	var box := BoxMesh.new()
-	box.size = Vector3.ONE
-	beam.mesh = box
-	var material := StandardMaterial3D.new()
-	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	material.albedo_color = Color(color.r, color.g, color.b, 0.8)
-	material.emission_enabled = true
+func _ready() -> void:
+	# Copia propia del material: los dos rayos de un enemigo tienen colores distintos.
+	var material := material_override as StandardMaterial3D
+	if material == null:
+		return
+	material = material.duplicate() as StandardMaterial3D
+	material.albedo_color = Color(color.r, color.g, color.b, material.albedo_color.a)
 	material.emission = color
-	material.emission_energy_multiplier = 2.2
-	beam.material_override = material
-	beam.default_thickness = thickness
-	host.add_child(beam)
-	return beam
+	material_override = material
+
+
+func _exit_tree() -> void:
+	# Liberado a mitad del rayo (cambio de mapa, cierre, recortes del tope):
+	# nunca dejar una referencia del zumbido colgada.
+	_release_hum()
 
 
 ## Muestra el rayo de `from` a `to`; thickness < 0 usa default_thickness.
@@ -50,5 +56,23 @@ func span(from: Vector3, to: Vector3, thickness: float = -1.0) -> void:
 			(from + to) * 0.5)
 
 
+## Oculta el rayo y corta su zumbido.
 func clear() -> void:
 	visible = false
+	_release_hum()
+
+
+## Empieza el zumbido de hum_loop. Sfx cuenta referencias por id, así que
+## cada rayo toma a lo sumo una y la suelta en clear() o al salir del árbol.
+func start_hum() -> void:
+	if _hum_held or hum_loop.is_empty():
+		return
+	_hum_held = true
+	Sfx.acquire_loop(hum_loop)
+
+
+func _release_hum() -> void:
+	if not _hum_held:
+		return
+	_hum_held = false
+	Sfx.release_loop(hum_loop)

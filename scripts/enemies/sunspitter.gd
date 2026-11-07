@@ -1,39 +1,51 @@
 class_name Sunspitter
 extends EnemyBase
 ## Escupesol (Dunas de Ceniza), a distancia: un escarabajo que mantiene una
-## banda de distancia, apunta una línea de aviso que engorda durante la
-## carga y después fija un rayo ámbar continuo que daña por pulsos mientras
-## dure la línea de visión. Cualquier geometría del mundo (mesa, roca,
-## obelisco) corta el rayo, así que la cobertura es la respuesta. Después
-## se escabulle de lado mientras recarga. El rayo de visión solo ve la capa
-## 1 (mundo + jugadores; los enemigos están en la capa 2 y nunca bloquean ni
-## se queman) y daña al raider que el rayo alcanzó: el que fijó al apuntar,
-## o un compañero que se cruzó para cubrirlo. Nada más puede recibirlo.
+## banda de distancia, apunta una línea de aviso (nodo AimLine) que engorda
+## durante la carga y después fija un rayo ámbar continuo (nodo Beam) que
+## daña por pulsos mientras dure la línea de visión. Cualquier geometría del
+## mundo (mesa, roca, obelisco) corta el rayo, así que la cobertura es la
+## respuesta. Después se escabulle de lado mientras recarga. El rayo de
+## visión solo ve la capa 1 (mundo + jugadores; los enemigos están en la 2 y
+## nunca bloquean ni se queman) y daña al raider que el rayo alcanzó: el que
+## fijó al apuntar, o un compañero que se cruzó para cubrirlo. Los colores y
+## grosores de las dos líneas están en sus nodos de Sunspitter.tscn.
 
 enum State { SKITTER, AIM, FIRE }
 
-const AIM_COLOR := Color(1.0, 0.62, 0.18)
-const BEAM_COLOR := Color(1.0, 0.42, 0.1)
-
-@export_group("Standoff Band")
+@export_group("Banda de distancia")
+## Distancia en metros por debajo de la cual retrocede.
 @export var band_inner: float = 10.0
+## Distancia en metros por encima de la cual avanza.
 @export var band_outer: float = 14.0
 
-@export_group("Beam")
+@export_group("Rayo")
+## Distancia máxima en metros a la que empieza a apuntar.
 @export var fire_range: float = 17.0
+## Segundos de carga con la línea de aviso antes de disparar.
 @export var aim_windup: float = 0.8
+## Segundos que dura el rayo encendido.
 @export var beam_duration: float = 1.5
+## Daño de cada pulso del rayo.
 @export var beam_tick_damage: float = 4.0
+## Segundos entre pulsos de daño del rayo.
 @export var beam_tick_interval: float = 0.5
+## Segundos de recarga después de cada rayo.
 @export var beam_cooldown: float = 3.0
-## Extremos del rayo: sale del ojo y sigue el pecho del raider.
+## Segundos de espera al aparecer antes de poder apuntar.
+@export var first_beam_delay: float = 1.2
+## Altura en metros del ojo, de donde sale el rayo.
 @export var muzzle_height: float = 0.55
+## Altura en metros del pecho del raider, adonde va el rayo.
 @export var target_height: float = 0.9
+## Grosor en metros de la línea de aviso al empezar la carga.
+@export var aim_width_start: float = 0.03
+## Grosor en metros de la línea de aviso al terminar la carga.
+@export var aim_width_end: float = 0.14
 
 var _state: State = State.SKITTER
 var _state_timer: float = 0.0
-# Espera inicial para que uno recién aparecido no dispare al aterrizar.
-var _cooldown_timer: float = 1.2
+var _cooldown_timer: float = 0.0
 var _tick_timer: float = 0.0
 # Dirección del escabullirse de lado; se invierte tras cada rayo.
 var _strafe_sign: float = 1.0
@@ -41,20 +53,19 @@ var _strafe_sign: float = 1.0
 ## víctima, así que el rayo sigue quemando a esa en vez de elegir al más
 ## cercano en cada tick (en co-op el más cercano cambia todo el tiempo).
 var _target: Node3D = null
-var _aim_line: BeamVisual
-var _beam: BeamVisual
-var _hum_held: bool = false
 ## Consulta del rayo de visión (solo capa 1), creada una vez y reapuntada en
 ## cada lanzamiento: _beam_sight corre en cada tick de apuntar, disparar o
 ## esperar con la línea bloqueada. Solo cambian from y to.
 var _sight_query: PhysicsRayQueryParameters3D = \
 		PhysicsRayQueryParameters3D.create(Vector3.ZERO, Vector3.ZERO, 1)
 
+@onready var _aim_line: BeamVisual = $AimLine
+@onready var _beam: BeamVisual = $Beam
+
 
 func _ready() -> void:
 	super()
-	_aim_line = BeamVisual.create(self, AIM_COLOR, 0.05)
-	_beam = BeamVisual.create(self, BEAM_COLOR, 0.22)
+	_cooldown_timer = first_beam_delay
 	_health.died.connect(_on_sunspitter_died)
 	_strafe_sign = 1.0 if get_instance_id() % 2 == 0 else -1.0
 
@@ -73,11 +84,6 @@ func _behavior_tick(delta: float) -> void:
 		_tick_aim(_target)
 	elif _state == State.FIRE:
 		_tick_fire(_target, delta)
-
-
-func _target_is_valid() -> bool:
-	return _target != null and is_instance_valid(_target) \
-			and _target.is_inside_tree() and _target.is_in_group("player")
 
 
 func _movement_intent(seek: Vector3, distance: float) -> Vector3:
@@ -108,10 +114,19 @@ func _combat_tick(player: Node3D, distance: float) -> void:
 	_target = player
 
 
+func _apply_elite_damage(multiplier: float) -> void:
+	beam_tick_damage *= multiplier
+
+
+func _target_is_valid() -> bool:
+	return _target != null and is_instance_valid(_target) \
+			and _target.is_inside_tree() and _target.is_in_group("player")
+
+
 func _tick_aim(player: Node3D) -> void:
 	# La línea de aviso engorda durante la carga: el grosor es la cuenta.
 	var progress := 1.0 - clampf(_state_timer / aim_windup, 0.0, 1.0)
-	_beam_sight(player, _aim_line, lerpf(0.03, 0.14, progress))
+	_beam_sight(player, _aim_line, lerpf(aim_width_start, aim_width_end, progress))
 	if _state_timer <= 0.0:
 		_begin_fire()
 
@@ -139,7 +154,7 @@ func _begin_fire() -> void:
 	_state_timer = beam_duration
 	_tick_timer = 0.0  # el primer pulso cae en el primer frame del rayo
 	_aim_line.clear()
-	_acquire_hum()
+	_beam.start_hum()
 
 
 func _end_fire() -> void:
@@ -148,7 +163,6 @@ func _end_fire() -> void:
 	_strafe_sign = -_strafe_sign
 	_target = null
 	_beam.clear()
-	_release_hum()
 
 
 ## Lanza un rayo del ojo al pecho del raider contra la capa 1 (mundo +
@@ -174,10 +188,6 @@ func _beam_sight(player: Node3D, line: BeamVisual, thickness: float = -1.0) -> N
 	return burned
 
 
-func _apply_elite_damage(multiplier: float) -> void:
-	beam_tick_damage *= multiplier
-
-
 func _abort_attack() -> void:
 	# Se rearma ante CUALQUIER ataque interrumpido, no solo uno disparado:
 	# si no, el siguiente raider en rango recibiría el rayo al instante.
@@ -187,28 +197,7 @@ func _abort_attack() -> void:
 	_target = null
 	_aim_line.clear()
 	_beam.clear()
-	_release_hum()
 
 
 func _on_sunspitter_died() -> void:
 	_abort_attack()
-
-
-func _exit_tree() -> void:
-	# Liberado a mitad del rayo (cambio de mapa, recortes del tope): nunca
-	# dejar una referencia del zumbido colgada.
-	_release_hum()
-
-
-func _acquire_hum() -> void:
-	if _hum_held:
-		return
-	_hum_held = true
-	Sfx.acquire_loop(&"laser_hum")
-
-
-func _release_hum() -> void:
-	if not _hum_held:
-		return
-	_hum_held = false
-	Sfx.release_loop(&"laser_hum")
