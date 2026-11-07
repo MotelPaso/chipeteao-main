@@ -97,6 +97,7 @@ var chest_price_multiplier: float = 1.0
 const ROULETTE_PRICE_GROWTH: float = 2.0
 var roulette_price_multiplier: float = 1.0
 ## Lo que pide el vendedor de power-ups por su primera venta de la partida.
+## Cuánto sube tras cada venta: Vendor.powerup_price_growth (Vendor.tscn).
 const POWERUP_VENDOR_BASE_PRICE: int = 100
 ## Lo que cobra a continuación el vendedor de power-ups, en puntos. Un precio
 ## ABSOLUTO de la partida y no un multiplicador: el puesto vende un power-up

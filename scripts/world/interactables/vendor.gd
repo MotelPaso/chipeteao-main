@@ -58,8 +58,7 @@ const VENDOR_PANEL_SCENE := preload("res://scenes/ui/modal/VendorPanel.tscn")
 ## es un precio de cofre: una mascota es un espacio, no una rareza, y ponerle
 ## precio por rareza daría a entender que una es la buena.
 @export var pet_price: int = 120
-## Multiplicador del precio del power-up tras cada venta, para toda la partida.
-## El precio inicial es RunState.POWERUP_VENDOR_BASE_PRICE.
+## Multiplicador del precio del power-up tras cada venta, para toda la partida. El precio inicial es RunState.POWERUP_VENDOR_BASE_PRICE (run_state.gd).
 @export var powerup_price_growth: float = 1.5
 
 @export_group("Estante")

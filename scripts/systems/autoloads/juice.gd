@@ -521,9 +521,8 @@ func _kill_fov_tween(kick: FovKick) -> void:
 
 func _build_vignette() -> void:
 	var layer := CanvasLayer.new()
-	# Sobre la escena 3D y bajo el HUD: debe quedar menor que la capa 5 de
-	# HUD.tscn.
-	layer.layer = 4
+	# Sobre la escena 3D y bajo el HUD (el orden está en UiLayers).
+	layer.layer = UiLayers.JUICE_VIGNETTE
 	add_child(layer)
 	var shader := Shader.new()
 	shader.code = VIGNETTE_SHADER
