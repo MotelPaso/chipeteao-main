@@ -121,20 +121,25 @@ func set_prompt(text: String) -> void:
 ## Hunde y encoge el interactuable (sink_duration, sink_depth, sink_end_scale) y
 ## lo libera al terminar; detiene _physics_process. Con `keep_alive` el nodo
 ## sigue vivo hasta esos segundos aunque el hundimiento ya haya terminado.
+## `duration` y `depth` (negativos = los exports) cambian solo esta salida:
+## el cofre de suministros que nadie abrió se encoge más rápido y sin bajar.
 ## Una sola vez: las llamadas siguientes no hacen nada.
-func sink_away(keep_alive: float = 0.0) -> void:
+func sink_away(keep_alive: float = 0.0, duration: float = -1.0,
+		depth: float = -1.0) -> void:
 	if _sinking:
 		return
 	_sinking = true
 	set_physics_process(false)
+	var seconds := sink_duration if duration < 0.0 else duration
+	var drop := sink_depth if depth < 0.0 else depth
 	var tween := create_tween()
 	tween.set_parallel(true)
 	if keep_alive > 0.0:
 		tween.tween_interval(keep_alive)
-	if not is_zero_approx(sink_depth):
-		tween.tween_property(self, "position:y", position.y - sink_depth, sink_duration) \
+	if not is_zero_approx(drop):
+		tween.tween_property(self, "position:y", position.y - drop, seconds) \
 				.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
-	tween.tween_property(self, "scale", Vector3.ONE * sink_end_scale, sink_duration) \
+	tween.tween_property(self, "scale", Vector3.ONE * sink_end_scale, seconds) \
 			.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_IN)
 	tween.chain().tween_callback(queue_free)
 

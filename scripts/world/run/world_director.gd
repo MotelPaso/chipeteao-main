@@ -184,6 +184,8 @@ class TimedBeacon:
 ## Pesos que reemplazan los de EVENT_LIBRARY, por id de evento; 0 quita el
 ## evento. Vale para todas las arenas: el director es uno por partida.
 @export var event_weight_overrides: Dictionary[String, float] = {}
+## Segundos que tarda en encogerse el cofre de suministros que nadie abrió al apagarse su baliza.
+@export var lost_supply_chest_sink_time: float = 0.4
 
 @export_group("Altares")
 ## Cuánto sube el peso de los altares por minuto: peso x (1 + esto x minutos).
@@ -569,12 +571,10 @@ func _despawn_chest(chest: Chest) -> void:
 	# Un cofre perdido no cuenta para la misión chests_opened.
 	chest.meta_stat_id = ""
 	chest.consume()
-	# El tween es del COFRE, no del director: un cambio de etapa dentro de
-	# los 0.4 s liberaría el cofre bajo un tween ajeno todavía animándolo.
-	var tween := chest.create_tween()
-	tween.tween_property(chest, "scale", Vector3.ONE * 0.05, 0.4) \
-			.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_IN)
-	tween.tween_callback(chest.queue_free)
+	# sink_away anima con un tween del COFRE, no del director: un cambio de
+	# etapa a mitad liberaría el cofre bajo un tween ajeno todavía animándolo.
+	# Solo se encoge (profundidad 0), sin la bajada del cofre abierto.
+	chest.sink_away(0.0, lost_supply_chest_sink_time, 0.0)
 
 
 ## Levanta una baliza (Beacon.tscn) del color dado sobre `at`.
