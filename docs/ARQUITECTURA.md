@@ -1247,7 +1247,7 @@ a su raider la pasiva entera y deja un warning enterrado en un log de 20 000
 líneas; una ruta `scene` con un typo solo falla el día que alguien tira esa
 fila; un glifo repetido entre dos catálogos pinta la sigla equivocada.
 
-Doce comprobaciones (la lista fija es `LINT_CHECKS` en `tools/verificar.sh`), una línea `Catalog lint: check <nombre> ok rows=%d` por
+Trece comprobaciones (la lista fija es `LINT_CHECKS` en `tools/verificar.sh`), una línea `Catalog lint: check <nombre> ok rows=%d` por
 cada una que pasa y un `push_error` por cada fallo:
 
 | Comprobación                | Qué mira                                                                                                                                                                                   |
@@ -1264,6 +1264,7 @@ cada una que pasa y un `push_error` por cada fallo:
 | `id_format`                 | todo id de catálogo es minúsculas, dígitos y guiones bajos: un id con espacios o mayúsculas termina dentro de claves del guardado (`runs_as_<id>`) y de los contadores de las misiones |
 | `quest_stats`               | toda misión cuyo `stat` lleva un id de otro catálogo tras un prefijo de `SaveData` nombra un id que existe: si no, el contador nunca sube y la misión queda imposible sin ningún error |
 | `text_numbers`              | los números que un texto repite de su propia fila (la pasiva de cada personaje, la etiqueta de cada mascota, el texto de rango de cada reliquia) coinciden con los que de verdad se aplican |
+| `sfx_ids`                   | todo id escrito a mano en `Sfx.play(&"…")`, `acquire_loop(&"…")` y demás llamadas a `Sfx` con un literal existe como clave de `Sfx.SOUND_LIBRARY`: un id mal escrito solo avisa en tiempo de ejecución y el sonido no suena |
 
 `rows` es lo que se inspeccionó **de verdad**, y **cero filas es un fallo**: una
 comprobación que recorre una lista vacía pasa por el motivo equivocado, que es
