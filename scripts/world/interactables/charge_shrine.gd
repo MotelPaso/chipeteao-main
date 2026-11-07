@@ -14,8 +14,10 @@ extends Interactable
 const ALTAR_CHOICE_COUNT: int = 3
 ## Radio de respaldo si la escena no trae una zona cilíndrica, en metros.
 const DEFAULT_ZONE_RADIUS: float = 9.3
-## Id del objeto que acelera la carga y agranda el don (ItemCatalog).
-const MASTER_KEY_ID: String = "master_key"
+## Kind del objeto que acelera la carga y agranda el don (Llave maestra); su
+## fila de ItemCatalog lleva los porcentajes por copia (charge_speed_percent,
+## boon_percent).
+const MASTER_KEY_KIND: String = "charge_boost"
 
 ## Dones planos que puede dar un altar: {stat, amount, name, label}. `stat`
 ## es un id de PlayerStats; `name` titula la carta (caja baja tipo oración)
@@ -52,11 +54,6 @@ const ALTAR_BOONS: Array[Dictionary] = [
 @export var channel_loop: StringName = &"shrine_channel"
 ## Multiplicador del tamaño del don (el altar demoníaco paga más).
 @export var boon_scale: float = 1.0
-@export_group("Llave maestra")
-## Velocidad de carga extra por cada Llave maestra (0.2 = +20 % por copia).
-@export var key_speed_per_copy: float = 0.2
-## Tamaño extra del don por cada Llave maestra (0.2 = +20 % por copia).
-@export var key_boon_per_copy: float = 0.2
 @export_group("Textos")
 ## Aviso mientras carga; %d%% es el porcentaje.
 @export var charging_prompt: String = "Cargando... %d%%"
@@ -171,7 +168,8 @@ func _physics_process(delta: float) -> void:
 ## Tamaño de un don: la cantidad base, la escala de este altar y las Llaves
 ## maestras de quien carga. Nunca menos de 1.
 func boon_amount(base: float, keys: int) -> float:
-	var amount := base * _effective_boon_scale() * (1.0 + key_boon_per_copy * float(keys))
+	var per_key := _master_key_fraction("boon_percent")
+	var amount := base * _effective_boon_scale() * (1.0 + per_key * float(keys))
 	return maxf(roundf(amount), 1.0)
 
 
@@ -282,11 +280,17 @@ func _player_near() -> bool:
 
 ## Llaves maestras de los raiders en pie del anillo: cuenta la mayor.
 func _keys_in_ring() -> int:
-	return best_item_count_in_range(MASTER_KEY_ID)
+	return best_kind_count_in_range(MASTER_KEY_KIND)
 
 
 func _charge_speed() -> float:
-	return 1.0 + key_speed_per_copy * float(_keys_in_ring())
+	return 1.0 + _master_key_fraction("charge_speed_percent") * float(_keys_in_ring())
+
+
+## Un porcentaje por copia de la fila de la Llave maestra, como fracción
+## (20 -> 0.2).
+func _master_key_fraction(field: String) -> float:
+	return float(ItemCatalog.kind_row(MASTER_KEY_KIND).get(field, 0.0)) / 100.0
 
 
 func _complete() -> void:

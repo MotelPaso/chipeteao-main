@@ -22,11 +22,10 @@ extends RefCounted
 ##   Números del comportamiento: cada objeto con `kind` lleva sus propios
 ##             campos (ver cada fila); los lee ItemBag (o PlayerStats en
 ##             Zenkai). Los de Sangre de demonio, Llave maestra y Gusano
-##             cósmico los aplican los santuarios (ver cada fila).
+##             cósmico los leen los santuarios por kind (ver cada fila).
 ## Llave interna (la lee el código; cambiarla rompe algo):
 ##   id:       identificador en inglés, nunca se muestra; nombra los
-##             contadores de SaveData. Los santuarios todavía buscan por id a
-##             demon_blood, master_key y cosmic_worm: no los renombres.
+##             contadores de SaveData.
 ##   rarity:   "Common" | "Rare" | "Epic" | "Legendary" (nombres de
 ##             UpgradePool); la pantalla lo traduce con
 ##             UpgradePool.rarity_display().
@@ -109,8 +108,7 @@ const ITEM_LIBRARY: Array[Dictionary] = [
 		"glyph": "SD", "kind": "demonic_boost",
 		"description": "Los altares demoníacos dan +%d%% más por copia",
 		"text_values": ["boost_percent"],
-		# Lo aplica curse_shrine.gd (demon_blood_per_copy = 0.25): mantén los
-		# dos iguales hasta que el santuario lo lea de aquí.
+		# Lo lee curse_shrine.gd (por kind): % extra al don y al costo por copia.
 		"boost_percent": 25.0,
 	},
 	{
@@ -118,8 +116,8 @@ const ITEM_LIBRARY: Array[Dictionary] = [
 		"glyph": "LM", "kind": "charge_boost",
 		"description": "Los altares de carga se llenan %d%% más rápido y dan +%d%% más por copia",
 		"text_values": ["charge_speed_percent", "boon_percent"],
-		# Lo aplica charge_shrine.gd (key_speed_per_copy y key_boon_per_copy
-		# = 0.2): mantén los dos iguales hasta que el santuario lo lea de aquí.
+		# Los lee charge_shrine.gd (por kind): % más de velocidad de carga y
+		# de tamaño del don, por copia.
 		"charge_speed_percent": 20.0, "boon_percent": 20.0,
 	},
 	# --- Legendary ------------------------------------------------------
@@ -175,8 +173,8 @@ const ITEM_LIBRARY: Array[Dictionary] = [
 		"glyph": "GC", "kind": "portal_recharge",
 		"description": "Los portales se recargan %d%% más rápido por copia",
 		"text_values": ["recharge_percent"],
-		# Lo aplica portal_shrine.gd (worm_cooldown_per_copy = 0.25): mantén
-		# los dos iguales hasta que el portal lo lea de aquí.
+		# Lo lee portal_shrine.gd (por kind): recarga = cooldown / (1 + esto/100
+		# x copias).
 		"recharge_percent": 25.0,
 	},
 ]

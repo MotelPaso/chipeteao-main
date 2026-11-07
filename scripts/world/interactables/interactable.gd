@@ -192,14 +192,15 @@ func nearest_live_player() -> Node3D:
 	return best
 
 
-## Mayor cantidad de copias de `item_id` entre los raiders del anillo (la
-## party junta sus llaves y su sangre: manda el que más tiene).
-func best_item_count_in_range(item_id: String) -> int:
+## Mayor cantidad de copias de objetos con este `kind` (ItemCatalog) entre
+## los raiders del anillo (la party junta sus llaves y su sangre: manda el
+## que más tiene).
+func best_kind_count_in_range(kind: String) -> int:
 	var best := 0
 	for body: Node3D in live_players_in_range():
 		var bag := ItemBag.find_in(body)
 		if bag != null:
-			best = maxi(best, bag.count(item_id))
+			best = maxi(best, bag.count_kind(kind))
 	return best
 
 
