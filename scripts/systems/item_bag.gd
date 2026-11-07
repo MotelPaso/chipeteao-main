@@ -14,7 +14,7 @@ extends Node
 ##   saiyan        — cada N bajas, un aura temporal de stats
 ##   zenkai        — sobrevivir con poco HP sube todo para siempre
 ## Los demás kinds (demonic_boost, charge_boost, portal_recharge) son
-## contadores que leen los santuarios con count()/count_kind().
+## contadores que leen los santuarios con count_kind().
 ## Los números de cada comportamiento viven en la fila del objeto en
 ## ItemCatalog (ItemCatalog.kind_row), junto al texto que los muestra.
 ## Las armas reportan golpes y bajas por WeaponBase.deal_damage.

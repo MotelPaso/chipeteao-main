@@ -8,9 +8,6 @@ extends Interactable
 
 ## Segundos de recarga de los dos portales tras un viaje.
 @export var cooldown: float = 30.0
-## Cuánto acorta la recarga cada Gusano Cósmico del viajero:
-## recarga = cooldown / (1 + esto x copias).
-@export var worm_cooldown_per_copy: float = 0.25
 ## Radio (metros) del anillo donde hay que pararse.
 @export var ring_radius: float = 1.6
 ## Cuánto más allá del anillo de la pareja aparece el viajero (metros),
@@ -34,6 +31,8 @@ const FALLBACK_COLOR: Color = Color(0.5, 0.9, 1.0)
 const EXIT_ANGLE_TRIES: int = 8
 ## Altura (metros) a la que se pone al viajero, sobre el suelo.
 const EXIT_LIFT: float = 0.2
+## Kind del Gusano cósmico; su fila de ItemCatalog lleva recharge_percent.
+const WORM_KIND: String = "portal_recharge"
 
 ## La pareja de este portal; la pone el director.
 var twin: PortalShrine = null
@@ -111,8 +110,12 @@ func _interact(player: Node) -> void:
 	var worms := 0
 	var bag := ItemBag.find_in(player)
 	if bag != null:
-		worms = bag.count("cosmic_worm")
-	var recharge := cooldown / (1.0 + worm_cooldown_per_copy * float(worms))
+		worms = bag.count_kind(WORM_KIND)
+	# Cada Gusano cósmico del viajero acorta la recarga: recarga = cooldown /
+	# (1 + recharge_percent/100 x copias), con recharge_percent de su fila.
+	var row := ItemCatalog.kind_row(WORM_KIND)
+	var per_worm := float(row.get("recharge_percent", 0.0)) / 100.0
+	var recharge := cooldown / (1.0 + per_worm * float(worms))
 	body.global_position = _exit_position()
 	if body is CharacterBody3D:
 		(body as CharacterBody3D).velocity = Vector3.ZERO

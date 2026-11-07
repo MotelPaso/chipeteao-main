@@ -21,10 +21,10 @@ extends Node
 ## filas es un fallo: una comprobación que recorre una lista vacía pasa por la
 ## razón equivocada (así pasaría inadvertida una constante renombrada).
 
-## El director no declara class_name: su EVENT_LIBRARY y su WEATHER_CATALOG
-## solo se alcanzan por el recurso del script.
+## El director no declara class_name: su EVENT_LIBRARY solo se alcanza por
+## el recurso del script.
 const WORLD_DIRECTOR := preload("res://scripts/world/run/world_director.gd")
-## El clima vive en su propio nodo (WeatherDirector), también sin class_name.
+## El clima vive en su propio nodo (WeatherDirector), dueño de WEATHER_CATALOG.
 const WEATHER_DIRECTOR := preload("res://scripts/world/run/director/weather_director.gd")
 ## Se lee como TEXTO para sacar los brazos `match stat:` de _apply_effect: no
 ## hay reflexión para un bloque match, y copiar la lista aquí serían dos
@@ -38,6 +38,20 @@ const SCENE_ROOTS: Array[String] = ["res://scenes"]
 const ENEMY_SCRIPT_ROOTS: Array[String] = ["res://scripts/enemies"]
 ## Formato de todo id de catálogo: minúsculas, dígitos y guiones bajos.
 const ID_PATTERN := "^[a-z0-9_]+$"
+## Script del autoload Sfx: su SOUND_LIBRARY se lee por el recurso, así la
+## comprobación no depende de que el autoload exista.
+const SFX_SCRIPT := preload("res://scripts/systems/autoloads/sfx.gd")
+## Carpetas donde se buscan ids de sonido escritos a mano (.gd y .tscn).
+const SFX_ROOTS: Array[String] = ["res://scripts", "res://scenes"]
+## Llamadas a Sfx que reciben un id; el grupo 1 son sus argumentos hasta el
+## paréntesis, un comentario o el fin de línea.
+const SFX_CALL_PATTERN := "Sfx\\.(?:play|play_loop|stop_loop|acquire_loop|release_loop|loop_refcount)\\(([^)#]*)"
+## Default de un export de sonido (`*_sound` / `*_loop`) en un .gd.
+const SFX_EXPORT_PATTERN := "^@export var \\w+_(?:sound|loop): StringName = &\"([^\"]+)\""
+## Valor de un export de sonido guardado en un .tscn.
+const SFX_SCENE_PATTERN := "^\\w+_(?:sound|loop) = &\"([^\"]+)\"$"
+## Un literal StringName dentro de los argumentos de una llamada.
+const STRING_NAME_PATTERN := "&\"([^\"]*)\""
 
 var _checks_run: int = 0
 var _checks_failed: int = 0
@@ -56,6 +70,7 @@ func _ready() -> void:
 	_check_id_format()
 	_check_quest_stats()
 	_check_text_numbers()
+	_check_sfx_ids()
 	if _checks_failed == 0:
 		print("Catalog lint: ok checks=%d" % _checks_run)
 	else:
@@ -564,6 +579,42 @@ func _check_text_numbers() -> void:
 			failures.append("relic '%s' amount_text '%s' does not show amount %s"
 					% [String(row.get("id", "?")), amount_text, str(row.get("amount", 0.0))])
 	_report("text_numbers", rows, failures)
+
+
+## Cada id de sonido escrito a mano: los `&"x"` de una llamada a Sfx
+## (play, acquire_loop...), los defaults de los exports `*_sound` / `*_loop`
+## y sus valores en las escenas. Un id que no está en Sfx.SOUND_LIBRARY no
+## suena y solo deja una advertencia perdida en el log.
+func _check_sfx_ids() -> void:
+	var failures: Array[String] = []
+	var rows := 0
+	var known: Dictionary = SFX_SCRIPT.SOUND_LIBRARY
+	var call_pattern := RegEx.create_from_string(SFX_CALL_PATTERN)
+	var export_pattern := RegEx.create_from_string(SFX_EXPORT_PATTERN)
+	var scene_pattern := RegEx.create_from_string(SFX_SCENE_PATTERN)
+	var literal_pattern := RegEx.create_from_string(STRING_NAME_PATTERN)
+	var files := _gd_files(SFX_ROOTS)
+	files.append_array(_gd_files(SFX_ROOTS, ".tscn"))
+	for path: String in files:
+		var lines := FileAccess.get_file_as_string(path).split("\n")
+		for i in lines.size():
+			var line := lines[i].strip_edges()
+			if line.begins_with("#"):
+				continue
+			var ids: Array[String] = []
+			for call_match: RegExMatch in call_pattern.search_all(line):
+				for literal: RegExMatch in literal_pattern.search_all(call_match.get_string(1)):
+					ids.append(literal.get_string(1))
+			for pattern: RegEx in [export_pattern, scene_pattern]:
+				var value_match := pattern.search(line)
+				if value_match != null:
+					ids.append(value_match.get_string(1))
+			for id: String in ids:
+				rows += 1
+				if not known.has(StringName(id)):
+					failures.append("%s:%d sound id '%s' is not in Sfx.SOUND_LIBRARY"
+							% [path, i + 1, id])
+	_report("sfx_ids", rows, failures)
 
 
 ## Conjunto de los valores de `field` en `rows`.

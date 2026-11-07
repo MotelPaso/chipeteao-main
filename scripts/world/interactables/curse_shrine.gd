@@ -8,8 +8,9 @@ extends ChargeShrine
 ## Sangre de demonio agranda las dos mitades del trato. Los jefes sueltan un
 ## cofre extra por uso (BossBase lee RunState.demonic_uses).
 
-## Id del objeto que agranda las dos mitades del pacto (ItemCatalog).
-const DEMON_BLOOD_ID: String = "demon_blood"
+## Kind del objeto que agranda las dos mitades del pacto (Sangre de demonio);
+## su fila de ItemCatalog lleva el porcentaje por copia (boost_percent).
+const DEMON_BLOOD_KIND: String = "demonic_boost"
 
 ## Pactos: cada fila es una carta. `benefit` y `cost` son filas {kind, ...}
 ## resueltas por los dos match de abajo: un pacto nuevo es una fila nueva y
@@ -73,8 +74,6 @@ const PACT_LIBRARY: Array[Dictionary] = [
 @export_group("Pactos")
 ## Multiplica el costo de dificultad de cada pacto (1 = el número de PACT_LIBRARY, 2 = el doble).
 @export var difficulty_scale: float = 1.0
-## Sangre de demonio: cada copia de quien carga suma esta fracción al don Y al costo de dificultad.
-@export var demon_blood_per_copy: float = 0.25
 ## Distancia en metros desde el obelisco a la que cae el cofre gratis del pacto.
 @export var chest_drop_distance: float = 2.4
 ## Texto de cada carta: beneficio (%s) arriba y costo (%s) abajo, en dos líneas para que el costo se lea.
@@ -82,13 +81,15 @@ const PACT_LIBRARY: Array[Dictionary] = [
 
 
 func _demon_blood_in_ring() -> int:
-	return best_item_count_in_range(DEMON_BLOOD_ID)
+	return best_kind_count_in_range(DEMON_BLOOD_KIND)
 
 
 ## La Sangre de demonio agranda el don y el costo de dificultad; ambos la
-## leen de aquí.
+## leen de aquí. Cada copia suma boost_percent de su fila de ItemCatalog.
 func _blood_scale() -> float:
-	return 1.0 + demon_blood_per_copy * float(_demon_blood_in_ring())
+	var row := ItemCatalog.kind_row(DEMON_BLOOD_KIND)
+	var per_copy := float(row.get("boost_percent", 0.0)) / 100.0
+	return 1.0 + per_copy * float(_demon_blood_in_ring())
 
 
 func _effective_boon_scale() -> float:
@@ -190,7 +191,7 @@ func _pay_cost(cost: Dictionary) -> float:
 		"events":
 			RunState.event_chance_bonus += fraction
 		"disasters":
-			# Lo lee WorldDirector._maybe_weather.
+			# Lo lee WeatherDirector.maybe_roll.
 			RunState.disaster_chance_bonus += fraction
 		_:
 			push_warning("CurseShrine: unknown cost kind '%s'" % cost.kind)

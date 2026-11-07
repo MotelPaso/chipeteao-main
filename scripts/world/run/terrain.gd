@@ -215,7 +215,7 @@ func _run_seed() -> int:
 ## sitio de meseta. NO los POIs barajables: el WorldDirector los mueve a otro
 ## XZ después de construir esto, así que un claro en su lugar de autor sería
 ## suelo plano en el sitio equivocado; ellos se ajustan al relieve
-## (world_director._shuffle_ground_interactables).
+## (StageLayout.shuffle_ground_interactables).
 func _collect_pads() -> void:
 	_pads.append({"center": Vector2.ZERO, "radius": spawn_flat_radius})
 	for node: Node in get_tree().get_nodes_in_group(&"scatter_keepout"):

@@ -159,7 +159,7 @@ func _end_run(victory: bool) -> bool:
 	if GameConfig.daily_mode:
 		GameConfig.last_daily_score = GameConfig.daily_score(
 				RunState.kills, RunState.level, RunState.run_time)
-		SaveData.raise_to("daily_best_" + GameConfig.daily_date,
+		SaveData.raise_to(DailyHunt.BEST_STAT_PREFIX + GameConfig.daily_date,
 				GameConfig.last_daily_score)
 		SaveData.bump("daily_runs")
 	# Pasa la partida terminada al registro de progresión meta antes de abrir

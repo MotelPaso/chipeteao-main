@@ -20,9 +20,8 @@ const UP_COLINEAR_DOT: float = 0.99
 ## Multitud: el escalonado se comprime para que la cola de una ráfaga no se
 ## monte sobre la siguiente.
 const VOLLEY_WINDOW: float = 0.6
-## Edita aquí: altura sobre el origen de un enemigo a la que apuntan todas
-## las armas y la persecución de los proyectiles, en metros (el cuerpo, no
-## los pies).
+## Altura de puntería, en metros sobre el origen, para un blanco que no es
+## un EnemyBase. Cada enemigo lleva la suya en su export aim_height.
 const AIM_HEIGHT: float = 0.8
 
 @export_group("Estadísticas")
@@ -399,8 +398,13 @@ static func flat_dir_or(vector: Vector3, fallback: Vector3) -> Vector3:
 			else fallback
 
 
-## Punto del cuerpo de `target` al que se apunta: AIM_HEIGHT sobre su origen.
+## Punto del cuerpo de `target` al que apuntan las armas y la persecución de
+## los proyectiles: EnemyBase.aim_point() si es un enemigo, si no AIM_HEIGHT
+## sobre su origen.
 static func body_aim_point(target: Node3D) -> Vector3:
+	var enemy := target as EnemyBase
+	if enemy != null:
+		return enemy.aim_point()
 	return target.global_position + Vector3.UP * AIM_HEIGHT
 
 

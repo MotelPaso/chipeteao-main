@@ -58,8 +58,7 @@ const VENDOR_PANEL_SCENE := preload("res://scenes/ui/modal/VendorPanel.tscn")
 ## es un precio de cofre: una mascota es un espacio, no una rareza, y ponerle
 ## precio por rareza daría a entender que una es la buena.
 @export var pet_price: int = 120
-## Multiplicador del precio del power-up tras cada venta, para toda la partida.
-## El precio inicial es RunState.POWERUP_VENDOR_BASE_PRICE.
+## Multiplicador del precio del power-up tras cada venta, para toda la partida. El precio inicial es RunState.POWERUP_VENDOR_BASE_PRICE (run_state.gd).
 @export var powerup_price_growth: float = 1.5
 
 @export_group("Estante")
@@ -79,10 +78,6 @@ const VENDOR_PANEL_SCENE := preload("res://scenes/ui/modal/VendorPanel.tscn")
 ## soak vuelve a interactuar cada 0.75 s mientras se queda cerca, y sin esto el
 ## panel se reabriría apenas se cierra, para siempre.
 @export var retry_cooldown: float = 20.0
-## Segundos que tarda el puesto en encogerse y desaparecer tras la venta.
-@export var sink_time: float = 0.6
-## Escala final del puesto al encogerse (0-1).
-@export var sink_scale: float = 0.05
 
 @export_group("Toldo")
 ## Metros que sube y baja el toldo mientras el puesto atiende.
@@ -393,8 +388,5 @@ static func _payload_id(offer: Dictionary) -> String:
 
 func _leave() -> void:
 	get_tree().call_group("hud", "announce", leave_announcement)
-	set_physics_process(false)
-	var tween := create_tween()
-	tween.tween_property(self, "scale", Vector3.ONE * sink_scale, sink_time) \
-			.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_IN)
-	tween.tween_callback(queue_free)
+	# Se encoge sin bajar: sink_duration y sink_end_scale en Vendor.tscn.
+	sink_away()

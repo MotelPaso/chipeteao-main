@@ -89,7 +89,7 @@ func _exit_tree() -> void:
 	clear_weapon_fields()
 
 
-## La mitad opcional del contrato de caída del Player (Player._clear_weapon_fields
+## La mitad opcional del contrato de caída del Player (PlayerRevive
 ## la llama por nombre), y el gancho de etapa: los VISUALES son de la arena y
 ## los registros viajan con el raider, así que sin esto _tick_puddles seguiría
 ## pulsando en las coordenadas de la arena anterior.

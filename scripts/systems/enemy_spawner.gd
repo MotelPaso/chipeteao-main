@@ -274,7 +274,7 @@ var _hordes_fired: int = 0
 var _horde_waves_left: int = 0
 var _horde_wave_timer: float = 0.0
 var _horde_wave_size: int = 0
-## Evento de cielo (WorldDirector): "" | "blood_moon" | "eclipse", y los
+## Evento de cielo (nodo Weather del WorldDirector): "" | "blood_moon" | "eclipse", y los
 ## segundos que le quedan.
 var _sky_kind: String = ""
 var _sky_left: float = 0.0
@@ -544,7 +544,7 @@ func spawn_minions(scene: PackedScene, positions: Array[Vector3],
 
 
 ## Un enemigo en cada uno de `points`, a ras de suelo (lluvia de enemigos y
-## tsunami del WorldDirector). Con presupuesto, como spawn_pressure_burst:
+## tsunami del nodo Weather). Con presupuesto, como spawn_pressure_burst:
 ## max_active más horde_overflow si `horde`, o pressure_overflow si no.
 ## Devuelve cuántos cayeron, para que el llamador pueda dosificarse.
 func spawn_at_points(points: Array[Vector3], horde: bool = true) -> int:
@@ -563,7 +563,7 @@ func spawn_at_points(points: Array[Vector3], horde: bool = true) -> int:
 	return made
 
 
-## Ráfaga de presión (hordas y jauría shiny del WorldDirector): `count`
+## Ráfaga de presión (hordas propias y jauría shiny del WorldDirector): `count`
 ## enemigos de la fase actual en la banda surge_min_radius-surge_max_radius
 ## alrededor de `center`, encima de la cadencia normal pero con presupuesto:
 ## max_active más horde_overflow si `horde`, o pressure_overflow si no. Con

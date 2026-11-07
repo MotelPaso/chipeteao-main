@@ -243,7 +243,7 @@ func _clamp_to_arena(point: Vector3) -> Vector3:
 
 ## Recorte MÁS la máscara caminable irregular de la arena, para puntos donde
 ## se pone un CUERPO. Teletransportarse a una celda bloqueada lo deja dentro
-## de un muro de máscara de 7 m, donde nadie lo alcanza cuerpo a cuerpo; el
+## de una formación de roca de la máscara, donde nadie lo alcanza; el
 ## spawner ya hace la misma pregunta antes de cada aparición en anillo.
 ## Prueba rumbos alternados alrededor del punto original y, si fallan, se
 ## queda en la posición actual del jefe, que es caminable por construcción.

@@ -199,7 +199,7 @@ func _start_blink(player: Node3D) -> void:
 			+ Vector3(cos(angle), 0.0, sin(angle)) * blink_arrival_distance
 	wanted.y = global_position.y
 	# Teletransporte duro, así que el recorte cuadrado no alcanza: la máscara
-	# de la arena llena celdas enteras con muros de 7 m, y salir dentro de una
+	# de la arena llena celdas enteras con formaciones de roca, y salir en una
 	# deja al jefe encaramado en roca donde nadie lo alcanza cuerpo a cuerpo.
 	_blink_target = _safe_arena_point(wanted)
 	Telegraph.spawn_disc(self, _blink_target, blink_disc_radius, blink_windup, telegraph_color)

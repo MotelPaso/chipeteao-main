@@ -90,7 +90,8 @@ const ARENA_CLAMP_MARGIN: float = 1.5
 @export var climb_speed: float = 5.5
 ## Altura máxima en metros de UNA trepada, desde donde empezó: sin tope, un
 ## cuerpo atascado sube para siempre fuera de alcance. Por encima de los
-## muros de máscara (7 m, ver scatter.gd) para que los sigan cruzando.
+## muros de máscara (formaciones de roca: max_height en
+## assets/world/rock_style_<mapa>.tres) para que los sigan cruzando.
 @export var max_climb_height: float = 10.0
 
 @export_group("Posesión")

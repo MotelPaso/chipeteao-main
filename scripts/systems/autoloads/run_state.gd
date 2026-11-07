@@ -73,8 +73,8 @@ const DIFFICULTY_XP_SHARE: float = 0.75
 ## pacto. Cada una es una fracción (0.1 = +10%) y tiene exactamente un
 ## consumidor, nombrado aquí para que ninguna quede como dato muerto:
 ##   elite_chance_bonus      -> EnemySpawner.elite_chance()
-##   sky_duration_multiplier -> duración del evento de cielo (WorldDirector)
-##   event_chance_bonus      -> probabilidad de evento de cielo (WorldDirector)
+##   sky_duration_multiplier -> duración del evento de cielo (WeatherDirector)
+##   event_chance_bonus      -> probabilidad de evento de cielo (WeatherDirector)
 ##   disaster_chance_bonus   -> tirada de desastre del WorldDirector (lo
 ##                              primero que se tira en un tick de evento).
 var elite_chance_bonus: float = 0.0
@@ -97,6 +97,7 @@ var chest_price_multiplier: float = 1.0
 const ROULETTE_PRICE_GROWTH: float = 2.0
 var roulette_price_multiplier: float = 1.0
 ## Lo que pide el vendedor de power-ups por su primera venta de la partida.
+## Cuánto sube tras cada venta: Vendor.powerup_price_growth (Vendor.tscn).
 const POWERUP_VENDOR_BASE_PRICE: int = 100
 ## Lo que cobra a continuación el vendedor de power-ups, en puntos. Un precio
 ## ABSOLUTO de la partida y no un multiplicador: el puesto vende un power-up
