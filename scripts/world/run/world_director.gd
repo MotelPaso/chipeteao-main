@@ -7,29 +7,27 @@ extends Node
 ##    cada interactuable de suelo del grupo "scatter_keepout" (altares, el
 ##    cofre de suelo, los secretos) se mueve a un punto al azar, para que
 ##    el mapa no se pueda memorizar. Lo que está sobre una plataforma
-##    conserva su altura. Después pone los objetos de inicio.
+##    conserva su altura. Después el hijo StageFixtures pone los objetos
+##    de inicio (portales, ruletas, cofres extra...).
 ##
 ## 2. Eventos con aviso en el HUD desde first_event_at hasta el final: cada
 ##    cierto tiempo sale una fila de EVENT_LIBRARY y puede empezar un clima
-##    de WEATHER_CATALOG.
+##    (el hijo Weather, con su WEATHER_CATALOG).
 ##
 ## 3. El portal de salida al superar la etapa, y las balizas de luz.
 ## Todo punto pasa por la máscara caminable de la arena y una sonda de
 ## suelo: lo anunciado siempre se puede alcanzar y pisar.
 ## Modo de proceso pausable: los eventos se congelan con la pausa y las cartas.
 
-const CHEST_SCENE := preload("res://scenes/world/chests/Chest.tscn")
 const XP_GEM_SCENE := preload("res://scenes/systems/XpGem.tscn")
 const CHARGE_SHRINE_SCENE := preload("res://scenes/world/shrines/ChargeShrine.tscn")
 const CURSE_SHRINE_SCENE := preload("res://scenes/world/shrines/CurseShrine.tscn")
 const SPRING_SHRINE_SCENE := preload("res://scenes/world/shrines/SpringShrine.tscn")
-const ROULETTE_SHRINE_SCENE := preload("res://scenes/world/shrines/RouletteShrine.tscn")
 const EVENT_ALTAR_SCENE := preload("res://scenes/world/shrines/EventAltar.tscn")
 const LUCKY_BLOCK_SCENE := preload("res://scenes/world/chests/LuckyBlock.tscn")
 const PET_BOX_SCENE := preload("res://scenes/world/PetBox.tscn")
 const VENDOR_SCENE := preload("res://scenes/world/Vendor.tscn")
 const SUPPLY_CHEST_SCENE := preload("res://scenes/world/director/SupplyChest.tscn")
-const PORTAL_SHRINE_SCENE := preload("res://scenes/world/director/PortalShrine.tscn")
 const EXIT_PORTAL_SCENE := preload("res://scenes/world/director/ExitPortal.tscn")
 const BEACON_SCENE := preload("res://scenes/world/director/Beacon.tscn")
 const Beacon := preload("res://scripts/world/run/director/beacon.gd")
@@ -148,7 +146,7 @@ class TimedBeacon:
 		return not (available is bool) or bool(available)
 
 
-@export_group("Layout Shuffle")
+@export_group("Reparto de POI")
 ## Mueve los POI de suelo a puntos al azar en cada etapa.
 @export var shuffle_layout: bool = true
 ## Distancia mínima (metros) de un POI movido al punto de aparición.
@@ -160,20 +158,22 @@ class TimedBeacon:
 ## Margen (metros) que los POI dejan con el borde de la arena.
 @export var bounds_margin: float = 14.0
 
-@export_group("Events")
+@export_group("Eventos")
 ## Activa los eventos del mundo y el clima.
 @export var events_enabled: bool = true
 ## Segundos desde el inicio de la etapa hasta el primer evento.
 @export var first_event_at: float = 60.0
-## Pausa mínima y máxima entre eventos (segundos), antes de acortarse con el minuto.
+## Pausa mínima entre eventos (segundos), antes de acortarse con el minuto.
 @export var event_gap_min: float = 50.0
+## Pausa máxima entre eventos (segundos), antes de acortarse con el minuto.
 @export var event_gap_max: float = 75.0
 ## Pausa más corta posible entre eventos (segundos), aunque la partida avance.
 @export var event_gap_floor: float = 20.0
 ## Cuánto se acorta la pausa por minuto de partida: pausa / (1 + esto x minutos).
 @export var event_gap_decay_per_minute: float = 0.18
-## Distancia mínima y máxima (metros) de un evento a un jugador vivo al azar.
+## Distancia mínima (metros) de un evento a un jugador vivo al azar.
 @export var event_min_distance: float = 25.0
+## Distancia máxima (metros) de un evento a un jugador vivo al azar.
 @export var event_max_distance: float = 45.0
 ## Enemigos shiny de la jauría de élite.
 @export var elite_pack_size: int = 3
@@ -184,32 +184,30 @@ class TimedBeacon:
 ## Pesos que reemplazan los de EVENT_LIBRARY, por id de evento; 0 quita el
 ## evento. Vale para todas las arenas: el director es uno por partida.
 @export var event_weight_overrides: Dictionary[String, float] = {}
-@export_group("Altars (iteration 47)")
+
+@export_group("Altares")
 ## Cuánto sube el peso de los altares por minuto: peso x (1 + esto x minutos).
 @export var altar_weight_per_minute: float = 0.25
 ## Tope de ese multiplicador del peso de los altares.
 @export var altar_weight_max_scale: float = 3.0
-## Probabilidad (0-1) de que la etapa empiece con una caja de mascota.
-@export var start_pet_box_chance: float = 0.5
-## Probabilidad (0-1) de que la etapa empiece con un altar de evento.
-@export var start_event_altar_chance: float = 0.5
-## Probabilidad (0-1) de que la etapa empiece con un bloque de la suerte.
-@export var lucky_block_start_chance: float = 0.5
 ## Altares sin usar permitidos a la vez al empezar, contando los de la escena.
 @export var altar_cap_base: int = 3
 ## Cada tantos minutos se permite un altar sin usar más.
 @export var altar_cap_minutes: float = 3.0
-## Probabilidad (0-1) de que cada cofre de inicio (de la escena o extra) sea gratis.
-@export var free_start_chest_chance: float = 0.15
-@export_group("Exit portal (iteration 49)")
+
+@export_group("Portal de salida")
 ## Distancia mínima (metros) del portal de salida al jugador más cercano.
 @export var exit_portal_min_distance: float = 40.0
 ## Aviso en el HUD cuando se abre el portal de salida.
 @export var exit_portal_announce: String = "Se abrió el portal de salida — crúzalo cuando quieras"
-## Portales al inicio de la etapa; van en pares, así que conviene un número par.
-@export var portal_count: int = 4
-## Ruletas al inicio de la etapa.
-@export var roulette_count: int = 1
+
+## El clima activo, o vacío: {id, group, time_left}. Vive en el nodo
+## Weather; hud.gd, event_altar.gd y el probe lo leen aquí con
+## get("active_weather").
+var active_weather: Dictionary:
+	get:
+		return _weather.active_weather if _weather != null else {}
+
 ## Reparto de la etapa actual: arena, máscara, puntos ocupados y
 ## muestreos. Uno nuevo por etapa; entre etapas, uno vacío.
 var _layout: StageLayout = null
@@ -218,16 +216,11 @@ var _exit_portal_spawned: bool = false
 var _event_timer: float = 0.0
 ## Balizas vivas (cofres de suministros, altares, manantiales, grietas...).
 var _beacons: Array[TimedBeacon] = []
-## El clima activo, o vacío: {id, group, time_left}. Vive en el nodo
-## Weather; hud.gd, event_altar.gd y el probe lo leen aquí con
-## get("active_weather").
-var active_weather: Dictionary:
-	get:
-		return _weather.active_weather if _weather != null else {}
 
 ## El clima (RunSystems.tscn > WorldDirector > Weather).
 @onready var _weather: WeatherDirector = $Weather
-
+## Los objetos de inicio (RunSystems.tscn > WorldDirector > StageFixtures).
+@onready var _fixtures: StageFixtures = $StageFixtures
 
 func _ready() -> void:
 	_set_layout(_new_layout(null))
@@ -257,43 +250,9 @@ func on_stage_started(arena: Node3D) -> void:
 	_exit_portal_spawned = false
 	if shuffle_layout:
 		_layout.shuffle_ground_interactables()
-	# El inicio irregular va ANTES de los objetos de inicio: quita POI de
-	# la escena y sus puntos tienen que quedar libres para los portales y
-	# la ruleta.
-	_randomize_starting_pois()
-	# Objetos de inicio. Este orden es parte del sorteo: no cambiarlo.
-	_spawn_portals()
-	_spawn_roulettes()
-	_spawn_start_pet_boxes()
-	_spawn_start_event_altars()
-	_spawn_start_lucky_blocks()
-
-
-## 0-1 cajas de mascota al inicio de la etapa: una mascota tiene que
-## sentirse como algo que el mapa ofrece, no algo que siempre está.
-## Con probabilidad 0 no se tira ningún dado: el RNG de la partida es uno
-## solo y un dado de más aquí mueve todo lo que se sortea después.
-func _spawn_start_pet_boxes() -> void:
-	if start_pet_box_chance <= 0.0 or randf() >= start_pet_box_chance:
-		return
-	_spawn_at(PET_BOX_SCENE, _layout.claim_clear_point())
-
-
-## 0-1 altares de evento al inicio de la etapa, como la caja de mascota.
-func _spawn_start_event_altars() -> void:
-	# Con probabilidad 0 no se tira ningún dado (ver la caja de mascota):
-	# cambiaría dónde caen los portales, las ruletas y los POI movidos.
-	if start_event_altar_chance <= 0.0 or randf() >= start_event_altar_chance:
-		return
-	_spawn_at(EVENT_ALTAR_SCENE, _layout.claim_clear_point())
-
-
-## 0-1 bloques de la suerte al inicio de la etapa; con probabilidad 0 no
-## se tira ningún dado.
-func _spawn_start_lucky_blocks() -> void:
-	if lucky_block_start_chance <= 0.0 or randf() >= lucky_block_start_chance:
-		return
-	_spawn_at(LUCKY_BLOCK_SCENE, _layout.claim_clear_point())
+	# Objetos de inicio (nodo StageFixtures), después de mover los POI: su
+	# orden interno es parte del sorteo.
+	_fixtures.place(_layout)
 
 
 ## Fin de etapa: RunRoot lo llama antes de liberar la arena. Para el
@@ -319,6 +278,37 @@ func beacon_count() -> int:
 	return _beacons.size()
 
 
+## --- puertas del clima -----------------------------------------------------
+## El clima vive en el nodo Weather; estas puertas siguen aquí porque otros
+## nodos llegan por el grupo "world_director": event_altar.gd, enemy_base.gd,
+## arena_probe.gd, hud.gd.
+
+## La fila de WEATHER_CATALOG con ese id, o vacío (arena_probe.gd la usa).
+static func weather_row(id: String) -> Dictionary:
+	return WeatherDirector.weather_row(id)
+
+
+## FUERZA un clima: detiene el que haya y empieza aunque no haya pasado la
+## pausa (el altar de evento, el probe, BONK_WEATHER_NOW).
+func start_sky_event(kind: String) -> void:
+	_weather.start_sky_event(kind)
+
+
+## Un clima al azar que el altar de evento puede invocar.
+func random_altar_weather() -> String:
+	return _weather.random_altar_weather()
+
+
+## Un charco de ácido durante la lluvia radiactiva (EnemyBase al morir).
+func spawn_acid_pool(at: Vector3) -> void:
+	_weather.spawn_acid_pool(at)
+
+
+## Verdadero mientras `id` sea el clima activo.
+func is_weather_active(id: String) -> bool:
+	return _weather.is_weather_active(id)
+
+
 ## Un StageLayout para `arena` (null = vacío) con las distancias del reparto.
 func _new_layout(arena: Node3D) -> StageLayout:
 	var layout := StageLayout.new(self, arena)
@@ -333,57 +323,6 @@ func _new_layout(arena: Node3D) -> StageLayout:
 func _set_layout(layout: StageLayout) -> void:
 	_layout = layout
 	_weather.layout = layout
-
-
-@export_group("Irregular start (iteration 44)")
-## Probabilidad (0-1) de quitar cada cofre o altar de la escena en esta etapa.
-@export var poi_skip_chance: float = 0.3
-## Cofres extra al empezar la etapa: un número al azar entre mínimo y máximo.
-@export var extra_start_chests_min: int = 0
-@export var extra_start_chests_max: int = 2
-
-
-## Inicio irregular: quita al azar cofres y altares de la escena (siempre
-## queda el primer cofre de suelo), hace gratis algunos cofres y suma
-## cofres extra.
-func _randomize_starting_pois() -> void:
-	var removed := 0
-	var chests_kept := 0
-	var freebies := 0
-	for node: Node in get_tree().get_nodes_in_group("scatter_keepout"):
-		if node is Chest or node is ChargeShrine or node is GreedShrine:
-			if node is Chest and chests_kept == 0:
-				chests_kept += 1  # el primer cofre de suelo siempre se queda
-				if _make_start_chest_free(node as Chest):
-					freebies += 1
-				continue
-			if randf() < poi_skip_chance:
-				node.queue_free()
-				removed += 1
-			elif node is Chest:
-				chests_kept += 1
-				if _make_start_chest_free(node as Chest):
-					freebies += 1
-	_layout.refresh_placed_points()
-	var extra := randi_range(extra_start_chests_min, extra_start_chests_max)
-	for i in extra:
-		var chest := CHEST_SCENE.instantiate() as Chest
-		# ANTES de add_child: el cofre elige su tinte y su texto en _ready.
-		if randf() < free_start_chest_chance:
-			chest.free_open = true
-			freebies += 1
-		_layout.stage_parent().add_child(chest)
-		chest.global_position = _layout.claim_clear_point()
-	print("Start layout: %d POI(s) skipped, %d extra chest(s), %d free" % [
-			removed, extra, freebies])
-
-
-## Hace gratis un cofre de la escena que ya pasó su _ready. Devuelve true si cambió.
-func _make_start_chest_free(chest: Chest) -> bool:
-	if chest == null or randf() >= free_start_chest_chance:
-		return false
-	chest.make_free()
-	return true
 
 
 func _physics_process(delta: float) -> void:
@@ -454,44 +393,6 @@ func _altar_cap() -> int:
 	return altar_cap_base + floori(_minutes() / maxf(altar_cap_minutes, 0.001))
 
 
-## --- objetos de inicio ------------------------------------------------------
-
-## Portales en pares al azar (PortalShrine.tscn). El color sale del índice
-## del par de creación (i / 2) y los pares se forman después de mezclar:
-## el color no indica cuál es la pareja.
-func _spawn_portals() -> void:
-	var count := portal_count - (portal_count % 2)
-	var portals: Array[PortalShrine] = []
-	for i in count:
-		var portal := PORTAL_SHRINE_SCENE.instantiate() as PortalShrine
-		# El nombre sale en el log "Portal used:".
-		portal.name = "Portal%d" % (i + 1)
-		portal.pair_index = i / 2
-		_layout.stage_parent().add_child(portal)
-		portal.global_position = _layout.claim_clear_point()
-		portals.append(portal)
-	portals.shuffle()
-	for i in range(0, portals.size() - 1, 2):
-		portals[i].twin = portals[i + 1]
-		portals[i + 1].twin = portals[i]
-	if count > 0:
-		print("Portals placed: %d (%d pairs)" % [count, count / 2])
-
-
-func _spawn_roulettes() -> void:
-	for i in roulette_count:
-		_spawn_at(ROULETTE_SHRINE_SCENE, _layout.claim_clear_point())
-
-
-## Crea `scene` en la arena y la pone en `at` (ya calculado: el punto se
-## sortea antes de crear el nodo).
-func _spawn_at(scene: PackedScene, at: Vector3) -> Node3D:
-	var node := scene.instantiate() as Node3D
-	_layout.stage_parent().add_child(node)
-	node.global_position = at
-	return node
-
-
 ## --- eventos ----------------------------------------------------------------
 
 ## Peso de una fila de EVENT_LIBRARY ahora mismo. Un peso 0 saca el evento
@@ -541,7 +442,7 @@ func _fire_random_event() -> void:
 ## Evento simple: el POI de la fila lejos de un jugador, con su baliza (si
 ## la fila tiene beacon_color), su aviso y su línea de log.
 func _event_spawn_poi(row: Dictionary) -> void:
-	var poi := _spawn_at(row["scene"], _event_point())
+	var poi := _layout.spawn_at(row["scene"], _event_point())
 	if row.has("beacon_color"):
 		_raise_beacon(poi.global_position, row["beacon_color"], poi, float(row["beacon_time"]))
 	_announce(String(row["announce"]))
@@ -683,37 +584,6 @@ func _spawn_beacon(at: Vector3, color: Color) -> Node3D:
 	_layout.stage_parent().add_child(beacon)
 	beacon.global_position = at
 	return beacon
-
-
-## --- puertas del clima -----------------------------------------------------
-## El clima vive en el nodo Weather; estas puertas siguen aquí porque otros
-## nodos llegan por el grupo "world_director": event_altar.gd, enemy_base.gd,
-## arena_probe.gd, hud.gd.
-
-## La fila de WEATHER_CATALOG con ese id, o vacío (arena_probe.gd la usa).
-static func weather_row(id: String) -> Dictionary:
-	return WeatherDirector.weather_row(id)
-
-
-## FUERZA un clima: detiene el que haya y empieza aunque no haya pasado la
-## pausa (el altar de evento, el probe, BONK_WEATHER_NOW).
-func start_sky_event(kind: String) -> void:
-	_weather.start_sky_event(kind)
-
-
-## Un clima al azar que el altar de evento puede invocar.
-func random_altar_weather() -> String:
-	return _weather.random_altar_weather()
-
-
-## Un charco de ácido durante la lluvia radiactiva (EnemyBase al morir).
-func spawn_acid_pool(at: Vector3) -> void:
-	_weather.spawn_acid_pool(at)
-
-
-## Verdadero mientras `id` sea el clima activo.
-func is_weather_active(id: String) -> bool:
-	return _weather.is_weather_active(id)
 
 
 func _free_beacon(beacon: Node3D) -> void:

@@ -85,6 +85,15 @@ func stage_parent() -> Node:
 	return found if found != null else _host
 
 
+## Crea `scene` bajo stage_parent() y la pone en `at` (el punto ya está
+## sorteado antes de crear el nodo).
+func spawn_at(scene: PackedScene, at: Vector3) -> Node3D:
+	var node := scene.instantiate() as Node3D
+	stage_parent().add_child(node)
+	node.global_position = at
+	return node
+
+
 ## --- máscara y suelo --------------------------------------------------------
 
 func walkable_xz(xz: Vector2) -> bool:
