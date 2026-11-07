@@ -137,7 +137,7 @@ func _earning_lines() -> Array[String]:
 	if GameConfig.daily_mode:
 		lines.append("Puntaje diario: %d — mejor de hoy: %d" % [
 				GameConfig.last_daily_score,
-				SaveData.stat("daily_best_" + GameConfig.daily_date)])
+				SaveData.stat(DailyHunt.BEST_STAT_PREFIX + GameConfig.daily_date)])
 	return lines
 
 
