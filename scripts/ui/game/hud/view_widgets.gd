@@ -17,8 +17,6 @@ const OVERLAY_SCENE := preload("res://scenes/ui/maps/MapOverlay.tscn")
 ## borde superior de la ventana (las de arriba usan el de MinimapSlot, que deja
 ## libre la columna de bajas y FPS).
 @export var lower_cell_top_margin: float = 14.0
-## Capa del mapa de Tab: sobre el HUD (5) y bajo el selector de cartas (10).
-@export var overlay_layer: int = 8
 
 var _minimaps: Array[Minimap] = []
 var _overlays: Array[MapOverlay] = []
@@ -48,10 +46,10 @@ func build(player_count: int) -> void:
 		minimap.offset_bottom = top + _slot.offset_bottom - _slot.offset_top
 		add_child(minimap)
 		_minimaps.append(minimap)
-		# Su propia CanvasLayer: el mapa de Tab dibuja SOBRE el HUD y bajo el
-		# selector de cartas, y un Control no cruza capas.
+		# Su propia CanvasLayer (UiLayers.MAP_OVERLAY): el mapa de Tab dibuja
+		# SOBRE el HUD y bajo el selector de cartas, y un Control no cruza capas.
 		var layer := CanvasLayer.new()
-		layer.layer = overlay_layer
+		layer.layer = UiLayers.MAP_OVERLAY
 		add_child(layer)
 		var overlay: MapOverlay = OVERLAY_SCENE.instantiate()
 		overlay.slot = slot

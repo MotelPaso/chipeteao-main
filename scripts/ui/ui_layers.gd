@@ -1,23 +1,20 @@
 class_name UiLayers
 extends RefCounted
-## Orden de dibujo de las capas de la UI (CanvasLayer.layer): un número más
-## alto dibuja encima de uno más bajo. Es la única tabla del orden: para
-## subir o bajar una capa, cambia su número aquí. Nunca va en una escena:
-## edita aquí.
+## Orden de dibujo de las capas de la UI que se crean en código
+## (CanvasLayer.layer): un número más alto dibuja encima. Nunca va en una
+## escena: edita aquí.
+## Las capas de escena guardan su número en su .tscn (nodo raíz > Layer):
+## HUD.tscn 5, UpgradeCardUI.tscn 10, modal/ModalPanel.tscn 15 y
+## PauseMenu.tscn 30. El orden completo que importa es: viñeta de Juice 4 <
+## HUD 5 < mapa de Tab 8 < cartas 10 < modales 15 < fin de partida 20 <
+## pausa 30 < fundido 100.
 
 ## Viñeta de daño de Juice (juice.gd): sobre el mundo 3D y bajo el HUD.
 const JUICE_VIGNETTE := 4
-## HUD de la partida (HUD.tscn).
-const HUD := 5
-## Mapa de Tab (hud.gd): sobre el HUD.
+## Mapa de Tab (view_widgets.gd): sobre el HUD y bajo las cartas de mejora.
 const MAP_OVERLAY := 8
-## Cartas de mejora (UpgradeCardUI.tscn).
-const UPGRADE_CARDS := 10
-## Paneles modales de la partida: vendedor y ruleta (vendor_ui.gd, roulette_ui.gd).
-const MODAL := 15
-## Pantalla de fin de partida (run_end_screen.gd): sobre las cartas de mejora.
+## Pantalla de fin de partida (run_end_screen.gd): sobre los modales y bajo
+## la pausa.
 const RUN_END := 20
-## Menú de pausa (PauseMenu.tscn): sobre todo lo de la partida.
-const PAUSE := 30
 ## Fundido de ScreenFade (screen_fade.gd): encima de todo.
 const SCREEN_FADE := 100
