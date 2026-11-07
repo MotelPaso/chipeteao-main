@@ -84,6 +84,7 @@ grupos con su nombre.
 | Bumerán | `Boomerang.tscn` y `BoomerangProjectile.tscn` | `travel_scale`; `speed`, `spin_speed` |
 | Velocidad, rastreo y perforación de dardos y flechas | `Projectile.tscn` (dardo) / `Arrow.tscn` (flecha) > raíz | `speed`, `homing_enabled`, `pierce_remaining` |
 | Destello del disparo, tajos y latigazo | `scenes/fx/MuzzleFlash.tscn`, `SlashArc.tscn`, `WhipCrack.tscn` > raíz | sus grupos de forma y tiempo |
+| Alcance del primer rayo del Cinturón eléctrico | `scripts/weapons/belt_bolt.gd` (bloque «Edita aquí») | `FIRST_RANGE` |
 | Rayo del Pararrayos y del Cinturón eléctrico | `scenes/fx/LightningBeam.tscn` > raíz | grosor, brillo y tiempo del rayo |
 | Nombre, sigla, carta propia, evolución | ver «Personajes, armas, cartas y progreso» | |
 
@@ -166,8 +167,8 @@ Lo que no cambia por mapa se edita en `scripts/systems/enemy_spawner.gd`.
 | Anillo al subir de nivel | Juice.tscn > Juice («Anillo de subida de nivel») | `level_pulse_color`, `level_pulse_duration` |
 | Volumen, tope por segundo o variación de un sonido | `scripts/systems/autoloads/sfx.gd` > su fila en `SOUND_LIBRARY` | `volume_db`, `rate_limit`, `jitter`, `loop` |
 | Voces simultáneas de sonido | `scenes/systems/Sfx.tscn` > Sfx | `pool_size`, `default_pitch_jitter` |
-| Precio de los cofres y cuánto suben | `scripts/systems/autoloads/run_state.gd` | el bloque de precios de cofres |
-| Curva de experiencia por nivel | `scripts/systems/autoloads/run_state.gd` | el bloque de la curva de XP |
+| Precio de los cofres y cuánto suben | `scripts/systems/autoloads/run_state.gd` (bloque «Edita aquí») | `CHEST_BASE_PRICES`, `CHEST_PRICE_GROWTH` |
+| Curva de experiencia por nivel | `scripts/systems/autoloads/run_state.gd` (bloque «Edita aquí») | `XP_BASE`, `XP_PER_LEVEL`, `XP_PER_LEVEL_SQUARED` |
 
 ## Eventos del mapa, clima y portales
 
