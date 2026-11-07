@@ -30,11 +30,11 @@ extends Node
 ##
 ## It presses the REAL controls: buttons by unique name resolved against
 ## their own owner (%SettingsButton exists in both CharacterSelect.tscn
-## and PauseMenu.tscn), by text only for the ones built in code, and
-## pause_game as a parsed InputEventAction with the release on a LATER
-## frame. It never calls an underscore handler: a test that calls
-## _on_card_pressed directly proves the method exists, not that the
-## button reaches it.
+## and PauseMenu.tscn; the co-op buttons and each card's «Sí» resolve
+## inside their own CoopLobby / CharacterCard instance), and pause_game
+## as a parsed InputEventAction with the release on a LATER frame. It
+## never calls an underscore handler: a test that calls _on_card_pressed
+## directly proves the method exists, not that the button reaches it.
 
 ## Save file when BONK_SAVE_PATH is not set. SaveData._ready already
 ## honours the env var; this is only the fallback, so a hand-run probe
@@ -201,16 +201,14 @@ class Driver extends Node:
 
 	# --- steps ---------------------------------------------------------
 
-	## Colección: the button is built in code (no unique name), so it is
-	## matched by its label — the only thing that identifies it.
 	func _step_collection() -> bool:
-		return _visit_meta_screen(_extra_button("Colección"), COLLECTION_PATH)
+		return _visit_meta_screen(_unique_button("%CollectionButton"), COLLECTION_PATH)
 
 	func _step_quests() -> bool:
 		return _visit_meta_screen(_unique_button("%QuestsButton"), QUEST_LOG_PATH)
 
 	func _step_relics() -> bool:
-		return _visit_meta_screen(_extra_button("Armería"), RELIC_SHOP_PATH)
+		return _visit_meta_screen(_unique_button("%ArmoryButton"), RELIC_SHOP_PATH)
 
 	## The co-op row rejects a party bigger than the connected pads allow.
 	## Headless there are none, so 2 players is always the reject path —
@@ -221,9 +219,9 @@ class Driver extends Node:
 			0:
 				if not _at_scene(CHARACTER_SELECT_PATH):
 					return false
-				var button := _button_with_text("2")
+				var button := _lobby_node("%Count2") as Button
 				if button == null:
-					_fail("no co-op count button labelled '2'")
+					_fail("no %Count2 button in %CoopLobby")
 					return false
 				if not _press(button, "co-op count 2"):
 					return false
@@ -233,10 +231,11 @@ class Driver extends Node:
 				# The hint is the reject path's only output: the select
 				# screen does not touch Coop until Start, so player_count
 				# would read 1 whether the press was accepted or not.
-				return _hint_label_text().find("Conecta") >= 0
+				var hint := _lobby_node("%CoopHint") as Label
+				return hint != null and hint.text.find("Conecta") >= 0
 
 	## One locked raider bought through the real two-press flow: the card
-	## arms the inline confirm, the code-built «Sí» inside it commits.
+	## arms the inline confirm, the card's %UnlockYes («Sí») commits.
 	func _step_unlock_confirm() -> bool:
 		match _phase:
 			0:
@@ -254,9 +253,9 @@ class Driver extends Node:
 				return false
 			1:
 				var card := _card_for(_unlock_id)
-				var yes := _find_button_with_text(card, "Sí")
+				var yes := _visible_unlock_yes(card)
 				if yes == null:
-					return false  # the confirm card rebuilds over a frame
+					return false  # the confirm face shows on the next refresh
 				if not _press(yes, "confirm «Sí» for %s" % _unlock_id):
 					return false
 				_phase = 2
@@ -266,7 +265,7 @@ class Driver extends Node:
 					_fail("raider '%s' is still locked after confirming" % _unlock_id)
 					return false
 				var card := _card_for(_unlock_id)
-				if _find_button_with_text(card, "Sí") != null:
+				if _visible_unlock_yes(card) != null:
 					_fail("card '%s' still shows the confirm button after unlocking"
 							% _unlock_id)
 					return false
@@ -560,46 +559,23 @@ class Driver extends Node:
 	func _unique_button(unique_name: String) -> Button:
 		return _unique(unique_name) as Button
 
-	## The code-built meta buttons (Colección, Armería) carry no unique
-	## name; their label is the only handle they have.
-	func _extra_button(label_text: String) -> Button:
-		return _find_button_with_text(get_tree().current_scene, label_text)
-
-	## First Button whose own text matches, anywhere under `root`.
-	func _find_button_with_text(root: Node, label_text: String) -> Button:
-		if root == null:
+	## A unique node inside the select screen's %CoopLobby instance (its
+	## nodes are owned by the lobby scene, not by the select screen).
+	func _lobby_node(unique_name: String) -> Node:
+		var lobby := _unique("%CoopLobby")
+		if lobby == null:
 			return null
-		var button := root as Button
-		if button != null and button.text == label_text:
-			return button
-		for child: Node in root.get_children():
-			var found := _find_button_with_text(child, label_text)
-			if found != null:
-				return found
-		return null
+		return lobby.get_node_or_null(unique_name)
 
-	func _button_with_text(label_text: String) -> Button:
-		return _find_button_with_text(get_tree().current_scene, label_text)
-
-	## Text of the co-op row's hint label (built in code, no unique name):
-	## the only visible proof the reject path ran.
-	func _hint_label_text() -> String:
-		var scene := get_tree().current_scene
-		if scene == null:
-			return ""
-		var texts := ""
-		for label: Label in _labels(scene):
-			texts += label.text + "\n"
-		return texts
-
-	func _labels(root: Node) -> Array[Label]:
-		var found: Array[Label] = []
-		var label := root as Label
-		if label != null:
-			found.append(label)
-		for child: Node in root.get_children():
-			found.append_array(_labels(child))
-		return found
+	## The card's %UnlockYes while its confirm face is showing, else null
+	## (every card holds the button; only the confirm face shows it).
+	func _visible_unlock_yes(card: Button) -> Button:
+		if card == null:
+			return null
+		var yes := card.get_node_or_null("%UnlockYes") as Button
+		if yes == null or not yes.is_visible_in_tree():
+			return null
+		return yes
 
 	## The cheapest locked raider this balance can buy.
 	func _affordable_locked_id() -> String:

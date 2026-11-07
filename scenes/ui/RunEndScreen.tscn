@@ -1,11 +1,17 @@
-[gd_scene load_steps=2 format=3]
+[gd_scene load_steps=4 format=3]
 
 [ext_resource type="Script" path="res://scripts/ui/game/run_end_screen.gd" id="1_runend"]
 
+[sub_resource type="FontVariation" id="FontVariation_title"]
+spacing_glyph = 8
+
+[sub_resource type="FontVariation" id="FontVariation_subtitle"]
+spacing_glyph = 2
+
 [node name="RunEndScreen" type="CanvasLayer"]
 process_mode = 3
-layer = 20
 script = ExtResource("1_runend")
+editor_description = "La capa de dibujo sale de UiLayers.RUN_END (scripts/ui/ui_layers.gd): cámbiala allí."
 
 [node name="Root" type="Control" parent="."]
 unique_name_in_owner = true
@@ -26,6 +32,11 @@ theme_override_constants/separation = 20
 
 [node name="TitleLabel" type="Label" parent="Root/Center/VBox"]
 unique_name_in_owner = true
+editor_description = "El color del título lo pone run_end_screen.gd según el final (ENDINGS); aquí se ve el de la derrota."
+theme_override_colors/font_color = Color(0.9, 0.25, 0.2, 1)
+theme_override_colors/font_outline_color = Color(0.03, 0.035, 0.06, 0.92)
+theme_override_constants/outline_size = 14
+theme_override_fonts/font = SubResource("FontVariation_title")
 theme_override_font_sizes/font_size = 72
 horizontal_alignment = 1
 text = "MORISTE"
@@ -33,6 +44,7 @@ text = "MORISTE"
 [node name="SubtitleLabel" type="Label" parent="Root/Center/VBox"]
 unique_name_in_owner = true
 theme_override_colors/font_color = Color(0.72, 0.74, 0.78, 1)
+theme_override_fonts/font = SubResource("FontVariation_subtitle")
 theme_override_font_sizes/font_size = 20
 horizontal_alignment = 1
 text = "La horda te alcanzó."

@@ -1,40 +1,39 @@
 class_name MetaScreen
 extends Control
-## Shared chassis for the three between-run screens (Quest Log, Armory,
-## Collection). They are the same screen with different rows: same fog
-## backdrop, same spaced amber title, same badge pill, same Back button,
-## same staggered entrance and — for the two that spend or earn Shards —
-## the same count-up payoff. Everything that is NOT row content lives
-## here, so a fix or a restyle lands on all three at once instead of
-## drifting three ways.
+## Chasis compartido de las tres pantallas entre partidas (Registro de
+## misiones, Armería, Colección): son la misma pantalla con distintas filas.
+## Mismo fondo de niebla, mismo título ámbar espaciado, misma insignia, mismo
+## botón Volver, misma entrada escalonada y, en las dos que gastan o ganan
+## esquirlas, el mismo conteo animado. Todo lo que NO es contenido de filas
+## vive aquí, así un arreglo llega a las tres a la vez.
 ##
-## Scene contract (QuestLog.tscn / RelicShop.tscn / Collection.tscn):
-## %TitleLabel, %BadgeLabel, %List (VBoxContainer) and %BackButton. The
-## title text stays in the scene — it is per-screen copy, not behaviour.
+## Contrato de escena (QuestLog.tscn / RelicShop.tscn / Collection.tscn):
+## %BadgeLabel, %List (VBoxContainer dentro de un ScrollContainer) y
+## %BackButton. El título vive entero en la escena (texto, fuente, color), y
+## el color de texto de %BadgeLabel en la escena también pinta su píldora.
 ##
-## Subclass hooks: _badge_color(), _tracks_shards() and _build_rows(list).
-## Shared moments a subclass calls: payoff() (claim / buy), reject()
-## (can't afford) and rebuild().
+## Ganchos de las subclases: _tracks_shards() y _build_rows(list). Momentos
+## compartidos que llama una subclase: payoff() (reclamar / comprar),
+## reject() (no alcanza) y rebuild().
 
-const CHARACTER_SELECT_SCENE_PATH := "res://scenes/ui/CharacterSelect.tscn"
-
+## Destello de la fila (modulate) al pagar.
 const PAYOFF_FLASH := Color(1.7, 1.45, 0.85)
-const REJECT_FLASH := Color(1.0, 0.42, 0.42)
+## Margen interno (píxeles) de la tarjeta de cada fila: lados y arriba/abajo.
 const CARD_MARGIN_H := 16.0
 const CARD_MARGIN_V := 10.0
-## Only the rows that fit on screen animate in; a 40-row list would
-## otherwise open as a slideshow.
+## Solo animan su entrada las filas que caben en pantalla; una lista de 40
+## filas se abriría como una presentación de diapositivas.
 const ENTRANCE_ROWS := 8
+## Duración (segundos) del conteo del saldo.
 const COUNT_TIME := 0.4
-## Pixels one ui_up / ui_down press scrolls the list when there is no row
-## button to move the focus to (see _input).
+## Píxeles que se desplaza la lista con ui_up / ui_down cuando no hay un
+## botón de fila al que mover el foco (ver _input).
 const SCROLL_STEP := 110
 
-@onready var _title_label: Label = %TitleLabel
 @onready var _badge_label: Label = %BadgeLabel
 @onready var _list: VBoxContainer = %List
 @onready var _back_button: Button = %BackButton
-## The list's ScrollContainer (every MetaScreen scene puts %List in one).
+## El ScrollContainer de la lista (toda escena MetaScreen pone %List en uno).
 @onready var _scroll: ScrollContainer = _list.get_parent() as ScrollContainer
 
 var _count_tween: Tween = null
@@ -42,17 +41,16 @@ var _count_tween: Tween = null
 
 func _ready() -> void:
 	Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
-	UiTheme.style_title(_title_label, 40, UiTheme.ACCENT_AMBER, 8, 10)
-	var badge := _badge_color()
+	var badge := _badge_label.get_theme_color(&"font_color")
 	UiTheme.style_badge(_badge_label, badge, UiTheme.PANEL_BG, badge.darkened(0.45))
 	_badge_label.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	UiTheme.style_button(_back_button, UiTheme.ACCENT, true)
 	_back_button.pressed.connect(_on_back_pressed)
-	# Button prompts under Volver; they follow the last device used.
+	# Indicaciones de botones bajo Volver; siguen al último dispositivo usado.
 	_back_button.get_parent().add_child(InputHints.build([
 			["ui_accept", "Elegir"], ["ui_cancel", "Volver"]]))
 	if _scroll != null:
-		# A pad walking the row buttons must see the one it lands on.
+		# Un control que recorre los botones de las filas debe ver el enfocado.
 		_scroll.follow_focus = true
 	if _tracks_shards():
 		SaveData.shards_changed.connect(_on_shards_changed)
@@ -63,29 +61,28 @@ func _ready() -> void:
 
 
 func _exit_tree() -> void:
-	# SaveData outlives every screen, so the connection has to go with us.
+	# SaveData sobrevive a cada pantalla: la conexión se va con nosotros.
 	if SaveData.shards_changed.is_connected(_on_shards_changed):
 		SaveData.shards_changed.disconnect(_on_shards_changed)
 
 
-## Esc leaves, the same as everywhere else in the game (the HUD teaches
-## "Esc" and the pause menu, settings and roulette all honour it).
+## Esc sale, igual que en el resto del juego (la pausa, los ajustes y la
+## ruleta también lo respetan).
 func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed("ui_cancel"):
 		_on_back_pressed()
 		get_viewport().set_input_as_handled()
 
 
-## Pad / arrow-key scrolling. Focus can only walk BUTTONS, and most rows
-## have none (the whole Collection, every quest not yet claimable), so a
-## pad player used to be stuck on the first screenful of the list. Up/down
-## now scroll the list whenever moving the focus would skip rows that are
-## still out of view:
-##   - a list with no buttons: always (Volver keeps the focus);
-##   - down from the LAST row button / up from the FIRST one: while there
-##     is list left in that direction, then on to Volver as usual.
-## Runs in _input, before the GUI moves the focus, so it can take the
-## press first.
+## Desplazamiento con control o flechas. El foco solo recorre BOTONES y la
+## mayoría de las filas no tiene ninguno (toda la Colección, cada misión sin
+## reclamar), así que arriba/abajo desplazan la lista cuando mover el foco se
+## saltaría filas que siguen fuera de vista:
+##   - una lista sin botones: siempre (Volver conserva el foco);
+##   - abajo desde el ÚLTIMO botón de fila / arriba desde el PRIMERO: mientras
+##     quede lista en esa dirección; después sigue hacia Volver.
+## Corre en _input, antes de que la GUI mueva el foco, para tomar la
+## pulsación primero.
 func _input(event: InputEvent) -> void:
 	if _scroll == null or not is_visible_in_tree():
 		return
@@ -115,22 +112,22 @@ func _can_scroll(direction: int) -> bool:
 
 func _on_back_pressed() -> void:
 	ScreenFade.transition(func() -> void:
-		get_tree().change_scene_to_file(CHARACTER_SELECT_SCENE_PATH))
+		get_tree().change_scene_to_file(ScenePaths.CHARACTER_SELECT))
 
 
-# --- badge ------------------------------------------------------------
+# --- insignia ---------------------------------------------------------
 
 func refresh_badge() -> void:
 	set_badge_count(SaveData.shards)
 
 
 func set_badge_count(value: int) -> void:
-	_badge_label.text = "Esquirlas: %d" % value
+	_badge_label.text = UiTheme.SHARDS_BALANCE % value
 
 
-## The balance broadcast arrives synchronously from claim_quest /
-## purchase_relic, i.e. BEFORE the count-up starts: repainting on it would
-## show the final number for one frame and then jump back to count.
+## El aviso de saldo llega en forma síncrona desde claim_quest /
+## purchase_relic, es decir, ANTES de que empiece el conteo: repintar con él
+## mostraría el número final un frame y luego saltaría atrás a contar.
 func _on_shards_changed(_balance: int) -> void:
 	if _count_tween != null and _count_tween.is_valid():
 		return
@@ -138,13 +135,13 @@ func _on_shards_changed(_balance: int) -> void:
 
 
 func _count_balance(before: int, after: int) -> void:
-	set_badge_count(before)  # start from the old value, never from the new one
+	set_badge_count(before)  # parte del valor viejo, nunca del nuevo
 	if _count_tween != null and _count_tween.is_valid():
 		_count_tween.kill()
 	_count_tween = create_tween()
 	_count_tween.set_ignore_time_scale(true)
 	_count_tween.tween_method(_set_badge_step, float(before), float(after), COUNT_TIME)
-	_count_tween.tween_callback(refresh_badge)  # settle on the real balance
+	_count_tween.tween_callback(refresh_badge)  # termina en el saldo real
 	UiTheme.pop(_badge_label, 1.2, 0.3)
 
 
@@ -152,10 +149,11 @@ func _set_badge_step(value: float) -> void:
 	set_badge_count(int(value))
 
 
-# --- shared moments ---------------------------------------------------
+# --- momentos compartidos ---------------------------------------------
 
-## The payoff moment (claim a quest, buy a rank): count the balance up or
-## down, flash the row gold, and resort the list once the flash lands.
+## El momento de pago (reclamar una misión, comprar un rango): cuenta el
+## saldo hacia arriba o abajo, hace destellar la fila en oro y reordena la
+## lista cuando termina el destello.
 func payoff(row: Control, before: int, after: int, sound: StringName) -> void:
 	Sfx.play(sound)
 	_count_balance(before, after)
@@ -169,36 +167,24 @@ func payoff(row: Control, before: int, after: int, sound: StringName) -> void:
 	flash.tween_callback(rebuild)
 
 
-## Can't-afford wobble. One tween per row, parked in metadata: mashing the
-## button restarts it instead of stacking N tweens writing the same
-## rotation and modulate (the kill_meta_tween pattern the rest of the UI
-## already uses).
+## Vaivén suave de "no alcanza" (UiTheme.reject con el perfil de filas).
+## Parte siempre de la pose recta: insistir en el botón lo reinicia.
 func reject(row: Control) -> void:
 	if not is_instance_valid(row):
 		return
-	row.pivot_offset = row.size * 0.5
-	UiTheme.kill_meta_tween(row, &"ui_reject_tween")
 	row.rotation_degrees = 0.0
 	row.modulate = Color.WHITE
-	var tween := create_tween()
-	tween.set_ignore_time_scale(true)
-	tween.tween_property(row, "modulate", REJECT_FLASH, 0.06)
-	tween.parallel().tween_property(row, "rotation_degrees", -2.0, 0.05)
-	tween.tween_property(row, "rotation_degrees", 2.0, 0.08)
-	tween.tween_property(row, "rotation_degrees", 0.0, 0.07)
-	tween.parallel().tween_property(row, "modulate", Color.WHITE, 0.18)
-	row.set_meta(&"ui_reject_tween", tween)
+	UiTheme.reject(row, UiTheme.REJECT_SWINGS_ROW, UiTheme.REJECT_SWING_TIMES_ROW)
 
 
-## remove_child BEFORE queue_free: a child freed this frame still sits in
-## the container until the frame ends, so appending the new rows first
-## would double the container's height for one frame and make the
-## ScrollContainer jump away from the row the player just used.
+## remove_child ANTES de queue_free: un hijo liberado este frame sigue en el
+## contenedor hasta que termina el frame, así que agregar primero las filas
+## nuevas duplicaría la altura del contenedor un frame y haría saltar el
+## ScrollContainer lejos de la fila que el jugador acaba de usar.
 ##
-## Focus survives the rebuild: the button a pad player just pressed (Buy,
-## Claim) is one of the rows being freed, and without this the focus died
-## with it — after one purchase the pad could not do anything else until
-## the mouse clicked something.
+## El foco sobrevive a la reconstrucción: el botón que un control acaba de
+## presionar (Comprar, Reclamar) está en una de las filas liberadas, y sin
+## esto el foco moriría con ella.
 func rebuild() -> void:
 	var focused_slot := -1
 	var focus_owner := get_viewport().gui_get_focus_owner()
@@ -216,7 +202,7 @@ func rebuild() -> void:
 			buttons[mini(focused_slot, buttons.size() - 1)].grab_focus()
 
 
-## Every button the rows hold (Buy, Claim), top to bottom.
+## Todos los botones de las filas (Comprar, Reclamar), de arriba abajo.
 func _row_buttons() -> Array[Button]:
 	var buttons: Array[Button] = []
 	for node: Node in _list.find_children("*", "Button", true, false):
@@ -226,11 +212,11 @@ func _row_buttons() -> Array[Button]:
 	return buttons
 
 
-## Chains the row buttons and Volver into one loop for the pad: down walks
-## the rows in order and lands on Volver, up from Volver goes to the last
-## row. Left to Godot's nearest-control search, the last row (half hidden
-## under the list's bottom edge) lost to Volver, which sat closer on
-## screen, and could never be reached.
+## Encadena los botones de las filas y Volver en un ciclo para el control:
+## abajo recorre las filas en orden y termina en Volver, arriba desde Volver
+## va a la última fila. Con la búsqueda automática de Godot, la última fila
+## (medio oculta bajo el borde de la lista) pierde contra Volver, que queda
+## más cerca en pantalla, y nunca se alcanza.
 func _link_row_focus() -> Array[Button]:
 	var buttons := _row_buttons()
 	if buttons.is_empty():
@@ -247,8 +233,8 @@ func _link_row_focus() -> Array[Button]:
 	return buttons
 
 
-## Staggered fade-in of the topmost rows. Bails out on an empty list: a
-## Tween with no tweeners warns on stderr, and the soaks grep for that.
+## Aparición escalonada de las primeras filas. Sale antes con la lista vacía:
+## un Tween sin tweeners avisa por stderr y los soaks buscan eso.
 func play_entrance() -> void:
 	var rows: Array[Control] = []
 	for child: Node in _list.get_children():
@@ -268,10 +254,11 @@ func play_entrance() -> void:
 				.set_delay(0.04 * i)
 
 
-# --- shared row chrome ------------------------------------------------
+# --- cromo compartido de las filas ------------------------------------
 
-## The card look every row in the three screens wears: rounded card body,
-## 2px accent border, optional glow for the "earned" states.
+## El aspecto de tarjeta de toda fila de las tres pantallas: cuerpo
+## redondeado, borde de 2 px en el acento y brillo opcional para los estados
+## "ganados".
 static func card_style(accent: Color, glow: bool) -> StyleBoxFlat:
 	var style := UiTheme.flat(UiTheme.CARD_BG, UiTheme.RADIUS)
 	style.border_color = accent
@@ -293,19 +280,14 @@ static func label(label_text: String, font_size: int, color: Color) -> Label:
 	return text_label
 
 
-# --- subclass hooks ---------------------------------------------------
+# --- ganchos de las subclases -----------------------------------------
 
-## Badge pill accent (and its text color). Shards blue by default.
-func _badge_color() -> Color:
-	return UiTheme.SHARD_BLUE
-
-
-## False for screens whose badge is not a Shard balance (the Collection
-## writes its own completion percentage while it rebuilds).
+## False en las pantallas cuya insignia no es un saldo de esquirlas (la
+## Colección escribe su propio porcentaje al reconstruir).
 func _tracks_shards() -> bool:
 	return true
 
 
-## Fill the list. Called on open and after every payoff.
+## Llena la lista. Se llama al abrir y después de cada pago.
 func _build_rows(_list_node: VBoxContainer) -> void:
 	pass
