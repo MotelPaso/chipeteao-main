@@ -115,6 +115,7 @@ grupos con su nombre.
 
 El nodo `EnemySpawner` vive dentro de cada arena (`scenes/world/<Arena>.tscn`).
 Lo que no cambia por mapa se edita en `scripts/systems/enemy_spawner.gd`.
+La lógica vive en ayudantes de `scripts/systems/spawner/` (`SpawnScaling`, `SpawnPoints`, `HordeSchedule`, `BossSchedule`…), pero todos leen los exports del spawner: los valores se cambian en `enemy_spawner.gd` o en el nodo de la arena.
 
 | Qué quieres cambiar | Dónde | Qué propiedad |
 | --- | --- | --- |
@@ -126,6 +127,8 @@ Lo que no cambia por mapa se edita en `scripts/systems/enemy_spawner.gd`.
 | Qué enemigos salen en cada minuto | `enemy_spawner.gd`, tablas al comienzo | `FOREST_PHASES`, `DUNES_PHASES`, `MARSH_PHASES` (un bioma nuevo va al FINAL del enum `PhasePreset`) |
 | Probabilidad de que caiga un power-up | `enemy_spawner.gd` (grupo «Power-ups») | `base_powerup_drop_chance`, `shiny_powerup_drop_scale` |
 | Textos de «¡TIEMPO DETENIDO!» | `enemy_spawner.gd` (grupo «Tiempo detenido») | `time_stop_start_text`, `time_stop_end_text` |
+| Altura a la que nace un enemigo sobre el suelo e intentos para hallar un punto libre | `scripts/systems/spawner/spawn_points.gd`, constantes al comienzo | `SPAWN_GROUND_OFFSET`, `RING_ATTEMPTS` |
+| Cuánto se desordena el cerco de una oleada de horda | `scripts/systems/spawner/horde_schedule.gd`, constante al comienzo | `BURST_ANGLE_JITTER` (radianes) |
 
 ## Personajes, armas, cartas y progreso (catálogos)
 
