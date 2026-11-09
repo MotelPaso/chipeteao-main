@@ -69,44 +69,15 @@ func _ready() -> void:
 	_refresh_prompt_text()
 
 
-## El precio sube con cada giro de la partida, así que el prompt se vuelve a
-## leer en vez de fijarse una vez al iniciar.
-func current_price() -> int:
-	return RunState.roulette_price(price)
-
-
-func _refresh_prompt_text() -> void:
-	set_prompt(prompt_template % current_price())
-
-
 func _physics_process(delta: float) -> void:
 	if _wheel != null:
 		_wheel.rotate_y(delta * wheel_spin_speed)
 
 
-func _interact(player: Node) -> void:
-	var cost := current_price()
-	if int(player.get("points")) < cost:
-		Sfx.play(&"dodge")
-		set_prompt(broke_prompt_template % [cost, int(player.get("points"))])
-		return
-	if _ui != null and is_instance_valid(_ui):
-		return
-	# Nunca sobre otra capa que pausa el árbol: el panel de la ruleta suelta la
-	# pausa al cerrarse, y esa pausa podría ser del selector de cartas o del
-	# menú de Esc.
-	if BlockingUi.any_open(get_tree()):
-		return
-	_ui = (load(ROULETTE_PANEL_PATH) as PackedScene).instantiate() as RouletteUi
-	_ui.setup(self, player)
-	# Bajo la ESCENA ACTUAL, nunca bajo /root: esta capa tiene todo el árbol
-	# pausado, y un CanvasLayer colgado de root sobrevive a
-	# change_scene_to_file y deja la siguiente arena congelada detrás de un
-	# panel huérfano que nadie puede cerrar.
-	var host := RunRoot.stage_parent(get_tree())
-	if host == null:
-		host = get_tree().root
-	host.add_child(_ui)
+## El precio sube con cada giro de la partida, así que el prompt se vuelve a
+## leer en vez de fijarse una vez al iniciar.
+func current_price() -> int:
+	return RunState.roulette_price(price)
 
 
 ## Elección ponderada pura sobre OUTCOMES para una tirada uniforme en [0, 1).
@@ -215,3 +186,32 @@ func apply_outcome(outcome_id: String, player: Node) -> void:
 					float(outcome.multiplier), float(outcome.seconds))
 		_:
 			push_warning("RouletteShrine: unknown outcome '%s'" % outcome_id)
+
+
+func _refresh_prompt_text() -> void:
+	set_prompt(prompt_template % current_price())
+
+
+func _interact(player: Node) -> void:
+	var cost := current_price()
+	if int(player.get("points")) < cost:
+		Sfx.play(&"dodge")
+		set_prompt(broke_prompt_template % [cost, int(player.get("points"))])
+		return
+	if _ui != null and is_instance_valid(_ui):
+		return
+	# Nunca sobre otra capa que pausa el árbol: el panel de la ruleta suelta la
+	# pausa al cerrarse, y esa pausa podría ser del selector de cartas o del
+	# menú de Esc.
+	if BlockingUi.any_open(get_tree()):
+		return
+	_ui = (load(ROULETTE_PANEL_PATH) as PackedScene).instantiate() as RouletteUi
+	_ui.setup(self, player)
+	# Bajo la ESCENA ACTUAL, nunca bajo /root: esta capa tiene todo el árbol
+	# pausado, y un CanvasLayer colgado de root sobrevive a
+	# change_scene_to_file y deja la siguiente arena congelada detrás de un
+	# panel huérfano que nadie puede cerrar.
+	var host := RunRoot.stage_parent(get_tree())
+	if host == null:
+		host = get_tree().root
+	host.add_child(_ui)

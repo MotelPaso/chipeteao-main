@@ -64,6 +64,17 @@ func _ready() -> void:
 	_visual.build(ring_radius, pair_color())
 
 
+func _physics_process(delta: float) -> void:
+	if _cooldown_left > 0.0:
+		_cooldown_left = maxf(_cooldown_left - delta, 0.0)
+		# El visual estrecha el pilar mientras recarga.
+		_visual.recharge_fraction = 1.0 - _cooldown_left / maxf(cooldown, 0.01)
+		if player_in_range:
+			set_prompt(_recharging_text())
+	else:
+		_visual.recharge_fraction = -1.0
+
+
 ## Color de este portal según su par.
 func pair_color() -> Color:
 	if pair_colors.is_empty():
@@ -76,15 +87,11 @@ func is_ready() -> bool:
 	return _cooldown_left <= 0.0 and twin != null and is_instance_valid(twin)
 
 
-func _physics_process(delta: float) -> void:
-	if _cooldown_left > 0.0:
-		_cooldown_left = maxf(_cooldown_left - delta, 0.0)
-		# El visual estrecha el pilar mientras recarga.
-		_visual.recharge_fraction = 1.0 - _cooldown_left / maxf(cooldown, 0.01)
-		if player_in_range:
-			set_prompt(_recharging_text())
-	else:
-		_visual.recharge_fraction = -1.0
+## Empieza la recarga de este portal (también la llama su pareja).
+func start_cooldown(seconds: float) -> void:
+	_cooldown_left = seconds
+	if player_in_range:
+		set_prompt(_recharging_text())
 
 
 func _recharging_text() -> String:
@@ -139,10 +146,3 @@ func _exit_position() -> Vector3:
 				or bool(bounds.call("is_walkable", Vector2(candidate.x, candidate.z))):
 			return candidate
 	return twin.global_position + Vector3.UP * EXIT_LIFT
-
-
-## Empieza la recarga de este portal (también la llama su pareja).
-func start_cooldown(seconds: float) -> void:
-	_cooldown_left = seconds
-	if player_in_range:
-		set_prompt(_recharging_text())
