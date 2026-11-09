@@ -338,13 +338,11 @@ func _apply_aura_shell(on: bool) -> void:
 		return
 	var row := ItemCatalog.kind_row("saiyan")
 	var tint: Color = row.aura_color
+	# Sin sombreado, como Juice.flash: la cáscara se ve solo con su albedo.
 	var shell := StandardMaterial3D.new()
 	shell.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	shell.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	shell.albedo_color = Color(tint, float(row.get("aura_alpha", 0.4)))
-	shell.emission_enabled = true
-	shell.emission = tint
-	shell.emission_energy_multiplier = 2.0
 	for node: Node in rig.find_children("*", "MeshInstance3D", true, false):
 		var mesh := node as MeshInstance3D
 		if mesh != null:
