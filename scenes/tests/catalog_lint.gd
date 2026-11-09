@@ -584,9 +584,11 @@ func _check_text_numbers() -> void:
 	_report("text_numbers", rows, failures)
 
 
-## Las filas que RowText arma: cada campo de text_values existe en la fila
-## ("amount" pide un primer efecto con amount) y la descripción tiene un %d
-## por campo. Un campo que falta se dibuja como 0 sin avisar a nadie.
+## Las filas que RowText arma: cada campo de text_values es un número de la
+## fila ("amount" pide un primer efecto con amount), y la descripción tiene un
+## %d por campo y ningún % suelto (el signo de porcentaje se escribe %%). Un
+## campo que falta se dibuja como 0, y un % suelto hace fallar el formato: el
+## jugador ve la plantilla cruda.
 func _check_text_values() -> void:
 	var failures: Array[String] = []
 	var rows := 0
@@ -603,21 +605,33 @@ func _check_text_values() -> void:
 			var names: Array = row.get("text_values", [])
 			for field: Variant in names:
 				if not _row_has_text_field(row, String(field)):
-					failures.append("%s text_values names '%s', which the row does not have"
+					failures.append("%s text_values names '%s', which is not a number field of the row"
 							% [owner_text, String(field)])
-			var slots := String(row.get("description", "")).replace("%%", "").count("%d")
+			var bare := String(row.get("description", "")).replace("%%", "")
+			var slots := bare.count("%d")
 			if slots != names.size():
 				failures.append("%s description has %d %%d but text_values lists %d fields"
 						% [owner_text, slots, names.size()])
+			# Solo las filas con text_values pasan por el formato; las demás
+			# pueden llevar un % suelto.
+			if not names.is_empty() and bare.count("%") != slots:
+				failures.append("%s description has a lone %% (write %%%% for a percent sign)"
+						% owner_text)
 	_report("text_values", rows, failures)
 
 
-## Si `field` es un número que RowText.value_of() puede leer de la fila.
+## Si `field` es un número (int o float) que RowText.value_of() puede leer de
+## la fila.
 func _row_has_text_field(row: Dictionary, field: String) -> bool:
+	var value: Variant = null
 	if field == "amount":
 		var effects: Array = row.get("effects", [])
-		return not effects.is_empty() and (effects[0] as Dictionary).has("amount")
-	return row.has(field)
+		if effects.is_empty():
+			return false
+		value = (effects[0] as Dictionary).get("amount")
+	else:
+		value = row.get(field)
+	return typeof(value) == TYPE_INT or typeof(value) == TYPE_FLOAT
 
 
 ## Cada `kind` de comportamiento en una sola fila de ITEM_LIBRARY:
