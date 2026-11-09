@@ -14,8 +14,8 @@ extends SceneTree
 ## Los sonidos en bucle no traen metadatos de bucle: Sfx y AmbientBed fuerzan
 ## LOOP_FORWARD sobre su propia COPIA del stream importado.
 ##
-## Pendiente: los wav del repo se generaron cuando _save_wav truncaba en vez
-## de redondear; regenerarlos cambia como mucho 1 LSB por muestra.
+## Pendiente: los wav del repo no son los que escribe esta versión;
+## regenerarlos cambia como mucho 1 LSB por muestra.
 
 const RATE := 44100.0
 const SFX_DIR := "res://assets/audio/sfx"
