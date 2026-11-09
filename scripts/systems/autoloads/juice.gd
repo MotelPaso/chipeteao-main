@@ -86,14 +86,16 @@ void fragment() {
 @export var fov_kick_out_time: float = 0.15
 
 @export_group("Ráfagas")
-## Partículas de la ráfaga de muerte de un enemigo: mínimo y máximo.
+## Mínimo de partículas de la ráfaga de muerte de un enemigo.
 @export var death_burst_min: int = 4
+## Máximo de partículas de la ráfaga de muerte de un enemigo.
 @export var death_burst_max: int = 6
 ## Partículas de la ráfaga de muerte de un jefe. No lo subas por encima del
 ## `amount` de DeathBurst.tscn (24): la ráfaga se recorta a su buffer.
 @export var boss_burst_amount: int = 24
-## Partículas y color del destello dorado de cofres y santuarios.
+## Partículas del destello dorado de cofres y santuarios.
 @export var sparkle_amount: int = 6
+## Color del destello dorado de cofres y santuarios.
 @export var sparkle_color: Color = Color(1.0, 0.84, 0.3)
 
 @export_group("Anillo de subida de nivel")
@@ -105,8 +107,9 @@ void fragment() {
 @export var level_ring_alpha: float = 0.85
 ## Intensidad del brillo (emisión) del anillo.
 @export var level_ring_emission_energy: float = 2.4
-## Escala del anillo al nacer y al terminar (x/z = ancho, y = grosor).
+## Escala del anillo al nacer (x/z = ancho, y = grosor).
 @export var level_ring_start_scale: Vector3 = Vector3(0.4, 0.55, 0.4)
+## Escala del anillo al terminar (x/z = ancho, y = grosor).
 @export var level_ring_end_scale: Vector3 = Vector3(4.6, 0.25, 4.6)
 
 ## Cámaras que mueve la capa de sensación. La pantalla dividida registra

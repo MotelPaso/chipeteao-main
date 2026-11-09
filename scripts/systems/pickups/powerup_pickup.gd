@@ -16,23 +16,31 @@ extends Area3D
 ## PowerUpPickup.tscn (nodos CollisionShape3D, Gem, Glyph y Light); el script
 ## solo los tiñe con el color y el glifo de la fila.
 
-## Segundos antes de que se desvanezca sin recoger. La estrella tiene el
-## suyo, más largo: se mueve y hay que darle tiempo para alcanzarla.
+@export_group("Vida")
+## Segundos antes de que se desvanezca sin recoger.
 @export var lifetime: float = 45.0
+## Segundos de vida de la estrella: más larga porque se mueve y hay que alcanzarla.
 @export var star_lifetime: float = 60.0
+
+@export_group("Ronda de la estrella")
 ## Velocidad de ronda de la estrella, en m/s (las demás filas no se mueven).
 @export var roam_speed: float = 6.0
-## Altura del salto mientras ronda, en metros, y su frecuencia en Hz.
+## Altura del salto mientras ronda, en metros.
 @export var hop_height: float = 0.9
+## Saltos por segundo mientras ronda, en Hz.
 @export var hop_hz: float = 1.6
-## Flotación en reposo: altura en metros y frecuencia en Hz.
-@export var bob_height: float = 0.22
-@export var bob_hz: float = 1.4
-## Giro de la gema, en radianes por segundo.
-@export var spin_speed: float = 1.8
 ## Distancia, en metros, que mira adelante la estrella buscando un muro en
 ## el que rebotar.
 @export var roam_probe: float = 3.0
+
+@export_group("Flotación y giro")
+## Altura de la flotación en reposo, en metros.
+@export var bob_height: float = 0.22
+## Frecuencia de la flotación en reposo, en Hz.
+@export var bob_hz: float = 1.4
+## Giro de la gema, en radianes por segundo.
+@export var spin_speed: float = 1.8
+@export_group("")
 
 ## Segundos del desvanecimiento antes de que el nodo se libere.
 const FADE_TIME: float = 0.45

@@ -15,10 +15,11 @@ extends WeaponBase
 
 # --- edita aquí --------------------------------------------------------------
 # BeltBolt no tiene escena (ItemBag lo crea con BeltBolt.new()), así que sus
-# ajustes son estas constantes y no aparecen en el Inspector. El alcance del
-# primer blanco es ItemBag.belt_first_range, y el aspecto del rayo está en
-# scenes/fx/LightningBeam.tscn, grupo «Cinturón eléctrico».
+# ajustes son estas constantes y no aparecen en el Inspector. El aspecto del
+# rayo está en scenes/fx/LightningBeam.tscn, grupo «Cinturón eléctrico».
 
+## Alcance desde el raider hasta el primer blanco, en metros.
+const FIRST_RANGE: float = 10.0
 ## Daño del primer golpe con una sola copia del cinturón.
 const BELT_DAMAGE: float = 25.0
 ## Daño extra por cada copia después de la primera (0.35 = +35%).
@@ -34,10 +35,6 @@ const BEAM_HEIGHT: float = 0.9
 # --- fin de edita aquí -------------------------------------------------------
 
 const LIGHTNING_BEAM_SCENE: PackedScene = preload("res://scenes/fx/LightningBeam.tscn")
-
-## Alcance hasta el primer blanco, en metros. ItemBag lo escribe con su
-## belt_first_range al crear el rayo; este valor es solo el respaldo.
-var first_range: float = 10.0
 
 
 func _ready() -> void:
@@ -60,7 +57,7 @@ func zap_chain(origin: Vector3, copies: int) -> int:
 	var hits := 0
 	var struck: Array[Node3D] = []
 	var from := origin
-	var reach := first_range
+	var reach := FIRST_RANGE
 	var remaining := BASE_BOUNCES + copies + 1
 	# deal_damage lee `damage`: se fija en cada derrape según las copias.
 	damage = BELT_DAMAGE * (1.0 + DAMAGE_PER_EXTRA_COPY * float(maxi(copies - 1, 0)))

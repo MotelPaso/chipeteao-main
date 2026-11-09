@@ -11,19 +11,21 @@ extends Node
 
 signal run_ended(victory: bool)
 
-## Segundos que debe durar una ETAPA antes de que su puerta pueda abrirse.
-## Se mide con RunState.stage_time, así cada mapa de la partida tiene su
-## tramo completo.
-@export var stage_goal: float = 900.0
-
 ## Interruptor del harness: BONK_STAGE_FAST=1 supera una etapa a los
 ## STAGE_FAST_GOAL segundos y sin jefe, para que un soak cruce de etapa.
 ## Solo pruebas; nada del juego lo pone.
 const STAGE_FAST_ENV: String = "BONK_STAGE_FAST"
 const STAGE_FAST_GOAL: float = 60.0
+
+@export_group("Puerta de etapa")
+## Segundos que debe durar una ETAPA antes de que su puerta pueda abrirse.
+## Se mide con RunState.stage_time, así cada mapa de la partida tiene su
+## tramo completo.
+@export var stage_goal: float = 900.0
 ## Aviso del momento en que se supera una etapa. Sin marcadores de formato:
 ## habla de la puerta que se acaba de abrir, no de un número.
 @export var survival_text: String = "¡Etapa superada! Se abrió el portal — quédate cuanto quieras"
+@export_group("")
 
 var _run_over: bool = false
 ## True si BONK_STAGE_FAST está puesto (se lee una vez, en _ready).

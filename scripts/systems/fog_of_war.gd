@@ -17,6 +17,7 @@ extends Node
 ## nada fuera de este nodo escribe la imagen, y por eso `revision` puede
 ## representar su contenido.
 
+@export_group("Niebla")
 ## Metros por píxel de niebla. 2 m da 121x121 en una arena de 240 m: lo
 ## bastante grueso para pintar barato y fino para que un pasillo entre dos
 ## manchas de máscara se lea como explorado.
@@ -26,6 +27,7 @@ extends Node
 ## Segundos entre pasadas de pintura. No por frame: caminando, un raider
 ## recorre menos de un metro en este tiempo, un tercio de píxel de niebla.
 @export var paint_interval: float = 0.2
+@export_group("")
 
 ## El estado de verdad. FORMAT_L8: un byte por píxel, sin alfa; MapDraw lo
 ## convierte en algo dibujable.

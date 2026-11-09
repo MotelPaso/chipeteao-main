@@ -11,8 +11,9 @@ extends RefCounted
 ## Se puede cambiar sin romper nada:
 ##   display_name, description: texto para el jugador (HUD, avisos, cofres).
 ##   glyph:    1-2 letras de la casilla del HUD mientras no hay sprite. Se
-##             DECLARA (no sale del nombre) y debe ser único entre armas,
-##             evoluciones, tomos, objetos y power-ups: la franja los mezcla.
+##             DECLARA (no sale del nombre). No debe repetirse entre armas,
+##             evoluciones, tomos, objetos, power-ups ni mascotas (el lint
+##             glyphs_unique lo revisa).
 ##   icon:     OPCIONAL, ruta res:// de una textura; si está, el HUD la
 ##             muestra en vez del glifo.
 ##   effects:  OPCIONAL, [{stat, amount}] de PlayerStats POR COPIA, por el
@@ -26,14 +27,16 @@ extends RefCounted
 ## Llave interna (la lee el código; cambiarla rompe algo):
 ##   id:       identificador en inglés, nunca se muestra; nombra los
 ##             contadores de SaveData.
-##   rarity:   "Common" | "Rare" | "Epic" | "Legendary" (nombres de
-##             UpgradePool); la pantalla lo traduce con
-##             UpgradePool.rarity_display().
+##   rarity:   "Common" | "Rare" | "Epic" | "Legendary" (los name de
+##             Rarity.TIERS); la pantalla lo traduce con
+##             Rarity.display_name().
 ##   kind:     OPCIONAL, comportamiento: "magnet", "poison_on_hit", "titan",
 ##             "spiders", "shock_dash", "saiyan", "zenkai" (los maneja
 ##             ItemBag) y "demonic_boost", "charge_boost", "portal_recharge"
-##             (contadores que leen los santuarios). Un kind por fila: el
-##             comportamiento se busca por kind, no por id.
+##             (contadores que leen los santuarios). Un kind por fila y un
+##             objeto por kind: el comportamiento se busca por kind, no por
+##             id, y sus números salen de esa única fila (el lint
+##             item_kinds_unique lo revisa).
 ## No hay kind "pet": la mascota es un espacio único del Player que solo
 ## llenan la caja de mascota y el traficante, así que un cofre o la ruleta
 ## nunca pueden repartir una (tirarían la que el jugador eligió).
@@ -210,8 +213,8 @@ static func ids_of_kind(kind: String) -> PackedStringArray:
 	return _ids_by_kind[kind]
 
 
-## La fila del objeto con este `kind` de comportamiento (hay una por tipo),
-## o vacía si no existe. ItemBag y PlayerStats leen de aquí los números de
+## La fila del objeto con este `kind` de comportamiento (hay una por tipo; el
+## lint item_kinds_unique lo revisa), o vacía si no existe. ItemBag y PlayerStats leen de aquí los números de
 ## cada comportamiento.
 static func kind_row(kind: String) -> Dictionary:
 	var ids := ids_of_kind(kind)

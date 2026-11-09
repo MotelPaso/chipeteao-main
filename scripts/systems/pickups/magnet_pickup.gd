@@ -22,6 +22,7 @@ const CATCH_RADIUS_SQ: float = 0.36
 ## los pies.
 const TARGET_HEIGHT: float = 0.9
 
+@export_group("Imán")
 ## Radio de imán en metros (antes del multiplicador de alcance de la partida).
 @export var magnet_radius: float = 4.0
 ## Aceleración de la persecución, en m/s².
@@ -29,13 +30,19 @@ const TARGET_HEIGHT: float = 0.9
 ## Velocidad inicial de persecución, en m/s, cuando la aspiradora de subida
 ## de nivel agarra este recolectable.
 @export var vacuum_speed: float = 26.0
+
+@export_group("Vida")
 ## Segundos en el suelo antes de desaparecer sin recoger.
 @export var lifetime: float = 60.0
+
+@export_group("Reposo")
 ## Giro en reposo, en radianes por segundo.
 @export var spin_speed: float = 2.5
-## Flotación en reposo: altura en metros y velocidad.
+## Altura de la flotación en reposo, en metros.
 @export var bob_amplitude: float = 0.12
+## Velocidad de la flotación en reposo, en radianes por segundo.
 @export var bob_speed: float = 3.0
+@export_group("")
 
 @onready var _visual: Node3D = $Visual
 

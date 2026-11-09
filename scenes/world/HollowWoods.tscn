@@ -239,6 +239,8 @@ grunt_scene = ExtResource("4_grunt")
 skirmisher_scene = ExtResource("15_skirmisher")
 tank_scene = ExtResource("16_tank")
 boss_scene = ExtResource("17_boss")
+elder_title = "Rey Pútrido Ancestral"
+boss_warning_text = "Una presencia monstruosa se acerca..."
 
 [node name="AmbientBed" type="AudioStreamPlayer" parent="."]
 stream = ExtResource("23_wind")

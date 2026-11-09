@@ -106,11 +106,13 @@ const SOUND_LIBRARY: Dictionary[StringName, Dictionary] = {
 	},
 }
 
+@export_group("Voces")
 ## Voces para sonidos de un disparo; los que se solapan rotan entre ellas.
 @export var pool_size: int = 12
 ## Variación de tono al azar (fracción: 0.08 = ±8%) de los ids con
 ## "jitter" en SOUND_LIBRARY.
 @export var default_pitch_jitter: float = 0.08
+@export_group("")
 
 
 ## Ventana móvil de un segundo con las marcas de tiempo de un id con tope.

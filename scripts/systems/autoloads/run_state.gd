@@ -15,6 +15,38 @@ signal difficulty_changed(bonus: float)
 ## soak lo imprime como stage_index + 1.
 signal stage_changed(stage_index: int, map_id: String)
 
+# --- Edita aquí -------------------------------------------------------------
+# RunState es un autoload sin escena, así que sus números de diseño son estas
+# constantes y no aparecen en el Inspector.
+
+## Curva de XP: costo del nivel al que se sube, en gemas (del 1 al 2 cuesta
+## XP_BASE + XP_PER_LEVEL + el término cuadrático). Todo el ritmo de la
+## partida va en estos tres números.
+const XP_BASE: int = 5
+const XP_PER_LEVEL: int = 3
+## Término cuadrático: los primeros niveles casi no cambian (el 1 cuesta 8)
+## y los tardíos pesan: el nivel 10 cuesta 50 y el 20 cuesta 125.
+const XP_PER_LEVEL_SQUARED: float = 0.15
+## Fracción del bono de dificultad que se vuelve XP extra en cada gema.
+const DIFFICULTY_XP_SHARE: float = 0.75
+## Precios de cofres: precio base en puntos por rareza.
+const CHEST_BASE_PRICES: Dictionary[String, int] = {
+	"Common": 20, "Rare": 40, "Epic": 80, "Legendary": 160}
+## Multiplicador GLOBAL que cada cofre abierto aplica al precio de todos los demás.
+const CHEST_PRICE_GROWTH: float = 1.25
+## Precio de la ruleta: cada giro lo multiplica por esto para los siguientes
+## de la partida. Más empinado que el de cofres a propósito: un giro puede dar
+## un objeto Legendario.
+const ROULETTE_PRICE_GROWTH: float = 2.0
+## Lo que pide el vendedor de power-ups por su primera venta de la partida.
+## Cuánto sube tras cada venta: Vendor.powerup_price_growth (Vendor.tscn).
+const POWERUP_VENDOR_BASE_PRICE: int = 100
+# --- fin de edita aquí ------------------------------------------------------
+
+## Variable de entorno que hace reproducible toda una partida (ver reset()).
+## Solo pruebas; nada del juego la pone.
+const GAME_SEED_ENV: String = "BONK_GAME_SEED"
+
 var xp: int = 0
 var level: int = 1
 ## Costo de la primera subida de nivel (reset() lo vuelve a sacar de la curva).
@@ -67,8 +99,6 @@ var demonic_uses: int = 0
 var difficulty_bonus: float = 0.0
 ## Aporte de dificultad por fuente (id de fuente -> fracción).
 var _difficulty_sources: Dictionary[String, float] = {}
-## Fracción del bono de dificultad que se vuelve XP extra en cada gema.
-const DIFFICULTY_XP_SHARE: float = 0.75
 ## Pactos demoníacos: las perillas de la partida que escribe el COSTO de un
 ## pacto. Cada una es una fracción (0.1 = +10%) y tiene exactamente un
 ## consumidor, nombrado aquí para que ninguna quede como dato muerto:
@@ -81,24 +111,14 @@ var elite_chance_bonus: float = 0.0
 var sky_duration_multiplier: float = 1.0
 var event_chance_bonus: float = 0.0
 var disaster_chance_bonus: float = 0.0
-## Economía de cofres: precio base en puntos por rareza, y el multiplicador
-## GLOBAL que cada cofre abierto aplica a todos los demás.
-const CHEST_BASE_PRICES: Dictionary[String, int] = {
-	"Common": 20, "Rare": 40, "Epic": 80, "Legendary": 160}
-const CHEST_PRICE_GROWTH: float = 1.25
 ## Multiplicador de precio de cofres de la party, un paso de
 ## CHEST_PRICE_GROWTH por cofre abierto. Es el ÚNICO registro de cofres de la
 ## partida: el contador "chests_opened" de las misiones vive en SaveData (lo
 ## suma Interactable.consume).
 var chest_price_multiplier: float = 1.0
-## Economía de la ruleta: cada giro DUPLICA el precio de los siguientes en
-## esta partida. Más empinado que el de cofres a propósito: un giro puede dar
-## un objeto Legendario.
-const ROULETTE_PRICE_GROWTH: float = 2.0
+## Multiplicador de precio de la ruleta, un paso de ROULETTE_PRICE_GROWTH
+## por giro.
 var roulette_price_multiplier: float = 1.0
-## Lo que pide el vendedor de power-ups por su primera venta de la partida.
-## Cuánto sube tras cada venta: Vendor.powerup_price_growth (Vendor.tscn).
-const POWERUP_VENDOR_BASE_PRICE: int = 100
 ## Lo que cobra a continuación el vendedor de power-ups, en puntos. Un precio
 ## ABSOLUTO de la partida y no un multiplicador: el puesto vende un power-up
 ## sacado sea cual sea, así que el número mismo es la escalera, y sube solo
@@ -110,18 +130,6 @@ var powerup_vendor_price: int = POWERUP_VENDOR_BASE_PRICE
 ## chest_price. El vendedor de power-ups y los precios de mascota quedan
 ## fuera a propósito: son la economía de largo plazo de la partida.
 var price_discount: float = 1.0
-## Variable de entorno que hace reproducible toda una partida (ver reset()).
-## Solo pruebas; nada del juego la pone.
-const GAME_SEED_ENV: String = "BONK_GAME_SEED"
-
-## Curva de XP: costo del nivel al que se sube, en gemas (del 1 al 2 cuesta
-## XP_BASE + XP_PER_LEVEL + el término cuadrático). Todo el ritmo de la
-## partida va en estos tres números.
-const XP_BASE: int = 5
-const XP_PER_LEVEL: int = 3
-## Término cuadrático: los primeros niveles casi no cambian (el 1 cuesta 8)
-## y los tardíos pesan: el nivel 10 cuesta 50 y el 20 cuesta 125.
-const XP_PER_LEVEL_SQUARED: float = 0.15
 
 
 func _ready() -> void:

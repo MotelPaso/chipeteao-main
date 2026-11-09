@@ -34,6 +34,8 @@ static func render_all(rows: Array[Dictionary]) -> Array[Dictionary]:
 
 
 ## Un número de la fila: un campo propio, o "amount" para el primer efecto.
+## Un campo que no existe vale 0 y deja una advertencia (el lint
+## text_values lo atrapa antes).
 static func value_of(row: Dictionary, field: String) -> float:
 	if field == "amount":
 		var effects: Array = row.get("effects", [])
@@ -41,4 +43,8 @@ static func value_of(row: Dictionary, field: String) -> float:
 			return 0.0
 		var first: Dictionary = effects[0]
 		return float(first.get("amount", 0.0))
-	return float(row.get(field, 0.0))
+	if not row.has(field):
+		push_warning("RowText: row '%s' has no field '%s' for its description"
+				% [String(row.get("id", "?")), field])
+		return 0.0
+	return float(row[field])
