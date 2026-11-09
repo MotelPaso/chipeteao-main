@@ -74,7 +74,7 @@ const VENDOR_PANEL_PATH: String = "res://scenes/ui/modal/VendorPanel.tscn"
 ## tener menos objetos que huecos el estante (Legendario tiene dos).
 @export var item_rerolls: int = 4
 
-@export_group("Espera y salida")
+@export_group("Espera")
 ## Segundos que el puesto ignora `interact` tras cerrarse un menú sin venta. El
 ## soak vuelve a interactuar cada 0.75 s mientras se queda cerca, y sin esto el
 ## panel se reabriría apenas se cierra, para siempre.
@@ -384,5 +384,5 @@ static func _payload_id(offer: Dictionary) -> String:
 
 func _leave() -> void:
 	get_tree().call_group("hud", "announce", leave_announcement)
-	# Se encoge sin bajar: sink_duration y sink_end_scale en Vendor.tscn.
+	# Se encoge sin bajar: sink_duration en Vendor.tscn; sink_end_scale es el de interactable.gd.
 	sink_away()
