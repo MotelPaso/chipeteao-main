@@ -18,7 +18,6 @@ extends MetaScreen
 ## Sangría de las filas de evolución. Es diseño, no texto: queda fuera de las
 ## cadenas traducidas.
 const EVO_PREFIX := "⤷ "
-const UNKNOWN := "???"
 
 ## Filas del bestiario, en el orden en que aparecen en pantalla. Edita aquí.
 ##
@@ -67,6 +66,14 @@ const BESTIARY: Array[Dictionary] = [
 @export_group("Textos")
 ## Insignia de arriba (%d = descubiertos, %d = total, %d = porcentaje).
 @export var badge_format: String = "Colección: %d / %d — %d%%"
+## Título de la sección de raiders.
+@export var raiders_title: String = "RAIDERS"
+## Título de la sección de armas y evoluciones.
+@export var arsenal_title: String = "ARSENAL"
+## Título de la sección del bestiario.
+@export var bestiary_title: String = "BESTIARIO"
+## Título de una fila sin descubrir (raider, arma, evolución o enemigo).
+@export var unknown_text: String = "???"
 ## Detalle de un raider sin desbloquear.
 @export var hidden_raider_text: String = "Un raider que sigue allá afuera..."
 ## Detalle de un arma que nunca se llevó.
@@ -91,7 +98,7 @@ func _tracks_shards() -> bool:
 func _build_rows(list_node: VBoxContainer) -> void:
 	var found := 0
 	var total := 0
-	list_node.add_child(_section_header("RAIDERS"))
+	list_node.add_child(_section_header(raiders_title))
 	for character: Dictionary in CharacterCatalog.CHARACTER_LIBRARY:
 		total += 1
 		if SaveData.is_unlocked(String(character.id)):
@@ -100,7 +107,7 @@ func _build_rows(list_node: VBoxContainer) -> void:
 					String(character.blurb), Color(character.tint)))
 		else:
 			list_node.add_child(_hidden_row(hidden_raider_text))
-	list_node.add_child(_section_header("ARSENAL"))
+	list_node.add_child(_section_header(arsenal_title))
 	for weapon: Dictionary in UpgradePool.WEAPON_LIBRARY:
 		total += 2  # el arma y su evolución cuentan por separado
 		var weapon_id := String(weapon.id)
@@ -122,12 +129,12 @@ func _build_rows(list_node: VBoxContainer) -> void:
 							EvolutionCatalog.EVOLVE_AT_LEVEL, String(recipe.flavor)],
 					true))
 		elif carried:
-			list_node.add_child(_evo_row(UNKNOWN,
+			list_node.add_child(_evo_row(unknown_text,
 					evo_hint_format % EvolutionCatalog.EVOLVE_AT_LEVEL,
 					false))
 		else:
-			list_node.add_child(_evo_row(UNKNOWN, evo_unknown_text, false))
-	list_node.add_child(_section_header("BESTIARIO"))
+			list_node.add_child(_evo_row(unknown_text, evo_unknown_text, false))
+	list_node.add_child(_section_header(bestiary_title))
 	for beast: Dictionary in BESTIARY:
 		total += 1
 		var kills := SaveData.stat("kills_" + String(beast.id))
@@ -156,7 +163,7 @@ func _row(title: String, detail: String, accent: Color) -> PanelContainer:
 
 
 func _hidden_row(tease: String) -> PanelContainer:
-	return _build_row(UNKNOWN, tease, UiTheme.BORDER_LOCKED, false)
+	return _build_row(unknown_text, tease, UiTheme.BORDER_LOCKED, false)
 
 
 ## Las filas de evolución van con sangría bajo su arma; las descubiertas

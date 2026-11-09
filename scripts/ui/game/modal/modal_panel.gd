@@ -78,6 +78,30 @@ func _ready() -> void:
 		_auto_play()
 
 
+## Con el árbol pausado nada más puede notar que el raider ya no está (caída de
+## todo el grupo en co-op, desmontaje de la escena) o que el objeto que abrió el
+## panel se fue con la etapa. No quedaría nadie para presionar Salir.
+func _process(_delta: float) -> void:
+	if is_queued_for_deletion():
+		return
+	if not is_instance_valid(_player) or not is_instance_valid(_host):
+		_close()
+
+
+func _unhandled_input(event: InputEvent) -> void:
+	if event.is_action_pressed("ui_cancel") and _can_close():
+		_close()
+		get_viewport().set_input_as_handled()
+
+
+## _close() es el único camino que quita la pausa, así que un panel LIBERADO en
+## vez de cerrado (free() desde un harness, el padre de la etapa que se va con
+## un cambio de etapa) dejaría un árbol pausado sin nada en pantalla que lo
+## suelte.
+func _exit_tree() -> void:
+	_release_pause()
+
+
 ## Contrato "ui_blocking" (BlockingUi): true mientras esta capa es dueña de la
 ## pausa. Es false apenas queda en cola para borrarse: el nodo sigue en el grupo
 ## hasta que la cola de borrado se vacía al final del frame, y un panel que se va
@@ -94,22 +118,6 @@ func dismiss() -> void:
 	if not _can_close():
 		return
 	_close()
-
-
-## Con el árbol pausado nada más puede notar que el raider ya no está (caída de
-## todo el grupo en co-op, desmontaje de la escena) o que el objeto que abrió el
-## panel se fue con la etapa. No quedaría nadie para presionar Salir.
-func _process(_delta: float) -> void:
-	if is_queued_for_deletion():
-		return
-	if not is_instance_valid(_player) or not is_instance_valid(_host):
-		_close()
-
-
-func _unhandled_input(event: InputEvent) -> void:
-	if event.is_action_pressed("ui_cancel") and _can_close():
-		_close()
-		get_viewport().set_input_as_handled()
 
 
 ## Lo llama el setup() de cada panel, antes de add_child(): quién lo abrió y
@@ -197,11 +205,3 @@ func _release_pause() -> void:
 		return
 	get_tree().paused = false
 	Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
-
-
-## _close() es el único camino que quita la pausa, así que un panel LIBERADO en
-## vez de cerrado (free() desde un harness, el padre de la etapa que se va con
-## un cambio de etapa) dejaría un árbol pausado sin nada en pantalla que lo
-## suelte.
-func _exit_tree() -> void:
-	_release_pause()

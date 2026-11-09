@@ -9,9 +9,6 @@ extends MetaScreen
 ## El cromo, la salida con Esc/Volver, la entrada escalonada y el pago (la
 ## fila destella en oro y el saldo cuenta y salta) vienen de MetaScreen.
 
-## Modulate de las filas ya reclamadas.
-const CLAIMED_MODULATE := Color(1.0, 1.0, 1.0, 0.45)
-
 ## Tres estados de fila que se excluyen entre sí.
 enum RowState { IN_PROGRESS, CLAIMABLE, CLAIMED }
 
@@ -36,6 +33,12 @@ enum RowState { IN_PROGRESS, CLAIMABLE, CLAIMED }
 @export var claimed_font_size: int = 12
 ## Color del sello de misión reclamada.
 @export var claimed_color: Color = UiTheme.TEXT_FAINT
+## Modulate de las filas ya reclamadas (atenuadas).
+@export var claimed_row_modulate: Color = Color(1.0, 1.0, 1.0, 0.45)
+## Tamaño mínimo del botón Reclamar, en píxeles (ancho, alto).
+@export var claim_button_size: Vector2 = Vector2(110.0, 34.0)
+## Tamaño mínimo de la barra de progreso, en píxeles (ancho, alto).
+@export var progress_bar_size: Vector2 = Vector2(260.0, 14.0)
 
 @export_group("Textos")
 ## Botón de una misión completa sin reclamar.
@@ -81,7 +84,7 @@ func _build_row(quest: Dictionary, state: RowState) -> PanelContainer:
 	row.add_theme_stylebox_override("panel", MetaScreen.card_style(
 			UiTheme.ACCENT_AMBER if claimable else UiTheme.BORDER_DIM, claimable))
 	if state == RowState.CLAIMED:
-		row.modulate = CLAIMED_MODULATE
+		row.modulate = claimed_row_modulate
 	var columns := HBoxContainer.new()
 	columns.add_theme_constant_override("separation", 16)
 	row.add_child(columns)
@@ -117,7 +120,7 @@ func _build_side(quest: Dictionary, state: RowState,
 	if state == RowState.CLAIMABLE:
 		var claim := Button.new()
 		claim.text = claim_text
-		claim.custom_minimum_size = Vector2(110.0, 34.0)
+		claim.custom_minimum_size = claim_button_size
 		claim.pressed.connect(_on_claim_pressed.bind(String(quest.id), row))
 		UiTheme.style_button(claim, UiTheme.ACCENT_AMBER, true)
 		side.add_child(claim)
@@ -135,7 +138,7 @@ func _progress_line(current: int, target: int, complete: bool) -> HBoxContainer:
 	var line := HBoxContainer.new()
 	line.add_theme_constant_override("separation", 10)
 	var bar := ProgressBar.new()
-	bar.custom_minimum_size = Vector2(260.0, 14.0)
+	bar.custom_minimum_size = progress_bar_size
 	bar.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	bar.max_value = float(target)
 	bar.value = float(mini(current, target))

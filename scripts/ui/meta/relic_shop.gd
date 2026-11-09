@@ -26,6 +26,8 @@ extends MetaScreen
 @export var maxed_font_size: int = 13
 ## Color del sello de rango máximo.
 @export var maxed_color: Color = UiTheme.ACCENT_AMBER
+## Tamaño mínimo del botón de compra, en píxeles (ancho, alto).
+@export var buy_button_size: Vector2 = Vector2(130.0, 34.0)
 
 @export_group("Textos")
 ## Rombo de un rango comprado.
@@ -88,7 +90,7 @@ func _build_row(relic: Dictionary) -> PanelContainer:
 		var cost := RelicCatalog.next_rank_cost(relic_id, rank)
 		var buy := Button.new()
 		buy.text = UiTheme.SHARDS_AMOUNT % cost
-		buy.custom_minimum_size = Vector2(130.0, 34.0)
+		buy.custom_minimum_size = buy_button_size
 		buy.pressed.connect(_on_buy_pressed.bind(relic_id, row))
 		UiTheme.style_button(buy, UiTheme.SHARD_BLUE, SaveData.can_afford(cost))
 		side.add_child(buy)

@@ -10,8 +10,6 @@ extends Control
 
 signal closed
 
-## Color del canal de los sliders.
-const SLIDER_TRACK_COLOR := Color(0.05, 0.06, 0.09, 0.9)
 ## El volumen es un porcentaje 0-100 en todo el juego (SettingsApply lo pasa
 ## a dB); el rango de la sensibilidad es el de SaveData, que también acota el
 ## valor guardado.
@@ -35,6 +33,14 @@ const VOLUME_MAX := 100.0
 @export var open_fade_time: float = 0.14
 ## Duración del crecimiento con rebote del panel, en segundos.
 @export var open_grow_time: float = 0.2
+
+@export_group("Panel")
+## Margen interior del panel, en píxeles (horizontal, vertical).
+@export var panel_margin: Vector2 = Vector2(32.0, 24.0)
+
+@export_group("Sliders")
+## Color del canal (el fondo) de los sliders.
+@export var slider_track_color: Color = Color(0.05, 0.06, 0.09, 0.9)
 
 @onready var _panel: PanelContainer = %Panel
 @onready var _sfx_slider: HSlider = %SfxSlider
@@ -234,11 +240,11 @@ func _apply_ranges() -> void:
 func _apply_styles() -> void:
 	_apply_ranges()
 	_panel.add_theme_stylebox_override("panel",
-			UiTheme.panel(UiTheme.PANEL_BG, UiTheme.BORDER_DIM, 32.0, 24.0))
+			UiTheme.panel(UiTheme.PANEL_BG, UiTheme.BORDER_DIM, panel_margin.x, panel_margin.y))
 	var grabber := UiTheme.grabber_icon(UiTheme.ACCENT)
 	var grabber_hi := UiTheme.grabber_icon(UiTheme.ACCENT.lightened(0.25))
 	for slider: HSlider in [_sfx_slider, _ambient_slider, _sensitivity_slider]:
-		var track := UiTheme.flat(SLIDER_TRACK_COLOR, 4)
+		var track := UiTheme.flat(slider_track_color, 4)
 		track.set_border_width_all(1)
 		track.border_color = Color(0.0, 0.0, 0.0, 0.6)
 		track.content_margin_top = 4.0

@@ -9,8 +9,9 @@ extends Control
 ## así que la horda sigue mientras el mapa está abierto: mirarlo es una
 ## decisión con costo. Se oculta solo en cuanto termina la partida, cuando
 ## algo que SÍ es dueño de la pausa pausa el árbol (el selector de cartas, el
-## menú de pausa) o cuando el jugador de esta ranura ya no está. Para verlo
-## con el árbol en pausa, la escena guarda process_mode Always.
+## menú de pausa) o cuando el jugador de esta ranura ya no está. La escena
+## guarda process_mode Always para que _process siga corriendo con el árbol en
+## pausa y pueda ocultar el mapa.
 ##
 ## Una instancia por jugador, creada por el HUD (ViewWidgets) en su propia
 ## CanvasLayer (capa 8: sobre el HUD, bajo el selector de cartas) y anclada a
@@ -24,7 +25,7 @@ extends Control
 
 ## Filas del panel de estadísticas, en orden. `property` es la propiedad de
 ## PlayerStats que se muestra (se lee POR NOMBRE: si se renombra allá, la fila
-## muestra empty_text). `show` dice cómo se escribe:
+## muestra empty_text; el lint stat_rows lo revisa). `show` dice cómo se escribe:
 ##   "multiplier"    multiplicador que parte en 1.0, como +N%   (1.25 -> +25%)
 ##   "fraction"      fracción que parte en 0, como +N%          (0.1 -> +10%)
 ##   "flat"          número entero con signo                    (3 -> +3)
