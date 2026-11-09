@@ -239,6 +239,27 @@ func _ready() -> void:
 	add_to_group("world_director")
 
 
+func _physics_process(delta: float) -> void:
+	if not RunState.run_active:
+		# La partida acaba de terminar (derrota o extracción) y la pantalla
+		# final deja la arena viva y en pausa: el clima se detiene aquí, o el
+		# HUD quedaría desplazado y el descuento dorado seguiría activo.
+		_weather.stop_weather()
+		return
+	_tick_exit_portal()
+	_tick_beacons(delta)
+	if not events_enabled:
+		return
+	_weather.tick(delta)
+	_event_timer -= delta
+	if _event_timer > 0.0:
+		return
+	_event_timer = _next_event_gap()
+	# El clima tira DESPUÉS del evento: ese orden es parte del sorteo.
+	_fire_random_event()
+	_weather.maybe_roll()
+
+
 ## Inicio de etapa: Arena._ready lo llama por el grupo "world_director".
 ## El director dura toda la partida, así que aquí olvida todo lo que
 ## guardaba de la arena anterior.
@@ -335,27 +356,6 @@ func _new_layout(arena: Node3D) -> StageLayout:
 func _set_layout(layout: StageLayout) -> void:
 	_layout = layout
 	_weather.layout = layout
-
-
-func _physics_process(delta: float) -> void:
-	if not RunState.run_active:
-		# La partida acaba de terminar (derrota o extracción) y la pantalla
-		# final deja la arena viva y en pausa: el clima se detiene aquí, o el
-		# HUD quedaría desplazado y el descuento dorado seguiría activo.
-		_weather.stop_weather()
-		return
-	_tick_exit_portal()
-	_tick_beacons(delta)
-	if not events_enabled:
-		return
-	_weather.tick(delta)
-	_event_timer -= delta
-	if _event_timer > 0.0:
-		return
-	_event_timer = _next_event_gap()
-	# El clima tira DESPUÉS del evento: ese orden es parte del sorteo.
-	_fire_random_event()
-	_weather.maybe_roll()
 
 
 ## Levanta el portal de salida el primer frame en que la etapa cuenta como
