@@ -53,6 +53,9 @@ const SFX_EXPORT_PATTERN := "^@export var \\w+_(?:sound|loop): StringName = &\"(
 const SFX_SCENE_PATTERN := "^\\w+_(?:sound|loop) = &\"([^\"]+)\"$"
 ## Un literal StringName dentro de los argumentos de una llamada.
 const STRING_NAME_PATTERN := "&\"([^\"]*)\""
+## Valores de `show` en MapOverlay.STAT_ROWS: las ramas del match de
+## MapOverlay._stat_value más "flat", su rama por defecto.
+const STAT_ROW_SHOWS: Array[String] = ["multiplier", "attack_speed", "fraction", "flat"]
 
 var _checks_run: int = 0
 var _checks_failed: int = 0
@@ -74,6 +77,7 @@ func _ready() -> void:
 	_check_text_values()
 	_check_item_kinds_unique()
 	_check_sfx_ids()
+	_check_stat_rows()
 	if _checks_failed == 0:
 		print("Catalog lint: ok checks=%d" % _checks_run)
 	else:
@@ -675,6 +679,33 @@ func _check_sfx_ids() -> void:
 					failures.append("%s:%d sound id '%s' is not in Sfx.SOUND_LIBRARY"
 							% [path, i + 1, id])
 	_report("sfx_ids", rows, failures)
+
+
+## Cada fila de MapOverlay.STAT_ROWS. El mapa de Tab lee `property` de
+## PlayerStats por nombre: una propiedad renombrada muestra empty_text para
+## siempre sin ningún error, y un `show` desconocido se escribe como "flat".
+func _check_stat_rows() -> void:
+	var failures: Array[String] = []
+	var rows := 0
+	# La instancia nunca entra al árbol (su _ready no corre) y se libera al
+	# terminar de leer su lista de propiedades.
+	var properties: Dictionary[String, bool] = {}
+	var stats := PlayerStats.new()
+	for entry: Dictionary in stats.get_property_list():
+		properties[String(entry.get("name", ""))] = true
+	stats.free()
+	for row: Dictionary in MapOverlay.STAT_ROWS:
+		rows += 1
+		var label := String(row.get("label", "?"))
+		var property := String(row.get("property", ""))
+		if not properties.has(property):
+			failures.append("stat row '%s' property '%s' is not a PlayerStats property"
+					% [label, property])
+		var shown := String(row.get("show", ""))
+		if not STAT_ROW_SHOWS.has(shown):
+			failures.append("stat row '%s' show '%s' is not one of %s"
+					% [label, shown, str(STAT_ROW_SHOWS)])
+	_report("stat_rows", rows, failures)
 
 
 ## Conjunto de los valores de `field` en `rows`.

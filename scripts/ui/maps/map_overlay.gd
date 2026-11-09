@@ -25,7 +25,7 @@ extends Control
 
 ## Filas del panel de estadísticas, en orden. `property` es la propiedad de
 ## PlayerStats que se muestra (se lee POR NOMBRE: si se renombra allá, la fila
-## muestra empty_text). `show` dice cómo se escribe:
+## muestra empty_text; el lint stat_rows lo revisa). `show` dice cómo se escribe:
 ##   "multiplier"    multiplicador que parte en 1.0, como +N%   (1.25 -> +25%)
 ##   "fraction"      fracción que parte en 0, como +N%          (0.1 -> +10%)
 ##   "flat"          número entero con signo                    (3 -> +3)
