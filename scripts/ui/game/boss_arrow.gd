@@ -50,23 +50,6 @@ func _ready() -> void:
 		($Fill as Polygon2D).color = color_source.fill_color
 
 
-## Entrada para pantalla dividida: una flecha por vista, cada una apunta con
-## la cámara de ESA vista y mide desde SU jugador. Sin ella la flecha usa la
-## cámara del viewport raíz (solo) y el jugador de pie con la ranura más baja.
-func bind_view(camera: Camera3D, carrier: Node3D) -> void:
-	_camera = camera
-	_carrier = carrier
-
-
-## Apunta la flecha a algo que no es un jefe (el portal de salida de la
-## etapa). Un jefe vivo siempre gana (una pelea pendiente pesa más que una
-## puerta que puedes usar cuando quieras), así que esto es un objetivo de
-## respaldo, no un reemplazo. Se borra pasando null, y se suelta solo cuando
-## el nodo desaparece (el portal se consume al usarse).
-func track_objective(node: Node3D) -> void:
-	_objective = node
-
-
 func _process(delta: float) -> void:
 	var camera := _resolve_camera(delta)
 	if camera == null:
@@ -87,6 +70,58 @@ func _process(delta: float) -> void:
 		# por el origen de la celda.
 		position = (placement["position"] as Vector2) + _view_origin(view)
 		rotation = float(placement["angle"])
+
+
+## Entrada para pantalla dividida: una flecha por vista, cada una apunta con
+## la cámara de ESA vista y mide desde SU jugador. Sin ella la flecha usa la
+## cámara del viewport raíz (solo) y el jugador de pie con la ranura más baja.
+func bind_view(camera: Camera3D, carrier: Node3D) -> void:
+	_camera = camera
+	_carrier = carrier
+
+
+## Apunta la flecha a algo que no es un jefe (el portal de salida de la
+## etapa). Un jefe vivo siempre gana (una pelea pendiente pesa más que una
+## puerta que puedes usar cuando quieras), así que esto es un objetivo de
+## respaldo, no un reemplazo. Se borra pasando null, y se suelta solo cuando
+## el nodo desaparece (el portal se consume al usarse).
+func track_objective(node: Node3D) -> void:
+	_objective = node
+
+
+## Matemática de pantalla pura, aparte para que un arnés headless la
+## verifique. Recibe el objetivo proyectado por la cámara, si está detrás del
+## plano de la cámara y el tamaño del viewport; devuelve {"visible": bool,
+## "position": Vector2, "angle": float}. Un objetivo fuera de pantalla se
+## recorta al rectángulo de edge_margin sobre el rayo desde el centro; el arte
+## de la flecha apunta a +X, así que el ángulo del rayo es también la rotación
+## del nodo.
+func compute_placement(unprojected: Vector2, behind: bool,
+		viewport_size: Vector2) -> Dictionary:
+	var center := viewport_size * 0.5
+	var pos := unprojected
+	if behind:
+		# unproject refleja los objetivos detrás del plano de la cámara; se
+		# reflejan de vuelta por el centro para que la flecha apunte hacia
+		# donde girarías.
+		pos = center * 2.0 - pos
+	if not behind and Rect2(Vector2.ZERO, viewport_size) \
+			.grow(-on_screen_inset).has_point(pos):
+		return {"visible": false, "position": Vector2.ZERO, "angle": 0.0}
+	var dir := pos - center
+	if dir.length_squared() < 0.0001:
+		dir = Vector2.DOWN  # justo detrás de la cámara: "está detrás de ti"
+	dir = dir.normalized()
+	# Escala el rayo central hasta el primer borde del rectángulo de margen que cruza.
+	var half := center - Vector2(edge_margin, edge_margin)
+	half.x = maxf(half.x, 4.0)
+	half.y = maxf(half.y, 4.0)
+	var t := INF
+	if absf(dir.x) > 0.0001:
+		t = minf(t, half.x / absf(dir.x))
+	if absf(dir.y) > 0.0001:
+		t = minf(t, half.y / absf(dir.y))
+	return {"visible": true, "position": center + dir * t, "angle": dir.angle()}
 
 
 ## La cámara con la que apuntar: la inyectada; si no, la del viewport raíz
@@ -140,41 +175,6 @@ func _resolve_reference() -> Node3D:
 	if tree == null:
 		return null
 	return PartySlots.lowest_standing(tree)
-
-
-## Matemática de pantalla pura, aparte para que un arnés headless la
-## verifique. Recibe el objetivo proyectado por la cámara, si está detrás del
-## plano de la cámara y el tamaño del viewport; devuelve {"visible": bool,
-## "position": Vector2, "angle": float}. Un objetivo fuera de pantalla se
-## recorta al rectángulo de edge_margin sobre el rayo desde el centro; el arte
-## de la flecha apunta a +X, así que el ángulo del rayo es también la rotación
-## del nodo.
-func compute_placement(unprojected: Vector2, behind: bool,
-		viewport_size: Vector2) -> Dictionary:
-	var center := viewport_size * 0.5
-	var pos := unprojected
-	if behind:
-		# unproject refleja los objetivos detrás del plano de la cámara; se
-		# reflejan de vuelta por el centro para que la flecha apunte hacia
-		# donde girarías.
-		pos = center * 2.0 - pos
-	if not behind and Rect2(Vector2.ZERO, viewport_size) \
-			.grow(-on_screen_inset).has_point(pos):
-		return {"visible": false, "position": Vector2.ZERO, "angle": 0.0}
-	var dir := pos - center
-	if dir.length_squared() < 0.0001:
-		dir = Vector2.DOWN  # justo detrás de la cámara: "está detrás de ti"
-	dir = dir.normalized()
-	# Escala el rayo central hasta el primer borde del rectángulo de margen que cruza.
-	var half := center - Vector2(edge_margin, edge_margin)
-	half.x = maxf(half.x, 4.0)
-	half.y = maxf(half.y, 4.0)
-	var t := INF
-	if absf(dir.x) > 0.0001:
-		t = minf(t, half.x / absf(dir.x))
-	if absf(dir.y) > 0.0001:
-		t = minf(t, half.y / absf(dir.y))
-	return {"visible": true, "position": center + dir * t, "angle": dir.angle()}
 
 
 ## Lo que la flecha señala ahora: el jefe vivo más cercano; si no hay, el
