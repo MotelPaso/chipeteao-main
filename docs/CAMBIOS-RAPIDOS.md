@@ -57,6 +57,7 @@ golpe fue normal, crítico o una esquiva.
 | Aviso cuando llega o se va una mascota | Player.tscn > PetSlot | `joins_text`, `leaves_text` |
 | Respiración, inclinación y rebote de la foca | `scenes/player/SealRig.tscn` > SealRig | `breathe_*`, `lean_max`, `bob_amount`, `bob_speed`, `reference_speed` |
 | Estiramiento al saltar y aplastado al derrapar | SealRig.tscn > SealRig | `stretch_max`, `slide_squash`, `slide_spread` |
+| Caída de cara al morir | SealRig.tscn > SealRig (grupo «Muerte») | `death_lift`, `death_duration`, `death_tilt`, `death_squash` |
 
 ## Armas
 
@@ -75,6 +76,7 @@ grupos con su nombre.
 | Kamehameha (largo, ancho, sacudida, cámara lenta) | `Kamehameha.tscn` > Kamehameha (grupos «Rayo», «Sensación») | `beam_length`, `beam_width`, `shake_strength`, `hit_stop_time` |
 | Báculo de nigromante (siervos y rayo) | `NecroStaff.tscn` > NecroStaff (grupos «Siervos», «Rayo de alma») | `possess_duration`, `max_possessed`, `bolt_speed`, `bolt_lifetime` |
 | Vial de sangre (lanzamiento y charco) | `BloodVial.tscn` > BloodVial (grupos «Frasco», «Charco») | `lob_time`, `arc_height`, `pool_radius`, `pool_ticks`, `heal_fraction` |
+| Latido del charco del Vial de sangre | `scenes/fx/BloodPool.tscn` > raíz (grupo «Animación») | `throb_time`, `throb_spread`, `throb_height` |
 | Rastro de baba | `SlimeTrail.tscn` > SlimeTrail (grupos «Charco», «Visual») | `puddle_radius`, `puddle_life`, `tick_interval` |
 | Hedor (veneno, ralentización, nube) | `Stench.tscn` > Stench | `poison_damage_fraction`, `slow_multiplier`, `cloud_*` |
 | Aura y Hedor: cuánto crece el campo con Multitud | `Aura.tscn` / `Stench.tscn` > raíz (grupo «Multitud») | `radius_per_extra`, `pulse_per_extra` |
@@ -107,7 +109,15 @@ grupos con su nombre.
 | Avisos, impacto y arena del Excavadunas | `scenes/enemies/Duneburrower.tscn` > raíz (grupo «Telegrafía») | `telegraph_color`, `impact_color`, `impact_flash_time`, `impact_shake_*`, `sand_burst_*` |
 | Llegada de un jefe (anillo y aparición) | `scripts/enemies/boss_base.gd` (grupo «Llegada compartida») o `<Jefe>.tscn` > raíz | `entrance_ring_time`, `entrance_pop_time`, `entrance_start_scale`; `entrance_ring_radius` (Sarcognato, Larvón, Cofre Mímico) |
 | Lo que paga un jefe al morir | `<Jefe>.tscn` > raíz | `boss_gem_count`, `boss_gem_value`, `health_orb_count`, `base_chest_drops` |
+| Dónde caen las gemas, los orbes y los cofres de un jefe, y la suerte de cofre por altar demoníaco | `scripts/enemies/boss_base.gd` (grupos «Pago» y «Cofres»; vale para todos los jefes) o `<Jefe>.tscn` > raíz para uno solo | `gem_ring_radius`, `orb_ring_radius`, `chest_ring_radius`, `chest_luck_per_demonic` |
 | Púas de corteza (Rey Pútrido) y de arenisca (Sarcognato) | `scenes/enemies/BarkSpikes.tscn` / `SandSpikes.tscn` | la malla y el material de `Spike1`; tiempos en la raíz |
+| Animación del Rey Pútrido (inclinación del Aplastón, inflado del rugido) | `scenes/enemies/Rotking.tscn` > raíz (grupos «Aplastón», «Invocación») | `smash_lean_angle`, `smash_straighten_time`, `summon_roar_scale`, `summon_swell_fraction` |
+| Aplastado del Espectro de la Ciénaga al hundirse | `scenes/enemies/Fenwraith.tscn` > raíz (grupo «Hundirse y emerger») | `blink_sink_squash`, `blink_sink_fraction` |
+| Salto del Larvón (agazapado, estirón y altura del arco) | `scenes/enemies/Grubthing.tscn` > raíz (grupo «Salto embestida») | `hop_windup_squash`, `hop_leap_stretch`, `hop_stretch_time`, `hop_leap_lift` |
+| Tapa y entierro del Cofre Mímico | `scenes/enemies/CofferMimic.tscn` > raíz (grupos «Mordisco», «Enterrarse») | `lid_gape_angle`, `snap_lid_close_time`, `bury_lid_close_time`, `bury_rise_time`, `bury_lid_open_time` |
+| Estirón del Excavadunas al salir del suelo | `scenes/enemies/Duneburrower.tscn` > raíz (grupo «Erupción») | `erupt_pop_scale`, `erupt_pop_time` |
+| Espera del muñeco de práctica antes de reaparecer | `scenes/enemies/TargetDummy.tscn` > raíz (grupo «Reaparición») | `respawn_delay` |
+| Cada cuánto pega el veneno a un enemigo | `scripts/enemies/enemy/enemy_status.gd` (bloque «Edita aquí») | `POISON_TICK` (segundos) |
 | Láseres (color y grosor) | `Sunspitter.tscn` / `Sarcognath.tscn` | color: `color` en AimLine / WarnLine (aviso) y Beam (disparo); grosor del aviso: `aim_width_start` / `aim_width_end` (raíz del Sunspitter) o `warn_width_start` / `warn_width_end` (raíz del Sarcognath); grosor del disparo: Beam > `default_thickness` |
 | Discos de aviso en el suelo | `scenes/fx/TelegraphDisc.tscn` > raíz | `start_scale`, `fade_time`; opacidad en `albedo_color` de su material (el color lo pasa quien avisa) |
 | Velocidad de los proyectiles enemigos | `scenes/enemies/EnemyBolt.tscn` > raíz | `speed`, `max_distance` (el daño lo pone quien dispara) |
