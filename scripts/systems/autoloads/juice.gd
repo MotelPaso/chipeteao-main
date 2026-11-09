@@ -9,16 +9,18 @@ extends Node
 ## Se carga desde scenes/systems/Juice.tscn: sus ajustes se editan en el
 ## Inspector de esa escena (o aquí, en los valores por defecto).
 
-## Shader de la viñeta de daño. Su color se edita aquí: el `tint` (rojo).
+## Shader de la viñeta de daño. Su color se cambia en vignette_color (grupo
+## «Viñeta de daño»), que _build_vignette pasa al uniform `tint`; el vec3 de
+## abajo solo es su respaldo.
 const VIGNETTE_SHADER: String = """
 shader_type canvas_item;
 
 uniform float intensity : hint_range(0.0, 1.0) = 0.0;
-uniform vec4 tint : source_color = vec4(0.82, 0.06, 0.05, 1.0);
+uniform vec3 tint = vec3(0.82, 0.06, 0.05);
 
 void fragment() {
 	float edge = smoothstep(0.3, 0.75, length(UV - vec2(0.5)));
-	COLOR = vec4(tint.rgb, edge * intensity);
+	COLOR = vec4(tint, edge * intensity);
 }
 """
 
@@ -69,9 +71,12 @@ void fragment() {
 @export var flash_color: Color = Color(1.0, 1.0, 1.0, 0.7)
 
 @export_group("Viñeta de daño")
-## Opacidad máxima (0-1) de la viñeta roja al recibir un golpe. El color
-## está en VIGNETTE_SHADER (uniform tint), arriba.
+## Color de la viñeta al recibir un golpe (solo se usa el RGB; el alfa no).
+@export var vignette_color: Color = Color(0.82, 0.06, 0.05, 1.0)
+## Opacidad máxima (0-1) de la viñeta al recibir un golpe.
 @export var vignette_strength: float = 0.5
+## Segundos que la viñeta se queda a pleno antes de empezar a desvanecerse.
+@export var vignette_hold_time: float = 0.05
 ## Segundos que tarda la viñeta en desvanecerse.
 @export var vignette_fade_time: float = 0.45
 
@@ -103,6 +108,12 @@ void fragment() {
 @export var level_pulse_duration: float = 0.5
 ## Opacidad inicial (0-1) del anillo.
 @export var level_ring_alpha: float = 0.85
+## Radio interior del anillo, en metros, antes de aplicarle las escalas.
+@export var level_ring_inner_radius: float = 0.42
+## Radio exterior del anillo, en metros, antes de aplicarle las escalas.
+@export var level_ring_outer_radius: float = 0.55
+## Altura sobre los pies del raider a la que nace el anillo, en metros.
+@export var level_ring_height: float = 0.15
 ## Escala del anillo al nacer (x/z = ancho, y = grosor).
 @export var level_ring_start_scale: Vector3 = Vector3(0.4, 0.55, 0.4)
 ## Escala del anillo al terminar (x/z = ancho, y = grosor).
@@ -526,6 +537,10 @@ func _build_vignette() -> void:
 	shader.code = VIGNETTE_SHADER
 	_vignette_material = ShaderMaterial.new()
 	_vignette_material.shader = shader
+	# Como vec3 y sin conversión de color: el shader recibe los mismos números
+	# que muestra el Inspector.
+	_vignette_material.set_shader_parameter("tint",
+			Vector3(vignette_color.r, vignette_color.g, vignette_color.b))
 	_vignette_material.set_shader_parameter("intensity", 0.0)
 	var rect := ColorRect.new()
 	rect.material = _vignette_material
@@ -543,7 +558,7 @@ func _pulse_vignette() -> void:
 	_vignette_tween = create_tween()
 	_vignette_tween.set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
 	_vignette_tween.tween_property(_vignette_material, "shader_parameter/intensity",
-			0.0, vignette_fade_time).set_delay(0.05)
+			0.0, vignette_fade_time).set_delay(vignette_hold_time)
 
 
 # --- Pulso de subida de nivel ---------------------------------------------------
@@ -562,7 +577,7 @@ func _on_leveled_up(_new_level: int) -> void:
 	for node: Node in get_tree().get_nodes_in_group(&"player"):
 		var player := node as Node3D
 		if player != null and player.is_inside_tree():
-			_spawn_level_ring(player.global_position + Vector3.UP * 0.15)
+			_spawn_level_ring(player.global_position + Vector3.UP * level_ring_height)
 
 
 ## Anillo que se expande a los pies del jugador. Su tween ignora la
@@ -601,8 +616,8 @@ func _spawn_level_ring(at: Vector3) -> void:
 ## nivel.
 func _build_level_ring_assets() -> void:
 	_level_ring_mesh = TorusMesh.new()
-	_level_ring_mesh.inner_radius = 0.42
-	_level_ring_mesh.outer_radius = 0.55
+	_level_ring_mesh.inner_radius = level_ring_inner_radius
+	_level_ring_mesh.outer_radius = level_ring_outer_radius
 	# Teselado explícito: el anillo crece a ~2.5 m, donde 32 cortes aún se
 	# ven redondos; 8 lados alcanzan para el tubo delgado.
 	_level_ring_mesh.rings = 32
