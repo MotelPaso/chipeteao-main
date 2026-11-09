@@ -17,13 +17,13 @@ extends StaticBody3D
 @export_group("Escala")
 ## Escala base del modelo, antes de la variación al azar.
 @export var base_scale: float = 3.8
-## Rango del multiplicador de ancho (X y Z) sobre base_scale: hasta más del
-## doble de ancho.
+## Multiplicador mínimo de ancho (X y Z) sobre base_scale.
 @export var width_scale_min: float = 1.0
+## Multiplicador máximo de ancho (X y Z) sobre base_scale: hasta más del doble de ancho.
 @export var width_scale_max: float = 2.3
-## Rango del multiplicador de alto (Y) sobre base_scale: árboles de ~5.5 m
-## a ~10 m.
+## Multiplicador mínimo de alto (Y) sobre base_scale: árboles de ~5.5 m.
 @export var height_scale_min: float = 0.85
+## Multiplicador máximo de alto (Y) sobre base_scale: árboles de ~10 m.
 @export var height_scale_max: float = 1.55
 
 

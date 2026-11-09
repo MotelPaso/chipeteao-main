@@ -41,7 +41,11 @@ const Beacon := preload("res://scripts/world/run/director/beacon.gd")
 ##                 se llama con call(row) y catalog_lint.gd revisa que exista.
 ##   announce:     aviso en el HUD (texto del jugador).
 ##   beacon_color: color de la baliza sobre el evento; sin él no hay baliza.
-##   beacon_time:  segundos que arde la baliza; INF = hasta que el POI se usa.
+##                 En los altares es aparte de su accent_color (la escena):
+##                 cambia los dos. El vendedor no lo usa: su baliza toma el
+##                 `color` de su fila en Vendor.VENDOR_LIBRARY.
+##   beacon_time:  segundos que arde la baliza; sin él o INF = hasta que el
+##                 POI se usa (o hasta el cambio de etapa si no hay POI).
 ##   altar:        cadencia de altares: el peso sube con el minuto y vale 0
 ##                 mientras haya demasiados altares sin usar.
 ##   cap_group/cap: con `cap` o más nodos en el grupo `cap_group`, el evento
@@ -155,7 +159,7 @@ class TimedBeacon:
 @export var min_distance_between: float = 18.0
 ## Distancia mínima (metros) a los puntos fijos: plataformas y rocas.
 @export var min_distance_from_keepouts: float = 12.0
-## Margen (metros) que los POI dejan con el borde de la arena.
+## Margen (metros) con el borde de la arena para todo lo que pone el director: POI, eventos, clima (lluvia, tsunami, meteoritos) y el portal de salida.
 @export var bounds_margin: float = 14.0
 
 @export_group("Eventos")
@@ -204,8 +208,8 @@ class TimedBeacon:
 @export var exit_portal_announce: String = "Se abrió el portal de salida — crúzalo cuando quieras"
 
 ## El clima activo, o vacío: {id, group, time_left}. Vive en el nodo
-## Weather; hud.gd, event_altar.gd y el probe lo leen aquí con
-## get("active_weather").
+## Weather; weather_badge.gd (HUD), event_altar.gd y el probe lo leen aquí
+## con get("active_weather").
 var active_weather: Dictionary:
 	get:
 		return _weather.active_weather if _weather != null else {}
@@ -282,8 +286,8 @@ func beacon_count() -> int:
 
 ## --- puertas del clima -----------------------------------------------------
 ## El clima vive en el nodo Weather; estas puertas siguen aquí porque otros
-## nodos llegan por el grupo "world_director": event_altar.gd, enemy_base.gd,
-## arena_probe.gd, hud.gd.
+## nodos llegan por el grupo "world_director": event_altar.gd, enemy_loot.gd,
+## weather_badge.gd y arena_probe.gd.
 
 ## La fila de WEATHER_CATALOG con ese id, o vacío (arena_probe.gd la usa).
 static func weather_row(id: String) -> Dictionary:
@@ -445,8 +449,7 @@ func _fire_random_event() -> void:
 ## la fila tiene beacon_color), su aviso y su línea de log.
 func _event_spawn_poi(row: Dictionary) -> void:
 	var poi := _layout.spawn_at(row["scene"], _event_point())
-	if row.has("beacon_color"):
-		_raise_beacon(poi.global_position, row["beacon_color"], poi, float(row["beacon_time"]))
+	_raise_row_beacon(row, poi.global_position, poi)
 	_announce(String(row["announce"]))
 	if row.has("log"):
 		print(String(row["log"]))
@@ -462,8 +465,8 @@ func _event_vendor(row: Dictionary) -> void:
 	vendor.set("kind", String(kind.id))
 	_layout.stage_parent().add_child(vendor)
 	vendor.global_position = _event_point()
-	_raise_beacon(vendor.global_position, kind.get("color", Color.WHITE), vendor,
-			float(row["beacon_time"]))
+	_raise_row_beacon(row, vendor.global_position, vendor, false,
+			kind.get("color", Color.WHITE))
 	_announce(String(row["announce"]))
 	print("Vendor arrived: %s" % String(kind.id))
 
@@ -478,7 +481,7 @@ func _event_star(row: Dictionary) -> void:
 	var at := _event_point()
 	if spawner.call("spawn_powerup_pickup", at + Vector3.UP * 0.6, "star") == null:
 		return
-	_raise_beacon(at, row["beacon_color"], null, float(row["beacon_time"]))
+	_raise_row_beacon(row, at, null)
 	_announce(String(row["announce"]))
 
 
@@ -490,8 +493,7 @@ func _event_supply_chest(row: Dictionary) -> void:
 	# el RNG de la partida, y ese orden es parte del sorteo.
 	_layout.stage_parent().add_child(chest)
 	chest.global_position = _event_point()
-	_raise_beacon(chest.global_position, row["beacon_color"], chest,
-			float(row["beacon_time"]), true)
+	_raise_row_beacon(row, chest.global_position, chest, true)
 	_announce(String(row["announce"]))
 
 
@@ -527,7 +529,7 @@ func _event_essence_rift(row: Dictionary) -> void:
 		var orb := Pools.acquire_scene(Pools.HEALTH_ORB_SCENE) as HealthOrb
 		if orb != null:
 			orb.global_position = center + Vector3.UP * 0.6
-	_raise_beacon(center, row["beacon_color"], null, float(row["beacon_time"]))
+	_raise_row_beacon(row, center, null)
 	_announce(String(row["announce"]))
 
 
@@ -535,6 +537,17 @@ func _event_essence_rift(row: Dictionary) -> void:
 ## apoyado en el suelo (ver StageLayout.event_point).
 func _event_point() -> Vector3:
 	return _layout.event_point(event_min_distance, event_max_distance)
+
+
+## La baliza de una fila de EVENT_LIBRARY: su beacon_color (o `color`, si
+## se da) y su beacon_time (INF si falta). Sin color no hay baliza.
+func _raise_row_beacon(row: Dictionary, at: Vector3, poi: Node, sink_poi: bool = false,
+		color: Variant = null) -> void:
+	if color == null:
+		color = row.get("beacon_color")
+	if color == null:
+		return
+	_raise_beacon(at, color as Color, poi, float(row.get("beacon_time", INF)), sink_poi)
 
 
 ## Levanta una baliza sobre `at` y la anota. `poi` es lo que señala (null

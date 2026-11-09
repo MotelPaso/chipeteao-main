@@ -42,14 +42,17 @@ extends Node3D
 @export var rock_count: int = 54
 ## Cantidad de props de stump_scene (por defecto, la del bosque).
 @export var stump_count: int = 34
-## Rango de escala uniforme de cada prop de tree_scene.
+## Escala uniforme mínima de cada prop de tree_scene (1 = tamaño del modelo).
 @export var tree_scale_min: float = 0.85
+## Escala uniforme máxima de cada prop de tree_scene (1 = tamaño del modelo).
 @export var tree_scale_max: float = 1.25
-## Rango de escala uniforme de cada prop de rock_scene.
+## Escala uniforme mínima de cada prop de rock_scene (1 = tamaño del modelo).
 @export var rock_scale_min: float = 0.7
+## Escala uniforme máxima de cada prop de rock_scene (1 = tamaño del modelo).
 @export var rock_scale_max: float = 1.1
-## Rango de escala uniforme de cada prop de stump_scene.
+## Escala uniforme mínima de cada prop de stump_scene (1 = tamaño del modelo).
 @export var stump_scale_min: float = 0.8
+## Escala uniforme máxima de cada prop de stump_scene (1 = tamaño del modelo).
 @export var stump_scale_max: float = 1.2
 ## Distancia mínima entre centros de props, en metros: pasillos anchos para
 ## la horda (por defecto, la del bosque).
@@ -74,29 +77,32 @@ extends Node3D
 @export var perimeter_step: float = 9.0
 ## Cada cuántas ranuras va un acento (0 = nunca; por defecto, el del bosque).
 @export var perimeter_rock_every: int = 5
-## Franja del borde: los props caen entre estos metros hacia dentro del
-## borde de la arena (máximo = lado interior de la franja).
+## Lado exterior de la franja del borde: metros hacia dentro del borde de la arena donde empiezan los props del borde.
 @export var perimeter_edge_margin_min: float = 2.0
+## Lado interior de la franja del borde: metros hacia dentro del borde de la arena donde terminan los props del borde.
 @export var perimeter_edge_margin_max: float = 8.0
 ## Desvío al azar, en metros, de cada prop del borde a lo largo de su lado.
 @export var perimeter_jitter: float = 2.0
-## Rango de escala uniforme de los props del borde.
+## Escala uniforme mínima de los props del borde (1 = tamaño del modelo).
 @export var perimeter_scale_min: float = 1.0
+## Escala uniforme máxima de los props del borde (1 = tamaño del modelo).
 @export var perimeter_scale_max: float = 1.4
-## Rango de escala uniforme de los acentos del borde.
+## Escala uniforme mínima de los acentos del borde (1 = tamaño del modelo).
 @export var perimeter_accent_scale_min: float = 1.2
+## Escala uniforme máxima de los acentos del borde (1 = tamaño del modelo).
 @export var perimeter_accent_scale_max: float = 1.7
 
 @export_group("Mesetas")
 ## Mesetas (plataforma + rampa) por etapa; el Terrain aplana un claro bajo
 ## cada una. Son los hitos con nombre que vuelven legible una arena grande.
 @export var mesa_count: int = 5
-## Escenas de plataforma y rampa del bioma. Sin plataforma no hay mesetas:
-## es un error de configuración que se ve, no un mapa plano en silencio.
+## Escena de plataforma del bioma. Sin plataforma no hay mesetas: es un error de configuración que se ve, no un mapa plano en silencio.
 @export var mesa_platform_scene: PackedScene
+## Escena de la rampa que sube a cada plataforma del bioma.
 @export var mesa_ramp_scene: PackedScene
-## Rango de escala uniforme de una meseta (plataforma y rampa).
+## Escala uniforme mínima de una meseta, plataforma y rampa (1 = tamaño del modelo).
 @export var mesa_scale_min: float = 1.0
+## Escala uniforme máxima de una meseta, plataforma y rampa (1 = tamaño del modelo).
 @export var mesa_scale_max: float = 1.6
 ## Distancia en metros del centro de la plataforma al de su rampa, a
 ## escala 1 (se multiplica por la escala de la meseta). 4.95 deja la rampa
@@ -134,11 +140,13 @@ extends Node3D
 ## Lado de una celda de la máscara, en metros. Una formación solo es tan
 ## redonda como la cuadrícula: con celdas grandes salen piezas cuadradas.
 @export var mask_cell_size: float = 5.0
-## Formaciones de roca sembradas por etapa (mínimo y máximo).
+## Formaciones de roca sembradas por etapa, como mínimo.
 @export var mask_blobs_min: int = 5
+## Formaciones de roca sembradas por etapa, como máximo.
 @export var mask_blobs_max: int = 8
-## Celdas que crece cada formación desde su semilla (25 m² por celda de 5 m).
+## Celdas mínimas que crece cada formación desde su semilla (25 m² por celda de 5 m).
 @export var mask_blob_cells_min: int = 20
+## Celdas máximas que crece cada formación desde su semilla (25 m² por celda de 5 m).
 @export var mask_blob_cells_max: int = 50
 ## Cuánto se estira una formación a lo largo de su propio eje al crecer:
 ## 0 da macizos redondos, ~3 da crestas. Cada formación sortea su

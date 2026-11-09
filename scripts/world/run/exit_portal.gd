@@ -4,7 +4,8 @@ extends Interactable
 ## WorldDirector lo levanta lejos del grupo en cuanto RunState.stage_cleared
 ## pasa a true (meta cumplida y jefe de etapa muerto). Es permanente: no se
 ## recarga y solo se gasta al usarlo. Su aspecto (más alto y dorado que un
-## PortalShrine) está en el nodo Visual de la escena.
+## PortalShrine) está en el nodo Visual de la escena. No sube contador de
+## SaveData (meta_stat_id vacío): los de etapa viven en RunState.
 ##
 ## Cualquier jugador vivo dentro del anillo puede tomarlo y viaja TODO el
 ## grupo, caídos incluidos: RunRoot.advance_stage() mueve a todos, así una
@@ -14,12 +15,14 @@ extends Interactable
 ## heredar traería la pareja, la recarga y el descuento del Gusano Cósmico,
 ## que aquí no existen.
 
-## Radio (metros) del anillo donde hay que pararse.
-@export var ring_radius: float = 2.2
+@export_group("Aspecto")
 ## Color del portal; el director también lo usa para su baliza.
 @export var portal_color: Color = Color(1.0, 0.82, 0.35)
-## Cuánto más ancha que el anillo es la zona de detección (metros), para
-## que el aviso aparezca un paso antes.
+
+@export_group("Anillo")
+## Radio (metros) del anillo donde hay que pararse.
+@export var ring_radius: float = 2.2
+## Cuánto más ancha que el anillo es la zona de detección (metros), para que el aviso aparezca un paso antes.
 @export var detect_margin: float = 0.8
 ## Altura (metros) de la zona de detección.
 @export var detect_height: float = 4.0
@@ -29,20 +32,6 @@ extends Interactable
 var _taken: bool = false
 
 @onready var _visual: PortalVisual = $Visual
-
-
-func _init() -> void:
-	prompt_text = "[E] Cruzar al siguiente mapa"
-	marker_kind = &"exit"
-	prompt_height = 4.2
-	# Sin contador propio: los contadores de etapa viven en RunState y se
-	# suman una vez al final de la partida.
-	meta_stat_id = ""
-	collision_layer = 0
-	collision_mask = 1
-	# Nada en el juego detecta áreas como áreas, así que ser detectable
-	# solo ocupa la física. Se fija aquí, antes de entrar al árbol.
-	monitorable = false
 
 
 func _ready() -> void:
