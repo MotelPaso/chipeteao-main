@@ -198,7 +198,8 @@ func _style_buttons() -> void:
 ## "ocupado"). La tipografía del título y del subtítulo vive en la escena.
 func _apply_chrome() -> void:
 	var badge := _shards_label.get_theme_color(&"font_color")
-	UiTheme.style_badge(_shards_label, badge, UiTheme.PANEL_BG, badge.darkened(0.45))
+	UiTheme.style_badge(_shards_label, badge, UiTheme.PANEL_BG,
+			badge.darkened(UiTheme.BADGE_EDGE_DARKEN))
 	if _title_tween != null and _title_tween.is_valid():
 		_title_tween.kill()
 	_title_tween = create_tween().set_loops()

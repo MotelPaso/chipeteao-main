@@ -50,6 +50,10 @@ extends CanvasLayer
 @export var xp_trough_color: Color = Color(0.04, 0.045, 0.07, 0.85)
 ## Línea inferior de la franja de XP.
 @export var xp_line_color: Color = Color(0.0, 0.0, 0.0, 0.6)
+## Radio de las esquinas de la franja de XP y de su relleno, en píxeles (0 = cuadrada).
+@export var xp_corner_radius: int = 0
+## Grosor de la línea inferior de la franja de XP, en píxeles.
+@export var xp_line_width: int = 1
 @export_group("Barras")
 ## Segundos que tardan las barras de vida y XP en llegar a su nuevo valor.
 @export var bar_tween_time: float = 0.15
@@ -357,11 +361,11 @@ func _apply_styles() -> void:
 	_hp_fill = UiTheme.style_bar(_hp_bar, hp_full_color, hp_corner_radius)
 	# La franja de XP sigue de borde a borde y cuadrada, pero gana la línea de
 	# brillo y un borde de avance claro para leer el progreso de un vistazo.
-	var xp_trough := UiTheme.flat(xp_trough_color, 0)
-	xp_trough.border_width_bottom = 1
+	var xp_trough := UiTheme.flat(xp_trough_color, xp_corner_radius)
+	xp_trough.border_width_bottom = xp_line_width
 	xp_trough.border_color = xp_line_color
 	_xp_bar.add_theme_stylebox_override("background", xp_trough)
-	_xp_bar.add_theme_stylebox_override("fill", UiTheme.bar_fill(xp_color, 0))
+	_xp_bar.add_theme_stylebox_override("fill", UiTheme.bar_fill(xp_color, xp_corner_radius))
 	for label: Label in [_level_label, _kills_label, _points_label, _timer_label]:
 		UiTheme.style_badge(label, label.get_theme_color(&"font_color"))
 	_timer_label.add_theme_font_override("font", UiTheme.spaced_font(timer_letter_spacing))

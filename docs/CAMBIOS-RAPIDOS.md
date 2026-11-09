@@ -268,7 +268,7 @@ de reparto se llama `ForestScatter`, `DuneScatter` o `MarshScatter`.
 | Tamaño y margen del minimapa | HUD.tscn > ViewWidgets/MinimapSlot (solo cuentan su tamaño y sus márgenes, medidos desde la esquina superior derecha de cada celda; no muevas sus anclas); en las celdas de abajo, ViewWidgets | Layout > márgenes; `lower_cell_top_margin` |
 | Color o tamaño de Nivel, Reloj, Bajas y Puntos | HUD.tscn > LevelLabel, TimerLabel, KillsLabel, PointsLabel | Theme Overrides > Colors / Font Sizes |
 | Colores de la barra de vida y el latido de vida baja | HUD.tscn > HUD | `hp_full_color`, `hp_low_color`, grupo «Latido de vida baja» |
-| Color de la barra de XP | HUD.tscn > HUD | `xp_color`, `xp_trough_color` |
+| Color y forma de la barra de XP | HUD.tscn > HUD | `xp_color`, `xp_trough_color`, `xp_line_color`, `xp_corner_radius`, `xp_line_width` |
 | Textos de bajas, puntos, dificultad, etapa y reloj | HUD.tscn > HUD (grupo «Textos») | `kills_format`, `points_format`, `difficulty_format`, `stage_format`, `timer_format` |
 | Palabras, colores y umbrales de las rachas («¡TRITURANDO!») | HUD.tscn > StreakLabel | `tier_kills`, `tier_words`, `tier_colors`, `window_seconds` |
 | Duración y color de los avisos en pantalla | HUD.tscn > AnnounceLabel | `fade_in_time`, `hold_time`, `fade_out_time`, `normal_color`, `major_*` |
@@ -282,7 +282,7 @@ de reparto se llama `ForestScatter`, `DuneScatter` o `MarshScatter`.
 | Insignia de FPS | HUD.tscn > FpsBadge | `text_format`, `background_color`, `refresh_seconds` |
 | Marco y refresco del minimapa | `scripts/ui/maps/minimap.gd` (bloque «Edita aquí») | `FRAME_PAD`, `MARKER_SCALE`, `BACKGROUND_COLOR`, `BORDER_WIDTH`, `BORDER_DARKEN`, `REFRESH` |
 | Colores, formas y leyenda de los marcadores del mapa | `scripts/ui/maps/map_draw.gd` | `MARKER_STYLES`, `MARKER_LABELS` |
-| Fondo liso del mapa cuando la arena no tiene Terrain | `scripts/ui/maps/map_draw.gd` | `PLAIN_BACKGROUND` (al comienzo) |
+| Fondo liso del mapa cuando la arena no tiene Terrain y oscurecido de las celdas bloqueadas | `scripts/ui/maps/map_draw.gd` | `PLAIN_BACKGROUND`, `BLOCKED_DARKEN` (al comienzo) |
 | Mapa de Tab: fondo, paneles y textos | `scenes/ui/maps/MapOverlay.tscn` (paneles: `scenes/ui/maps/MapSection.tscn`) | Layout, `title`, grupo «Textos» |
 | Marco del mapa, leyenda y encabezado del mapa de Tab | `MapOverlay.tscn` > raíz (grupos «Mapa», «Leyenda», «Encabezado») | `frame_color`, `frame_margin`, `border_width`, `border_darken`; `swatch_size`, `legend_font_size`, `legend_text_color`, `legend_row_separation`; `header_letter_spacing` |
 | Filas de estadísticas del mapa de Tab | `scripts/ui/maps/map_overlay.gd` | `STAT_ROWS` (al comienzo) |
@@ -305,12 +305,13 @@ de reparto se llama `ForestScatter`, `DuneScatter` o `MarshScatter`.
 | Títulos de Misiones, Armería y Colección | `scenes/ui/QuestLog.tscn`, `RelicShop.tscn`, `Collection.tscn` > TitleLabel | Theme Overrides |
 | Filas de Misiones, Armería y Colección (letra, color, textos) | esas mismas escenas > raíz | grupos «Filas» y «Textos» |
 | Colección: títulos de sección (RAIDERS, ARSENAL, BESTIARIO) y el «???» de lo no descubierto | `scenes/ui/Collection.tscn` > raíz | grupo «Textos» (`raiders_title`, `arsenal_title`, `bestiary_title`, `unknown_text`) |
-| Misiones: atenuado de las reclamadas, tamaño del botón Reclamar y de la barra de progreso, y separaciones de cada fila | `scenes/ui/QuestLog.tscn` > raíz | grupo «Filas» (`claimed_row_modulate`, `claim_button_size`, `progress_bar_size`, `columns_separation`, `info_separation`, `side_separation`, `progress_separation`) |
-| Armería: tamaño del botón de compra y separaciones de cada fila | `scenes/ui/RelicShop.tscn` > raíz | grupo «Filas» (`buy_button_size`, `columns_separation`, `info_separation`) |
-| Colección: separación entre el título y el detalle de cada fila | `scenes/ui/Collection.tscn` > raíz | grupo «Filas» (`row_separation`) |
+| Misiones: atenuado de las reclamadas, botón Reclamar, barra de progreso (tamaño, radio, margen y tono), sello RECLAMADA y separaciones de cada fila | `scenes/ui/QuestLog.tscn` > raíz | grupo «Filas» (`claimed_row_modulate`, `claim_button_size`, `progress_bar_size`, `progress_bar_radius`, `progress_bar_inset`, `progress_fill_darken`, `claimed_spacing`, `columns_separation`, `info_separation`, `side_separation`, `progress_separation`) |
+| Armería: tamaño del botón de compra, sello MÁX y separaciones de cada fila | `scenes/ui/RelicShop.tscn` > raíz | grupo «Filas» (`buy_button_size`, `maxed_spacing`, `columns_separation`, `info_separation`) |
+| Colección: separación entre el título y el detalle de cada fila y tono de las filas del bestiario | `scenes/ui/Collection.tscn` > raíz | grupo «Filas» (`row_separation`, `bestiary_row_lighten`) |
+| Tarjeta de las filas de Misiones, Armería y Colección (margen, borde y brillo) | `scripts/ui/meta/meta_screen.gd` | `CARD_MARGIN_H`, `CARD_MARGIN_V`, `CARD_BORDER_WIDTH`, `CARD_GLOW_SIZE`, `CARD_GLOW_ALPHA` (al comienzo) |
 | Entrada de filas, conteo del saldo y destello de pago de Misiones, Armería y Colección | esas mismas escenas > raíz (sección MetaScreen); las tres a la vez: valores por defecto en `scripts/ui/meta/meta_screen.gd` | grupos «Animación» y «Textos» |
 | Ajustes: formato de los valores, indicaciones y entrada del panel | `SettingsPanel.tscn` > raíz | grupos «Textos» (`sensitivity_format`, `volume_format`) y «Entrada» |
-| Ajustes: canal de los sliders y margen del panel | `scenes/ui/SettingsPanel.tscn` > raíz | grupos «Panel» (`panel_margin`) y «Sliders» (`slider_track_color`, `slider_track_border_color`) |
+| Ajustes: sliders (canal, relleno y agarrador) y margen del panel | `scenes/ui/SettingsPanel.tscn` > raíz | grupos «Panel» (`panel_margin`) y «Sliders» (`slider_track_color`, `slider_track_border_color`, `slider_track_border_width`, `slider_track_margin`, `slider_corner_radius`, `slider_fill_darken`, `slider_fill_edge_width`, `slider_fill_edge_lighten`, `slider_grabber_hover_lighten`) |
 | Ajustes: color de los valores y encabezados | `scenes/ui/SettingsPanel.tscn` > los nodos *Value; encabezados en SoundHeader/Label, ControlsHeader/Label y ScreenHeader/Label (texto y letra) y */Rule (línea) | Theme Overrides, `text`; `color` de cada Rule |
 | Rango de la sensibilidad del mouse | `scripts/systems/autoloads/save_data.gd` | `MIN_MOUSE_SENSITIVITY`, `MAX_MOUSE_SENSITIVITY` |
 | Pantalla de fin de partida | `scenes/ui/RunEndScreen.tscn` > TitleLabel; colores en `scripts/ui/game/run_end_screen.gd` | Theme Overrides; `DEFEAT_TITLE_COLOR`, `VICTORY_TITLE_COLOR` |
@@ -319,6 +320,7 @@ de reparto se llama `ForestScatter`, `DuneScatter` o `MarshScatter`.
 | Textos de ganancias y animación de la pantalla de fin | `RunEndScreen.tscn` > raíz | grupos «Textos» (`stages_format`, `quests_format`…) y «Animación» (`title_start_scale`, `shimmer_color`…) |
 | Colores compartidos y frases comunes («%d esquirlas», «J%d») | `scripts/ui/ui_theme.gd` | constantes al comienzo |
 | Sombra de los paneles, texto de los botones sin relleno, borde de las chapas, interruptor apagado y canal de las barras | `scripts/ui/ui_theme.gd` | `PANEL_SHADOW`, `PANEL_SHADOW_SIZE`, `BUTTON_TEXT`, `BADGE_BORDER`, `TOGGLE_TRACK_OFF`, `BAR_TROUGH`, `BAR_TROUGH_BORDER` (al comienzo) |
+| Medidas de paneles, botones, píldoras, interruptores, agarradores y barras (bordes, radios, brillos y márgenes) | `scripts/ui/ui_theme.gd` (sección «medidas de los estilos») | `PANEL_*`, `BUTTON_*`, `BADGE_*`, `TOGGLE_*`, `GRABBER_*`, `BAR_*`, `CARD_HIGHLIGHT_LIGHTEN`, `POP_RISE_SHARE` |
 | Orden de dibujo de las capas de UI | las capas de escena en la raíz de su .tscn (HUD 5, UpgradeCardUI 10, modal/ModalPanel 15, RunEndScreen 20, PauseMenu 30); las que se crean en código en `scripts/ui/ui_layers.gd` | Layer; una constante por capa |
 
 ## Cartas de mejora, pausa, tienda y ruleta

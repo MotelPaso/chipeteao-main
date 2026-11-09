@@ -47,6 +47,15 @@ enum RowState { IN_PROGRESS, CLAIMABLE, CLAIMED }
 @export var side_separation: int = 4
 ## Separación entre la barra de progreso y su contador, en píxeles.
 @export var progress_separation: int = 10
+## Radio de las esquinas de la barra de progreso, en píxeles.
+@export var progress_bar_radius: int = 5
+## Margen entre el canal de la barra de progreso y su relleno, en píxeles.
+@export var progress_bar_inset: int = 2
+## Cuánto se oscurece el azul de esquirla (UiTheme.SHARD_BLUE) en la barra de
+## una misión en curso (0-1); las terminadas usan UiTheme.ACCENT_AMBER.
+@export var progress_fill_darken: float = 0.15
+## Espacio extra entre las letras del sello RECLAMADA, en píxeles.
+@export var claimed_spacing: int = 2
 
 @export_group("Textos")
 ## Botón de una misión completa sin reclamar.
@@ -134,7 +143,7 @@ func _build_side(quest: Dictionary, state: RowState,
 		side.add_child(claim)
 	elif state == RowState.CLAIMED:
 		var done := MetaScreen.label(claimed_text, claimed_font_size, claimed_color)
-		done.add_theme_font_override("font", UiTheme.spaced_font(2))
+		done.add_theme_font_override("font", UiTheme.spaced_font(claimed_spacing))
 		done.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		side.add_child(done)
 	return side
@@ -152,8 +161,8 @@ func _progress_line(current: int, target: int, complete: bool) -> HBoxContainer:
 	bar.value = float(mini(current, target))
 	bar.show_percentage = false
 	UiTheme.style_bar(bar,
-			UiTheme.ACCENT_AMBER if complete else UiTheme.SHARD_BLUE.darkened(0.15),
-			5, 2)
+			UiTheme.ACCENT_AMBER if complete else UiTheme.SHARD_BLUE.darkened(progress_fill_darken),
+			progress_bar_radius, progress_bar_inset)
 	line.add_child(bar)
 	line.add_child(MetaScreen.label("%d/%d" % [mini(current, target), target],
 			progress_font_size, progress_color))

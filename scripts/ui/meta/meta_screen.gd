@@ -19,6 +19,11 @@ extends Control
 ## Margen interno (píxeles) de la tarjeta de cada fila: lados y arriba/abajo.
 const CARD_MARGIN_H := 16.0
 const CARD_MARGIN_V := 10.0
+## Grosor del borde de la tarjeta de cada fila, en píxeles, y su brillo
+## exterior en los estados "ganados" (tamaño en píxeles y alfa).
+const CARD_BORDER_WIDTH := 2
+const CARD_GLOW_SIZE := 8
+const CARD_GLOW_ALPHA := 0.32
 ## Solo animan su entrada las filas que caben en pantalla; una lista de 40
 ## filas se abriría como una presentación de diapositivas.
 const ENTRANCE_ROWS := 8
@@ -62,7 +67,8 @@ var _count_tween: Tween = null
 func _ready() -> void:
 	Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
 	var badge := _badge_label.get_theme_color(&"font_color")
-	UiTheme.style_badge(_badge_label, badge, UiTheme.PANEL_BG, badge.darkened(0.45))
+	UiTheme.style_badge(_badge_label, badge, UiTheme.PANEL_BG,
+			badge.darkened(UiTheme.BADGE_EDGE_DARKEN))
 	_badge_label.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	UiTheme.style_button(_back_button, UiTheme.ACCENT, true)
 	_back_button.pressed.connect(_on_back_pressed)
@@ -277,14 +283,14 @@ func play_entrance() -> void:
 # --- cromo compartido de las filas ------------------------------------
 
 ## El aspecto de tarjeta de toda fila de las tres pantallas: cuerpo
-## redondeado, borde de 2 px en el acento y brillo opcional para los estados
-## "ganados".
+## redondeado, borde en el acento y brillo opcional para los estados
+## "ganados" (medidas en las constantes CARD_* del comienzo).
 static func card_style(accent: Color, glow: bool) -> StyleBoxFlat:
 	var style := UiTheme.flat(UiTheme.CARD_BG, UiTheme.RADIUS)
 	style.border_color = accent
-	style.set_border_width_all(2)
+	style.set_border_width_all(CARD_BORDER_WIDTH)
 	if glow:
-		UiTheme.add_glow(style, accent, 8, 0.32)
+		UiTheme.add_glow(style, accent, CARD_GLOW_SIZE, CARD_GLOW_ALPHA)
 	style.content_margin_left = CARD_MARGIN_H
 	style.content_margin_right = CARD_MARGIN_H
 	style.content_margin_top = CARD_MARGIN_V

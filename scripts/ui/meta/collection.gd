@@ -64,6 +64,9 @@ const BESTIARY: Array[Dictionary] = [
 @export var hidden_row_modulate: Color = Color(1.0, 1.0, 1.0, 0.55)
 ## Separación vertical entre el título y el detalle de cada fila, en píxeles.
 @export var row_separation: int = 2
+## Cuánto se aclara el rojo de acento (UiTheme.ACCENT_RED) en el borde de las
+## filas del bestiario ya descubiertas (0-1).
+@export var bestiary_row_lighten: float = 0.15
 
 @export_group("Textos")
 ## Insignia de arriba (%d = descubiertos, %d = total, %d = porcentaje).
@@ -144,7 +147,7 @@ func _build_rows(list_node: VBoxContainer) -> void:
 			found += 1
 			list_node.add_child(_row(String(beast.display_name),
 					kills_format % [String(beast.flavor), kills],
-					UiTheme.ACCENT_RED.lightened(0.15)))
+					UiTheme.ACCENT_RED.lightened(bestiary_row_lighten)))
 		else:
 			list_node.add_child(_hidden_row(hidden_beast_text))
 	var percent := roundi(100.0 * float(found) / float(maxi(total, 1)))

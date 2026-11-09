@@ -43,6 +43,20 @@ const VOLUME_MAX := 100.0
 @export var slider_track_color: Color = Color(0.05, 0.06, 0.09, 0.9)
 ## Color del borde del canal de los sliders.
 @export var slider_track_border_color: Color = Color(0.0, 0.0, 0.0, 0.6)
+## Grosor del borde del canal de los sliders, en píxeles.
+@export var slider_track_border_width: int = 1
+## Alto que suma el canal arriba y abajo de la línea, en píxeles.
+@export var slider_track_margin: float = 4.0
+## Radio de las esquinas del canal y del relleno de los sliders, en píxeles.
+@export var slider_corner_radius: int = 4
+## Cuánto se oscurece el turquesa (UiTheme.ACCENT) en el relleno de los sliders (0-1).
+@export var slider_fill_darken: float = 0.15
+## Grosor de la marca clara en el borde de avance del relleno, en píxeles.
+@export var slider_fill_edge_width: int = 2
+## Cuánto se aclara el turquesa en esa marca (0-1).
+@export var slider_fill_edge_lighten: float = 0.3
+## Cuánto se aclara el agarrador con el mouse encima (0-1).
+@export var slider_grabber_hover_lighten: float = 0.25
 
 @onready var _panel: PanelContainer = %Panel
 @onready var _sfx_slider: HSlider = %SfxSlider
@@ -244,17 +258,19 @@ func _apply_styles() -> void:
 	_panel.add_theme_stylebox_override("panel",
 			UiTheme.panel(UiTheme.PANEL_BG, UiTheme.BORDER_DIM, panel_margin.x, panel_margin.y))
 	var grabber := UiTheme.grabber_icon(UiTheme.ACCENT)
-	var grabber_hi := UiTheme.grabber_icon(UiTheme.ACCENT.lightened(0.25))
+	var grabber_hi := UiTheme.grabber_icon(
+			UiTheme.ACCENT.lightened(slider_grabber_hover_lighten))
 	for slider: HSlider in [_sfx_slider, _ambient_slider, _sensitivity_slider]:
-		var track := UiTheme.flat(slider_track_color, 4)
-		track.set_border_width_all(1)
+		var track := UiTheme.flat(slider_track_color, slider_corner_radius)
+		track.set_border_width_all(slider_track_border_width)
 		track.border_color = slider_track_border_color
-		track.content_margin_top = 4.0
-		track.content_margin_bottom = 4.0
+		track.content_margin_top = slider_track_margin
+		track.content_margin_bottom = slider_track_margin
 		slider.add_theme_stylebox_override("slider", track)
-		var fill := UiTheme.flat(UiTheme.ACCENT.darkened(0.15), 4)
-		fill.border_width_right = 2
-		fill.border_color = UiTheme.ACCENT.lightened(0.3)
+		var fill := UiTheme.flat(UiTheme.ACCENT.darkened(slider_fill_darken),
+				slider_corner_radius)
+		fill.border_width_right = slider_fill_edge_width
+		fill.border_color = UiTheme.ACCENT.lightened(slider_fill_edge_lighten)
 		slider.add_theme_stylebox_override("grabber_area", fill)
 		slider.add_theme_stylebox_override("grabber_area_highlight", fill)
 		slider.add_theme_icon_override("grabber", grabber)

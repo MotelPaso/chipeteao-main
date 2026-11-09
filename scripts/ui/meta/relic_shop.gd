@@ -32,6 +32,8 @@ extends MetaScreen
 @export var columns_separation: int = 16
 ## Separación vertical entre nombre, efecto y rombos de rango, en píxeles.
 @export var info_separation: int = 3
+## Espacio extra entre las letras del sello MÁX, en píxeles.
+@export var maxed_spacing: int = 2
 
 @export_group("Textos")
 ## Rombo de un rango comprado.
@@ -86,7 +88,7 @@ func _build_row(relic: Dictionary) -> PanelContainer:
 	columns.add_child(side)
 	if capped:
 		var done := MetaScreen.label(maxed_text, maxed_font_size, maxed_color)
-		done.add_theme_font_override("font", UiTheme.spaced_font(2))
+		done.add_theme_font_override("font", UiTheme.spaced_font(maxed_spacing))
 		done.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		side.add_child(done)
 	else:

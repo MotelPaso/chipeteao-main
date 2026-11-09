@@ -102,6 +102,9 @@ const PIXELS_PER_METER: float = 0.5
 ## Color liso del fondo del mapa cuando la arena no tiene Terrain y no hay
 ## relieve que dibujar.
 const PLAIN_BACKGROUND: Color = Color(0.16, 0.17, 0.2)
+## Cuánto se oscurecen en el mapa las celdas que la máscara de la arena
+## bloquea (0-1).
+const BLOCKED_DARKEN: float = 0.55
 
 ## Media extensión, en metros, de la arena que cubre este mapa.
 var half_extent: float = 120.0
@@ -172,7 +175,7 @@ func _darken_blocked_cells(bounds: Node) -> void:
 		for px in pixels:
 			var column := floori((-half_extent + (float(px) + 0.5) * meters - corner.x) / cell_size)
 			if blocked.has(Vector2i(column, row)):
-				background.set_pixel(px, py, background.get_pixel(px, py).darkened(0.55))
+				background.set_pixel(px, py, background.get_pixel(px, py).darkened(BLOCKED_DARKEN))
 
 
 ## Fondo por niebla en la textura dibujable. El consumidor lo llama en el
