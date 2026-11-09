@@ -7,6 +7,7 @@ extends HBoxContainer
 
 const TILE_SCENE := preload("res://scenes/ui/hud/LoadoutTile.tscn")
 
+@export_group("Fila")
 ## Segundos entre consultas de los power-ups del jugador.
 @export var refresh_seconds: float = 0.2
 ## Esquina de cada casilla: los segundos que le quedan al power-up.

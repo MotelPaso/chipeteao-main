@@ -9,7 +9,8 @@ extends Control
 ## así que la horda sigue mientras el mapa está abierto: mirarlo es una
 ## decisión con costo. Se oculta solo en cuanto termina la partida, cuando
 ## algo que SÍ es dueño de la pausa pausa el árbol (el selector de cartas, el
-## menú de pausa) o cuando el jugador de esta ranura ya no está.
+## menú de pausa) o cuando el jugador de esta ranura ya no está. Para verlo
+## con el árbol en pausa, la escena guarda process_mode Always.
 ##
 ## Una instancia por jugador, creada por el HUD (ViewWidgets) en su propia
 ## CanvasLayer (capa 8: sobre el HUD, bajo el selector de cartas) y anclada a
@@ -48,6 +49,7 @@ const STAT_ROWS: Array[Dictionary] = [
 	{"label": "Saltos", "property": "extra_jumps", "show": "flat"},
 ]
 
+@export_group("Jugador y refresco")
 ## Qué jugador es dueño de este mapa (ranura 0-3). Lo asigna el HUD.
 @export var slot: int = 0
 ## Segundos entre refrescos mientras el mapa está abierto. Mientras está
@@ -126,9 +128,6 @@ var _seen_raider: Node3D = null
 
 
 func _ready() -> void:
-	# Procesa aunque el árbol esté pausado: así se oculta cuando otro menú
-	# pausa la partida.
-	process_mode = Node.PROCESS_MODE_ALWAYS
 	add_to_group(&"map_overlay")
 	_header.add_theme_font_override("font", UiTheme.spaced_font(header_letter_spacing))
 	_map = MapDraw.new(get_tree())

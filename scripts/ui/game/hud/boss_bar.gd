@@ -12,7 +12,7 @@ extends ProgressBar
 ## Borde del fondo de la barra.
 @export var trough_border_color: Color = Color(0.35, 0.22, 0.06, 0.9)
 @export_group("Forma")
-## Radio de las esquinas del relleno, en píxeles (el fondo suma 1).
+## Radio base de la barra (px): el relleno usa este valor - 1 y el fondo + 1.
 @export var corner_radius: int = 7
 ## Tamaño del brillo exterior, en píxeles, con el color de relleno.
 @export var glow_size: int = 6

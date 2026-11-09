@@ -1,7 +1,7 @@
 extends CanvasLayer
 ## Pantalla de fin de partida (GDD 9.6): la abre RunManager.run_ended con las
-## estadísticas de RunState. Su capa (UiLayers.RUN_END) dibuja sobre las
-## cartas de mejora y process_mode ALWAYS mantiene la animación y los botones
+## estadísticas de RunState. Su capa (20, en RunEndScreen.tscn) dibuja sobre
+## las cartas de mejora y process_mode ALWAYS mantiene la animación y los botones
 ## vivos con el árbol en pausa. Reintentar recarga la partida (el _ready del
 ## jugador recaptura el mouse), Cambiar raider hace la misma limpieza pero
 ## vuelve al selector y Salir cierra el juego.
@@ -43,6 +43,54 @@ const ENDINGS: Dictionary[String, Dictionary] = {
 	},
 }
 
+@export_group("Textos")
+## Indicación del botón de aceptar, bajo los botones.
+@export var accept_hint_text: String = "Elegir"
+## Línea de etapas superadas en la partida (%d = etapas).
+@export var stages_format: String = "Etapas superadas: %d"
+## Línea de vueltas completas al circuito de mapas (%d = vueltas); solo sale con al menos una.
+@export var laps_format: String = "Vueltas: %d"
+## Línea de misiones nuevas (%s = esquirlas ganadas, %d = misiones, %s = frase de misión).
+@export var quests_format: String = "%s · %d %s — reclámalas en el registro"
+## Frase de misión cuando se completó una sola.
+@export var quest_singular_text: String = "misión completada"
+## Frase de misión cuando se completaron varias.
+@export var quest_plural_text: String = "misiones completadas"
+## Línea de la Cacería diaria (%d = puntaje de esta partida, %d = mejor de hoy).
+@export var daily_score_format: String = "Puntaje diario: %d — mejor de hoy: %d"
+
+@export_group("Animación")
+## Duración del fundido de entrada del atenuado, en segundos.
+@export var dim_fade_time: float = 0.18
+## Escala desde la que cae el título.
+@export var title_start_scale: float = 1.9
+## Duración del fundido de entrada del título, en segundos.
+@export var title_fade_time: float = 0.12
+## Duración de la caída del título en una derrota con golpe, en segundos.
+@export var title_slam_time: float = 0.14
+## Duración de la caída con rebote del título en los demás finales, en segundos.
+@export var title_bounce_time: float = 0.3
+## Primer giro de la sacudida de la derrota, en grados.
+@export var shake_first_angle: float = -2.0
+## Segundo giro de la sacudida de la derrota, en grados.
+@export var shake_second_angle: float = 1.6
+## Duración del primer giro de la sacudida, en segundos.
+@export var shake_first_time: float = 0.04
+## Duración del segundo giro y del regreso a recto, en segundos cada uno.
+@export var shake_swing_time: float = 0.06
+## Duración del fundido de estadísticas, recompensas y botones, en segundos.
+@export var section_fade_time: float = 0.2
+## Retraso de la primera sección tras abrir la pantalla, en segundos.
+@export var section_delay: float = 0.22
+## Retraso extra entre una sección y la siguiente, en segundos.
+@export var section_stagger: float = 0.09
+## Brillo (modulate) al que sube el título en el destello dorado de la victoria.
+@export var shimmer_color: Color = Color(1.3, 1.22, 1.0)
+## Duración de cada mitad del destello dorado, en segundos.
+@export var shimmer_time: float = 0.9
+## Espera antes de cada subida del destello dorado, en segundos.
+@export var shimmer_delay: float = 0.4
+
 @onready var _root: Control = %Root
 @onready var _title_label: Label = %TitleLabel
 @onready var _subtitle_label: Label = %SubtitleLabel
@@ -60,11 +108,6 @@ var _entrance_tween: Tween = null
 var _shimmer_tween: Tween = null
 
 
-## La capa sale de la tabla de UiLayers; la escena no guarda una propia.
-func _init() -> void:
-	layer = UiLayers.RUN_END
-
-
 func _ready() -> void:
 	visible = false
 	add_to_group(BlockingUi.GROUP)
@@ -75,7 +118,7 @@ func _ready() -> void:
 	# anclada en el titular en vez de deslizarlo por la pantalla.
 	_title_label.resized.connect(_center_title_pivot)
 	# Indicación de botones bajo los botones; sigue al último dispositivo.
-	_buttons_row.get_parent().add_child(InputHints.build([["ui_accept", "Elegir"]]))
+	_buttons_row.get_parent().add_child(InputHints.build([["ui_accept", accept_hint_text]]))
 	_retry_button.pressed.connect(_on_retry_pressed)
 	_change_character_button.pressed.connect(_on_change_character_pressed)
 	_quit_button.pressed.connect(_on_quit_pressed)
@@ -122,20 +165,20 @@ func _ending_key(victory: bool, extracted: bool) -> String:
 func _earning_lines() -> Array[String]:
 	var lines: Array[String] = []
 	# El avance por etapas va primero: es de lo que trató la partida.
-	lines.append("Etapas superadas: %d" % RunState.stages_cleared_total)
+	lines.append(stages_format % RunState.stages_cleared_total)
 	if RunState.laps_completed > 0:
-		lines.append("Vueltas: %d" % RunState.laps_completed)
+		lines.append(laps_format % RunState.laps_completed)
 	var quest_count := SaveData.last_new_quest_ids.size()
 	if quest_count > 0:
 		# Concuerda la frase entera, no solo una letra plural: el español
 		# también flexiona el participio ("1 misión completada" / "3 misiones
 		# completadas"), así que la cantidad elige la frase.
-		var quest_phrase := "misión completada" if quest_count == 1 else "misiones completadas"
-		lines.append("%s · %d %s — reclámalas en el registro" % [
+		var quest_phrase := quest_singular_text if quest_count == 1 else quest_plural_text
+		lines.append(quests_format % [
 				UiTheme.SHARDS_GAIN % SaveData.last_reward_shards, quest_count, quest_phrase])
 	# Línea del marcador de la Cacería diaria.
 	if GameConfig.daily_mode:
-		lines.append("Puntaje diario: %d — mejor de hoy: %d" % [
+		lines.append(daily_score_format % [
 				GameConfig.last_daily_score,
 				SaveData.stat(DailyHunt.BEST_STAT_PREFIX + GameConfig.daily_date)])
 	return lines
@@ -162,7 +205,7 @@ func _play_entrance(ending: Dictionary) -> void:
 		_shimmer_tween.kill()
 	_root.modulate.a = 0.0
 	_center_title_pivot()
-	_title_label.scale = Vector2(1.9, 1.9)
+	_title_label.scale = Vector2.ONE * title_start_scale
 	_title_label.modulate = Color(1, 1, 1, 0)
 	_title_label.rotation_degrees = 0.0
 	var staggered: Array[Control] = [_stats_panel, _rewards_label, _buttons_row]
@@ -170,29 +213,34 @@ func _play_entrance(ending: Dictionary) -> void:
 		section.modulate.a = 0.0
 	_entrance_tween = create_tween()
 	_entrance_tween.set_ignore_time_scale(true)
-	_entrance_tween.tween_property(_root, "modulate:a", 1.0, 0.18)
+	_entrance_tween.tween_property(_root, "modulate:a", 1.0, dim_fade_time)
 	# Título: cae desde grande; el golpe sacude y lo demás suaviza.
-	_entrance_tween.parallel().tween_property(_title_label, "modulate:a", 1.0, 0.12)
+	_entrance_tween.parallel().tween_property(_title_label, "modulate:a", 1.0,
+			title_fade_time)
 	if bool(ending.shake):
-		_entrance_tween.parallel().tween_property(_title_label, "scale", Vector2.ONE, 0.14) \
+		_entrance_tween.parallel().tween_property(_title_label, "scale", Vector2.ONE,
+				title_slam_time) \
 				.set_trans(Tween.TRANS_QUART).set_ease(Tween.EASE_IN)
-		_entrance_tween.tween_property(_title_label, "rotation_degrees", -2.0, 0.04)
-		_entrance_tween.tween_property(_title_label, "rotation_degrees", 1.6, 0.06)
-		_entrance_tween.tween_property(_title_label, "rotation_degrees", 0.0, 0.06)
+		_entrance_tween.tween_property(_title_label, "rotation_degrees", shake_first_angle,
+				shake_first_time)
+		_entrance_tween.tween_property(_title_label, "rotation_degrees", shake_second_angle,
+				shake_swing_time)
+		_entrance_tween.tween_property(_title_label, "rotation_degrees", 0.0, shake_swing_time)
 	else:
-		_entrance_tween.parallel().tween_property(_title_label, "scale", Vector2.ONE, 0.3) \
+		_entrance_tween.parallel().tween_property(_title_label, "scale", Vector2.ONE,
+				title_bounce_time) \
 				.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 	for i in staggered.size():
-		_entrance_tween.parallel().tween_property(staggered[i], "modulate:a", 1.0, 0.2) \
-				.set_delay(0.22 + 0.09 * i)
+		_entrance_tween.parallel().tween_property(staggered[i], "modulate:a", 1.0,
+				section_fade_time).set_delay(section_delay + section_stagger * i)
 	if bool(ending.shimmer):
 		# Brillo dorado: el título respira más claro, en bucle.
 		_shimmer_tween = create_tween().set_loops()
 		_shimmer_tween.set_ignore_time_scale(true)
 		_shimmer_tween.tween_property(_title_label, "modulate",
-				Color(1.3, 1.22, 1.0), 0.9).set_delay(0.4) \
+				shimmer_color, shimmer_time).set_delay(shimmer_delay) \
 				.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
-		_shimmer_tween.tween_property(_title_label, "modulate", Color.WHITE, 0.9) \
+		_shimmer_tween.tween_property(_title_label, "modulate", Color.WHITE, shimmer_time) \
 				.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 
 

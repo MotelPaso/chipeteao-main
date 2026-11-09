@@ -100,7 +100,7 @@ Lo que NO se traduce nunca: los `id` de catálogo, los `node_name`, los nombres 
 | Tome of Chance | Tomo del Azar |
 | Tome of Peril | Tomo del Peligro |
 | Tome of Fury II | Tomo de Furia II |
-| Tome of  | Tomo de  / Tomo del  (prefijo; ver principio 12: hud.gd:231) |
+| Tome of  | Tomo de  / Tomo del  (prefijo; ver principio 12: `TOME_NAME_PREFIXES` en `scripts/ui/game/hud/loadout_strip.gd`) |
 
 ## Objetos
 

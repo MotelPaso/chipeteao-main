@@ -16,20 +16,25 @@ const CLAIMED_MODULATE := Color(1.0, 1.0, 1.0, 0.45)
 enum RowState { IN_PROGRESS, CLAIMABLE, CLAIMED }
 
 @export_group("Filas")
-## Nombre de la misión: tamaño de fuente (píxeles) y color.
+## Tamaño de fuente del nombre de la misión, en píxeles.
 @export var name_font_size: int = 16
+## Color del nombre de la misión.
 @export var name_color: Color = UiTheme.TEXT_BRIGHT
-## Descripción de la misión: tamaño de fuente (píxeles) y color.
+## Tamaño de fuente de la descripción de la misión, en píxeles.
 @export var description_font_size: int = 12
+## Color de la descripción de la misión.
 @export var description_color: Color = UiTheme.TEXT_DIM
-## Recompensa "+N esquirlas" a la derecha: tamaño de fuente (píxeles) y color.
+## Tamaño de fuente de la recompensa "+N esquirlas" de la derecha, en píxeles.
 @export var reward_font_size: int = 14
+## Color de la recompensa "+N esquirlas" de la derecha.
 @export var reward_color: Color = UiTheme.SHARD_BLUE
-## Contador "x/y" junto a la barra: tamaño de fuente (píxeles) y color.
+## Tamaño de fuente del contador "x/y" junto a la barra, en píxeles.
 @export var progress_font_size: int = 12
+## Color del contador "x/y" junto a la barra.
 @export var progress_color: Color = Color(0.72, 0.74, 0.78)
-## Sello de misión reclamada: tamaño de fuente (píxeles) y color.
+## Tamaño de fuente del sello de misión reclamada, en píxeles.
 @export var claimed_font_size: int = 12
+## Color del sello de misión reclamada.
 @export var claimed_color: Color = UiTheme.TEXT_FAINT
 
 @export_group("Textos")

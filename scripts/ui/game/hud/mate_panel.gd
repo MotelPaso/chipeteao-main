@@ -7,6 +7,7 @@ extends VBoxContainer
 
 const ROW_SCENE := preload("res://scenes/ui/hud/MateRow.tscn")
 
+@export_group("Compañeros")
 ## Segundos entre consultas del conteo de power-ups de cada compañero.
 @export var refresh_seconds: float = 0.2
 

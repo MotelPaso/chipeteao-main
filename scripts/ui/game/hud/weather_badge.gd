@@ -8,6 +8,7 @@ extends Label
 ## WeatherDirector.WEATHER_CATALOG (weather_director.gd); un id sin fila se
 ## muestra tal cual.
 
+@export_group("Chip")
 ## Segundos entre lecturas del clima.
 @export var refresh_seconds: float = 0.2
 ## Texto del chip: nombre del clima y segundos restantes.

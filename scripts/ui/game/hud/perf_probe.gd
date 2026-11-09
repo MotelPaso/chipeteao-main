@@ -10,6 +10,7 @@ extends Label
 const ENV := "BONK_PERF"
 const TEXT_FORMAT := "FPS %d | enemies %d | gems %d | shots %d | bolts %d\npools (created/parked): %s"
 
+@export_group("Sonda")
 ## Muestra la sonda (solo para desarrollo).
 @export var enabled: bool = false
 ## Segundos entre lecturas.

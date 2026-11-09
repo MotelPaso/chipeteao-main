@@ -208,8 +208,8 @@ class TimedBeacon:
 @export var exit_portal_announce: String = "Se abrió el portal de salida — crúzalo cuando quieras"
 
 ## El clima activo, o vacío: {id, group, time_left}. Vive en el nodo
-## Weather; weather_badge.gd (HUD), event_altar.gd y el probe lo leen aquí
-## con get("active_weather").
+## Weather; scripts/ui/game/hud/weather_badge.gd, event_altar.gd y el probe
+## lo leen aquí con get("active_weather").
 var active_weather: Dictionary:
 	get:
 		return _weather.active_weather if _weather != null else {}
@@ -287,7 +287,7 @@ func beacon_count() -> int:
 ## --- puertas del clima -----------------------------------------------------
 ## El clima vive en el nodo Weather; estas puertas siguen aquí porque otros
 ## nodos llegan por el grupo "world_director": event_altar.gd, enemy_loot.gd,
-## weather_badge.gd y arena_probe.gd.
+## arena_probe.gd y scripts/ui/game/hud/weather_badge.gd.
 
 ## La fila de WEATHER_CATALOG con ese id, o vacío (arena_probe.gd la usa).
 static func weather_row(id: String) -> Dictionary:

@@ -8,24 +8,29 @@ extends MetaScreen
 ## alcanza recibe el vaivén de rechazo compartido.
 
 @export_group("Filas")
-## Nombre de la reliquia: tamaño de fuente (píxeles) y color.
+## Tamaño de fuente del nombre de la reliquia, en píxeles.
 @export var name_font_size: int = 16
+## Color del nombre de la reliquia.
 @export var name_color: Color = UiTheme.TEXT_BRIGHT
-## Línea de efecto: tamaño de fuente (píxeles) y color.
+## Tamaño de fuente de la línea de efecto, en píxeles.
 @export var effect_font_size: int = 12
+## Color de la línea de efecto.
 @export var effect_color: Color = UiTheme.TEXT_DIM
-## Rombos de rango: tamaño de fuente (píxeles), color con algún rango
-## comprado y color sin ninguno.
+## Tamaño de fuente de los rombos de rango, en píxeles.
 @export var pips_font_size: int = 14
+## Color de los rombos cuando hay algún rango comprado.
 @export var pips_owned_color: Color = UiTheme.ACCENT_AMBER
+## Color de los rombos cuando no hay ningún rango comprado.
 @export var pips_empty_color: Color = UiTheme.TEXT_FAINT
-## Sello de rango máximo: tamaño de fuente (píxeles) y color.
+## Tamaño de fuente del sello de rango máximo, en píxeles.
 @export var maxed_font_size: int = 13
+## Color del sello de rango máximo.
 @export var maxed_color: Color = UiTheme.ACCENT_AMBER
 
 @export_group("Textos")
-## Rombo de un rango comprado y de uno que falta.
+## Rombo de un rango comprado.
 @export var pip_owned: String = "◆"
+## Rombo de un rango que falta.
 @export var pip_empty: String = "◇"
 ## Sello de una reliquia en su rango máximo.
 @export var maxed_text: String = "MÁX"

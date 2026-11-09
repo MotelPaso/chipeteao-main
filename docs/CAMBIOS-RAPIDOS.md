@@ -235,7 +235,8 @@ de reparto se llama `ForestScatter`, `DuneScatter` o `MarshScatter`.
 
 | Qué quieres cambiar | Dónde | Qué propiedad |
 | --- | --- | --- |
-| Posición o tamaño de cualquier elemento del HUD | `scenes/ui/HUD.tscn` > el nodo (TimerLabel, KillsLabel, BuildStrip, BagStrip, FpsBadge, PowerUpRow, MatePanel, ViewWidgets/MinimapSlot…) | Layout (anclas y márgenes) |
+| Posición o tamaño de cualquier elemento del HUD | `scenes/ui/HUD.tscn` > el nodo (TimerLabel, KillsLabel, BuildStrip, BagStrip, FpsBadge, PowerUpRow, MatePanel…) | Layout (anclas y márgenes) |
+| Tamaño y margen del minimapa | HUD.tscn > ViewWidgets/MinimapSlot (solo cuentan su tamaño y sus márgenes, medidos desde la esquina superior derecha de cada celda; no muevas sus anclas); en las celdas de abajo, ViewWidgets | Layout > márgenes; `lower_cell_top_margin` |
 | Color o tamaño de Nivel, Reloj, Bajas y Puntos | HUD.tscn > LevelLabel, TimerLabel, KillsLabel, PointsLabel | Theme Overrides > Colors / Font Sizes |
 | Colores de la barra de vida y el latido de vida baja | HUD.tscn > HUD | `hp_full_color`, `hp_low_color`, grupo «Latido de vida baja» |
 | Color de la barra de XP | HUD.tscn > HUD | `xp_color`, `xp_trough_color` |
@@ -243,7 +244,7 @@ de reparto se llama `ForestScatter`, `DuneScatter` o `MarshScatter`.
 | Palabras, colores y umbrales de las rachas («¡TRITURANDO!») | HUD.tscn > StreakLabel | `tier_kills`, `tier_words`, `tier_colors`, `window_seconds` |
 | Duración y color de los avisos en pantalla | HUD.tscn > AnnounceLabel | `fade_in_time`, `hold_time`, `fade_out_time`, `normal_color`, `major_*` |
 | Barra del jefe (y color de su flecha) | HUD.tscn > BossBar | `fill_color`, `glow_size`, `glow_alpha` |
-| Colores de las fichas de armas, evoluciones y tomos | HUD.tscn > BuildStrip / BagStrip | `weapon_color`, `evolved_weapon_color`, `tome_color` |
+| Colores de las fichas de armas, evoluciones y tomos | HUD.tscn > BuildStrip | `weapon_color`, `evolved_weapon_color`, `tome_color` |
 | Fondo, borde y brillo de cada ficha | `scenes/ui/hud/LoadoutTile.tscn` > raíz | `background_color`, `border_width`, `glow_size` |
 | Tarjeta de botín | `scenes/ui/hud/LootToast.tscn` > raíz | `hold_time`, `fade_time`, `background_color` |
 | Filas de compañeros en co-op | `scenes/ui/hud/MateRow.tscn` > raíz | `knocked_out_format`, `knocked_out_tint`, `points_format` |
@@ -267,11 +268,14 @@ de reparto se llama `ForestScatter`, `DuneScatter` o `MarshScatter`.
 | Fondo de niebla de los menús | `assets/ui/menu_backdrop.tres` | `top_color`, `bottom_color`, `fog_color`, `fog_strength` |
 | Títulos de Misiones, Armería y Colección | `scenes/ui/QuestLog.tscn`, `RelicShop.tscn`, `Collection.tscn` > TitleLabel | Theme Overrides |
 | Filas de Misiones, Armería y Colección (letra, color, textos) | esas mismas escenas > raíz | grupos «Filas» y «Textos» |
-| Ajustes: color de los valores y encabezados | `scenes/ui/SettingsPanel.tscn` > los nodos *Value y *Header | Theme Overrides, `text` |
+| Entrada de filas, conteo del saldo y destello de pago de Misiones, Armería y Colección | esas mismas escenas > raíz (sección MetaScreen) | grupos «Animación» y «Textos» |
+| Ajustes: formato de los valores, indicaciones y entrada del panel | `SettingsPanel.tscn` > raíz | grupos «Textos» (`sensitivity_format`, `volume_format`) y «Entrada» |
+| Ajustes: color de los valores y encabezados | `scenes/ui/SettingsPanel.tscn` > los nodos *Value; encabezados en SoundHeader/Label, ControlsHeader/Label y ScreenHeader/Label (texto y letra) y */Rule (línea) | Theme Overrides, `text`; `color` de cada Rule |
 | Rango de la sensibilidad del mouse | `scripts/systems/autoloads/save_data.gd` | `MIN_MOUSE_SENSITIVITY`, `MAX_MOUSE_SENSITIVITY` |
 | Pantalla de fin de partida | `scenes/ui/RunEndScreen.tscn` > TitleLabel; colores en `scripts/ui/game/run_end_screen.gd` | Theme Overrides; `DEFEAT_TITLE_COLOR`, `VICTORY_TITLE_COLOR` |
+| Textos de ganancias y animación de la pantalla de fin | `RunEndScreen.tscn` > raíz | grupos «Textos» (`stages_format`, `quests_format`…) y «Animación» (`title_start_scale`, `shimmer_color`…) |
 | Colores compartidos y frases comunes («%d esquirlas», «J%d») | `scripts/ui/ui_theme.gd` | constantes al comienzo |
-| Orden de dibujo de las capas de UI | `scripts/ui/ui_layers.gd` | una constante por capa |
+| Orden de dibujo de las capas de UI | las capas de escena en la raíz de su .tscn (HUD 5, UpgradeCardUI 10, modal/ModalPanel 15, RunEndScreen 20, PauseMenu 30); las que se crean en código en `scripts/ui/ui_layers.gd` | Layer; una constante por capa |
 
 ## Cartas de mejora, pausa, tienda y ruleta
 
