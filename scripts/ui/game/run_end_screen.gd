@@ -91,6 +91,10 @@ const ENDINGS: Dictionary[String, Dictionary] = {
 ## Espera antes de cada subida del destello dorado, en segundos.
 @export var shimmer_delay: float = 0.4
 
+@export_group("Panel")
+## Margen interior del panel de estadísticas, en píxeles (horizontal, vertical).
+@export var panel_margin: Vector2 = Vector2(26.0, 16.0)
+
 @onready var _root: Control = %Root
 @onready var _title_label: Label = %TitleLabel
 @onready var _subtitle_label: Label = %SubtitleLabel
@@ -274,7 +278,7 @@ func _on_quit_pressed() -> void:
 ## subtítulo vive en la escena; el color del título lo elige el final.
 func _apply_styles() -> void:
 	_stats_panel.add_theme_stylebox_override("panel",
-			UiTheme.panel(UiTheme.PANEL_BG, UiTheme.BORDER_DIM, 26.0, 16.0))
+			UiTheme.panel(UiTheme.PANEL_BG, UiTheme.BORDER_DIM, panel_margin.x, panel_margin.y))
 	UiTheme.style_button(_retry_button, UiTheme.ACCENT, true)
 	UiTheme.style_button(_change_character_button)
 	UiTheme.style_button(_quit_button)

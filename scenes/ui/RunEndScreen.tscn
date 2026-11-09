@@ -32,7 +32,7 @@ theme_override_constants/separation = 20
 
 [node name="TitleLabel" type="Label" parent="Root/Center/VBox"]
 unique_name_in_owner = true
-editor_description = "El color del título lo pone run_end_screen.gd según el final (ENDINGS); aquí se ve el de la derrota."
+editor_description = "El texto y el color del título los pone run_end_screen.gd según el final (ENDINGS, al comienzo del script); aquí se ven los de MORISTE."
 theme_override_colors/font_color = Color(0.9, 0.25, 0.2, 1)
 theme_override_colors/font_outline_color = Color(0.03, 0.035, 0.06, 0.92)
 theme_override_constants/outline_size = 14
