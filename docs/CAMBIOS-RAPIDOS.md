@@ -258,9 +258,10 @@ de reparto se llama `ForestScatter`, `DuneScatter` o `MarshScatter`.
 | Filas de compañeros en co-op | `scenes/ui/hud/MateRow.tscn` > raíz | `knocked_out_format`, `knocked_out_tint`, `points_format` |
 | Color del chip de clima bajo el reloj | HUD.tscn > TimerLabel/WeatherBadge | `group_colors`, `text_format` (el nombre sale de `display_name` en `weather_catalog.gd`) |
 | Insignia de FPS | HUD.tscn > FpsBadge | `text_format`, `background_color`, `refresh_seconds` |
-| Marco y refresco del minimapa | `scripts/ui/maps/minimap.gd` (bloque «Edita aquí») | `FRAME_PAD`, `MARKER_SCALE`, `BACKGROUND_COLOR`, `REFRESH` |
+| Marco y refresco del minimapa | `scripts/ui/maps/minimap.gd` (bloque «Edita aquí») | `FRAME_PAD`, `MARKER_SCALE`, `BACKGROUND_COLOR`, `BORDER_WIDTH`, `BORDER_DARKEN`, `REFRESH` |
 | Colores, formas y leyenda de los marcadores del mapa | `scripts/ui/maps/map_draw.gd` | `MARKER_STYLES`, `MARKER_LABELS` |
 | Mapa de Tab: fondo, paneles y textos | `scenes/ui/maps/MapOverlay.tscn` (paneles: `scenes/ui/maps/MapSection.tscn`) | Layout, `title`, grupo «Textos» |
+| Marco del mapa, leyenda y encabezado del mapa de Tab | `MapOverlay.tscn` > raíz (grupos «Mapa», «Leyenda», «Encabezado») | `frame_color`, `frame_margin`, `border_width`, `border_darken`; `swatch_size`, `legend_font_size`, `legend_text_color`, `legend_row_separation`; `header_letter_spacing` |
 | Filas de estadísticas del mapa de Tab | `scripts/ui/maps/map_overlay.gd` | `STAT_ROWS` (al comienzo) |
 
 ## Menús
@@ -269,14 +270,18 @@ de reparto se llama `ForestScatter`, `DuneScatter` o `MarshScatter`.
 | --- | --- | --- |
 | Título del selector de personajes | `scenes/ui/CharacterSelect.tscn` > TitleLabel | Theme Overrides |
 | Textos de los botones del selector (Iniciar, Misiones, Colección, Armería, Cacería diaria) | `CharacterSelect.tscn` > raíz (grupo «Textos») y ButtonRow | `start_solo_format`, `start_party_format`; `text` de cada botón |
+| Columnas y filas de la cuadrícula de personajes | `CharacterSelect.tscn` > raíz (grupo «Cuadrícula») | `grid_min_columns`, `grid_target_rows` |
+| Brillo del título, entrada de las cartas y rebotes del selector | `CharacterSelect.tscn` > raíz (grupo «Movimiento») | `title_glow_color`, `title_glow_time`, `entrance_*`, `start_hover_grow`, `start_press_squash`, `shards_pop_*` |
 | Carta de personaje (letra y color del nombre, arma, pasiva, descripción) | `scenes/ui/meta/character_select/CharacterCard.tscn` > Unlocked/Name, Weapon, Passive, Blurb | Theme Overrides |
 | Carta bloqueada (precio, candado, pregunta de desbloqueo) | `CharacterCard.tscn` > Locked/* y raíz | Theme Overrides; `confirm_format` |
 | Bordes, escala y tamaño de la carta | `CharacterCard.tscn` > raíz | grupo «Bordes», `selected_scale`, `custom_minimum_size` |
+| Retrato de la carta (sale del tinte del raider) y movimiento al pasar el cursor | `CharacterCard.tscn` > raíz (grupos «Retrato», «Movimiento») | `portrait_body_darken`, `portrait_rim_lighten`, `portrait_glow_alpha`, `monogram_outline_darken`; `hover_grow`, `unselected_modulate`, `settle_time` |
 | Lobby co-op (textos y botones 1-4) | `scenes/ui/meta/character_select/CoopLobby.tscn` | grupo «Textos»; PlayersRow/Count1..Count4 |
+| Colores, bordes y tamaños de los botones del lobby co-op | `CoopLobby.tscn` > raíz (grupos «Botones de cantidad», «Botones de slot») | `count_*`, `slot_*` (por ejemplo `count_selected_color`, `slot_button_size`) |
 | Fondo de niebla de los menús | `assets/ui/menu_backdrop.tres` | `top_color`, `bottom_color`, `fog_color`, `fog_strength` |
 | Títulos de Misiones, Armería y Colección | `scenes/ui/QuestLog.tscn`, `RelicShop.tscn`, `Collection.tscn` > TitleLabel | Theme Overrides |
 | Filas de Misiones, Armería y Colección (letra, color, textos) | esas mismas escenas > raíz | grupos «Filas» y «Textos» |
-| Entrada de filas, conteo del saldo y destello de pago de Misiones, Armería y Colección | esas mismas escenas > raíz (sección MetaScreen) | grupos «Animación» y «Textos» |
+| Entrada de filas, conteo del saldo y destello de pago de Misiones, Armería y Colección | esas mismas escenas > raíz (sección MetaScreen); las tres a la vez: valores por defecto en `scripts/ui/meta/meta_screen.gd` | grupos «Animación» y «Textos» |
 | Ajustes: formato de los valores, indicaciones y entrada del panel | `SettingsPanel.tscn` > raíz | grupos «Textos» (`sensitivity_format`, `volume_format`) y «Entrada» |
 | Ajustes: color de los valores y encabezados | `scenes/ui/SettingsPanel.tscn` > los nodos *Value; encabezados en SoundHeader/Label, ControlsHeader/Label y ScreenHeader/Label (texto y letra) y */Rule (línea) | Theme Overrides, `text`; `color` de cada Rule |
 | Rango de la sensibilidad del mouse | `scripts/systems/autoloads/save_data.gd` | `MIN_MOUSE_SENSITIVITY`, `MAX_MOUSE_SENSITIVITY` |
@@ -294,7 +299,7 @@ de reparto se llama `ForestScatter`, `DuneScatter` o `MarshScatter`.
 | Letra, tamaño y color de los textos de una carta | `scenes/ui/upgrade_card_ui/UpgradeCard.tscn` > CardBox/RarityLabel, TitleLabel, DescLabel, WeapLabel | Theme Overrides |
 | Brillo de las legendarias, cinta de rareza, crecer al pasar el cursor | `UpgradeCard.tscn` > raíz | `shine_color`, `ribbon_text_color`, `hover_grow` |
 | Menú de pausa (título, animación, textos de ayuda) | `scenes/ui/PauseMenu.tscn` > TitleLabel y raíz | Theme Overrides; `panel_fade_time`, `accept_hint_text` |
-| Marco común de la tienda y la ruleta («Tienes N pts», «Salir») | `scenes/ui/modal/ModalPanel.tscn` > raíz y sus nodos | `points_template`, `close_text`; propiedades de cada nodo |
+| Marco común de la tienda y la ruleta («Tienes N pts», «Salir») | `scripts/ui/game/modal/modal_panel.gd` (vale para los dos paneles; para uno solo, la raíz de `RoulettePanel.tscn` o `VendorPanel.tscn`); aspecto de cada nodo en `scenes/ui/modal/ModalPanel.tscn` | grupos «Textos» (`points_template`, `close_text`) y «Panel» (`panel_margin`, `title_letter_spacing`); propiedades de cada nodo |
 | Textos y barrido de la ruleta | `scenes/ui/modal/RoulettePanel.tscn` > raíz | `title_text`, `spin_template`, `sweep_time`, `sweep_steps` |
 | Premios de la ruleta (cuánto da cada resultado y su peso) | `scripts/world/interactables/roulette_shrine.gd` > `OUTCOMES` | `amount`, `seconds`, `weight` (el número de la etiqueta sale del campo) |
 | Precio del altar de la ruleta | `scenes/world/shrines/RouletteShrine.tscn` > raíz | `price` |
