@@ -284,12 +284,17 @@ de reparto se llama `ForestScatter`, `DuneScatter` o `MarshScatter`.
 | Fondo de niebla de los menús | `assets/ui/menu_backdrop.tres` | `top_color`, `bottom_color`, `fog_color`, `fog_strength` |
 | Títulos de Misiones, Armería y Colección | `scenes/ui/QuestLog.tscn`, `RelicShop.tscn`, `Collection.tscn` > TitleLabel | Theme Overrides |
 | Filas de Misiones, Armería y Colección (letra, color, textos) | esas mismas escenas > raíz | grupos «Filas» y «Textos» |
+| Colección: títulos de sección (RAIDERS, ARSENAL, BESTIARIO) y el «???» de lo no descubierto | `scenes/ui/Collection.tscn` > raíz | grupo «Textos» (`raiders_title`, `arsenal_title`, `bestiary_title`, `unknown_text`) |
+| Misiones: atenuado de las reclamadas, tamaño del botón Reclamar y de la barra de progreso | `scenes/ui/QuestLog.tscn` > raíz | grupo «Filas» (`claimed_row_modulate`, `claim_button_size`, `progress_bar_size`) |
+| Armería: tamaño del botón de compra | `scenes/ui/RelicShop.tscn` > raíz | grupo «Filas» (`buy_button_size`) |
 | Entrada de filas, conteo del saldo y destello de pago de Misiones, Armería y Colección | esas mismas escenas > raíz (sección MetaScreen); las tres a la vez: valores por defecto en `scripts/ui/meta/meta_screen.gd` | grupos «Animación» y «Textos» |
 | Ajustes: formato de los valores, indicaciones y entrada del panel | `SettingsPanel.tscn` > raíz | grupos «Textos» (`sensitivity_format`, `volume_format`) y «Entrada» |
+| Ajustes: canal de los sliders y margen del panel | `scenes/ui/SettingsPanel.tscn` > raíz | grupos «Panel» (`panel_margin`) y «Sliders» (`slider_track_color`) |
 | Ajustes: color de los valores y encabezados | `scenes/ui/SettingsPanel.tscn` > los nodos *Value; encabezados en SoundHeader/Label, ControlsHeader/Label y ScreenHeader/Label (texto y letra) y */Rule (línea) | Theme Overrides, `text`; `color` de cada Rule |
 | Rango de la sensibilidad del mouse | `scripts/systems/autoloads/save_data.gd` | `MIN_MOUSE_SENSITIVITY`, `MAX_MOUSE_SENSITIVITY` |
 | Pantalla de fin de partida | `scenes/ui/RunEndScreen.tscn` > TitleLabel; colores en `scripts/ui/game/run_end_screen.gd` | Theme Overrides; `DEFEAT_TITLE_COLOR`, `VICTORY_TITLE_COLOR` |
 | Títulos y subtítulos de cada final («MORISTE», «¡Sobreviviste!»…) | `scripts/ui/game/run_end_screen.gd` > `ENDINGS` (al comienzo) | `title`, `subtitle` |
+| Margen del panel de estadísticas de la pantalla de fin | `scenes/ui/RunEndScreen.tscn` > raíz | grupo «Panel» (`panel_margin`) |
 | Textos de ganancias y animación de la pantalla de fin | `RunEndScreen.tscn` > raíz | grupos «Textos» (`stages_format`, `quests_format`…) y «Animación» (`title_start_scale`, `shimmer_color`…) |
 | Colores compartidos y frases comunes («%d esquirlas», «J%d») | `scripts/ui/ui_theme.gd` | constantes al comienzo |
 | Orden de dibujo de las capas de UI | las capas de escena en la raíz de su .tscn (HUD 5, UpgradeCardUI 10, modal/ModalPanel 15, RunEndScreen 20, PauseMenu 30); las que se crean en código en `scripts/ui/ui_layers.gd` | Layer; una constante por capa |
