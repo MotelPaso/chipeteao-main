@@ -36,6 +36,11 @@ const SCENE_PATH: String = "res://scenes/world/chests/Chest.tscn"
 @export_range(0.0, 1.0) var open_hop_up_share: float = 0.4
 ## Segundos que sigue vivo el cofre tras pagar; el hundimiento (sink_duration) empieza de inmediato.
 @export var reward_linger: float = 1.4
+@export_group("Cofre perdido")
+## Segundos que tarda en encogerse si nadie lo abre antes de que se apague su baliza (cofre de suministros).
+@export var lost_sink_duration: float = 0.4
+## Metros que baja al perderse (0 = solo se encoge).
+@export var lost_sink_depth: float = 0.0
 @export_group("Brillo por rareza")
 ## Energía de emisión del modelo según la rareza (clave: id de rareza en inglés).
 @export var glow_energy_by_rarity: Dictionary[String, float] = {
@@ -124,6 +129,12 @@ func make_free() -> void:
 	rarity = ""
 	_tint_by_rarity()
 	_refresh_price_prompt()
+
+
+## Hunde el cofre de suministros que nadie abrió antes de que se apagara su
+## baliza (lo llama el WorldDirector), con los valores de «Cofre perdido».
+func sink_lost() -> void:
+	sink_away(0.0, lost_sink_duration, lost_sink_depth)
 
 
 func rarity_name() -> String:

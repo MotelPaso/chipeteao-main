@@ -22,7 +22,6 @@ pillar_top_radius = 1.3
 pillar_alpha = 0.3
 idle_pulse_speed = 2.2
 idle_pulse_amount = 0.08
-emission_energy = 1.8
 light_energy = 2.4
 light_range = 9.0
 light_height = 2.0

@@ -37,9 +37,10 @@ const Beacon := preload("res://scripts/world/run/director/beacon.gd")
 ##   id:           identificador; event_weight_overrides lo usa como clave.
 ##   weight:       peso relativo del sorteo.
 ##   scene:        POI que aparece lejos de un jugador al azar.
-##   method:       solo en los eventos que hacen algo más que poner `scene`;
+##   method:       solo en los eventos que no se resuelven con
+##                 _event_spawn_poi (sortear el punto y poner `scene` ahí);
 ##                 se llama con call(row) y catalog_lint.gd revisa que exista.
-##   announce:     aviso en el HUD (texto del jugador).
+##   announce:     aviso en el HUD (texto del jugador); obligatorio.
 ##   beacon_color: color de la baliza sobre el evento; sin él no hay baliza.
 ##                 En los altares es aparte de su accent_color (la escena):
 ##                 cambia los dos. El vendedor no lo usa: su baliza toma el
@@ -48,8 +49,8 @@ const Beacon := preload("res://scripts/world/run/director/beacon.gd")
 ##                 POI se usa (o hasta el cambio de etapa si no hay POI).
 ##   altar:        cadencia de altares: el peso sube con el minuto y vale 0
 ##                 mientras haya demasiados altares sin usar.
-##   cap_group/cap: con `cap` o más nodos en el grupo `cap_group`, el evento
-##                 pesa 0 y sale otro.
+##   cap_group/cap: van juntos: con `cap` o más nodos en el grupo
+##                 `cap_group`, el evento pesa 0 y sale otro.
 ##   log:          línea de log al aparecer, para los soaks (no traducir).
 const EVENT_LIBRARY: Array[Dictionary] = [
 	{
@@ -71,20 +72,23 @@ const EVENT_LIBRARY: Array[Dictionary] = [
 		"beacon_color": UiTheme.XP_GREEN, "beacon_time": 30.0,
 	},
 	{
-		"id": "charge_altar", "weight": 1.6, "altar": true, "scene": CHARGE_SHRINE_SCENE,
+		"id": "charge_altar", "weight": 1.6, "altar": true, "method": &"_event_shrine",
+		"scene": CHARGE_SHRINE_SCENE,
 		"announce": "Se alza un altar de carga — párate en su anillo",
 		"beacon_color": Color(0.45, 0.85, 1.0), "beacon_time": INF,
 		"log": "Altar placed: charge",
 	},
 	{
-		"id": "demonic_altar", "weight": 0.5, "altar": true, "scene": CURSE_SHRINE_SCENE,
+		"id": "demonic_altar", "weight": 0.5, "altar": true, "method": &"_event_shrine",
+		"scene": CURSE_SHRINE_SCENE,
 		"announce": "Un obelisco demoníaco sale del suelo a zarpazos...",
 		"beacon_color": Color(1.0, 0.35, 0.3), "beacon_time": INF,
 		"log": "Altar placed: demonic",
 	},
 	{
 		# Un solo manantial a la vez; se queda hasta que alguien bebe.
-		"id": "spring", "weight": 0.7, "scene": SPRING_SHRINE_SCENE,
+		"id": "spring", "weight": 0.7, "method": &"_event_shrine",
+		"scene": SPRING_SHRINE_SCENE,
 		"announce": "Un manantial brota en algún lugar del campo...",
 		"beacon_color": Color(0.4, 0.8, 1.0), "beacon_time": INF,
 		"cap_group": &"springs", "cap": 1,
@@ -185,11 +189,13 @@ class TimedBeacon:
 @export var rift_gem_count: int = 10
 ## XP de cada gema de la grieta (una gema normal vale 1).
 @export var rift_gem_value: int = 3
+## Distancia mínima (metros) de cada gema de la grieta a su centro.
+@export var rift_gem_min_spread: float = 0.6
+## Distancia máxima (metros) de cada gema de la grieta a su centro.
+@export var rift_gem_max_spread: float = 2.6
 ## Pesos que reemplazan los de EVENT_LIBRARY, por id de evento; 0 quita el
 ## evento. Vale para todas las arenas: el director es uno por partida.
 @export var event_weight_overrides: Dictionary[String, float] = {}
-## Segundos que tarda en encogerse el cofre de suministros que nadie abrió al apagarse su baliza.
-@export var lost_supply_chest_sink_time: float = 0.4
 
 @export_group("Altares")
 ## Cuánto sube el peso de los altares por minuto: peso x (1 + esto x minutos).
@@ -231,6 +237,27 @@ var _beacons: Array[TimedBeacon] = []
 func _ready() -> void:
 	_set_layout(_new_layout(null))
 	add_to_group("world_director")
+
+
+func _physics_process(delta: float) -> void:
+	if not RunState.run_active:
+		# La partida acaba de terminar (derrota o extracción) y la pantalla
+		# final deja la arena viva y en pausa: el clima se detiene aquí, o el
+		# HUD quedaría desplazado y el descuento dorado seguiría activo.
+		_weather.stop_weather()
+		return
+	_tick_exit_portal()
+	_tick_beacons(delta)
+	if not events_enabled:
+		return
+	_weather.tick(delta)
+	_event_timer -= delta
+	if _event_timer > 0.0:
+		return
+	_event_timer = _next_event_gap()
+	# El clima tira DESPUÉS del evento: ese orden es parte del sorteo.
+	_fire_random_event()
+	_weather.maybe_roll()
 
 
 ## Inicio de etapa: Arena._ready lo llama por el grupo "world_director".
@@ -331,27 +358,6 @@ func _set_layout(layout: StageLayout) -> void:
 	_weather.layout = layout
 
 
-func _physics_process(delta: float) -> void:
-	if not RunState.run_active:
-		# La partida acaba de terminar (derrota o extracción) y la pantalla
-		# final deja la arena viva y en pausa: el clima se detiene aquí, o el
-		# HUD quedaría desplazado y el descuento dorado seguiría activo.
-		_weather.stop_weather()
-		return
-	_tick_exit_portal()
-	_tick_beacons(delta)
-	if not events_enabled:
-		return
-	_weather.tick(delta)
-	_event_timer -= delta
-	if _event_timer > 0.0:
-		return
-	_event_timer = _next_event_gap()
-	# El clima tira DESPUÉS del evento: ese orden es parte del sorteo.
-	_fire_random_event()
-	_weather.maybe_roll()
-
-
 ## Levanta el portal de salida el primer frame en que la etapa cuenta como
 ## superada (RunState.stage_cleared). Se consulta cada frame, igual que la
 ## meta en RunManager.
@@ -445,10 +451,25 @@ func _fire_random_event() -> void:
 		_event_spawn_poi(chosen)
 
 
-## Evento simple: el POI de la fila lejos de un jugador, con su baliza (si
-## la fila tiene beacon_color), su aviso y su línea de log.
+## Evento simple: el POI de la fila lejos de un jugador. El punto se sortea
+## antes de crear el nodo.
 func _event_spawn_poi(row: Dictionary) -> void:
-	var poi := _layout.spawn_at(row["scene"], _event_point())
+	_present_poi(row, _layout.spawn_at(row["scene"], _event_point()))
+
+
+## Altar de carga, altar demoníaco y manantial: el nodo entra al árbol
+## ANTES de sortear su punto, así su cuerpo ya está en la arena (en su
+## origen) mientras la sonda de suelo mide el punto.
+func _event_shrine(row: Dictionary) -> void:
+	var shrine := (row["scene"] as PackedScene).instantiate() as Node3D
+	_layout.stage_parent().add_child(shrine)
+	shrine.global_position = _event_point()
+	_present_poi(row, shrine)
+
+
+## Lo que sigue a poner un POI de evento: su baliza (si la fila tiene
+## beacon_color), su aviso y su línea de log.
+func _present_poi(row: Dictionary, poi: Node3D) -> void:
 	_raise_row_beacon(row, poi.global_position, poi)
 	_announce(String(row["announce"]))
 	if row.has("log"):
@@ -524,7 +545,7 @@ func _event_essence_rift(row: Dictionary) -> void:
 		gem.xp_value = rift_gem_value
 		var angle := TAU * float(i) / float(rift_gem_count)
 		gem.global_position = center + Vector3(cos(angle), 0.0, sin(angle)) \
-				* randf_range(0.6, 2.6) + Vector3.UP * 0.6
+				* randf_range(rift_gem_min_spread, rift_gem_max_spread) + Vector3.UP * 0.6
 	if not HealthOrb.at_soft_cap(get_tree()):
 		var orb := Pools.acquire_scene(Pools.HEALTH_ORB_SCENE) as HealthOrb
 		if orb != null:
@@ -584,10 +605,10 @@ func _despawn_chest(chest: Chest) -> void:
 	# Un cofre perdido no cuenta para la misión chests_opened.
 	chest.meta_stat_id = ""
 	chest.consume()
-	# sink_away anima con un tween del COFRE, no del director: un cambio de
-	# etapa a mitad liberaría el cofre bajo un tween ajeno todavía animándolo.
-	# Solo se encoge (profundidad 0), sin la bajada del cofre abierto.
-	chest.sink_away(0.0, lost_supply_chest_sink_time, 0.0)
+	# El cofre anima con su propio tween, no con uno del director: un cambio
+	# de etapa a mitad liberaría el cofre bajo un tween ajeno todavía
+	# animándolo. Duración y bajada: grupo «Cofre perdido» del cofre.
+	chest.sink_lost()
 
 
 ## Levanta una baliza (Beacon.tscn) del color dado sobre `at`.

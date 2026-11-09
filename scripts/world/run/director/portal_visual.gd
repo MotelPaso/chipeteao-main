@@ -1,9 +1,10 @@
 class_name PortalVisual
 extends Node3D
 ## Aspecto de un portal: un anillo que gira en el suelo, un pilar de luz
-## que late y una luz. Lo comparten ExitPortal.tscn y PortalShrine.tscn;
-## cada una ajusta estos valores en su nodo Visual. El portal llama a
-## build() desde su _ready con el radio de su anillo y su color.
+## que late y una luz. Lo comparten ExitPortal.tscn, que ajusta estos
+## valores en su nodo Visual, y PortalShrine.tscn, que usa los de este
+## script. El portal llama a build() desde su _ready con el radio de su
+## anillo y su color.
 
 @export_group("Anillo")
 ## Medio grosor (metros) del tubo del anillo.
@@ -31,9 +32,7 @@ extends Node3D
 @export var recharge_min_width: float = 0.3
 
 @export_group("Brillo")
-## Brillo de la emisión del anillo y el pilar.
-@export var emission_energy: float = 1.4
-## Energía de la luz.
+## Energía de la luz (multiplicador).
 @export var light_energy: float = 1.8
 ## Alcance (metros) de la luz.
 @export var light_range: float = 7.0
@@ -99,7 +98,8 @@ func _physics_process(delta: float) -> void:
 
 
 ## Material propio de esta instancia: así el latido y el color no pasan a
-## otro portal.
+## otro portal. Sin sombreado solo se ve albedo_color (color y opacidad),
+## así que no lleva emisión.
 func _glow_material(color: Color, alpha: float, additive: bool) -> StandardMaterial3D:
 	var material := StandardMaterial3D.new()
 	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
@@ -107,7 +107,4 @@ func _glow_material(color: Color, alpha: float, additive: bool) -> StandardMater
 	if additive:
 		material.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
 	material.albedo_color = Color(color, alpha)
-	material.emission_enabled = true
-	material.emission = color
-	material.emission_energy_multiplier = emission_energy
 	return material
