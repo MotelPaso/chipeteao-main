@@ -8,6 +8,17 @@ extends RefCounted
 ## pressed/focus) son UiTheme.style_card, el único aspecto de carta de toda
 ## superficie de "elige una". Colores y radios también salen de UiTheme.
 
+# --- edita aquí --------------------------------------------------------------
+# CardFactory no tiene escena (sus funciones son estáticas), así que sus
+# ajustes son estas constantes y no aparecen en el Inspector.
+
+## Margen interior de la caja de contenido de una carta, en píxeles
+## (horizontal, vertical).
+const CARD_BOX_MARGIN := Vector2(12.0, 12.0)
+## Separación vertical entre las piezas de la carta, en píxeles.
+const CARD_BOX_SEPARATION := 8
+# --- fin de edita aquí -------------------------------------------------------
+
 
 ## Etiqueta centrada. El llamador agrega el ajuste de línea y el tope de
 ## líneas: las cartas de la cuadrícula recortan, las filas anchas no.
@@ -22,8 +33,8 @@ static func label(label_text: String, font_size: int, color: Color) -> Label:
 
 ## VBox de contenido que llena el botón de la carta, con márgenes.
 static func card_box(card: Button) -> VBoxContainer:
-	var box := _full_rect_box(card, 12.0, 12.0)
-	box.add_theme_constant_override("separation", 8)
+	var box := _full_rect_box(card, CARD_BOX_MARGIN.x, CARD_BOX_MARGIN.y)
+	box.add_theme_constant_override("separation", CARD_BOX_SEPARATION)
 	return box
 
 

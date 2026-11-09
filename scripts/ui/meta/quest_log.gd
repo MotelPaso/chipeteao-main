@@ -39,6 +39,14 @@ enum RowState { IN_PROGRESS, CLAIMABLE, CLAIMED }
 @export var claim_button_size: Vector2 = Vector2(110.0, 34.0)
 ## Tamaño mínimo de la barra de progreso, en píxeles (ancho, alto).
 @export var progress_bar_size: Vector2 = Vector2(260.0, 14.0)
+## Separación entre la columna de la misión y la de la recompensa, en píxeles.
+@export var columns_separation: int = 16
+## Separación vertical entre nombre, descripción y progreso, en píxeles.
+@export var info_separation: int = 3
+## Separación vertical entre la recompensa y el botón Reclamar o el sello, en píxeles.
+@export var side_separation: int = 4
+## Separación entre la barra de progreso y su contador, en píxeles.
+@export var progress_separation: int = 10
 
 @export_group("Textos")
 ## Botón de una misión completa sin reclamar.
@@ -86,7 +94,7 @@ func _build_row(quest: Dictionary, state: RowState) -> PanelContainer:
 	if state == RowState.CLAIMED:
 		row.modulate = claimed_row_modulate
 	var columns := HBoxContainer.new()
-	columns.add_theme_constant_override("separation", 16)
+	columns.add_theme_constant_override("separation", columns_separation)
 	row.add_child(columns)
 	columns.add_child(_build_info(quest, state))
 	columns.add_child(_build_side(quest, state, row))
@@ -97,7 +105,7 @@ func _build_row(quest: Dictionary, state: RowState) -> PanelContainer:
 func _build_info(quest: Dictionary, state: RowState) -> VBoxContainer:
 	var info := VBoxContainer.new()
 	info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	info.add_theme_constant_override("separation", 3)
+	info.add_theme_constant_override("separation", info_separation)
 	info.add_child(MetaScreen.label(String(quest.display_name), name_font_size, name_color))
 	info.add_child(MetaScreen.label(String(quest.description), description_font_size,
 			description_color))
@@ -112,7 +120,7 @@ func _build_side(quest: Dictionary, state: RowState,
 		row: PanelContainer) -> VBoxContainer:
 	var side := VBoxContainer.new()
 	side.alignment = BoxContainer.ALIGNMENT_CENTER
-	side.add_theme_constant_override("separation", 4)
+	side.add_theme_constant_override("separation", side_separation)
 	var reward := MetaScreen.label(UiTheme.SHARDS_GAIN % int(quest.reward),
 			reward_font_size, reward_color)
 	reward.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -136,7 +144,7 @@ func _build_side(quest: Dictionary, state: RowState,
 ## Las misiones terminadas pintan el relleno de ámbar.
 func _progress_line(current: int, target: int, complete: bool) -> HBoxContainer:
 	var line := HBoxContainer.new()
-	line.add_theme_constant_override("separation", 10)
+	line.add_theme_constant_override("separation", progress_separation)
 	var bar := ProgressBar.new()
 	bar.custom_minimum_size = progress_bar_size
 	bar.size_flags_vertical = Control.SIZE_SHRINK_CENTER

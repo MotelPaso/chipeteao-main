@@ -99,6 +99,9 @@ const FOG_ALPHA: float = 0.85
 ## Píxeles del mapa por metro de arena. 0.5 da 120 px para una arena de
 ## 240 m; el minimapa (150 px) y el mapa de Tab estiran esa imagen a su tamaño.
 const PIXELS_PER_METER: float = 0.5
+## Color liso del fondo del mapa cuando la arena no tiene Terrain y no hay
+## relieve que dibujar.
+const PLAIN_BACKGROUND: Color = Color(0.16, 0.17, 0.2)
 
 ## Media extensión, en metros, de la arena que cubre este mapa.
 var half_extent: float = 120.0
@@ -136,7 +139,7 @@ func build_background(_arena: Node3D = null) -> void:
 	else:
 		var pixels := maxi(int(round(half_extent * 2.0 * PIXELS_PER_METER)), 8)
 		background = Image.create_empty(pixels, pixels, false, Image.FORMAT_RGBA8)
-		background.fill(Color(0.16, 0.17, 0.2))
+		background.fill(PLAIN_BACKGROUND)
 	_darken_blocked_cells(bounds)
 	composite()
 

@@ -28,6 +28,10 @@ extends MetaScreen
 @export var maxed_color: Color = UiTheme.ACCENT_AMBER
 ## Tamaño mínimo del botón de compra, en píxeles (ancho, alto).
 @export var buy_button_size: Vector2 = Vector2(130.0, 34.0)
+## Separación entre la columna de la reliquia y la del precio, en píxeles.
+@export var columns_separation: int = 16
+## Separación vertical entre nombre, efecto y rombos de rango, en píxeles.
+@export var info_separation: int = 3
 
 @export_group("Textos")
 ## Rombo de un rango comprado.
@@ -61,12 +65,12 @@ func _build_row(relic: Dictionary) -> PanelContainer:
 			UiTheme.ACCENT_AMBER if capped else UiTheme.BORDER_DIM, capped))
 
 	var columns := HBoxContainer.new()
-	columns.add_theme_constant_override("separation", 16)
+	columns.add_theme_constant_override("separation", columns_separation)
 	row.add_child(columns)
 
 	var info := VBoxContainer.new()
 	info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	info.add_theme_constant_override("separation", 3)
+	info.add_theme_constant_override("separation", info_separation)
 	columns.add_child(info)
 	info.add_child(MetaScreen.label(String(relic.display_name), name_font_size, name_color))
 	info.add_child(MetaScreen.label(_effect_line(relic), effect_font_size, effect_color))
@@ -79,7 +83,6 @@ func _build_row(relic: Dictionary) -> PanelContainer:
 
 	var side := VBoxContainer.new()
 	side.alignment = BoxContainer.ALIGNMENT_CENTER
-	side.add_theme_constant_override("separation", 4)
 	columns.add_child(side)
 	if capped:
 		var done := MetaScreen.label(maxed_text, maxed_font_size, maxed_color)

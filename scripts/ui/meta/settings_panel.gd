@@ -41,6 +41,8 @@ const VOLUME_MAX := 100.0
 @export_group("Sliders")
 ## Color del canal (el fondo) de los sliders.
 @export var slider_track_color: Color = Color(0.05, 0.06, 0.09, 0.9)
+## Color del borde del canal de los sliders.
+@export var slider_track_border_color: Color = Color(0.0, 0.0, 0.0, 0.6)
 
 @onready var _panel: PanelContainer = %Panel
 @onready var _sfx_slider: HSlider = %SfxSlider
@@ -246,7 +248,7 @@ func _apply_styles() -> void:
 	for slider: HSlider in [_sfx_slider, _ambient_slider, _sensitivity_slider]:
 		var track := UiTheme.flat(slider_track_color, 4)
 		track.set_border_width_all(1)
-		track.border_color = Color(0.0, 0.0, 0.0, 0.6)
+		track.border_color = slider_track_border_color
 		track.content_margin_top = 4.0
 		track.content_margin_bottom = 4.0
 		slider.add_theme_stylebox_override("slider", track)

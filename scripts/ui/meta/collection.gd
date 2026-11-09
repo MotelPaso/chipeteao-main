@@ -62,6 +62,8 @@ const BESTIARY: Array[Dictionary] = [
 @export var hidden_text_color: Color = UiTheme.TEXT_FAINT
 ## Modulate de una fila sin descubrir (atenuada).
 @export var hidden_row_modulate: Color = Color(1.0, 1.0, 1.0, 0.55)
+## Separación vertical entre el título y el detalle de cada fila, en píxeles.
+@export var row_separation: int = 2
 
 @export_group("Textos")
 ## Insignia de arriba (%d = descubiertos, %d = total, %d = porcentaje).
@@ -182,7 +184,7 @@ func _build_row(title: String, detail: String, accent: Color,
 	if not discovered:
 		row.modulate = hidden_row_modulate
 	var box := VBoxContainer.new()
-	box.add_theme_constant_override("separation", 2)
+	box.add_theme_constant_override("separation", row_separation)
 	row.add_child(box)
 	var title_label := MetaScreen.label(title, title_font_size,
 			title_color if discovered else hidden_text_color)

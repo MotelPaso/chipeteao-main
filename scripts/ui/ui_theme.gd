@@ -37,6 +37,19 @@ const REJECT_FLASH := Color(1.0, 0.42, 0.42)
 ## gemas (XpGem.tscn) guarda el mismo verde en su escena: cámbialo ahí también.
 const XP_GREEN := Color(0.35, 0.95, 0.6)
 
+## Sombra de los paneles (panel): color y tamaño, en píxeles.
+const PANEL_SHADOW := Color(0.0, 0.0, 0.0, 0.45)
+const PANEL_SHADOW_SIZE := 14
+## Texto de los botones sin relleno; los rellenos usan TEXT_BRIGHT.
+const BUTTON_TEXT := Color(0.88, 0.9, 0.94)
+## Borde por defecto de las chapas y píldoras (style_badge).
+const BADGE_BORDER := Color(0, 0, 0, 0.5)
+## Pista del interruptor apagado (toggle_icon); encendido usa su acento.
+const TOGGLE_TRACK_OFF := Color(0.16, 0.17, 0.23)
+## Canal de las barras (style_bar): fondo y borde.
+const BAR_TROUGH := Color(0.04, 0.045, 0.07, 0.85)
+const BAR_TROUGH_BORDER := Color(0.0, 0.0, 0.0, 0.6)
+
 ## Radio de las esquinas (píxeles): paneles y cartas, chips y botones.
 const RADIUS := 10
 const RADIUS_SMALL := 7
@@ -107,8 +120,8 @@ static func panel(bg: Color = PANEL_BG, border: Color = BORDER_DIM,
 	box.content_margin_right = margin_h
 	box.content_margin_top = margin_v
 	box.content_margin_bottom = margin_v
-	box.shadow_color = Color(0.0, 0.0, 0.0, 0.45)
-	box.shadow_size = 14
+	box.shadow_color = PANEL_SHADOW
+	box.shadow_size = PANEL_SHADOW_SIZE
 	return box
 
 
@@ -188,7 +201,7 @@ static func style_button(button: Button, accent: Color = ACCENT,
 	for state: String in states:
 		button.add_theme_stylebox_override(state, states[state])
 	button.add_theme_color_override("font_color",
-			TEXT_BRIGHT if filled else Color(0.88, 0.9, 0.94))
+			TEXT_BRIGHT if filled else BUTTON_TEXT)
 	button.add_theme_color_override("font_hover_color", TEXT_BRIGHT)
 	button.add_theme_color_override("font_pressed_color", TEXT_BRIGHT)
 	button.add_theme_color_override("font_focus_color", TEXT_BRIGHT)
@@ -308,7 +321,7 @@ static func style_title(label: Label, font_size: int, color: Color,
 
 ## Chapa o píldora pequeña para chips del HUD y cintas.
 static func style_badge(label: Label, text_color: Color,
-		bg: Color = PANEL_BG, border: Color = Color(0, 0, 0, 0.5)) -> void:
+		bg: Color = PANEL_BG, border: Color = BADGE_BORDER) -> void:
 	var box := flat(bg, RADIUS_SMALL)
 	box.set_border_width_all(1)
 	box.border_color = border
@@ -345,7 +358,7 @@ static func toggle_icon(on: bool, accent: Color = ACCENT,
 		width: int = 46, height: int = 26) -> ImageTexture:
 	var image := Image.create(width, height, false, Image.FORMAT_RGBA8)
 	var radius := height * 0.5
-	var track := accent.darkened(0.25) if on else Color(0.16, 0.17, 0.23)
+	var track := accent.darkened(0.25) if on else TOGGLE_TRACK_OFF
 	var rim := accent.lightened(0.2) if on else BORDER_DIM
 	var knob := TEXT_BRIGHT if on else TEXT_FAINT
 	var knob_center := Vector2(width - radius if on else radius, radius)
@@ -403,9 +416,9 @@ static func style_toggle(check: CheckButton, accent: Color = ACCENT) -> void:
 ## relleno). Devuelve el relleno para recolorearlo en vivo (vida verde→rojo).
 static func style_bar(bar: ProgressBar, fill_color: Color, radius: int = 6,
 		inset: int = 3) -> StyleBoxFlat:
-	var trough := flat(Color(0.04, 0.045, 0.07, 0.85), radius + 1)
+	var trough := flat(BAR_TROUGH, radius + 1)
 	trough.set_border_width_all(2)
-	trough.border_color = Color(0.0, 0.0, 0.0, 0.6)
+	trough.border_color = BAR_TROUGH_BORDER
 	trough.set_content_margin_all(inset)
 	bar.add_theme_stylebox_override("background", trough)
 	var fill := bar_fill(fill_color, radius - 1)
