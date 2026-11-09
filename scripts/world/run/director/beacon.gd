@@ -3,9 +3,10 @@ extends Node3D
 ## la arena, con un pulso suave para que se lea como invitación y no como
 ## amenaza. El WorldDirector la levanta sobre cada evento con el color de
 ## su fila de EVENT_LIBRARY. El tamaño del pilar (radios y `height` de su
-## malla) y la luz están en los nodos Pillar y Light de Beacon.tscn; el
-## pilar se apoya solo en el suelo según su altura. El color y la opacidad
-## del material los pone este script (color, pillar_alpha).
+## malla), su opacidad (el alfa de `albedo_color` de su material) y la luz
+## están en los nodos Pillar y Light de Beacon.tscn; el pilar se apoya solo
+## en el suelo según su altura. El color lo pone este script (`color`).
+## Sin sombreado, el material solo muestra `albedo_color`: no lleva emisión.
 
 ## Color del pilar y de la luz; el director lo pone antes de añadirla.
 @export var color: Color = Color.WHITE:
@@ -13,8 +14,6 @@ extends Node3D
 		color = value
 		if is_node_ready():
 			_apply_color()
-## Opacidad del pilar (0-1).
-@export var pillar_alpha: float = 0.35
 
 @export_group("Pulso")
 ## Ancho del pilar en lo más abierto del pulso (1 = sin cambio).
@@ -40,11 +39,11 @@ func _ready() -> void:
 			.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 
 
-## Pinta el pilar y la luz. El material es propio de cada baliza
-## (resource_local_to_scene en Beacon.tscn), así un color no pasa a otra.
+## Pinta el pilar y la luz; el alfa del material (la opacidad) se conserva.
+## El material es propio de cada baliza (resource_local_to_scene en
+## Beacon.tscn), así un color no pasa a otra.
 func _apply_color() -> void:
 	var material := _pillar.material_override as StandardMaterial3D
 	if material != null:
-		material.albedo_color = Color(color.r, color.g, color.b, pillar_alpha)
-		material.emission = color
+		material.albedo_color = Color(color, material.albedo_color.a)
 	_light.light_color = color
