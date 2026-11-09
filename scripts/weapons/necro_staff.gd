@@ -15,8 +15,8 @@ extends WeaponBase
 ## poseído necesitaría que sus proyectiles y rayos cambiaran de bando, y esos
 ## apuntan al grupo "player" en todo su recorrido.
 ##
-## Los siervos viven en el grupo EnemyBase.POSSESSED_GROUP; el soak lee el
-## tope con possessed_count() y max_possessed.
+## Los siervos viven en el grupo EnemyBase.POSSESSED_GROUP; el soak cuenta
+## ese grupo contra la suma de max_possessed de la party.
 
 @export_group("Siervos")
 ## Segundos que dura un siervo; la carta «Posesión más larga» (+25%) y la evolución «Corona del Rey Lich» (+4 s) lo suben.
@@ -78,8 +78,7 @@ func fire(target: Node3D) -> void:
 			_launch_at_fresh_target, extra_stagger, false)
 
 
-## Siervos que tiene ahora este portador; el soak imprime possessed=a/b con
-## esto y el tope, y a>b significaría que el tope no se cumple.
+## Siervos vivos de este portador. Hoy nadie lo llama (el soak cuenta el grupo).
 func possessed_count() -> int:
 	var mine := 0
 	for node: Node in get_tree().get_nodes_in_group(EnemyBase.POSSESSED_GROUP):
