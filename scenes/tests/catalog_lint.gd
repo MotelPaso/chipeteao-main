@@ -47,6 +47,12 @@ const SFX_ROOTS: Array[String] = ["res://scripts", "res://scenes"]
 ## Llamadas a Sfx que reciben un id; el grupo 1 son sus argumentos hasta el
 ## paréntesis, un comentario o el fin de línea.
 const SFX_CALL_PATTERN := "Sfx\\.(?:play|play_loop|stop_loop|acquire_loop|release_loop|loop_refcount)\\(([^)#]*)"
+## Llamadas a MetaScreen.payoff(), que recibe el sonido entre sus argumentos;
+## el grupo 1 son esos argumentos, como en SFX_CALL_PATTERN.
+const SFX_PAYOFF_PATTERN := "payoff\\(([^)#]*)"
+## Constante de sonido en un .gd: un nombre con SOUND o SFX cuyo valor es un
+## literal StringName (FANFARE_SFX, SOUND...). BUS_NAME no entra.
+const SFX_CONST_PATTERN := "^const \\w*(?:SOUND|SFX)\\w*(?::\\s*StringName)?\\s*:?=\\s*&\"([^\"]+)\""
 ## Default de un export de sonido (`*_sound` / `*_loop`) en un .gd.
 const SFX_EXPORT_PATTERN := "^@export var \\w+_(?:sound|loop): StringName = &\"([^\"]+)\""
 ## Valor de un export de sonido guardado en un .tscn.
@@ -588,9 +594,11 @@ func _check_text_numbers() -> void:
 	_report("text_numbers", rows, failures)
 
 
-## Las filas que RowText arma: cada campo de text_values existe en la fila
-## ("amount" pide un primer efecto con amount) y la descripción tiene un %d
-## por campo. Un campo que falta se dibuja como 0 sin avisar a nadie.
+## Las filas que RowText arma: cada campo de text_values es un número de la
+## fila ("amount" pide un primer efecto con amount), y la descripción tiene un
+## %d por campo y ningún % suelto (el signo de porcentaje se escribe %%). Un
+## campo que falta se dibuja como 0, y un % suelto hace fallar el formato: el
+## jugador ve la plantilla cruda.
 func _check_text_values() -> void:
 	var failures: Array[String] = []
 	var rows := 0
@@ -607,21 +615,33 @@ func _check_text_values() -> void:
 			var names: Array = row.get("text_values", [])
 			for field: Variant in names:
 				if not _row_has_text_field(row, String(field)):
-					failures.append("%s text_values names '%s', which the row does not have"
+					failures.append("%s text_values names '%s', which is not a number field of the row"
 							% [owner_text, String(field)])
-			var slots := String(row.get("description", "")).replace("%%", "").count("%d")
+			var bare := String(row.get("description", "")).replace("%%", "")
+			var slots := bare.count("%d")
 			if slots != names.size():
 				failures.append("%s description has %d %%d but text_values lists %d fields"
 						% [owner_text, slots, names.size()])
+			# Solo las filas con text_values pasan por el formato; las demás
+			# pueden llevar un % suelto.
+			if not names.is_empty() and bare.count("%") != slots:
+				failures.append("%s description has a lone %% (write %%%% for a percent sign)"
+						% owner_text)
 	_report("text_values", rows, failures)
 
 
-## Si `field` es un número que RowText.value_of() puede leer de la fila.
+## Si `field` es un número (int o float) que RowText.value_of() puede leer de
+## la fila.
 func _row_has_text_field(row: Dictionary, field: String) -> bool:
+	var value: Variant = null
 	if field == "amount":
 		var effects: Array = row.get("effects", [])
-		return not effects.is_empty() and (effects[0] as Dictionary).has("amount")
-	return row.has(field)
+		if effects.is_empty():
+			return false
+		value = (effects[0] as Dictionary).get("amount")
+	else:
+		value = row.get(field)
+	return typeof(value) == TYPE_INT or typeof(value) == TYPE_FLOAT
 
 
 ## Cada `kind` de comportamiento en una sola fila de ITEM_LIBRARY:
@@ -646,14 +666,17 @@ func _check_item_kinds_unique() -> void:
 
 
 ## Cada id de sonido escrito a mano: los `&"x"` de una llamada a Sfx
-## (play, acquire_loop...), los defaults de los exports `*_sound` / `*_loop`
-## y sus valores en las escenas. Un id que no está en Sfx.SOUND_LIBRARY no
-## suena y solo deja una advertencia perdida en el log.
+## (play, acquire_loop...) o a MetaScreen.payoff(), las constantes de sonido
+## (un nombre con SOUND o SFX, como FANFARE_SFX), los defaults de los exports
+## `*_sound` / `*_loop` y sus valores en las escenas. Un id que no está en
+## Sfx.SOUND_LIBRARY no suena y solo deja una advertencia perdida en el log.
 func _check_sfx_ids() -> void:
 	var failures: Array[String] = []
 	var rows := 0
 	var known: Dictionary = SFX_SCRIPT.SOUND_LIBRARY
 	var call_pattern := RegEx.create_from_string(SFX_CALL_PATTERN)
+	var payoff_pattern := RegEx.create_from_string(SFX_PAYOFF_PATTERN)
+	var const_pattern := RegEx.create_from_string(SFX_CONST_PATTERN)
 	var export_pattern := RegEx.create_from_string(SFX_EXPORT_PATTERN)
 	var scene_pattern := RegEx.create_from_string(SFX_SCENE_PATTERN)
 	var literal_pattern := RegEx.create_from_string(STRING_NAME_PATTERN)
@@ -666,10 +689,11 @@ func _check_sfx_ids() -> void:
 			if line.begins_with("#"):
 				continue
 			var ids: Array[String] = []
-			for call_match: RegExMatch in call_pattern.search_all(line):
-				for literal: RegExMatch in literal_pattern.search_all(call_match.get_string(1)):
-					ids.append(literal.get_string(1))
-			for pattern: RegEx in [export_pattern, scene_pattern]:
+			for args_pattern: RegEx in [call_pattern, payoff_pattern]:
+				for call_match: RegExMatch in args_pattern.search_all(line):
+					for literal: RegExMatch in literal_pattern.search_all(call_match.get_string(1)):
+						ids.append(literal.get_string(1))
+			for pattern: RegEx in [export_pattern, scene_pattern, const_pattern]:
 				var value_match := pattern.search(line)
 				if value_match != null:
 					ids.append(value_match.get_string(1))

@@ -6,7 +6,8 @@ extends RefCounted
 ## Se puede cambiar libremente: display_name, description, target, reward.
 ## Llave interna, NUNCA la cambies: id (SaveData guarda las misiones
 ## completadas y reclamadas por id). Borrar una fila es seguro: los ids
-## guardados que ya no están en el catálogo se ignoran.
+## guardados que ya no están en el catálogo se ignoran; una misión completada
+## y sin reclamar pierde su premio.
 ## stat nombra un contador de SaveData (lista en save_data.gd). Los contadores
 ## con prefijo llevan un id de otro catálogo dentro del nombre y dejan de
 ## avanzar en silencio si ese id cambia:

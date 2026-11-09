@@ -7,6 +7,12 @@ extends RefCounted
 ## se siente sin leer un número.
 ##
 ## Edita aquí: cada fila es un power-up.
+## Se puede cambiar sin romper nada: display_name, description, duration,
+## weight, color, glyph, icon, effects, text_values y los números del
+## comportamiento.
+## Llave interna (la lee el código): id (nombra el ícono por defecto
+## res://assets/icons/powerups/<id>.png, el log y BONK_POWERUP_NOW) y kind
+## (la rama de PowerUps; "star" también lo lee este catálogo).
 ##   id:            identificador (no se muestra; lo usan el log y los
 ##                  interruptores de prueba).
 ##   display_name:  texto para el jugador.
