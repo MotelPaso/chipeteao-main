@@ -196,21 +196,24 @@ La lógica vive en ayudantes de `scripts/systems/spawner/` (`SpawnScaling`, `Spa
 | --- | --- | --- |
 | Cuándo sale el primer evento y la pausa entre eventos | `scenes/world/RunSystems.tscn` > WorldDirector (grupo «Eventos») | `first_event_at`, `event_gap_min`, `event_gap_max`, `event_gap_floor` |
 | Qué tan seguido sale cada evento, su aviso y su baliza | `scripts/world/run/world_director.gd` > su fila en `EVENT_LIBRARY` | `weight`, `announce`, `beacon_color` (quítalo y no hay baliza; el vendedor usa el `color` de su fila en `VENDOR_LIBRARY` de `vendor.gd`), `beacon_time` (sin él, hasta que se use) |
+| Gemas de la grieta de esencia (cuántas, XP, qué tan repartidas) | RunSystems.tscn > WorldDirector (grupo «Eventos») | `rift_gem_count`, `rift_gem_value`, `rift_gem_min_spread`, `rift_gem_max_spread` |
 | Máximo de vendedores o manantiales a la vez | `world_director.gd` > fila `vendor` / `spring` | `cap` |
 | Tope y ritmo de los altares | RunSystems.tscn > WorldDirector (grupo «Altares») | `altar_cap_base`, `altar_cap_minutes` |
-| Aspecto del pilar de baliza | `scenes/world/director/Beacon.tscn` > Pillar (su malla) / Light / raíz | `height` y radios de la malla (el pilar se apoya solo en el suelo), `light_energy`, `pulse_half_time`, `pillar_alpha`; el color sale de la fila del evento (`beacon_color`), no del material |
+| Aspecto del pilar de baliza | `scenes/world/director/Beacon.tscn` > Pillar (su malla y su material) / Light / raíz | `height` y radios de la malla (el pilar se apoya solo en el suelo), la opacidad (alfa de `albedo_color` del material de Pillar), `light_energy`, `pulse_half_time`; el color sale de la fila del evento (`beacon_color`), no del material |
 | Cofre de suministros (rareza mínima, suerte) | `scenes/world/director/SupplyChest.tscn` > SupplyChest | `min_rarity`, `luck_bonus` |
+| Cuánto tarda en encogerse el cofre de suministros que nadie abrió | `scenes/world/director/SupplyChest.tscn` > SupplyChest (grupo «Cofre perdido») | `lost_sink_duration`, `lost_sink_depth` |
 | Aviso, tinte del cielo, nombre en el HUD y partículas de un clima | `scripts/world/run/director/weather_catalog.gd` > su fila en `WEATHER_CATALOG` | `announce`, `sun_color`, `sun_energy`, `ambient_color`, `fx_color`, `display_name` |
 | Peso, duración base y si el altar de evento puede invocar un clima | `scripts/world/run/director/weather_catalog.gd` > su fila en `WEATHER_CATALOG` | `weight`, `duration`, `altar_ok` |
 | De dónde viene el tsunami (texto del aviso) | `scripts/world/run/director/weather_catalog.gd` | `COMPASS_WORDS` |
 | Segundos del paso al tinte del cielo y de la vuelta | `scripts/world/run/director/sky_tint.gd` | `TINT_SECONDS`, `RESTORE_SECONDS` |
 | Duración de un clima y probabilidades de desastre, lluvia y luna | RunSystems.tscn > WorldDirector > Weather | `weather_duration_overrides`, `disaster_chance`, `rain_chance`, `sky_event_chance` |
 | Ácido, meteoritos y tsunami (daño, radio, frecuencia) | RunSystems.tscn > WorldDirector > Weather (grupos por clima) | `acid_pool_*`, `meteor_*`, `tsunami_*` |
+| Partículas de la lluvia de enemigos, del terremoto y de los meteoritos | RunSystems.tscn > WorldDirector > Weather (grupos «Lluvia de enemigos», «Terremoto», «Meteoritos») | `enemy_rain_burst_height`, `enemy_rain_burst_count`, `earthquake_dust_count`, `meteor_impact_burst_count`; el color sale de `fx_color` / `impact_color` de su fila en `WEATHER_CATALOG` |
 | Bonos de la luna llena y de la lluvia dorada | RunSystems.tscn > WorldDirector > Weather | `full_moon_xp_bonus`, `full_moon_luck_bonus`, `golden_points_multiplier` |
 | Portales, ruletas, cofres y cajas al inicio de cada etapa | RunSystems.tscn > WorldDirector > StageFixtures | `portal_count`, `roulette_count`, `extra_start_chests_min/max`, `start_pet_box_chance` |
 | Colores, recarga y avisos de los pares de portales | `scenes/world/director/PortalShrine.tscn` > PortalShrine | `pair_colors`, `cooldown`, `prompt_text`, `recharging_prompt` |
 | Color y tamaño del portal de salida | `scenes/world/director/ExitPortal.tscn` > ExitPortal | `portal_color`, `ring_radius` |
-| Aspecto de los portales (anillo, pilar, latido, luz) | `ExitPortal.tscn` > Visual (salida) o `PortalShrine.tscn` > Visual (pares; sin valores propios, usa los de `scripts/world/run/director/portal_visual.gd`) | `ring_*`, `pillar_*`, `idle_pulse_*`, `recharge_min_width`, `light_*` |
+| Aspecto de los portales (anillo, pilar, latido, luz) | `scenes/world/director/ExitPortal.tscn` > Visual; los pares de portales usan los valores de `scripts/world/run/director/portal_visual.gd` (`PortalShrine.tscn` > Visual no guarda ninguno) | `ring_*`, `pillar_*`, `idle_pulse_*`, `recharge_min_width` (solo pares), `light_*`; el color es `portal_color` / `pair_colors` |
 
 ## Altares, cofres y secretos del mapa
 
