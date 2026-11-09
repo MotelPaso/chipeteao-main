@@ -10,7 +10,7 @@ extends StaticBody3D
 ## 1.5-3.0 m según el bioma; el relieve da lectura (sabes dónde estás) y silueta.
 ##
 ## Se siembra con la semilla de partida del SCATTER (`run_seed()`, válida
-## desde su _enter_tree), así BONK_SEED, BONK_GAME_SEED y la Cacería diaria
+## desde su _enter_tree), así BONK_GAME_SEED y la Cacería diaria
 ## reproducen el mismo relieve que los props que tiene encima.
 ##
 ## Ciclo de vida: se construye en _ready, que corre ANTES de Arena._ready
@@ -201,7 +201,7 @@ func _arena_size() -> float:
 
 
 ## La semilla de partida del scatter, para que el relieve coincida con los
-## props bajo BONK_SEED, BONK_GAME_SEED o la Cacería diaria. Sin scatter usa
+## props bajo BONK_GAME_SEED o la Cacería diaria. Sin scatter usa
 ## un número fijo y no uno al azar: un terreno que cambiara entre dos
 ## corridas iguales arruinaría toda comparación de soaks.
 func _run_seed() -> int:

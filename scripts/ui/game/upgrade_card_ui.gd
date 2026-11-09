@@ -5,7 +5,7 @@ extends CanvasLayer
 ## mezclan ambos lados. Procesa siempre (process_mode ALWAYS) para que sus
 ## botones funcionen con todo lo demás en pausa.
 ##
-## Santuarios, cofres y altares lo abren por el grupo "upgrade_ui":
+## Los altares, la caja de mascota y el bloque de la suerte lo abren por el grupo "upgrade_ui":
 ## open_bonus_pick() da una elección gratis (con suerte extra o rareza mínima) y
 ## open_choice() muestra opciones que armó quien llama. Lo que llega con el
 ## selector abierto se encola (primero los niveles pendientes, después el resto)
@@ -91,11 +91,11 @@ func is_blocking() -> bool:
 	return visible or _opening
 
 
-## Público (santuarios y cofres, por el grupo "upgrade_ui"): una elección gratis
+## Público (hoy lo llama el Altar de codicia, por el grupo "upgrade_ui"): una elección gratis
 ## fuera del flujo de nivel. luck_bonus es suerte temporal solo para esta tirada;
 ## min_rarity (p. ej. "Rare") pone piso a cada rareza sorteada. `recipient` es el
 ## raider dueño del premio: pásalo siempre que alguien PAGÓ la elección (el
-## santuario de codicia cobra HP, los cofres cobran puntos), o la rotación puede
+## Altar de codicia cobra HP), o la rotación puede
 ## darle el premio a un compañero. Sin él se usa la rotación, así que los
 ## llamadores de 3 argumentos por call_group siguen funcionando. Se encola detrás
 ## de lo que ya esté abierto: un nivel y una elección extra del mismo frame nunca

@@ -7,8 +7,8 @@ extends RefCounted
 ## lluvia y tsunami del nodo Weather caen encima de la cadencia normal, con
 ## su propio presupuesto sobre max_active.
 ## Los valores son exports del spawner (grupos «Hordas», «Oleadas de
-## presión» y «Cupo de enemigos»): cada arena los guarda en su nodo
-## EnemySpawner.
+## presión» y «Cupo de enemigos» de enemy_spawner.gd); las arenas usan los
+## valores del script.
 ## No procesa solo: EnemySpawner llama tick() desde su _physics_process, así
 ## que detener al spawner también lo detiene.
 

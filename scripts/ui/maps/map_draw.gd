@@ -96,8 +96,8 @@ const LEGEND_VARIANTS: Dictionary[StringName, bool] = {
 ## Cuánto se oscurece el suelo sin explorar en la composición (0-1). No es
 ## opaco del todo: la forma del mapa es una pista, lo que hay ENCIMA es el premio.
 const FOG_ALPHA: float = 0.85
-## Píxeles del mapa por metro de arena. 0.5 da 240 px para una arena de
-## 240 m: de sobra para un minimapa de 150 px y nítido en el mapa de Tab.
+## Píxeles del mapa por metro de arena. 0.5 da 120 px para una arena de
+## 240 m; el minimapa (150 px) y el mapa de Tab estiran esa imagen a su tamaño.
 const PIXELS_PER_METER: float = 0.5
 
 ## Media extensión, en metros, de la arena que cubre este mapa.

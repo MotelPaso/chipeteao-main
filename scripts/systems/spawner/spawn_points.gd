@@ -3,9 +3,9 @@ extends RefCounted
 ## Dónde cae un spawn: el anillo alrededor de un raider, la banda de las
 ## oleadas, la máscara caminable de la arena, el espacio libre alrededor de
 ## la party y la altura del suelo bajo el punto.
-## Los radios y márgenes son exports del spawner (grupo «Anillo de spawn»):
-## cada arena los guarda en su nodo EnemySpawner. Lo usan EnemySpawner,
-## BossSchedule y HordeSchedule.
+## Los radios y márgenes son exports del spawner (grupo «Anillo de spawn» de
+## enemy_spawner.gd); las arenas usan los valores del script. Lo usan
+## EnemySpawner, BossSchedule y HordeSchedule.
 ## Orden del RNG: ring_position tira el ángulo y luego band_position un
 ## randf_range por intento; no las reordenes.
 

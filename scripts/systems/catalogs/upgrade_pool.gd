@@ -5,7 +5,7 @@ extends RefCounted
 ## las armas que se tienen + cartas new_weapon) o tomos/stats (cartas de tomo +
 ## GENERIC_POOL). roll_side() elige el lado, ponderado por cuántas entradas
 ## tiene cada uno, y nunca devuelve uno vacío; la UI de cartas lo nombra en el
-## título. Las elecciones extra (cofres, altares) no pasan lado y mezclan todo.
+## título. Las elecciones extra (open_bonus_pick, hoy el Altar de codicia) no pasan lado y mezclan todo.
 ## El pool se arma de nuevo en cada tirada con:
 ##   - GENERIC_POOL: ajustes de player/health/run_state, siempre disponibles.
 ##   - Cartas de tomo (Tome.TOME_LIBRARY): el siguiente stack de cada tomo que
@@ -134,8 +134,8 @@ const RARITIES: Array[Dictionary] = Rarity.TIERS
 
 ## Sortea `count` mejoras distintas del pool válido para el equipo de este
 ## jugador, cada una con su propia rareza ponderada. Devuelve diccionarios
-## listos para mostrar: entry, rarity, amount, title, description. Altares y
-## cofres pasan luck_bonus (suerte temporal sobre la de PlayerStats) y/o
+## listos para mostrar: entry, rarity, amount, title, description. Una elección
+## extra (open_bonus_pick) pasa luck_bonus (suerte temporal sobre la de PlayerStats) y/o
 ## min_rarity (nombre de la rareza mínima, que sube también las fijas). `side`
 ## limita el pool a SIDE_WEAPONS o SIDE_TOMES; "" (por defecto, lo que pasan
 ## las elecciones extra) mezcla.

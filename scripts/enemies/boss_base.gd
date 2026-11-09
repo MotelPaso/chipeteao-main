@@ -2,7 +2,7 @@ class_name BossBase
 extends EnemyBase
 ## Chasis común de los jefes sobre EnemyBase: lo que repite cada jefe de
 ## bioma. Engancha la barra de vida del HUD por el grupo "boss_ui", recorta
-## la posición a la arena, escala por grado con apply_tier() (el daño del
+## la posición a la arena, escala con apply_tier() (Elder, vuelta, dificultad y party; el daño del
 ## moveset pasa por el hook _scale_attack_damage), paga gemas en anillo y
 ## hace el momento de muerte de jefe. Cada jefe concreto (Rotking,
 ## Sarcognath...) tiene su propia máquina de estados y moveset. Un jefe

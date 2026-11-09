@@ -9,7 +9,7 @@ extends Node
 ##
 ## El estado es una Image L8 de un canal: 255 explorado, 0 desconocido. Se
 ## pinta un disco por raider vivo en un tick lento, barato de dejar corriendo
-## (una imagen de 121x121 y un radio de 9 píxeles son unos cientos de
+## (una imagen de 120x120 y un radio de 9 píxeles son unos cientos de
 ## set_pixel cada quinto de segundo) y lo bastante preciso para que el mapa
 ## se lea como "por donde caminamos".
 ##
@@ -18,7 +18,7 @@ extends Node
 ## representar su contenido.
 
 @export_group("Niebla")
-## Metros por píxel de niebla. 2 m da 121x121 en una arena de 240 m: lo
+## Metros por píxel de niebla. 2 m da 120x120 en una arena de 240 m: lo
 ## bastante grueso para pintar barato y fino para que un pasillo entre dos
 ## manchas de máscara se lea como explorado.
 @export var meters_per_pixel: float = 2.0
