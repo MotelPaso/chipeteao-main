@@ -314,7 +314,8 @@ func _start_aura(copies: int) -> void:
 	_apply_aura_shell(true)
 	var body := get_parent() as Node3D
 	if body != null:
-		Juice.burst(body.global_position + Vector3.UP * 1.0, row.aura_color as Color, 24)
+		Juice.burst(body.global_position + Vector3.UP * 1.0, row.aura_color as Color,
+				int(row.get("aura_burst", 24)))
 	get_tree().call_group("hud", "announce", saiyan_aura_text)
 	print("Saiyan aura: kills=%d" % _aura_threshold(copies))
 
@@ -335,11 +336,12 @@ func _apply_aura_shell(on: bool) -> void:
 	var rig := get_parent().get_node_or_null("SealRig") as Node3D
 	if rig == null:
 		return
-	var tint: Color = ItemCatalog.kind_row("saiyan").aura_color
+	var row := ItemCatalog.kind_row("saiyan")
+	var tint: Color = row.aura_color
 	var shell := StandardMaterial3D.new()
 	shell.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	shell.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	shell.albedo_color = Color(tint, 0.4)
+	shell.albedo_color = Color(tint, float(row.get("aura_alpha", 0.4)))
 	shell.emission_enabled = true
 	shell.emission = tint
 	shell.emission_energy_multiplier = 2.0

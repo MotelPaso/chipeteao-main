@@ -153,9 +153,13 @@ const ITEM_LIBRARY: Array[Dictionary] = [
 		# (si no, el aura sería permanente).
 		"kills_per_aura": 40, "kills_scale_per_extra_copy": 0.85, "kills_floor": 15,
 		# Segundos del aura y sus bonos por copia, en %: daño, velocidad de
-		# ataque y velocidad de movimiento. aura_color tiñe la cáscara.
+		# ataque y velocidad de movimiento.
 		"aura_duration": 12.0, "aura_damage": 40.0, "aura_attack_speed": 25.0,
-		"aura_move_speed": 20.0, "aura_color": Color(1.0, 0.85, 0.25),
+		"aura_move_speed": 20.0,
+		# Aspecto del aura: aura_color tiñe la cáscara y el estallido,
+		# aura_alpha es la opacidad de la cáscara (0-1) y aura_burst las
+		# partículas del estallido al encenderse.
+		"aura_color": Color(1.0, 0.85, 0.25), "aura_alpha": 0.4, "aura_burst": 24,
 	},
 	{
 		"id": "zenkai", "display_name": "Zenkai", "rarity": "Legendary",
