@@ -24,7 +24,8 @@ extends Node
 ## El director no declara class_name: su EVENT_LIBRARY solo se alcanza por
 ## el recurso del script.
 const WORLD_DIRECTOR := preload("res://scripts/world/run/world_director.gd")
-## El clima vive en su propio nodo (WeatherDirector), dueño de WEATHER_CATALOG.
+## El clima vive en su propio nodo (WeatherDirector): declara los métodos
+## start/tick/stop y reexpone WEATHER_CATALOG, que está en WeatherCatalog.
 const WEATHER_DIRECTOR := preload("res://scripts/world/run/director/weather_director.gd")
 ## Se lee como TEXTO para sacar los brazos `match stat:` de _apply_effect: no
 ## hay reflexión para un bloque match, y copiar la lista aquí serían dos

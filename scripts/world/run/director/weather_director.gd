@@ -4,127 +4,17 @@ extends Node
 ## (`active_weather` guarda como mucho una fila, así nunca se solapan).
 ## Es el nodo RunSystems.tscn > WorldDirector > Weather: sus números se
 ## editan en el Inspector de ese nodo, y el aspecto y el texto de cada
-## clima en su fila de WEATHER_CATALOG.
+## clima en su fila de WeatherCatalog (weather_catalog.gd). El tinte del
+## cielo lo hace SkyTint (sky_tint.gd).
 ## No tiene _physics_process propio: el WorldDirector llama a tick() y a
 ## maybe_roll() en su cadencia de eventos, y ese orden es parte del sorteo
 ## (el RNG de la partida es uno solo).
 ## En el código esto es WEATHER, nunca "event": EVENT_LIBRARY es la tabla
 ## de eventos de POI. Para el jugador la palabra sigue siendo «evento».
 
-## Climas, una fila por clima: edita aquí el aviso, el tinte del cielo y
-## los colores de cada uno. Campos:
-##   id/group:      identificador y grupo: moon | rain | disaster.
-##   display_name:  nombre que muestra el HUD.
-##   weight:        peso del sorteo DENTRO de su grupo.
-##   duration:      segundos, antes de weather_duration_overrides y, en
-##                  lunas y lluvias, de RunState.sky_duration_multiplier
-##                  (los pactos no alargan los desastres).
-##   announce:      aviso en el HUD al empezar; %s = dato que pone el
-##                  clima (el tsunami: de dónde viene la ola).
-##   sun_color, sun_energy, ambient_color: tinte del cielo; sun_energy
-##                  multiplica la energía original del sol. Sin sun_color
-##                  el cielo no cambia.
-##   fx_color:      color de los avisos en el suelo y las partículas.
-##   altar_ok:      el altar de evento puede invocarlo.
-##   start/tick/stop: métodos que se llaman con call(); tick y stop pueden
-##                  ir vacíos. catalog_lint.gd revisa que existan.
-##   follow_up:     la fila que empieza en cuanto esta termina, sin pausa
-##                  (las lunas malas -> luna llena; las dos lluvias ->
-##                  lluvia dorada, el premio por aguantar la mala).
-##   follow_up_only: nunca sale por sorteo, solo como follow_up.
-const WEATHER_CATALOG: Array[Dictionary] = [
-	{
-		"id": "blood_moon", "group": "moon", "display_name": "Luna de sangre",
-		"weight": 1.0, "duration": 45.0,
-		"announce": "LUNA DE SANGRE — ¡la horda enloquece!",
-		"sun_color": Color(1.0, 0.25, 0.2), "sun_energy": 0.9,
-		"ambient_color": Color(0.5, 0.1, 0.1), "altar_ok": true,
-		"start": &"_weather_start_dark_moon", "tick": &"", "stop": &"",
-		"follow_up": "full_moon",
-	},
-	{
-		"id": "eclipse", "group": "moon", "display_name": "Eclipse",
-		"weight": 1.0, "duration": 45.0,
-		"announce": "ECLIPSE — las sombras entran por todos lados",
-		"sun_color": Color(0.35, 0.3, 0.5), "sun_energy": 0.35,
-		"ambient_color": Color(0.12, 0.1, 0.2), "altar_ok": true,
-		"start": &"_weather_start_dark_moon", "tick": &"", "stop": &"",
-		"follow_up": "full_moon",
-	},
-	{
-		"id": "full_moon", "group": "moon", "display_name": "Luna llena",
-		"weight": 1.0, "duration": 40.0,
-		"announce": "LUNA LLENA — la fortuna y la sabiduría te sonríen",
-		"sun_color": Color(0.85, 0.9, 1.0), "sun_energy": 1.3,
-		"ambient_color": Color(0.6, 0.65, 0.9), "altar_ok": false,
-		"start": &"_weather_start_full_moon", "tick": &"", "stop": &"",
-		"follow_up_only": true,
-	},
-	{
-		"id": "enemy_rain", "group": "rain", "display_name": "Lluvia de enemigos",
-		"weight": 1.0, "duration": 35.0,
-		"announce": "LLUVIA DE ENEMIGOS — ¡caen del cielo!",
-		"sun_color": Color(0.6, 0.8, 1.0), "sun_energy": 0.8,
-		"ambient_color": Color(0.35, 0.45, 0.6), "fx_color": Color(0.6, 0.85, 1.0),
-		"altar_ok": true,
-		"start": &"_weather_start_enemy_rain", "tick": &"_weather_tick_enemy_rain",
-		"stop": &"", "follow_up": "golden_rain",
-	},
-	{
-		# Sin stop: los charcos sobreviven a la lluvia a propósito; cada uno
-		# caduca solo y el cambio de etapa recoge los que queden.
-		"id": "radioactive_rain", "group": "rain", "display_name": "Lluvia radiactiva",
-		"weight": 1.0, "duration": 40.0,
-		"announce": "LLUVIA RADIACTIVA — el suelo se vuelve ácido",
-		"sun_color": Color(0.5, 1.0, 0.4), "sun_energy": 0.85,
-		"ambient_color": Color(0.2, 0.4, 0.15), "altar_ok": true,
-		"start": &"_weather_start_radioactive_rain",
-		"tick": &"_weather_tick_radioactive_rain", "stop": &"",
-		"follow_up": "golden_rain",
-	},
-	{
-		"id": "golden_rain", "group": "rain", "display_name": "Lluvia dorada",
-		"weight": 1.0, "duration": 40.0,
-		"announce": "LLUVIA DORADA — todo brilla y todo vale la mitad",
-		"sun_color": Color(1.0, 0.85, 0.4), "sun_energy": 1.2,
-		"ambient_color": Color(0.6, 0.5, 0.2), "altar_ok": false,
-		"start": &"_weather_start_golden_rain", "tick": &"",
-		"stop": &"_weather_stop_golden_rain", "follow_up_only": true,
-	},
-	{
-		# Una sola ola: su tick la vierte en tres segundos y termina el
-		# desastre él mismo. Puede volver a salir más tarde.
-		"id": "enemy_tsunami", "group": "disaster", "display_name": "Tsunami",
-		"weight": 1.0, "duration": 3.0,
-		"announce": "¡TSUNAMI DE ENEMIGOS! %s", "altar_ok": true,
-		"start": &"_weather_start_tsunami", "tick": &"_weather_tick_tsunami",
-		"stop": &"",
-	},
-	{
-		"id": "earthquake", "group": "disaster", "display_name": "Terremoto",
-		"weight": 1.0, "duration": 25.0,
-		"announce": "¡TERREMOTO! El suelo no se queda quieto",
-		"fx_color": Color(0.6, 0.55, 0.45), "altar_ok": true,
-		"start": &"_weather_start_earthquake", "tick": &"_weather_tick_earthquake",
-		"stop": &"_weather_stop_earthquake",
-	},
-	{
-		# fx_color es el aviso en el suelo; impact_color, la explosión;
-		# scorch_color, la marca que deja.
-		"id": "meteor_shower", "group": "disaster", "display_name": "Lluvia de meteoritos",
-		"weight": 1.0, "duration": 30.0,
-		"announce": "¡LLUVIA DE METEORITOS! Sal de los círculos",
-		"sun_color": Color(1.0, 0.6, 0.35), "sun_energy": 0.95,
-		"ambient_color": Color(0.4, 0.25, 0.15), "fx_color": Color(1.0, 0.55, 0.2),
-		"impact_color": Color(1.0, 0.6, 0.25), "scorch_color": Color(0.35, 0.2, 0.15),
-		"altar_ok": true,
-		"start": &"_weather_start_meteors", "tick": &"_weather_tick_meteors",
-		"stop": &"",
-	},
-]
-
-## Grupos que un pacto demoníaco puede alargar (RunState.sky_duration_multiplier).
-const STRETCHABLE_GROUPS: Array[String] = ["moon", "rain"]
+## Alias de WeatherCatalog.WEATHER_CATALOG: catalog_lint.gd lo lee por
+## este script.
+const WEATHER_CATALOG: Array[Dictionary] = WeatherCatalog.WEATHER_CATALOG
 ## Tope de charcos de ácido vivos y distancia mínima entre ellos (metros).
 ## Pasado el tope se saltan; subir el tope no es la solución.
 const MAX_LIVE_ACID_POOLS: int = 24
@@ -152,7 +42,7 @@ const FULL_MOON_TAG: String = "full_moon"
 @export var sky_event_chance_per_demonic: float = 0.08
 ## Segundos sin clima tras terminar uno; vale para lunas, lluvias y desastres.
 @export var sky_event_min_gap: float = 150.0
-## Duraciones (segundos) que reemplazan las de WEATHER_CATALOG, por id de
+## Duraciones (segundos) que reemplazan las de WeatherCatalog, por id de
 ## clima. Vale para todas las arenas: este nodo es uno por partida.
 @export var weather_duration_overrides: Dictionary[String, float] = {}
 
@@ -257,15 +147,11 @@ var layout: StageLayout = null
 ## uno, así ningún clima lee lo que dejó el anterior.
 var _weather_state: Dictionary = {}
 var _sky_gap_left: float = 0.0
-var _sun: DirectionalLight3D = null
-var _sun_color: Color = Color.WHITE
-var _sun_energy: float = 1.0
-var _environment: Environment = null
-var _ambient_color: Color = Color.WHITE
-var _ambient_energy: float = 1.0
-## El ÚNICO tween que escribe el sol y el ambiente: dos a la vez escriben
-## las mismas propiedades cada frame y gana el más largo.
-var _sky_tween: Tween = null
+var _sky: SkyTint = null
+
+
+func _init() -> void:
+	_sky = SkyTint.new(self)
 
 
 ## La partida puede terminar en medio de un clima: se detiene y el cielo
@@ -276,12 +162,10 @@ func _exit_tree() -> void:
 	end_stage()
 
 
-## La fila de WEATHER_CATALOG con ese id, o vacío.
+## La fila de WeatherCatalog con ese id, o vacío (weather_badge.gd y el
+## WorldDirector la leen por aquí).
 static func weather_row(id: String) -> Dictionary:
-	for row: Dictionary in WEATHER_CATALOG:
-		if String(row.id) == id:
-			return row
-	return {}
+	return WeatherCatalog.by_id(id)
 
 
 ## Inicio de etapa: olvida las luces de la arena anterior (si no, la etapa
@@ -289,13 +173,7 @@ static func weather_row(id: String) -> Dictionary:
 ## vacía el canal, sin stop(): on_stage_ended ya detuvo el clima.
 func begin_stage(stage_layout: StageLayout) -> void:
 	layout = stage_layout
-	_kill_sky_tween()
-	_sun = null
-	_environment = null
-	_sun_color = Color.WHITE
-	_sun_energy = 1.0
-	_ambient_color = Color.WHITE
-	_ambient_energy = 1.0
+	_sky.forget()
 	active_weather = {}
 	_weather_state = {}
 	_sky_gap_left = 0.0
@@ -305,7 +183,7 @@ func begin_stage(stage_layout: StageLayout) -> void:
 ## y devuelve el cielo al instante, antes de que la arena se libere.
 func end_stage() -> void:
 	stop_weather()
-	_snap_sky_back()
+	_sky.snap_back()
 
 
 ## Detiene el clima activo sin encadenar el siguiente ni devolver el cielo
@@ -342,11 +220,11 @@ func maybe_roll() -> void:
 	# solo y un dado de más cambia todo lo que se sortea después.
 	var disaster_odds := disaster_chance + RunState.disaster_chance_bonus
 	if disaster_odds > 0.0 and randf() < disaster_odds:
-		_start_weather(_roll_group("disaster"))
+		_start_weather(WeatherCatalog.roll_group("disaster"))
 		return
 	var rain_odds := rain_chance + RunState.event_chance_bonus
 	if rain_odds > 0.0 and randf() < rain_odds:
-		_start_weather(_roll_group("rain"))
+		_start_weather(WeatherCatalog.roll_group("rain"))
 		return
 	# Los pactos demoníacos venden probabilidad de luna, además del extra
 	# que suma cada altar demoníaco usado.
@@ -354,7 +232,7 @@ func maybe_roll() -> void:
 			+ sky_event_chance_per_demonic * float(RunState.demonic_uses)
 	if randf() >= chance:
 		return
-	_start_weather(_roll_group("moon"))
+	_start_weather(WeatherCatalog.roll_group("moon"))
 
 
 ## FUERZA un clima (el probe, BONK_WEATHER_NOW, el altar de evento): detiene
@@ -365,22 +243,9 @@ func start_sky_event(kind: String) -> void:
 	_start_weather(kind, true)
 
 
-## La tirada del altar de evento: cualquier fila con altar_ok.
+## La tirada del altar de evento (el WorldDirector la reenvía).
 func random_altar_weather() -> String:
-	var total := 0.0
-	for row: Dictionary in WEATHER_CATALOG:
-		if bool(row.get("altar_ok", true)):
-			total += float(row.weight)
-	if total <= 0.0:
-		return ""
-	var roll := randf() * total
-	for row: Dictionary in WEATHER_CATALOG:
-		if not bool(row.get("altar_ok", true)):
-			continue
-		roll -= float(row.weight)
-		if roll <= 0.0:
-			return String(row.id)
-	return ""
+	return WeatherCatalog.roll_altar()
 
 
 ## Un charco de ácido (EnemyBase lo pide al morir durante la lluvia
@@ -414,27 +279,9 @@ func is_weather_active(id: String) -> bool:
 ## lunas y lluvias, el multiplicador de los pactos.
 func _weather_duration(row: Dictionary) -> float:
 	var seconds := float(weather_duration_overrides.get(String(row.id), row.duration))
-	if STRETCHABLE_GROUPS.has(String(row.group)):
+	if WeatherCatalog.STRETCHABLE_GROUPS.has(String(row.group)):
 		seconds *= RunState.sky_duration_multiplier
 	return seconds
-
-
-## Un id al azar del grupo, por peso, sin las filas follow_up_only.
-func _roll_group(group: String) -> String:
-	var total := 0.0
-	for row: Dictionary in WEATHER_CATALOG:
-		if String(row.group) == group and not bool(row.get("follow_up_only", false)):
-			total += float(row.weight)
-	if total <= 0.0:
-		return ""
-	var roll := randf() * total
-	for row: Dictionary in WEATHER_CATALOG:
-		if String(row.group) != group or bool(row.get("follow_up_only", false)):
-			continue
-		roll -= float(row.weight)
-		if roll <= 0.0:
-			return String(row.id)
-	return ""
 
 
 func _start_weather(id: String, forced: bool = false) -> void:
@@ -450,7 +297,7 @@ func _start_weather(id: String, forced: bool = false) -> void:
 		# Forzado: el clima activo se detiene bien, con su stop(), que es lo
 		# que suelta el tinte, la fuente de puntos y el desplazamiento del HUD.
 		_stop_weather(false)
-	_cache_lights()
+	_sky.cache(layout)
 	_weather_state = {}
 	var seconds := _weather_duration(row)
 	active_weather = {"id": id, "group": String(row.group), "time_left": seconds}
@@ -467,7 +314,7 @@ func _start_weather(id: String, forced: bool = false) -> void:
 ## línea "Sky event:".
 func _present(row: Dictionary) -> void:
 	if row.has("sun_color"):
-		_tint_sky(row["sun_color"], float(row["sun_energy"]), row["ambient_color"])
+		_sky.tint(row["sun_color"], float(row["sun_energy"]), row["ambient_color"])
 	var text := String(row.get("announce", ""))
 	if not text.is_empty():
 		if _weather_state.has("announce_arg"):
@@ -498,7 +345,7 @@ func _stop_weather(chain: bool) -> void:
 		# 2 s competiría con el de 1.5 s del siguiente y ganaría el más largo.
 		_start_weather(follow_up)
 		return
-	_restore_sky()
+	_sky.restore()
 	_sky_gap_left = sky_event_min_gap
 
 
@@ -615,7 +462,7 @@ func _weather_start_tsunami() -> void:
 	# una tercera etapa saldría enorme.
 	var wanted := tsunami_base + tsunami_per_minute * int(RunState.stage_time / 60.0)
 	_weather_state["left"] = wanted
-	_weather_state["announce_arg"] = _compass_word(angle)
+	_weather_state["announce_arg"] = WeatherCatalog.compass_word(angle)
 
 
 ## Vierte la ola durante los tres segundos de la fila, por tandas de
@@ -734,81 +581,9 @@ func _meteor_impact(at: Vector3) -> void:
 			enemy_health.take_damage(damage * meteor_enemy_scale)
 
 
-## --- cielo ------------------------------------------------------------------
-
-## Guarda el sol y el ambiente de la arena actual y sus valores originales.
-## No hace nada si ya los tiene (begin_stage los olvida en cada etapa).
-func _cache_lights() -> void:
-	if _sun != null:
-		return
-	# La ARENA, no current_scene: current_scene es la raíz de la partida y
-	# sus luces son las de la arena que tenga debajo.
-	var scene := layout.current_arena() if layout != null else null
-	if scene == null:
-		return
-	for node: Node in scene.find_children("*", "DirectionalLight3D", true, false):
-		_sun = node as DirectionalLight3D
-		_sun_color = _sun.light_color
-		_sun_energy = _sun.light_energy
-		break
-	for node: Node in scene.find_children("*", "WorldEnvironment", true, false):
-		var world_environment := node as WorldEnvironment
-		if world_environment == null or world_environment.environment == null:
-			break
-		# El Environment de la arena es un sub_resource COMPARTIDO por todas
-		# las instancias de la escena: teñirlo pasaría a la partida
-		# siguiente. Se trabaja sobre una copia propia de esta arena.
-		_environment = world_environment.environment.duplicate()
-		world_environment.environment = _environment
-		_ambient_color = _environment.ambient_light_color
-		_ambient_energy = _environment.ambient_light_energy
-		break
-
-
-## Lleva el sol y el ambiente a un tinte en 1.5 s. `sun_energy` multiplica
-## la energía original del sol.
-func _tint_sky(sun_color: Color, sun_energy: float, ambient: Color) -> void:
-	_kill_sky_tween()
-	_sky_tween = create_tween().set_parallel()
-	if _sun != null:
-		_sky_tween.tween_property(_sun, "light_color", sun_color, 1.5)
-		_sky_tween.tween_property(_sun, "light_energy", _sun_energy * sun_energy, 1.5)
-	if _environment != null:
-		_sky_tween.tween_property(_environment, "ambient_light_color", ambient, 1.5)
-
-
-## Devuelve el cielo original de la arena en 2 s.
-func _restore_sky() -> void:
-	_kill_sky_tween()
-	_sky_tween = create_tween().set_parallel()
-	if _sun != null:
-		_sky_tween.tween_property(_sun, "light_color", _sun_color, 2.0)
-		_sky_tween.tween_property(_sun, "light_energy", _sun_energy, 2.0)
-	if _environment != null:
-		_sky_tween.tween_property(_environment, "ambient_light_color", _ambient_color, 2.0)
-
-
-## Devuelve la luz original de la arena AL INSTANTE (sin tween). Se usa
-## cuando la arena se va: un tween sobre un sol liberado es un error.
-func _snap_sky_back() -> void:
-	_kill_sky_tween()
-	if _sun != null and is_instance_valid(_sun):
-		_sun.light_color = _sun_color
-		_sun.light_energy = _sun_energy
-	if _environment != null:
-		_environment.ambient_light_color = _ambient_color
-		_environment.ambient_light_energy = _ambient_energy
-
-
-func _kill_sky_tween() -> void:
-	if _sky_tween != null and _sky_tween.is_valid():
-		_sky_tween.kill()
-	_sky_tween = null
-
-
 ## --- utilidades -------------------------------------------------------------
 
-## La fila de WEATHER_CATALOG del clima activo (los tick leen sus colores).
+## La fila de WeatherCatalog del clima activo (los tick leen sus colores).
 func _active_row() -> Dictionary:
 	return weather_row(String(active_weather.get("id", "")))
 
@@ -836,19 +611,6 @@ static func _flat_distance_sq(a: Vector3, b: Vector3) -> float:
 	var span := a - b
 	span.y = 0.0
 	return span.length_squared()
-
-
-## De dónde viene el tsunami, para el aviso: cuatro rumbos bastan para
-## saber hacia dónde correr.
-static func _compass_word(angle: float) -> String:
-	var turns := fposmod(angle / TAU, 1.0)
-	if turns < 0.125 or turns >= 0.875:
-		return "desde el este"
-	if turns < 0.375:
-		return "desde el sur"
-	if turns < 0.625:
-		return "desde el oeste"
-	return "desde el norte"
 
 
 ## Muestra un aviso centrado en el HUD (grupo "boss_ui").
