@@ -9,8 +9,9 @@ extends Control
 ## así que la horda sigue mientras el mapa está abierto: mirarlo es una
 ## decisión con costo. Se oculta solo en cuanto termina la partida, cuando
 ## algo que SÍ es dueño de la pausa pausa el árbol (el selector de cartas, el
-## menú de pausa) o cuando el jugador de esta ranura ya no está. Para verlo
-## con el árbol en pausa, la escena guarda process_mode Always.
+## menú de pausa) o cuando el jugador de esta ranura ya no está. La escena
+## guarda process_mode Always para que _process siga corriendo con el árbol en
+## pausa y pueda ocultar el mapa.
 ##
 ## Una instancia por jugador, creada por el HUD (ViewWidgets) en su propia
 ## CanvasLayer (capa 8: sobre el HUD, bajo el selector de cartas) y anclada a
