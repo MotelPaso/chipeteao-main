@@ -230,10 +230,10 @@ lo que cambies ahí vale para todos los que no tengan su propio valor en la esce
 | Color del anillo de un altar de carga o del altar demoníaco | `scenes/world/shrines/ChargeShrine.tscn` / `CurseShrine.tscn` > raíz (grupo «Anillo») | `accent_color`; el color de su baliza es aparte: `beacon_color` de la fila `charge_altar` / `demonic_altar` en `EVENT_LIBRARY` (`world_director.gd`) |
 | Tiempo de carga y tamaño del don | `ChargeShrine.tscn` / `CurseShrine.tscn` > raíz (grupo «Carga») | `channel_time`, `boon_scale` |
 | Costo de dificultad de los pactos | `CurseShrine.tscn` > CurseShrine (grupo «Pactos») | `difficulty_scale` (1 = lo que dice `PACT_LIBRARY` en `curse_shrine.gd`) |
-| Premios y aspecto del bloque de la suerte | `scenes/world/chests/LuckyBlock.tscn` > LuckyBlock | `points_reward`, `gem_count`, `explosion_radius`, `block_color` |
+| Premios y aspecto del bloque de la suerte | `scenes/world/chests/LuckyBlock.tscn` > LuckyBlock | `points_reward`, `gem_count`, `gem_min_spread`/`gem_spread`, `explosion_radius`, `explosion_burst_count`, `explosion_shake`, `block_color` |
 | Caja de mascota | `scenes/world/PetBox.tscn` > PetBox | `paw_color`, grupo «Textos» |
 | Precio y textos del manantial | `scenes/world/shrines/SpringShrine.tscn` > SpringShrine | `price`, `price_prompt` |
-| Peaje y premio del altar de la codicia | `scenes/world/shrines/GreedShrine.tscn` > GreedShrine | `hp_cost_fraction`, `gem_chance`, `card_chance` |
+| Peaje y premio del altar de la codicia | `scenes/world/shrines/GreedShrine.tscn` > GreedShrine | `hp_cost_fraction`, `gem_chance`, `card_chance`, `gem_count`, `gem_ring_min_radius`/`gem_ring_max_radius` |
 | Altar de eventos | `scenes/world/shrines/EventAltar.tscn` > EventAltar | `glass_color`, `busy_prompt` |
 | Minijefe secreto y su frase | `scenes/world/secrets/HummingSkull.tscn` / `OddStump.tscn` > raíz | `miniboss_scene`, `spawn_offset`, `awaken_text` |
 
@@ -252,6 +252,7 @@ de reparto se llama `ForestScatter`, `DuneScatter` o `MarshScatter`.
 | Mesetas | la arena > *Scatter (grupo «Mesetas») | `mesa_count`, `mesa_scale_min/max`, `mesa_ramp_offset` |
 | Formaciones de roca (cuántas y qué tan grandes) | la arena > *Scatter (grupo «Máscara de la arena») | `mask_blobs_min/max`, `mask_blob_cells_min/max`, `mask_min_open_fraction` |
 | Color y forma de la roca de un bioma | `assets/world/rock_style_<mapa>.tres` | `rock_color`, `cap_color`, `cliff_height`, `peak_height`, `max_height` (bajar `margin_min` o `cliff_height` puede abrir huecos en el sello del mapa) |
+| Tamaño de las ondulaciones, grietas y cumbres de la roca (todas las arenas) | `scripts/world/rock_formation.gd` (bloque «edita aquí») | `LIFT_WAVELENGTH`, `CRAG_WAVELENGTH`, `EDGE_WAVELENGTH`, `SPIRE_WAVELENGTH` (metros; más grande = rasgos más anchos), `SPIRE_FADE_FROM`/`SPIRE_FADE_TO` (desde qué profundidad asoman las cumbres) |
 | Jugar siempre el mismo mapa (para probar) | la arena > *Scatter (grupo «Semilla») | `randomize_per_run` apagado y `scatter_seed` |
 | Altura de las lomas del suelo | la arena > Terrain (grupo «Relieve») | `amplitude`, `feature_size` |
 | Color del minimapa y colinas del horizonte | la arena > Backdrop | `ground_color`, `hill_color`, `far_hill_color` (cambiar `hill_count` mueve los altares aunque la semilla sea la misma) |
