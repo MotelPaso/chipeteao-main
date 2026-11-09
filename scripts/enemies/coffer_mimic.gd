@@ -13,8 +13,6 @@ enum State { ENTRANCE, PURSUE, SNAP_WINDUP, SNAP_RECOVER, BURIED }
 
 ## Ángulo de la tapa enterrado: cerrada del todo, solo se ve arena.
 const LID_CLOSED_ANGLE: float = 0.0
-## Cuánto se abren las fauces durante la carga del mordisco.
-const LID_GAPE_ANGLE: float = 1.15
 
 @export_group("Llegada")
 ## Segundos del estado de llegada antes de empezar a pelear.
@@ -45,6 +43,10 @@ const LID_GAPE_ANGLE: float = 1.15
 @export var snap_height_window: float = 1.3
 ## Segundos del destello del mordisco (más corto que el impacto común).
 @export var snap_flash_time: float = 0.15
+## Ángulo en radianes al que se abren las fauces (la tapa) durante la carga del mordisco.
+@export var lid_gape_angle: float = 1.15
+## Segundos que tarda la tapa en cerrarse de golpe, de vuelta a su reposo, al morder.
+@export var snap_lid_close_time: float = 0.12
 
 @export_group("Enterrarse")
 ## Segundos de espera entre un entierro y el siguiente.
@@ -55,6 +57,12 @@ const LID_GAPE_ANGLE: float = 1.15
 @export var bury_armor_bonus: float = 6.0
 ## Metros que se hunde el cuerpo: ajustado para que solo asome la tapa.
 @export var bury_sink_depth: float = 0.85
+## Segundos que tarda la tapa en cerrarse al enterrarse.
+@export var bury_lid_close_time: float = 0.15
+## Segundos que tarda el cuerpo en volver a la superficie al salir.
+@export var bury_rise_time: float = 0.2
+## Segundos que tarda la tapa en volver a abrirse al salir.
+@export var bury_lid_open_time: float = 0.2
 ## Radio de la onda de choque al salir y de su disco de aviso, en metros.
 @export var shockwave_radius: float = 3.0
 ## Daño de la onda a cada raider dentro del radio (valor base; apply_tier lo escala).
@@ -150,7 +158,7 @@ func _start_snap(player: Node3D) -> void:
 	_state_timer = snap_windup
 	_snap_point = _clamp_to_arena(player.global_position)
 	Telegraph.spawn_disc(self, _snap_point, snap_radius, snap_windup, telegraph_color)
-	_play_lid(LID_GAPE_ANGLE, snap_windup)
+	_play_lid(lid_gape_angle, snap_windup)
 
 
 func _resolve_snap() -> void:
@@ -159,7 +167,7 @@ func _resolve_snap() -> void:
 	_snap_cooldown_timer = snap_cooldown
 	Telegraph.spawn_disc(self, _snap_point, snap_radius, snap_flash_time, impact_color)
 	Sfx.play(&"hit_crit", -3.0)
-	_play_lid(_lid_rest_angle, 0.12)
+	_play_lid(_lid_rest_angle, snap_lid_close_time)
 	# Contra el punto marcado del mordisco y todo el equipo: el raider que
 	# fijó puede ya no ser el más cercano.
 	damage_players_in_disc(_snap_point, snap_radius, snap_height_window,
@@ -179,7 +187,7 @@ func _start_bury() -> void:
 	# Todo el tiempo enterrado se lee como la cuenta de la onda.
 	Telegraph.spawn_disc(self, global_position, shockwave_radius,
 			bury_duration, telegraph_color)
-	_play_lid(LID_CLOSED_ANGLE, 0.15)
+	_play_lid(LID_CLOSED_ANGLE, bury_lid_close_time)
 	_play_cue(_visual, "position:y", -bury_sink_depth, 0.25,
 			Tween.TRANS_QUAD, Tween.EASE_IN)
 
@@ -192,10 +200,11 @@ func _resolve_bury() -> void:
 		_buried_armor_applied = false
 		_health.armor -= bury_armor_bonus
 	Sfx.play(&"burrow_pop")
-	_play_cue(_visual, "position:y", 0.0, 0.2, Tween.TRANS_BACK, Tween.EASE_OUT)
+	_play_cue(_visual, "position:y", 0.0, bury_rise_time,
+			Tween.TRANS_BACK, Tween.EASE_OUT)
 	# Enterrarse cerró la tapa; al salir hay que abrirla a su ángulo de
 	# reposo o el cofre sigue peleando sellado el resto de la partida.
-	_play_lid(_lid_rest_angle, 0.2)
+	_play_lid(_lid_rest_angle, bury_lid_open_time)
 	# El anillo de la onda se marca para todos, así que lo recibe todo el que
 	# esté dentro.
 	_resolve_ground_hit([global_position], shockwave_radius,
