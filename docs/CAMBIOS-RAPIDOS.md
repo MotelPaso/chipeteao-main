@@ -163,6 +163,7 @@ La lógica vive en ayudantes de `scripts/systems/spawner/` (`SpawnScaling`, `Spa
 | Cada cuántos niveles evoluciona o asciende un arma | `evolution_catalog.gd` | `EVOLVE_AT_LEVEL` |
 | Cartel, fanfarria y sacudida de la evolución | `scripts/systems/catalogs/evolution_ceremony.gd` | `EVOLVED_BANNER`, `ASCENDED_BANNER`, `FANFARE_SFX`, `SHAKE_STRENGTH` |
 | Mascotas | `scripts/systems/catalogs/pet_catalog.gd` > `PET_LIBRARY` | `display_name`, `weapon_scene`, `weapon_damage_scale`, `stat`, `amount_per_level`, `color` |
+| Cómo sigue y se ve toda mascota (velocidad, distancia al raider, brillo, ojos, vaivén) | `scripts/systems/pet.gd` (bloque «Edita aquí») | `FOLLOW_SPEED`, `TURN_SPEED`, `FOLLOW_OFFSET`, `BODY_GLOW`, `EYE_COLOR`, `HOVER_BOB_HEIGHT`, `HOVER_BOB_SPEED` |
 | Misiones (texto, meta, premio) | `scripts/systems/catalogs/quest_catalog.gd` > `QUEST_LIBRARY` | `display_name`, `description`, `target`, `reward` |
 | Reliquias de la Armería | `scripts/systems/catalogs/relic_catalog.gd` > `RELIC_LIBRARY` | `display_name`, `amount`, `max_ranks`, `base_cost`, `cost_growth` |
 | Orden y textos de los mapas | `scripts/systems/catalogs/map_catalog.gd` > `MAP_LIBRARY` | orden de las filas, `display_name`, `blurb` |
@@ -172,10 +173,12 @@ La lógica vive en ayudantes de `scripts/systems/spawner/` (`SpawnScaling`, `Spa
 | Qué quieres cambiar | Dónde | Qué propiedad |
 | --- | --- | --- |
 | Números de un objeto (imán, veneno, titán, arañas, aura sayayin, zenkai…) | `scripts/systems/catalogs/item_catalog.gd` > su fila en `ITEM_LIBRARY` | sus campos numéricos (la descripción se arma sola con ellos) |
+| Aspecto del aura sayayin (color, opacidad, partículas) | `scripts/systems/catalogs/item_catalog.gd` > fila `saiyan_blood` | `aura_color`, `aura_alpha`, `aura_burst` |
 | Duración, peso, color o texto de un power-up | `scripts/systems/catalogs/powerup_catalog.gd` > su fila en `POWERUP_LIBRARY` | `duration`, `weight`, `color`, `display_name` |
 | Fiebre del oro, reflejo, vida por baja del vampiro | `powerup_catalog.gd` > fila gold / reflect / vampire | `points_multiplier`, `reflect_fraction`, `max_hp_per_kill` (si cambias el número, ajusta el texto) |
 | Textos «¡Aura sayayin!» y «¡Zenkai!» | Player.tscn > ItemBag (grupo «Textos») | `saiyan_aura_text`, `zenkai_text` |
-| Power-up en el suelo (tamaño, brillo, luz, duración) | `scenes/systems/PowerUpPickup.tscn` > sus nodos y la raíz | la malla de `Gem`, `light_energy`; `lifetime`, `spin_speed` en la raíz |
+| Texto bajo el nombre en el aviso de un power-up («… (10 s)») | Player.tscn > PowerUps (grupo «Textos») | `toast_template` (%s = descripción, %d = segundos) |
+| Power-up en el suelo (tamaño, brillo, luz, duración, desvanecimiento, arcoíris de la estrella) | `scenes/systems/PowerUpPickup.tscn` > sus nodos y la raíz | la malla de `Gem`, `light_energy`; `lifetime`, `fade_time`, `spin_speed`, `star_hue_hz` en la raíz |
 | Orbe de vida (imán, curación, duración) | `scenes/systems/HealthOrb.tscn` > HealthOrb | `magnet_radius`, `heal_fraction`, `lifetime` |
 | Sacudida de cámara | `scenes/systems/Juice.tscn` > Juice (grupo «Sacudida de cámara») | `kill_shake_*`, `hurt_shake_*`, `boss_death_shake_*`, `crit_shake_*` |
 | Cámara lenta al crítico o al matar un jefe | Juice.tscn > Juice («Hit-stop») | `crit_stop_scale`, `crit_stop_duration`, `boss_death_stop_*` |
@@ -269,6 +272,7 @@ de reparto se llama `ForestScatter`, `DuneScatter` o `MarshScatter`.
 | Fondo, borde y brillo de cada ficha | `scenes/ui/hud/LoadoutTile.tscn` > raíz | `background_color`, `border_width`, `glow_size` |
 | Tarjeta de botín | `scenes/ui/hud/LootToast.tscn` > raíz | `hold_time`, `fade_time`, `background_color` |
 | Filas de compañeros en co-op | `scenes/ui/hud/MateRow.tscn` > raíz | `knocked_out_format`, `knocked_out_tint`, `points_format` |
+| Panel de relleno del cuarto vacío con 3 jugadores (fondo, texto, color, tamaño) | `scripts/systems/split_screen.gd` (bloque «Edita aquí») | `FILLER_BG`, `FILLER_TEXT`, `FILLER_TEXT_COLOR`, `FILLER_FONT_SIZE` |
 | Color del chip de clima bajo el reloj | HUD.tscn > TimerLabel/WeatherBadge | `group_colors`, `text_format` (el nombre sale de `display_name` en `weather_catalog.gd`) |
 | Insignia de FPS | HUD.tscn > FpsBadge | `text_format`, `background_color`, `refresh_seconds` |
 | Marco y refresco del minimapa | `scripts/ui/maps/minimap.gd` (bloque «Edita aquí») | `FRAME_PAD`, `MARKER_SCALE`, `BACKGROUND_COLOR`, `BORDER_WIDTH`, `BORDER_DARKEN`, `REFRESH` |
