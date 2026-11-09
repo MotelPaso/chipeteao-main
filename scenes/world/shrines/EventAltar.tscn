@@ -52,11 +52,13 @@ mesh = SubResource("BoxMesh_pedestal")
 
 [node name="Glass" type="MeshInstance3D" parent="Visual"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.45, 0)
+editor_description = "El color lo pinta event_altar.gd con glass_color al iniciar; cambiarlo aquí no tiene efecto (el alfa sí sale de aquí)."
 material_override = SubResource("StandardMaterial3D_glass")
 mesh = SubResource("SphereMesh_orb")
 
 [node name="Glow" type="OmniLight3D" parent="Visual"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.45, 0)
+editor_description = "El color lo pinta event_altar.gd con glass_color al iniciar; cambiarlo aquí no tiene efecto."
 light_color = Color(0.7, 0.78, 1, 1)
 light_energy = 2.0
 omni_range = 7.0

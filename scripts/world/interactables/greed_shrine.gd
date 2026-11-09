@@ -26,6 +26,10 @@ extends Interactable
 @export var gem_count: int = 12
 ## XP de cada gema.
 @export var gem_value: int = 4
+## Radio mínimo del anillo de gemas, en metros; cada gema cae al azar entre este y el máximo.
+@export var gem_ring_min_radius: float = 1.1
+## Radio máximo del anillo de gemas, en metros.
+@export var gem_ring_max_radius: float = 1.9
 ## Escena de gema (pasa por Pools).
 @export var xp_gem_scene: PackedScene = preload("res://scenes/systems/XpGem.tscn")
 ## Título de la carta gratis.
@@ -111,7 +115,8 @@ func _burst_gems() -> void:
 		gem.xp_value = gem_value
 		var angle := TAU * float(i) / float(gem_count)
 		gem.global_position = global_position + Vector3.UP * 0.8 \
-				+ Vector3(cos(angle), 0.0, sin(angle)) * randf_range(1.1, 1.9)
+				+ Vector3(cos(angle), 0.0, sin(angle)) \
+				* randf_range(gem_ring_min_radius, gem_ring_max_radius)
 		placed += 1
 	if placed == 0:
 		push_warning("GreedShrine: gem pool gave nothing; paying the flavor line instead")

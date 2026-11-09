@@ -46,8 +46,9 @@ const KIND_ANIMALS: String = "animals"
 const KIND_POWERUPS: String = "powerups"
 const KIND_ITEMS: String = "items"
 
-## El menú que abre el puesto (VendorUi).
-const VENDOR_PANEL_SCENE := preload("res://scenes/ui/modal/VendorPanel.tscn")
+## El menú que abre el puesto (VendorUi). Se carga al abrirlo: vendor_ui.gd usa
+## Vendor y un preload aquí cerraría un ciclo de carga.
+const VENDOR_PANEL_PATH: String = "res://scenes/ui/modal/VendorPanel.tscn"
 
 ## Qué puesto es (id de fila de VENDOR_LIBRARY); lo fija el WorldDirector antes
 ## de que entre al árbol.
@@ -73,7 +74,7 @@ const VENDOR_PANEL_SCENE := preload("res://scenes/ui/modal/VendorPanel.tscn")
 ## tener menos objetos que huecos el estante (Legendario tiene dos).
 @export var item_rerolls: int = 4
 
-@export_group("Espera y salida")
+@export_group("Espera")
 ## Segundos que el puesto ignora `interact` tras cerrarse un menú sin venta. El
 ## soak vuelve a interactuar cada 0.75 s mientras se queda cerca, y sin esto el
 ## panel se reabriría apenas se cierra, para siempre.
@@ -120,6 +121,15 @@ func _ready() -> void:
 	_apply_tint()
 
 
+func _physics_process(delta: float) -> void:
+	_time += delta
+	if _cooldown_left > 0.0:
+		_cooldown_left = maxf(_cooldown_left - delta, 0.0)
+		_refresh_cooldown_prompt()
+	if available:
+		_sign.position.y = _sign_rest_y + sin(_time * sign_bob_speed) * sign_bob_height
+
+
 ## La fila de VENDOR_LIBRARY de este puesto (la primera si `kind` es
 ## desconocido, así un export mal escrito igual dibuja algo en vez de romperse).
 func row() -> Dictionary:
@@ -145,81 +155,6 @@ func roll_offers(player: Node) -> Array[Dictionary]:
 			return _item_offers(player)
 	push_warning("VendorUi: unknown vendor kind '%s'" % kind)
 	return []
-
-
-## Pinta la figura, el toldo y la luz con el color de la fila del puesto: lo
-## único que insinúa el tipo antes de leer el prompt. Los materiales de la
-## figura y el toldo son locales a cada puesto (resource_local_to_scene), así
-## dos puestos de distinto tipo no se pintan entre sí.
-func _apply_tint() -> void:
-	var tint: Color = row().get("color", Color.WHITE)
-	for mesh: MeshInstance3D in [_figure, _sign]:
-		var material := mesh.material_override as StandardMaterial3D
-		material.albedo_color = tint
-		material.emission = tint
-	_light.light_color = tint
-
-
-func _physics_process(delta: float) -> void:
-	_time += delta
-	if _cooldown_left > 0.0:
-		_cooldown_left = maxf(_cooldown_left - delta, 0.0)
-		_refresh_cooldown_prompt()
-	if available:
-		_sign.position.y = _sign_rest_y + sin(_time * sign_bob_speed) * sign_bob_height
-
-
-## La línea propia del puesto, de su fila de VENDOR_LIBRARY.
-func _row_prompt() -> String:
-	return String(row().get("prompt", default_prompt))
-
-
-## Cuenta la espera en el prompt y devuelve la línea propia del puesto apenas
-## termina: un puesto que ofrece la mercancía mientras rechaza cada clic miente
-## (el cofre y la ruleta también cambian su línea cuando dicen que no). No
-## depende del rango a propósito: la espera puede terminar sin nadie mirando y la
-## línea igual tiene que volver.
-func _refresh_cooldown_prompt() -> void:
-	var line: String = _row_prompt() if _cooldown_left <= 0.0 \
-			else cooldown_prompt_template % ceili(_cooldown_left)
-	# Solo ante un cambio real: set_prompt reescribe el Label3D (que rearma su
-	# malla de texto), y esta línea cambia una vez por segundo, no por frame.
-	if line == prompt_text:
-		return
-	set_prompt(line)
-
-
-func _interact(player: Node) -> void:
-	if _sold or not available or _cooldown_left > 0.0:
-		return
-	if _ui != null and is_instance_valid(_ui):
-		return
-	# Nunca abre un menú que pausa el árbol SOBRE otro: el panel de este puesto
-	# suelta la pausa al cerrarse, y esa pausa podría ser del selector de cartas.
-	# El soak cuelga toda la partida de un nodo que procesa siempre, así que
-	# Interactable._unhandled_input sigue disparando en pausa y el probe presiona
-	# interact cada 0.75 s mientras se queda cerca.
-	if BlockingUi.any_open(get_tree()):
-		return
-	var offers := roll_offers(player)
-	var ui := VENDOR_PANEL_SCENE.instantiate() as VendorUi
-	ui.setup(self, player, offers)
-	# Cuelga de la etapa como todo lo que aparece, así un cambio de etapa se
-	# lleva el panel junto con el puesto en vez de dejar un árbol pausado.
-	RunRoot.stage_parent(get_tree()).add_child(ui)
-	_ui = ui
-	ui.tree_exited.connect(_on_menu_closed)
-
-
-## El menú se fue. Si no hubo compra el puesto sigue, pero se calla un rato: si
-## no, el interact repetido del soak lo reabriría en el frame siguiente.
-func _on_menu_closed() -> void:
-	_ui = null
-	if not _sold:
-		_cooldown_left = retry_cooldown
-		# Se dice de inmediato, no en el próximo tick de física: el raider está
-		# parado en el anillo justo cuando el panel se cierra, leyéndolo.
-		_refresh_cooldown_prompt()
 
 
 ## LA compra. Cobra, entrega, registra y cierra el puesto. Devuelve false SOLO
@@ -273,6 +208,72 @@ func buy(offer: Dictionary, player: Node) -> bool:
 ## nunca revela qué vendedor llegó antes de que alguien camine hasta allá.
 func map_marker_color() -> Color:
 	return row().get("color", Color.WHITE)
+
+
+## Pinta la figura, el toldo y la luz con el color de la fila del puesto: lo
+## único que insinúa el tipo antes de leer el prompt. Los materiales de la
+## figura y el toldo son locales a cada puesto (resource_local_to_scene), así
+## dos puestos de distinto tipo no se pintan entre sí.
+func _apply_tint() -> void:
+	var tint: Color = row().get("color", Color.WHITE)
+	for mesh: MeshInstance3D in [_figure, _sign]:
+		var material := mesh.material_override as StandardMaterial3D
+		material.albedo_color = tint
+		material.emission = tint
+	_light.light_color = tint
+
+
+## La línea propia del puesto, de su fila de VENDOR_LIBRARY.
+func _row_prompt() -> String:
+	return String(row().get("prompt", default_prompt))
+
+
+## Cuenta la espera en el prompt y devuelve la línea propia del puesto apenas
+## termina: un puesto que ofrece la mercancía mientras rechaza cada clic miente
+## (el cofre y la ruleta también cambian su línea cuando dicen que no). No
+## depende del rango a propósito: la espera puede terminar sin nadie mirando y la
+## línea igual tiene que volver.
+func _refresh_cooldown_prompt() -> void:
+	var line: String = _row_prompt() if _cooldown_left <= 0.0 \
+			else cooldown_prompt_template % ceili(_cooldown_left)
+	# Solo ante un cambio real: set_prompt reescribe el Label3D (que rearma su
+	# malla de texto), y esta línea cambia una vez por segundo, no por frame.
+	if line == prompt_text:
+		return
+	set_prompt(line)
+
+
+func _interact(player: Node) -> void:
+	if _sold or not available or _cooldown_left > 0.0:
+		return
+	if _ui != null and is_instance_valid(_ui):
+		return
+	# Nunca abre un menú que pausa el árbol SOBRE otro: el panel de este puesto
+	# suelta la pausa al cerrarse, y esa pausa podría ser del selector de cartas.
+	# El soak cuelga toda la partida de un nodo que procesa siempre, así que
+	# Interactable._unhandled_input sigue disparando en pausa y el probe presiona
+	# interact cada 0.75 s mientras se queda cerca.
+	if BlockingUi.any_open(get_tree()):
+		return
+	var offers := roll_offers(player)
+	var ui := (load(VENDOR_PANEL_PATH) as PackedScene).instantiate() as VendorUi
+	ui.setup(self, player, offers)
+	# Cuelga de la etapa como todo lo que aparece, así un cambio de etapa se
+	# lleva el panel junto con el puesto en vez de dejar un árbol pausado.
+	RunRoot.stage_parent(get_tree()).add_child(ui)
+	_ui = ui
+	ui.tree_exited.connect(_on_menu_closed)
+
+
+## El menú se fue. Si no hubo compra el puesto sigue, pero se calla un rato: si
+## no, el interact repetido del soak lo reabriría en el frame siguiente.
+func _on_menu_closed() -> void:
+	_ui = null
+	if not _sold:
+		_cooldown_left = retry_cooldown
+		# Se dice de inmediato, no en el próximo tick de física: el raider está
+		# parado en el anillo justo cuando el panel se cierra, leyéndolo.
+		_refresh_cooldown_prompt()
 
 
 ## Mascotas que el comprador no lleva: venderle la que ya tiene le cobraría por
@@ -383,5 +384,5 @@ static func _payload_id(offer: Dictionary) -> String:
 
 func _leave() -> void:
 	get_tree().call_group("hud", "announce", leave_announcement)
-	# Se encoge sin bajar: sink_duration y sink_end_scale en Vendor.tscn.
+	# Se encoge sin bajar: sink_duration en Vendor.tscn; sink_end_scale es el de interactable.gd.
 	sink_away()
