@@ -37,7 +37,8 @@ const Beacon := preload("res://scripts/world/run/director/beacon.gd")
 ##   id:           identificador; event_weight_overrides lo usa como clave.
 ##   weight:       peso relativo del sorteo.
 ##   scene:        POI que aparece lejos de un jugador al azar.
-##   method:       solo en los eventos que hacen algo más que poner `scene`;
+##   method:       solo en los eventos que no se resuelven con
+##                 _event_spawn_poi (sortear el punto y poner `scene` ahí);
 ##                 se llama con call(row) y catalog_lint.gd revisa que exista.
 ##   announce:     aviso en el HUD (texto del jugador).
 ##   beacon_color: color de la baliza sobre el evento; sin él no hay baliza.
@@ -71,20 +72,23 @@ const EVENT_LIBRARY: Array[Dictionary] = [
 		"beacon_color": UiTheme.XP_GREEN, "beacon_time": 30.0,
 	},
 	{
-		"id": "charge_altar", "weight": 1.6, "altar": true, "scene": CHARGE_SHRINE_SCENE,
+		"id": "charge_altar", "weight": 1.6, "altar": true, "method": &"_event_shrine",
+		"scene": CHARGE_SHRINE_SCENE,
 		"announce": "Se alza un altar de carga — párate en su anillo",
 		"beacon_color": Color(0.45, 0.85, 1.0), "beacon_time": INF,
 		"log": "Altar placed: charge",
 	},
 	{
-		"id": "demonic_altar", "weight": 0.5, "altar": true, "scene": CURSE_SHRINE_SCENE,
+		"id": "demonic_altar", "weight": 0.5, "altar": true, "method": &"_event_shrine",
+		"scene": CURSE_SHRINE_SCENE,
 		"announce": "Un obelisco demoníaco sale del suelo a zarpazos...",
 		"beacon_color": Color(1.0, 0.35, 0.3), "beacon_time": INF,
 		"log": "Altar placed: demonic",
 	},
 	{
 		# Un solo manantial a la vez; se queda hasta que alguien bebe.
-		"id": "spring", "weight": 0.7, "scene": SPRING_SHRINE_SCENE,
+		"id": "spring", "weight": 0.7, "method": &"_event_shrine",
+		"scene": SPRING_SHRINE_SCENE,
 		"announce": "Un manantial brota en algún lugar del campo...",
 		"beacon_color": Color(0.4, 0.8, 1.0), "beacon_time": INF,
 		"cap_group": &"springs", "cap": 1,
@@ -443,10 +447,25 @@ func _fire_random_event() -> void:
 		_event_spawn_poi(chosen)
 
 
-## Evento simple: el POI de la fila lejos de un jugador, con su baliza (si
-## la fila tiene beacon_color), su aviso y su línea de log.
+## Evento simple: el POI de la fila lejos de un jugador. El punto se sortea
+## antes de crear el nodo.
 func _event_spawn_poi(row: Dictionary) -> void:
-	var poi := _layout.spawn_at(row["scene"], _event_point())
+	_present_poi(row, _layout.spawn_at(row["scene"], _event_point()))
+
+
+## Altar de carga, altar demoníaco y manantial: el nodo entra al árbol
+## ANTES de sortear su punto, así su cuerpo ya está en la arena (en su
+## origen) mientras la sonda de suelo mide el punto.
+func _event_shrine(row: Dictionary) -> void:
+	var shrine := (row["scene"] as PackedScene).instantiate() as Node3D
+	_layout.stage_parent().add_child(shrine)
+	shrine.global_position = _event_point()
+	_present_poi(row, shrine)
+
+
+## Lo que sigue a poner un POI de evento: su baliza (si la fila tiene
+## beacon_color), su aviso y su línea de log.
+func _present_poi(row: Dictionary, poi: Node3D) -> void:
 	_raise_row_beacon(row, poi.global_position, poi)
 	_announce(String(row["announce"]))
 	if row.has("log"):
