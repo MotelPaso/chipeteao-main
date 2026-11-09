@@ -5,8 +5,7 @@ extends Label
 ## "world_director", propiedad active_weather) en vez de que él lo empuje: el
 ## chip es una vista. El color del texto de la escena es el de un grupo de
 ## clima sin color propio. El nombre sale de la columna display_name de
-## WeatherDirector.WEATHER_CATALOG (weather_director.gd); un id sin fila se
-## muestra tal cual.
+## WeatherCatalog (weather_catalog.gd); un id sin fila se muestra tal cual.
 
 @export_group("Chip")
 ## Segundos entre lecturas del clima.
