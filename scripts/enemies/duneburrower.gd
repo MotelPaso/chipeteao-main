@@ -34,6 +34,10 @@ const BURROWED_GROUP: StringName = &"burrowed"
 @export var erupt_damage: float = 14.0
 ## Metros sobre el punto de ataque por encima de los cuales la erupción no golpea.
 @export var erupt_height_window: float = 1.5
+## Escala con la que asoma el gusano al erupcionar, antes de estirarse a su tamaño (x, y, z).
+@export var erupt_pop_scale: Vector3 = Vector3(1.3, 0.15, 1.3)
+## Segundos que tarda el gusano en estirarse a su tamaño al salir.
+@export var erupt_pop_time: float = 0.28
 
 @export_group("Telegrafía")
 ## Color del disco de aviso de la erupción.
@@ -187,7 +191,7 @@ func _apply_elite_damage(multiplier: float) -> void:
 
 ## Estirón al salir: el gusano asoma del suelo.
 func _play_erupt_pop() -> void:
-	_visual.scale = Vector3(1.3, 0.15, 1.3)
+	_visual.scale = erupt_pop_scale
 	var tween := create_tween()
-	tween.tween_property(_visual, "scale", Vector3.ONE, 0.28) \
+	tween.tween_property(_visual, "scale", Vector3.ONE, erupt_pop_time) \
 			.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)

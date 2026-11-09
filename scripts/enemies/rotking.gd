@@ -31,6 +31,10 @@ enum State { ENTRANCE, PURSUE, SMASH, ROOT_BURST, SUMMON }
 @export var smash_cooldown: float = 3.0
 ## Metros sobre los pies del jefe por encima de los cuales la onda no golpea (un salto a tiempo la esquiva).
 @export var smash_height_window: float = 1.2
+## Inclinación del cuerpo durante la carga del Aplastón, en radianes (negativo = hacia adelante).
+@export var smash_lean_angle: float = -0.38
+## Segundos que tarda en volver a enderezarse después del golpe.
+@export var smash_straighten_time: float = 0.25
 
 @export_group("Estallido de raíces")
 ## Segundos de espera entre un Estallido de raíces y el siguiente.
@@ -63,6 +67,10 @@ enum State { ENTRANCE, PURSUE, SMASH, ROOT_BURST, SUMMON }
 @export var summon_ring_radius: float = 3.2
 ## Segundos del rugido de invocación; los esbirros salen al terminar.
 @export var summon_duration: float = 1.1
+## Escala a la que se infla la silueta durante el rugido (1.14 = +14 %).
+@export var summon_roar_scale: float = 1.14
+## Fracción de summon_duration que tarda la silueta en inflarse (0-1).
+@export var summon_swell_fraction: float = 0.4
 
 var _state: State = State.ENTRANCE
 var _state_timer: float = 0.0
@@ -146,14 +154,14 @@ func _start_smash() -> void:
 	_state_timer = smash_windup
 	_smash_resolved = false
 	Telegraph.spawn_disc(self, global_position, smash_radius, smash_windup, telegraph_color)
-	_play_cue_lean(-0.38, smash_windup)
+	_play_cue_lean(smash_lean_angle, smash_windup)
 
 
 func _resolve_smash() -> void:
 	_smash_resolved = true
 	_state_timer = smash_recover
 	_smash_cooldown_timer = smash_cooldown
-	_play_cue_lean(0.0, 0.25)
+	_play_cue_lean(0.0, smash_straighten_time)
 	# La onda se dibuja para todo el equipo, así que golpea a todo el equipo.
 	_resolve_ground_hit([global_position], smash_radius, smash_height_window,
 			smash_damage)
@@ -194,7 +202,8 @@ func _start_summon() -> void:
 	_pending_summons -= 1
 	# Señal de rugido: la silueta entera se infla y se asienta.
 	var cue := _begin_cue()
-	cue.tween_property(_visual, "scale", Vector3.ONE * 1.14, summon_duration * 0.4) \
+	cue.tween_property(_visual, "scale", Vector3.ONE * summon_roar_scale,
+			summon_duration * summon_swell_fraction) \
 			.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 	cue.tween_property(_visual, "scale", Vector3.ONE, summon_duration * 0.5) \
 			.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)

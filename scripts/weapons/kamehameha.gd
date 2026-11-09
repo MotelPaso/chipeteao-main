@@ -32,7 +32,7 @@ const BEAM_VOLUME_DB: float = -12.0
 @export var beam_grow_fraction: float = 0.3
 
 @export_group("Sensación")
-## Fuerza de la sacudida de cámara por ráfaga.
+## Fuerza de la sacudida de cámara por ráfaga (trauma 0-1).
 @export var shake_strength: float = 0.2
 ## Segundos de la sacudida de cámara por ráfaga.
 @export var shake_time: float = 0.35

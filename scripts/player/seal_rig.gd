@@ -61,6 +61,10 @@ const HIDDEN_NODE_NAME := "SUELO"
 @export var death_lift: float = 0.55
 ## Duración de la caída de cara al morir, en segundos.
 @export var death_duration: float = 0.5
+## Giro final del modelo al morir, en radianes (-TAU/4 = de nariz contra el piso).
+@export var death_tilt: float = -TAU * 0.25
+## Escala final del modelo al morir (z < 1 lo aplasta).
+@export var death_squash: Vector3 = Vector3(1.0, 1.0, 0.8)
 
 @onready var _model: Node3D = $Model
 
@@ -219,11 +223,11 @@ func play_death() -> void:
 	_death_tween = create_tween()
 	_death_tween.set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
 	_death_tween.set_parallel(true)
-	_death_tween.tween_property(_model, "rotation:x", -TAU * 0.25, death_duration) \
+	_death_tween.tween_property(_model, "rotation:x", death_tilt, death_duration) \
 			.set_trans(Tween.TRANS_BOUNCE).set_ease(Tween.EASE_OUT)
 	_death_tween.tween_property(_model, "position:y", death_lift, death_duration) \
 			.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
-	_death_tween.tween_property(_model, "scale", Vector3(1.0, 1.0, 0.8), death_duration) \
+	_death_tween.tween_property(_model, "scale", death_squash, death_duration) \
 			.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 
 

@@ -23,6 +23,15 @@ const VOLLEY_WINDOW: float = 0.6
 ## Altura de puntería, en metros sobre el origen, para un blanco que no es
 ## un EnemyBase. Cada enemigo lleva la suya en su export aim_height.
 const AIM_HEIGHT: float = 0.8
+## Escalón plano de ascenso, aplicado SOBRE lo que el arma ya es en cada hito
+## de EvolutionCatalog.EVOLVE_AT_LEVEL después del primero. Vive aquí y no en
+## el catálogo porque no necesita receta: toda arma mejora cada diez niveles.
+const ASCEND_MULTS: Dictionary[String, float] = {
+	"damage": 1.15, "cooldown_scale": 0.9, "attack_range": 1.1}
+## Proyectil extra solo en los tiers PARES (20, 40...): uno por tier haría
+## crecer un arma de ráfaga mucho más rápido que los multiplicadores.
+const ASCEND_PROJECTILE_TIER_STEP: int = 2
+const ASCEND_PROJECTILE_ADD: int = 1
 
 @export_group("Estadísticas")
 ## Daño por golpe. Valor de respaldo; cada arma fija el suyo en su escena. Lo suben «Afilado», «Temple», «Ritmo de batalla», evoluciones y ascensos.
@@ -46,16 +55,6 @@ var evolved_name: String = ""
 ## Hitos de EvolutionCatalog.EVOLVE_AT_LEVEL que pasó el arma: el tier 1 es el
 ## nivel 10 (evolución si hay receta, ascenso si no) y suma uno por múltiplo.
 var ascension_tier: int = 0
-
-## Escalón plano de ascenso, aplicado SOBRE lo que el arma ya es en cada hito
-## de EvolutionCatalog.EVOLVE_AT_LEVEL después del primero. Vive aquí y no en
-## el catálogo porque no necesita receta: toda arma mejora cada diez niveles.
-const ASCEND_MULTS: Dictionary[String, float] = {
-	"damage": 1.15, "cooldown_scale": 0.9, "attack_range": 1.1}
-## Proyectil extra solo en los tiers PARES (20, 40...): uno por tier haría
-## crecer un arma de ráfaga mucho más rápido que los multiplicadores.
-const ASCEND_PROJECTILE_TIER_STEP: int = 2
-const ASCEND_PROJECTILE_ADD: int = 1
 
 var _cooldown_left: float = 0.0
 

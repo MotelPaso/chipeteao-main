@@ -3,6 +3,8 @@ extends StaticBody3D
 ## "enemies" al morir y reaparece con la vida llena tras una espera, para
 ## probar armas una y otra vez.
 
+@export_group("Reaparición")
+## Segundos que espera muerto antes de reaparecer con la vida llena.
 @export var respawn_delay: float = 3.0
 
 @onready var _health: Health = $Health

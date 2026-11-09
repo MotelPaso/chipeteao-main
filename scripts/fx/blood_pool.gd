@@ -15,6 +15,10 @@ extends Node3D
 @export var fade_time: float = 0.3
 ## Radio de la esfera de burbujas como fracción del radio del charco (0.85 cae dentro del disco).
 @export var bubble_emission_ratio: float = 0.85
+## Ensanche del charco en lo más alto del latido (multiplicador del radio; 1.06 = +6 %).
+@export var throb_spread: float = 1.06
+## Escala Y del disco y del borde en lo más alto del latido (en reposo es 1).
+@export var throb_height: float = 1.4
 
 @onready var _disc: MeshInstance3D = $Disc
 @onready var _rim: MeshInstance3D = $Rim
@@ -54,7 +58,7 @@ func play(center: Vector3, radius: float) -> void:
 	_bubbles.restart()
 	_bubbles.emitting = true
 	var rest := Vector3(radius, 1.0, radius)
-	var swollen := Vector3(radius * 1.06, 1.4, radius * 1.06)
+	var swollen := Vector3(radius * throb_spread, throb_height, radius * throb_spread)
 	_throb = create_tween().set_loops()
 	_throb.set_parallel(true)
 	_throb.tween_property(_disc, "scale", swollen, throb_time) \

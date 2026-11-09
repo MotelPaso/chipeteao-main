@@ -5,6 +5,10 @@ extends EnemyBase
 ## dentro) y lanza saetas lentas y esquivables con un ritmo fijo. Siempre
 ## mira al raider, incluso al retroceder, para que se lea como tirador.
 
+## Bajo este largo al cuadrado una puntería es "ninguna dirección" (el
+## tirador está parado sobre su objetivo): un milímetro al cuadrado.
+const AIM_EPSILON_SQ: float = 0.000001
+
 @export_group("Distancia")
 ## Metros por debajo de los cuales retrocede del raider.
 @export var band_inner: float = 8.0
@@ -61,11 +65,6 @@ func _combat_tick(player: Node3D, distance: float) -> void:
 	# Solo un tiro que salió de verdad gasta la espera.
 	if _fire_bolt(player):
 		_fire_timer = fire_cooldown
-
-
-## Bajo este largo al cuadrado una puntería es "ninguna dirección" (el
-## tirador está parado sobre su objetivo): un milímetro al cuadrado.
-const AIM_EPSILON_SQ: float = 0.000001
 
 
 func _fire_bolt(player: Node3D) -> bool:

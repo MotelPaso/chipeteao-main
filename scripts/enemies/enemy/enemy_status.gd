@@ -4,7 +4,7 @@ extends RefCounted
 ## crea la primera vez que recibe uno (apply_slow / apply_poison), así los
 ## cuerpos que nunca lo reciben no pagan nada por frame.
 
-## Segundos entre pulsos de daño del veneno.
+## Segundos entre pulsos de daño del veneno. Edita aquí.
 const POISON_TICK: float = 0.5
 
 var _health: Health

@@ -45,6 +45,10 @@ extends EnemyBase
 @export var boss_gem_value: int = 5
 ## Orbes de vida garantizados al morir (sujetos al tope global de HealthOrb).
 @export var health_orb_count: int = 2
+## Radio en metros del anillo de gemas de pago; más cerrado que el de orbes para que se distingan en el suelo.
+@export var gem_ring_radius: float = 1.2
+## Radio en metros del anillo de orbes de vida; más abierto que el de gemas.
+@export var orb_ring_radius: float = 2.2
 
 @export_group("Grado")
 ## Escala extra del cuerpo por cada llamada a apply_tier() (Elder y más); 1.15 = +15%.
@@ -55,15 +59,10 @@ extends EnemyBase
 @export var base_chest_drops: int = 1
 ## Rareza mínima del anillo de cofres ("" = sin piso, para que tiren su rareza con la suerte demoníaca).
 @export var chest_min_rarity: String = ""
-
-## Anillo donde caen los cofres de la muerte, y la suerte extra que suma
-## cada altar demoníaco usado en la partida a su tirada de rareza.
-const CHEST_RING_RADIUS: float = 3.5
-const CHEST_LUCK_PER_DEMONIC: float = 20.0
-## Anillos de pago: las gemas caen cerca y los orbes de vida más abiertos,
-## para que se distingan en el suelo.
-const GEM_RING_RADIUS: float = 1.2
-const ORB_RING_RADIUS: float = 2.2
+## Radio en metros del anillo donde caen los cofres al morir.
+@export var chest_ring_radius: float = 3.5
+## Suerte extra que suma cada altar demoníaco usado en la partida a la tirada de rareza de cada cofre.
+@export var chest_luck_per_demonic: float = 20.0
 
 ## Media arena menos arena_clamp_margin: la posición se recorta para que el
 ## jefe (y sus ataques de suelo) nunca salgan del campo. _ready la recalcula
@@ -123,7 +122,7 @@ func _apply_elite_damage(multiplier: float) -> void:
 ## Instancia de jefe más fuerte (revancha Elder, grados de mapa): multiplica
 ## vida, daño y pago, y abulta un poco el cuerpo. Los tres canales van
 ## separados a propósito: el factor de grupo en co-op es solo un muro de
-## vida (ver "damage is deliberately NOT scaled" en EnemySpawner), y
+## vida (ver «El daño NO se escala» en coop_hp_per_extra_player de EnemySpawner), y
 ## juntarlos duplicaría cada ataque en una partida de cuatro. `-1.0` quiere
 ## decir "el mismo factor que la vida".
 ## Llamar una vez, con el jefe ya en el árbol: se acumula.
@@ -304,13 +303,13 @@ func _drop_chests() -> void:
 	for i in count:
 		var angle := TAU * float(i) / float(count)
 		var at := global_position \
-				+ Vector3(cos(angle), 0.0, sin(angle)) * CHEST_RING_RADIUS
+				+ Vector3(cos(angle), 0.0, sin(angle)) * chest_ring_radius
 		# Cada cofre del anillo cae sobre el relieve bajo SU propio punto, así
 		# un jefe que muere en una pendiente no entierra la mitad del pago.
 		var terrain := Terrain.find(get_tree())
 		if terrain != null:
 			at.y = terrain.height_at(at.x, at.z)
-		if spawn_chest(at, CHEST_LUCK_PER_DEMONIC * float(RunState.demonic_uses),
+		if spawn_chest(at, chest_luck_per_demonic * float(RunState.demonic_uses),
 				chest_min_rarity) != null:
 			dropped += 1
 	print("Boss chests dropped: %d" % dropped)
@@ -337,7 +336,7 @@ func _drop_xp_gem() -> void:
 		gem.xp_value = value
 		var gem_angle := TAU * float(i) / float(boss_gem_count)
 		gem.global_position = global_position + Vector3.UP * 0.6 \
-				+ Vector3(cos(gem_angle), 0.0, sin(gem_angle)) * GEM_RING_RADIUS
+				+ Vector3(cos(gem_angle), 0.0, sin(gem_angle)) * gem_ring_radius
 
 
 ## Los jefes siempre pagan curación: health_orb_count orbes en un anillo más
@@ -346,7 +345,7 @@ func _drop_health_orbs() -> void:
 	for i in health_orb_count:
 		var orb_angle := TAU * (float(i) + 0.5) / float(maxi(health_orb_count, 1))
 		EnemyLoot.spawn_health_orb(get_tree(), global_position + Vector3.UP * 0.6
-				+ Vector3(cos(orb_angle), 0.0, sin(orb_angle)) * ORB_RING_RADIUS)
+				+ Vector3(cos(orb_angle), 0.0, sin(orb_angle)) * orb_ring_radius)
 
 
 ## Contrato de marcador de mapa (grupo "map_markers"). Los enemigos comunes
