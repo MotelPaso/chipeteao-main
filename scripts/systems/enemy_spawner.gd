@@ -8,8 +8,12 @@ extends Node3D
 ## y de la puerta de etapa), así que rampa, hordas y jefes nunca se desfasan.
 ## Los enemigos son hijos de este nodo, pero el conteo de vivos sale del grupo
 ## "enemies" (un cadáver sigue siendo hijo durante su animación de muerte).
-## Ayudantes que maneja desde su _physics_process: BossSchedule (horario de
-## jefes), EnemyFreeze (tiempo detenido) y PowerUpDrops (drops de power-up).
+## Este nodo guarda los exports y orquesta; la lógica vive en ayudantes de
+## scripts/systems/spawner/ que maneja desde su _physics_process y que leen
+## estos exports: SpawnScaling (escalado de stats, cielo y buff temporal),
+## SpawnPoints (anillo, suelo y espacio libre), HordeSchedule (hordas y
+## ráfagas de presión), BossSchedule (horario de jefes), EnemyFreeze (tiempo
+## detenido) y PowerUpDrops (drops de power-up).
 ## Contratos: grupo "enemy_spawner" y los métodos públicos que otros llaman
 ## por nombre (call_group/has_method); los exports los guarda cada arena.
 ## Orden del RNG: las tiradas (randf, randf_range, pick_random) siguen un
@@ -51,28 +55,9 @@ const MARSH_PHASES: Array[Dictionary] = [
 			"weights": {"grunt": 0.25, "skirmisher": 0.3, "burrower": 0.25, "tank": 0.2}},
 ]
 
-## Intentos de una muestra de anillo/banda para hallar una celda caminable;
-## el último candidato se usa igual (un spawn nunca se pierde en silencio).
-const RING_ATTEMPTS: int = 8
-## Altura sobre el suelo hallado por el rayo, en metros: el enemigo se
-## asienta en vez de nacer un frame dentro del suelo.
-const SPAWN_GROUND_OFFSET: float = 0.05
-## Altura de inicio del rayo de suelo sin Terrain, en metros: sobre toda
-## plataforma y meseta, bajo el techo de los muros de máscara.
-const GROUND_PROBE_HEIGHT: float = 12.0
-## Con Terrain, el rayo parte esta altura sobre su punto más alto y termina
-## esta otra bajo el más bajo, en metros (ver _ground_height).
-const PROBE_HEADROOM: float = 30.0
-const PROBE_UNDERSHOOT: float = 2.0
-## Radianes que un hueco de ráfaga puede desviarse de su posición pareja en
-## el anillo, para que el cerco se vea orgánico y no geométrico.
-const BURST_ANGLE_JITTER: float = 0.35
 ## Techo duro de la probabilidad de élite, suba lo que suba la dificultad:
 ## pasado esto una élite deja de ser un evento.
 const ELITE_CHANCE_CAP: float = 0.6
-## Media placa usable, en metros, solo si la escena no tiene nodo en el grupo
-## "arena_bounds" (las arenas lo tienen: es su scatter).
-const FALLBACK_HALF_EXTENT: float = 78.0
 
 @export_group("Escenas y fases")
 ## Tabla de fases de spawn de esta arena (ver PhasePreset).
@@ -271,34 +256,13 @@ const FALLBACK_HALF_EXTENT: float = 78.0
 @export var temp_buff_text: String = "¡La horda crece con una fuerza antinatural!"
 
 var _spawn_timer: float = 0.0  # arranca vencido: la acción empieza de inmediato
-## Estado de la horda.
-var _hordes_fired: int = 0
-var _horde_waves_left: int = 0
-var _horde_wave_timer: float = 0.0
-var _horde_wave_size: int = 0
-## Evento de cielo (nodo Weather del WorldDirector): "" | "blood_moon" | "eclipse", y los
-## segundos que le quedan.
-var _sky_kind: String = ""
-var _sky_left: float = 0.0
-## Buff temporal de enemigos (frenesí de la ruleta): multiplicador y segundos.
-var _temp_buff_multiplier: float = 1.0
-var _temp_buff_left: float = 0.0
-## Último minuto pseudo-infinito ya anunciado, para que el log salga una vez
-## por minuto y no una vez por frame.
-var _endless_minute_logged: int = -1
-## Nodo de límites de arena (el scatter): también responde is_walkable()
-## para la máscara irregular de la arena.
-var _bounds: Node3D = null
-## Media placa donde puede caer un spawn, en metros: el arena_half_extent del
-## scatter menos arena_edge_margin, fijado en _ready.
-var _arena_half_extent: float = FALLBACK_HALF_EXTENT
 ## Solo lo activa el gancho del harness (force_elite_spawns).
 var _force_elite_spawns: bool = false
-## Spawns descartados este minuto por falta de espacio, y el minuto que se
-## está contando. Se imprime una vez por minuto mientras no sea cero, para
-## que un soak vea si el chequeo se está comiendo la rampa.
-var _clearance_skips: int = 0
-var _clearance_report_minute: int = -1
+# Ayudantes. HordeSchedule recibe _points, así que el orden de declaración
+# importa: los inicializadores corren de arriba abajo.
+var _scaling := SpawnScaling.new(self)
+var _points := SpawnPoints.new(self)
+var _hordes := HordeSchedule.new(self, _points)
 var _bosses := BossSchedule.new(self)
 var _freeze := EnemyFreeze.new(self)
 var _drops := PowerUpDrops.new(self)
@@ -307,9 +271,7 @@ var _drops := PowerUpDrops.new(self)
 func _ready() -> void:
 	# Los santuarios llegan al spawner por este grupo, nunca por ruta.
 	add_to_group("enemy_spawner")
-	_bounds = get_tree().get_first_node_in_group("arena_bounds") as Node3D
-	if _bounds != null:
-		_arena_half_extent = float(_bounds.get("arena_half_extent")) - arena_edge_margin
+	_points.read_bounds()
 	_drops.read_boost_switch()
 	_validate_phase_scenes()
 
@@ -317,13 +279,10 @@ func _ready() -> void:
 func _physics_process(delta: float) -> void:
 	_freeze.tick(delta)
 	_bosses.tick_relief(delta)
-	_temp_buff_left = maxf(_temp_buff_left - delta, 0.0)
-	_sky_left = maxf(_sky_left - delta, 0.0)
-	if _sky_left <= 0.0 and not _sky_kind.is_empty():
-		_sky_kind = ""
-	_tick_endless_log()
+	_scaling.tick(delta)
+	_scaling.tick_endless_log()
 	_bosses.tick()
-	_tick_hordes(delta)
+	_hordes.tick(delta)
 	_spawn_timer -= delta
 	if _spawn_timer > 0.0:
 		return
@@ -332,89 +291,98 @@ func _physics_process(delta: float) -> void:
 	# haría la cadencia real más lenta que la tabulada. Con piso en cero, un
 	# tirón de frames compra como mucho un tick de recuperación.
 	_spawn_timer = maxf(_spawn_timer + current_interval(), 0.0)
-	var budget := mini(current_count_per_tick(), max_active - _live_enemy_count())
+	var budget := mini(current_count_per_tick(), max_active - live_enemy_count())
 	for i in budget:
 		_spawn_one()
 
 
-## --- Escalado por vuelta y pseudo-infinito ---------------------------------
+## --- Escalado (fachadas sobre SpawnScaling) ---------------------------------
 
-## Escalado por VUELTA: cada vuelta completa a la lista de mapas multiplica
-## los spawns nuevos y los jefes.
+## Escalado por vuelta completa a la lista de mapas (spawns nuevos y jefes).
 func lap_hp_factor() -> float:
-	return pow(lap_hp_mult, float(RunState.lap))
+	return _scaling.lap_hp_factor()
 
 
 func lap_damage_factor() -> float:
-	return pow(lap_damage_mult, float(RunState.lap))
+	return _scaling.lap_damage_factor()
 
 
 func lap_xp_factor() -> float:
-	return pow(lap_xp_mult, float(RunState.lap))
+	return _scaling.lap_xp_factor()
 
 
-## Superada la etapa, la party puede quedarse cuanto quiera y el mapa
-## responde: por minuto de RunState.pseudo_infinite_time los spawns nuevos
-## traen más HP, daño y velocidad, el intervalo se acorta y las hordas
-## crecen. La velocidad tiene techo: un cuerpo más rápido que el raider no se
-## puede esquivar.
+## Minutos de rampa pseudo-infinita (0 mientras la etapa no está superada).
 func endless_minutes() -> float:
-	return RunState.pseudo_infinite_time / 60.0 if RunState.stage_cleared else 0.0
+	return _scaling.endless_minutes()
 
 
 func endless_hp_factor() -> float:
-	return 1.0 + endless_hp_per_minute * endless_minutes()
+	return _scaling.endless_hp_factor()
 
 
 func endless_damage_factor() -> float:
-	return 1.0 + endless_damage_per_minute * endless_minutes()
+	return _scaling.endless_damage_factor()
 
 
 func endless_speed_factor() -> float:
-	return minf(1.0 + endless_speed_per_minute * endless_minutes(), endless_speed_cap)
+	return _scaling.endless_speed_factor()
 
 
 func endless_interval_factor() -> float:
-	return pow(endless_interval_per_minute, endless_minutes())
+	return _scaling.endless_interval_factor()
 
 
 ## Factores de la rampa tardía para un spawn que cae ahora (1.0 antes de la
 ## rampa).
 func late_hp_factor() -> float:
-	return 1.0 + late_hp_per_minute * maxf(_minutes() - late_ramp_start_minute, 0.0)
+	return _scaling.late_hp_factor()
 
 
 func late_damage_factor() -> float:
-	return 1.0 + late_damage_per_minute * maxf(_minutes() - late_ramp_start_minute, 0.0)
+	return _scaling.late_damage_factor()
 
 
 func late_xp_factor() -> float:
-	return 1.0 + late_xp_per_minute * maxf(_minutes() - late_ramp_start_minute, 0.0)
+	return _scaling.late_xp_factor()
+
+
+## Jugadores extra de la party del lobby, estén o no derribados (HP de jefe).
+func coop_extra() -> float:
+	return SpawnScaling.coop_extra()
 
 
 ## --- Cadencia del flujo -----------------------------------------------------
 
 func current_interval() -> float:
-	var interval := maxf(start_interval - interval_shrink_per_minute * _minutes(), min_interval)
+	var interval := maxf(start_interval - interval_shrink_per_minute * run_minutes(), min_interval)
 	interval *= _bosses.interval_factor()
-	if _sky_kind == "eclipse":
+	if _scaling.sky_kind == "eclipse":
 		interval /= eclipse_rate_multiplier
 	# El apretón pseudo-infinito se compone encima; la presión de la party
 	# divide al final, para que una party más grande siga proporcionalmente
 	# más rápida.
-	interval = maxf(interval * endless_interval_factor(), min_interval)
-	return interval / (1.0 + coop_rate_per_extra_player * _coop_extra_alive())
+	interval = maxf(interval * _scaling.endless_interval_factor(), min_interval)
+	return interval / (1.0 + coop_rate_per_extra_player
+			* SpawnScaling.coop_extra_alive(get_tree()))
 
 
 func current_count_per_tick() -> int:
-	var base := base_count_per_tick + int(_minutes() * extra_count_per_minute)
+	var base := base_count_per_tick + int(run_minutes() * extra_count_per_minute)
 	return maxi(roundi(float(base) * spawn_count_multiplier), 1)
 
 
-## La party configurada en el lobby: para lo que se dimensiona toda la
-## partida (HP de jefe), esté quien esté derribado ahora.
-func coop_extra() -> float:
-	return float(maxi(Coop.player_count - 1, 0))
+## Reloj de la partida en minutos. RunState es el dueño del reloj (timer del
+## HUD, puerta de etapa); un segundo reloj aquí empezaría más tarde, porque
+## la arena carga después de RunState.reset().
+func run_minutes() -> float:
+	return RunState.run_time / 60.0
+
+
+## Cuerpos vivos Y peligrosos. Los cadáveres siguen siendo hijos durante su
+## animación de muerte y los jefes también son hijos, así que se cuenta el
+## grupo "enemies", que un enemigo deja en el instante en que muere.
+func live_enemy_count() -> int:
+	return get_tree().get_node_count_in_group(&"enemies")
 
 
 ## --- Tabla de fases ---------------------------------------------------------
@@ -432,7 +400,7 @@ func active_phases() -> Array[Dictionary]:
 
 ## Elección ponderada de la fase activa en el minuto actual de la partida.
 func pick_spawn_scene() -> PackedScene:
-	var minutes := _minutes()
+	var minutes := run_minutes()
 	var phases := active_phases()
 	var weights: Dictionary = phases[0]["weights"]
 	for phase: Dictionary in phases:
@@ -454,12 +422,11 @@ func pick_spawn_scene() -> PackedScene:
 
 ## --- Ganchos de grupo ("enemy_spawner") ----------------------------------
 
-## Luna de sangre: los spawns pegan más fuerte y la mitad llega como
+## Luna de sangre: los spawns pegan más fuerte y algunos llegan como
 ## berserker. Eclipse: flujo más rápido, spawns más duros y algunos llegan
 ## como sombra. "" lo apaga. Lo llama el WorldDirector.
 func set_sky_event(kind: String, duration: float) -> void:
-	_sky_kind = kind
-	_sky_left = duration if not kind.is_empty() else 0.0
+	_scaling.set_sky_event(kind, duration)
 
 
 ## Congela a la horda por `duration` segundos (lo llama PowerUps). Con
@@ -499,18 +466,15 @@ func force_elite_spawns(on: bool) -> void:
 
 
 ## Buff temporal de enemigos (el frenesí de la ruleta): los spawns nuevos
-## escalan HP y daño por `multiplier` durante `duration` segundos. Renueva
-## como EnemyBase.apply_poison: gana el multiplicador más fuerte y el
-## temporizador más largo.
+## escalan HP y daño por `multiplier` durante `duration` segundos. Gana el
+## multiplicador más fuerte y el temporizador más largo.
 func apply_temp_enemy_buff(multiplier: float, duration: float) -> void:
-	var live := _temp_buff_multiplier if _temp_buff_left > 0.0 else 1.0
-	_temp_buff_multiplier = maxf(live, maxf(multiplier, 1.0))
-	_temp_buff_left = maxf(_temp_buff_left, duration)
+	_scaling.apply_temp_buff(multiplier, duration)
 	get_tree().call_group("boss_ui", "announce", temp_buff_text)
 
 
 func temp_enemy_buff() -> float:
-	return _temp_buff_multiplier if _temp_buff_left > 0.0 else 1.0
+	return _scaling.temp_buff()
 
 
 ## Probabilidad de que un spawn nuevo salga élite: cero antes de
@@ -518,7 +482,7 @@ func temp_enemy_buff() -> float:
 ## dificultad de la partida la multiplica: más élites es amenaza y
 ## recompensa a la vez.
 func elite_chance() -> float:
-	var minutes := _minutes()
+	var minutes := run_minutes()
 	if minutes < elite_start_minute:
 		return 0.0
 	# Ambos extremos son exports por instancia: una arena que los iguale
@@ -542,7 +506,7 @@ func spawn_minions(scene: PackedScene, positions: Array[Vector3],
 	if scene == null:
 		return spawned
 	for pos: Vector3 in positions:
-		var minion := _make_enemy_at(pos, force_elites, scene)
+		var minion := make_enemy_at(pos, force_elites, scene)
 		if minion != null:
 			spawned.append(minion)
 	return spawned
@@ -553,19 +517,7 @@ func spawn_minions(scene: PackedScene, positions: Array[Vector3],
 ## max_active más horde_overflow si `horde`, o pressure_overflow si no.
 ## Devuelve cuántos cayeron, para que el llamador pueda dosificarse.
 func spawn_at_points(points: Array[Vector3], horde: bool = true) -> int:
-	var cap := max_active + (horde_overflow if horde else pressure_overflow)
-	var budget := cap - _live_enemy_count()
-	if budget <= 0:
-		return 0
-	var made := 0
-	for point: Vector3 in points:
-		if made >= budget:
-			break
-		var pos := point
-		pos.y = _ground_height(pos) + SPAWN_GROUND_OFFSET
-		if _make_enemy_at(pos) != null:
-			made += 1
-	return made
+	return _hordes.spawn_at_points(points, horde)
 
 
 ## Ráfaga de presión (hordas propias y jauría shiny del WorldDirector): `count`
@@ -576,60 +528,56 @@ func spawn_at_points(points: Array[Vector3], horde: bool = true) -> int:
 ## llamador no anuncie una recompensa que el tope se tragó.
 func spawn_pressure_burst(center: Vector3, count: int, force_elites: bool = false,
 		horde: bool = false) -> int:
-	if Coop.alive_player_count(get_tree()) <= 0:
-		return 0
-	var cap := max_active + (horde_overflow if horde else pressure_overflow)
-	var budget := mini(count, cap - _live_enemy_count())
-	var spawned := 0
-	for i in budget:
-		# Huecos parejos en el anillo con desvío, para que rodee sin amontonar.
-		var angle := TAU * float(i) / float(budget) \
-				+ randf_range(-BURST_ANGLE_JITTER, BURST_ANGLE_JITTER)
-		# Un hueco bloqueado gira dentro de la banda de OLEADA, nunca hacia el
-		# anillo lejano: un punto junto a un muro debe seguir sintiéndose como
-		# "aguanta aquí bajo presión".
-		var pos := _band_position(center, surge_min_radius, surge_max_radius, angle)
-		pos.y = _ground_height(pos) + SPAWN_GROUND_OFFSET
-		if _make_enemy_at(pos, force_elites) != null:
-			spawned += 1
-	return spawned
+	return _hordes.pressure_burst(center, count, force_elites, horde)
 
 
-## --- Ubicación (también la usa BossSchedule) --------------------------------
+## --- Ubicación (fachadas sobre SpawnPoints; también las usa BossSchedule) ---
 
 ## Posición del anillo alrededor del jugador, a distancia de spawn y sobre
 ## el suelo.
 func ring_position(player: Node3D) -> Vector3:
-	var pos := _band_position(player.global_position, min_radius, max_radius, randf() * TAU)
-	pos.y = _ground_height(pos) + SPAWN_GROUND_OFFSET
-	return pos
+	return _points.ring_position(player)
 
 
-## True si `pos` queda lo bastante lejos de todo raider en pie. Los cuerpos
-## derribados no cuentan: tratarlos como zona prohibida abriría huecos
-## muertos en el anillo.
+## True si `pos` queda lo bastante lejos de todo raider en pie.
 func has_player_clearance(pos: Vector3) -> bool:
-	var clearance_sq := min_player_clearance * min_player_clearance
-	for node: Node in Coop.alive_players(get_tree()):
-		var body := node as Node3D
-		if body == null:
-			continue
-		var away := pos - body.global_position
-		away.y = 0.0
-		if away.length_squared() < clearance_sq:
-			return false
-	return true
+	return _points.has_player_clearance(pos)
 
 
 ## Cuenta un spawn descartado e informa el total una vez por minuto de juego.
 func register_clearance_skip() -> void:
-	_clearance_skips += 1
-	var minute := floori(_minutes())
-	if minute == _clearance_report_minute:
-		return
-	_clearance_report_minute = minute
-	# Log de una línea (convención de RunManager) para los soaks headless.
-	print("Spawn skipped: no clearance x%d" % _clearance_skips)
+	_points.register_clearance_skip()
+
+
+## Un enemigo, colocado, escalado y con su tirada de élite. `scene_override`
+## reemplaza la tirada de la tabla de fases. Devuelve null si no hay escena o
+## su raíz no es EnemyBase, para que un llamador en bucle salte esa unidad
+## sin perder el resto. Lo usan también HordeSchedule y spawn_minions.
+## Orden del RNG: tabla de fases, variante de cielo y luego élite.
+func make_enemy_at(pos: Vector3, force_elite: bool = false,
+		scene_override: PackedScene = null) -> EnemyBase:
+	# LA puerta de todo spawn: anillo, hordas, oleadas, invocaciones y packs
+	# pasan por aquí, así que la regla de espacio libre no se le puede olvidar
+	# a un llamador nuevo. Los muestreadores de posición ya prefieren puntos
+	# libres; esto es lo que pasa cuando no hay ninguno.
+	if not _points.has_player_clearance(pos):
+		_points.register_clearance_skip()
+		return null
+	var scene := scene_override if scene_override != null else pick_spawn_scene()
+	if scene == null:
+		return null
+	var node := scene.instantiate()
+	var enemy := node as EnemyBase
+	if enemy == null:
+		node.free()
+		push_warning("EnemySpawner: spawn scene root does not extend EnemyBase.")
+		return null
+	add_child(enemy)
+	enemy.global_position = pos
+	_scaling.scale_fresh_spawn(enemy)
+	if force_elite or _force_elite_spawns or randf() < elite_chance():
+		enemy.make_elite()
+	return enemy
 
 
 ## --- Privados ---------------------------------------------------------------
@@ -646,101 +594,6 @@ func _validate_phase_scenes() -> void:
 				missing.append(kind)
 	if not missing.is_empty():
 		push_error("EnemySpawner: no scene assigned for spawn kind(s) %s." % [missing])
-
-
-## Una línea por minuto mientras corre la rampa pseudo-infinita, para que un
-## soak pruebe que se movió.
-func _tick_endless_log() -> void:
-	if not RunState.stage_cleared:
-		_endless_minute_logged = -1
-		return
-	var minute := floori(endless_minutes())
-	if minute <= _endless_minute_logged:
-		return
-	_endless_minute_logged = minute
-	print("Pseudo-infinite: minute %d hp x%.2f dmg x%.2f speed x%.2f" % [
-			minute, endless_hp_factor(), endless_damage_factor(),
-			endless_speed_factor()])
-
-
-## Reloj de la partida en minutos. RunState es el dueño del reloj (timer del
-## HUD, puerta de etapa); un segundo reloj aquí empezaría más tarde, porque
-## la arena carga después de RunState.reset().
-func _minutes() -> float:
-	return RunState.run_time / 60.0
-
-
-## Cuerpos vivos Y peligrosos. Los cadáveres siguen siendo hijos durante su
-## animación de muerte y los jefes también son hijos, así que se cuenta el
-## grupo "enemies", que un enemigo deja en el instante en que muere.
-func _live_enemy_count() -> int:
-	return get_tree().get_node_count_in_group(&"enemies")
-
-
-## La party que sigue en pie. Un raider derribado sale del grupo "player"
-## hasta que lo reanimen (ver coop.gd), así que la presión por tick (ritmo,
-## HP de spawns nuevos, tamaño de horda) sigue a la pelea y no castiga al
-## último en pie con la horda de cuatro.
-func _coop_extra_alive() -> float:
-	return float(maxi(Coop.alive_player_count(get_tree()) - 1, 0))
-
-
-func _sky_hp_factor() -> float:
-	return eclipse_hp_multiplier if _sky_kind == "eclipse" else 1.0
-
-
-func _sky_damage_factor() -> float:
-	return blood_moon_damage_multiplier if _sky_kind == "blood_moon" else 1.0
-
-
-func _apply_sky_variant(enemy: EnemyBase) -> void:
-	match _sky_kind:
-		"blood_moon":
-			if randf() < blood_moon_berserker_chance:
-				enemy.apply_variant("berserker")
-		"eclipse":
-			if randf() < eclipse_shade_chance:
-				enemy.apply_variant("shade")
-
-
-func _next_horde_time() -> float:
-	if _hordes_fired < horde_minutes.size():
-		return horde_minutes[_hordes_fired] * 60.0
-	var last := horde_minutes[horde_minutes.size() - 1] if not horde_minutes.is_empty() else 0.0
-	return (last + horde_repeat_minutes * float(_hordes_fired - horde_minutes.size() + 1)) * 60.0
-
-
-func _tick_hordes(delta: float) -> void:
-	if _horde_waves_left > 0:
-		_horde_wave_timer -= delta
-		if _horde_wave_timer <= 0.0:
-			# Primero el ancla: con toda la party derribada no hay a quién
-			# rodear, y gastar la oleada igual achicaría una horda anunciada.
-			# Se reintenta en el próximo tick.
-			var anchor := Coop.random_player(get_tree())
-			if anchor == null:
-				return
-			_horde_wave_timer = horde_wave_gap
-			_horde_waves_left -= 1
-			spawn_pressure_burst(anchor.global_position, _horde_wave_size, false, true)
-		return
-	if RunState.stage_time < _next_horde_time():
-		return
-	_hordes_fired += 1
-	var size := int((float(horde_base_size) + horde_size_per_minute * _minutes())
-			* (1.0 + RunState.difficulty_bonus)
-			* (1.0 + coop_horde_per_extra_player * _coop_extra_alive())
-			* (endless_horde_mult if RunState.stage_cleared else 1.0)
-			* spawn_count_multiplier)
-	_horde_wave_size = maxi(ceili(float(size) / float(maxi(horde_waves, 1))), 1)
-	_horde_waves_left = horde_waves
-	_horde_wave_timer = 0.0
-	get_tree().call_group("boss_ui", "announce", horde_warning_text)
-	# Se loguea lo que de verdad se pide: redondear hacia arriba el tamaño
-	# de oleada puede pasar el `size` crudo hasta en horde_waves - 1, y este
-	# log es la única vista de la horda que tienen los soaks.
-	print("Horde: %d enemies in %d waves at %.1fs" % [
-			_horde_wave_size * horde_waves, horde_waves, RunState.stage_time])
 
 
 ## La escena exportada de un tipo de la tabla de fases, o null si el tipo no
@@ -767,112 +620,4 @@ func _spawn_one() -> void:
 	var player := Coop.random_player(get_tree())
 	if player == null:
 		return
-	_make_enemy_at(ring_position(player))
-
-
-## Un enemigo, colocado, escalado y con su tirada de élite. `scene_override`
-## reemplaza la tirada de la tabla de fases. Devuelve null si no hay escena o
-## su raíz no es EnemyBase, para que un llamador en bucle salte esa unidad
-## sin perder el resto.
-func _make_enemy_at(pos: Vector3, force_elite: bool = false,
-		scene_override: PackedScene = null) -> EnemyBase:
-	# LA puerta de todo spawn: anillo, hordas, oleadas, invocaciones y packs
-	# pasan por aquí, así que la regla de espacio libre no se le puede olvidar
-	# a un llamador nuevo. Los muestreadores de posición ya prefieren puntos
-	# libres; esto es lo que pasa cuando no hay ninguno.
-	if not has_player_clearance(pos):
-		register_clearance_skip()
-		return null
-	var scene := scene_override if scene_override != null else pick_spawn_scene()
-	if scene == null:
-		return null
-	var node := scene.instantiate()
-	var enemy := node as EnemyBase
-	if enemy == null:
-		node.free()
-		push_warning("EnemySpawner: spawn scene root does not extend EnemyBase.")
-		return null
-	add_child(enemy)
-	enemy.global_position = pos
-	_scale_fresh_spawn(enemy)
-	if force_elite or _force_elite_spawns or randf() < elite_chance():
-		enemy.make_elite()
-	return enemy
-
-
-## Todo el escalado de stats de un spawn regular en un solo lugar: vuelta x
-## pseudo-infinito x rampa tardía x HP de co-op x dificultad de la partida
-## (más duros Y más ricos: la parte de XP la paga RunState).
-func _scale_fresh_spawn(enemy: EnemyBase) -> void:
-	var difficulty := (1.0 + RunState.difficulty_bonus) * temp_enemy_buff()
-	enemy.apply_tier_scaling(
-			lap_hp_factor() * endless_hp_factor() * late_hp_factor() * difficulty
-					* _sky_hp_factor()
-					* (1.0 + coop_hp_per_extra_player * _coop_extra_alive()),
-			lap_damage_factor() * endless_damage_factor() * late_damage_factor()
-					* difficulty * _sky_damage_factor(),
-			lap_xp_factor() * late_xp_factor())
-	# La velocidad es el canal propio de la rampa pseudo-infinita:
-	# apply_tier_scaling solo cubre HP, daño y pago.
-	enemy.move_speed *= endless_speed_factor()
-	_apply_sky_variant(enemy)
-
-
-func _walkable(pos: Vector3) -> bool:
-	if _bounds == null or not _bounds.has_method("is_walkable"):
-		return true
-	return bool(_bounds.call("is_walkable", Vector2(pos.x, pos.z)))
-
-
-## Un punto caminable en la banda [min_r, max_r] alrededor de `center`, que
-## empieza en `angle` y gira 1/RING_ATTEMPTS de vuelta por intento. Los
-## candidatos fuera de la placa se REINTENTAN, no se recortan: recortar X y Z
-## por separado juntaría todos los ángulos en la misma esquina junto a un
-## borde. El último intento se usa aunque esté bloqueado (los trepadores
-## salen), así que un spawn nunca se pierde en silencio.
-func _band_position(center: Vector3, min_r: float, max_r: float, angle: float) -> Vector3:
-	var pos := center
-	for attempt in RING_ATTEMPTS:
-		var heading := angle + TAU * float(attempt) / float(RING_ATTEMPTS)
-		pos = center + Vector3(cos(heading), 0.0, sin(heading)) * randf_range(min_r, max_r)
-		if absf(pos.x) > _arena_half_extent or absf(pos.z) > _arena_half_extent:
-			continue
-		# El espacio libre es parte de "¿sirve este punto?": girar por la
-		# banda es justo como se resuelve un hueco bloqueado.
-		if _walkable(pos) and has_player_clearance(pos):
-			break
-	pos.x = clampf(pos.x, -_arena_half_extent, _arena_half_extent)
-	pos.z = clampf(pos.z, -_arena_half_extent, _arena_half_extent)
-	return pos
-
-
-## Baja el punto de spawn hasta la geometría del mundo (capa 1) que haya
-## debajo — suelo, roca, plataforma — para que un enemigo nunca nazca dentro
-## de un prop. Las copas de árbol no tienen colisión. Si el rayo no toca
-## nada, usa la altura del Terrain (o 0 sin Terrain).
-func _ground_height(pos: Vector3) -> float:
-	# El rayo cubre todo el relieve: desde sobre la cima más alta hasta bajo
-	# el fondo más hondo.
-	var terrain := Terrain.find(get_tree())
-	var top := GROUND_PROBE_HEIGHT
-	var bottom := -1.0
-	if terrain != null:
-		top = terrain.max_height + PROBE_HEADROOM
-		bottom = terrain.min_height - PROBE_UNDERSHOOT
-	var ray := PhysicsRayQueryParameters3D.create(
-			Vector3(pos.x, top, pos.z), Vector3(pos.x, bottom, pos.z), 1)
-	# Los raiders comparten la capa 1 con el mundo, así que se excluye a TODA
-	# la party: si no, un spawn sobre un compañero usaría su cabeza de suelo.
-	var excluded: Array[RID] = []
-	for node: Node in Coop.alive_players(get_tree()):
-		var body := node as CollisionObject3D
-		if body != null:
-			excluded.append(body.get_rid())
-	ray.exclude = excluded
-	var hit := get_world_3d().direct_space_state.intersect_ray(ray)
-	if hit.is_empty():
-		# La altura del TERRAIN, no 0: cero es una altura real en un relieve,
-		# y usarla metería cuerpos dentro o debajo de una colina.
-		return terrain.height_at(pos.x, pos.z) if terrain != null else 0.0
-	var hit_position: Vector3 = hit["position"]
-	return hit_position.y
+	make_enemy_at(_points.ring_position(player))
