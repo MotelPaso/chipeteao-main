@@ -141,7 +141,7 @@ fi
 fase_fin
 
 # --- Harness de UI ----------------------------------------------------------
-# Siete de las nueve escenas de UI no las arrancaba nada. --quit-after es un
+# Abre las escenas de UI que ningún soak visita. --quit-after es un
 # techo de dos minutos: el harness se va solo mucho antes.
 echo "== harness de UI =="
 fase
