@@ -183,8 +183,8 @@ La lógica vive en ayudantes de `scripts/systems/spawner/` (`SpawnScaling`, `Spa
 | Sacudida de cámara | `scenes/systems/Juice.tscn` > Juice (grupo «Sacudida de cámara») | `kill_shake_*`, `hurt_shake_*`, `boss_death_shake_*`, `crit_shake_*` |
 | Cámara lenta al crítico o al matar un jefe | Juice.tscn > Juice («Hit-stop») | `crit_stop_scale`, `crit_stop_duration`, `boss_death_stop_*` |
 | Destello blanco al golpear | Juice.tscn > Juice («Destello de golpe») | `flash_duration`, `flash_color` |
-| Viñeta roja al recibir daño | Juice.tscn > Juice («Viñeta de daño») | `vignette_strength`, `vignette_fade_time` |
-| Anillo al subir de nivel | Juice.tscn > Juice («Anillo de subida de nivel») | `level_pulse_color`, `level_pulse_duration` |
+| Viñeta al recibir daño (color, fuerza, cuánto dura) | Juice.tscn > Juice («Viñeta de daño») | `vignette_color`, `vignette_strength`, `vignette_hold_time`, `vignette_fade_time` |
+| Anillo al subir de nivel (color, duración, tamaño, altura) | Juice.tscn > Juice («Anillo de subida de nivel») | `level_pulse_color`, `level_pulse_duration`, `level_ring_alpha`, `level_ring_inner_radius`, `level_ring_outer_radius`, `level_ring_height`, `level_ring_start_scale`, `level_ring_end_scale` |
 | Volumen, tope por segundo o variación de un sonido | `scripts/systems/autoloads/sfx.gd` > su fila en `SOUND_LIBRARY` | `volume_db`, `rate_limit`, `jitter`, `loop` |
 | Voces simultáneas de sonido | `scenes/systems/Sfx.tscn` > Sfx | `pool_size`, `default_pitch_jitter` |
 | Precio de los cofres y cuánto suben | `scripts/systems/autoloads/run_state.gd` (bloque «Edita aquí») | `CHEST_BASE_PRICES`, `CHEST_PRICE_GROWTH` |
