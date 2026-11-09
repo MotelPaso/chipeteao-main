@@ -88,7 +88,7 @@ grupos con su nombre.
 | Velocidad y rastreo de las flechas | `Arrow.tscn` > raíz | `speed`, `homing_enabled` |
 | Perforación de las flechas | `HuntingBow.tscn` > raíz | `pierce_count` (reemplaza el `pierce_remaining` de cada flecha) |
 | Destello del disparo, tajos y latigazo | `scenes/fx/MuzzleFlash.tscn`, `SlashArc.tscn`, `WhipCrack.tscn` > raíz | sus grupos de forma y tiempo |
-| Alcance del primer rayo del Cinturón eléctrico | `scripts/weapons/belt_bolt.gd` (bloque «Edita aquí») | `FIRST_RANGE` |
+| Daño, rebotes y alcance del rayo del Cinturón eléctrico | `scripts/weapons/belt_bolt.gd` (bloque «Edita aquí») | `BELT_DAMAGE`, `DAMAGE_PER_EXTRA_COPY`, `BASE_BOUNCES`, `FIRST_RANGE`, `BOUNCE_RANGE` (si cambias `BASE_BOUNCES`, cambia también el «4» de la descripción de la fila `electric_belt` en `item_catalog.gd`) |
 | Rayo del Pararrayos y del Cinturón eléctrico | `scenes/fx/LightningBeam.tscn` > raíz (grupos «Pararrayos», «Cinturón eléctrico») | `storm_mesh` / `belt_mesh` (radio, y color en `albedo_color` de su material), `*_fade_time`, `*_fade_scale` |
 | Nombre, sigla, carta propia, evolución | ver «Personajes, armas, cartas y progreso» | |
 
@@ -253,11 +253,12 @@ de reparto se llama `ForestScatter`, `DuneScatter` o `MarshScatter`.
 | Formaciones de roca (cuántas y qué tan grandes) | la arena > *Scatter (grupo «Máscara de la arena») | `mask_blobs_min/max`, `mask_blob_cells_min/max`, `mask_min_open_fraction` |
 | Color y forma de la roca de un bioma | `assets/world/rock_style_<mapa>.tres` | `rock_color`, `cap_color`, `cliff_height`, `peak_height`, `max_height` (bajar `margin_min` o `cliff_height` puede abrir huecos en el sello del mapa) |
 | Tamaño de las ondulaciones, grietas y cumbres de la roca (todas las arenas) | `scripts/world/rock_formation.gd` (bloque «edita aquí») | `LIFT_WAVELENGTH`, `CRAG_WAVELENGTH`, `EDGE_WAVELENGTH`, `SPIRE_WAVELENGTH` (metros; más grande = rasgos más anchos), `SPIRE_FADE_FROM`/`SPIRE_FADE_TO` (desde qué profundidad asoman las cumbres) |
-| Jugar siempre el mismo mapa (para probar) | la arena > *Scatter (grupo «Semilla») | `randomize_per_run` apagado y `scatter_seed` |
+| Jugar siempre el mismo mapa (para probar) | la arena > *Scatter (grupo «Semilla (solo pruebas)») | `randomize_per_run` apagado y `scatter_seed` |
 | Altura de las lomas del suelo | la arena > Terrain (grupo «Relieve») | `amplitude`, `feature_size` |
 | Color del minimapa y colinas del horizonte | la arena > Backdrop | `ground_color`, `hill_color`, `far_hill_color` (cambiar `hill_count` mueve los altares aunque la semilla sea la misma) |
 | Tamaño y variante de los pinos | `scenes/world/props/Tree.tscn` > Tree | `wide_chance`, `base_scale`, `width_scale_min/max`, `height_scale_min/max` |
-| Color de las rocas sueltas | `assets/materials/boulder.tres`, `boulder_red.tres` | `shader_parameter/albedo` |
+| Color de las rocas sueltas de las Dunas de Ceniza | `assets/materials/boulder_red.tres` (lo usa `scenes/world/props/DuneRock.tscn`) | `shader_parameter/albedo` |
+| Color de las rocas sueltas del Bosque Hueco y la Ciénaga Lóbrega | `scenes/world/props/Rock.tscn` (modelo `assets/models/survival/rock-a.glb`) | sin valor propio: el color sale de la textura `assets/models/survival/Textures/colormap.png`, que también pinta árboles y tocones |
 
 ## HUD
 
@@ -290,7 +291,7 @@ de reparto se llama `ForestScatter`, `DuneScatter` o `MarshScatter`.
 | Qué quieres cambiar | Dónde | Qué propiedad |
 | --- | --- | --- |
 | Título del selector de personajes | `scenes/ui/CharacterSelect.tscn` > TitleLabel | Theme Overrides |
-| Textos de los botones del selector (Iniciar, Misiones, Colección, Armería, Cacería diaria) | `CharacterSelect.tscn` > raíz (grupo «Textos») y ButtonRow | `start_solo_format`, `start_party_format`; `text` de cada botón |
+| Textos de los botones del selector (Iniciar, Misiones, Colección, Armería, Cacería diaria) | `CharacterSelect.tscn` > raíz (grupo «Textos») y ButtonRow | `start_solo_format`, `start_party_format`, `daily_best_format` (Cacería diaria cuando ya hay marca hoy); `text` de cada botón |
 | Columnas y filas de la cuadrícula de personajes | `CharacterSelect.tscn` > raíz (grupo «Cuadrícula») | `grid_min_columns`, `grid_target_rows` |
 | Brillo del título, entrada de las cartas y rebotes del selector | `CharacterSelect.tscn` > raíz (grupo «Movimiento») | `title_glow_color`, `title_glow_time`, `entrance_*`, `start_hover_grow`, `start_press_squash`, `shards_pop_*` |
 | Carta de personaje (letra y color del nombre, arma, pasiva, descripción) | `scenes/ui/meta/character_select/CharacterCard.tscn` > Unlocked/Name, Weapon, Passive, Blurb | Theme Overrides |
