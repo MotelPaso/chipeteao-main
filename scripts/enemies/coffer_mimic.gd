@@ -22,38 +22,44 @@ const LID_GAPE_ANGLE: float = 1.15
 ## Radio en metros del anillo de destello de la llegada.
 @export var entrance_ring_radius: float = 2.4
 
-@export_group("Scuttle")
-## La move_speed del chasis es la de la ráfaga; en las pausas se queda quieto.
+@export_group("Correteo")
+## Segundos de cada ráfaga de carrera, a la move_speed del chasis.
 @export var scuttle_burst_time: float = 0.8
+## Segundos de cada pausa quieto entre ráfagas.
 @export var scuttle_rest_time: float = 0.6
 
-@export_group("Snap")
-## Distancia al raider que dispara un mordisco.
+@export_group("Mordisco")
+## Distancia al raider, en metros, que dispara un mordisco.
 @export var snap_range: float = 2.4
-## Radio del disco del mordisco alrededor del punto que fijan las fauces.
+## Radio en metros del disco del mordisco alrededor del punto que fijan las fauces.
 @export var snap_radius: float = 1.8
+## Daño del mordisco a cada raider dentro del disco (valor base; apply_tier lo escala).
 @export var snap_damage: float = 14.0
+## Segundos de aviso entre el disco y el mordisco.
 @export var snap_windup: float = 0.45
+## Segundos quieto después del mordisco antes de volver a moverse.
 @export var snap_recover: float = 0.55
+## Segundos de espera entre un mordisco y el siguiente.
 @export var snap_cooldown: float = 2.2
+## Metros sobre el suelo por encima de los cuales el mordisco no golpea.
 @export var snap_height_window: float = 1.3
 ## Segundos del destello del mordisco (más corto que el impacto común).
 @export var snap_flash_time: float = 0.15
 
-@export_group("Bury")
+@export_group("Enterrarse")
+## Segundos de espera entre un entierro y el siguiente.
 @export var bury_interval: float = 8.0
 ## Segundos enterrado (también el aviso de la onda al salir).
 @export var bury_duration: float = 2.0
-## Armadura plana que se suma a Health mientras está enterrado.
-## Health.take_damage deja todo golpe en al menos 1 de daño, así que
-## enterrado (armadura 2 de la escena + esto = 8) cualquier golpe de menos
-## de 8 hace exactamente 1. Esa ES la ventana de "espera"; subirlo más se
-## leería como inmunidad, no como armadura.
+## Armadura plana que se suma a Health mientras está enterrado (con la de la escena, golpes menores que el total hacen 1).
 @export var bury_armor_bonus: float = 6.0
-## Cuánto se hunde el cuerpo: ajustado para que solo asome la tapa.
+## Metros que se hunde el cuerpo: ajustado para que solo asome la tapa.
 @export var bury_sink_depth: float = 0.85
+## Radio de la onda de choque al salir y de su disco de aviso, en metros.
 @export var shockwave_radius: float = 3.0
+## Daño de la onda a cada raider dentro del radio (valor base; apply_tier lo escala).
 @export var shockwave_damage: float = 10.0
+## Metros sobre el suelo por encima de los cuales la onda no golpea.
 @export var shockwave_height_window: float = 1.5
 
 var _state: State = State.ENTRANCE

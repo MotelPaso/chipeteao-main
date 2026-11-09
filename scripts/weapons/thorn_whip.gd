@@ -6,7 +6,8 @@ extends WeaponBase
 ## por un WhipCrack del pool, una franja verde que se estira por el carril y
 ## vuelve, soltando partículas de espinas.
 
-## Ancho total de la franja del latigazo; su largo es attack_range. Los dos crecen con los tomos de área.
+@export_group("Latigazo")
+## Ancho total de la franja del latigazo, en metros; su largo es attack_range. Los dos crecen con los tomos de área.
 @export var strip_width: float = 1.2
 ## Porcentaje de velocidad que pierden los enemigos azotados (30 = conservan el 70%); la carta «Espinas aferradas» (+8) y la evolución «Guirnalda sepulcral» (+25) lo suben.
 @export var slow_percent: float = 30.0

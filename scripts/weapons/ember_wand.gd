@@ -1,9 +1,10 @@
 extends WeaponBase
 ## Vara de brasas: en cada enfriamiento detona un estallido de fuego en la
 ## posición del blanco que daña a todo cuerpo del grupo "enemies" dentro de
-## burst_radius. El visual es un EmberBurst del pool: cáscara emisiva que se
+## burst_radius. El visual es un EmberBurst del pool: cáscara que se
 ## expande, una quemadura en el suelo que se desvanece y brasas que suben.
 
+@export_group("Estallido")
 ## Radio del estallido, en metros (los tomos de área lo escalan); la evolución «Lanza solar» lo multiplica.
 @export var burst_radius: float = 2.5
 

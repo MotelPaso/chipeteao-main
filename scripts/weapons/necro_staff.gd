@@ -35,7 +35,7 @@ extends WeaponBase
 @export var bolt_hit_radius: float = 0.9
 ## Altura sobre el montaje desde la que sale el rayo, en metros.
 @export var bolt_spawn_height: float = 1.0
-## Malla y material del rayo (color, transparencia, brillo); esfera de radio 1 que bolt_radius escala.
+## Malla y material del rayo, esfera de radio 1 que bolt_radius escala; el material da la opacidad y el color sale de enemy_look.tres > possessed_color.
 @export var bolt_mesh: Mesh
 
 @export_group("Multitud")
@@ -52,6 +52,10 @@ class SoulBolt extends RefCounted:
 
 
 var _bolts: Array[SoulBolt] = []
+
+
+func _ready() -> void:
+	_tint_bolt_mesh()
 
 
 func _physics_process(delta: float) -> void:
@@ -83,6 +87,16 @@ func possessed_count() -> int:
 		if servant != null and servant.possession_carrier() == carrier_player():
 			mine += 1
 	return mine
+
+
+## El rayo es del color de los siervos que levanta: lo toma de
+## EnemyBase.LOOK y conserva la opacidad del material de la escena.
+func _tint_bolt_mesh() -> void:
+	if bolt_mesh == null:
+		return
+	var material := bolt_mesh.surface_get_material(0) as StandardMaterial3D
+	if material != null:
+		material.albedo_color = Color(EnemyBase.LOOK.possessed_color, material.albedo_color.a)
 
 
 func _launch_at_fresh_target() -> void:

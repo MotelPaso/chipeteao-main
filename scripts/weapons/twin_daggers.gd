@@ -7,6 +7,7 @@ extends WeaponBase
 ## del pool sobre el blanco, alternando izquierda y derecha para que se lea
 ## el ritmo de dos dagas.
 
+@export_group("Corte")
 ## Segundos que dura el destello de un corte.
 @export var slash_time: float = 0.2
 ## Radio de la medialuna de un corte, en metros.

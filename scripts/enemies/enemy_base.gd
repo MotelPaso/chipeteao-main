@@ -13,9 +13,6 @@ extends CharacterBody3D
 ## Grupo de los siervos poseídos. También lo leen el bastón nigromante,
 ## RunRoot y ArenaProbe.
 const POSSESSED_GROUP: StringName = &"possessed"
-## Color de los siervos poseídos (su capa y el estallido al expirar). También
-## lo lee el bastón nigromante.
-const POSSESSED_TINT := Color(0.65, 0.35, 0.95)
 ## Tope de cofres shiny sin abrir; el valor se edita en EnemyLoot. ArenaProbe
 ## lo lee aquí.
 const BOUNTY_CHEST_CAP: int = EnemyLoot.BOUNTY_CHEST_CAP
@@ -24,20 +21,18 @@ const BOUNTY_CHEST_CAP: int = EnemyLoot.BOUNTY_CHEST_CAP
 const LOOK: EnemyLookPalette = preload("res://assets/enemies/enemy_look.tres")
 ## Variantes del cielo que el spawner aplica durante un evento. Edita aquí
 ## sus valores: speed, damage, separation y hp multiplican (1.0 = sin
-## cambio), reward multiplica la XP y los puntos, y albedo / emission /
-## energy son su capa de color.
+## cambio), reward multiplica la XP y los puntos, y albedo es el color de su
+## capa (el alfa es la opacidad).
 const VARIANTS: Dictionary = {
 	# Luna de sangre: más rápido, pega más fuerte, ignora a la multitud.
 	"berserker": {
 		"speed": 1.4, "damage": 1.3, "separation": 0.2, "hp": 1.0, "reward": 2,
-		"albedo": Color(1.0, 0.15, 0.1, 0.45), "emission": Color(1.0, 0.2, 0.1),
-		"energy": 2.0,
+		"albedo": Color(1.0, 0.15, 0.1, 0.45),
 	},
 	# Eclipse: mucho más resistente, casi negro.
 	"shade": {
 		"speed": 1.0, "damage": 1.0, "separation": 1.0, "hp": 1.6, "reward": 2,
-		"albedo": Color(0.05, 0.02, 0.1, 0.8), "emission": Color(0.3, 0.1, 0.5),
-		"energy": 0.6,
+		"albedo": Color(0.05, 0.02, 0.1, 0.8),
 	},
 }
 ## Margen en metros entre un trepador y el borde de la arena, para que el
@@ -337,8 +332,7 @@ func apply_variant(kind: String) -> void:
 	if separation_factor != 1.0:
 		separation_strength *= separation_factor
 	var albedo: Color = row["albedo"]
-	var emission: Color = row["emission"]
-	_overlays.set_variant(albedo, emission, float(row["energy"]))
+	_overlays.set_variant(albedo)
 	var reward := int(row["reward"])
 	_xp_multiplier *= reward
 	points_value *= reward
@@ -354,7 +348,7 @@ func make_possessed(carrier: Node3D, duration: float) -> void:
 	# Por la capa de poseído, no escribiendo material_overlay a mano:
 	# Juice.flash restaura current_overlay() tras cada destello, y un tinte
 	# fuera de las capas se borraría con el primer golpe.
-	_overlays.set_possessed(POSSESSED_TINT)
+	_overlays.set_possessed(LOOK.possessed_color)
 	print("Possessed spawned: %s" % _script_name())
 
 
@@ -371,7 +365,7 @@ func end_possession() -> void:
 		return
 	_possession.expiring = true
 	print("Possessed expired: %s" % _script_name())
-	Juice.burst(global_position + Vector3.UP * 0.8, POSSESSED_TINT,
+	Juice.burst(global_position + Vector3.UP * 0.8, LOOK.possessed_color,
 			LOOK.possessed_expire_burst)
 	queue_free()
 

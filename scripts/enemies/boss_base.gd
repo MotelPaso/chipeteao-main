@@ -8,9 +8,10 @@ extends EnemyBase
 ## Sarcognath...) tiene su propia máquina de estados y moveset. Un jefe
 ## nunca se vuelve shiny (make_elite no hace nada).
 
+@export_group("Jefe")
+## Nombre del jefe en la barra de vida del HUD y en el log; el calendario de jefes puede reemplazarlo.
 @export var boss_title: String = "Jefe"
-## Distancia en metros que el jefe guarda del muro, para que sus ataques de
-## suelo caigan en el piso.
+## Distancia en metros que el jefe guarda del muro, para que sus ataques de suelo caigan en el piso.
 @export var arena_clamp_margin: float = 4.0
 
 @export_group("Llegada compartida")
@@ -37,7 +38,7 @@ extends EnemyBase
 ## Escena del grupo de púas que revienta el suelo (SpikeCluster); vacío = sin púas.
 @export var spike_cluster_scene: PackedScene
 
-@export_group("Reward")
+@export_group("Pago")
 ## Pago al morir: un anillo de boss_gem_count gemas de boss_gem_value XP.
 @export var boss_gem_count: int = 8
 ## XP de cada gema del anillo de pago.
@@ -45,17 +46,14 @@ extends EnemyBase
 ## Orbes de vida garantizados al morir (sujetos al tope global de HealthOrb).
 @export var health_orb_count: int = 2
 
-@export_group("Tier")
-## Escala extra del cuerpo por cada llamada a apply_tier() (Elder y más).
+@export_group("Grado")
+## Escala extra del cuerpo por cada llamada a apply_tier() (Elder y más); 1.15 = +15%.
 @export var tier_body_scale: float = 1.15
 
-@export_group("Chests")
-## Cofres al morir: siempre esta cantidad, más uno por altar demoníaco
-## usado en la partida (RunState.demonic_uses).
+@export_group("Cofres")
+## Cofres al morir: siempre esta cantidad, más uno por altar demoníaco usado en la partida.
 @export var base_chest_drops: int = 1
-## Rareza mínima del anillo de cofres ("" = sin piso). Los cofres de jefe
-## son gratis y tiran su rareza al abrirse, inclinada por la suerte
-## demoníaca; un piso encima les quitaría la tirada.
+## Rareza mínima del anillo de cofres ("" = sin piso, para que tiren su rareza con la suerte demoníaca).
 @export var chest_min_rarity: String = ""
 
 ## Anillo donde caen los cofres de la muerte, y la suerte extra que suma

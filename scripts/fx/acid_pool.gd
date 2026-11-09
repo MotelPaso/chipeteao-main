@@ -15,15 +15,16 @@ extends Node3D
 ## todos los tamaños de charco.
 const BASE_RADIUS: float = 1.0
 
-## Radio, duración y daño por segundo no están aquí: los manda el nodo
-## Weather (weather_director.gd) en play() con sus exports acid_pool_radius,
-## acid_pool_lifetime y acid_pool_damage_per_second.
+# Radio, duración y daño por segundo no están aquí: llegan en play() desde el
+# nodo Weather (WeatherDirector: acid_pool_radius, acid_pool_lifetime,
+# acid_pool_damage_per_second), en scenes/world/RunSystems.tscn > WorldDirector > Weather.
+
 @export_group("Daño")
 ## Segundos entre aplicaciones de daño; por frame, los números de daño taparían la barra de vida.
 @export var tick_interval: float = 0.5
 
 @export_group("Aspecto")
-## Color del disco ácido (también su brillo).
+## Color del disco ácido.
 @export var disc_color: Color = Color(0.45, 0.95, 0.3)
 ## Opacidad del disco mientras está activo (0-1).
 @export var disc_alpha: float = 0.55
@@ -83,9 +84,6 @@ func _build_visual() -> void:
 	_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	_material.albedo_color = Color(disc_color, disc_alpha)
-	_material.emission_enabled = true
-	_material.emission = disc_color
-	_material.emission_energy_multiplier = 1.2
 	_disc.material_override = _material
 	_disc.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(_disc)

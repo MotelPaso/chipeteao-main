@@ -6,9 +6,10 @@ extends WeaponBase
 ## grueso de la flecha y un destello de carga en el Nock que crece y estalla
 ## al soltar (su aspecto está en MuzzleFlash.tscn, grupo «Destello de carga»).
 
+@export_group("Flechas")
 ## Escena de la flecha que se dispara (Arrow.tscn).
 @export var projectile_scene: PackedScene
-## Máximo de enemigos que daña una flecha antes de desaparecer ("Puntas con púas" lo sube).
+## Máximo de enemigos que daña una flecha antes de desaparecer; reemplaza el pierce_remaining de Arrow.tscn ("Puntas con púas" lo sube).
 @export var pierce_count: int = 3
 ## Grados entre flechas vecinas cuando hay más de una.
 @export var fan_spread_deg: float = 7.0

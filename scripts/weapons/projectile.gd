@@ -7,13 +7,14 @@ extends Area3D
 ## del jugador); vuelve al pool al gastar la perforación o tras max_distance,
 ## y pool_reset() rearma perforación, registro de golpes y trazador.
 
+@export_group("Vuelo")
 ## Velocidad de vuelo, en metros por segundo.
 @export var speed: float = 26.0
 ## Si el vuelo se curva hacia el blanco (las flechas vuelan rectas).
 @export var homing_enabled: bool = true
 ## Radianes por segundo que el vuelo puede girar hacia el blanco; 0 apaga la persecución.
 @export var homing_turn_speed: float = 3.5
-## Cuántos enemigos distintos puede dañar antes de desaparecer (el Arco de caza lo sube por disparo).
+## Cuántos enemigos distintos puede dañar antes de desaparecer (el Arco de caza lo reemplaza por su pierce_count en cada flecha).
 @export var pierce_remaining: int = 1
 ## El trazador nace estirado este factor a lo largo y vuelve a 1 (sensación de estela).
 @export var spawn_stretch: float = 2.4
@@ -83,10 +84,7 @@ func tint(color: Color) -> void:
 	if _tint_material == null:
 		_tint_material = StandardMaterial3D.new()
 		_tint_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-		_tint_material.emission_enabled = true
 	_tint_material.albedo_color = color
-	_tint_material.emission = color
-	_tint_material.emission_energy_multiplier = 1.6
 	_tracer.material_override = _tint_material
 
 

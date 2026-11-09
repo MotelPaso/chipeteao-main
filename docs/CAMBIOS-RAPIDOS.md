@@ -68,7 +68,7 @@ grupos con su nombre.
 | --- | --- | --- |
 | Daño, enfriamiento y alcance de un arma | `scenes/weapons/<Arma>.tscn` > raíz (grupo «Estadísticas») | `damage`, `cooldown`, `attack_range`, `projectile_count` |
 | Cómo se reparten los disparos extra del Tomo de Multitud | `<Arma>.tscn` > raíz (grupo «Multitud») | `extra_stagger` (segundos entre extras), `extra_fan_deg` |
-| Color o forma del efecto de un arma | `<Arma>.tscn` > raíz, la malla del grupo (`flask_mesh`, `beam_mesh`, `orb_mesh`, `cloud_mesh`, `puddle_mesh`, `bolt_mesh`) | su material (`albedo_color`, emisión) |
+| Color o forma del efecto de un arma | `<Arma>.tscn` > raíz, la malla del grupo (`flask_mesh`, `beam_mesh`, `orb_mesh`, `cloud_mesh`, `puddle_mesh`, `bolt_mesh`) | su material: `albedo_color` (color y opacidad); son materiales sin sombreado, la emisión no se ve |
 | Espada corta | `Shortsword.tscn` > Shortsword | `arc_angle_deg`, `swing_time`, `slash_color`, `spark_color` |
 | Dagas gemelas | `TwinDaggers.tscn` > TwinDaggers | `slash_time`, `slash_radius`, `slash_color`, `slash_sweep_deg` |
 | Orbes espirituales (tamaño visual, tamaño de golpe, velocidad) | `SpiritOrbs.tscn` > SpiritOrbs (grupo «Orbes») | `orb_radius`, `hit_radius`, `orbit_speed`, `orb_height` |
@@ -82,10 +82,12 @@ grupos con su nombre.
 | Látigo de espinas | `ThornWhip.tscn` > ThornWhip | `strip_width`, `slow_percent`, `slow_duration` |
 | Vara de brasas | `EmberWand.tscn` > EmberWand | `burst_radius` |
 | Bumerán | `Boomerang.tscn` y `BoomerangProjectile.tscn` | `travel_scale`; `speed`, `spin_speed` |
-| Velocidad, rastreo y perforación de dardos y flechas | `Projectile.tscn` (dardo) / `Arrow.tscn` (flecha) > raíz | `speed`, `homing_enabled`, `pierce_remaining` |
+| Velocidad, rastreo y perforación de los dardos | `Projectile.tscn` > raíz | `speed`, `homing_enabled`, `pierce_remaining` |
+| Velocidad y rastreo de las flechas | `Arrow.tscn` > raíz | `speed`, `homing_enabled` |
+| Perforación de las flechas | `HuntingBow.tscn` > raíz | `pierce_count` (reemplaza el `pierce_remaining` de cada flecha) |
 | Destello del disparo, tajos y latigazo | `scenes/fx/MuzzleFlash.tscn`, `SlashArc.tscn`, `WhipCrack.tscn` > raíz | sus grupos de forma y tiempo |
 | Alcance del primer rayo del Cinturón eléctrico | `scripts/weapons/belt_bolt.gd` (bloque «Edita aquí») | `FIRST_RANGE` |
-| Rayo del Pararrayos y del Cinturón eléctrico | `scenes/fx/LightningBeam.tscn` > raíz | grosor, brillo y tiempo del rayo |
+| Rayo del Pararrayos y del Cinturón eléctrico | `scenes/fx/LightningBeam.tscn` > raíz (grupos «Pararrayos», «Cinturón eléctrico») | `storm_mesh` / `belt_mesh` (radio, y color en `albedo_color` de su material), `*_fade_time`, `*_fade_scale` |
 | Nombre, sigla, carta propia, evolución | ver «Personajes, armas, cartas y progreso» | |
 
 ## Enemigos y jefes
@@ -98,14 +100,14 @@ grupos con su nombre.
 | Daño de contacto | `<Enemigo>.tscn` > raíz | `contact_damage` |
 | Si un enemigo se puede poseer o trepar | `<Enemigo>.tscn` > raíz (grupos «Posesión», «Trepar») | `possessable`, `can_climb`, `max_climb_height` |
 | Fuerza de los shiny (vida, velocidad, daño, XP) | `scripts/enemies/enemy_base.gd` (grupo «Shiny») o la escena del enemigo | `elite_*` |
-| Colores del shiny, del veneno, de los poseídos y la animación de muerte | `assets/enemies/enemy_look.tres` (ábrelo en el Inspector) | grupos Shiny, Veneno, Poseído, Muerte |
+| Colores del shiny, del veneno, de los poseídos y la animación de muerte | `assets/enemies/enemy_look.tres` (ábrelo en el Inspector) | grupos Shiny, Veneno, Poseído, Muerte; `possessed_color` tiñe también el rayo del Báculo de nigromante |
 | Luna de sangre y eclipse (velocidad, daño, vida, color) | `scripts/enemies/enemy_base.gd`, tabla `VARIANTS` al comienzo | filas `berserker` y `shade` |
 | Altura a la que apuntan las armas | `scripts/enemies/enemy_base.gd` (grupo «Puntería») o la escena del enemigo | `aim_height` |
 | Colores de los avisos y del impacto de un jefe, temblor y destello | `scenes/enemies/<Jefe>.tscn` > raíz (grupo «Telegrafía») | `telegraph_color`, `impact_color`, `impact_shake_strength`, `impact_shake_duration`, `impact_flash_time` |
 | Lo que paga un jefe al morir | `<Jefe>.tscn` > raíz | `boss_gem_count`, `boss_gem_value`, `health_orb_count`, `base_chest_drops` |
 | Púas de corteza (Rey Pútrido) y de arenisca (Sarcognato) | `scenes/enemies/BarkSpikes.tscn` / `SandSpikes.tscn` | la malla y el material de `Spike1`; tiempos en la raíz |
-| Láseres (color y grosor) | `Sunspitter.tscn` > AimLine / Beam; `Sarcognath.tscn` > WarnLine / Beam | `color`, `default_thickness`, `emission_energy` |
-| Discos de aviso en el suelo | `scenes/fx/TelegraphDisc.tscn` > raíz | `start_scale`, `peak_energy`, `fade_time`; opacidad en su material |
+| Láseres (color y grosor) | `Sunspitter.tscn` / `Sarcognath.tscn` | color: `color` en AimLine / WarnLine (aviso) y Beam (disparo); grosor del aviso: `aim_width_start` / `aim_width_end` (raíz del Sunspitter) o `warn_width_start` / `warn_width_end` (raíz del Sarcognath); grosor del disparo: Beam > `default_thickness` |
+| Discos de aviso en el suelo | `scenes/fx/TelegraphDisc.tscn` > raíz | `start_scale`, `fade_time`; opacidad en `albedo_color` de su material (el color lo pasa quien avisa) |
 | Velocidad de los proyectiles enemigos | `scenes/enemies/EnemyBolt.tscn` > raíz | `speed`, `max_distance` (el daño lo pone quien dispara) |
 | Nombre de un jefe en pantalla | `<Jefe>.tscn` > raíz | `boss_title` (y la tabla `BESTIARY` de `scripts/ui/meta/collection.gd`) |
 

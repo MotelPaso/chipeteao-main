@@ -15,36 +15,56 @@ extends BossBase
 
 enum State { ENTRANCE, PURSUE, NOVA, VOLLEY, BLINK }
 
+@export_group("Llegada")
 ## Segundos del estado de llegada antes de empezar a pelear.
 @export var entrance_duration: float = 0.9
 
-@export_group("Miasma Nova")
+@export_group("Nova de miasma")
+## Distancia al raider, en metros, por debajo de la cual lanza la Nova.
 @export var nova_trigger_range: float = 5.0
+## Radio de la Nova y de su disco de aviso, en metros.
 @export var nova_radius: float = 5.5
+## Daño de la Nova a cada raider dentro del radio (valor base; apply_tier lo escala).
 @export var nova_damage: float = 22.0
+## Segundos de aviso entre el disco y el estallido.
 @export var nova_windup: float = 0.9
+## Segundos quieto después del estallido antes de volver a pelear.
 @export var nova_recover: float = 0.7
+## Segundos de espera entre una Nova y la siguiente.
 @export var nova_cooldown: float = 5.0
-## Un raider más alto que esto sobre los pies del jefe no la recibe.
+## Metros sobre los pies del jefe por encima de los cuales la Nova no golpea.
 @export var nova_height_window: float = 1.5
 
-@export_group("Bog Volley")
+@export_group("Andanada del pantano")
+## Segundos de espera entre una andanada y la siguiente.
 @export var volley_interval: float = 5.5
+## Segundos de carga antes de soltar las saetas.
 @export var volley_windup: float = 0.5
+## Distancia mínima al raider, en metros, para lanzar la andanada.
 @export var volley_min_range: float = 6.0
+## Distancia máxima al raider, en metros, para lanzar la andanada.
 @export var volley_max_range: float = 22.0
+## Saetas por andanada.
 @export var volley_bolt_count: int = 5
+## Ancho total del abanico de saetas, en grados.
 @export var volley_spread_degrees: float = 40.0
+## Daño de cada saeta (valor base; apply_tier lo escala).
 @export var bolt_damage: float = 9.0
+## Escena de la saeta (EnemyBolt, sale de Pools).
 @export var bolt_scene: PackedScene
+## Altura en metros desde la que salen las saetas.
 @export var muzzle_height: float = 1.6
+## Altura en metros sobre los pies del raider a la que apuntan las saetas.
 @export var target_height: float = 0.9
 
-@export_group("Sink & Rise")
+@export_group("Hundirse y emerger")
+## Segundos de espera entre un hundimiento y el siguiente.
 @export var blink_interval: float = 9.0
+## Distancia mínima al raider, en metros, para hundirse y salir cerca de él.
 @export var blink_trigger_range: float = 12.0
+## Segundos que tarda en hundirse antes de salir en el punto marcado.
 @export var blink_windup: float = 0.7
-## El punto de salida queda a esta distancia del raider perseguido.
+## Distancia en metros del punto de salida al raider perseguido.
 @export var blink_arrival_distance: float = 5.0
 ## Fracción de blink_interval que espera el primer hundimiento al aparecer (0-1).
 @export var first_blink_fraction: float = 0.6

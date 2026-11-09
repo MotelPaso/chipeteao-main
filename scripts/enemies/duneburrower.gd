@@ -15,22 +15,24 @@ enum State { SURFACED, BURROWED, ERUPTING }
 ## que todavía puede herirte desde la arena. Lo lee EnemySpawner.
 const BURROWED_GROUP: StringName = &"burrowed"
 
-@export_group("Cycle")
+@export_group("Ciclo")
 ## Segundos de persecución vulnerable tras cada erupción antes de enterrarse.
 @export var surface_duration: float = 4.0
-## Seguro: enterrado, erupciona donde esté pasado este tiempo, así un raider
-## más rápido no puede pasear para siempre un montículo invulnerable.
+## Segundos máximos enterrado; pasado esto erupciona donde esté, así no se pasea para siempre un montículo invulnerable.
 @export var max_burrow_duration: float = 6.0
-## El montículo ataca al llegar a esta distancia plana del raider.
+## Distancia plana al raider, en metros, a la que el montículo ataca.
 @export var strike_trigger_range: float = 1.1
+## Multiplicador de move_speed mientras está enterrado (2.4 = 2.4 veces más rápido).
 @export var burrow_speed_multiplier: float = 2.4
 
-@export_group("Eruption")
+@export_group("Erupción")
+## Segundos de aviso entre el disco y la erupción.
 @export var erupt_windup: float = 0.8
+## Radio de la erupción y de su disco de aviso, en metros.
 @export var erupt_radius: float = 2.0
+## Daño de la erupción a cada raider dentro del disco.
 @export var erupt_damage: float = 14.0
-## Erupción desde el suelo: un raider más alto que esto sobre el punto de
-## ataque (una cornisa de mesa) no recibe el golpe.
+## Metros sobre el punto de ataque por encima de los cuales la erupción no golpea.
 @export var erupt_height_window: float = 1.5
 
 @export_group("Telegrafía")

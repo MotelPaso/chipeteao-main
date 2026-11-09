@@ -7,7 +7,7 @@ extends WeaponBase
 ##   cooldown      — segundos entre charcos mientras se mueve
 ##   attack_range  — sin uso (Largo alcance igual ensancha los charcos por el área)
 ## Los charcos son registros SlimePuddle que avanza esta arma (sin escena de
-## pool): el visual es un disco emisivo plano por charco (puddle_mesh) que se
+## pool): el visual es un disco plano por charco (puddle_mesh) que se
 ## desvanece al expirar.
 ## La evolución «Marea ácida» multiplica damage, puddle_radius y puddle_life.
 
@@ -24,7 +24,7 @@ extends WeaponBase
 @export var height_window: float = 1.6
 
 @export_group("Visual")
-## Malla y material del charco (color, transparencia, brillo); disco de radio 1 que se escala al radio del charco.
+## Malla y material del charco (color y opacidad en albedo_color); disco de radio 1 que se escala al radio del charco.
 @export var puddle_mesh: Mesh
 ## Cuánto sobre los pies del portador se dibuja el disco, en metros: lo justo para despegarlo del piso.
 @export var puddle_ground_offset: float = 0.05

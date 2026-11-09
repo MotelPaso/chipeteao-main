@@ -24,7 +24,7 @@ const BEAM_VOLUME_DB: float = -12.0
 @export var flash_time: float = 0.45
 ## Altura sobre el montaje desde la que sale el rayo, en metros.
 @export var muzzle_height: float = 1.1
-## Malla y material del rayo (color, transparencia, brillo); cilindro unitario que se estira al carril.
+## Malla y material del rayo (color y opacidad en albedo_color); cilindro unitario que se estira al carril.
 @export var beam_mesh: Mesh
 ## Grosor con que nace el rayo, como fracción de su ancho final.
 @export var beam_start_width: float = 0.3

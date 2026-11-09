@@ -20,33 +20,46 @@ const HOP_ARRIVAL_EPSILON: float = 0.35
 ## Radio en metros del anillo de destello de la llegada.
 @export var entrance_ring_radius: float = 2.4
 
-@export_group("Lunging Hop")
-## Distancia al raider que dispara un salto (sin mínimo: también salta en el sitio).
+@export_group("Salto embestida")
+## Distancia al raider, en metros, que dispara un salto (sin mínimo: también salta en el sitio).
 @export var hop_max_range: float = 9.0
+## Segundos de carga antes de saltar; el disco de aviso dura esto más hop_leap_time.
 @export var hop_windup: float = 0.75
-## Tiempo en el aire del salto hacia el punto marcado.
+## Segundos en el aire del salto hacia el punto marcado.
 @export var hop_leap_time: float = 0.45
+## Segundos quieto después de caer antes de volver a perseguir.
 @export var hop_recover: float = 0.5
+## Segundos de espera entre un salto y el siguiente.
 @export var hop_cooldown: float = 2.8
+## Daño del aplastón al caer a cada raider dentro del radio (valor base; apply_tier lo escala).
 @export var hop_damage: float = 12.0
+## Radio del aplastón y de su disco de aviso, en metros.
 @export var hop_radius: float = 2.0
-## El aplastón al caer es de suelo; un raider más alto que esto no lo recibe.
+## Metros sobre el suelo por encima de los cuales el aplastón no golpea.
 @export var hop_height_window: float = 1.4
-## La velocidad del salto es distancia/tiempo en el aire, con este tope.
+## Tope de velocidad del salto en m/s (la velocidad es distancia / tiempo en el aire).
 @export var hop_max_speed: float = 24.0
 
-@export_group("Glob Spit")
+@export_group("Escupitajo")
+## Distancia mínima al raider, en metros, para escupir.
 @export var spit_min_range: float = 4.0
+## Distancia máxima al raider, en metros, para escupir.
 @export var spit_max_range: float = 16.0
+## Segundos de espera entre un escupitajo y el siguiente.
 @export var spit_interval: float = 5.5
+## Segundos de vuelo de las bolas, que es también lo que duran sus discos de aviso.
 @export var spit_windup: float = 1.0
 ## Fracción de spit_interval que espera el primer escupitajo al aparecer (0-1).
 @export var first_spit_fraction: float = 0.5
+## Bolas por escupitajo.
 @export var glob_count: int = 3
+## Radio de la salpicadura de cada bola y de su disco de aviso, en metros.
 @export var glob_radius: float = 1.5
+## Daño de cada salpicadura a los raiders dentro (valor base; apply_tier lo escala).
 @export var glob_damage: float = 10.0
-## La primera bola va al punto del raider; las demás se esparcen en este rango.
+## Metros alrededor del raider en los que se esparcen las bolas después de la primera, que va a su punto.
 @export var glob_scatter: float = 2.4
+## Metros sobre el suelo por encima de los cuales la salpicadura no golpea.
 @export var glob_height_window: float = 1.5
 ## Segundos del destello de cada salpicadura.
 @export var glob_flash_time: float = 0.18

@@ -1,6 +1,6 @@
 class_name EmberBurst
 extends Node3D
-## Detonación de la Vara de brasas, del pool: la cáscara emisiva que se
+## Detonación de la Vara de brasas, del pool: la cáscara que se
 ## expande (la lectura del estallido), un disco de quemadura en el suelo que
 ## dura y se desvanece, y una ráfaga de brasas que suben. Mallas y materiales
 ## son recursos compartidos de la escena; cada instancia se desvanece con

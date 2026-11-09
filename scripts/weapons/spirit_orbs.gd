@@ -22,7 +22,7 @@ extends WeaponBase
 @export var orb_height: float = 1.0
 ## Oscilación vertical del anillo, en metros, para que no se lea como una calcomanía plana.
 @export var bob_height: float = 0.15
-## Malla y material de cada orbe (color y brillo); esfera de radio 1 que orb_radius escala.
+## Malla y material de cada orbe (color en albedo_color); esfera de radio 1 que orb_radius escala.
 @export var orb_mesh: Mesh
 
 var _angle: float = 0.0

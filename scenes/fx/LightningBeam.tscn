@@ -7,9 +7,6 @@ shading_mode = 0
 transparency = 1
 blend_mode = 1
 albedo_color = Color(0.55, 0.75, 1, 1)
-emission_enabled = true
-emission = Color(0.55, 0.75, 1, 1)
-emission_energy_multiplier = 2.4
 
 [sub_resource type="CylinderMesh" id="CylinderMesh_storm"]
 material = SubResource("StandardMaterial3D_storm")
@@ -23,9 +20,6 @@ rings = 1
 shading_mode = 0
 transparency = 1
 albedo_color = Color(1, 0.95, 0.45, 1)
-emission_enabled = true
-emission = Color(1, 0.95, 0.45, 1)
-emission_energy_multiplier = 2.4
 
 [sub_resource type="CylinderMesh" id="CylinderMesh_belt"]
 material = SubResource("StandardMaterial3D_belt")
