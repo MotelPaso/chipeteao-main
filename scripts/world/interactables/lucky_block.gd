@@ -37,8 +37,14 @@ const WELL_OFFERS: int = 2
 @export var explosion_radius: float = 12.0
 ## Fracción de la vida máxima (0-1) que pierde un jefe en enemy_explosion, en vez de morir.
 @export var boss_hp_fraction: float = 0.15
+## Cantidad de chispas (con block_color) sobre cada enemigo que alcanza enemy_explosion.
+@export var explosion_burst_count: int = 10
+## Sacudida de cámara de enemy_explosion, en trauma (0-1).
+@export var explosion_shake: float = 0.3
 ## Gemas de XP que suelta gem_rain.
 @export var gem_count: int = 25
+## Distancia mínima a la que caen las gemas de gem_rain, en metros.
+@export var gem_min_spread: float = 1.0
 ## Distancia máxima a la que caen las gemas de gem_rain, en metros.
 @export var gem_spread: float = 6.0
 ## Puntos de partida que da el premio points.
@@ -177,12 +183,12 @@ func _reward_explosion() -> void:
 		var health := Health.find_in(body)
 		if health == null or health.is_dead:
 			continue
-		Juice.burst(body.global_position + Vector3.UP * 0.6, block_color, 10)
+		Juice.burst(body.global_position + Vector3.UP * 0.6, block_color, explosion_burst_count)
 		if body.is_in_group("boss"):
 			health.take_damage(health.max_hp * boss_hp_fraction)
 		else:
 			health.take_damage(health.current_hp + health.armor)
-	Juice.shake(0.3)
+	Juice.shake(explosion_shake)
 
 
 func _reward_gems() -> void:
@@ -191,7 +197,7 @@ func _reward_gems() -> void:
 		if gem == null:
 			return
 		var angle := randf() * TAU
-		var distance := randf_range(1.0, gem_spread)
+		var distance := randf_range(gem_min_spread, gem_spread)
 		gem.global_position = global_position \
 				+ Vector3(cos(angle), 0.0, sin(angle)) * distance + Vector3.UP * 0.6
 

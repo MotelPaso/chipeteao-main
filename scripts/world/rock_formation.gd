@@ -56,6 +56,18 @@ const JITTER: float = 0.22
 ## La distancia interior deja de medirse pasados estos metros: el perfil
 ## ya se aplanó mucho antes.
 const INTERIOR_CAP: float = 24.0
+## Longitud de onda en metros de los cuatro ruidos (frecuencia = 1 / esto;
+## más grande = rasgos más anchos): ondulación del perfil (LIFT), rugosidad
+## de las facetas (CRAG), temblor del contorno de la huella (EDGE) y cumbres
+## (SPIRE).
+const LIFT_WAVELENGTH: float = 28.0
+const CRAG_WAVELENGTH: float = 6.0
+const EDGE_WAVELENGTH: float = 9.0
+const SPIRE_WAVELENGTH: float = 16.0
+## Las cumbres empiezan a asomar a SPIRE_FADE_FROM metros hacia dentro del
+## borde de la huella y llegan a su altura completa en SPIRE_FADE_TO metros.
+const SPIRE_FADE_FROM: float = 3.0
+const SPIRE_FADE_TO: float = 9.0
 ## Altura mínima de roca sobre el suelo EN un borde de celda, en metros. La
 ## cápsula del barrido ocupa 0-1.8 m sobre el suelo ahí; cualquier altura
 ## sobre cero sella, y esto deja margen para el ruido y la curvatura del
@@ -235,19 +247,19 @@ func _setup_noise(noise_seed: int) -> void:
 	# huella y las cumbres.
 	_lift_noise.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH
 	_lift_noise.seed = noise_seed
-	_lift_noise.frequency = 1.0 / 28.0
+	_lift_noise.frequency = 1.0 / LIFT_WAVELENGTH
 	_lift_noise.fractal_octaves = 2
 	_crag_noise.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH
 	_crag_noise.seed = noise_seed + 1
-	_crag_noise.frequency = 1.0 / 6.0
+	_crag_noise.frequency = 1.0 / CRAG_WAVELENGTH
 	_crag_noise.fractal_octaves = 2
 	_edge_noise.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH
 	_edge_noise.seed = noise_seed + 2
-	_edge_noise.frequency = 1.0 / 9.0
+	_edge_noise.frequency = 1.0 / EDGE_WAVELENGTH
 	_edge_noise.fractal_octaves = 2
 	_spire_noise.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH
 	_spire_noise.seed = noise_seed + 3
-	_spire_noise.frequency = 1.0 / 16.0
+	_spire_noise.frequency = 1.0 / SPIRE_WAVELENGTH
 	_spire_noise.fractal_octaves = 1
 
 
@@ -322,7 +334,8 @@ func _profile(depth: float, at: Vector2) -> float:
 	var lift := 1.0 + style.lift_variation * _lift_noise.get_noise_2d(at.x, at.y)
 	var height := (cliff + crest) * lift
 	var ridge := 1.0 - absf(_spire_noise.get_noise_2d(at.x, at.y))
-	height += style.spire_height * ridge * ridge * ridge * smoothstep(3.0, 9.0, depth)
+	height += style.spire_height * ridge * ridge * ridge \
+			* smoothstep(SPIRE_FADE_FROM, SPIRE_FADE_TO, depth)
 	height += style.crag_height * _crag_noise.get_noise_2d(at.x, at.y) \
 			* smoothstep(0.0, cliff_run, depth)
 	var terrace_step := style.terrace_step
