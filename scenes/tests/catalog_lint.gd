@@ -47,6 +47,12 @@ const SFX_ROOTS: Array[String] = ["res://scripts", "res://scenes"]
 ## Llamadas a Sfx que reciben un id; el grupo 1 son sus argumentos hasta el
 ## paréntesis, un comentario o el fin de línea.
 const SFX_CALL_PATTERN := "Sfx\\.(?:play|play_loop|stop_loop|acquire_loop|release_loop|loop_refcount)\\(([^)#]*)"
+## Llamadas a MetaScreen.payoff(), que recibe el sonido entre sus argumentos;
+## el grupo 1 son esos argumentos, como en SFX_CALL_PATTERN.
+const SFX_PAYOFF_PATTERN := "payoff\\(([^)#]*)"
+## Constante de sonido en un .gd: un nombre con SOUND o SFX cuyo valor es un
+## literal StringName (FANFARE_SFX, SOUND...). BUS_NAME no entra.
+const SFX_CONST_PATTERN := "^const \\w*(?:SOUND|SFX)\\w*(?::\\s*StringName)?\\s*:?=\\s*&\"([^\"]+)\""
 ## Default de un export de sonido (`*_sound` / `*_loop`) en un .gd.
 const SFX_EXPORT_PATTERN := "^@export var \\w+_(?:sound|loop): StringName = &\"([^\"]+)\""
 ## Valor de un export de sonido guardado en un .tscn.
@@ -656,14 +662,17 @@ func _check_item_kinds_unique() -> void:
 
 
 ## Cada id de sonido escrito a mano: los `&"x"` de una llamada a Sfx
-## (play, acquire_loop...), los defaults de los exports `*_sound` / `*_loop`
-## y sus valores en las escenas. Un id que no está en Sfx.SOUND_LIBRARY no
-## suena y solo deja una advertencia perdida en el log.
+## (play, acquire_loop...) o a MetaScreen.payoff(), las constantes de sonido
+## (un nombre con SOUND o SFX, como FANFARE_SFX), los defaults de los exports
+## `*_sound` / `*_loop` y sus valores en las escenas. Un id que no está en
+## Sfx.SOUND_LIBRARY no suena y solo deja una advertencia perdida en el log.
 func _check_sfx_ids() -> void:
 	var failures: Array[String] = []
 	var rows := 0
 	var known: Dictionary = SFX_SCRIPT.SOUND_LIBRARY
 	var call_pattern := RegEx.create_from_string(SFX_CALL_PATTERN)
+	var payoff_pattern := RegEx.create_from_string(SFX_PAYOFF_PATTERN)
+	var const_pattern := RegEx.create_from_string(SFX_CONST_PATTERN)
 	var export_pattern := RegEx.create_from_string(SFX_EXPORT_PATTERN)
 	var scene_pattern := RegEx.create_from_string(SFX_SCENE_PATTERN)
 	var literal_pattern := RegEx.create_from_string(STRING_NAME_PATTERN)
@@ -676,10 +685,11 @@ func _check_sfx_ids() -> void:
 			if line.begins_with("#"):
 				continue
 			var ids: Array[String] = []
-			for call_match: RegExMatch in call_pattern.search_all(line):
-				for literal: RegExMatch in literal_pattern.search_all(call_match.get_string(1)):
-					ids.append(literal.get_string(1))
-			for pattern: RegEx in [export_pattern, scene_pattern]:
+			for args_pattern: RegEx in [call_pattern, payoff_pattern]:
+				for call_match: RegExMatch in args_pattern.search_all(line):
+					for literal: RegExMatch in literal_pattern.search_all(call_match.get_string(1)):
+						ids.append(literal.get_string(1))
+			for pattern: RegEx in [export_pattern, scene_pattern, const_pattern]:
 				var value_match := pattern.search(line)
 				if value_match != null:
 					ids.append(value_match.get_string(1))
