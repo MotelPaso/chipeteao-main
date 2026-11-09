@@ -69,7 +69,9 @@ const MAX_GRAPHICS_QUALITY := 2
 ## Ids viejos de personaje -> id actual. load_from_disk traduce con esta tabla
 ## los personajes desbloqueados y comprados y los contadores runs_as_/wins_as_
 ## de un guardado viejo. Si renombras un id en CharacterCatalog, agrega aquí
-## la fila viejo -> nuevo.
+## la fila viejo -> nuevo. Una llave de esta tabla no puede volver a ser id de
+## un personaje, y se traduce un solo salto: si renombras un id que ya es
+## destino de otras filas, cambia también esas filas.
 const ID_ALIASES: Dictionary[String, String] = {
 	"juno": "yandere_chan",
 	"Yandere-chan": "yandere_chan",
