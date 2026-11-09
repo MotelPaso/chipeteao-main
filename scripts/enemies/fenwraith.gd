@@ -70,6 +70,10 @@ enum State { ENTRANCE, PURSUE, NOVA, VOLLEY, BLINK }
 @export var first_blink_fraction: float = 0.6
 ## Radio en metros del disco que marca la salida (y el destello al llegar).
 @export var blink_disc_radius: float = 2.2
+## Escala del sudario aplastado contra el pantano al hundirse (x, y, z).
+@export var blink_sink_squash: Vector3 = Vector3(1.2, 0.1, 1.2)
+## Fracción de blink_windup que tarda el sudario en aplastarse (0-1).
+@export var blink_sink_fraction: float = 0.8
 ## Segundos que tarda el sudario en desplegarse al salir.
 @export var blink_rise_time: float = 0.3
 ## Fuerza del temblor de cámara al salir (0-1).
@@ -224,7 +228,7 @@ func _start_blink(player: Node3D) -> void:
 	_blink_target = _safe_arena_point(wanted)
 	Telegraph.spawn_disc(self, _blink_target, blink_disc_radius, blink_windup, telegraph_color)
 	# Señal de hundirse: el sudario se aplasta en el pantano durante la carga.
-	_play_cue(_visual, "scale", Vector3(1.2, 0.1, 1.2), blink_windup * 0.8,
+	_play_cue(_visual, "scale", blink_sink_squash, blink_windup * blink_sink_fraction,
 			Tween.TRANS_QUAD, Tween.EASE_IN)
 
 

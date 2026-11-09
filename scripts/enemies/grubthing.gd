@@ -39,6 +39,14 @@ const HOP_ARRIVAL_EPSILON: float = 0.35
 @export var hop_height_window: float = 1.4
 ## Tope de velocidad del salto en m/s (la velocidad es distancia / tiempo en el aire).
 @export var hop_max_speed: float = 24.0
+## Escala del cuerpo agazapado durante la carga del salto (x, y, z).
+@export var hop_windup_squash: Vector3 = Vector3(1.18, 0.62, 1.18)
+## Escala del cuerpo estirado al despegar (x, y, z).
+@export var hop_leap_stretch: Vector3 = Vector3(0.85, 1.25, 0.85)
+## Segundos que tarda el cuerpo en estirarse al despegar.
+@export var hop_stretch_time: float = 0.1
+## Metros que sube el cuerpo a mitad del salto (solo visual: el chasis sigue en el suelo).
+@export var hop_leap_lift: float = 1.1
 
 @export_group("Escupitajo")
 ## Distancia mínima al raider, en metros, para escupir.
@@ -162,7 +170,7 @@ func _start_hop(player: Node3D) -> void:
 	# Un solo disco cubre la carga y el vuelo, así la promesa dura hasta caer.
 	Telegraph.spawn_disc(self, _hop_target, hop_radius,
 			hop_windup + hop_leap_time, telegraph_color)
-	_play_cue_squash(Vector3(1.18, 0.62, 1.18), hop_windup)
+	_play_cue_squash(hop_windup_squash, hop_windup)
 
 
 func _begin_leap() -> void:
@@ -174,8 +182,8 @@ func _begin_leap() -> void:
 	move_speed = minf(flat.length() / maxf(hop_leap_time, 0.05), hop_max_speed)
 	# Arco solo visual: el cuerpo sube y baja mientras el chasis avanza.
 	var cue := _begin_cue()
-	cue.tween_property(_visual, "scale", Vector3(0.85, 1.25, 0.85), 0.1)
-	cue.parallel().tween_property(_visual, "position:y", 1.1, hop_leap_time * 0.5) \
+	cue.tween_property(_visual, "scale", hop_leap_stretch, hop_stretch_time)
+	cue.parallel().tween_property(_visual, "position:y", hop_leap_lift, hop_leap_time * 0.5) \
 			.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 	cue.tween_property(_visual, "position:y", 0.0, hop_leap_time * 0.5) \
 			.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
