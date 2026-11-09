@@ -102,6 +102,7 @@ omni_range = 5.0
 [node name="ProgressDisc" type="MeshInstance3D" parent="Visual"]
 visible = false
 transform = Transform3D(0.001, 0, 0, 0, 1, 0, 0, 0, 0.001, 0, 0.06, 0)
+editor_description = "El color, la opacidad y la energía de emisión los pinta charge_shrine.gd al iniciar (accent_color de la raíz de esta escena, disc_alpha, ring_energy_*); cambiarlos aquí no tiene efecto."
 mesh = SubResource("CylinderMesh_progress")
 
 [node name="Body" type="StaticBody3D" parent="."]
