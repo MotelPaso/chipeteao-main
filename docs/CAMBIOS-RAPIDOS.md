@@ -197,6 +197,7 @@ La lógica vive en ayudantes de `scripts/systems/spawner/` (`SpawnScaling`, `Spa
 | Portales, ruletas, cofres y cajas al inicio de cada etapa | RunSystems.tscn > WorldDirector > StageFixtures | `portal_count`, `roulette_count`, `extra_start_chests_min/max`, `start_pet_box_chance` |
 | Colores, recarga y avisos de los pares de portales | `scenes/world/director/PortalShrine.tscn` > PortalShrine | `pair_colors`, `cooldown`, `prompt_text`, `recharging_prompt` |
 | Color y tamaño del portal de salida | `scenes/world/director/ExitPortal.tscn` > ExitPortal | `portal_color`, `ring_radius` |
+| Aspecto de los portales (anillo, pilar, latido, luz) | `ExitPortal.tscn` > Visual (salida) o `PortalShrine.tscn` > Visual (pares; sin valores propios, usa los de `scripts/world/run/director/portal_visual.gd`) | `ring_*`, `pillar_*`, `idle_pulse_*`, `recharge_min_width`, `light_*` |
 
 ## Altares, cofres y secretos del mapa
 
@@ -288,6 +289,7 @@ de reparto se llama `ForestScatter`, `DuneScatter` o `MarshScatter`.
 | Ajustes: color de los valores y encabezados | `scenes/ui/SettingsPanel.tscn` > los nodos *Value; encabezados en SoundHeader/Label, ControlsHeader/Label y ScreenHeader/Label (texto y letra) y */Rule (línea) | Theme Overrides, `text`; `color` de cada Rule |
 | Rango de la sensibilidad del mouse | `scripts/systems/autoloads/save_data.gd` | `MIN_MOUSE_SENSITIVITY`, `MAX_MOUSE_SENSITIVITY` |
 | Pantalla de fin de partida | `scenes/ui/RunEndScreen.tscn` > TitleLabel; colores en `scripts/ui/game/run_end_screen.gd` | Theme Overrides; `DEFEAT_TITLE_COLOR`, `VICTORY_TITLE_COLOR` |
+| Títulos y subtítulos de cada final («MORISTE», «¡Sobreviviste!»…) | `scripts/ui/game/run_end_screen.gd` > `ENDINGS` (al comienzo) | `title`, `subtitle` |
 | Textos de ganancias y animación de la pantalla de fin | `RunEndScreen.tscn` > raíz | grupos «Textos» (`stages_format`, `quests_format`…) y «Animación» (`title_start_scale`, `shimmer_color`…) |
 | Colores compartidos y frases comunes («%d esquirlas», «J%d») | `scripts/ui/ui_theme.gd` | constantes al comienzo |
 | Orden de dibujo de las capas de UI | las capas de escena en la raíz de su .tscn (HUD 5, UpgradeCardUI 10, modal/ModalPanel 15, RunEndScreen 20, PauseMenu 30); las que se crean en código en `scripts/ui/ui_layers.gd` | Layer; una constante por capa |
@@ -307,4 +309,4 @@ de reparto se llama `ForestScatter`, `DuneScatter` o `MarshScatter`.
 | Precio del altar de la ruleta | `scenes/world/shrines/RouletteShrine.tscn` > raíz | `price` |
 | Cartas y textos de la tienda | `scenes/ui/modal/VendorPanel.tscn` > raíz | `card_size`, `card_title_font_size`, `sold_template` |
 | Precios y oferta del vendedor | `scenes/world/Vendor.tscn` > Vendor | `pet_price`, `powerup_price_growth`, `pet_offers`, `item_offers` (precio inicial del power-up: `POWERUP_VENDOR_BASE_PRICE` en `run_state.gd`) |
-| Aspecto del puesto del vendedor | `Vendor.tscn` > Stall, Figure, Sign, Light | malla, material, color de la luz |
+| Aspecto del puesto del vendedor | `Vendor.tscn` > Stall, Figure, Sign, Light | malla y material; el color de Figure, Sign y la luz sale del campo `color` de su fila en `VENDOR_LIBRARY` (`scripts/world/interactables/vendor.gd`), no de la escena |
