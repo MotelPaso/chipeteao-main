@@ -46,8 +46,9 @@ const KIND_ANIMALS: String = "animals"
 const KIND_POWERUPS: String = "powerups"
 const KIND_ITEMS: String = "items"
 
-## El menú que abre el puesto (VendorUi).
-const VENDOR_PANEL_SCENE := preload("res://scenes/ui/modal/VendorPanel.tscn")
+## El menú que abre el puesto (VendorUi). Se carga al abrirlo: vendor_ui.gd usa
+## Vendor y un preload aquí cerraría un ciclo de carga.
+const VENDOR_PANEL_PATH: String = "res://scenes/ui/modal/VendorPanel.tscn"
 
 ## Qué puesto es (id de fila de VENDOR_LIBRARY); lo fija el WorldDirector antes
 ## de que entre al árbol.
@@ -202,7 +203,7 @@ func _interact(player: Node) -> void:
 	if BlockingUi.any_open(get_tree()):
 		return
 	var offers := roll_offers(player)
-	var ui := VENDOR_PANEL_SCENE.instantiate() as VendorUi
+	var ui := (load(VENDOR_PANEL_PATH) as PackedScene).instantiate() as VendorUi
 	ui.setup(self, player, offers)
 	# Cuelga de la etapa como todo lo que aparece, así un cambio de etapa se
 	# lleva el panel junto con el puesto en vez de dejar un árbol pausado.
