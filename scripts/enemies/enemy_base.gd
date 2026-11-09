@@ -248,7 +248,7 @@ func death_burst_color() -> Color:
 ## velocidad durante `duration` segundos. Reaplicar REFRESCA en vez de
 ## acumular, así latigazos repetidos nunca la llevan a cero; como en
 ## apply_poison, ganan la ralentización MÁS FUERTE y el reloj MÁS LARGO.
-## Lo llaman las armas (Látigo de espinas, Hedor) y el spawner.
+## Lo llaman el Látigo de espinas y el Hedor.
 func apply_slow(speed_multiplier: float, duration: float) -> void:
 	if duration <= 0.0:
 		return
