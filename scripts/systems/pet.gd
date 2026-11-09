@@ -8,15 +8,28 @@ extends Node3D
 ##
 ## Una por raider: Player.set_pet() libera la vieja antes de crear la nueva.
 
-@export_group("Seguimiento")
+# --- Edita aquí -------------------------------------------------------------
+# Pet no tiene escena (PetSlot la crea con Pet.new()), así que sus ajustes
+# son estas constantes y no aparecen en el Inspector. Lo propio de cada
+# mascota (forma, tamaño, color, altura de vuelo, arma) está en su fila de
+# PetCatalog.
+
 ## Rigidez del seguimiento, en 1/segundos de suavizado exponencial: más alto
 ## es más rápido, y no depende de la frecuencia de física.
-@export var follow_speed: float = 6.0
-## Rigidez del giro, en 1/segundos de suavizado exponencial (como follow_speed).
-@export var turn_speed: float = 6.0
+const FOLLOW_SPEED: float = 6.0
+## Rigidez del giro, en 1/segundos de suavizado exponencial (como FOLLOW_SPEED).
+const TURN_SPEED: float = 6.0
 ## Posición respecto del dueño, en metros (rota con él).
-@export var follow_offset: Vector3 = Vector3(-1.4, 0.0, 1.2)
-@export_group("")
+const FOLLOW_OFFSET: Vector3 = Vector3(-1.4, 0.0, 1.2)
+## Intensidad del brillo (emisión) del cuerpo; el color es el de la fila.
+const BODY_GLOW: float = 0.35
+## Color de los ojos.
+const EYE_COLOR: Color = Color(0.05, 0.05, 0.08)
+## Cuánto sube y baja al flotar, en metros, sobre su altura de vuelo.
+const HOVER_BOB_HEIGHT: float = 0.12
+## Rapidez del vaivén al flotar, en radianes por segundo.
+const HOVER_BOB_SPEED: float = 3.0
+# --- fin de edita aquí ------------------------------------------------------
 
 var pet_id: String = ""
 var _row: Dictionary = {}
@@ -41,7 +54,7 @@ func _ready() -> void:
 	_body_color = _row.get("color", Color.WHITE)
 	var owner_body := get_parent() as Node3D
 	if owner_body != null:
-		global_position = owner_body.global_position + follow_offset
+		global_position = owner_body.global_position + FOLLOW_OFFSET
 	_build_body()
 	_build_weapon()
 
@@ -75,7 +88,7 @@ func _build_body() -> void:
 	material.albedo_color = _body_color
 	material.emission_enabled = true
 	material.emission = _body_color
-	material.emission_energy_multiplier = 0.35
+	material.emission_energy_multiplier = BODY_GLOW
 	_body.material_override = material
 	add_child(_body)
 	# Dos ojitos para que se lea como criatura y no como prop.
@@ -89,7 +102,7 @@ func _build_body() -> void:
 		eye_mesh.rings = 4
 		eye.mesh = eye_mesh
 		var eye_material := StandardMaterial3D.new()
-		eye_material.albedo_color = Color(0.05, 0.05, 0.08)
+		eye_material.albedo_color = EYE_COLOR
 		eye.material_override = eye_material
 		eye.position = Vector3(side * size * 0.35, size * 0.25, -size * 0.8)
 		add_child(eye)
@@ -121,14 +134,15 @@ func _physics_process(delta: float) -> void:
 	if owner_body == null:
 		return
 	var target := owner_body.global_position \
-			+ follow_offset.rotated(Vector3.UP, owner_body.rotation.y)
-	target.y = owner_body.global_position.y + _hover + sin(_time * 3.0) * 0.12
+			+ FOLLOW_OFFSET.rotated(Vector3.UP, owner_body.rotation.y)
+	target.y = owner_body.global_position.y + _hover \
+			+ sin(_time * HOVER_BOB_SPEED) * HOVER_BOB_HEIGHT
 	# Suavizado exponencial (1 - e^-kt), la convención del proyecto: un
 	# factor lineal delta * speed cambiaría la rigidez con la frecuencia de
 	# física y la teletransportaría cuando delta * speed pase de 1.
-	global_position = global_position.lerp(target, 1.0 - exp(-follow_speed * delta))
+	global_position = global_position.lerp(target, 1.0 - exp(-FOLLOW_SPEED * delta))
 	var to_owner := owner_body.global_position - global_position
 	to_owner.y = 0.0
 	if to_owner.length_squared() > 0.01:
 		rotation.y = lerp_angle(rotation.y, atan2(-to_owner.x, -to_owner.z),
-				1.0 - exp(-turn_speed * delta))
+				1.0 - exp(-TURN_SPEED * delta))
