@@ -8,6 +8,21 @@ extends Node
 ## armas leen los multiplicadores con los helpers de WeaponBase, la armadura
 ## se empuja al Health hermano y UpgradePool lee la suerte al sortear rarezas.
 
+## Pisos de los multiplicadores que un debuff podría llevar a cero (o
+## menos): un raider maldito sigue pegando, moviéndose, ganando XP y con
+## sus efectos activos, por muchos boons negativos que se acumulen.
+const MIN_DAMAGE_MULTIPLIER: float = 0.1
+const MIN_MOVE_MULTIPLIER: float = 0.2
+const MIN_DURATION_MULTIPLIER: float = 0.1
+const MIN_XP_MULTIPLIER: float = 0.1
+## Techo de saltos extra. No es gusto: el raider no tiene más control en el
+## aire que air_acceleration, y pasado esto la verticalidad de una arena
+## (mesetas, plataformas, el borde) deja de ser un obstáculo.
+const MAX_EXTRA_JUMPS: int = 5
+## Cada tipo que _apply_character_passive sabe correr; una fila fuera de esta
+## lista se rechaza al asignarla, no una vez por recompute.
+const PASSIVE_KINDS: Array[String] = ["per_level", "evasion_execute", "speed_to_damage"]
+
 @export_group("Base")
 ## Multiplicador de daño crítico antes de cualquier bono del Tomo de Ruina.
 @export var base_crit_damage: float = 5.0
@@ -26,21 +41,6 @@ extends Node
 ## el tipo "evasion_execute", así que no ajusta nada.
 @export var execute_threshold: float = 0.25
 @export_group("")
-
-## Pisos de los multiplicadores que un debuff podría llevar a cero (o
-## menos): un raider maldito sigue pegando, moviéndose, ganando XP y con
-## sus efectos activos, por muchos boons negativos que se acumulen.
-const MIN_DAMAGE_MULTIPLIER: float = 0.1
-const MIN_MOVE_MULTIPLIER: float = 0.2
-const MIN_DURATION_MULTIPLIER: float = 0.1
-const MIN_XP_MULTIPLIER: float = 0.1
-## Techo de saltos extra. No es gusto: el raider no tiene más control en el
-## aire que air_acceleration, y pasado esto la verticalidad de una arena
-## (mesetas, plataformas, el borde) deja de ser un obstáculo.
-const MAX_EXTRA_JUMPS: int = 5
-## Cada tipo que _apply_character_passive sabe correr; una fila fuera de esta
-## lista se rechaza al asignarla, no una vez por recompute.
-const PASSIVE_KINDS: Array[String] = ["per_level", "evasion_execute", "speed_to_damage"]
 
 # Valores derivados: cámbialos con add_tome()/recompute(), nunca a mano.
 var damage_multiplier: float = 1.0
