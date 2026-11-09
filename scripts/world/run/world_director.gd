@@ -40,7 +40,7 @@ const Beacon := preload("res://scripts/world/run/director/beacon.gd")
 ##   method:       solo en los eventos que no se resuelven con
 ##                 _event_spawn_poi (sortear el punto y poner `scene` ahí);
 ##                 se llama con call(row) y catalog_lint.gd revisa que exista.
-##   announce:     aviso en el HUD (texto del jugador).
+##   announce:     aviso en el HUD (texto del jugador); obligatorio.
 ##   beacon_color: color de la baliza sobre el evento; sin él no hay baliza.
 ##                 En los altares es aparte de su accent_color (la escena):
 ##                 cambia los dos. El vendedor no lo usa: su baliza toma el
@@ -49,8 +49,8 @@ const Beacon := preload("res://scripts/world/run/director/beacon.gd")
 ##                 POI se usa (o hasta el cambio de etapa si no hay POI).
 ##   altar:        cadencia de altares: el peso sube con el minuto y vale 0
 ##                 mientras haya demasiados altares sin usar.
-##   cap_group/cap: con `cap` o más nodos en el grupo `cap_group`, el evento
-##                 pesa 0 y sale otro.
+##   cap_group/cap: van juntos: con `cap` o más nodos en el grupo
+##                 `cap_group`, el evento pesa 0 y sale otro.
 ##   log:          línea de log al aparecer, para los soaks (no traducir).
 const EVENT_LIBRARY: Array[Dictionary] = [
 	{

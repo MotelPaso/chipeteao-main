@@ -23,12 +23,15 @@ extends RefCounted
 ##                  lunas y lluvias, de RunState.sky_duration_multiplier
 ##                  (los pactos no alargan los desastres).
 ##   announce:      aviso en el HUD al empezar; %s = dato que pone el
-##                  clima (el tsunami: de dónde viene la ola, ver
-##                  COMPASS_WORDS).
-##   sun_color, sun_energy, ambient_color: tinte del cielo; sun_energy
-##                  multiplica la energía original del sol. Sin sun_color
-##                  el cielo no cambia.
-##   fx_color:      color de los avisos en el suelo y las partículas.
+##                  clima. El del tsunami necesita su %s: de dónde viene
+##                  la ola (ver COMPASS_WORDS).
+##   sun_color, sun_energy, ambient_color: tinte del cielo; van los tres
+##                  juntos o ninguno. sun_energy multiplica la energía
+##                  original del sol. Sin ellos el cielo no cambia.
+##   fx_color:      color de los avisos en el suelo y las partículas;
+##                  obligatorio en las filas que ya lo tienen.
+##   impact_color, scorch_color: explosión y marca de cada meteorito;
+##                  obligatorios en meteor_shower.
 ##   altar_ok:      el altar de evento puede invocarlo.
 ##   start/tick/stop: métodos de WeatherDirector; tick y stop pueden ir
 ##                  vacíos.
