@@ -144,13 +144,14 @@ static func roll_id(exclude_star: bool = true) -> String:
 	return String(POWERUP_LIBRARY[0].id)
 
 
-## Cada fila que enciende la estrella: todas menos la estrella misma. Lo lee
+## Cada fila que enciende la estrella: todas menos la estrella misma, con la
+## descripción ya armada como en by_id() (ver RowText). Lo lee
 ## PowerUps.apply(); una fila nueva se suma a la estrella sola.
 static func star_components() -> Array[Dictionary]:
 	var rows: Array[Dictionary] = []
 	for row: Dictionary in POWERUP_LIBRARY:
 		if String(row.get("kind", "")) != "star":
-			rows.append(row)
+			rows.append(RowText.render(row))
 	return rows
 
 

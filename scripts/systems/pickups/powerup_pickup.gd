@@ -21,6 +21,8 @@ extends Area3D
 @export var lifetime: float = 45.0
 ## Segundos de vida de la estrella: más larga porque se mueve y hay que alcanzarla.
 @export var star_lifetime: float = 60.0
+## Segundos del desvanecimiento antes de que el nodo se libere.
+@export var fade_time: float = 0.45
 
 @export_group("Ronda de la estrella")
 ## Velocidad de ronda de la estrella, en m/s (las demás filas no se mueven).
@@ -32,6 +34,8 @@ extends Area3D
 ## Distancia, en metros, que mira adelante la estrella buscando un muro en
 ## el que rebotar.
 @export var roam_probe: float = 3.0
+## Ciclo arcoíris del tinte de la estrella, en vueltas por segundo.
+@export var star_hue_hz: float = 0.55
 
 @export_group("Flotación y giro")
 ## Altura de la flotación en reposo, en metros.
@@ -41,11 +45,6 @@ extends Area3D
 ## Giro de la gema, en radianes por segundo.
 @export var spin_speed: float = 1.8
 @export_group("")
-
-## Segundos del desvanecimiento antes de que el nodo se libere.
-const FADE_TIME: float = 0.45
-## Ciclo arcoíris del tinte de la estrella, en vueltas completas por segundo.
-const STAR_HUE_HZ: float = 0.55
 
 var powerup_id: String = ""
 ## True para la fila de la estrella: ronda, salta y rebota en vez de quedarse.
@@ -170,7 +169,7 @@ func _tick_roam(delta: float) -> void:
 
 
 func _tick_star_tint() -> void:
-	var tint := Color.from_hsv(fmod(_time * STAR_HUE_HZ, 1.0), 0.75, 1.0)
+	var tint := Color.from_hsv(fmod(_time * star_hue_hz, 1.0), 0.75, 1.0)
 	_material.albedo_color = tint
 	_material.emission = tint
 	_light.light_color = tint
@@ -227,7 +226,7 @@ func _vanish() -> void:
 	set_deferred("monitoring", false)
 	remove_from_group(&"map_markers")
 	var tween := create_tween()
-	tween.tween_property(self, "scale", Vector3.ONE * 0.05, FADE_TIME) \
+	tween.tween_property(self, "scale", Vector3.ONE * 0.05, fade_time) \
 			.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_IN)
 	tween.tween_callback(queue_free)
 

@@ -65,10 +65,8 @@ void fragment() {
 @export_group("Destello de golpe")
 ## Segundos que dura el destello blanco de un cuerpo golpeado.
 @export var flash_duration: float = 0.08
-## Color y opacidad (alfa) del destello; el brillo usa el mismo color.
+## Color y opacidad (alfa) del destello.
 @export var flash_color: Color = Color(1.0, 1.0, 1.0, 0.7)
-## Intensidad del brillo (emisión) del destello.
-@export var flash_emission_energy: float = 2.2
 
 @export_group("Viñeta de daño")
 ## Opacidad máxima (0-1) de la viñeta roja al recibir un golpe. El color
@@ -105,8 +103,6 @@ void fragment() {
 @export var level_pulse_duration: float = 0.5
 ## Opacidad inicial (0-1) del anillo.
 @export var level_ring_alpha: float = 0.85
-## Intensidad del brillo (emisión) del anillo.
-@export var level_ring_emission_energy: float = 2.4
 ## Escala del anillo al nacer (x/z = ancho, y = grosor).
 @export var level_ring_start_scale: Vector3 = Vector3(0.4, 0.55, 0.4)
 ## Escala del anillo al terminar (x/z = ancho, y = grosor).
@@ -197,13 +193,12 @@ func _ready() -> void:
 	_noise_y.seed = 7331
 	_noise_x.frequency = 3.0
 	_noise_y.frequency = 3.0
+	# Sin sombreado: el destello se ve solo con su albedo (flash_color), sin
+	# luces ni emisión.
 	_flash_material = StandardMaterial3D.new()
 	_flash_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	_flash_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	_flash_material.albedo_color = flash_color
-	_flash_material.emission_enabled = true
-	_flash_material.emission = Color(flash_color, 1.0)
-	_flash_material.emission_energy_multiplier = flash_emission_energy
 	_build_vignette()
 	RunState.leveled_up.connect(_on_leveled_up)
 
@@ -570,7 +565,7 @@ func _on_leveled_up(_new_level: int) -> void:
 			_spawn_level_ring(player.global_position + Vector3.UP * 0.15)
 
 
-## Anillo emisivo que se expande a los pies del jugador. Su tween ignora la
+## Anillo que se expande a los pies del jugador. Su tween ignora la
 ## pausa para que el pulso se vea bajo la UI de cartas.
 func _spawn_level_ring(at: Vector3) -> void:
 	var scene_root := RunRoot.stage_parent(get_tree())
@@ -612,13 +607,11 @@ func _build_level_ring_assets() -> void:
 	# ven redondos; 8 lados alcanzan para el tubo delgado.
 	_level_ring_mesh.rings = 32
 	_level_ring_mesh.ring_segments = 8
+	# Sin sombreado, como el destello: el anillo se ve solo con su albedo.
 	_level_ring_material = StandardMaterial3D.new()
 	_level_ring_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	_level_ring_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	_level_ring_material.albedo_color = Color(level_pulse_color, level_ring_alpha)
-	_level_ring_material.emission_enabled = true
-	_level_ring_material.emission = level_pulse_color
-	_level_ring_material.emission_energy_multiplier = level_ring_emission_energy
 
 
 # --- Matemática compartida -----------------------------------------------------

@@ -13,6 +13,21 @@ extends Control
 ## sacudida y el empujón de FOV llegan a la pantalla dividida, donde el
 ## viewport raíz no tiene cámara activa.
 
+# --- Edita aquí -------------------------------------------------------------
+# SplitScreen no tiene escena (RunSystems la arma con SplitScreen.build()),
+# así que el panel de relleno del cuadrante libre con 3 jugadores se ajusta
+# con estas constantes y no en el Inspector.
+
+## Color de fondo del panel de relleno.
+const FILLER_BG: Color = Color(0.05, 0.055, 0.08)
+## Texto centrado en el panel de relleno.
+const FILLER_TEXT: String = "BONKRAIDERS"
+## Color del texto del panel de relleno.
+const FILLER_TEXT_COLOR: Color = Color(0.25, 0.27, 0.33)
+## Tamaño de la letra del panel de relleno, en píxeles.
+const FILLER_FONT_SIZE: int = 28
+# --- fin de edita aquí ------------------------------------------------------
+
 ## La vista de un jugador: la cámara que dibuja en su SubViewport y la
 ## cámara del jugador que copia cada frame.
 class CameraPair:
@@ -140,12 +155,12 @@ static func _filler_panel() -> Control:
 	var panel := PanelContainer.new()
 	panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_apply_rect(panel, Rect2(0.5, 0.5, 0.5, 0.5))
-	panel.add_theme_stylebox_override("panel", UiTheme.flat(Color(0.05, 0.055, 0.08), 0))
+	panel.add_theme_stylebox_override("panel", UiTheme.flat(FILLER_BG, 0))
 	var label := Label.new()
-	label.text = "BONKRAIDERS"
+	label.text = FILLER_TEXT
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	label.add_theme_color_override("font_color", Color(0.25, 0.27, 0.33))
-	label.add_theme_font_size_override("font_size", 28)
+	label.add_theme_color_override("font_color", FILLER_TEXT_COLOR)
+	label.add_theme_font_size_override("font_size", FILLER_FONT_SIZE)
 	panel.add_child(label)
 	return panel

@@ -34,6 +34,10 @@ const POINTS_SOURCE := "powerup_gold"
 ## tomarla limpie los suyos y solo los suyos.
 const BOON_TAG_PREFIX := "powerup:"
 
+@export_group("Textos")
+## Segunda línea del aviso de un power-up: %s = descripción, %d = segundos.
+@export var toast_template: String = "%s (%d s)"
+
 ## HP máx. permanente guardado por «Modo vampiro». Es un TOTAL GUARDADO que
 ## PlayerStats.recompute vuelve a sumar en cada reconstrucción; nunca se suma
 ## sobre un valor derivado, que _reset_derived borraría.
@@ -239,7 +243,7 @@ func _live_value(kind: String, field: String) -> float:
 
 func _announce(row: Dictionary, duration: float) -> void:
 	get_tree().call_group("hud", "show_loot", String(row.display_name),
-			"%s (%d s)" % [String(row.get("description", "")), roundi(duration)],
+			toast_template % [String(row.get("description", "")), roundi(duration)],
 			row.get("color", Color.WHITE) as Color, _player_index())
 
 
