@@ -67,8 +67,8 @@ grupos con su nombre.
 | Qué quieres cambiar | Dónde | Qué propiedad |
 | --- | --- | --- |
 | Daño, enfriamiento y alcance de un arma | `scenes/weapons/<Arma>.tscn` > raíz (grupo «Estadísticas») | `damage`, `cooldown`, `attack_range`, `projectile_count` |
-| Cómo se reparten los disparos extra del Tomo de Multitud | `<Arma>.tscn` > raíz (grupo «Multitud») | `extra_stagger` (segundos entre extras), `extra_fan_deg` |
-| Color o forma del efecto de un arma | `<Arma>.tscn` > raíz, la malla del grupo (`flask_mesh`, `beam_mesh`, `orb_mesh`, `cloud_mesh`, `puddle_mesh`, `bolt_mesh`) | su material: `albedo_color` (color y opacidad); son materiales sin sombreado, la emisión no se ve |
+| Cómo se reparten los disparos extra del Tomo de Multitud | `<Arma>.tscn` > raíz (grupo «Multitud»); Pistola de dardos y Arco de caza: grupos «Dardos» / «Flechas» | `extra_stagger` (segundos entre extras), `extra_fan_deg`; `fan_spread_deg` |
+| Color o forma del efecto de un arma | `<Arma>.tscn` > raíz, la malla del grupo (`flask_mesh`, `beam_mesh`, `orb_mesh`, `cloud_mesh`, `puddle_mesh`, `bolt_mesh`); el Aura: `Aura.tscn` > `Disc` > `mesh` > material | su material: `albedo_color` (color y opacidad); son sin sombreado (la emisión no se ve), salvo `flask_mesh`: sombreado, su color es `albedo_color` más `emission`. En `bolt_mesh` solo cuenta la opacidad: el color sale de `assets/enemies/enemy_look.tres` > `possessed_color` |
 | Espada corta | `Shortsword.tscn` > Shortsword | `arc_angle_deg`, `swing_time`, `slash_color`, `spark_color` |
 | Dagas gemelas | `TwinDaggers.tscn` > TwinDaggers | `slash_time`, `slash_radius`, `slash_color`, `slash_sweep_deg` |
 | Orbes espirituales (tamaño visual, tamaño de golpe, velocidad) | `SpiritOrbs.tscn` > SpiritOrbs (grupo «Orbes») | `orb_radius`, `hit_radius`, `orbit_speed`, `orb_height` |
@@ -103,7 +103,9 @@ grupos con su nombre.
 | Colores del shiny, del veneno, de los poseídos y la animación de muerte | `assets/enemies/enemy_look.tres` (ábrelo en el Inspector) | grupos Shiny, Veneno, Poseído, Muerte; `possessed_color` tiñe también el rayo del Báculo de nigromante |
 | Luna de sangre y eclipse (velocidad, daño, vida, color) | `scripts/enemies/enemy_base.gd`, tabla `VARIANTS` al comienzo | filas `berserker` y `shade` |
 | Altura a la que apuntan las armas | `scripts/enemies/enemy_base.gd` (grupo «Puntería») o la escena del enemigo | `aim_height` |
-| Colores de los avisos y del impacto de un jefe, temblor y destello | `scenes/enemies/<Jefe>.tscn` > raíz (grupo «Telegrafía») | `telegraph_color`, `impact_color`, `impact_shake_strength`, `impact_shake_duration`, `impact_flash_time` |
+| Colores de los avisos y del impacto de un jefe, temblor y destello | `scenes/enemies/<Jefe>.tscn` > raíz (grupo «Telegrafía») | `telegraph_color`, `impact_color`, `impact_shake_strength`, `impact_shake_duration`, `impact_flash_time` (los ataúdes del Sarcognato usan `coffin_telegraph_color` y `coffin_shake_*`; el parpadeo del Espectro de la Ciénaga, `blink_shake_*`; el escupitajo del Larvón, `glob_flash_time`; el mordisco del Cofre Mímico, `snap_flash_time`) |
+| Avisos, impacto y arena del Excavadunas | `scenes/enemies/Duneburrower.tscn` > raíz (grupo «Telegrafía») | `telegraph_color`, `impact_color`, `impact_flash_time`, `impact_shake_*`, `sand_burst_*` |
+| Llegada de un jefe (anillo y aparición) | `scripts/enemies/boss_base.gd` (grupo «Llegada compartida») o `<Jefe>.tscn` > raíz | `entrance_ring_time`, `entrance_pop_time`, `entrance_start_scale`; `entrance_ring_radius` (Sarcognato, Larvón, Cofre Mímico) |
 | Lo que paga un jefe al morir | `<Jefe>.tscn` > raíz | `boss_gem_count`, `boss_gem_value`, `health_orb_count`, `base_chest_drops` |
 | Púas de corteza (Rey Pútrido) y de arenisca (Sarcognato) | `scenes/enemies/BarkSpikes.tscn` / `SandSpikes.tscn` | la malla y el material de `Spike1`; tiempos en la raíz |
 | Láseres (color y grosor) | `Sunspitter.tscn` / `Sarcognath.tscn` | color: `color` en AimLine / WarnLine (aviso) y Beam (disparo); grosor del aviso: `aim_width_start` / `aim_width_end` (raíz del Sunspitter) o `warn_width_start` / `warn_width_end` (raíz del Sarcognath); grosor del disparo: Beam > `default_thickness` |
