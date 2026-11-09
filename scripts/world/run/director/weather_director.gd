@@ -49,7 +49,7 @@ const FULL_MOON_TAG: String = "full_moon"
 @export_group("Luna llena")
 ## XP extra (porcentaje) que da la luna llena a todo el grupo.
 @export var full_moon_xp_bonus: float = 50.0
-## Suerte extra que da la luna llena a todo el grupo.
+## Suerte extra (puntos de suerte) que da la luna llena a todo el grupo.
 @export var full_moon_luck_bonus: float = 30.0
 
 @export_group("Lluvia de enemigos")
@@ -67,6 +67,10 @@ const FULL_MOON_TAG: String = "full_moon"
 @export var enemy_rain_telegraph_radius: float = 1.4
 ## Segundos que dura ese aviso.
 @export var enemy_rain_telegraph_time: float = 1.0
+## Altura (metros) del destello sobre cada aviso de caída.
+@export var enemy_rain_burst_height: float = 3.0
+## Partículas de ese destello.
+@export var enemy_rain_burst_count: int = 6
 
 @export_group("Lluvia radiactiva")
 ## Segundos entre charcos de ácido.
@@ -104,7 +108,7 @@ const FULL_MOON_TAG: String = "full_moon"
 @export_group("Terremoto")
 ## Segundos entre sacudidas de cámara.
 @export var earthquake_shake_interval: float = 0.5
-## Fuerza de cada sacudida de cámara.
+## Fuerza de cada sacudida de cámara (trauma, 0-1).
 @export var earthquake_shake_strength: float = 0.25
 ## Cuánto se desplaza el HUD (píxeles).
 @export var earthquake_hud_amplitude: float = 14.0
@@ -112,6 +116,8 @@ const FULL_MOON_TAG: String = "full_moon"
 @export var earthquake_hud_hz: float = 20.0
 ## Segundos entre nubes de polvo sobre cada jugador.
 @export var earthquake_dust_interval: float = 3.0
+## Partículas de cada nube de polvo.
+@export var earthquake_dust_count: int = 8
 
 @export_group("Meteoritos")
 ## Segundos entre meteoritos.
@@ -130,8 +136,10 @@ const FULL_MOON_TAG: String = "full_moon"
 @export var meteor_damage_per_minute: float = 0.05
 ## Multiplicador del daño del impacto a los enemigos.
 @export var meteor_enemy_scale: float = 3.0
-## Fuerza de la sacudida de cámara de cada impacto.
+## Fuerza de la sacudida de cámara de cada impacto (trauma, 0-1).
 @export var meteor_impact_shake: float = 0.35
+## Partículas de la explosión de cada impacto.
+@export var meteor_impact_burst_count: int = 26
 ## Tamaño de la marca del impacto, relativo a meteor_radius.
 @export var meteor_scorch_scale: float = 0.8
 ## Segundos que dura la marca del impacto.
@@ -406,7 +414,8 @@ func _weather_tick_enemy_rain(delta: float) -> void:
 		points.append(point)
 		Telegraph.spawn_disc(self, point, enemy_rain_telegraph_radius,
 				enemy_rain_telegraph_time, color)
-		Juice.burst(point + Vector3.UP * 3.0, color, 6)
+		Juice.burst(point + Vector3.UP * enemy_rain_burst_height, color,
+				enemy_rain_burst_count)
 	if not points.is_empty():
 		# Sin el cupo de horda (false): la lluvia es clima de 35 s, y con
 		# ese cupo la arena se quedaba en su tope toda la ventana, un muro
@@ -503,7 +512,7 @@ func _weather_tick_earthquake(delta: float) -> void:
 		_weather_state["dust_left"] = earthquake_dust_interval
 		var dust: Color = _active_row()["fx_color"]
 		for body: Node3D in _all_raiders():
-			Juice.burst(body.global_position, dust, 8)
+			Juice.burst(body.global_position, dust, earthquake_dust_count)
 	# El HUD es un CanvasLayer: UN desplazamiento mueve todo lo que tiene
 	# (barras, reloj, minimapas). El mapa de Tab está en otra capa y queda
 	# quieto a propósito: un mapa que tiembla no se puede leer.
@@ -559,7 +568,7 @@ func _weather_tick_meteors(delta: float) -> void:
 ## quieto es el error.
 func _meteor_impact(at: Vector3) -> void:
 	var row := _active_row()
-	Juice.burst(at + Vector3.UP * 0.5, row["impact_color"], 26)
+	Juice.burst(at + Vector3.UP * 0.5, row["impact_color"], meteor_impact_burst_count)
 	Juice.shake(meteor_impact_shake)
 	Telegraph.spawn_disc(self, at, meteor_radius * meteor_scorch_scale, meteor_scorch_time,
 			row["scorch_color"])

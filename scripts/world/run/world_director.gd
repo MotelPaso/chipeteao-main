@@ -189,6 +189,10 @@ class TimedBeacon:
 @export var rift_gem_count: int = 10
 ## XP de cada gema de la grieta (una gema normal vale 1).
 @export var rift_gem_value: int = 3
+## Distancia mínima (metros) de cada gema de la grieta a su centro.
+@export var rift_gem_min_spread: float = 0.6
+## Distancia máxima (metros) de cada gema de la grieta a su centro.
+@export var rift_gem_max_spread: float = 2.6
 ## Pesos que reemplazan los de EVENT_LIBRARY, por id de evento; 0 quita el
 ## evento. Vale para todas las arenas: el director es uno por partida.
 @export var event_weight_overrides: Dictionary[String, float] = {}
@@ -541,7 +545,7 @@ func _event_essence_rift(row: Dictionary) -> void:
 		gem.xp_value = rift_gem_value
 		var angle := TAU * float(i) / float(rift_gem_count)
 		gem.global_position = center + Vector3(cos(angle), 0.0, sin(angle)) \
-				* randf_range(0.6, 2.6) + Vector3.UP * 0.6
+				* randf_range(rift_gem_min_spread, rift_gem_max_spread) + Vector3.UP * 0.6
 	if not HealthOrb.at_soft_cap(get_tree()):
 		var orb := Pools.acquire_scene(Pools.HEALTH_ORB_SCENE) as HealthOrb
 		if orb != null:
