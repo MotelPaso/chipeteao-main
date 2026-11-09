@@ -301,7 +301,9 @@ Una partida es una **secuencia de etapas**, una por mapa, en el orden de `MAP_LI
 | `scripts/world/run/arena.gd` (`Arena`, grupo `arena_root`)                              | Raíz de cada bioma. `map_id`, `SpawnPoint`, y el **orden** del ciclo de vida.                                                                                                                                                                                                                                                                                                           |
 | `scripts/world/run/exit_portal.gd` (`ExitPortal`) | El portal de salida de la etapa, escena `scenes/world/director/ExitPortal.tscn`. |
 | `scripts/world/run/world_director.gd` (`WorldDirector`, grupo `world_director`) | Dura toda la partida: los hooks de etapa, el tick de eventos (`EVENT_LIBRARY`), el portal de salida y las balizas. Sus dos hijos en `RunSystems.tscn` hacen el resto. |
-| `scripts/world/run/director/weather_director.gd` (`WeatherDirector`, nodo `WorldDirector/Weather`) | El clima: lunas, lluvias y desastres (`WEATHER_CATALOG`), el tinte del cielo y los charcos ácidos. |
+| `scripts/world/run/director/weather_director.gd` (`WeatherDirector`, nodo `WorldDirector/Weather`) | El clima: lunas, lluvias y desastres, el canal de uno a la vez, sus exports y los charcos ácidos. |
+| `scripts/world/run/director/weather_catalog.gd` (`WeatherCatalog`, `RefCounted`) | La tabla de climas `WEATHER_CATALOG`, `STRETCHABLE_GROUPS`, `COMPASS_WORDS` y las tiradas por peso (`roll_group`, `roll_altar`). `WeatherDirector.WEATHER_CATALOG` y `weather_row()` reenvían aquí. |
+| `scripts/world/run/director/sky_tint.gd` (`SkyTint`, `RefCounted`) | El tinte del cielo: cachea el Sol y el `Environment` de la arena, los tiñe y los devuelve con **un solo** tween, creado sobre el nodo `Weather`. |
 | `scripts/world/run/director/stage_fixtures.gd` (`StageFixtures`, nodo `WorldDirector/StageFixtures`) | Lo que se pone al empezar cada etapa: inicio irregular, cofres gratis, portales emparejados, ruletas, cajas de mascotas, altares de eventos y bloques de la suerte. |
 | `scripts/world/run/director/stage_layout.gd` (`StageLayout`, `RefCounted`) | Las preguntas de geometría de una etapa: `event_point`, `claim_clear_point`, `ring_point`, `exit_portal_point`, `ground_height`, `shuffle_ground_interactables`. Un `StageLayout` nuevo por etapa. |
 | `scenes/world/director/` | Las escenas que pone el director: `ExitPortal.tscn`, `PortalShrine.tscn`, `PortalVisual.tscn` (`portal_visual.gd`, el aspecto que comparten los dos portales), `Beacon.tscn` (`beacon.gd`, la baliza) y `SupplyChest.tscn`. |
@@ -316,7 +318,7 @@ Una partida es una **secuencia de etapas**, una por mapa, en el orden de `MAP_LI
 5. `Arena._ready()` llama `scatter.place_props()`, así que la lista de keepouts ve las posiciones **ya barajadas** — exactamente el orden que producía el viejo reparto `_enter_tree`/`_ready` cuando cada arena tenía su propio director.
 6. `RunRoot` coloca al equipo (`run_systems.place_party(origin)`, que reusa la geometría del anillo de co-op y **re-ancla el rescate del vacío** de cada cuerpo) y emite `stage_changed`.
 
-**Por qué el re-cacheo de luces es obligatorio**: `WeatherDirector._cache_lights()` sale temprano si `_sun` ya está puesto, y su `_exit_tree` no se dispara entre etapas, porque el director sobrevive a la arena. Sin ponerlas a `null` en `begin_stage` (llamado desde `on_stage_started`), la segunda etapa tintaría el Sol liberado de la primera y **ningún evento de cielo se vería** a partir de ahí. El soak lo comprueba: el harness dispara una luna de sangre 5 s después de cada cambio de etapa.
+**Por qué el re-cacheo de luces es obligatorio**: `SkyTint.cache()` sale temprano si ya tiene un Sol, y el `_exit_tree` del `WeatherDirector` no se dispara entre etapas, porque el director sobrevive a la arena. Sin `SkyTint.forget()` en `WeatherDirector.begin_stage` (llamado desde `on_stage_started`), la segunda etapa tintaría el Sol liberado de la primera y **ningún evento de cielo se vería** a partir de ahí. El soak lo comprueba: el harness dispara una luna de sangre 5 s después de cada cambio de etapa.
 
 ### El cambio de etapa (`advance_stage`)
 
@@ -758,7 +760,7 @@ estructura de datos y no un acuerdo entre tres temporizadores.
 | `earthquake`       | disaster | 25 s     | —               | sacudida + HUD desplazado                    |
 | `meteor_shower`    | disaster | 30 s     | —               | zonas marcadas, luego impacto                |
 
-La tabla es `WEATHER_CATALOG`, al principio de `weather_director.gd`. Campos
+La tabla es `WEATHER_CATALOG`, en `weather_catalog.gd` (`WeatherCatalog`; su encabezado dice qué campos se editan libremente). Campos
 de fila: `id`, `group`, `weight` (dentro de su grupo), `duration`,
 `start`/`tick`/`stop` (nombres de método de `WeatherDirector`, `tick` y `stop`
 opcionales; el lint `director_methods` comprueba que existan), `follow_up` y
@@ -799,7 +801,7 @@ tiñen nada de lo que esa puerta habla.
 
 El `stop` de la fila viva corre desde `WeatherDirector.end_stage()` —que
 llaman `WorldDirector.on_stage_ended()` y el `_exit_tree()` del propio
-`WeatherDirector`— **antes** de `_snap_sky_back()`: una lluvia dorada que
+`WeatherDirector`— **antes** de `SkyTint.snap_back()`: una lluvia dorada que
 terminara con la etapa dejaría un multiplicador de puntos ×2 en cada raider
 y un descuento de 0.5 en `RunState`, y los dos sobreviven a la arena.
 `begin_stage()` (desde `on_stage_started(arena)`) arranca con el canal vacío, y `RunState.reset()`
@@ -1257,7 +1259,7 @@ cada una que pasa y un `push_error` por cada fallo:
 | `paths_exist`               | toda ruta `scene` / `weapon_scene` / `scene_path` / `icon`, con `ResourceLoader.exists`                                                                                                    |
 | `stat_ids`                  | todo `passive_stat`, `stat` de objeto/power-up/mascota/reliquia y stat de boon de altar o pacto contra las ramas del `match` de `PlayerStats._apply_effect`                                |
 | `character_weapons`         | el `weapon_node_name` de cada raider existe como `node_name` en `WeaponCatalog.WEAPON_LIBRARY`                                                                                            |
-| `director_methods`          | todo `method` de `EVENT_LIBRARY` está declarado en `world_director.gd` (y toda fila sin `method` trae una `scene`); todo `start`/`tick`/`stop` de `WEATHER_CATALOG` está declarado en `weather_director.gd` |
+| `director_methods`          | todo `method` de `EVENT_LIBRARY` está declarado en `world_director.gd` (y toda fila sin `method` trae una `scene`); todo `start`/`tick`/`stop` de `WEATHER_CATALOG` (`weather_catalog.gd`) está declarado en `weather_director.gd` |
 | `weapon_properties`         | toda `extra_entries.property` y toda clave `mults`/`adds` de evolución existe en el arma destino (se instancia la escena y se lee su lista de propiedades)                                 |
 | `vendor_lucky_roulette_ids` | ids únicos en `VENDOR_LIBRARY`, `LUCKY_REWARDS` y `OUTCOMES`                                                                                                                               |
 | `marker_labels`             | todo `marker_kind` que algún `.gd` o `.tscn` asigna y toda clave de `MARKER_STYLES` (salvo `player`/`boss`/`exit`) tiene fila en `MARKER_LABELS`, **a menos que** esté en `MapDraw.LEGEND_VARIANTS` |

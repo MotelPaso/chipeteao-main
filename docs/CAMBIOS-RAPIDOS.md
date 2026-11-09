@@ -182,7 +182,10 @@ Lo que no cambia por mapa se edita en `scripts/systems/enemy_spawner.gd`.
 | Tope y ritmo de los altares | RunSystems.tscn > WorldDirector (grupo «Altares») | `altar_cap_base`, `altar_cap_minutes` |
 | Aspecto del pilar de baliza | `scenes/world/director/Beacon.tscn` > Pillar (su malla) / Light / raíz | `height` y radios de la malla (el pilar se apoya solo en el suelo), `light_energy`, `pulse_half_time`, `pillar_alpha`; el color sale de la fila del evento (`beacon_color`), no del material |
 | Cofre de suministros (rareza mínima, suerte) | `scenes/world/director/SupplyChest.tscn` > SupplyChest | `min_rarity`, `luck_bonus` |
-| Aviso, tinte del cielo, nombre en el HUD y partículas de un clima | `scripts/world/run/director/weather_director.gd` > su fila en `WEATHER_CATALOG` | `announce`, `sun_color`, `sun_energy`, `ambient_color`, `fx_color`, `display_name` |
+| Aviso, tinte del cielo, nombre en el HUD y partículas de un clima | `scripts/world/run/director/weather_catalog.gd` > su fila en `WEATHER_CATALOG` | `announce`, `sun_color`, `sun_energy`, `ambient_color`, `fx_color`, `display_name` |
+| Peso, duración base y si el altar de evento puede invocar un clima | `scripts/world/run/director/weather_catalog.gd` > su fila en `WEATHER_CATALOG` | `weight`, `duration`, `altar_ok` |
+| De dónde viene el tsunami (texto del aviso) | `scripts/world/run/director/weather_catalog.gd` | `COMPASS_WORDS` |
+| Segundos del paso al tinte del cielo y de la vuelta | `scripts/world/run/director/sky_tint.gd` | `TINT_SECONDS`, `RESTORE_SECONDS` |
 | Duración de un clima y probabilidades de desastre, lluvia y luna | RunSystems.tscn > WorldDirector > Weather | `weather_duration_overrides`, `disaster_chance`, `rain_chance`, `sky_event_chance` |
 | Ácido, meteoritos y tsunami (daño, radio, frecuencia) | RunSystems.tscn > WorldDirector > Weather (grupos por clima) | `acid_pool_*`, `meteor_*`, `tsunami_*` |
 | Bonos de la luna llena y de la lluvia dorada | RunSystems.tscn > WorldDirector > Weather | `full_moon_xp_bonus`, `full_moon_luck_bonus`, `golden_points_multiplier` |
@@ -250,7 +253,7 @@ de reparto se llama `ForestScatter`, `DuneScatter` o `MarshScatter`.
 | Fondo, borde y brillo de cada ficha | `scenes/ui/hud/LoadoutTile.tscn` > raíz | `background_color`, `border_width`, `glow_size` |
 | Tarjeta de botín | `scenes/ui/hud/LootToast.tscn` > raíz | `hold_time`, `fade_time`, `background_color` |
 | Filas de compañeros en co-op | `scenes/ui/hud/MateRow.tscn` > raíz | `knocked_out_format`, `knocked_out_tint`, `points_format` |
-| Color del chip de clima bajo el reloj | HUD.tscn > TimerLabel/WeatherBadge | `group_colors`, `text_format` (el nombre sale de `display_name` en `weather_director.gd`) |
+| Color del chip de clima bajo el reloj | HUD.tscn > TimerLabel/WeatherBadge | `group_colors`, `text_format` (el nombre sale de `display_name` en `weather_catalog.gd`) |
 | Insignia de FPS | HUD.tscn > FpsBadge | `text_format`, `background_color`, `refresh_seconds` |
 | Marco y refresco del minimapa | `scripts/ui/maps/minimap.gd` (bloque «Edita aquí») | `FRAME_PAD`, `MARKER_SCALE`, `BACKGROUND_COLOR`, `REFRESH` |
 | Colores, formas y leyenda de los marcadores del mapa | `scripts/ui/maps/map_draw.gd` | `MARKER_STYLES`, `MARKER_LABELS` |
