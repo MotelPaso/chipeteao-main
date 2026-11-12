@@ -1,25 +1,64 @@
 class_name SettingsPanel
 extends Control
-## The ONE settings surface, instanced in two hosts: as the PauseMenu's
-## swappable sub-panel (under a paused tree — works because the pause
-## layer processes always) and as an overlay on the character select
-## screen (gear button). Sliders and the fullscreen toggle write through
-## the Settings autoload, which applies live and debounces the SaveData
-## write; close() flushes any pending save and emits closed so the host
-## can restore its own UI. Esc while visible closes it too. Styling
-## matches the run UI: code-built dark StyleBoxFlat.
+## La ÚNICA superficie de ajustes, instanciada en dos anfitriones: como
+## subpanel del PauseMenu (bajo un árbol en pausa; funciona porque la capa de
+## pausa procesa siempre) y como capa sobre el selector de personaje (botón
+## Ajustes). Los sliders y los interruptores escriben a través del autoload
+## Settings, que aplica en vivo y agrupa la escritura en SaveData; close()
+## vacía el guardado pendiente y emite closed para que el anfitrión restaure
+## su propia UI. Esc también lo cierra mientras está visible.
 
 signal closed
 
-const SLIDER_TRACK_COLOR := Color(0.05, 0.06, 0.09, 0.9)
-## Volume is a 0-100 percentage everywhere (SettingsApply converts it to
-## dB); sensitivity's range is SaveData's, which is also what clamps the
-## stored value.
+## El volumen es un porcentaje 0-100 en todo el juego (SettingsApply lo pasa
+## a dB); el rango de la sensibilidad es el de SaveData, que también acota el
+## valor guardado.
 const VOLUME_MIN := 0.0
 const VOLUME_MAX := 100.0
 
+@export_group("Textos")
+## Indicación del botón de aceptar, bajo Volver.
+@export var accept_hint_text: String = "Elegir"
+## Indicación del botón de cancelar, bajo Volver.
+@export var cancel_hint_text: String = "Volver"
+## Valor junto al slider de sensibilidad (%.2f = multiplicador).
+@export var sensitivity_format: String = "%.2fx"
+## Valor junto a los sliders de volumen (%d = porcentaje; %% es el signo %).
+@export var volume_format: String = "%d%%"
+
+@export_group("Entrada")
+## Escala desde la que crece el panel al abrirse.
+@export var open_start_scale: float = 0.94
+## Duración del fundido de entrada del panel, en segundos.
+@export var open_fade_time: float = 0.14
+## Duración del crecimiento con rebote del panel, en segundos.
+@export var open_grow_time: float = 0.2
+
+@export_group("Panel")
+## Margen interior del panel, en píxeles (horizontal, vertical).
+@export var panel_margin: Vector2 = Vector2(32.0, 24.0)
+
+@export_group("Sliders")
+## Color del canal (el fondo) de los sliders.
+@export var slider_track_color: Color = Color(0.05, 0.06, 0.09, 0.9)
+## Color del borde del canal de los sliders.
+@export var slider_track_border_color: Color = Color(0.0, 0.0, 0.0, 0.6)
+## Grosor del borde del canal de los sliders, en píxeles.
+@export var slider_track_border_width: int = 1
+## Alto que suma el canal arriba y abajo de la línea, en píxeles.
+@export var slider_track_margin: float = 4.0
+## Radio de las esquinas del canal y del relleno de los sliders, en píxeles.
+@export var slider_corner_radius: int = 4
+## Cuánto se oscurece el turquesa (UiTheme.ACCENT) en el relleno de los sliders (0-1).
+@export var slider_fill_darken: float = 0.15
+## Grosor de la marca clara en el borde de avance del relleno, en píxeles.
+@export var slider_fill_edge_width: int = 2
+## Cuánto se aclara el turquesa en esa marca (0-1).
+@export var slider_fill_edge_lighten: float = 0.3
+## Cuánto se aclara el agarrador con el mouse encima (0-1).
+@export var slider_grabber_hover_lighten: float = 0.25
+
 @onready var _panel: PanelContainer = %Panel
-@onready var _title_label: Label = %TitleLabel
 @onready var _sfx_slider: HSlider = %SfxSlider
 @onready var _ambient_slider: HSlider = %AmbientSlider
 @onready var _sensitivity_slider: HSlider = %SensitivitySlider
@@ -28,10 +67,10 @@ const VOLUME_MAX := 100.0
 @onready var _ambient_value: Label = %AmbientValue
 @onready var _fullscreen_check: CheckButton = %FullscreenCheck
 @onready var _fps_check: CheckButton = %FpsCheck
-## Graphics preset (iteration 64), one toggle per SaveData.graphics_quality
-## index — Alta, Media, Baja, in that order. Three buttons in a ButtonGroup
-## instead of an OptionButton: the panel has no popup anywhere else, and a
-## popup list is one more surface to style and to navigate with a pad.
+## Preset gráfico: un botón por índice de SaveData.graphics_quality (Alta,
+## Media, Baja, en ese orden), en un ButtonGroup. No es un OptionButton: el
+## panel no tiene ningún popup, y una lista desplegable sería una superficie
+## más que estilizar y recorrer con control.
 @onready var _quality_buttons: Array[Button] = [%QualityHigh as Button,
 		%QualityMedium as Button, %QualityLow as Button]
 @onready var _back_button: Button = %BackButton
@@ -54,9 +93,9 @@ func _ready() -> void:
 		button.toggled.connect(_on_quality_toggled.bind(index))
 	_back_button.pressed.connect(close)
 	_link_focus()
-	# Button prompts under Volver; they follow the last device used.
+	# Indicaciones de botones bajo Volver; siguen al último dispositivo usado.
 	_back_button.get_parent().add_child(InputHints.build([
-			["ui_accept", "Elegir"], ["ui_cancel", "Volver"]]))
+			["ui_accept", accept_hint_text], ["ui_cancel", cancel_hint_text]]))
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -65,8 +104,8 @@ func _unhandled_input(event: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 
 
-## Host entry point: sync every control to the persisted values, show
-## with a quick pop-in (interruptible; close snaps the final state).
+## Entrada del anfitrión: sincroniza cada control con lo guardado y aparece
+## con un pop rápido (interrumpible; close fija el estado final).
 func open() -> void:
 	_refresh_controls()
 	visible = true
@@ -74,12 +113,12 @@ func open() -> void:
 	if _open_tween != null and _open_tween.is_valid():
 		_open_tween.kill()
 	_panel.pivot_offset = _panel.size * 0.5
-	_panel.scale = Vector2(0.94, 0.94)
+	_panel.scale = Vector2.ONE * open_start_scale
 	_panel.modulate.a = 0.0
 	_open_tween = create_tween().set_parallel()
 	_open_tween.set_ignore_time_scale(true)
-	_open_tween.tween_property(_panel, "modulate:a", 1.0, 0.14)
-	_open_tween.tween_property(_panel, "scale", Vector2.ONE, 0.2) \
+	_open_tween.tween_property(_panel, "modulate:a", 1.0, open_fade_time)
+	_open_tween.tween_property(_panel, "scale", Vector2.ONE, open_grow_time) \
 			.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 
 
@@ -95,10 +134,9 @@ func close() -> void:
 	closed.emit()
 
 
-## set_value_no_signal so refreshing never re-applies (or re-saves). The
-## label reads the slider back, not SaveData: Range snaps the assignment
-## to its step, and a grabber sitting on 0.35 under a label that reads
-## "0.37x" is a bug report waiting to happen.
+## set_value_no_signal para que refrescar nunca vuelva a aplicar (ni a
+## guardar). La etiqueta lee el slider, no SaveData: Range ajusta lo asignado
+## a su paso, y la etiqueta debe decir lo mismo que muestra el agarrador.
 func _refresh_controls() -> void:
 	_sfx_slider.set_value_no_signal(SaveData.sfx_volume)
 	_ambient_slider.set_value_no_signal(SaveData.ambient_volume)
@@ -112,16 +150,15 @@ func _refresh_controls() -> void:
 	_aim_at_chosen_quality()
 
 
-## Pad / keyboard navigation, wired by hand. Left to Godot's nearest-
-## control search, ui_up from Volver jumped to the character cards BEHIND
-## this panel on the select screen (they are focusable and, measured edge
-## to edge, closer than the rows above it), so a pad player could neither
-## reach a single setting nor get back. Each row now names its neighbours
-## explicitly and the column wraps, so focus can never leave the panel:
+## Navegación con control y teclado, cableada a mano. Con la búsqueda
+## automática de Godot, ui_up desde Volver salta a las cartas del selector
+## que quedan DETRÁS de este panel (son enfocables y, medidas borde a borde,
+## quedan más cerca que las filas de arriba). Cada fila nombra a sus vecinos
+## y la columna da la vuelta, así que el foco nunca sale del panel:
 ##   Efectos ↕ Ambiente ↕ Sensibilidad ↕ Pantalla completa ↕ FPS
-##   ↕ Calidad (Alta ↔ Media ↔ Baja) ↕ Volver ↕ (back to Efectos)
-## Left/right on a slider moves its value (HSlider handles that itself);
-## on a single control it goes nowhere instead of out of the panel.
+##   ↕ Calidad (Alta ↔ Media ↔ Baja) ↕ Volver ↕ (de vuelta a Efectos)
+## Izquierda/derecha sobre un slider mueve su valor (lo hace HSlider); sobre
+## un control simple no va a ningún lado en vez de salir del panel.
 func _link_focus() -> void:
 	var column: Array[Control] = [_sfx_slider, _ambient_slider,
 			_sensitivity_slider, _fullscreen_check, _fps_check,
@@ -136,8 +173,8 @@ func _link_focus() -> void:
 		here.focus_next = here.get_path_to(below)
 		here.focus_neighbor_left = here.get_path_to(here)
 		here.focus_neighbor_right = here.get_path_to(here)
-	# The quality row: every button shares the rows above and below, and
-	# left/right walk the row without wrapping out of it.
+	# La fila de calidad: todos sus botones comparten las filas de arriba y de
+	# abajo, e izquierda/derecha recorren la fila sin salirse de ella.
 	for i in _quality_buttons.size():
 		var button := _quality_buttons[i]
 		button.focus_neighbor_top = button.get_path_to(_fps_check)
@@ -148,8 +185,8 @@ func _link_focus() -> void:
 	_aim_at_chosen_quality()
 
 
-## Coming into the quality row from above or below lands on the preset
-## that is ON, not always on Alta.
+## Entrar a la fila de calidad desde arriba o abajo cae en el preset que
+## está ENCENDIDO, no siempre en Alta.
 func _aim_at_chosen_quality() -> void:
 	var chosen := _quality_buttons[0]
 	for button in _quality_buttons:
@@ -160,7 +197,7 @@ func _aim_at_chosen_quality() -> void:
 
 
 func _refresh_sensitivity_label(value: float) -> void:
-	_sensitivity_value.text = "%.2fx" % value
+	_sensitivity_value.text = sensitivity_format % value
 
 
 func _on_sfx_changed(value: float) -> void:
@@ -173,11 +210,11 @@ func _on_ambient_changed(value: float) -> void:
 	_refresh_volume_labels()
 
 
-## Volumes read as a percentage next to their slider, like the
-## sensitivity multiplier does, so all three rows end in a number.
+## Los volúmenes se leen como porcentaje junto a su slider, igual que el
+## multiplicador de sensibilidad: las tres filas terminan en un número.
 func _refresh_volume_labels() -> void:
-	_sfx_value.text = "%d%%" % roundi(_sfx_slider.value)
-	_ambient_value.text = "%d%%" % roundi(_ambient_slider.value)
+	_sfx_value.text = volume_format % roundi(_sfx_slider.value)
+	_ambient_value.text = volume_format % roundi(_ambient_slider.value)
 
 
 func _on_sensitivity_changed(value: float) -> void:
@@ -193,16 +230,17 @@ func _on_fps_toggled(on: bool) -> void:
 	Settings.set_show_fps(on)
 
 
-## A ButtonGroup toggles the old choice OFF as well; only the button that
-## turned on carries a decision.
+## Un ButtonGroup también APAGA la opción anterior; solo el botón que se
+## encendió trae una decisión.
 func _on_quality_toggled(on: bool, index: int) -> void:
 	if on:
 		Settings.set_graphics_quality(index)
 		_aim_at_chosen_quality()
 
 
-## Slider bounds come from the code that clamps the stored values, not
-## from the scene: two copies of 0.3-2.0 drift the day one of them moves.
+## Los límites de los sliders salen del código que acota los valores
+## guardados, no de la escena: dos copias de 0.3-2.0 se separan el día que
+## una cambia.
 func _apply_ranges() -> void:
 	for slider: HSlider in [_sfx_slider, _ambient_slider]:
 		slider.min_value = VOLUME_MIN
@@ -211,32 +249,33 @@ func _apply_ranges() -> void:
 	_sensitivity_slider.max_value = SaveData.MAX_MOUSE_SENSITIVITY
 
 
-## UiTheme design system: shared panel + headline, filled-track sliders
-## with a round teal grabber, teal Back button.
+## Sistema de diseño UiTheme: panel compartido, sliders con canal lleno y
+## agarrador redondo turquesa, interruptores de píldora y botón Volver
+## turquesa. El título, las etiquetas y los encabezados de sección (SONIDO /
+## CONTROLES / PANTALLA) tienen su aspecto en la escena.
 func _apply_styles() -> void:
 	_apply_ranges()
 	_panel.add_theme_stylebox_override("panel",
-			UiTheme.panel(UiTheme.PANEL_BG, UiTheme.BORDER_DIM, 32.0, 24.0))
-	UiTheme.style_title(_title_label, 30, Color(0.96, 0.93, 0.82), 6, 8)
+			UiTheme.panel(UiTheme.PANEL_BG, UiTheme.BORDER_DIM, panel_margin.x, panel_margin.y))
 	var grabber := UiTheme.grabber_icon(UiTheme.ACCENT)
-	var grabber_hi := UiTheme.grabber_icon(UiTheme.ACCENT.lightened(0.25))
+	var grabber_hi := UiTheme.grabber_icon(
+			UiTheme.ACCENT.lightened(slider_grabber_hover_lighten))
 	for slider: HSlider in [_sfx_slider, _ambient_slider, _sensitivity_slider]:
-		var track := UiTheme.flat(SLIDER_TRACK_COLOR, 4)
-		track.set_border_width_all(1)
-		track.border_color = Color(0.0, 0.0, 0.0, 0.6)
-		track.content_margin_top = 4.0
-		track.content_margin_bottom = 4.0
+		var track := UiTheme.flat(slider_track_color, slider_corner_radius)
+		track.set_border_width_all(slider_track_border_width)
+		track.border_color = slider_track_border_color
+		track.content_margin_top = slider_track_margin
+		track.content_margin_bottom = slider_track_margin
 		slider.add_theme_stylebox_override("slider", track)
-		var fill := UiTheme.flat(UiTheme.ACCENT.darkened(0.15), 4)
-		fill.border_width_right = 2
-		fill.border_color = UiTheme.ACCENT.lightened(0.3)
+		var fill := UiTheme.flat(UiTheme.ACCENT.darkened(slider_fill_darken),
+				slider_corner_radius)
+		fill.border_width_right = slider_fill_edge_width
+		fill.border_color = UiTheme.ACCENT.lightened(slider_fill_edge_lighten)
 		slider.add_theme_stylebox_override("grabber_area", fill)
 		slider.add_theme_stylebox_override("grabber_area_highlight", fill)
 		slider.add_theme_icon_override("grabber", grabber)
 		slider.add_theme_icon_override("grabber_highlight", grabber_hi)
 		slider.add_theme_icon_override("grabber_disabled", grabber)
-	for value_label: Label in [_sensitivity_value, _sfx_value, _ambient_value]:
-		value_label.add_theme_color_override("font_color", UiTheme.ACCENT)
 	for check: CheckButton in [_fullscreen_check, _fps_check]:
 		UiTheme.style_toggle(check)
 	for button: Button in _quality_buttons:
@@ -245,34 +284,4 @@ func _apply_styles() -> void:
 		chosen.border_color = UiTheme.ACCENT
 		button.add_theme_stylebox_override("hover_pressed", chosen)
 		button.add_theme_color_override("font_hover_pressed_color", UiTheme.TEXT_BRIGHT)
-	_add_section_headers()
 	UiTheme.style_button(_back_button, UiTheme.ACCENT, true)
-
-
-## Small spaced headers that group the rows (sound / controls / screen),
-## each with a faint rule, so the panel reads as sections instead of a
-## flat list.
-func _add_section_headers() -> void:
-	var vbox := _title_label.get_parent()
-	var sections: Array = [
-		["SONIDO", _sfx_slider.get_parent()],
-		["CONTROLES", _sensitivity_slider.get_parent()],
-		["PANTALLA", _fullscreen_check.get_parent()],
-	]
-	for section: Array in sections:
-		var header := VBoxContainer.new()
-		header.add_theme_constant_override("separation", 4)
-		var text := Label.new()
-		text.text = String(section[0])
-		text.add_theme_font_override("font", UiTheme.spaced_font(3))
-		text.add_theme_font_size_override("font_size", 12)
-		text.add_theme_color_override("font_color", UiTheme.TEXT_FAINT)
-		header.add_child(text)
-		var rule := ColorRect.new()
-		rule.custom_minimum_size = Vector2(0.0, 1.0)
-		rule.color = Color(UiTheme.BORDER_DIM, 0.5)
-		rule.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		header.add_child(rule)
-		var row: Control = section[1]
-		vbox.add_child(header)
-		vbox.move_child(header, row.get_index())

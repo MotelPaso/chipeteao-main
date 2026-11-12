@@ -1,32 +1,33 @@
 class_name BoomerangProjectile
 extends Area3D
-## Otto's spinning blade: flies out to a fixed turn point, then swings back
-## and chases the (moving) player until caught. Damages each enemy at most
-## once per leg — the per-leg hit set clears at the turn, and a body the
-## blade passes through re-enters the hitbox on the way back for its second
-## hit. Releases back to Pools on catch, on a lost player, or after
-## max_lifetime; pool_reset() re-arms the legs and hit set for reuse.
+## Hoja del Bumerán: vuela hasta un punto de giro fijo, da la vuelta y
+## persigue al jugador (que se mueve) hasta que la atrapa. Daña a cada
+## enemigo como máximo una vez por tramo: el registro de golpes se vacía al
+## girar, y un cuerpo que la hoja atraviesa vuelve a entrar en el área a la
+## vuelta para su segundo golpe. Vuelve a Pools al ser atrapada, si pierde al
+## jugador o tras max_lifetime; pool_reset() rearma tramos y registro.
 
+@export_group("Vuelo")
+## Velocidad de vuelo, en metros por segundo.
 @export var speed: float = 14.0
-## Radians/sec of the purely visual spin on the Spinner rig.
+## Radianes por segundo del giro puramente visual del nodo Spinner.
 @export var spin_speed: float = 14.0
-## Distance to the player's catch point that counts as caught.
+## Distancia al punto de captura del jugador que cuenta como atrapada, en metros.
 @export var catch_radius: float = 1.0
-## Hard lifetime cap so a stranded blade can never linger forever.
+## Tope de vida en segundos, para que una hoja varada nunca quede para siempre.
 @export var max_lifetime: float = 8.0
-## Height above the player's origin the return leg homes to.
+## Altura sobre el origen del jugador a la que vuelve la hoja, en metros.
 @export var catch_height: float = 0.9
 
 var _source: WeaponBase = null
 var _out_point: Vector3 = Vector3.ZERO
 var _returning: bool = false
 var _life_left: float = 0.0
-## Instance ids damaged on the CURRENT leg (cleared at the turn point).
+## IDs de instancia dañados en el tramo ACTUAL (se vacía al girar).
 var _hit_ids_this_leg: Dictionary[int, bool] = {}
-## True once the blade has been released back to the pool. Pools.release()
-## only defers the reparent, so the Area3D keeps reporting bodies for the
-## rest of the physics flush — a blade caught while an enemy is hugging the
-## player used to land one extra "already caught" hit.
+## True cuando la hoja ya volvió al pool. Pools.release() solo difiere el
+## cambio de padre, así que el Area3D sigue reportando cuerpos el resto del
+## paso de física; esto evita un golpe extra de una hoja ya atrapada.
 var _spent: bool = false
 
 @onready var _spinner: Node3D = $Spinner
@@ -37,9 +38,8 @@ func _ready() -> void:
 	body_entered.connect(_on_body_entered)
 
 
-## Pooled-node contract: fresh out-leg state on every acquire. The trail
-## restarts so no world-space puffs from the last flight linger at the
-## old position.
+## Contrato del pool: tramo de ida nuevo en cada adquisición. La estela se
+## reinicia para que no queden bocanadas del vuelo anterior en la posición vieja.
 func pool_reset() -> void:
 	_source = null
 	_out_point = Vector3.ZERO
@@ -47,16 +47,15 @@ func pool_reset() -> void:
 	_spent = false
 	_life_left = max_lifetime
 	_hit_ids_this_leg.clear()
-	# Orientation as well: launch() only writes the position, and the
-	# Spinner accumulates yaw for the whole flight, so a reused blade came
-	# back out mid-spin in whatever pose it was caught in.
+	# También la orientación: launch() solo escribe la posición, y el Spinner
+	# acumula giro todo el vuelo; sin esto una hoja reusada saldría a medio giro.
 	rotation = Vector3.ZERO
 	_spinner.rotation = Vector3.ZERO
 	_trail.restart()
 
 
-## Called by the firing weapon right after parenting the blade: sets the
-## throw origin and the point where the out leg turns around.
+## Lo llama el arma justo después de colgar la hoja: fija el origen del
+## lanzamiento y el punto donde el tramo de ida da la vuelta.
 func launch(source: WeaponBase, from: Vector3, direction: Vector3, distance: float) -> void:
 	_source = source
 	global_position = from
@@ -79,8 +78,8 @@ func _physics_process(delta: float) -> void:
 		else:
 			global_position += to_out.normalized() * step
 		return
-	# Return to the THROWER (each co-op raider catches their own blade);
-	# with the thrower gone, fall back to whoever is nearest.
+	# Vuelve a QUIEN LA LANZÓ (cada raider en co-op atrapa su hoja); sin él,
+	# vuelve al jugador más cercano.
 	var player: Node3D = null
 	if _source != null and is_instance_valid(_source):
 		player = _source.carrier_player()
@@ -96,8 +95,8 @@ func _physics_process(delta: float) -> void:
 		global_position += to_catch.normalized() * step
 
 
-## Single exit door: marks the blade spent before handing it back, so the
-## still-live Area3D cannot land another cut this flush.
+## Única salida: marca la hoja como gastada antes de devolverla, así el
+## Area3D todavía vivo no puede dar otro corte en este paso de física.
 func _release() -> void:
 	_spent = true
 	Pools.release(self)

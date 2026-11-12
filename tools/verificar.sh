@@ -12,14 +12,12 @@
 # el relieve). Sin él cada soak es un mundo distinto y cualquier comparación
 # entre dos corridas mide ruido, no el cambio.
 #
-# GUARDADO (iteración 57): cada soak y cada harness recibe su PROPIO
-# BONK_SAVE_PATH, borrado —con sus hermanos .bak y .tmp— antes de arrancar.
-# Antes todos compartían user://soak_save.json, que no acumula meta en los
-# soaks godmode (nunca terminan la partida) pero sí los contadores que
-# SaveData.bump acredita durante la corrida (bestiario kills_<script>,
-# used_weapon_<id>), y cualquier corrida mortal o de UI le doblaba encima
-# esquirlas, misiones y desbloqueos. Borrar solo el .json no era un reset:
-# load_from_disk cae al .bak.
+# GUARDADO: cada soak y cada harness recibe su PROPIO BONK_SAVE_PATH,
+# borrado —con sus hermanos .bak y .tmp— antes de arrancar. Un guardado
+# compartido acumularía los contadores que SaveData.bump acredita durante la
+# corrida (bestiario kills_<script>, used_weapon_<id>) y, desde una corrida
+# mortal o de UI, esquirlas, misiones y desbloqueos. Se borra también el
+# .bak porque load_from_disk cae a él cuando falta el .json.
 #
 # Falla (exit 1) si:
 #   - el import, el lint, el harness de UI o algún soak reporta
@@ -32,9 +30,9 @@
 #   - un soak GODMODE termina su partida (`Probe fog: skipped`): una
 #     corrida inmortal no tiene por qué acabarse, y la puerta de niebla se
 #     saltaría en silencio si no lo dijéramos aquí.
-#   - el soak de ETAPA (iteración 49) no cruza de mapa, deja algo vivo al
+#   - el soak de ETAPA no cruza de mapa, deja algo vivo al
 #     cruzar, o pierde progreso al hacerlo.
-#   - el soak de CO-OP (iteración 57) no arranca con dos raiders, no cruza
+#   - el soak de CO-OP no arranca con dos raiders, no cruza
 #     de etapa, ensucia un barrido o no reanima a nadie.
 set -uo pipefail
 cd "$(dirname "$0")/.."
@@ -71,13 +69,12 @@ fase_fin() {
 	printf '  (%d s)\n' "$(( SECONDS - FASE_INICIO ))"
 }
 
-# --- Tope de cofres de élite (iteración 64) ---------------------------------
+# --- Tope de cofres de élite ------------------------------------------------
 # Cada soak imprime `Probe bounty chests: max=N cap=M` al salir. Falla si la
 # línea falta o si hubo más cofres de élite SIN ABRIR que el tope a la vez.
 # El conteo no pasa por el tope (cuenta los cofres que hay), así que quitar
-# el tope se ve en cuanto un soak deja caer más de M — no en toda corrida:
-# de las dos que cerraron la iteración 64, el de etapa llegó a 30 en una y
-# a 6 en la otra.
+# el tope se ve en cuanto un soak deja caer más de M, lo que no pasa en
+# toda corrida: la cantidad de cofres varía mucho de una a otra.
 chequear_tope_cofres() {
 	local log="$1"
 	local tope
@@ -96,7 +93,9 @@ chequear_tope_cofres() {
 # ejecutarse desaparece del log sin ruido, y un conteo la daría por buena
 # mientras otra se repite.
 LINT_CHECKS=(ids_unique glyphs_unique paths_exist stat_ids character_weapons
-	director_methods weapon_properties vendor_lucky_roulette_ids marker_labels)
+	director_methods weapon_properties vendor_lucky_roulette_ids marker_labels
+	id_format quest_stats text_numbers text_values item_kinds_unique sfx_ids
+	stat_rows)
 UI_STEPS=(collection quests relics coop_count_reject unlock_confirm cards_all
 	start_run pause_open settings_toggle pause_close extract retry done)
 
@@ -113,7 +112,7 @@ else
 fi
 fase_fin
 
-# --- Lint de catálogos (iteración 57) ---------------------------------------
+# --- Lint de catálogos ------------------------------------------------------
 # Las referencias cruzadas que ningún soak puede comprobar: una rota no
 # revienta, simplemente no hace nada.
 echo "== lint de catálogos =="
@@ -142,8 +141,8 @@ else
 fi
 fase_fin
 
-# --- Harness de UI (iteración 57) -------------------------------------------
-# Siete de las nueve escenas de UI no las arrancaba nada. --quit-after es un
+# --- Harness de UI ----------------------------------------------------------
+# Abre las escenas de UI que ningún soak visita. --quit-after es un
 # techo de dos minutos: el harness se va solo mucho antes.
 echo "== harness de UI =="
 fase
@@ -238,7 +237,7 @@ for ARENA in HollowWoods AshDunes Gloomfen; do
 	INTERACCIONES=$(( INTERACCIONES + CHESTS + ALTARES + PORTALES ))
 done
 
-# --- Soak de etapa (iteración 49) ---------------------------------------
+# --- Soak de etapa ------------------------------------------------------
 # El cuarto soak es el único que cruza de mapa: con BONK_STAGE_FAST=1 la
 # etapa se supera a los 60 s sin jefe, el harness se queda 70 s más (para
 # que la rampa pseudo-infinita registre un minuto) y cruza el portal.
@@ -314,7 +313,7 @@ else
 	fi
 fi
 
-# --- Soak de co-op (iteración 57) ---------------------------------------
+# --- Soak de co-op ------------------------------------------------------
 # El quinto soak es el único con DOS raiders: prueba el reparto de party
 # (RunSystems._spawn_party lee Coop antes de instanciar), la pantalla
 # dividida, el cruce de etapa con dos cuerpos y —lo que ningún soak solo
@@ -324,7 +323,7 @@ fi
 echo "== soak co-op (HollowWoods, 2 raiders, ${SECS}s de partida) =="
 fase
 COOP_LOG="$LOGDIR/soak_coop.log"
-# BONK_GRAPHICS=1 (iteración 64): el co-op corre en calidad Media porque
+# BONK_GRAPHICS=1: el co-op corre en calidad Media porque
 # es el único soak con pantalla dividida, y el preset tiene que llegar a
 # las SubViewports además del sol de cada etapa.
 BONK_ARENA="res://scenes/world/HollowWoods.tscn" BONK_PLAYERS=2 BONK_STAGE_FAST=1 \

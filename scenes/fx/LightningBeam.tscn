@@ -1,0 +1,36 @@
+[gd_scene load_steps=6 format=3]
+
+[ext_resource type="Script" path="res://scripts/fx/lightning_beam.gd" id="1_beam"]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_storm"]
+shading_mode = 0
+transparency = 1
+blend_mode = 1
+albedo_color = Color(0.55, 0.75, 1, 1)
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_storm"]
+material = SubResource("StandardMaterial3D_storm")
+top_radius = 0.05
+bottom_radius = 0.05
+height = 1.0
+radial_segments = 6
+rings = 1
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_belt"]
+shading_mode = 0
+transparency = 1
+albedo_color = Color(1, 0.95, 0.45, 1)
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_belt"]
+material = SubResource("StandardMaterial3D_belt")
+top_radius = 0.05
+bottom_radius = 0.05
+height = 1.0
+radial_segments = 6
+rings = 0
+
+[node name="LightningBeam" type="MeshInstance3D"]
+cast_shadow = 0
+script = ExtResource("1_beam")
+storm_mesh = SubResource("CylinderMesh_storm")
+belt_mesh = SubResource("CylinderMesh_belt")

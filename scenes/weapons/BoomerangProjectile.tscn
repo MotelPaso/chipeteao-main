@@ -5,9 +5,6 @@
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_trail"]
 shading_mode = 0
 albedo_color = Color(0.95, 0.72, 0.35, 1)
-emission_enabled = true
-emission = Color(0.9, 0.62, 0.25, 1)
-emission_energy_multiplier = 1.2
 
 [sub_resource type="BoxMesh" id="BoxMesh_trail"]
 material = SubResource("StandardMaterial3D_trail")

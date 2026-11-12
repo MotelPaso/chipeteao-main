@@ -2,10 +2,21 @@
 
 [ext_resource type="Script" uid="uid://dvx7c2g2cu3m4" path="res://scripts/weapons/necro_staff.gd" id="1_necro"]
 
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_bolt"]
+shading_mode = 0
+transparency = 1
+albedo_color = Color(0.65, 0.35, 0.95, 0.9)
+
+[sub_resource type="SphereMesh" id="SphereMesh_bolt"]
+material = SubResource("StandardMaterial3D_bolt")
+radius = 1.0
+height = 2.0
+radial_segments = 8
+rings = 4
+
 [node name="NecroStaff" type="Node3D" unique_id=1336858352]
 script = ExtResource("1_necro")
-bolt_speed = 7.0
-bolt_lifetime = 3.7
 damage = 20.0
 cooldown = 3.0
 attack_range = 9.0
+bolt_mesh = SubResource("SphereMesh_bolt")

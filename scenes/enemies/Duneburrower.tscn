@@ -67,7 +67,10 @@ collision_layer = 2
 collision_mask = 3
 script = ExtResource("1_burrower")
 move_speed = 2.8
+turn_speed = 10.0
+separation_strength = 1.5
 xp_gem_scene = ExtResource("3_gem")
+possessable = false
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.7, 0)

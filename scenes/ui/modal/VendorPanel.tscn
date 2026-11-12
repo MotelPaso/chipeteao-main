@@ -1,0 +1,25 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="PackedScene" path="res://scenes/ui/modal/ModalPanel.tscn" id="1_base"]
+[ext_resource type="Script" path="res://scripts/ui/game/vendor_ui.gd" id="2_vendor"]
+
+[node name="VendorPanel" instance=ExtResource("1_base")]
+editor_description = "Tienda del vendedor. Tamaños de carta, tiempos y textos en el Inspector de este nodo (vendor_ui.gd); qué se vende y a qué precio, en Vendor.tscn (vendor.gd)."
+script = ExtResource("2_vendor")
+
+[node name="Title" parent="Root/Center/Panel/VBox" index="0"]
+theme_override_font_sizes/font_size = 34
+
+[node name="Shelf" type="HBoxContainer" parent="Root/Center/Panel/VBox/Body" index="0"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_constants/separation = 14
+alignment = 1
+
+[node name="EmptyLabel" type="Label" parent="Root/Center/Panel/VBox/Body" index="1"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+editor_description = "El texto sale de empty_shelf_line en el script."
+theme_override_colors/font_color = Color(0.66, 0.69, 0.75, 1)
+horizontal_alignment = 1

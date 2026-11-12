@@ -1,11 +1,47 @@
 extends MetaScreen
-## Armory screen (iteration 36): spend Shards on permanent Relic ranks
-## (RelicCatalog rows; SaveData persists the ranks and PlayerStats applies
-## them every run). One row per relic: name, effect line, rank pips, and a
-## buy button with the next rank's price — or MÁX once capped. Buying
-## flashes the row and counts the balance down (MetaScreen.payoff),
-## mirroring the quest log's claim so spending feels as good as earning;
-## an unaffordable rank gets the shared reject wobble.
+## Armería: gasta esquirlas en rangos permanentes de reliquias (filas de
+## RelicCatalog; SaveData guarda los rangos y PlayerStats los aplica en cada
+## partida). Una fila por reliquia: nombre, línea de efecto, rombos de rango y
+## un botón de compra con el precio del rango siguiente, o MÁX al llegar al
+## tope. Comprar hace destellar la fila y descuenta el saldo
+## (MetaScreen.payoff), igual que reclamar una misión; un rango que no
+## alcanza recibe el vaivén de rechazo compartido.
+
+@export_group("Filas")
+## Tamaño de fuente del nombre de la reliquia, en píxeles.
+@export var name_font_size: int = 16
+## Color del nombre de la reliquia.
+@export var name_color: Color = UiTheme.TEXT_BRIGHT
+## Tamaño de fuente de la línea de efecto, en píxeles.
+@export var effect_font_size: int = 12
+## Color de la línea de efecto.
+@export var effect_color: Color = UiTheme.TEXT_DIM
+## Tamaño de fuente de los rombos de rango, en píxeles.
+@export var pips_font_size: int = 14
+## Color de los rombos cuando hay algún rango comprado.
+@export var pips_owned_color: Color = UiTheme.ACCENT_AMBER
+## Color de los rombos cuando no hay ningún rango comprado.
+@export var pips_empty_color: Color = UiTheme.TEXT_FAINT
+## Tamaño de fuente del sello de rango máximo, en píxeles.
+@export var maxed_font_size: int = 13
+## Color del sello de rango máximo.
+@export var maxed_color: Color = UiTheme.ACCENT_AMBER
+## Tamaño mínimo del botón de compra, en píxeles (ancho, alto).
+@export var buy_button_size: Vector2 = Vector2(130.0, 34.0)
+## Separación entre la columna de la reliquia y la del precio, en píxeles.
+@export var columns_separation: int = 16
+## Separación vertical entre nombre, efecto y rombos de rango, en píxeles.
+@export var info_separation: int = 3
+## Espacio extra entre las letras del sello MÁX, en píxeles.
+@export var maxed_spacing: int = 2
+
+@export_group("Textos")
+## Rombo de un rango comprado.
+@export var pip_owned: String = "◆"
+## Rombo de un rango que falta.
+@export var pip_empty: String = "◇"
+## Sello de una reliquia en su rango máximo.
+@export var maxed_text: String = "MÁX"
 
 
 func _build_rows(list_node: VBoxContainer) -> void:
@@ -31,46 +67,45 @@ func _build_row(relic: Dictionary) -> PanelContainer:
 			UiTheme.ACCENT_AMBER if capped else UiTheme.BORDER_DIM, capped))
 
 	var columns := HBoxContainer.new()
-	columns.add_theme_constant_override("separation", 16)
+	columns.add_theme_constant_override("separation", columns_separation)
 	row.add_child(columns)
 
 	var info := VBoxContainer.new()
 	info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	info.add_theme_constant_override("separation", 3)
+	info.add_theme_constant_override("separation", info_separation)
 	columns.add_child(info)
-	info.add_child(MetaScreen.label(String(relic.display_name), 16, UiTheme.TEXT_BRIGHT))
-	info.add_child(MetaScreen.label(_effect_line(relic), 12, UiTheme.TEXT_DIM))
-	# Rank pips: filled diamonds for owned ranks, hollow for the rest.
+	info.add_child(MetaScreen.label(String(relic.display_name), name_font_size, name_color))
+	info.add_child(MetaScreen.label(_effect_line(relic), effect_font_size, effect_color))
+	# Rombos de rango: llenos los comprados, huecos los que faltan.
 	var pips := ""
 	for i in max_ranks:
-		pips += "◆" if i < rank else "◇"
-	info.add_child(MetaScreen.label(pips, 14,
-			UiTheme.ACCENT_AMBER if rank > 0 else UiTheme.TEXT_FAINT))
+		pips += pip_owned if i < rank else pip_empty
+	info.add_child(MetaScreen.label(pips, pips_font_size,
+			pips_owned_color if rank > 0 else pips_empty_color))
 
 	var side := VBoxContainer.new()
 	side.alignment = BoxContainer.ALIGNMENT_CENTER
-	side.add_theme_constant_override("separation", 4)
 	columns.add_child(side)
 	if capped:
-		var done := MetaScreen.label("MÁX", 13, UiTheme.ACCENT_AMBER)
-		done.add_theme_font_override("font", UiTheme.spaced_font(2))
+		var done := MetaScreen.label(maxed_text, maxed_font_size, maxed_color)
+		done.add_theme_font_override("font", UiTheme.spaced_font(maxed_spacing))
 		done.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		side.add_child(done)
 	else:
 		var cost := RelicCatalog.next_rank_cost(relic_id, rank)
 		var buy := Button.new()
-		buy.text = "%d esquirlas" % cost
-		buy.custom_minimum_size = Vector2(130.0, 34.0)
+		buy.text = UiTheme.SHARDS_AMOUNT % cost
+		buy.custom_minimum_size = buy_button_size
 		buy.pressed.connect(_on_buy_pressed.bind(relic_id, row))
 		UiTheme.style_button(buy, UiTheme.SHARD_BLUE, SaveData.can_afford(cost))
 		side.add_child(buy)
 	return row
 
 
-## The effect line is a catalog template ("Todo el daño %s por rango.")
-## filled with the per-rank amount text. Guarded: a translated row that
-## drops the %s would otherwise raise a formatting error at runtime and
-## leave that single row blank while its five neighbours look fine.
+## La línea de efecto es una plantilla del catálogo ("Todo el daño %s por
+## rango.") rellenada con el texto del monto por rango. Protegida: una fila
+## traducida que pierde el %s daría un error de formato en tiempo de
+## ejecución y dejaría esa fila en blanco.
 func _effect_line(relic: Dictionary) -> String:
 	var template := String(relic.description)
 	if not template.contains("%s"):

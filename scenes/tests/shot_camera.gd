@@ -1,26 +1,22 @@
 class_name ShotCamera
 extends RefCounted
-## The camera both soak harnesses carry (iteration 60), behind
-## BONK_SHOT_DIR.
+## Cámara que llevan los dos arneses de soak, activada con BONK_SHOT_DIR.
 ##
-## WHY IT EXISTS. Every gate this project has ever run is --headless, and
-## the dummy renderer compiles no shader and rasterises nothing: a ground
-## mesh that is back-face culled, a material that never binds, a panel
-## drawn on top of the clock and a label clipped to two letters all
-## produce a perfectly green log. Iterations 51-59 shipped a terrain whose
-## triangles faced away from every camera above them and no soak could
-## say so. This class is how a soak looks at the screen.
+## POR QUÉ EXISTE. Los gates corren --headless, y el renderer dummy no
+## compila shaders ni rasteriza nada: un suelo con las caras al revés, un
+## material que no se aplica, un panel encima del reloj o un texto cortado
+## dejan el log igual de verde. Con esta clase un soak mira la pantalla.
 ##
-## HOW IT CAPTURES. From INSIDE the engine —
-## Viewport.get_texture().get_image() after RenderingServer.frame_post_draw
-## — and never with a screen grabber: macOS refuses a terminal's
-## `screencapture` without the Screen Recording permission, and a soak has
-## nobody to grant one.
+## CÓMO CAPTURA. Desde DENTRO del motor
+## (Viewport.get_texture().get_image() después de
+## RenderingServer.frame_post_draw), nunca con un capturador de pantalla:
+## macOS rechaza `screencapture` desde una terminal sin el permiso de
+## Grabación de pantalla, y en un soak no hay nadie que lo conceda.
 ##
-## It can only ADD frames. Nothing here changes what a harness asserts,
-## and with the switch unset every line below is a no-op.
+## Solo AGREGA frames. Nada aquí cambia lo que afirma un arnés, y sin la
+## variable cada línea de abajo no hace nada.
 
-## Seconds between periodic shots when BONK_SHOT_EVERY is unset.
+## Segundos entre fotos periódicas cuando BONK_SHOT_EVERY no está definido.
 const SHOT_EVERY_DEFAULT: float = 10.0
 const SHOT_DIR_ENV := "BONK_SHOT_DIR"
 const SHOT_EVERY_ENV := "BONK_SHOT_EVERY"
@@ -28,36 +24,35 @@ const SHOT_EVERY_ENV := "BONK_SHOT_EVERY"
 var _dir: String = ""
 var _on: bool = false
 var _every: float = SHOT_EVERY_DEFAULT
-## Counts DOWN to the next periodic shot. Fed with the caller's delta and
-## never with RunState.run_time: run_time freezes while a menu owns the
-## pause, and a menu is exactly the thing worth photographing.
+## Cuenta HACIA ABAJO hasta la próxima foto periódica. Se alimenta con el
+## delta del llamador y no con RunState.run_time: run_time se congela
+## mientras un menú tiene la pausa, y un menú es justo lo que vale fotografiar.
 var _left: float = 0.0
-## Pending stems, taken one per DRAWN frame, so two events in the same
-## frame produce two files instead of one image saved twice.
+## Nombres pendientes, uno por frame DIBUJADO: dos eventos en el mismo
+## frame dan dos archivos y no la misma imagen guardada dos veces.
 var _queue: Array[String] = []
 var _busy: bool = false
 var _taken: int = 0
 var _viewport: Viewport = null
-## Shots asked for with a delay, as {left, stem}. An EVENT is not the same
-## thing as what the event looks like: the map overlay opens on the frame
-## after the Tab press, a weather tint ramps in and a stage change is
-## behind a fade, so a picture taken on the frame the event fires is a
-## picture of the moment before it.
+## Fotos pedidas con retraso, como {left, stem}. Un EVENTO no es lo mismo
+## que cómo se ve: el mapa se abre el frame después de apretar Tab, el tinte
+## del clima entra de a poco y un cambio de etapa va detrás de un fundido,
+## así que la foto del frame del evento muestra el momento anterior.
 var _pending: Array[Dictionary] = []
 
 
-## `viewport` is the one whose frames get saved — the harness's own
-## get_viewport(), i.e. the window root, which is what composites the
-## split-screen cells and every CanvasLayer above them.
+## `viewport` es el que se guarda: el get_viewport() del propio arnés, o sea
+## la raíz de la ventana, que compone las celdas de pantalla dividida y cada
+## CanvasLayer encima.
 func _init(viewport: Viewport, every_default: float = SHOT_EVERY_DEFAULT) -> void:
 	_viewport = viewport
 	_every = every_default
 	var dir := OS.get_environment(SHOT_DIR_ENV).strip_edges()
 	if dir.is_empty():
 		return
-	# The dummy DisplayServer never drew a frame and its viewport texture
-	# is empty, so every PNG would be a lie. Said out loud exactly once: a
-	# script that asked for pictures has to be able to see it got none.
+	# El DisplayServer dummy nunca dibuja y su textura está vacía, así que cada
+	# PNG sería mentira. Se avisa una sola vez: quien pidió fotos tiene que
+	# poder ver que no obtuvo ninguna.
 	if DisplayServer.get_name() == "headless":
 		print("Shots skipped: headless")
 		return
@@ -74,7 +69,7 @@ func _init(viewport: Viewport, every_default: float = SHOT_EVERY_DEFAULT) -> voi
 	print("Shots on: dir=%s every=%.1fs" % [_dir, _every])
 
 
-## What every caller tests instead of re-reading the environment.
+## Lo que consulta cada llamador en vez de releer el entorno.
 func enabled() -> bool:
 	return _on
 
@@ -83,16 +78,15 @@ func every() -> float:
 	return _every
 
 
-## Queues one shot under `stem` (no extension). Safe from anywhere,
-## including a signal on a node that is about to free itself.
+## Encola una foto con nombre `stem` (sin extensión). Seguro desde cualquier
+## lugar, incluso desde una señal de un nodo que está por liberarse.
 func request(stem: String) -> void:
 	if _on:
 		_queue.append(stem)
 
 
-## Queues one shot `delay` seconds from now. See _pending: some events are
-## worth photographing for what they LEAVE on screen, not for the frame
-## they fire on.
+## Encola una foto dentro de `delay` segundos. Ver _pending: algunos eventos
+## valen por lo que DEJAN en pantalla, no por el frame en que ocurren.
 func request_in(delay: float, stem: String) -> void:
 	if not _on:
 		return
@@ -102,10 +96,10 @@ func request_in(delay: float, stem: String) -> void:
 	_pending.append({"left": delay, "stem": stem})
 
 
-## Drives the periodic shot and drains the queue, one frame at a time.
-## `periodic_stem` is a Callable returning the stem for the timed shot —
-## a Callable and not a string because the name carries the run clock,
-## which is only known at the moment the shot is due.
+## Maneja la foto periódica y vacía la cola, un frame a la vez.
+## `periodic_stem` es un Callable que devuelve el nombre de la foto periódica:
+## Callable y no texto porque el nombre lleva el reloj de la partida, que
+## solo se conoce cuando toca la foto.
 func tick(delta: float, periodic_stem: Callable) -> void:
 	if not _on:
 		return
@@ -122,13 +116,13 @@ func tick(delta: float, periodic_stem: Callable) -> void:
 	if _busy or _queue.is_empty():
 		return
 	_busy = true
-	# Started, not awaited: the caller's frame has other work to do.
+	# Se lanza sin await: el frame del llamador tiene otro trabajo.
 	_take(_queue.pop_front())
 
 
-## One PNG, saved after the frame it belongs to has actually been DRAWN:
-## get_image() before frame_post_draw hands back the PREVIOUS frame, which
-## for an event shot is the frame before the event.
+## Un PNG, guardado cuando su frame ya se DIBUJÓ: get_image() antes de
+## frame_post_draw devuelve el frame ANTERIOR, que en una foto de evento es
+## el frame previo al evento.
 func _take(stem: String) -> void:
 	await RenderingServer.frame_post_draw
 	_busy = false
@@ -139,10 +133,9 @@ func _take(stem: String) -> void:
 	_write(image, stem)
 
 
-## `final.png`, grabbed WITHOUT the frame_post_draw await: this runs from
-## an _exit_tree, where a coroutine parked on a signal is never resumed.
-## The cost is one frame of staleness, and what it saves is the frame that
-## was on screen when the harness ended.
+## `final.png`, tomada SIN esperar frame_post_draw: esto corre desde un
+## _exit_tree, donde una corrutina esperando una señal nunca se reanuda.
+## Cuesta un frame de atraso y guarda lo que había en pantalla al terminar.
 func final_shot() -> void:
 	if not _on:
 		return
@@ -153,8 +146,8 @@ func final_shot() -> void:
 	_write(image, "final")
 
 
-## The window's last drawn frame, or null when there is no viewport left
-## to read (teardown, or a display server that never drew).
+## El último frame dibujado de la ventana, o null si ya no queda viewport
+## que leer (cierre, o un display server que nunca dibujó).
 func _frame() -> Image:
 	if not is_instance_valid(_viewport):
 		return null
@@ -164,9 +157,9 @@ func _frame() -> Image:
 
 func _write(image: Image, stem: String) -> void:
 	var path := "%s/%s.png" % [_dir, stem]
-	# The run clock is frozen while a menu owns the pause, so two shots can
-	# want the same name; the counter suffix keeps both instead of
-	# overwriting. `final` is the one name that is meant to be overwritten.
+	# El reloj de la partida se congela mientras un menú tiene la pausa, así que
+	# dos fotos pueden pedir el mismo nombre; el sufijo con contador guarda ambas.
+	# `final` es el único nombre que se sobrescribe a propósito.
 	if stem != "final" and FileAccess.file_exists(path):
 		path = "%s/%s-%d.png" % [_dir, stem, _taken]
 	var error := image.save_png(path)

@@ -1,29 +1,29 @@
 extends CanvasLayer
-## Run-end overlay (GDD 9.6): opened by RunManager.run_ended with the
-## finished run's stats from RunState. Layer 20 draws over the upgrade-card
-## UI (10) and process_mode ALWAYS keeps the animation and buttons working
-## while the tree is paused. Retry reloads the arena (the player's _ready
-## recaptures the mouse); Change Character does the same cleanup but
-## returns to the character select screen; Quit exits the game.
+## Pantalla de fin de partida (GDD 9.6): la abre RunManager.run_ended con las
+## estadísticas de RunState. Su capa (20, en RunEndScreen.tscn) dibuja sobre
+## las cartas de mejora y process_mode ALWAYS mantiene la animación y los botones
+## vivos con el árbol en pausa. Reintentar recarga la partida (el _ready del
+## jugador recaptura el mouse), Cambiar raider hace la misma limpieza pero
+## vuelve al selector y Salir cierra el juego.
 ##
-## The four endings (survived or not × died or extracted) are ENDINGS
-## rows, not scattered conditionals: copy, title color and which flourish
-## plays all travel together, so a fifth ending is one more row.
+## Los cuatro finales (cumplió la meta o no × murió o se extrajo) son filas de
+## ENDINGS: texto, color del título y adorno viajan juntos, así que un quinto
+## final es una fila más.
 ##
-## Look (iteration 29): UiTheme system + a title with impact — defeat
-## drops in oversized with a shake, victory lands with a back-ease and a
-## looping golden shimmer — then the stats panel, rewards and buttons
-## stagger in (~0.8s total, buttons clickable throughout). Leaving goes
-## through ScreenFade.leave_run, which owns the cleanup and keeps the tree
-## paused across the cut. All tweens ignore time scale (a death can land
-## mid hit-stop).
+## Aspecto: la derrota cae grande con una sacudida y la victoria aterriza con
+## un rebote y un brillo dorado en bucle; luego entran escalonados el panel
+## de estadísticas, las recompensas y los botones (~0.8 s; los botones
+## responden desde el inicio). Salir pasa por ScreenFade.leave_run, dueño de
+## la limpieza, que mantiene el árbol en pausa durante el corte. Todos los
+## tweens ignoran la escala de tiempo (una muerte puede caer en pleno
+## hit-stop).
 
+## Color del título en las derrotas y en las victorias.
 const DEFEAT_TITLE_COLOR := Color(0.9, 0.25, 0.2)
 const VICTORY_TITLE_COLOR := Color(0.96, 0.78, 0.3)
-const CHARACTER_SELECT_SCENE_PATH := "res://scenes/ui/CharacterSelect.tscn"
 
-## One row per ending. `shake` is the defeat slam, `shimmer` the golden
-## breathing loop on a title worth staring at.
+## Una fila por final. `shake` es el golpe de la derrota y `shimmer` el
+## brillo dorado en bucle del título.
 const ENDINGS: Dictionary[String, Dictionary] = {
 	"death_win": {
 		"title": "INCURSIÓN COMPLETA", "subtitle": "¡Sobreviviste!",
@@ -42,6 +42,58 @@ const ENDINGS: Dictionary[String, Dictionary] = {
 		"color": DEFEAT_TITLE_COLOR, "shake": false, "shimmer": false,
 	},
 }
+
+@export_group("Textos")
+## Indicación del botón de aceptar, bajo los botones.
+@export var accept_hint_text: String = "Elegir"
+## Línea de etapas superadas en la partida (%d = etapas).
+@export var stages_format: String = "Etapas superadas: %d"
+## Línea de vueltas completas al circuito de mapas (%d = vueltas); solo sale con al menos una.
+@export var laps_format: String = "Vueltas: %d"
+## Línea de misiones nuevas (%s = esquirlas ganadas, %d = misiones, %s = frase de misión).
+@export var quests_format: String = "%s · %d %s — reclámalas en el registro"
+## Frase de misión cuando se completó una sola.
+@export var quest_singular_text: String = "misión completada"
+## Frase de misión cuando se completaron varias.
+@export var quest_plural_text: String = "misiones completadas"
+## Línea de la Cacería diaria (%d = puntaje de esta partida, %d = mejor de hoy).
+@export var daily_score_format: String = "Puntaje diario: %d — mejor de hoy: %d"
+
+@export_group("Animación")
+## Duración del fundido de entrada del atenuado, en segundos.
+@export var dim_fade_time: float = 0.18
+## Escala desde la que cae el título.
+@export var title_start_scale: float = 1.9
+## Duración del fundido de entrada del título, en segundos.
+@export var title_fade_time: float = 0.12
+## Duración de la caída del título en una derrota con golpe, en segundos.
+@export var title_slam_time: float = 0.14
+## Duración de la caída con rebote del título en los demás finales, en segundos.
+@export var title_bounce_time: float = 0.3
+## Primer giro de la sacudida de la derrota, en grados.
+@export var shake_first_angle: float = -2.0
+## Segundo giro de la sacudida de la derrota, en grados.
+@export var shake_second_angle: float = 1.6
+## Duración del primer giro de la sacudida, en segundos.
+@export var shake_first_time: float = 0.04
+## Duración del segundo giro y del regreso a recto, en segundos cada uno.
+@export var shake_swing_time: float = 0.06
+## Duración del fundido de estadísticas, recompensas y botones, en segundos.
+@export var section_fade_time: float = 0.2
+## Retraso de la primera sección tras abrir la pantalla, en segundos.
+@export var section_delay: float = 0.22
+## Retraso extra entre una sección y la siguiente, en segundos.
+@export var section_stagger: float = 0.09
+## Brillo (modulate) al que sube el título en el destello dorado de la victoria.
+@export var shimmer_color: Color = Color(1.3, 1.22, 1.0)
+## Duración de cada mitad del destello dorado, en segundos.
+@export var shimmer_time: float = 0.9
+## Espera antes de cada subida del destello dorado, en segundos.
+@export var shimmer_delay: float = 0.4
+
+@export_group("Panel")
+## Margen interior del panel de estadísticas, en píxeles (horizontal, vertical).
+@export var panel_margin: Vector2 = Vector2(26.0, 16.0)
 
 @onready var _root: Control = %Root
 @onready var _title_label: Label = %TitleLabel
@@ -62,35 +114,35 @@ var _shimmer_tween: Tween = null
 
 func _ready() -> void:
 	visible = false
-	add_to_group("ui_blocking")
+	add_to_group(BlockingUi.GROUP)
 	_apply_styles()
-	# The container re-sorts one frame AFTER the title text and font
-	# change, so the size read in _play_entrance is still the old one.
-	# Re-centering on every resize keeps the scale-in anchored on the
-	# headline instead of sliding it across the screen.
+	# El contenedor reacomoda un frame DESPUÉS del cambio de texto y fuente
+	# del título, así que el tamaño que lee _play_entrance todavía es el
+	# viejo. Recentrar el pivote en cada cambio de tamaño mantiene la escala
+	# anclada en el titular en vez de deslizarlo por la pantalla.
 	_title_label.resized.connect(_center_title_pivot)
-	# Button prompt under the buttons; it follows the last device used.
-	_buttons_row.get_parent().add_child(InputHints.build([["ui_accept", "Elegir"]]))
+	# Indicación de botones bajo los botones; sigue al último dispositivo.
+	_buttons_row.get_parent().add_child(InputHints.build([["ui_accept", accept_hint_text]]))
 	_retry_button.pressed.connect(_on_retry_pressed)
 	_change_character_button.pressed.connect(_on_change_character_pressed)
 	_quit_button.pressed.connect(_on_quit_pressed)
 
 
-## PauseMenu contract ("ui_blocking"): the end screen owns the run-end
-## pause while it is up, so Esc must not open the pause menu over it.
+## Contrato de BlockingUi (grupo BlockingUi.GROUP): la pantalla de fin es dueña
+## de la pausa mientras está arriba, así que Esc no abre la pausa encima.
 func is_blocking() -> bool:
 	return visible
 
 
-## Connected to RunManager.run_ended in RunSystems.tscn. The tree is
-## already paused when this runs.
+## Conectada a RunManager.run_ended en RunSystems.tscn. El árbol ya está en
+## pausa cuando esto corre.
 func open(victory: bool) -> void:
 	if visible:
 		return
-	# Iteration 38: no clock ends the run; victory means the survival goal
-	# was met before the end (death or extraction), defeat means it wasn't.
+	# Ningún reloj termina la partida: victoria es haber cumplido la meta de
+	# supervivencia antes del final (muerte o extracción).
 	var ending: Dictionary = ENDINGS[_ending_key(victory, not _party_wiped())]
-	UiTheme.style_title(_title_label, 72, ending.color as Color, 8, 14)
+	_title_label.add_theme_color_override("font_color", ending.color as Color)
 	_title_label.text = String(ending.title)
 	_subtitle_label.text = String(ending.subtitle)
 	var total: int = int(RunState.run_time)
@@ -111,36 +163,34 @@ func _ending_key(victory: bool, extracted: bool) -> String:
 	return "death_win" if victory else "death_loss"
 
 
-## Meta earnings from this run's fold (RunManager ran it just before
-## emitting run_ended): any map-tier victory bonus (credited outright)
-## plus quests newly completed, whose claimable Shard value waits in the
-## quest log.
+## Ganancias meta del cierre de esta partida (RunManager lo corrió justo
+## antes de emitir run_ended): etapas y vueltas, las misiones nuevas cuyas
+## esquirlas esperan en el registro y el puntaje de la Cacería diaria.
 func _earning_lines() -> Array[String]:
 	var lines: Array[String] = []
-	# Stage progression (iteration 50) reads first: it is what the run was
-	# actually about now that there is no tier to have picked.
-	lines.append("Etapas superadas: %d" % RunState.stages_cleared_total)
+	# El avance por etapas va primero: es de lo que trató la partida.
+	lines.append(stages_format % RunState.stages_cleared_total)
 	if RunState.laps_completed > 0:
-		lines.append("Vueltas: %d" % RunState.laps_completed)
+		lines.append(laps_format % RunState.laps_completed)
 	var quest_count := SaveData.last_new_quest_ids.size()
 	if quest_count > 0:
-		# The whole noun phrase agrees, not just a plural letter: Spanish
-		# inflects the participle too ("1 misión completada" / "3 misiones
-		# completadas"), so the count decides the phrase, not a suffix.
-		var quest_phrase := "misión completada" if quest_count == 1 else "misiones completadas"
-		lines.append("+%d esquirlas · %d %s — reclámalas en el registro" % [
-				SaveData.last_reward_shards, quest_count, quest_phrase])
-	# Daily Hunt scoreboard line (iteration 36).
+		# Concuerda la frase entera, no solo una letra plural: el español
+		# también flexiona el participio ("1 misión completada" / "3 misiones
+		# completadas"), así que la cantidad elige la frase.
+		var quest_phrase := quest_singular_text if quest_count == 1 else quest_plural_text
+		lines.append(quests_format % [
+				UiTheme.SHARDS_GAIN % SaveData.last_reward_shards, quest_count, quest_phrase])
+	# Línea del marcador de la Cacería diaria.
 	if GameConfig.daily_mode:
-		lines.append("Puntaje diario: %d — mejor de hoy: %d" % [
+		lines.append(daily_score_format % [
 				GameConfig.last_daily_score,
-				SaveData.stat("daily_best_" + GameConfig.daily_date)])
+				SaveData.stat(DailyHunt.BEST_STAT_PREFIX + GameConfig.daily_date)])
 	return lines
 
 
-## True when nobody in the party is standing (a death ended the run, not
-## an extraction). Downed co-op bodies leave the "player" group, so an
-## empty group at run end means a wipe.
+## True cuando nadie del grupo sigue en pie (una muerte terminó la partida,
+## no una extracción). Los cuerpos caídos en co-op salen del grupo "player",
+## así que un grupo vacío al final significa que cayeron todos.
 func _party_wiped() -> bool:
 	for node: Node in get_tree().get_nodes_in_group("player"):
 		var health := Health.find_in(node)
@@ -149,8 +199,9 @@ func _party_wiped() -> bool:
 	return true
 
 
-## Dim in, title lands with impact, then stats/rewards/buttons stagger.
-## Runs through the pause (ALWAYS layer) and ignores hit-stop.
+## Aparece el atenuado, el título aterriza con impacto y luego entran
+## escalonados estadísticas, recompensas y botones. Corre a través de la
+## pausa (capa ALWAYS) e ignora el hit-stop.
 func _play_entrance(ending: Dictionary) -> void:
 	if _entrance_tween != null and _entrance_tween.is_valid():
 		_entrance_tween.kill()
@@ -158,7 +209,7 @@ func _play_entrance(ending: Dictionary) -> void:
 		_shimmer_tween.kill()
 	_root.modulate.a = 0.0
 	_center_title_pivot()
-	_title_label.scale = Vector2(1.9, 1.9)
+	_title_label.scale = Vector2.ONE * title_start_scale
 	_title_label.modulate = Color(1, 1, 1, 0)
 	_title_label.rotation_degrees = 0.0
 	var staggered: Array[Control] = [_stats_panel, _rewards_label, _buttons_row]
@@ -166,29 +217,34 @@ func _play_entrance(ending: Dictionary) -> void:
 		section.modulate.a = 0.0
 	_entrance_tween = create_tween()
 	_entrance_tween.set_ignore_time_scale(true)
-	_entrance_tween.tween_property(_root, "modulate:a", 1.0, 0.18)
-	# Title: dropped-in scale; the slam shakes, everything else eases.
-	_entrance_tween.parallel().tween_property(_title_label, "modulate:a", 1.0, 0.12)
+	_entrance_tween.tween_property(_root, "modulate:a", 1.0, dim_fade_time)
+	# Título: cae desde grande; el golpe sacude y lo demás suaviza.
+	_entrance_tween.parallel().tween_property(_title_label, "modulate:a", 1.0,
+			title_fade_time)
 	if bool(ending.shake):
-		_entrance_tween.parallel().tween_property(_title_label, "scale", Vector2.ONE, 0.14) \
+		_entrance_tween.parallel().tween_property(_title_label, "scale", Vector2.ONE,
+				title_slam_time) \
 				.set_trans(Tween.TRANS_QUART).set_ease(Tween.EASE_IN)
-		_entrance_tween.tween_property(_title_label, "rotation_degrees", -2.0, 0.04)
-		_entrance_tween.tween_property(_title_label, "rotation_degrees", 1.6, 0.06)
-		_entrance_tween.tween_property(_title_label, "rotation_degrees", 0.0, 0.06)
+		_entrance_tween.tween_property(_title_label, "rotation_degrees", shake_first_angle,
+				shake_first_time)
+		_entrance_tween.tween_property(_title_label, "rotation_degrees", shake_second_angle,
+				shake_swing_time)
+		_entrance_tween.tween_property(_title_label, "rotation_degrees", 0.0, shake_swing_time)
 	else:
-		_entrance_tween.parallel().tween_property(_title_label, "scale", Vector2.ONE, 0.3) \
+		_entrance_tween.parallel().tween_property(_title_label, "scale", Vector2.ONE,
+				title_bounce_time) \
 				.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 	for i in staggered.size():
-		_entrance_tween.parallel().tween_property(staggered[i], "modulate:a", 1.0, 0.2) \
-				.set_delay(0.22 + 0.09 * i)
+		_entrance_tween.parallel().tween_property(staggered[i], "modulate:a", 1.0,
+				section_fade_time).set_delay(section_delay + section_stagger * i)
 	if bool(ending.shimmer):
-		# Golden shine: the title breathes brighter, forever.
+		# Brillo dorado: el título respira más claro, en bucle.
 		_shimmer_tween = create_tween().set_loops()
 		_shimmer_tween.set_ignore_time_scale(true)
 		_shimmer_tween.tween_property(_title_label, "modulate",
-				Color(1.3, 1.22, 1.0), 0.9).set_delay(0.4) \
+				shimmer_color, shimmer_time).set_delay(shimmer_delay) \
 				.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
-		_shimmer_tween.tween_property(_title_label, "modulate", Color.WHITE, 0.9) \
+		_shimmer_tween.tween_property(_title_label, "modulate", Color.WHITE, shimmer_time) \
 				.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 
 
@@ -197,17 +253,17 @@ func _center_title_pivot() -> void:
 
 
 func _on_retry_pressed() -> void:
-	# The return is checked (screen_fade.gd asks callers to): a press that
-	# lands while a cut is already running is DROPPED, and swallowing that
-	# silently leaves a live button that looks broken.
+	# Se revisa el retorno (screen_fade.gd lo pide): una pulsación que llega
+	# durante un corte se DESCARTA.
 	if not ScreenFade.leave_run():
 		return
 
 
-## Retry's cleanup, but back to the select screen for a new loadout (the
-## GameConfig selection survives, so the screen reopens on the last pick).
+## La limpieza de Reintentar, pero de vuelta al selector para elegir otro
+## raider (la elección en GameConfig sobrevive, así que el selector reabre
+## en lo último elegido).
 func _on_change_character_pressed() -> void:
-	if not ScreenFade.leave_run(CHARACTER_SELECT_SCENE_PATH):
+	if not ScreenFade.leave_run(ScenePaths.CHARACTER_SELECT):
 		return
 
 
@@ -217,12 +273,12 @@ func _on_quit_pressed() -> void:
 	get_tree().quit()
 
 
-## UiTheme design system: headline typography, stat panel with the header
-## accent line, teal hero Retry with quiet siblings.
+## Sistema de diseño UiTheme: panel de estadísticas con línea de acento y
+## Reintentar turquesa como botón principal. La tipografía del título y del
+## subtítulo vive en la escena; el color del título lo elige el final.
 func _apply_styles() -> void:
-	_subtitle_label.add_theme_font_override("font", UiTheme.spaced_font(2))
 	_stats_panel.add_theme_stylebox_override("panel",
-			UiTheme.panel(UiTheme.PANEL_BG, UiTheme.BORDER_DIM, 26.0, 16.0))
+			UiTheme.panel(UiTheme.PANEL_BG, UiTheme.BORDER_DIM, panel_margin.x, panel_margin.y))
 	UiTheme.style_button(_retry_button, UiTheme.ACCENT, true)
 	UiTheme.style_button(_change_character_button)
 	UiTheme.style_button(_quit_button)

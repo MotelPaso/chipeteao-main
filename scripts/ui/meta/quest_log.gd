@@ -1,28 +1,71 @@
 extends MetaScreen
-## Quest log screen (GDD 8), opened from the character select's Quests
-## button: every QuestCatalog challenge as a scrollable row with name,
-## description, an x/y progress bar, and its Shard reward. Completed but
-## unclaimed quests float to the top with a glowing border and a Claim
-## button — claiming is the manual payoff moment that credits the Shards
-## (SaveData persists immediately). Claimed rows sink to the bottom,
-## dimmed.
+## Registro de misiones (GDD 8), abierto desde el botón Misiones del
+## selector: cada desafío de QuestCatalog como una fila con nombre,
+## descripción, barra de progreso x/y y su recompensa en esquirlas. Las
+## misiones completas sin reclamar suben arriba con borde brillante y un
+## botón Reclamar: reclamar es el pago manual que acredita las esquirlas
+## (SaveData guarda al instante). Las reclamadas bajan al fondo, atenuadas.
 ##
-## Look (iteration 29): UiTheme design system — fog backdrop shader,
-## spaced amber title, quest rows as cards (claimable ones glow amber),
-## styled progress bars. The chrome, the Esc/Back exit, the staggered
-## entrance and the claim payoff (row flashes gold, the shard balance
-## counts up and pops) all come from MetaScreen.
+## El cromo, la salida con Esc/Volver, la entrada escalonada y el pago (la
+## fila destella en oro y el saldo cuenta y salta) vienen de MetaScreen.
 
-const CLAIMED_MODULATE := Color(1.0, 1.0, 1.0, 0.45)
-
-## Three mutually exclusive row states. An enum instead of two booleans:
-## _build_row(quest, true, true) used to be a state the types allowed but
-## the screen can never be in.
+## Tres estados de fila que se excluyen entre sí.
 enum RowState { IN_PROGRESS, CLAIMABLE, CLAIMED }
 
+@export_group("Filas")
+## Tamaño de fuente del nombre de la misión, en píxeles.
+@export var name_font_size: int = 16
+## Color del nombre de la misión.
+@export var name_color: Color = UiTheme.TEXT_BRIGHT
+## Tamaño de fuente de la descripción de la misión, en píxeles.
+@export var description_font_size: int = 12
+## Color de la descripción de la misión.
+@export var description_color: Color = UiTheme.TEXT_DIM
+## Tamaño de fuente de la recompensa "+N esquirlas" de la derecha, en píxeles.
+@export var reward_font_size: int = 14
+## Color de la recompensa "+N esquirlas" de la derecha.
+@export var reward_color: Color = UiTheme.SHARD_BLUE
+## Tamaño de fuente del contador "x/y" junto a la barra, en píxeles.
+@export var progress_font_size: int = 12
+## Color del contador "x/y" junto a la barra.
+@export var progress_color: Color = Color(0.72, 0.74, 0.78)
+## Tamaño de fuente del sello de misión reclamada, en píxeles.
+@export var claimed_font_size: int = 12
+## Color del sello de misión reclamada.
+@export var claimed_color: Color = UiTheme.TEXT_FAINT
+## Modulate de las filas ya reclamadas (atenuadas).
+@export var claimed_row_modulate: Color = Color(1.0, 1.0, 1.0, 0.45)
+## Tamaño mínimo del botón Reclamar, en píxeles (ancho, alto).
+@export var claim_button_size: Vector2 = Vector2(110.0, 34.0)
+## Tamaño mínimo de la barra de progreso, en píxeles (ancho, alto).
+@export var progress_bar_size: Vector2 = Vector2(260.0, 14.0)
+## Separación entre la columna de la misión y la de la recompensa, en píxeles.
+@export var columns_separation: int = 16
+## Separación vertical entre nombre, descripción y progreso, en píxeles.
+@export var info_separation: int = 3
+## Separación vertical entre la recompensa y el botón Reclamar o el sello, en píxeles.
+@export var side_separation: int = 4
+## Separación entre la barra de progreso y su contador, en píxeles.
+@export var progress_separation: int = 10
+## Radio de las esquinas de la barra de progreso, en píxeles.
+@export var progress_bar_radius: int = 5
+## Margen entre el canal de la barra de progreso y su relleno, en píxeles.
+@export var progress_bar_inset: int = 2
+## Cuánto se oscurece el azul de esquirla (UiTheme.SHARD_BLUE) en la barra de
+## una misión en curso (0-1); las terminadas usan UiTheme.ACCENT_AMBER.
+@export var progress_fill_darken: float = 0.15
+## Espacio extra entre las letras del sello RECLAMADA, en píxeles.
+@export var claimed_spacing: int = 2
 
-## Claimable first (the dopamine shelf), then in-progress in catalog
-## order, then claimed rows dimmed at the bottom.
+@export_group("Textos")
+## Botón de una misión completa sin reclamar.
+@export var claim_text: String = "Reclamar"
+## Sello de una misión ya reclamada.
+@export var claimed_text: String = "RECLAMADA"
+
+
+## Primero las reclamables, luego las en curso en orden de catálogo y al
+## final las reclamadas, atenuadas.
 func _build_rows(list_node: VBoxContainer) -> void:
 	var claimable: Array[Dictionary] = []
 	var in_progress: Array[Dictionary] = []
@@ -43,8 +86,8 @@ func _build_rows(list_node: VBoxContainer) -> void:
 		list_node.add_child(_build_row(quest, RowState.CLAIMED))
 
 
-## The payoff moment: credit the Shards, then let MetaScreen flash the
-## row, count the balance up and resort the list.
+## El pago: acredita las esquirlas y deja que MetaScreen haga destellar la
+## fila, cuente el saldo y reordene la lista.
 func _on_claim_pressed(quest_id: String, row: PanelContainer) -> void:
 	var before := SaveData.shards
 	if SaveData.claim_quest(quest_id) <= 0:
@@ -58,68 +101,69 @@ func _build_row(quest: Dictionary, state: RowState) -> PanelContainer:
 	row.add_theme_stylebox_override("panel", MetaScreen.card_style(
 			UiTheme.ACCENT_AMBER if claimable else UiTheme.BORDER_DIM, claimable))
 	if state == RowState.CLAIMED:
-		row.modulate = CLAIMED_MODULATE
+		row.modulate = claimed_row_modulate
 	var columns := HBoxContainer.new()
-	columns.add_theme_constant_override("separation", 16)
+	columns.add_theme_constant_override("separation", columns_separation)
 	row.add_child(columns)
 	columns.add_child(_build_info(quest, state))
 	columns.add_child(_build_side(quest, state, row))
 	return row
 
 
-## Left column: name, description and the progress line.
+## Columna izquierda: nombre, descripción y la línea de progreso.
 func _build_info(quest: Dictionary, state: RowState) -> VBoxContainer:
 	var info := VBoxContainer.new()
 	info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	info.add_theme_constant_override("separation", 3)
-	info.add_child(MetaScreen.label(String(quest.display_name), 16, UiTheme.TEXT_BRIGHT))
-	info.add_child(MetaScreen.label(String(quest.description), 12, UiTheme.TEXT_DIM))
+	info.add_theme_constant_override("separation", info_separation)
+	info.add_child(MetaScreen.label(String(quest.display_name), name_font_size, name_color))
+	info.add_child(MetaScreen.label(String(quest.description), description_font_size,
+			description_color))
 	info.add_child(_progress_line(SaveData.stat(String(quest.stat)), int(quest.target),
 			state != RowState.IN_PROGRESS))
 	return info
 
 
-## Right column: the reward, plus the state's own affordance (Claim
-## button / CLAIMED stamp / nothing while it is still in progress).
+## Columna derecha: la recompensa y lo propio del estado (botón Reclamar,
+## sello RECLAMADA o nada mientras sigue en curso).
 func _build_side(quest: Dictionary, state: RowState,
 		row: PanelContainer) -> VBoxContainer:
 	var side := VBoxContainer.new()
 	side.alignment = BoxContainer.ALIGNMENT_CENTER
-	side.add_theme_constant_override("separation", 4)
-	var reward := MetaScreen.label("+%d esquirlas" % int(quest.reward), 14,
-			UiTheme.SHARD_BLUE)
+	side.add_theme_constant_override("separation", side_separation)
+	var reward := MetaScreen.label(UiTheme.SHARDS_GAIN % int(quest.reward),
+			reward_font_size, reward_color)
 	reward.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	side.add_child(reward)
 	if state == RowState.CLAIMABLE:
 		var claim := Button.new()
-		claim.text = "Reclamar"
-		claim.custom_minimum_size = Vector2(110.0, 34.0)
+		claim.text = claim_text
+		claim.custom_minimum_size = claim_button_size
 		claim.pressed.connect(_on_claim_pressed.bind(String(quest.id), row))
 		UiTheme.style_button(claim, UiTheme.ACCENT_AMBER, true)
 		side.add_child(claim)
 	elif state == RowState.CLAIMED:
-		var done := MetaScreen.label("RECLAMADA", 12, UiTheme.TEXT_FAINT)
-		done.add_theme_font_override("font", UiTheme.spaced_font(2))
+		var done := MetaScreen.label(claimed_text, claimed_font_size, claimed_color)
+		done.add_theme_font_override("font", UiTheme.spaced_font(claimed_spacing))
 		done.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		side.add_child(done)
 	return side
 
 
-## "x/y" bar + counter; the bar clamps so overshoot still reads full.
-## Finished quests turn the fill amber (earned, not just progressing).
+## Barra "x/y" con contador; la barra se acota, así pasarse se lee lleno.
+## Las misiones terminadas pintan el relleno de ámbar.
 func _progress_line(current: int, target: int, complete: bool) -> HBoxContainer:
 	var line := HBoxContainer.new()
-	line.add_theme_constant_override("separation", 10)
+	line.add_theme_constant_override("separation", progress_separation)
 	var bar := ProgressBar.new()
-	bar.custom_minimum_size = Vector2(260.0, 14.0)
+	bar.custom_minimum_size = progress_bar_size
 	bar.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	bar.max_value = float(target)
 	bar.value = float(mini(current, target))
 	bar.show_percentage = false
 	UiTheme.style_bar(bar,
-			UiTheme.ACCENT_AMBER if complete else UiTheme.SHARD_BLUE.darkened(0.15),
-			5, 2)
+			UiTheme.ACCENT_AMBER if complete else UiTheme.SHARD_BLUE.darkened(progress_fill_darken),
+			progress_bar_radius, progress_bar_inset)
 	line.add_child(bar)
-	line.add_child(MetaScreen.label("%d/%d" % [mini(current, target), target], 12,
-			Color(0.72, 0.74, 0.78)))
+	line.add_child(MetaScreen.label("%d/%d" % [mini(current, target), target],
+			progress_font_size, progress_color))
 	return line

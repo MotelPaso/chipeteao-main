@@ -16,7 +16,7 @@ shading_mode = 0
 transparency = 1
 albedo_color = Color(0.4, 0.8, 1, 0.55)
 emission_enabled = true
-emission = Color(0.35, 0.75, 1, 1)
+emission = Color(0.4, 0.8, 1, 1)
 emission_energy_multiplier = 1.1
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_progress"]
@@ -24,7 +24,8 @@ shading_mode = 0
 transparency = 1
 albedo_color = Color(0.4, 0.8, 1, 0.26)
 emission_enabled = true
-emission = Color(0.3, 0.7, 1, 1)
+emission = Color(0.4, 0.8, 1, 1)
+emission_energy_multiplier = 1.1
 
 [sub_resource type="CylinderMesh" id="CylinderMesh_pillar"]
 material = ExtResource("2_rock")
@@ -73,7 +74,13 @@ collision_layer = 0
 collision_mask = 1
 monitorable = false
 script = ExtResource("1_charge")
+prompt_text = "Quédate dentro para cargar"
 prompt_height = 4.3
+meta_stat_id = "shrines_used"
+sink_duration = 0.6
+sink_depth = 2.5
+sink_end_scale = 0.2
+marker_kind = &"altar"
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.5, 0)
@@ -95,11 +102,13 @@ mesh = SubResource("SphereMesh_crystal")
 
 [node name="Ring" type="MeshInstance3D" parent="Visual"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.04, 0)
+editor_description = "El color, la opacidad y la energía de emisión los pinta charge_shrine.gd al iniciar (accent_color, ring_alpha_*, ring_energy_*); cambiarlos aquí no tiene efecto."
 mesh = SubResource("TorusMesh_ring")
 
 [node name="ProgressDisc" type="MeshInstance3D" parent="Visual"]
 visible = false
 transform = Transform3D(0.001, 0, 0, 0, 1, 0, 0, 0, 0.001, 0, 0.06, 0)
+editor_description = "El color, la opacidad y la energía de emisión los pinta charge_shrine.gd al iniciar (accent_color, disc_alpha, ring_energy_*); cambiarlos aquí no tiene efecto."
 mesh = SubResource("CylinderMesh_progress")
 
 [node name="Body" type="StaticBody3D" parent="."]

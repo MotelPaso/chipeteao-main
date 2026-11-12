@@ -1,6 +1,6 @@
 [gd_scene load_steps=4 format=3 uid="uid://ctree3hw7ka2f"]
 
-[ext_resource type="Script" path="res://scenes/world/props/tree_prop.gd" id="1_script"]
+[ext_resource type="Script" path="res://scripts/world/props/tree_prop.gd" id="1_script"]
 [ext_resource type="PackedScene" path="res://assets/models/survival/tree-tall.glb" id="2_treemodel"]
 
 [sub_resource type="CylinderShape3D" id="CylinderShape3D_trunk"]

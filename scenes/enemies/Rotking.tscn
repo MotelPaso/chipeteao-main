@@ -1,9 +1,10 @@
-[gd_scene load_steps=20 format=3]
+[gd_scene load_steps=21 format=3]
 
 [ext_resource type="Script" path="res://scripts/enemies/rotking.gd" id="1_rotking"]
 [ext_resource type="Script" path="res://scripts/systems/health.gd" id="2_health"]
 [ext_resource type="PackedScene" path="res://scenes/systems/XpGem.tscn" id="3_gem"]
 [ext_resource type="PackedScene" uid="uid://bqgr4nt0h3v2e" path="res://scenes/enemies/Grunt.tscn" id="4_grunt"]
+[ext_resource type="PackedScene" path="res://scenes/enemies/BarkSpikes.tscn" id="5_spikes"]
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_bark"]
 albedo_color = Color(0.32, 0.23, 0.15, 1)
@@ -20,9 +21,6 @@ roughness = 1.0
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_amber"]
 shading_mode = 0
 albedo_color = Color(1, 0.65, 0.2, 1)
-emission_enabled = true
-emission = Color(1, 0.55, 0.12, 1)
-emission_energy_multiplier = 2.2
 
 [sub_resource type="CylinderMesh" id="CylinderMesh_trunk"]
 material = SubResource("StandardMaterial3D_bark")
@@ -104,6 +102,11 @@ move_speed = 2.0
 turn_speed = 3.5
 separation_strength = 0.0
 xp_gem_scene = ExtResource("3_gem")
+points_value = 25
+possessable = false
+telegraph_color = Color(1, 0.55, 0.12, 1)
+impact_color = Color(1, 0.8, 0.35, 1)
+spike_cluster_scene = ExtResource("5_spikes")
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.5, 0)

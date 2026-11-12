@@ -1,39 +1,44 @@
 class_name RunRoot
 extends Node3D
-## Persistent root of a run (iteration 49). Everything that must SURVIVE a
-## map change lives under here: the run block (RunSystems — Player,
-## RunManager, WorldDirector, HUD, card picker, run-end screen, pause
-## menu) and nothing else. The biome of the moment is instanced under
-## ArenaHost and thrown away when the party leaves through the exit
-## portal, so a run is now a sequence of STAGES instead of one arena.
+## Raíz persistente de una partida. Todo lo que debe SOBREVIVIR a un cambio
+## de mapa vive aquí: el bloque de partida (RunSystems: Player, RunManager,
+## WorldDirector, HUD, cartas, pantalla de fin, menú de pausa) y nada más.
+## El bioma del momento se instancia bajo ArenaHost y se tira cuando el
+## equipo sale por el portal: una partida es una secuencia de ETAPAS.
 ##
-## What carries across a stage: the raiders themselves and therefore their
-## level, weapons, tomes, items, pets, points, altar boons, timed boons,
-## the run-wide difficulty and the chest/roulette inflation — none of it is
-## copied, because none of it is re-created. What resets: the map and
-## everything parented to it (chests, altars, portals, roulettes, beacons,
-## enemies, props), the stage clock and the boss schedule.
+## Qué cruza una etapa: los raiders mismos y por tanto su nivel, armas,
+## tomos, objetos, mascotas, puntos, bendiciones de altar y temporales, la
+## dificultad de la partida y la inflación de cofres y ruleta; nada se copia
+## porque nada se recrea. Qué se reinicia: el mapa y todo lo que cuelga de
+## él (cofres, altares, portales, ruletas, balizas, enemigos, props), el
+## reloj de etapa y el calendario de jefes.
 ##
-## Stage order is MapCatalog.MAP_LIBRARY order, wrapping to the first map
-## with lap + 1. RunState holds the counters; this node owns the swap.
+## El orden de etapas es el de MapCatalog.MAP_LIBRARY, volviendo al primer
+## mapa con lap + 1. RunState lleva los contadores; este nodo hace el cambio.
 ##
-## Reached through the "run_root" group, never by path — arena_root() in
-## particular is what every stage-scoped spawn parents to, so nothing from
-## stage N can outlive stage N.
+## Se llega por el grupo "run_root", nunca por ruta: arena_root() es el
+## padre de todo spawn de etapa, así nada de la etapa N sobrevive a la N.
 
-## Node the stage's arena scene is instanced under.
+## Nodo bajo el que se instancia la arena de la etapa.
 const ARENA_HOST_NAME: String = "ArenaHost"
-## Beat between freeing the old arena and building the next one, so the
-## engine actually reclaims the freed nodes before the sweep counts them.
+## Cuadros de espera tras liberar los objetos de la etapa, para que el motor
+## los recupere de verdad antes de que el barrido los cuente.
 const SWAP_SETTLE_FRAMES: int = 1
+## Grupos de objetos de etapa que el cambio libera antes del barrido, en
+## este orden. Cada uno tiene su campo en la línea `Stage sweep:` salvo
+## lucky_blocks: ese formato es fijo (tools/verificar.sh compara la línea
+## entera), así que un grupo nuevo se libera aquí sin tocar la línea.
+const STAGE_PROP_GROUPS: Array[StringName] = [&"altars", XpGem.LIVE_GROUP,
+		HealthOrb.LIVE_GROUP, &"powerup_pickups", &"pet_boxes", &"vendors", &"possessed",
+		&"lucky_blocks"]
 
 @onready var _arena_host: Node3D = get_node(ARENA_HOST_NAME)
 
-## The arena of the current stage. Cached because Pools and every world
-## spawn ask for it constantly; refreshed on every swap.
+## La arena de la etapa actual. Se guarda porque Pools y cada spawn del
+## mundo la piden todo el tiempo; se refresca en cada cambio.
 var _arena: Node3D = null
-## True from the moment a swap starts until the new stage is live: a
-## second raider pressing the portal mid-fade must not start a second one.
+## True desde que empieza un cambio hasta que la nueva etapa está viva: un
+## segundo raider que pulsa el portal durante el fundido no inicia otro.
 var _swapping: bool = false
 
 
@@ -42,40 +47,37 @@ func _enter_tree() -> void:
 
 
 func _ready() -> void:
-	# RunSystems (a child) already called RunState.reset() in its
-	# _enter_tree, so the stage counters are clean here; this only decides
-	# WHICH stage the run opens on. Normal play and the daily always start
-	# in the forest; the soak harness points BONK_ARENA at a biome, which
-	# becomes GameConfig.start_map_id.
+	# RunSystems (un hijo) ya llamó a RunState.reset() en su _enter_tree, así
+	# los contadores de etapa están limpios; esto solo decide en QUÉ etapa
+	# empieza la partida. El juego normal y la diaria empiezan en el bosque;
+	# el harness apunta BONK_ARENA a un bioma, que pasa a ser
+	# GameConfig.start_map_id.
 	RunState.stage_index = MapCatalog.index_of(GameConfig.start_map_id)
 	RunState.lap = 0
 	_load_stage()
 
 
-## The live arena, or null between stages. THE accessor for stage-scoped
-## parenting (Pools, dropped chests, FX): everything that used to reach
-## for get_tree().current_scene now asks here, because current_scene is
-## the run root and never changes any more.
+## La arena viva, o null entre etapas. EL acceso para colgar cosas de la
+## etapa (Pools, cofres soltados, FX): current_scene es la raíz de la
+## partida y no cambia, así que todo lo de la etapa pregunta aquí.
 func arena_root() -> Node3D:
 	if _arena != null and not is_instance_valid(_arena):
 		_arena = null
 	return _arena
 
 
-## Public alias with the name the rest of the codebase reads better with.
+## Alias público con el nombre que se lee mejor en el resto del código.
 func current_arena() -> Node3D:
 	return arena_root()
 
 
-## THE parent for anything spawned INTO THE WORLD from anywhere in the
-## codebase (pooled FX, dropped chests, boss spikes, weapon projectiles,
-## the roulette's blocking UI). Static and tree-taking so scripts without
-## an autoload of their own can reach it in one line.
-## Before iteration 49 every one of those call sites used
-## get_tree().current_scene, which WAS the arena. It is now the persistent
-## run root, so spawning there would carry stage 1's darts, chests and
-## puddles into stage 2. Falls back to current_scene outside a run (menus)
-## and to the tree root as a last resort.
+## EL padre de todo lo que se genera EN EL MUNDO desde cualquier parte del
+## código (FX de pool, cofres soltados, púas del jefe, proyectiles, la UI
+## bloqueante de la ruleta). Estático y recibe el árbol para que scripts sin
+## autoload propio lleguen en una línea. No usar current_scene: es la raíz
+## persistente, y colgar ahí llevaría los dardos, cofres y charcos de la
+## etapa 1 a la 2. Fuera de una partida (menús) cae a current_scene, y como
+## último recurso a la raíz del árbol.
 static func stage_parent(tree: SceneTree) -> Node:
 	if tree == null:
 		return null
@@ -87,9 +89,37 @@ static func stage_parent(tree: SceneTree) -> Node:
 	return tree.current_scene if tree.current_scene != null else tree.root
 
 
-## Builds the stage RunState.stage_index points at: instantiate, publish
-## the map id, place the party, announce. The arena's own _ready drives
-## the director/scatter handshake (see arena.gd).
+## Si un cambio de etapa puede EMPEZAR ahora. Síncrono a propósito: quien
+## se gasta para tomar el portal tiene que saberlo ANTES, y advance_stage es
+## una corrutina cuya respuesta llega recién tras todo el cambio, cuando el
+## portal ya se liberó con su arena.
+func can_advance_stage() -> bool:
+	return not _swapping and RunState.run_active and not ScreenFade.is_busy()
+
+
+## Público (portal de salida, por el grupo "run_root"): desarma la etapa
+## actual y construye la siguiente tras un fundido. No hace nada si ya hay
+## un cambio en curso.
+func advance_stage() -> void:
+	# Una partida que ya terminó no construye otra etapa: el cierre ya leyó
+	# stages_cleared_total, laps_completed y visited_map_ids, y un cambio
+	# posterior movería los tres a espaldas del registro y correría los
+	# objetos de la etapa siguiente bajo la pantalla de fin.
+	if _swapping or not RunState.run_active:
+		return
+	_swapping = true
+	# Con await, este método también es corrutina: quien lo llama lo dispara
+	# y se olvida (el portal lo hace), y la bandera es lo que vuelve inútil
+	# una segunda pulsación durante el fundido.
+	if not await ScreenFade.transition_async(_swap_stage):
+		# Ya había un fundido (una partida terminando, un menú saliendo): la
+		# etapa sigue y el portal se puede volver a pulsar.
+		_swapping = false
+
+
+## Construye la etapa a la que apunta RunState.stage_index: instancia,
+## publica el id del mapa, coloca al equipo y lo anuncia. El _ready de la
+## arena maneja el acuerdo director/scatter (ver arena.gd).
 func _load_stage() -> void:
 	var row := MapCatalog.MAP_LIBRARY[RunState.stage_index % MapCatalog.MAP_LIBRARY.size()]
 	var map_id := String(row.id)
@@ -101,9 +131,9 @@ func _load_stage() -> void:
 	if arena == null:
 		push_error("RunRoot: arena root of '%s' is not a Node3D" % row.scene_path)
 		return
-	# Cached BEFORE add_child: the scatter's _enter_tree and the arena's
-	# _ready both run inside add_child, and both reach back through
-	# arena_root() (directly, or through Pools).
+	# Se guarda ANTES del add_child: el _enter_tree del scatter y el _ready
+	# de la arena corren dentro del add_child, y ambos vuelven a
+	# arena_root() (directo o por Pools).
 	_arena = arena
 	GameConfig.selected_map_id = map_id
 	if not RunState.visited_map_ids.has(map_id):
@@ -113,8 +143,8 @@ func _load_stage() -> void:
 	RunState.stage_changed.emit(RunState.stage_index, map_id)
 
 
-## Puts every raider (standing or downed) at the stage's spawn point.
-## Delegated to the run block, which owns the co-op ring geometry.
+## Pone a cada raider (de pie o derribado) en el punto de aparición de la
+## etapa. Lo delega en el bloque de partida, dueño del anillo de co-op.
 func _place_party() -> void:
 	var origin := Vector3.ZERO
 	var arena := _arena as Arena
@@ -123,112 +153,102 @@ func _place_party() -> void:
 	get_tree().call_group("run_systems", "place_party", origin)
 
 
-## Public (exit portal, through the "run_root" group): tears the current
-## stage down and builds the next one behind a fade. Ignored while a swap
-## is already running.
-## Whether a swap can START right now. Synchronous on purpose: a caller
-## that spends itself to take the portal has to know BEFORE it does,
-## and advance_stage is a coroutine whose answer only comes back after
-## the whole swap — by which time the portal has been freed with its
-## own arena.
-func can_advance_stage() -> bool:
-	return not _swapping and RunState.run_active and not ScreenFade.is_busy()
-
-
-func advance_stage() -> void:
-	# A run that already ended must not build another stage: the fold has
-	# read stages_cleared_total, laps_completed and visited_map_ids, and a
-	# swap landing after it would move all three behind the ledger's back
-	# and run the next stage's fixtures under the run-end screen.
-	if _swapping or not RunState.run_active:
-		return
-	_swapping = true
-	# Awaited, so this method is a coroutine too — callers fire it and
-	# forget (the exit portal does), and the flag below is what makes a
-	# second press during the fade a no-op.
-	if not await ScreenFade.transition_async(_swap_stage):
-		# A fade was already running (a run ending, a menu leaving): the
-		# stage stands, and the portal can be pressed again.
-		_swapping = false
-
-
-## The swap itself, awaited by ScreenFade between the fade-in and the
-## fade-out. Every step is ordered on purpose; see the section comments.
+## El cambio en sí, que ScreenFade espera entre el fundido de entrada y el
+## de salida. Cada paso va en este orden a propósito; ver cada función.
 func _swap_stage() -> void:
 	var from_index := RunState.stage_index
 	var from_id := String(MapCatalog.MAP_LIBRARY[from_index % MapCatalog.MAP_LIBRARY.size()].id)
-	# 1. Freeze the world. The pause also stops player input, which is what
-	#    keeps a raider from walking into a scene being freed.
-	# 0. Close every blocking menu that CAN be closed, and do it before
-	#    anything here reads the pause. Those layers (VendorUi, RouletteUi)
-	#    hang off the ARENA, so step 5 frees them without ever running
-	#    their _close() — the only place either one hands the pause back —
-	#    and a `was_paused` read while one of them still held it would be
-	#    true, so step 7 would decline to unpause as well. A swap landing
-	#    on an open stall left the tree paused for the rest of the process,
-	#    with Esc refused (PauseMenu._open returns on an already-paused
-	#    tree) and nothing alive left to press Salir. `dismiss()` is
-	#    exactly the hook the "blocking_ui_closable" group was declared for.
-	#    Menus that are NOT closable (the card picker) keep their pause and
-	#    are handled by _other_blocking_ui_open() at the end.
+	var was_paused := _freeze_world()
+	# Lo que lleva el equipo, leído de los nodos vivos (la otra mitad del par
+	# se imprime al final).
+	_print_carry()
+	_tear_down_stage()
+	# Deja que el motor asiente las liberaciones antes de contarlas.
+	for i in SWAP_SETTLE_FRAMES:
+		await get_tree().process_frame
+	_print_sweep()
+	_free_arena()
+	var next_index := _advance_counters(from_index)
+	_load_stage()
+	_announce_stage(from_index, next_index)
+	_print_carry()
+	if not was_paused and not _other_blocking_ui_open():
+		get_tree().paused = false
+	_swapping = false
+	# from_id solo lo lee la narración de depuración de abajo.
+	if OS.get_environment("BONK_PROBE_DEBUG") == "1":
+		print("RunRoot: left %s" % from_id)
+
+
+## Cierra los menús que se pueden cerrar y congela el mundo. Devuelve si el
+## árbol ya estaba pausado ANTES del cambio.
+func _freeze_world() -> bool:
+	# Primero los menús, antes de leer la pausa: VendorUi y RouletteUi
+	# cuelgan de la ARENA, _free_arena() los libera sin correr su _close()
+	# (lo único que devuelve la pausa), y con uno abierto `was_paused` saldría
+	# true y el árbol quedaría pausado sin nada vivo que lo despause.
+	# `dismiss()` es el gancho del grupo "blocking_ui_closable". Los menús
+	# que NO se cierran (las cartas) conservan su pausa y los revisa
+	# _other_blocking_ui_open() al final.
 	get_tree().call_group(&"blocking_ui_closable", "dismiss")
+	# La pausa también corta la entrada del jugador, así ningún raider camina
+	# hacia una escena que se está liberando.
 	var was_paused := get_tree().paused
 	get_tree().paused = true
-	# The pause is NOT enough on its own: process_mode INHERITS, and the
-	# soak harness roots the whole run under an always-processing node, so
-	# a "paused" tree there still ticks the spawner and the director. Both
-	# are stopped explicitly — a spawner still working while its arena is
-	# torn down put six enemies into the first Stage sweep, and the
-	# director would drop a chest into a map nobody will ever see.
+	# La pausa sola NO basta: process_mode se HEREDA, y el harness cuelga
+	# toda la partida de un nodo que siempre procesa, así que ahí el spawner
+	# seguiría metiendo enemigos en el barrido. Se detiene explícitamente;
+	# el director se detiene con on_stage_ended (_tear_down_stage).
 	get_tree().call_group("enemy_spawner", "set_physics_process", false)
-	# 2. What the party is carrying, read off the live nodes.
-	_print_carry()
-	# 3. Tear the stage down.
+	return was_paused
+
+
+## Desarma la etapa: enemigos, objetos de pool, lo del director y los
+## objetos de etapa sueltos.
+func _tear_down_stage() -> void:
 	_free_enemies()
 	Pools.release_all_live()
 	get_tree().call_group("world_director", "on_stage_ended")
 	_free_stage_props()
-	# 4. Let the engine settle the frees before counting them.
-	for i in SWAP_SETTLE_FRAMES:
-		await get_tree().process_frame
-	_print_sweep()
-	# 5. Free the arena itself. free(), not queue_free(): the next stage is
-	#    built on the very next line and two live arenas would both answer
-	#    the "arena_bounds" and "enemy_spawner" group lookups.
+
+
+## Libera la arena. free() y no queue_free(): la etapa siguiente se construye
+## enseguida y dos arenas vivas responderían a los grupos "arena_bounds" y
+## "enemy_spawner".
+func _free_arena() -> void:
 	if _arena != null and is_instance_valid(_arena):
 		_arena_host.remove_child(_arena)
 		_arena.free()
 	_arena = null
-	# 6. Advance the counters and build the next stage.
+
+
+## Avanza los contadores de etapa (y de vuelta al pasar del último mapa al
+## primero). Devuelve el índice de la etapa siguiente.
+func _advance_counters(from_index: int) -> int:
 	var next_index := (from_index + 1) % MapCatalog.MAP_LIBRARY.size()
 	if next_index == 0:
 		RunState.lap += 1
 		RunState.laps_completed += 1
 	RunState.stage_index = next_index
 	RunState.begin_stage()
-	_load_stage()
-	# 7. Announce. 1-based everywhere the player (or a soak log) can see it.
+	return next_index
+
+
+## Anuncia la etapa nueva. Numeración desde 1 en todo lo que ve el jugador
+## (o un log de soak).
+func _announce_stage(from_index: int, next_index: int) -> void:
 	var to_id := String(MapCatalog.MAP_LIBRARY[next_index].id)
 	get_tree().call_group("boss_ui", "announce_major", "Etapa %d — %s" % [
 			RunState.stage_index + 1,
 			String(MapCatalog.by_id_or_default(to_id).display_name)])
 	get_tree().call_group("hud", "show_stage_tag", RunState.stage_index, RunState.lap)
-	# One-line log (RunManager convention) for headless soaks.
+	# Log de una línea para los soaks headless.
 	print("Stage advanced: %d -> %d (%s) at %.1fs" % [
 			from_index + 1, next_index + 1, to_id, RunState.run_time])
-	_print_carry()
-	if not was_paused and not _other_blocking_ui_open():
-		get_tree().paused = false
-	_swapping = false
-	# from_id is only read by the debug narration below, but keeping it in
-	# one place beats recomputing the outgoing name in two prints.
-	if OS.get_environment("BONK_PROBE_DEBUG") == "1":
-		print("RunRoot: left %s" % from_id)
 
 
-## Beacons still standing. on_stage_ended now FREES its beacon nodes
-## rather than only dropping the list, so a non-zero answer here is a real
-## leak — before that fix this field could never be anything but zero.
+## Balizas todavía en pie. on_stage_ended LIBERA sus balizas, así que un
+## valor distinto de cero aquí es una fuga real.
 func _live_beacons() -> int:
 	var director := get_tree().get_first_node_in_group("world_director")
 	if director == null or not director.has_method("beacon_count"):
@@ -236,9 +256,9 @@ func _live_beacons() -> int:
 	return int(director.call("beacon_count"))
 
 
-## Every enemy body, freed immediately. free() and not queue_free() so the
-## sweep two lines later counts what is REALLY gone: a queued free lands at
-## the end of the frame, after the count.
+## Libera de inmediato cada cuerpo enemigo. free() y no queue_free() para
+## que el barrido cuente lo que de verdad se fue: un free en cola cae al
+## final del cuadro, después del conteo.
 func _free_enemies() -> void:
 	for group: StringName in [&"enemies", &"boss"]:
 		for node: Node in get_tree().get_nodes_in_group(group):
@@ -247,25 +267,22 @@ func _free_enemies() -> void:
 				node.free()
 
 
-## Stage-scoped world objects that are NOT children of the arena scene
-## file: everything the director and the world dropped during the stage.
-## They are parented to the arena root (world_director._stage_parent), so
-## most of them would die with it anyway — but the sweep runs BEFORE the
-## arena is freed, and a stage that leaks one of these is exactly what the
-## sweep exists to catch. Later prompts append their own kinds here.
+## Objetos del mundo de la etapa que NO son hijos de la escena de arena: lo
+## que el director y el mundo soltaron durante la etapa. Cuelgan de la arena
+## (StageLayout.stage_parent()), así que casi todos morirían con ella,
+## pero el barrido corre ANTES de liberar la arena, y una etapa que filtra
+## uno de estos es justo lo que el barrido detecta.
 func _free_stage_props() -> void:
-	var kinds: Array[StringName] = [&"altars", XpGem.LIVE_GROUP, HealthOrb.LIVE_GROUP,
-			&"powerup_pickups", &"pet_boxes", &"vendors", &"possessed", &"lucky_blocks"]
-	for group: StringName in kinds:
+	for group: StringName in STAGE_PROP_GROUPS:
 		for node: Node in get_tree().get_nodes_in_group(group):
 			if is_instance_valid(node) and not node.is_queued_for_deletion():
 				var parent := node.get_parent()
 				if parent != null:
 					parent.remove_child(node)
 				node.free()
-	# Chests, portals, roulettes, springs and beacons carry no group of
-	# their own; they are all Interactables or plain Node3Ds parented to
-	# the arena, so the arena walk below catches every one of them.
+	# Cofres, portales, ruletas y manantiales no están en STAGE_PROP_GROUPS:
+	# son Interactables colgados de la arena, y los libera el recorrido de abajo.
+	# Las balizas las libera el director en on_stage_ended.
 	var arena := arena_root()
 	if arena != null:
 		for node: Node in _stage_leftovers(arena):
@@ -274,9 +291,9 @@ func _free_stage_props() -> void:
 				node.free()
 
 
-## Interactables and beacons still standing in `root`. Recursive because
-## an arena keeps its scene-placed shrines under an "Interactables" node
-## while the director parents its own spawns directly to the arena root.
+## Interactables que siguen en pie dentro de `root`. Recursivo porque una
+## arena guarda sus santuarios de escena bajo un nodo "Interactables" y el
+## director cuelga los suyos directo de la raíz.
 func _stage_leftovers(root: Node) -> Array[Node]:
 	var found: Array[Node] = []
 	for child: Node in root.get_children():
@@ -287,9 +304,10 @@ func _stage_leftovers(root: Node) -> Array[Node]:
 	return found
 
 
-## What is still alive right before the arena goes. Every counter must be
-## zero: a non-zero one is a leak that would follow the party into the
-## next stage. Later prompts append their own fields.
+## Lo que sigue vivo justo antes de que se vaya la arena. Todo contador
+## debe ser cero: uno distinto es una fuga que seguiría al equipo a la etapa
+## siguiente. El formato de la línea es fijo: tools/verificar.sh la compara
+## entera.
 func _print_sweep() -> void:
 	var chests := 0
 	var arena := arena_root()
@@ -312,10 +330,10 @@ func _print_sweep() -> void:
 			get_tree().get_node_count_in_group(&"possessed")])
 
 
-## The party's progress, computed from the LIVE nodes on both sides of the
-## swap. Printed twice on purpose: two identical lines are the proof that
-## a stage change costs the party nothing. Never cached — a cached copy
-## would report what we meant to carry, not what actually crossed.
+## El progreso del equipo, calculado de los nodos VIVOS a ambos lados del
+## cambio. Se imprime dos veces a propósito: dos líneas iguales prueban que
+## cambiar de etapa no le cuesta nada al equipo. Nunca en caché: una copia
+## diría lo que quisimos llevar, no lo que cruzó de verdad.
 func _print_carry() -> void:
 	var weapons := 0
 	var tomes := 0
@@ -341,9 +359,9 @@ func _print_carry() -> void:
 			RunState.level, weapons, tomes, items, points])
 
 
-## Any member of "ui_blocking" holding the pause right now (the card
-## picker, the run-end screen). The swap must not hand the world back to a
-## screen that took the pause for itself.
+## Algún miembro de "ui_blocking" con la pausa tomada ahora (las cartas, la
+## pantalla de fin). El cambio no debe devolverle el mundo a una pantalla que
+## tomó la pausa para sí.
 func _other_blocking_ui_open() -> bool:
 	for node: Node in get_tree().get_nodes_in_group("ui_blocking"):
 		if not node.has_method(&"is_blocking"):

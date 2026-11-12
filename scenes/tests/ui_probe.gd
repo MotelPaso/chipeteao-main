@@ -1,52 +1,50 @@
 extends Node
-## Headless UI harness (iteration 57). Seven of the nine UI scenes had
-## never been booted by anything: CharacterSelect, Collection, QuestLog,
-## RelicShop and SettingsPanel were never instanced at all, and PauseMenu
-## and RunEndScreen were instanced by RunSystems.tscn but never opened. A
-## handler that errors on its first press, a menu that never gives the
-## pause back, a `%` name renamed in a .tscn — none of that could fail a
-## soak, because no soak ever went there.
+## Arnés headless de la interfaz. Abre las escenas de UI que ningún soak
+## visita (CharacterSelect, Collection, QuestLog, RelicShop, SettingsPanel,
+## PauseMenu, RunEndScreen) y aprieta sus controles: un handler que falla al
+## primer clic, un menú que no devuelve la pausa o un nombre `%` cambiado en
+## un .tscn hacen fallar el gate.
 ##
-## Run it alone with (the --quit-after is a hard two-minute ceiling; the
-## probe quits itself long before that):
+## Se corre solo con (el --quit-after es un techo duro de dos minutos; el
+## probe sale mucho antes):
 ##   godot --headless --fixed-fps 60 --quit-after 7200 \
 ##     res://scenes/tests/UiProbe.tscn
 ##
-## Output contract (tools/verificar.sh greps every step name off its own
-## fixed list, so a step that silently stops running is a failure):
-##   UiProbe: step <name> ok      ... one per step, in order
-##   UiProbe: done steps=%d       ... only when every step passed
-## A missing control, a rejected precondition or a pause that does not
-## lift is a push_error, which PATRON_ERROR catches on its own.
+## Contrato de salida (tools/verificar.sh busca cada nombre de paso en su
+## propia lista fija, así que un paso que deja de correr en silencio es falla):
+##   UiProbe: step <name> ok      ... uno por paso, en orden
+##   UiProbe: done steps=%d       ... solo cuando pasaron todos los pasos
+## Un control que falta, una precondición rechazada o una pausa que no se
+## levanta es un push_error, que PATRON_ERROR atrapa por sí solo.
 ##
-## ARCHITECTURE. %StartButton and the run-end buttons REPLACE
-## current_scene, so a driver living inside the scene under test would be
-## freed halfway through its own test. This scene's root script therefore
-## does exactly one thing: it creates the Driver below and adds it to
-## get_tree().root (deferred — adding a child to the root from inside a
-## _ready trips "Parent node is busy setting up children"), where it
-## outlives every scene change. The driver then drives CharacterSelect
-## and everything downstream, re-acquiring current_scene after each cut.
+## ARQUITECTURA. %StartButton y los botones del fin de partida REEMPLAZAN
+## current_scene, así que un driver dentro de la escena probada se liberaría
+## a mitad de su propia prueba. Por eso el script raíz de esta escena hace
+## una sola cosa: crea el Driver de abajo y lo agrega a get_tree().root
+## (diferido: agregar un hijo a la raíz desde un _ready dispara "Parent node
+## is busy setting up children"), donde sobrevive a cada cambio de escena.
+## El driver maneja CharacterSelect y todo lo que sigue, y vuelve a tomar
+## current_scene después de cada corte.
 ##
-## It presses the REAL controls: buttons by unique name resolved against
-## their own owner (%SettingsButton exists in both CharacterSelect.tscn
-## and PauseMenu.tscn), by text only for the ones built in code, and
-## pause_game as a parsed InputEventAction with the release on a LATER
-## frame. It never calls an underscore handler: a test that calls
-## _on_card_pressed directly proves the method exists, not that the
-## button reaches it.
+## Aprieta los controles REALES: botones por nombre único resuelto contra su
+## propio owner (%SettingsButton existe en CharacterSelect.tscn y en
+## PauseMenu.tscn; los botones co-op y el «Sí» de cada tarjeta se resuelven
+## dentro de su instancia de CoopLobby / CharacterCard), y pause_game como
+## InputEventAction con la liberación en un frame POSTERIOR. Nunca llama a un
+## handler con guion bajo: llamar _on_card_pressed directo prueba que el
+## método existe, no que el botón llega a él.
 
-## Save file when BONK_SAVE_PATH is not set. SaveData._ready already
-## honours the env var; this is only the fallback, so a hand-run probe
-## still never touches the player's ledger.
+## Archivo de guardado si BONK_SAVE_PATH no está definido. SaveData._ready ya
+## lee la variable; esto es solo el respaldo, para que un probe corrido a mano
+## nunca toque el progreso del jugador.
 const FALLBACK_SAVE_PATH := "user://ui_probe_save.json"
-## Shards seeded after boot so exactly one raider unlock is affordable
-## (the locked catalog rows cost 50-180).
+## Fragmentos que se cargan tras el arranque para que alcance exactamente un
+## desbloqueo de raider (las filas bloqueadas del catálogo cuestan 50-180).
 const SEEDED_SHARDS: int = 200
 
 
 func _ready() -> void:
-	# Deferred: adding to the tree root from inside a _ready trips
+	# Diferido: agregar a la raíz del árbol desde un _ready dispara
 	# "Parent node is busy setting up children".
 	_spawn_driver.call_deferred()
 
@@ -58,8 +56,8 @@ func _spawn_driver() -> void:
 	get_tree().root.add_child(driver)
 
 
-## The whole harness. A Node parented to the tree ROOT, so it survives
-## every change_scene_to_file the steps below trigger.
+## El arnés completo. Un Node colgado de la RAÍZ del árbol, para sobrevivir a
+## cada change_scene_to_file que disparan los pasos de abajo.
 class Driver extends Node:
 	const CHARACTER_SELECT_PATH := "res://scenes/ui/CharacterSelect.tscn"
 	const COLLECTION_PATH := "res://scenes/ui/Collection.tscn"
@@ -67,27 +65,27 @@ class Driver extends Node:
 	const RELIC_SHOP_PATH := "res://scenes/ui/RelicShop.tscn"
 	const RUN_PATH := "res://scenes/world/Run.tscn"
 
-	## Frames a step may take before it counts as wedged. Generous on
-	## purpose: this is a HANG detector, not a stopwatch. Two steps wait
-	## on real run time and say so in STEP_DEADLINES below.
+	## Frames que puede tardar un paso antes de contar como trabado. Holgado a
+	## propósito: detecta CUELGUES, no mide tiempos. Dos pasos esperan tiempo de
+	## partida real y lo dicen en STEP_DEADLINES.
 	const STEP_DEADLINE_FRAMES: int = 600
-	## Steps that wait for the run clock, which ticks once per frame:
-	## start_run wants run_time >= 10 (600 frames on its own) and retry
-	## wants >= 5, so the default deadline would fire on a HEALTHY run.
+	## Pasos que esperan el reloj de la partida, que avanza una vez por frame:
+	## start_run pide run_time >= 10 (600 frames por sí solo) y retry pide >= 5,
+	## así que el plazo por defecto saltaría en una partida SANA.
 	const STEP_DEADLINES: Dictionary[String, int] = {
 		"start_run": 1200,
 		"retry": 900,
 	}
-	## Frames to let ScreenFade finish after a scene lands. Its cut is
-	## FADE_IN 0.22 + FADE_OUT 0.26 = ~29 frames, and a press that lands
-	## inside that window is DROPPED silently.
+	## Frames para que ScreenFade termine tras llegar a una escena. Su corte dura
+	## FADE_IN_TIME 0.22 + FADE_OUT_TIME 0.26 = ~29 frames, y un clic que cae en
+	## esa ventana se PIERDE en silencio.
 	const FADE_SETTLE_FRAMES: int = 40
-	## Run time the run has to reach before start_run / retry count.
+	## Tiempo de partida (segundos) que debe alcanzar la partida antes de que start_run / retry cuenten.
 	const RUN_TIME_TARGET: float = 10.0
 	const RETRY_TIME_TARGET: float = 5.0
 
-	## Every step, in order. Each one is a method named _step_<name>
-	## returning true when it is finished.
+	## Todos los pasos, en orden. Cada uno es un método _step_<name> que
+	## devuelve true cuando terminó.
 	const STEPS: Array[String] = [
 		"collection", "quests", "relics", "coop_count_reject",
 		"unlock_confirm", "cards_all", "start_run", "pause_open",
@@ -100,29 +98,27 @@ class Driver extends Node:
 	var _steps_done: int = 0
 	var _failed: bool = false
 	var _settle: int = 0
-	## scene_file_path of the scene the driver last saw, so a change can
-	## trigger exactly ONE fade settle instead of one per poll.
+	## scene_file_path de la última escena que vio el driver, para que un cambio
+	## dispare UNA sola espera del fundido y no una por sondeo.
 	var _last_scene: String = ""
-	## Character the unlock step bought, checked by the step after it.
+	## Personaje que compró el paso de desbloqueo; lo revisa el paso siguiente.
 	var _unlock_id: String = ""
-	## Actions waiting for their release frame (see _send_action).
+	## Acciones esperando su frame de liberación (ver _send_action).
 	var _release: Array[StringName] = []
 
-	## --- screenshots (iteration 60) ------------------------------------
-	## BONK_SHOT_DIR, the same switch the soak harness carries and for the
-	## same reason: every assertion in this file is about NODES — a control
-	## that exists, is visible, is not disabled — and none of that can see
-	## a panel drawn over the clock or a label clipped to two letters.
-	## Ignored under --headless, which is how tools/verificar.sh runs it,
-	## so the gate is untouched.
-	## Two seconds, not ten: this harness crosses seven screens in about a
-	## minute and a ten-second cadence would photograph three of them.
+	## --- capturas -------------------------------------------------------
+	## BONK_SHOT_DIR, la misma variable del arnés de soak y por la misma razón:
+	## cada aserción de este archivo es sobre NODOS (un control que existe, es
+	## visible, no está deshabilitado) y nada de eso ve un panel dibujado sobre
+	## el reloj o un texto cortado. Se ignora con --headless, que es como lo
+	## corre tools/verificar.sh, así que el gate no cambia.
+	## Dos segundos, no diez: este arnés cruza siete pantallas en cerca de un
+	## minuto y con diez segundos fotografiaría tres.
 	const SHOT_EVERY_DEFAULT: float = 2.0
 	var _camera: ShotCamera = null
-	## The (step, phase) the last shot was taken for. A step is not one
-	## screen — _visit_meta_screen opens Colección, checks it and comes
-	## back inside a single step — so the PHASE is what changes when the
-	## picture would change.
+	## El (paso, fase) de la última foto. Un paso no es una pantalla
+	## (_visit_meta_screen abre Colección, la revisa y vuelve dentro de un solo
+	## paso), así que la FASE es lo que cambia cuando cambiaría la imagen.
 	var _shot_at: Vector2i = Vector2i(-1, -1)
 
 	func _ready() -> void:
@@ -140,18 +136,17 @@ class Driver extends Node:
 		_tick_shots(delta)
 		if _failed:
 			return
-		# One settle per CUT: ScreenFade keeps fading for FADE_OUT_TIME
-		# over a scene the driver can already see, and a press landing in
-		# that window is dropped without a trace.
+		# Una espera por CORTE: ScreenFade sigue fundiendo FADE_OUT_TIME sobre una
+		# escena que el driver ya ve, y un clic en esa ventana se pierde sin rastro.
 		var scene := get_tree().current_scene
 		var path := scene.scene_file_path if scene != null else ""
 		if path != _last_scene:
 			_last_scene = path
 			_settle = FADE_SETTLE_FRAMES
 			return
-		# A level-up during the run steps would park a card UI over
-		# everything and wedge the probe exactly like the soak harness
-		# would be wedged; pick option 0 the same way ArenaProbe does.
+		# Un level-up durante los pasos de partida pondría la UI de cartas sobre
+		# todo y trabaría el probe igual que al arnés de soak; elige la opción 0
+		# como lo hace ArenaProbe.
 		_serve_card_ui()
 		if _settle > 0:
 			_settle -= 1
@@ -174,9 +169,9 @@ class Driver extends Node:
 			_camera.final_shot()
 			get_tree().quit(0)
 
-	## One shot whenever the driver moves to a new (step, phase) — which is
-	## one per SCREEN — plus the camera's own periodic frame, which catches
-	## the fades and the settles in between.
+	## Una foto cada vez que el driver pasa a un nuevo (paso, fase), o sea una
+	## por PANTALLA, más la foto periódica de la cámara, que atrapa los fundidos
+	## y las esperas entre medio.
 	func _tick_shots(delta: float) -> void:
 		if not _camera.enabled():
 			return
@@ -199,44 +194,43 @@ class Driver extends Node:
 		push_error("UiProbe: %s" % reason)
 		get_tree().quit(1)
 
-	# --- steps ---------------------------------------------------------
+	# --- pasos ---------------------------------------------------------
 
-	## Colección: the button is built in code (no unique name), so it is
-	## matched by its label — the only thing that identifies it.
 	func _step_collection() -> bool:
-		return _visit_meta_screen(_extra_button("Colección"), COLLECTION_PATH)
+		return _visit_meta_screen(_unique_button("%CollectionButton"), COLLECTION_PATH)
 
 	func _step_quests() -> bool:
 		return _visit_meta_screen(_unique_button("%QuestsButton"), QUEST_LOG_PATH)
 
 	func _step_relics() -> bool:
-		return _visit_meta_screen(_extra_button("Armería"), RELIC_SHOP_PATH)
+		return _visit_meta_screen(_unique_button("%ArmoryButton"), RELIC_SHOP_PATH)
 
-	## The co-op row rejects a party bigger than the connected pads allow.
-	## Headless there are none, so 2 players is always the reject path —
-	## the multi-slot rows themselves are unreachable here and belong to
-	## the co-op soak (BONK_PLAYERS=2).
+	## La fila co-op rechaza un grupo más grande que los mandos conectados.
+	## En headless no hay ninguno, así que 2 jugadores es siempre el camino de
+	## rechazo; las filas de varios jugadores no se alcanzan aquí y las cubre
+	## el soak co-op (BONK_PLAYERS=2).
 	func _step_coop_count_reject() -> bool:
 		match _phase:
 			0:
 				if not _at_scene(CHARACTER_SELECT_PATH):
 					return false
-				var button := _button_with_text("2")
+				var button := _lobby_node("%Count2") as Button
 				if button == null:
-					_fail("no co-op count button labelled '2'")
+					_fail("no %Count2 button in %CoopLobby")
 					return false
 				if not _press(button, "co-op count 2"):
 					return false
 				_phase = 1
 				return false
 			_:
-				# The hint is the reject path's only output: the select
-				# screen does not touch Coop until Start, so player_count
-				# would read 1 whether the press was accepted or not.
-				return _hint_label_text().find("Conecta") >= 0
+				# La pista es la única salida del camino de rechazo: la pantalla de
+				# selección no toca Coop hasta Start, así que player_count leería 1
+				# se aceptara o no el clic.
+				var hint := _lobby_node("%CoopHint") as Label
+				return hint != null and hint.text.find("Conecta") >= 0
 
-	## One locked raider bought through the real two-press flow: the card
-	## arms the inline confirm, the code-built «Sí» inside it commits.
+	## Un raider bloqueado comprado con el flujo real de dos clics: la tarjeta
+	## arma la confirmación en línea y el %UnlockYes («Sí») de la tarjeta la confirma.
 	func _step_unlock_confirm() -> bool:
 		match _phase:
 			0:
@@ -254,9 +248,9 @@ class Driver extends Node:
 				return false
 			1:
 				var card := _card_for(_unlock_id)
-				var yes := _find_button_with_text(card, "Sí")
+				var yes := _visible_unlock_yes(card)
 				if yes == null:
-					return false  # the confirm card rebuilds over a frame
+					return false  # la cara de confirmación aparece en el siguiente refresco
 				if not _press(yes, "confirm «Sí» for %s" % _unlock_id):
 					return false
 				_phase = 2
@@ -266,15 +260,15 @@ class Driver extends Node:
 					_fail("raider '%s' is still locked after confirming" % _unlock_id)
 					return false
 				var card := _card_for(_unlock_id)
-				if _find_button_with_text(card, "Sí") != null:
+				if _visible_unlock_yes(card) != null:
 					_fail("card '%s' still shows the confirm button after unlocking"
 							% _unlock_id)
 					return false
 				return true
 
-	## Every card once, after the unlock so no confirm is left armed by an
-	## earlier press. Locked-and-unaffordable cards take the reject path,
-	## unlocked ones the select path: both are handlers nothing else runs.
+	## Cada tarjeta una vez, después del desbloqueo para que no quede ninguna
+	## confirmación armada. Las bloqueadas que no alcanzan van por el camino de
+	## rechazo y las desbloqueadas por el de selección: handlers que nada más corre.
 	func _step_cards_all() -> bool:
 		var grid := _unique("%CardsGrid")
 		if grid == null:
@@ -295,8 +289,8 @@ class Driver extends Node:
 		_phase += 1
 		return false
 
-	## The real start: %StartButton runs ScreenFade.transition, which
-	## REPLACES current_scene with the run.
+	## El inicio real: %StartButton corre ScreenFade.transition, que REEMPLAZA
+	## current_scene con la partida.
 	func _step_start_run() -> bool:
 		match _phase:
 			0:
@@ -313,10 +307,9 @@ class Driver extends Node:
 					return false
 				return RunState.run_time >= RUN_TIME_TARGET
 
-	## pause_game (Esc / Start) opens the pause menu through its own
-	## _unhandled_input, which is the only path that exists: _open() is
-	## private. It was ui_cancel until the pause moved to its own action
-	## for the gamepad; ui_cancel (B) no longer opens it, only closes it.
+	## pause_game (Esc / Start) abre el menú de pausa por su propio
+	## _unhandled_input, el único camino que existe: _open() es privado.
+	## ui_cancel (B) no lo abre, solo lo cierra.
 	func _step_pause_open() -> bool:
 		match _phase:
 			0:
@@ -334,11 +327,11 @@ class Driver extends Node:
 					return false
 				return true
 
-	## The shared SettingsPanel, opened from the PAUSE menu's own
-	## %SettingsButton (the select screen has a different node with the
-	## same unique name, which is why every % here is resolved against its
-	## owner). %FpsCheck is a CheckButton: a click changes button_pressed,
-	## which is what emits `toggled` — pressed.emit() would not.
+	## El SettingsPanel compartido, abierto desde el %SettingsButton del menú de
+	## PAUSA (la pantalla de selección tiene otro nodo con el mismo nombre único,
+	## por eso cada % aquí se resuelve contra su owner). %FpsCheck es un
+	## CheckButton: un clic cambia button_pressed, que es lo que emite `toggled`;
+	## pressed.emit() no lo haría.
 	func _step_settings_toggle() -> bool:
 		var menu := _pause_menu()
 		if menu == null:
@@ -377,9 +370,8 @@ class Driver extends Node:
 				if SaveData.show_fps != before:
 					_fail("toggling %FpsCheck twice did not restore SaveData.show_fps")
 					return false
-				# Graphics preset (iteration 64): Media must reach both the
-				# save and the root viewport's 3D scale, and Alta must give
-				# back exactly the native 1.0 every earlier build rendered.
+				# Preset gráfico: Media debe llegar al guardado y a la escala 3D del
+				# viewport raíz, y Alta debe devolver exactamente la escala nativa 1.0.
 				var medium := panel.get_node_or_null("%QualityMedium") as Button
 				var high := panel.get_node_or_null("%QualityHigh") as Button
 				if medium == null or high == null:
@@ -433,8 +425,8 @@ class Driver extends Node:
 					return false
 				return not menu.visible
 
-	## Extract through the run_manager group, the same call the pause
-	## menu's own button makes. The end screen is what has to appear.
+	## Extraer por el grupo run_manager, la misma llamada que hace el botón del
+	## menú de pausa. Lo que tiene que aparecer es la pantalla de fin.
 	func _step_extract() -> bool:
 		match _phase:
 			0:
@@ -459,8 +451,8 @@ class Driver extends Node:
 					return false
 				return true
 
-	## Retry reloads the run behind ScreenFade.leave_run, which is the one
-	## ritual that owns the cleanup, the reset and the swap.
+	## Reintentar recarga la partida con ScreenFade.leave_run, el único ritual
+	## dueño de la limpieza, el reinicio y el cambio de escena.
 	func _step_retry() -> bool:
 		match _phase:
 			0:
@@ -483,23 +475,23 @@ class Driver extends Node:
 					return false
 				return RunState.run_time >= RETRY_TIME_TARGET
 
-	## Nothing to press: the last step exists so the run ends on a step
-	## line like every other one, and so the count in the summary is the
-	## count verificar.sh greps.
+	## Nada que apretar: el último paso existe para que la partida termine en
+	## una línea de paso como las demás, y para que la cuenta del resumen sea la
+	## que busca verificar.sh.
 	func _step_done() -> bool:
 		return true
 
-	# --- helpers -------------------------------------------------------
+	# --- ayudantes -----------------------------------------------------
 
-	## True when current_scene IS that scene. The fade after a cut is
-	## waited out by the settle in _process, once per change.
+	## True cuando current_scene ES esa escena. El fundido tras un corte se
+	## espera en _process, una vez por cambio.
 	func _at_scene(scene_path: String) -> bool:
 		var scene := get_tree().current_scene
 		return scene != null and scene.scene_file_path == scene_path
 
-	## Open a meta screen, check it landed, come back through its own
-	## %BackButton. The three of them share meta_screen.gd, so one shape
-	## covers Colección, Misiones and Armería.
+	## Abre una pantalla meta, revisa que llegó y vuelve por su propio
+	## %BackButton. Las tres comparten meta_screen.gd, así que una forma cubre
+	## Colección, Misiones y Armería.
 	func _visit_meta_screen(open_button: Button, scene_path: String) -> bool:
 		match _phase:
 			0:
@@ -530,9 +522,9 @@ class Driver extends Node:
 			_:
 				return _at_scene(CHARACTER_SELECT_PATH)
 
-	## pressed.emit() bypasses `disabled` and visibility, so a harness
-	## that only emits proves the handler runs, not that a player could
-	## ever reach it. Both are asserted first.
+	## pressed.emit() se salta `disabled` y la visibilidad, así que un arnés que
+	## solo emite prueba que el handler corre, no que un jugador pueda llegar a
+	## él. Ambas cosas se afirman antes.
 	func _press(button: Button, what: String) -> bool:
 		if button == null:
 			_fail("no button for '%s'" % what)
@@ -546,7 +538,7 @@ class Driver extends Node:
 		button.pressed.emit()
 		return true
 
-	## A unique name on the CURRENT scene's root, which is what owns it.
+	## Un nombre único en la raíz de la escena ACTUAL, que es su owner.
 	func _unique(unique_name: String) -> Node:
 		var scene := get_tree().current_scene
 		if scene == null:
@@ -554,54 +546,31 @@ class Driver extends Node:
 		return scene.get_node_or_null(unique_name)
 
 
-	## Same, cast to Button — separate from _unique because %CardsGrid is a
-	## GridContainer and a single Button-typed helper returned null for it,
-	## which read as "the grid is empty" instead of "wrong type".
+	## Igual, pero como Button. Va separado de _unique porque %CardsGrid es un
+	## GridContainer: un ayudante tipado Button devolvería null y se leería como
+	## "la grilla está vacía" en vez de "tipo equivocado".
 	func _unique_button(unique_name: String) -> Button:
 		return _unique(unique_name) as Button
 
-	## The code-built meta buttons (Colección, Armería) carry no unique
-	## name; their label is the only handle they have.
-	func _extra_button(label_text: String) -> Button:
-		return _find_button_with_text(get_tree().current_scene, label_text)
-
-	## First Button whose own text matches, anywhere under `root`.
-	func _find_button_with_text(root: Node, label_text: String) -> Button:
-		if root == null:
+	## Un nodo único dentro de la instancia %CoopLobby de la pantalla de
+	## selección (sus nodos pertenecen a la escena del lobby, no a la de selección).
+	func _lobby_node(unique_name: String) -> Node:
+		var lobby := _unique("%CoopLobby")
+		if lobby == null:
 			return null
-		var button := root as Button
-		if button != null and button.text == label_text:
-			return button
-		for child: Node in root.get_children():
-			var found := _find_button_with_text(child, label_text)
-			if found != null:
-				return found
-		return null
+		return lobby.get_node_or_null(unique_name)
 
-	func _button_with_text(label_text: String) -> Button:
-		return _find_button_with_text(get_tree().current_scene, label_text)
+	## El %UnlockYes de la tarjeta mientras muestra la confirmación, si no null
+	## (toda tarjeta tiene el botón; solo la cara de confirmación lo muestra).
+	func _visible_unlock_yes(card: Button) -> Button:
+		if card == null:
+			return null
+		var yes := card.get_node_or_null("%UnlockYes") as Button
+		if yes == null or not yes.is_visible_in_tree():
+			return null
+		return yes
 
-	## Text of the co-op row's hint label (built in code, no unique name):
-	## the only visible proof the reject path ran.
-	func _hint_label_text() -> String:
-		var scene := get_tree().current_scene
-		if scene == null:
-			return ""
-		var texts := ""
-		for label: Label in _labels(scene):
-			texts += label.text + "\n"
-		return texts
-
-	func _labels(root: Node) -> Array[Label]:
-		var found: Array[Label] = []
-		var label := root as Label
-		if label != null:
-			found.append(label)
-		for child: Node in root.get_children():
-			found.append_array(_labels(child))
-		return found
-
-	## The cheapest locked raider this balance can buy.
+	## El raider bloqueado más barato que este saldo puede comprar.
 	func _affordable_locked_id() -> String:
 		var best := ""
 		var best_cost := 0
@@ -617,7 +586,7 @@ class Driver extends Node:
 				best_cost = cost
 		return best
 
-	## The grid holds one Button per CHARACTER_LIBRARY row, in order.
+	## La grilla tiene un Button por fila de CHARACTER_LIBRARY, en orden.
 	func _card_for(character_id: String) -> Button:
 		var grid := _unique("%CardsGrid")
 		if grid == null:
@@ -643,17 +612,17 @@ class Driver extends Node:
 			return null
 		return scene.find_child("RunEndScreen", true, false) as CanvasLayer
 
-	## A level-up card UI would pause the tree over everything else; the
-	## soak harness answers it the same way.
+	## Una UI de cartas de level-up pausaría el árbol sobre todo lo demás; el
+	## arnés de soak la responde igual.
 	func _serve_card_ui() -> void:
 		for node: Node in get_tree().get_nodes_in_group("upgrade_ui"):
 			var ui := node as CanvasLayer
 			if ui != null and ui.visible and ui.has_method("_on_card_pressed"):
 				ui.call("_on_card_pressed", 0)
 
-	## A parsed InputEventAction, released on a LATER frame: both in one
-	## flush and is_action_just_pressed never sees the press, which is
-	## exactly what PauseMenu._unhandled_input tests for.
+	## Un InputEventAction, liberado en un frame POSTERIOR como lo haría un
+	## jugador: con ambos en el mismo vaciado, Input.is_action_just_pressed
+	## nunca vería la pulsación.
 	func _send_action(action: StringName, pressed: bool) -> void:
 		var event := InputEventAction.new()
 		event.action = action

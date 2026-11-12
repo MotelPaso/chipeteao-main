@@ -1,27 +1,29 @@
 class_name InputHints
 extends HBoxContainer
-## Button prompts ("✕ Elegir  ○ Volver") for the menus, drawn with the
-## Controller Icons addon (addons/controller_icons, MIT; Xelu's CC0 art).
+## Indicaciones de botones de los menús ("✕ Elegir  ○ Volver"), dibujadas con
+## el addon Controller Icons (addons/controller_icons, MIT; arte CC0 de Xelu).
 ##
-## Each icon is a ControllerIconTexture whose path is an INPUT ACTION, not a
-## button: it shows whatever key or pad button that action is bound to in
-## the Input Map, so rebinding an action there fixes every prompt at once.
-## The addon also watches the last device used and swaps keyboard glyphs
-## for pad glyphs (Xbox / PlayStation / Switch, read from the pad's name)
-## on the fly — nothing here has to listen for input.
+## Cada ícono es un ControllerIconTexture cuya ruta es una ACCIÓN de entrada,
+## no un botón: muestra la tecla o el botón del control asignado a esa acción
+## en el Input Map, así que reasignarla allí corrige todas las indicaciones.
+## El addon sigue el último dispositivo usado y cambia los glifos de teclado
+## por los del control (Xbox / PlayStation / Switch, según su nombre) al
+## vuelo: aquí nada escucha la entrada.
 ##
-## Usage: add_child(InputHints.build([["ui_accept", "Elegir"],
+## Uso: add_child(InputHints.build([["ui_accept", "Elegir"],
 ##        ["ui_cancel", "Volver"]]))
+## Se crea con build() y nunca va en una escena: edita los valores aquí.
 
+## Lado del ícono (píxeles) y tamaño de fuente de su texto.
 const ICON_SIZE := 28.0
 const TEXT_SIZE := 14
-## Space between an icon and its word, and between two prompts.
+## Espacio (píxeles) entre un ícono y su palabra, y entre dos indicaciones.
 const ICON_GAP := 6
 const HINT_GAP := 22
 
 
-## One row of prompts, centred, that never takes the mouse or the focus.
-## `hints` is a list of [action, text] pairs.
+## Una fila centrada de indicaciones que nunca toma el mouse ni el foco.
+## `hints` es una lista de pares [acción, texto].
 static func build(hints: Array) -> InputHints:
 	var row := InputHints.new()
 	row.name = "InputHints"
@@ -38,11 +40,11 @@ static func _prompt(action: String, text: String) -> HBoxContainer:
 	prompt.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	prompt.add_theme_constant_override("separation", ICON_GAP)
 	var icon := TextureRect.new()
-	# The headless display server (tools/verificar.sh runs every harness
-	# with --headless) cannot map a physical key to a keycode, and the addon
-	# logs an ERROR for each keyboard glyph it resolves there — which the
-	# gate counts as a failure. Headless nothing is drawn anyway, so the
-	# icon keeps its slot and simply gets no texture.
+	# El servidor de pantalla headless (tools/verificar.sh corre todos los
+	# harness con --headless) no traduce una tecla física a keycode, y el
+	# addon registra un ERROR por cada glifo de teclado que resuelve allí; la
+	# puerta lo cuenta como falla. Headless no se dibuja nada, así que el
+	# ícono guarda su espacio y queda sin textura.
 	if DisplayServer.get_name() != "headless":
 		var texture := ControllerIconTexture.new()
 		texture.path = action
@@ -62,7 +64,8 @@ static func _prompt(action: String, text: String) -> HBoxContainer:
 	return prompt
 
 
-## Pins the row to the bottom-left corner of a full-screen Control.
+## Fija la fila en la esquina inferior izquierda de un Control de pantalla
+## completa; `margin` en píxeles.
 func pin_bottom_left(margin: Vector2 = Vector2(24.0, 8.0)) -> void:
 	alignment = BoxContainer.ALIGNMENT_BEGIN
 	set_anchors_preset(Control.PRESET_BOTTOM_LEFT)

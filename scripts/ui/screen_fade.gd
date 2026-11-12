@@ -1,26 +1,29 @@
 extends CanvasLayer
-## ScreenFade autoload: quarter-second fade-to-black around every scene
-## change (select → run, run → select, retry, quest log) so cuts stop
-## being abrupt. transition(action) fades in a full-screen black rect,
-## runs the callable (which performs the actual change_scene/reload plus
-## any cleanup), then fades back out. Draws above everything (layer 100),
-## processes always and ignores time scale, so it works from paused
-## run-end screens and mid hit-stop. Headless-safe: it is only a ColorRect
-## tween.
+## Autoload ScreenFade: fundido a negro de un cuarto de segundo alrededor de
+## cada cambio de escena (selector → partida, partida → selector, reintentar,
+## pantallas meta). transition(action) funde a negro un rect de pantalla
+## completa, ejecuta el callable (el change_scene/reload y su limpieza) y
+## vuelve a fundir. Dibuja encima de todo (UiLayers.SCREEN_FADE), procesa
+## siempre e ignora la escala de tiempo, así que funciona desde la pantalla de
+## fin en pausa y en pleno hit-stop. Es seguro en headless: solo es un tween de
+## un ColorRect.
 ##
-## transition_async() is the awaiting variant, for work that spans frames
-## (the stage swap). While busy, repeat requests are DROPPED and both
-## return false
-## — the first change wins and the fade never strands the game mid-black.
-## Callers must therefore put their irreversible cleanup INSIDE the
-## callable (or check the return), never before the call: the busy window
-## outlives the scene swap by FADE_OUT_TIME.
+## transition_async() es la variante que espera, para trabajo que dura varios
+## frames (el cambio de etapa). Mientras hay un fundido en curso, las
+## peticiones repetidas se DESCARTAN y ambas devuelven false: gana el primer
+## cambio y el fundido nunca deja el juego a medio negro. Por eso la limpieza
+## irreversible va DENTRO del callable (o se revisa el retorno), nunca antes
+## de la llamada: la ventana ocupada dura FADE_OUT_TIME más que el cambio.
 ##
-## leave_run() is the one ritual for ending a run: it owns the cleanup,
-## the reset and the swap, and keeps the tree paused across the cut.
+## leave_run() es el único ritual para terminar una partida: es dueño de la
+## limpieza, el reinicio y el cambio, y mantiene el árbol en pausa en el corte.
+## Es un autoload sin escena: edita los valores aquí.
 
+## Duración (segundos) del fundido a negro y del regreso.
 const FADE_IN_TIME := 0.22
 const FADE_OUT_TIME := 0.26
+## Color del rect del fundido.
+const FADE_COLOR := Color(0.015, 0.018, 0.03)
 
 var _rect: ColorRect
 var _tween: Tween = null
@@ -28,31 +31,29 @@ var _busy: bool = false
 
 
 func _ready() -> void:
-	layer = 100
+	layer = UiLayers.SCREEN_FADE
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	_rect = ColorRect.new()
-	_rect.color = Color(0.015, 0.018, 0.03)
+	_rect.color = FADE_COLOR
 	_rect.modulate.a = 0.0
 	_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_rect.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(_rect)
 
 
-## True while a cut is running, i.e. while every new request would be
-## dropped. The busy contract is documented above and callers are told to
-## reason about it; without an accessor the only way to find out was to
-## fire a request and lose it.
+## True mientras corre un corte, es decir, mientras toda petición nueva se
+## descartaría.
 func is_busy() -> bool:
 	return _busy
 
 
-## Returns false when a fade is already running and this request was
-## dropped without doing anything.
+## Devuelve false si ya corría un fundido y esta petición se descartó sin
+## hacer nada.
 func transition(action: Callable) -> bool:
 	if _busy:
 		return false
 	_busy = true
-	_rect.mouse_filter = Control.MOUSE_FILTER_STOP  # swallow clicks mid-cut
+	_rect.mouse_filter = Control.MOUSE_FILTER_STOP  # traga los clics del corte
 	if _tween != null and _tween.is_valid():
 		_tween.kill()
 	_tween = create_tween()
@@ -60,9 +61,9 @@ func transition(action: Callable) -> bool:
 	_tween.tween_property(_rect, "modulate:a", 1.0, FADE_IN_TIME) \
 			.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
 	_tween.tween_callback(action)
-	# Give the mouse back with the cut, not with the flag: the rect keeps
-	# fading for another FADE_OUT_TIME over the scene the player can
-	# already see, and swallowing those clicks reads as a frozen UI.
+	# Devuelve el mouse con el corte, no con la bandera: el rect sigue
+	# fundiéndose FADE_OUT_TIME más sobre la escena que el jugador ya ve, y
+	# tragarse esos clics se siente como una UI congelada.
 	_tween.tween_callback(_release_mouse)
 	_tween.tween_property(_rect, "modulate:a", 0.0, FADE_OUT_TIME) \
 			.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
@@ -70,21 +71,20 @@ func transition(action: Callable) -> bool:
 	return true
 
 
-## Async sibling of transition(): AWAITS the action between the fade-in
-## and the fade-out. transition() cannot — its action runs inside a
-## tween_callback, and a callback that is a coroutine returns to the tween
-## the moment it hits its first await, so the screen would come back in
-## the middle of the work. The stage swap needs several frames (frees
-## settle, the next arena builds), which is what this exists for.
+## Hermano asíncrono de transition(): ESPERA la acción entre el fundido de
+## entrada y el de salida. transition() no puede: su acción corre dentro de
+## un tween_callback, y un callback que es corrutina vuelve al tween en su
+## primer await, así que la pantalla volvería a mitad del trabajo. El cambio
+## de etapa necesita varios frames (liberaciones, la arena siguiente).
 ##
-## Same busy contract as transition(): a request landing while another
-## fade runs is DROPPED and returns false, so the caller can decide
-## whether to retry.
+## Mismo contrato que transition(): una petición que llega durante otro
+## fundido se DESCARTA y devuelve false, para que el llamador decida si
+## reintenta.
 func transition_async(action: Callable) -> bool:
 	if _busy:
 		return false
 	_busy = true
-	_rect.mouse_filter = Control.MOUSE_FILTER_STOP  # swallow clicks mid-cut
+	_rect.mouse_filter = Control.MOUSE_FILTER_STOP  # traga los clics del corte
 	if _tween != null and _tween.is_valid():
 		_tween.kill()
 	_tween = create_tween()
@@ -93,7 +93,7 @@ func transition_async(action: Callable) -> bool:
 			.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
 	await _tween.finished
 	await action.call()
-	# Give the mouse back with the cut, not with the flag (see transition).
+	# Devuelve el mouse con el corte, no con la bandera (ver transition).
 	_release_mouse()
 	_tween = create_tween()
 	_tween.set_ignore_time_scale(true)
@@ -104,16 +104,17 @@ func transition_async(action: Callable) -> bool:
 	return true
 
 
-## The one way to leave a live run (retry, back to the select, abandon
-## from the pause menu). Owns the whole ritual so no caller can forget a
-## step: flush the settings save, stop the audio loops, drop the run state
-## and swap scenes. An empty scene_path reloads the current arena.
+## La única forma de salir de una partida en curso (reintentar, volver al
+## selector, abandonar desde la pausa). Es dueña de todo el ritual para que
+## ningún llamador olvide un paso: guarda los ajustes, para los loops de
+## audio, borra el estado de la partida y cambia de escena. Una scene_path
+## vacía recarga la escena actual.
 ##
-## The tree stays PAUSED across the swap on purpose. change_scene_to_file
-## and reload_current_scene are deferred, so unpausing here would hand the
-## outgoing arena one more live frame of a run that is already over:
-## enemies dying in it credit kills to the NEXT run and the world director
-## keeps firing events into a scene about to be freed.
+## El árbol queda EN PAUSA durante el cambio a propósito: change_scene_to_file
+## y reload_current_scene son diferidos, y despausar aquí le daría a la escena
+## saliente un frame más de una partida que ya terminó (los enemigos que
+## mueren en ella sumarían bajas a la partida SIGUIENTE y el director
+## dispararía eventos en una escena por liberarse).
 func leave_run(scene_path: String = "") -> bool:
 	return transition(func() -> void:
 		Settings.flush_save()
@@ -127,10 +128,9 @@ func leave_run(scene_path: String = "") -> bool:
 		_unpause_after_swap())
 
 
-## Hands the pause back once the deferred swap has landed — two frames,
-## because the first one still belongs to the outgoing tree. Safe to await
-## here and nowhere else: this autoload is the only node that survives the
-## scene change.
+## Devuelve la pausa cuando el cambio diferido ya aterrizó: dos frames,
+## porque el primero todavía es del árbol saliente. Esperar aquí es seguro y
+## en ningún otro lado: este autoload es el único nodo que sobrevive al cambio.
 func _unpause_after_swap() -> void:
 	await get_tree().process_frame
 	await get_tree().process_frame

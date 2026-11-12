@@ -1,32 +1,45 @@
 class_name PowerUpCatalog
 extends RefCounted
-## Static catalog of temporary power-ups (iteration 53): the pickups that
-## drop from kills, come out of a spring and are sold by the power-up
-## vendor. Unlike tomes and items, a power-up is LOUD and BRIEF — twenty
-## seconds where the run plays differently — so the roster is small and
-## every row changes something you can feel without reading a number.
+## Catálogo estático de power-ups temporales: los que sueltan las bajas, da
+## el manantial y vende el vendedor de power-ups. A diferencia de tomos y
+## objetos, un power-up es RUIDOSO y BREVE — unos segundos en que la partida
+## se juega distinto —, así que la lista es corta y cada fila cambia algo que
+## se siente sin leer un número.
 ##
-## Row fields:
-##   id:            identifier (never shown; the log and the switches use it).
-##   display_name:  player text.
-##   description:   one line, player text.
-##   duration:      seconds, before the raider's duration_multiplier.
-##   weight:        roll weight. The star is deliberately ~2% of the total.
-##   color:         pickup gem, HUD tile and toast tint.
-##   glyph:         two letters for the placeholder art (unique across the
-##                  weapon/tome/item/power-up glyph sets).
-##   icon:          OPTIONAL explicit texture; otherwise the convention
-##                  res://assets/icons/powerups/<id>.png applies.
-##   effects:       [{stat, amount}] handed to PlayerStats.add_timed_boon.
-##   kind:          behavior resolved by PowerUps, one branch each.
+## Edita aquí: cada fila es un power-up.
+## Se puede cambiar sin romper nada: display_name, description, duration,
+## weight, color, glyph, icon, effects, text_values y los números del
+## comportamiento.
+## Llave interna (la lee el código): id (nombra el ícono por defecto
+## res://assets/icons/powerups/<id>.png, el log y BONK_POWERUP_NOW) y kind
+## (la rama de PowerUps; "star" también lo lee este catálogo).
+##   id:            identificador (no se muestra; lo usan el log y los
+##                  interruptores de prueba).
+##   display_name:  texto para el jugador.
+##   description:   una línea, texto para el jugador.
+##   duration:      segundos, antes del duration_multiplier del raider.
+##   weight:        peso de la tirada. La estrella es ~2% del total a propósito.
+##   color:         tinte de la gema en el suelo, la casilla del HUD y el aviso.
+##   glyph:         dos letras para el arte provisional. No debe repetirse
+##                  entre armas, evoluciones, tomos, objetos, power-ups ni
+##                  mascotas (el lint glyphs_unique lo revisa).
+##   icon:          OPCIONAL, textura explícita; si falta se usa
+##                  res://assets/icons/powerups/<id>.png.
+##   effects:       [{stat, amount}] que recibe PlayerStats.add_timed_boon.
+##   kind:          comportamiento que resuelve PowerUps, una rama por tipo.
+##   text_values:   OPCIONAL, campos que llenan los %d de la descripción (ver
+##                  RowText); así el número del texto es el del campo.
+##   Números del comportamiento (los lee PowerUps de la fila viva):
+##     points_multiplier (gold): multiplicador de puntos por baja.
+##     reflect_fraction (reflect): fracción del daño recibido que vuelve (0-1).
+##     max_hp_per_kill (vampire): HP máx. permanente por baja.
 ##
-## Most rows are one or the other on purpose: a pure `effects` row needs no
-## code at all (the timed-boon channel already exists), and a `kind` row
-## gets exactly one branch in PowerUps. Adding "damage +200 for 20 s" must
-## never mean writing a new behavior. Two rows carry both, and say why:
-## the vampire's lifesteal is a plain stat riding alongside its per-kill
-## behavior, and the star has a kind and no effects because it IS every
-## other row at once.
+## Casi todas las filas son una cosa u otra a propósito: una fila de puros
+## `effects` no necesita código (el canal de boons temporales ya existe) y
+## una fila con `kind` tiene exactamente una rama en PowerUps. Dos filas
+## llevan ambas cosas: el robo de vida del vampiro es una stat normal junto a
+## su comportamiento por baja, y la estrella tiene kind y ningún efecto
+## porque ES todas las demás filas a la vez.
 
 const POWERUP_LIBRARY: Array[Dictionary] = [
 	{
@@ -39,7 +52,7 @@ const POWERUP_LIBRARY: Array[Dictionary] = [
 	},
 	{
 		"id": "might", "display_name": "Furia",
-		"description": "50% mas daño en todas tus armas!",
+		"description": "%d%% mas daño en todas tus armas!", "text_values": ["amount"],
 		"duration": 10.0, "weight": 1.0, "glyph": "FR",
 		"color": Color(1.0, 0.4, 0.25),
 		"effects": [{"stat": "damage", "amount": 50.0}],
@@ -53,23 +66,27 @@ const POWERUP_LIBRARY: Array[Dictionary] = [
 	},
 	{
 		"id": "gold", "display_name": "Fiebre del oro",
+		# El texto dice «el doble»: si cambias points_multiplier, cambia
+		# también la descripción.
 		"description": "Cada baja paga el doble de puntos.",
 		"duration": 10.0, "weight": 0.9, "glyph": "OR",
-		"color": Color(1.0, 0.82, 0.3), "kind": "gold",
+		"color": Color(1.0, 0.82, 0.3), "kind": "gold", "points_multiplier": 2.0,
 	},
 	{
 		"id": "reflect", "display_name": "Reflejo",
+		# El texto dice «todo»: si bajas reflect_fraction de 1.0, cambia
+		# también la descripción.
 		"description": "Todo el daño que recibes vuelve a quien te lo hizo.",
 		"duration": 10.0, "weight": 0.8, "glyph": "RJ",
-		"color": Color(0.75, 0.55, 1.0), "kind": "reflect",
+		"color": Color(0.75, 0.55, 1.0), "kind": "reflect", "reflect_fraction": 1.0,
 	},
 	{
 		"id": "vampire", "display_name": "Modo vampiro",
 		"description": "Robas vida y cada baja te sube el HP máx. para siempre.",
 		"duration": 5.0, "weight": 0.8, "glyph": "VP",
-		"color": Color(0.85, 0.15, 0.35), "kind": "vampire",
-		# The lifesteal is an ordinary timed boon; only the permanent HP
-		# per kill needs the behavior branch.
+		"color": Color(0.85, 0.15, 0.35), "kind": "vampire", "max_hp_per_kill": 1.0,
+		# El robo de vida es un boon temporal normal; solo el HP permanente
+		# por baja necesita la rama de comportamiento.
 		"effects": [{"stat": "lifesteal", "amount": 10.0}],
 	},
 	{
@@ -91,9 +108,9 @@ const POWERUP_LIBRARY: Array[Dictionary] = [
 		"color": Color(0.7, 0.9, 1.0), "kind": "time_stop",
 	},
 	{
-		# Shorter than the rest BECAUSE it is all of them: fifteen seconds
-		# of everything reads as a jackpot, twenty starts to feel like the
-		# normal state of the run.
+		# Más corta que el resto PORQUE es todas a la vez: unos pocos
+		# segundos de todo se leen como premio gordo; más, como el estado
+		# normal de la partida.
 		"id": "star", "display_name": "Estrella",
 		"description": "Todos los power-ups a la vez, durante poco.",
 		"duration": 5.0, "weight": 0.15, "glyph": "ES",
@@ -101,19 +118,20 @@ const POWERUP_LIBRARY: Array[Dictionary] = [
 	},
 ]
 
-## Lazily built id -> row (see CatalogIndex).
+## Índice id -> fila con la descripción ya armada (ver RowText), construido
+## al primer uso (ver CatalogIndex).
 static var _by_id: Dictionary[String, Dictionary] = {}
 
 
 static func by_id(powerup_id: String) -> Dictionary:
 	if _by_id.is_empty():
-		_by_id = CatalogIndex.build(POWERUP_LIBRARY)
+		_by_id = CatalogIndex.build(RowText.render_all(POWERUP_LIBRARY))
 	return _by_id.get(powerup_id, {})
 
 
-## Weighted roll. `exclude_star` is the DEFAULT for every source that is
-## not a star sighting: the star is a thing you find roaming the map, not
-## something a kill or a spring can hand you.
+## Tirada ponderada. `exclude_star` es lo NORMAL para toda fuente que no sea
+## el avistamiento de la estrella: la estrella se encuentra rondando el mapa,
+## no la da una baja ni un manantial.
 static func roll_id(exclude_star: bool = true) -> String:
 	var total := 0.0
 	for row: Dictionary in POWERUP_LIBRARY:
@@ -132,13 +150,14 @@ static func roll_id(exclude_star: bool = true) -> String:
 	return String(POWERUP_LIBRARY[0].id)
 
 
-## Every row the star turns on, i.e. all of them except the star itself.
-## Read by PowerUps.apply(); a row added above joins the star for free.
+## Cada fila que enciende la estrella: todas menos la estrella misma, con la
+## descripción ya armada como en by_id() (ver RowText). Lo lee
+## PowerUps.apply(); una fila nueva se suma a la estrella sola.
 static func star_components() -> Array[Dictionary]:
 	var rows: Array[Dictionary] = []
 	for row: Dictionary in POWERUP_LIBRARY:
 		if String(row.get("kind", "")) != "star":
-			rows.append(row)
+			rows.append(RowText.render(row))
 	return rows
 
 

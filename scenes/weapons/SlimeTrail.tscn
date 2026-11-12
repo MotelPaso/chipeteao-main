@@ -2,8 +2,22 @@
 
 [ext_resource type="Script" uid="uid://pq7s6dopkrhv" path="res://scripts/weapons/slime_trail.gd" id="1_slime_trail"]
 
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_slime"]
+shading_mode = 0
+transparency = 1
+albedo_color = Color(0.45, 0.95, 0.3, 0.55)
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_puddle"]
+material = SubResource("StandardMaterial3D_slime")
+top_radius = 1.0
+bottom_radius = 1.0
+height = 0.06
+radial_segments = 24
+rings = 1
+
 [node name="SlimeTrail" type="Node3D" unique_id=1410248768]
 script = ExtResource("1_slime_trail")
 damage = 4.0
 cooldown = 0.35
 attack_range = 6.0
+puddle_mesh = SubResource("CylinderMesh_puddle")

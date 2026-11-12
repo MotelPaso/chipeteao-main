@@ -1,0 +1,69 @@
+[gd_scene format=3]
+
+[node name="ModalPanel" type="CanvasLayer"]
+process_mode = 3
+layer = 15
+editor_description = "Escena base de los paneles modales del mundo. VendorPanel.tscn y RoulettePanel.tscn la heredan y le ponen su script, que extiende modal_panel.gd. Los textos los escribe el script (grupo Textos del Inspector)."
+
+[node name="Root" type="Control" parent="."]
+anchor_right = 1.0
+anchor_bottom = 1.0
+
+[node name="Dim" type="ColorRect" parent="Root"]
+anchor_right = 1.0
+anchor_bottom = 1.0
+color = Color(0.03, 0.03, 0.05, 0.75)
+
+[node name="Center" type="CenterContainer" parent="Root"]
+anchor_right = 1.0
+anchor_bottom = 1.0
+
+[node name="Panel" type="PanelContainer" parent="Root/Center"]
+unique_name_in_owner = true
+layout_mode = 2
+editor_description = "El borde toma el color de acento del panel y el margen sale de panel_margin en el script."
+
+[node name="VBox" type="VBoxContainer" parent="Root/Center/Panel"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="Title" type="Label" parent="Root/Center/Panel/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+editor_description = "El texto y el color los pone el script; el tamaño va en cada escena hija."
+theme_override_colors/font_outline_color = Color(0.03, 0.035, 0.06, 0.92)
+theme_override_constants/outline_size = 8
+horizontal_alignment = 1
+
+[node name="Points" type="Label" parent="Root/Center/Panel/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+editor_description = "El texto sale de points_template en el script."
+theme_override_colors/font_color = Color(0.66, 0.69, 0.75, 1)
+horizontal_alignment = 1
+
+[node name="Body" type="VBoxContainer" parent="Root/Center/Panel/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+editor_description = "Cada escena hija pone aquí su contenido (el estante, la lista de resultados)."
+
+[node name="Result" type="Label" parent="Root/Center/Panel/VBox"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 30)
+layout_mode = 2
+editor_description = "La línea de resultado la escribe el script."
+theme_override_colors/font_color = Color(0.96, 0.97, 0.99, 1)
+theme_override_font_sizes/font_size = 20
+horizontal_alignment = 1
+
+[node name="Buttons" type="HBoxContainer" parent="Root/Center/Panel/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_constants/separation = 14
+alignment = 1
+
+[node name="CloseButton" type="Button" parent="Root/Center/Panel/VBox/Buttons"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(140, 46)
+layout_mode = 2
+editor_description = "El texto sale de close_text en el script."

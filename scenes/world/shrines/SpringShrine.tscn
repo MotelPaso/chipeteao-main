@@ -45,6 +45,9 @@ collision_mask = 1
 monitorable = false
 script = ExtResource("1_spring")
 prompt_height = 2.4
+complete_sound = &"heal"
+meta_stat_id = "shrines_used"
+marker_kind = &"spring"
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.5, 0)

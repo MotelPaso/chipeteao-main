@@ -1,15 +1,10 @@
 [gd_scene format=3 uid="uid://ct62hsbsvrfj3"]
 
 [ext_resource type="Script" uid="uid://dicopglygu0w8" path="res://scripts/ui/meta/quest_log.gd" id="1_questlog"]
-[ext_resource type="Shader" uid="uid://cnndc4w2t8jrk" path="res://assets/ui/menu_backdrop.gdshader" id="2_backdrop"]
+[ext_resource type="Material" path="res://assets/ui/menu_backdrop.tres" id="2_backdrop"]
 
-[sub_resource type="ShaderMaterial" id="ShaderMaterial_backdrop"]
-shader = ExtResource("2_backdrop")
-shader_parameter/top_color = Color(0.07, 0.085, 0.135, 1)
-shader_parameter/bottom_color = Color(0.028, 0.032, 0.052, 1)
-shader_parameter/fog_color = Color(0.18, 0.26, 0.33, 1)
-shader_parameter/fog_strength = 0.2
-shader_parameter/drift_speed = 0.03
+[sub_resource type="FontVariation" id="FontVariation_title"]
+spacing_glyph = 8
 
 [node name="QuestLog" type="Control" unique_id=356829787]
 layout_mode = 3
@@ -19,7 +14,7 @@ anchor_bottom = 1.0
 script = ExtResource("1_questlog")
 
 [node name="Background" type="ColorRect" parent="." unique_id=1660240075]
-material = SubResource("ShaderMaterial_backdrop")
+material = ExtResource("2_backdrop")
 layout_mode = 0
 anchor_right = 1.0
 anchor_bottom = 1.0
@@ -36,7 +31,10 @@ theme_override_constants/separation = 12
 [node name="TitleLabel" type="Label" parent="Center/VBox" unique_id=1022591225]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_colors/font_color = Color(0.96, 0.78, 0.3, 1)
+theme_override_colors/font_color = Color(0.98, 0.76, 0.28, 1)
+theme_override_colors/font_outline_color = Color(0.03, 0.035, 0.06, 0.92)
+theme_override_constants/outline_size = 10
+theme_override_fonts/font = SubResource("FontVariation_title")
 theme_override_font_sizes/font_size = 40
 text = "REGISTRO DE MISIONES"
 horizontal_alignment = 1

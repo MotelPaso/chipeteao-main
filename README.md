@@ -1,6 +1,6 @@
 # Bonkraiders
 
-Roguelite de supervivencia "bullet-heaven" en 3D hecho en Godot 4.7 (GDScript): incursiones sin límite de tiempo que recorren **un mapa tras otro**: superas una etapa sobreviviendo 15 minutos y matando a su jefe, se abre un portal de salida, te quedas cuanto quieras en modo **pseudo-infinito** (la dificultad sube rápido) y cruzas al mapa siguiente con todo lo que llevas donde las armas disparan solas, los enemigos llegan en hordas crecientes y cada subida de nivel ofrece 3 cartas de mejora. Arenas de **240×240 con relieve** (colinas, hondonadas y mesetas), con **minimapa** en la esquina de cada vista y **mapa completo con Tab** sobre una niebla de guerra que el equipo destapa caminando. Incluye tres biomas (Bosque Hueco, Dunas de Ceniza y Ciénaga Lóbrega) con jefes propios y minijefes secretos, 16 raiders con arma inicial y pasiva propia, 15 armas **que evolucionan por nivel**, 15 tomos, 16 objetos con rareza fija y 9 mascotas, dificultad por **vueltas** al circuito de mapas y meta-progresión entre incursiones (esquirlas, 40 misiones, desbloqueo de raiders, 6 reliquias permanentes de la Armería, pantalla de Colección, Cacería diaria con semilla por fecha). El diseño completo está en `GDD.md` y la historia de desarrollo en `CHANGELOG.md`.
+Roguelite de supervivencia "bullet-heaven" en 3D hecho en Godot 4.7 (GDScript): incursiones sin límite de tiempo que recorren **un mapa tras otro**: superas una etapa sobreviviendo 15 minutos y matando a su jefe, se abre un portal de salida, te quedas cuanto quieras en modo **pseudo-infinito** (la dificultad sube rápido) y cruzas al mapa siguiente con todo lo que llevas donde las armas disparan solas, los enemigos llegan en hordas crecientes y cada subida de nivel ofrece 3 cartas de mejora. Arenas de **240×240 con relieve** (colinas, hondonadas y mesetas), con **minimapa** en la esquina de cada vista y **mapa completo con Tab** sobre una niebla de guerra que el equipo destapa caminando. Incluye tres biomas (Bosque Hueco, Dunas de Ceniza y Ciénaga Lóbrega) con jefes propios y minijefes secretos, 12 raiders con arma inicial y pasiva propia, 15 armas **que evolucionan por nivel**, 15 tomos, 16 objetos con rareza fija y 9 mascotas, dificultad por **vueltas** al circuito de mapas y meta-progresión entre incursiones (esquirlas, 39 misiones, desbloqueo de raiders, 6 reliquias permanentes de la Armería, pantalla de Colección, Cacería diaria con semilla por fecha). El diseño completo está en `GDD.md` y la historia de desarrollo en `CHANGELOG.md`.
 
 **Idioma:** el juego está íntegramente en **español latinoamericano**. La terminología canónica vive en `docs/GLOSARIO.md` y es obligatoria para cualquier cadena nueva; los identificadores (ids de catálogo, `node_name`, grupos, `StringName`, claves de guardado y los `print()` de depuración) se quedan en inglés a propósito.
 
@@ -29,7 +29,7 @@ godot -e --path .       # abre el editor
 | C                  | Cambiar cámara: tercera persona → primera persona → órbita libre                                                                                               | `camera_mode`                                             |
 | Rueda del mouse    | Zoom (solo en cámara de órbita libre)                                                                                                                          | `camera_zoom_in` / `camera_zoom_out`                      |
 | Tab                | Abre el **mapa** de tu vista a pantalla completa (etapa, reloj, leyenda, estadísticas, party y objetos). No pausa la partida                                   | `map_overlay`                                             |
-| Esc                | Menú de pausa: **Continuar** / **Ajustes** / **Extraerse (terminar incursión)** — cierra la incursión y guarda / **Salir al menú** — abandona sin guardar nada | — (`ui_cancel`)                                           |
+| Esc                | Menú de pausa: **Continuar** / **Ajustes** / **Extraerse (terminar incursión)** — cierra la incursión y guarda / **Salir al menú** — abandona sin guardar nada | `pause_game`                                              |
 
 **Modos de cámara** (por jugador, también en co-op; en control: click del stick derecho alterna, D-pad arriba/abajo hace zoom):
 
@@ -37,9 +37,9 @@ godot -e --path .       # abre el editor
 - **Primera persona** — la cámara baja a los ojos y tu propia foca se oculta (solo en tu vista; tus compañeros te siguen viendo), con rango de pitch completo.
 - **Órbita libre** — la cámara orbita alrededor del jugador con mouse/stick y zoom con rueda/D-pad; el raider camina hacia donde te mueves, independiente de hacia dónde mire la cámara (las armas apuntan solas, así que la orientación es cosmética).
 
-Las armas disparan automáticamente al enemigo más cercano: no hay botón de ataque. Los mapeos viven en `project.godot`, sección `[input]`: `move_forward`, `move_back`, `move_left`, `move_right`, `jump`, `sprint`, `interact`, `camera_mode`, `camera_zoom_in`, `camera_zoom_out`, `map_overlay`. El menú de pausa usa `ui_cancel`, que es el mapeo por defecto de Godot (Esc). En co-op, el autoload `Coop` clona cada una de esas acciones por slot (`p1_*`, `p2_*`…) ligada solo al dispositivo de ese jugador.
+Las armas disparan automáticamente al enemigo más cercano: no hay botón de ataque. Los mapeos viven en `project.godot`, sección `[input]`: `move_forward`, `move_back`, `move_left`, `move_right`, `jump`, `sprint`, `interact`, `camera_mode`, `camera_zoom_in`, `camera_zoom_out`, `map_overlay`, `pause_game` (Esc / Start: abre y cierra el menú de pausa; `ui_cancel`, B en un control, solo lo cierra). En co-op, el autoload `Coop` clona cada acción de juego por slot (`p0_*`, `p1_*`…) ligada solo al dispositivo de ese jugador.
 
-**Control (también en solitario):** stick izquierdo = movimiento, stick derecho = cámara, A = salto, X o LB = derrape, Y = interactuar, click del stick derecho = cambiar cámara, D-pad arriba/abajo = zoom, BACK/Select = abrir el mapa, B/Start = navegación de menús (acciones `ui_*` por defecto de Godot). Cualquier control conectado sirve en solitario; el mouse y el control conviven.
+**Control (también en solitario):** stick izquierdo = movimiento, stick derecho = cámara, A = salto, X o LB = derrape, Y = interactuar, click del stick derecho = cambiar cámara, D-pad arriba/abajo = zoom, BACK/Select = abrir el mapa, Start = pausa (`pause_game`), A/B = aceptar/cerrar en los menús (acciones `ui_*` de Godot). Cualquier control conectado sirve en solitario; el mouse y el control conviven.
 
 ## Co-op local (2-4 jugadores, pantalla dividida)
 
@@ -48,7 +48,7 @@ En la pantalla de selección hay una fila **Jugadores 1-4**: el jugador 1 usa te
 En partida:
 
 - **Pantalla dividida**: 2 jugadores = mitades arriba/abajo; 3-4 = rejilla 2x2 (`scripts/systems/split_screen.gd`, un `SubViewport` con cámara-espejo por jugador). Cada jugador conserva su cámara en tercera persona (mouse o stick derecho).
-- **Entrada aislada por jugador**: el autoload `Coop` (`scripts/systems/autoloads/coop.gd`) clona las acciones base como `p<slot>_*` ligadas solo al dispositivo de ese slot, así que dos controles nunca se pisan.
+- **Entrada aislada por jugador**: el autoload `Coop` (`scripts/systems/autoloads/coop.gd`) clona las acciones base como `p<slot>_*` (`p0_*` para el jugador 1) ligadas solo al dispositivo de ese slot, así que dos controles nunca se pisan.
 - **XP, nivel y muertes compartidos** (RunState no cambia); las gemas vuelan al jugador vivo más cercano. Las cartas de mejora se reparten **por turnos rotatorios** entre los jugadores en pie (el título indica a quién le toca) y se aplican a las armas/stats de ese jugador.
 - **Caídos y reanimación**: al llegar a 0 HP un jugador queda **derribado** (no muerto): sus armas se apagan y los enemigos lo ignoran. Un compañero puede reanimarlo al 50% manteniendo su botón de interactuar a su lado ~3 s. La derrota solo llega cuando **todo** el equipo está derribado a la vez.
 - **Enemigos y jefes** persiguen/aparecen alrededor de jugadores vivos aleatorios, repartiendo la presión; los interactuables responden al botón del jugador que realmente los pulsa.
@@ -68,19 +68,19 @@ Cada partida es distinta y el mapa sigue dando cosas que hacer hasta el final:
 - **Sin reloj**: la incursión sigue hasta morir o **extraerse** desde el menú de pausa; 15 minutos sobrevividos = victoria. Tras el Elder (min 11) vuelve un jefe cada 4 min, cada vez más fuerte; hay **hordas** en los minutos 3/7/10/13 y luego cada 3.
 - **Puntos de partida** (por jugador, se reinician cada run): cada muerte paga puntos al raider más cercano (shiny x5, jefes 25). Sirven para abrir **cofres** (precio por rareza: 20/40/80/160, y cada cofre abierto encarece todos los demás x1.25), girar la **ruleta** (60) y beber del **manantial** (40).
 - **Cofres gratis**: los que suelta un cuerpo (jefes y shiny), el del pacto demoníaco y ~15% de los del inicio no cuestan nada, **no encarecen** a los de pago y tiran su rareza **al abrirlos** con tu suerte, así que cualquier rareza es posible. Todo cofre se hunde después de entregar el premio.
-- **Cofres** solo dan **objetos** (`scripts/systems/catalogs/item_catalog.gd`): rareza fija por objeto, copias ilimitadas, independientes de armas y tomos. La suerte inclina la rareza del cofre. Ejemplos: Imán (aspira toda la XP periódicamente), Bolsa de pedos (veneno al golpear), Sangre de titán (creces y tus ataques cubren más área), Sangre de demonio, Llave maestra, Gusano cósmico, Máscara de superhéroe (arañas venenosas al matar) y huevos de **mascota** (Alienígena, Dinosaurio, Pájaro furioso, Capibara: te siguen, llevan un arma propia fuera del tope de 5 armas y dan un stat por nivel).
+- **Cofres** solo dan **objetos** (`scripts/systems/catalogs/item_catalog.gd`): rareza fija por objeto, copias ilimitadas, independientes de armas y tomos. La suerte inclina la rareza del cofre. Ejemplos: Imán (aspira toda la XP periódicamente), Bolsa de pedos (veneno al golpear), Sangre de titán (creces y tus ataques cubren más área), Sangre de demonio, Llave maestra, Gusano cósmico, Máscara de superhéroe (arañas venenosas al matar). Las **mascotas** no salen de cofres: una por raider, de la caja de mascotas o del traficante de animales; te siguen, llevan un arma propia fuera del tope de armas y dan un stat por nivel.
 - **Altares**: el de **carga** se carga solo al estar dentro de un anillo **tres veces más grande**, que **se marca y late** cuando te acercas; salir solo **pausa** la carga (nada se pierde, nada caduca) y al completarlo eliges **1 de 3 bendiciones** que van a toda la party, independientes de las cartas; el **demoníaco** ofrece **pactos**: cada carta trae un **beneficio** (boon grande, puntos, o un cofre gratis ahí mismo) y su **costo** (dificultad permanente, más shiny, lunas más largas o más frecuentes, desastres). Todo altar se hunde después de pagar, y el director los siembra cada vez más seguido con un cupo que crece por minuto; el de **codicia** sigue apostando vida; la **ruleta** abre un menú con 11 resultados (objetos, +stats, +armas, jackpot, curación, maldiciones…) y **cada giro duplica el precio** del siguiente para el resto de la partida; los **portales** aparecen emparejados al inicio y teletransportan con recarga; el **manantial** cura y da un power-up al azar (20 s).
-- **Cartas**: tope de 5 armas y 5 tomos distintos por jugador (**los stacks y los niveles de arma no tienen tope**); cada subida de nivel ofrece **un solo lado**: armas o tomos, nunca mezclado; cartas que suben dos stats de un arma; las armas **evolucionan al nivel 10 y ascienden cada 10 niveles** a partir de ahí; «Corazón recio» cura solo lo ganado; subir de nivel ya no aspira las gemas. Tomos nuevos: Tomo de Fortuna (suerte), de Multitud (+proyectiles), de Persistencia (duración de efectos), de Sabiduría (XP), del Azar (stats aleatorios según rareza) y del Peligro (dificultad).
-- **Mapa irregular**: cada run bloquea manchas de celdas con **rocas de verdad** —una retícula que cubre la celda entera, con colisión por cada blob visible— en vez de los muros invisibles de 10x7x10 m que había antes: ya no chocas contra nada y los enemigos dejaron de caminar a 7 m de altura sobre ellos. Todo lo abierto sigue siendo alcanzable a pie, y los cofres/altares iniciales varían. Los enemigos **trepan** muros y props.
+- **Cartas**: tope de 3 armas y 3 tomos distintos por jugador (**los stacks y los niveles de arma no tienen tope**); cada subida de nivel ofrece **un solo lado**: armas o tomos, nunca mezclado; cartas que suben dos stats de un arma; las armas **evolucionan al nivel 10 y ascienden cada 10 niveles** a partir de ahí; «Corazón recio» cura solo lo ganado; subir de nivel ya no aspira las gemas. Tomos nuevos: Tomo de Fortuna (suerte), de Multitud (+proyectiles), de Persistencia (duración de efectos), de Sabiduría (XP), del Azar (stats aleatorios según rareza) y del Peligro (dificultad).
+- **Mapa irregular**: cada run bloquea regiones de celdas con **formaciones de roca** (una malla facetada por región, cuya colisión es la misma malla que se ve: no hay muros invisibles). Todo lo abierto sigue siendo alcanzable a pie, y los cofres/altares iniciales varían. Los enemigos **trepan** muros y props.
 - **Calidad gráfica** (Ajustes, iteración 64): **Alta** (lo de siempre), **Media** (el 3D al 75 % con FSR y las sombras del sol a 60 m) y **Baja** (el 3D al 50 % y sin sombras del sol). El HUD no se escala nunca, así que queda nítido en los tres. Pensada para notebooks más modestas que la de desarrollo; en pantalla completa retina el 3D se dibuja a resolución nativa.
 - **HUD**: puntos, dificultad acumulada, **toast de botín** abajo al centro cada vez que algo entra a una bolsa, un **badge de FPS** opcional (Ajustes → «Mostrar FPS») arriba a la derecha, y dos tiras inferiores: **abajo a la izquierda** armas (nivel o ★rango) y tomos (stacks), **abajo a la derecha** los objetos (copias). Cada casilla busca `res://assets/icons/<biblioteca>/<id>.png` (`weapons`, `tomes`, `items`) y cae a `assets/icons/placeholder.png` con la sigla encima; una fila de catálogo con `icon` propio gana sobre ambos. Para poner arte real basta soltar los PNG con el id como nombre.
 - **Dificultad**: rampa de spawns más agresiva (`interval_shrink_per_minute` 0.32, `extra_count_per_minute` 0.45), más shiny (8% → 21%), y un **escalado tardío abierto** desde el minuto 6 (+8% HP y +5% daño por minuto en spawns nuevos) para que el late game no se pueda ignorar quieto. En co-op los enemigos escalan por jugador extra (+50% HP, +30% ritmo de spawn, jefes +50% HP por jugador).
 
-Los números viven como exports en `enemy_spawner.gd` y `world_director.gd` para ajustarlos sin tocar código.
+Los números viven como exports para ajustarlos sin tocar código: en `enemy_spawner.gd` (nodo `EnemySpawner` de cada arena) y en `world_director.gd`, `weather_director.gd` y `stage_fixtures.gd` (nodos `WorldDirector`, `WorldDirector/Weather` y `WorldDirector/StageFixtures` de `RunSystems.tscn`). La guía de qué valor está dónde es `docs/CAMBIOS-RAPIDOS.md`.
 
 ## Fondo del mundo (iteración 34)
 
-Las arenas ya no flotan en el vacío: cada mapa instancia un nodo **Backdrop** (`scripts/world/run/backdrop.gd`) que construye en código un disco de suelo gigante bajo el borde del mapa (tinte del bioma) y dos anillos de colinas-silueta low-poly fuera del perímetro (a ~190-250 m y ~310-410 m, derivadas del medio-extent de 120), que la niebla del `WorldEnvironment` ya existente funde con el horizonte. Los colores son exports por bioma en la escena de cada mapa; las colinas se re-generan aleatorias cada partida.
+Las arenas ya no flotan en el vacío: cada mapa instancia un nodo **Backdrop** (`scripts/world/run/backdrop.gd`) que construye en código un disco de suelo gigante bajo el borde del mapa (tinte del bioma) y dos anillos de colinas-silueta low-poly fuera del perímetro (a ~190-250 m y ~310-410 m, derivadas del medio-extent de 120), que la niebla del `WorldEnvironment` ya existente funde con el horizonte. Los colores son exports por bioma en la escena de cada mapa (el `ground_color` del Backdrop también tiñe el minimapa); las colinas se re-generan aleatorias cada partida.
 
 ## Enganche y rejugabilidad (iteraciones 35-37)
 
@@ -92,14 +92,14 @@ Las arenas ya no flotan en el vacío: cada mapa instancia un nodo **Backdrop** (
 
 ## Compilar (export)
 
-Hay tres presets en `export_presets.cfg`: **macOS** (`builds/Bonkraiders.app`), **Windows Desktop** (`builds/Bonkraiders.exe`) y **Linux/X11** (`builds/Bonkraiders.x86_64`). Desde la raíz:
+Hay tres presets en `export_presets.cfg`: **macOS** (`builds/Bonkraiders.app`), uno de Windows llamado **holarorro** (plataforma Windows Desktop, exporta `./chipeteao.exe`) y **Linux/X11** (`./Bonkraiders.x86_64`). Desde la raíz:
 
 ```sh
 mkdir -p builds
 godot --headless --export-release "macOS" builds/Bonkraiders.app
 ```
 
-Para Windows/Linux se usan los mismos comandos con `"Windows Desktop"` / `"Linux/X11"`, pero hay que **descargar antes las export templates 4.7.2** de la plataforma destino (Editor > Manage Export Templates, o `Godot_v4.7.2-stable_export_templates.tpz`). La carpeta `builds/` está en `.gitignore`. Versión actual: `0.1.0` (`config/version` en `project.godot`, mostrada en el selector).
+Para Windows/Linux se usan los mismos comandos con el nombre del preset (`"holarorro"` / `"Linux/X11"`), pero hay que **descargar antes las export templates 4.7.2** de la plataforma destino (Editor > Manage Export Templates, o `Godot_v4.7.2-stable_export_templates.tpz`). La carpeta `builds/` está en `.gitignore`. Versión actual: `0.1.0` (`config/version` en `project.godot`, mostrada en el selector).
 
 ## Resolución y escala de la interfaz
 
@@ -117,44 +117,67 @@ esquina; los detalles y la consecuencia en la sensibilidad del ratón están en
 
 ## Estructura del proyecto
 
+**¿Quieres cambiar un valor** (un color, un daño, un texto, un tiempo)? La guía es `docs/CAMBIOS-RAPIDOS.md`: dónde cambiar cada valor (archivo o escena > nodo, y qué propiedad). `docs/ARQUITECTURA.md` explica cómo funciona cada sistema, y `CLAUDE.md` tiene las reglas para trabajar con Claude en este repo.
+
 ```
 project.godot            # autoloads, input map, escena principal, escala de UI
 export_presets.cfg       # presets macOS / Windows / Linux
 GDD.md                   # documento de diseño
-CHANGELOG.md             # una línea por iteración (45 hasta ahora)
+CHANGELOG.md             # historia del desarrollo, una entrada por iteración
+CLAUDE.md                # reglas para Claude en este repo
+docs/CAMBIOS-RAPIDOS.md  # dónde cambiar cada valor (guía rápida del equipo)
 docs/ARQUITECTURA.md     # mapa de sistemas: dónde tocar para extender cada cosa
 docs/GLOSARIO.md         # terminología canónica es-419 (obligatoria)
 docs/AUDITORIA-RONDA-2.md  # registro de la auditoría de código (80 hallazgos)
 docs/AUDITORIA-VISUAL.md   # registro de la auditoría VISUAL: qué se vio en pantalla,
                          #   con captura de antes y después por hallazgo
-tools/verificar.sh       # import + soak de las 3 arenas + soak de etapa + cobertura
+tools/verificar.sh       # import + lint + harness de UI + soaks (arenas, etapa, co-op)
 assets/
   audio/sfx/             # 20 wav sintetizados (regenerables, ver ARQUITECTURA)
   audio/ambient/         # camas de viento por bioma (forest_wind, desert_wind)
   materials/             # StandardMaterial3D .tres de los props low-poly
+  enemies/enemy_look.tres  # look compartido de la horda (shiny, veneno, muerte)
+  ui/menu_backdrop.tres  # fondo que comparten los menús
+  world/rock_style_*.tres  # estilo de las formaciones de roca, uno por mapa
 scenes/
   ui/                    # CharacterSelect (main), HUD, UpgradeCardUI, PauseMenu,
                          #   RunEndScreen, QuestLog, SettingsPanel,
                          #   Collection, RelicShop
-  player/Player.tscn     # CharacterBody3D + SpringArm3D + Weapons + Health +
-                         #   Stats + ItemBag + SealRig
+  ui/hud/                # piezas del HUD: LoadoutTile, LootToast, MateRow
+  ui/maps/               # MapOverlay (mapa de Tab) y MapSection
+  ui/modal/              # ModalPanel y sus herederas VendorPanel, RoulettePanel
+  ui/upgrade_card_ui/    # UpgradeCard (una carta de mejora)
+  ui/meta/character_select/  # CharacterCard, CoopLobby
+  player/Player.tscn     # CharacterBody3D + SealRig + CameraRig + Weapons +
+                         #   Health + Stats + ItemBag + PowerUps + Revive +
+                         #   Flight + PetSlot + Wallet
   weapons/               # 15 armas + proyectiles (Projectile, Arrow,
                          #   BoomerangProjectile)
   enemies/               # Grunt/Skirmisher/Tank/Sunspitter/Duneburrower, jefes
                          #   (Rotking, Sarcognath, Fenwraith), minijefes
-                         #   (Grubthing, CofferMimic)
+                         #   (Grubthing, CofferMimic), púas (BarkSpikes, SandSpikes)
   world/                 # HollowWoods.tscn, AshDunes.tscn y Gloomfen.tscn (arenas),
-                         #   RunSystems.tscn (bloque común de partida),
+                         #   Run.tscn, RunSystems.tscn (bloque común de partida),
                          #   props/, shrines/, chests/, secrets/
-  systems/               # XpGem, HealthOrb
-  fx/                    # DamagePopup, DeathBurst, TelegraphDisc, SlashArc...
-  tests/ArenaProbe.tscn  # harness headless de soak (ver Verificación)
-scripts/                 # espejo de scenes/: systems/ (autoloads y catálogos),
-                         #   player/, weapons/, enemies/, world/, ui/, fx/,
-                         #   tools/generate_sfx.gd (generador de audio)
+  world/director/        # lo que pone el director: ExitPortal, PortalShrine,
+                         #   PortalVisual, Beacon, SupplyChest
+  systems/               # XpGem, HealthOrb, PowerUpPickup y los autoloads
+                         #   Juice.tscn y Sfx.tscn
+  fx/                    # DamagePopup, DeathBurst, TelegraphDisc, SlashArc,
+                         #   LightningBeam...
+  tests/                 # harnesses headless (ArenaProbe, UiProbe, CatalogLint,
+                         #   TerrainShots; ver Verificación)
+scripts/                 # espejo de scenes/: systems/ (autoloads, catálogos y
+                         #   spawner/), player/, weapons/, enemies/, world/, ui/,
+                         #   fx/, tools/generate_sfx.gd (generador de audio).
+                         #   Los componentes de un dueño grande viven junto a él,
+                         #   en scripts/<área>/<dueño>/: player/components/,
+                         #   enemies/enemy/, world/run/director/,
+                         #   world/run/scatter/, ui/game/hud/, ui/game/modal/,
+                         #   ui/game/upgrade_card_ui/, ui/meta/character_select/
 ```
 
-Los archivos clave para tocar contenido son los **catálogos** en `scripts/systems/`: `upgrade_pool.gd` (armas y cartas), `character_catalog.gd`, `tome.gd`, `map_catalog.gd`, `quest_catalog.gd`, `evolution_catalog.gd` (recetas de evolución) y `relic_catalog.gd` (reliquias de la Armería). Ver `docs/ARQUITECTURA.md`, y `docs/GLOSARIO.md` para los nombres visibles.
+Los archivos clave para tocar contenido son los **catálogos** en `scripts/systems/catalogs/`: `weapon_catalog.gd` (armas), `upgrade_pool.gd` (cartas de mejora), `character_catalog.gd`, `tome.gd`, `item_catalog.gd`, `pet_catalog.gd`, `powerup_catalog.gd`, `map_catalog.gd`, `quest_catalog.gd`, `evolution_catalog.gd` (recetas de evolución), `relic_catalog.gd` (reliquias de la Armería) y `rarity.gd` (rarezas). La cabecera de cada catálogo dice qué campos son llaves (no se tocan) y cuáles se pueden cambiar libremente. Ver `docs/ARQUITECTURA.md`, y `docs/GLOSARIO.md` para los nombres visibles.
 
 ## Verificación
 
@@ -171,8 +194,8 @@ Falla (exit 1) si el import, el lint, el harness de UI o un soak imprimen errore
 
 Las dos piezas nuevas de la iteración 57 y el quinto soak:
 
-- **Lint de catálogos** (`scenes/tests/CatalogLint.tscn`): las referencias cruzadas que ningún soak puede comprobar, porque una rota no revienta — simplemente no hace nada. Nueve comprobaciones (`ids_unique`, `glyphs_unique`, `paths_exist`, `stat_ids`, `character_weapons`, `director_methods`, `weapon_properties`, `vendor_lucky_roulette_ids`, `marker_labels`), cada una con su línea `Catalog lint: check <nombre> ok rows=N`. `rows` es lo que se inspeccionó de verdad: **cero filas es un fallo**, porque una comprobación que recorre una lista vacía pasa por el motivo equivocado.
-- **Harness de UI** (`scenes/tests/UiProbe.tscn`): siete de las nueve escenas de UI no las arrancaba nada. Trece pasos que pulsan los **controles reales** (Colección, Misiones, Armería, el rechazo de la fila de co-op, el desbloqueo de un raider con su carta de confirmación, todas las cartas, iniciar la incursión, abrir y cerrar la pausa, Ajustes con «Mostrar FPS» y los botones de «Calidad gráfica», extraerse y reintentar), cada uno con su `UiProbe: step <nombre> ok`. Un control que falta, una precondición rechazada o una pausa que no se suelta es un `push_error`.
+- **Lint de catálogos** (`scenes/tests/CatalogLint.tscn`): las referencias cruzadas que ningún soak puede comprobar, porque una rota no revienta — simplemente no hace nada. Dieciséis comprobaciones (`ids_unique`, `glyphs_unique`, `paths_exist`, `stat_ids`, `character_weapons`, `director_methods`, `weapon_properties`, `vendor_lucky_roulette_ids`, `marker_labels`, `id_format`, `quest_stats`, `text_numbers`, `text_values`, `item_kinds_unique`, `sfx_ids`, `stat_rows`), cada una con su línea `Catalog lint: check <nombre> ok rows=N`. `rows` es lo que se inspeccionó de verdad: **cero filas es un fallo**, porque una comprobación que recorre una lista vacía pasa por el motivo equivocado.
+- **Harness de UI** (`scenes/tests/UiProbe.tscn`): arranca las escenas de UI que ningún soak abre. Trece pasos que pulsan los **controles reales** (Colección, Misiones, Armería, el rechazo de la fila de co-op, el desbloqueo de un raider con su carta de confirmación, todas las cartas, iniciar la incursión, abrir y cerrar la pausa, Ajustes con «Mostrar FPS» y los botones de «Calidad gráfica», extraerse y reintentar), cada uno con su `UiProbe: step <nombre> ok`. Un control que falta, una precondición rechazada o una pausa que no se suelta es un `push_error`.
 - **Soak de co-op**: dos raiders (`BONK_PLAYERS=2`), el slot 1 **mortal** a propósito (godmode cubre solo al slot 0) y derribado a los 45 s con `BONK_DOWN_NOW`, para que el ciclo derribo/reanimación —lo único que ningún soak en solitario puede alcanzar— se ejercite de verdad. Exige `ArenaProbe: players=2`, un cruce de etapa, barridos limpios y al menos un `Player revived:`.
 
 **Guardado por corrida**: cada soak y cada harness recibe su propio `BONK_SAVE_PATH`, borrado con sus hermanos `.bak` y `.tmp` antes de arrancar. Antes todos compartían `user://soak_save.json`: los soaks godmode no doblan meta (nunca terminan la partida), pero sí acumulan los contadores que `SaveData.bump` acredita durante la corrida (bestiario `kills_<script>`, `used_weapon_<id>`), y cualquier corrida mortal o de UI le escribía encima esquirlas, misiones y desbloqueos. Borrar solo el `.json` no era un reset: `load_from_disk` cae al `.bak`.
@@ -236,7 +259,7 @@ Para lógica aislada sigue sirviendo un harness desechable `extends SceneTree` c
 
 ## Guardado
 
-Un único JSON en `user://save.json` (esquirlas, raiders desbloqueados, contadores de misiones, grados, rangos de reliquia, ajustes). En macOS:
+Un único JSON en `user://save.json` (esquirlas, raiders desbloqueados, contadores de misiones, rangos de reliquia, ajustes). En macOS:
 
 ```
 ~/Library/Application Support/Godot/app_userdata/Bonkraiders/save.json
@@ -244,4 +267,4 @@ Un único JSON en `user://save.json` (esquirlas, raiders desbloqueados, contador
 
 (Windows: `%APPDATA%\Godot\app_userdata\Bonkraiders\`; Linux: `~/.local/share/godot/app_userdata/Bonkraiders/`.)
 
-**Resetear el progreso** = borrar ese archivo con el juego cerrado; se regenera limpio al arrancar (Rook y Vex desbloqueados, 0 esquirlas). Un archivo corrupto no crashea: la escritura es atómica (`.tmp` + rename) y deja un `.bak`, así que `SaveData.load_from_disk()` recupera el respaldo y, si tampoco sirve, cae a valores por defecto. Los harness de prueba pueden apuntar `SaveData.save_path` a un archivo temporal antes de `load_from_disk()`.
+**Resetear el progreso** = borrar ese archivo con el juego cerrado; se regenera limpio al arrancar (los raiders con `unlock_cost` 0 desbloqueados, 0 esquirlas). Si un id de raider se renombra, `SaveData.ID_ALIASES` traduce los guardados viejos al cargar. Un archivo corrupto no crashea: la escritura es atómica (`.tmp` + rename) y deja un `.bak`, así que `SaveData.load_from_disk()` recupera el respaldo y, si tampoco sirve, cae a valores por defecto. Los harness de prueba pueden apuntar `SaveData.save_path` a un archivo temporal antes de `load_from_disk()`.

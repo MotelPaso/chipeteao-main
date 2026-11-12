@@ -1,54 +1,167 @@
 class_name UiTheme
 extends RefCounted
-## The one UI design system (iteration 29): every menu, card, bar and
-## button pulls its StyleBoxFlat looks and its hover/press motion from
-## here, so the whole game shares a palette (deep blue-black ground, teal
-## for actions, amber for bosses/gold/legendary, the shard blue kept) and
-## one set of corner radii, borders and states. Also owns the small
-## motion vocabulary: pivot-centered grow-on-hover / squash-on-press for
-## every button (attach_motion) and the reusable "pop" punch. All tweens
-## ignore Engine.time_scale (hit-stop safe) and bind to the control, so
-## layers that process while paused keep animating.
+## Sistema de diseño de la UI: de aquí sacan menús, cartas, barras y
+## botones sus StyleBoxFlat y su movimiento al pasar el mouse o presionar,
+## para que todo el juego comparta paleta (fondo azul negro, turquesa para
+## acciones, ámbar para jefes, oro y legendario, azul de esquirla), radios,
+## bordes y estados. También es dueño del vocabulario de movimiento: crecer
+## al pasar el mouse y aplastar al presionar (attach_motion) y el golpe "pop".
+## Todos los tweens ignoran Engine.time_scale (seguros con hit-stop) y van
+## atados al control, así que las capas que procesan en pausa siguen animando.
+## Es estático y nunca va en una escena: edita los valores aquí.
 
-# --- palette ---------------------------------------------------------------
-const BG_DEEP := Color(0.045, 0.05, 0.08)
+# --- paleta ------------------------------------------------------------------
 const PANEL_BG := Color(0.09, 0.1, 0.145, 0.96)
 const CARD_BG := Color(0.115, 0.125, 0.17, 0.98)
 const CARD_BG_HOVER := Color(0.16, 0.175, 0.24, 0.98)
 const CARD_BG_PRESSED := Color(0.085, 0.09, 0.125, 0.98)
 const BORDER_DIM := Color(0.29, 0.315, 0.4)
 const BORDER_LOCKED := Color(0.2, 0.21, 0.26)
-const ACCENT := Color(0.3, 0.82, 0.76)  ## teal — actions / primary CTA
-const ACCENT_AMBER := Color(0.98, 0.76, 0.28)  ## bosses, gold, legendary
+const ACCENT := Color(0.3, 0.82, 0.76)  ## turquesa: acciones y botón principal
+const ACCENT_AMBER := Color(0.98, 0.76, 0.28)  ## jefes, oro, legendario
 const ACCENT_RED := Color(0.92, 0.28, 0.24)
 const SHARD_BLUE := Color(0.55, 0.8, 0.92)
 const TEXT_BRIGHT := Color(0.96, 0.97, 0.99)
 const TEXT_DIM := Color(0.66, 0.69, 0.75)
 const TEXT_FAINT := Color(0.47, 0.5, 0.56)
+## Texto normal sobre paneles oscuros (etiquetas de ajustes, botones de co-op).
+const TEXT_NORMAL := Color(0.85, 0.87, 0.9)
 const OUTLINE_DARK := Color(0.03, 0.035, 0.06, 0.92)
+## Fondo oscuro de chips y filas del HUD y de los modales, opaco: cada uso le
+## pone su alfa con Color(UiTheme.TILE_BG, alfa).
+const TILE_BG := Color(0.07, 0.075, 0.11)
+## Destello (modulate) de "no alcanza" (ver reject).
+const REJECT_FLASH := Color(1.0, 0.42, 0.42)
+## Verde de la experiencia: barra de XP del HUD, anillo de subida de nivel
+## (juice.gd) y baliza de essence_rift (world_director.gd). El material de las
+## gemas (XpGem.tscn) guarda el mismo verde en su escena: cámbialo ahí también.
+const XP_GREEN := Color(0.35, 0.95, 0.6)
 
+## Sombra de los paneles (panel): color y tamaño, en píxeles.
+const PANEL_SHADOW := Color(0.0, 0.0, 0.0, 0.45)
+const PANEL_SHADOW_SIZE := 14
+## Texto de los botones sin relleno; los rellenos usan TEXT_BRIGHT.
+const BUTTON_TEXT := Color(0.88, 0.9, 0.94)
+## Borde por defecto de las chapas y píldoras (style_badge).
+const BADGE_BORDER := Color(0, 0, 0, 0.5)
+## Pista del interruptor apagado (toggle_icon); encendido usa su acento.
+const TOGGLE_TRACK_OFF := Color(0.16, 0.17, 0.23)
+## Canal de las barras (style_bar): fondo y borde.
+const BAR_TROUGH := Color(0.04, 0.045, 0.07, 0.85)
+const BAR_TROUGH_BORDER := Color(0.0, 0.0, 0.0, 0.6)
+
+## Radio de las esquinas (píxeles): paneles y cartas, chips y botones.
 const RADIUS := 10
 const RADIUS_SMALL := 7
 
-## Outer glow a card wears in its own border color (style_card). Hover and
-## focus add the same extra alpha, so a pad player's focus ring reads
-## exactly as loudly as a mouse hover.
+## Brillo exterior de una carta en el color de su borde (style_card): tamaño
+## (píxeles) y alfa. El hover y el foco suman el mismo alfa extra, así que el
+## anillo de foco de un control se lee igual de fuerte que el hover del mouse.
 const CARD_GLOW_SIZE := 10
 const CARD_GLOW_ALPHA := 0.3
 const CARD_GLOW_HIGHLIGHT := 0.2
 
+## Escala de un botón al pasar el mouse y al presionarlo, y duración del
+## tween (segundos).
 const HOVER_GROW := 1.04
 const PRESS_SQUASH := 0.95
 const MOTION_TIME := 0.12
+## Vaivén de "no alcanza" de cartas y botones (ver reject): ángulo (grados)
+## de cada paso y su duración (segundos).
+const REJECT_SWINGS: Array[float] = [-4.0, 4.0, -2.0, 0.0]
+const REJECT_SWING_TIMES: Array[float] = [0.05, 0.08, 0.07, 0.06]
+## El vaivén más suave de las filas de las pantallas meta.
+const REJECT_SWINGS_ROW: Array[float] = [-2.0, 2.0, 0.0]
+const REJECT_SWING_TIMES_ROW: Array[float] = [0.05, 0.08, 0.07]
+## Duración (segundos) del destello rojo y de su vuelta al modulate de reposo.
+const REJECT_FLASH_TIME := 0.06
+const REJECT_RESTORE_TIME := 0.18
 
-# --- shared wordings -------------------------------------------------------
+# --- medidas de los estilos ---------------------------------------------------
+# Los números con que las funciones de abajo dibujan cada pieza.
 
-## Two different "level" scales the player reads side by side: the RUN
-## level (HUD chip) and a WEAPON's upgrade level (loadout corner tag,
-## Collection rows). One constant each so re-wording either one lands on
-## every screen at once instead of drifting apart.
+## Panel (panel): radio de las esquinas, grosor del borde y de la línea de
+## acento de arriba, en píxeles.
+const PANEL_RADIUS := RADIUS + 2
+const PANEL_BORDER_WIDTH := 1
+const PANEL_ACCENT_WIDTH := 3
+## Botón (button_states): radio de las esquinas y grosor del borde, en píxeles.
+const BUTTON_RADIUS := RADIUS_SMALL + 2
+const BUTTON_BORDER_WIDTH := 2
+## Cuerpo de un botón relleno: cuánto de su color de acento lleva en reposo,
+## con el mouse encima y presionado (0-1), y su alfa.
+const BUTTON_FILL_SHARE := 0.22
+const BUTTON_FILL_SHARE_HOVER := 0.32
+const BUTTON_FILL_SHARE_PRESSED := 0.16
+const BUTTON_FILL_ALPHA := 0.97
+## Cuánto se oscurece el borde de un botón presionado (0-1).
+const BUTTON_PRESSED_DARKEN := 0.2
+## Brillo exterior de un botón relleno: tamaño en píxeles y alfa, normal y
+## presionado.
+const BUTTON_GLOW_SIZE := 6
+const BUTTON_GLOW_ALPHA := 0.28
+const BUTTON_GLOW_ALPHA_PRESSED := 0.12
+## Cuánto se aclara el borde de una carta con el mouse encima o con foco (0-1).
+const CARD_HIGHLIGHT_LIGHTEN := 0.2
+## Píldora (style_badge): grosor del borde y margen interior (horizontal,
+## vertical), en píxeles.
+const BADGE_BORDER_WIDTH := 1
+const BADGE_MARGIN := Vector2(12.0, 3.0)
+## Cuánto más oscuro que su texto es el borde de la píldora de esquirlas del
+## selector y de las pantallas meta (0-1).
+const BADGE_EDGE_DARKEN := 0.45
+## Golpe "pop": parte de la duración que toma la subida (0-1); el resto es la
+## vuelta con rebote.
+const POP_RISE_SHARE := 0.35
+## Agarrador de slider (grabber_icon): hasta dónde es sólido y dónde termina
+## su borde suave, como fracción del radio (0-1).
+const GRABBER_SOLID := 0.78
+const GRABBER_EDGE := 0.86
+## Interruptor (toggle_icon): cuánto se oscurece la pista y se aclara el
+## contorno al estar encendido (0-1), y el grosor del contorno y el hueco
+## entre la perilla y el borde, en píxeles.
+const TOGGLE_TRACK_DARKEN := 0.25
+const TOGGLE_RIM_LIGHTEN := 0.2
+const TOGGLE_RIM_WIDTH := 1.5
+const TOGGLE_KNOB_INSET := 4.0
+## Anillo de foco del interruptor (style_toggle): grosor, radio de las
+## esquinas y cuánto sobresale, en píxeles, y su brillo (tamaño en píxeles y
+## alfa).
+const TOGGLE_RING_WIDTH := 2
+const TOGGLE_RING_RADIUS := 17
+const TOGGLE_RING_EXPAND := 4.0
+const TOGGLE_RING_GLOW_SIZE := 6
+const TOGGLE_RING_GLOW_ALPHA := 0.28
+## Barra (style_bar, bar_fill): grosor del borde del canal, de la línea de
+## brillo de arriba y de la marca del borde de avance, en píxeles, y cuánto
+## más claras que el relleno son esa línea y esa marca (0-1).
+const BAR_TROUGH_BORDER_WIDTH := 2
+const BAR_SHINE_WIDTH := 2
+const BAR_EDGE_WIDTH := 3
+const BAR_EDGE_LIGHTEN := 0.35
+
+# --- textos compartidos ------------------------------------------------------
+
+## Dos escalas de "nivel" que el jugador lee lado a lado: el nivel de la
+## PARTIDA (chapa del HUD) y el nivel de mejora de un ARMA (esquina del
+## equipamiento, filas de la Colección). Una constante para cada una, así
+## cambiar la palabra llega a todas las pantallas a la vez.
 const LEVEL_ABBREV := "Nv %d"
 const WEAPON_LEVEL_ABBREV := "N%d"
+## Saldo de esquirlas ("Esquirlas: 120"): selector y pantallas meta.
+const SHARDS_BALANCE := "Esquirlas: %d"
+## Cantidad de esquirlas ("120 esquirlas"): precios de raiders y de la Armería.
+const SHARDS_AMOUNT := "%d esquirlas"
+## Esquirlas ganadas ("+20 esquirlas"): recompensa de una misión.
+const SHARDS_GAIN := "+%d esquirlas"
+## Puntos de la partida ("35 pts"): HUD y precios del vendedor.
+const POINTS_AMOUNT := "%d pts"
+## Saldo de puntos en los paneles modales ("Tienes 35 pts").
+const POINTS_BALANCE := "Tienes %d pts"
+## Aviso de puntos insuficientes en los paneles modales.
+const POINTS_SHORT := "No te alcanzan los puntos."
+## Etiqueta de un jugador en co-op ("J2").
+const PLAYER_TAG := "J%d"
 
 
 # --- styleboxes ------------------------------------------------------------
@@ -62,43 +175,41 @@ static func flat(color: Color, radius: int = RADIUS) -> StyleBoxFlat:
 
 static func panel(bg: Color = PANEL_BG, border: Color = BORDER_DIM,
 		margin_h: float = 30.0, margin_v: float = 22.0) -> StyleBoxFlat:
-	var box := flat(bg, RADIUS + 2)
+	var box := flat(bg, PANEL_RADIUS)
 	box.border_color = border
-	box.set_border_width_all(1)
-	box.border_width_top = 3  # header accent line
+	box.set_border_width_all(PANEL_BORDER_WIDTH)
+	box.border_width_top = PANEL_ACCENT_WIDTH  # línea de acento del encabezado
 	box.content_margin_left = margin_h
 	box.content_margin_right = margin_h
 	box.content_margin_top = margin_v
 	box.content_margin_bottom = margin_v
-	box.shadow_color = Color(0.0, 0.0, 0.0, 0.45)
-	box.shadow_size = 14
+	box.shadow_color = PANEL_SHADOW
+	box.shadow_size = PANEL_SHADOW_SIZE
 	return box
 
 
-## Soft outer glow via the stylebox shadow (used for selected cards,
-## rarity borders, claimable quest rows).
+## Brillo exterior suave con la sombra del stylebox (cartas elegidas, bordes
+## de rareza, misiones por reclamar).
 static func add_glow(box: StyleBoxFlat, color: Color, size: int = 8,
 		alpha: float = 0.35) -> void:
 	box.shadow_color = Color(color.r, color.g, color.b, alpha)
 	box.shadow_size = size
 
 
-## The four button states in one dictionary. filled = hero CTA look
-## (accent-tinted body, dark-on-bright is avoided: text stays bright over
-## a deep accent fill).
+## Los cuatro estados de un botón en un diccionario. filled = aspecto de
+## botón principal: cuerpo teñido con el acento y texto claro encima.
 static func button_states(accent: Color = ACCENT,
 		filled: bool = false) -> Dictionary[String, StyleBoxFlat]:
-	var body := Color(accent.r * 0.22, accent.g * 0.22, accent.b * 0.22, 0.97) \
-			if filled else CARD_BG
-	var body_hover := Color(accent.r * 0.32, accent.g * 0.32, accent.b * 0.32, 0.97) \
+	var body := _filled_body(accent, BUTTON_FILL_SHARE) if filled else CARD_BG
+	var body_hover := _filled_body(accent, BUTTON_FILL_SHARE_HOVER) \
 			if filled else CARD_BG_HOVER
-	var body_pressed := Color(accent.r * 0.16, accent.g * 0.16, accent.b * 0.16, 0.97) \
+	var body_pressed := _filled_body(accent, BUTTON_FILL_SHARE_PRESSED) \
 			if filled else CARD_BG_PRESSED
 	var edge := accent if filled else BORDER_DIM
 	var states: Dictionary[String, StyleBoxFlat] = {}
 	for state: String in ["normal", "hover", "pressed", "focus"]:
-		var box := flat(body, RADIUS_SMALL + 2)
-		box.set_border_width_all(2)
+		var box := flat(body, BUTTON_RADIUS)
+		box.set_border_width_all(BUTTON_BORDER_WIDTH)
 		box.border_color = edge
 		match state:
 			"hover":
@@ -106,24 +217,30 @@ static func button_states(accent: Color = ACCENT,
 				box.border_color = accent
 			"pressed":
 				box.bg_color = body_pressed
-				box.border_color = accent.darkened(0.2)
+				box.border_color = accent.darkened(BUTTON_PRESSED_DARKEN)
 			"focus":
 				box.bg_color = body_hover
 				box.border_color = accent
 		if filled:
-			add_glow(box, accent, 6, 0.28 if state != "pressed" else 0.12)
+			add_glow(box, accent, BUTTON_GLOW_SIZE,
+					BUTTON_GLOW_ALPHA if state != "pressed" else BUTTON_GLOW_ALPHA_PRESSED)
 		states[state] = box
 	return states
 
 
-## THE card look, shared by every "pick one of these" surface (upgrade
-## cards, raider/map/tier/co-op cards): one body palette for the four
-## states, the accent as the border, and an outer glow that strengthens on
-## hover AND on focus — keyboard/pad players navigate by that focus ring,
-## so it must read as loudly as a hover does.
+## Cuerpo de un botón relleno: su acento escalado por `share`, con el alfa de
+## BUTTON_FILL_ALPHA.
+static func _filled_body(accent: Color, share: float) -> Color:
+	return Color(accent.r * share, accent.g * share, accent.b * share, BUTTON_FILL_ALPHA)
+
+
+## EL aspecto de carta de toda superficie de "elige una" (cartas de mejora,
+## raiders, botones de co-op): un cuerpo por estado, el acento como borde y
+## un brillo exterior que sube con el hover Y con el foco (teclado y control
+## navegan por ese anillo, así que debe leerse igual de fuerte).
 ##
-## `glow` off is the quiet look the unselected and locked cards wear:
-## border only, no shadow, so the picked card is the one that lights up.
+## Con `glow` apagado es el aspecto quieto de las cartas no elegidas y
+## bloqueadas: solo borde, sin sombra, para que se encienda la elegida.
 static func style_card(button: Button, border: Color, width: int = 3,
 		glow: bool = true) -> void:
 	var bodies: Dictionary[String, Color] = {
@@ -135,7 +252,7 @@ static func style_card(button: Button, border: Color, width: int = 3,
 	for state: String in bodies:
 		var highlighted := state == "hover" or state == "focus"
 		var box := flat(bodies[state], RADIUS)
-		box.border_color = border.lightened(0.2) if highlighted else border
+		box.border_color = border.lightened(CARD_HIGHLIGHT_LIGHTEN) if highlighted else border
 		box.set_border_width_all(width)
 		if glow:
 			add_glow(box, border, CARD_GLOW_SIZE,
@@ -144,26 +261,27 @@ static func style_card(button: Button, border: Color, width: int = 3,
 		button.add_theme_stylebox_override(state, box)
 
 
-## Apply the full system to a Button: state styleboxes, font colors, and
-## the grow/squash motion. The one entry point every screen uses.
+## Aplica el sistema completo a un Button: styleboxes por estado, colores de
+## texto y el movimiento de crecer y aplastar. Es la entrada que usa toda
+## pantalla.
 static func style_button(button: Button, accent: Color = ACCENT,
 		filled: bool = false) -> void:
 	var states := button_states(accent, filled)
 	for state: String in states:
 		button.add_theme_stylebox_override(state, states[state])
 	button.add_theme_color_override("font_color",
-			TEXT_BRIGHT if filled else Color(0.88, 0.9, 0.94))
+			TEXT_BRIGHT if filled else BUTTON_TEXT)
 	button.add_theme_color_override("font_hover_color", TEXT_BRIGHT)
 	button.add_theme_color_override("font_pressed_color", TEXT_BRIGHT)
 	button.add_theme_color_override("font_focus_color", TEXT_BRIGHT)
 	attach_motion(button)
 
 
-# --- motion ----------------------------------------------------------------
+# --- movimiento --------------------------------------------------------------
 
-## Pivot-centered hover grow + press squash. Idempotent: safe to call on
-## every restyle; connects only once per button. Scale is visual-only in
-## containers, so layout never shifts.
+## Crece al pasar el mouse y se aplasta al presionar, centrado en el pivote.
+## Idempotente: la primera llamada gana y conecta una sola vez por botón. La
+## escala es solo visual dentro de un contenedor, así que el layout no se mueve.
 static func attach_motion(button: BaseButton, grow: float = HOVER_GROW,
 		squash: float = PRESS_SQUASH) -> void:
 	if button.has_meta(&"ui_motion"):
@@ -188,8 +306,8 @@ static func _scale_to(button: BaseButton, target: float) -> void:
 	button.set_meta(&"ui_motion_tween", tween)
 
 
-## Quick attention punch (level chip, shard counter, chosen card): scales
-## up and settles back. Interruptible — re-popping restarts cleanly.
+## Golpe de atención (chapa de nivel, contador de esquirlas, carta elegida):
+## escala hacia arriba y vuelve. Se puede interrumpir: repetirlo reinicia limpio.
 static func pop(control: Control, peak: float = 1.22, duration: float = 0.26) -> void:
 	if not control.is_inside_tree():
 		return
@@ -198,15 +316,41 @@ static func pop(control: Control, peak: float = 1.22, duration: float = 0.26) ->
 	control.scale = Vector2.ONE
 	var tween := control.create_tween()
 	tween.set_ignore_time_scale(true)
-	tween.tween_property(control, "scale", Vector2.ONE * peak, duration * 0.35) \
+	tween.tween_property(control, "scale", Vector2.ONE * peak, duration * POP_RISE_SHARE) \
 			.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
-	tween.tween_property(control, "scale", Vector2.ONE, duration * 0.65) \
+	tween.tween_property(control, "scale", Vector2.ONE, duration * (1.0 - POP_RISE_SHARE)) \
 			.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 	control.set_meta(&"ui_pop_tween", tween)
 
 
-## Kill-and-forget for tweens parked in metadata (the pattern that keeps
-## every animation idempotent under rapid open/close).
+## Respuesta de "no alcanza": destello rojo (REJECT_FLASH) y un vaivén de
+## rotación que recorre `swings` (grados), cada paso con su tiempo en
+## `swing_times` (segundos); con el último paso el modulate vuelve a
+## `rest_modulate`. La rotación no pelea con el layout de un contenedor como
+## lo haría la posición. El tween queda en la metadata `meta_key`: repetirlo
+## lo reinicia en vez de apilar tweens.
+static func reject(control: Control, swings: Array[float] = REJECT_SWINGS,
+		swing_times: Array[float] = REJECT_SWING_TIMES,
+		rest_modulate: Color = Color.WHITE,
+		meta_key: StringName = &"ui_reject_tween") -> void:
+	control.pivot_offset = control.size * 0.5
+	kill_meta_tween(control, meta_key)
+	var tween := control.create_tween()
+	tween.set_ignore_time_scale(true)
+	tween.tween_property(control, "modulate", REJECT_FLASH, REJECT_FLASH_TIME)
+	for i in swings.size():
+		if i == 0:
+			tween.parallel().tween_property(control, "rotation_degrees",
+					swings[i], swing_times[i])
+		else:
+			tween.tween_property(control, "rotation_degrees", swings[i], swing_times[i])
+	tween.parallel().tween_property(control, "modulate", rest_modulate,
+			REJECT_RESTORE_TIME)
+	control.set_meta(meta_key, tween)
+
+
+## Mata el tween guardado en la metadata del nodo con esa llave (el patrón que
+## mantiene idempotente cada animación al abrir y cerrar rápido).
 static func kill_meta_tween(node: Node, key: StringName) -> void:
 	if not node.has_meta(key):
 		return
@@ -215,17 +359,16 @@ static func kill_meta_tween(node: Node, key: StringName) -> void:
 		(old as Tween).kill()
 
 
-# --- typography ------------------------------------------------------------
+# --- tipografía --------------------------------------------------------------
 
-## One shared FontVariation per spacing value. They are immutable once
-## built, so sharing is safe — and it matters: a fresh FontVariation per
-## call (3 per card deal, 5 per HUD restyle) invalidates the TextServer
-## shaping cache every time.
+## Un FontVariation compartido por valor de espaciado. Son inmutables una vez
+## armados, así que compartirlos es seguro; uno nuevo por llamada invalidaría
+## la caché de shaping del TextServer cada vez.
 static var _spaced_fonts: Dictionary[int, FontVariation] = {}
 
 
-## Default font with extra per-glyph spacing: the "small caps label" /
-## big title treatment without shipping a font asset.
+## Fuente por defecto con espacio extra entre letras: el tratamiento de
+## títulos y etiquetas espaciadas sin cargar una fuente.
 static func spaced_font(spacing: int) -> FontVariation:
 	if not _spaced_fonts.has(spacing):
 		var font := FontVariation.new()
@@ -235,7 +378,7 @@ static func spaced_font(spacing: int) -> FontVariation:
 	return _spaced_fonts[spacing]
 
 
-## Headline treatment: letter-spaced, outlined, colored.
+## Tratamiento de titular: letras espaciadas, contorno oscuro y color.
 static func style_title(label: Label, font_size: int, color: Color,
 		spacing: int = 6, outline: int = 10) -> void:
 	label.add_theme_font_override("font", spaced_font(spacing))
@@ -245,27 +388,27 @@ static func style_title(label: Label, font_size: int, color: Color,
 	label.add_theme_constant_override("outline_size", outline)
 
 
-## Small badge/pill treatment for HUD chips and ribbons.
+## Chapa o píldora pequeña para chips del HUD y cintas.
 static func style_badge(label: Label, text_color: Color,
-		bg: Color = PANEL_BG, border: Color = Color(0, 0, 0, 0.5)) -> void:
+		bg: Color = PANEL_BG, border: Color = BADGE_BORDER) -> void:
 	var box := flat(bg, RADIUS_SMALL)
-	box.set_border_width_all(1)
+	box.set_border_width_all(BADGE_BORDER_WIDTH)
 	box.border_color = border
-	box.content_margin_left = 12.0
-	box.content_margin_right = 12.0
-	box.content_margin_top = 3.0
-	box.content_margin_bottom = 3.0
+	box.content_margin_left = BADGE_MARGIN.x
+	box.content_margin_right = BADGE_MARGIN.x
+	box.content_margin_top = BADGE_MARGIN.y
+	box.content_margin_bottom = BADGE_MARGIN.y
 	label.add_theme_stylebox_override("normal", box)
 	label.add_theme_color_override("font_color", text_color)
 
 
-# --- widgets ---------------------------------------------------------------
+# --- widgets ------------------------------------------------------------------
 
-## Round slider grabber built from a radial gradient (no texture assets).
+## Agarrador redondo de slider hecho con un degradado radial (sin texturas).
 static func grabber_icon(color: Color, diameter: int = 18) -> GradientTexture2D:
 	var gradient := Gradient.new()
 	gradient.colors = PackedColorArray([color, color, Color(color, 0.0)])
-	gradient.offsets = PackedFloat32Array([0.0, 0.78, 0.86])
+	gradient.offsets = PackedFloat32Array([0.0, GRABBER_SOLID, GRABBER_EDGE])
 	var texture := GradientTexture2D.new()
 	texture.gradient = gradient
 	texture.fill = GradientTexture2D.FILL_RADIAL
@@ -276,30 +419,30 @@ static func grabber_icon(color: Color, diameter: int = 18) -> GradientTexture2D:
 	return texture
 
 
-## Pill switch drawn pixel by pixel (no texture assets), used as the
-## CheckButton on/off icons. `on` slides the knob right and fills the
-## track with the accent; off is a dim track with a gray knob. Edges are
-## antialiased from the signed distance to the capsule and the knob.
+## Interruptor de píldora dibujado píxel a píxel (sin texturas), para los
+## íconos on/off de un CheckButton. `on` corre la perilla a la derecha y llena
+## la pista con el acento; apagado es una pista oscura con perilla gris. Los
+## bordes se suavizan con la distancia con signo a la cápsula y a la perilla.
 static func toggle_icon(on: bool, accent: Color = ACCENT,
 		width: int = 46, height: int = 26) -> ImageTexture:
 	var image := Image.create(width, height, false, Image.FORMAT_RGBA8)
 	var radius := height * 0.5
-	var track := accent.darkened(0.25) if on else Color(0.16, 0.17, 0.23)
-	var rim := accent.lightened(0.2) if on else BORDER_DIM
+	var track := accent.darkened(TOGGLE_TRACK_DARKEN) if on else TOGGLE_TRACK_OFF
+	var rim := accent.lightened(TOGGLE_RIM_LIGHTEN) if on else BORDER_DIM
 	var knob := TEXT_BRIGHT if on else TEXT_FAINT
 	var knob_center := Vector2(width - radius if on else radius, radius)
-	var knob_radius := radius - 4.0
+	var knob_radius := radius - TOGGLE_KNOB_INSET
 	for y in height:
 		for x in width:
 			var p := Vector2(x + 0.5, y + 0.5)
-			# Capsule distance: clamp to the segment between the end caps.
+			# Distancia a la cápsula: se acota al segmento entre los extremos.
 			var cx := clampf(p.x, radius, width - radius)
 			var d_track := p.distance_to(Vector2(cx, radius)) - (radius - 0.5)
 			var a_track := clampf(0.5 - d_track, 0.0, 1.0)
 			if a_track <= 0.0:
 				continue
 			var color := track
-			if d_track > -1.5:
+			if d_track > -TOGGLE_RIM_WIDTH:
 				color = rim
 			var d_knob := p.distance_to(knob_center) - knob_radius
 			color = color.lerp(knob, clampf(0.5 - d_knob, 0.0, 1.0))
@@ -308,10 +451,10 @@ static func toggle_icon(on: bool, accent: Color = ACCENT,
 	return ImageTexture.create_from_image(image)
 
 
-## CheckButton as a pill switch: the drawn on/off icons in every state,
-## no button chrome around them, and an accent ring on focus so keyboard
-## and pad players can see which switch they are on (the same rule as
-## style_card: focus must read as loudly as a hover).
+## CheckButton como interruptor de píldora: los íconos dibujados en cada
+## estado, sin cromo de botón alrededor y un anillo de acento con el foco,
+## para que teclado y control vean en qué interruptor están (misma regla que
+## style_card: el foco se lee tan fuerte como el hover).
 static func style_toggle(check: CheckButton, accent: Color = ACCENT) -> void:
 	var on := toggle_icon(true, accent)
 	var off := toggle_icon(false, accent)
@@ -328,23 +471,23 @@ static func style_toggle(check: CheckButton, accent: Color = ACCENT) -> void:
 	var ring := StyleBoxFlat.new()
 	ring.draw_center = false
 	ring.border_color = accent
-	ring.set_border_width_all(2)
-	ring.set_corner_radius_all(17)
-	ring.set_expand_margin_all(4.0)
-	add_glow(ring, accent, 6, 0.28)
+	ring.set_border_width_all(TOGGLE_RING_WIDTH)
+	ring.set_corner_radius_all(TOGGLE_RING_RADIUS)
+	ring.set_expand_margin_all(TOGGLE_RING_EXPAND)
+	add_glow(ring, accent, TOGGLE_RING_GLOW_SIZE, TOGGLE_RING_GLOW_ALPHA)
 	check.add_theme_stylebox_override("focus", ring)
 	check.focus_mode = Control.FOCUS_ALL
 	check.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 
 
-## Layered bar treatment: dark trough + rounded fill with a top gloss
-## line and a brighter leading-edge tick (right border of the fill).
-## Returns the fill so callers can recolor it live (HP green→red ramp).
+## Barra en capas: canal oscuro y relleno redondeado con una línea de brillo
+## arriba y una marca más clara en el borde de avance (borde derecho del
+## relleno). Devuelve el relleno para recolorearlo en vivo (vida verde→rojo).
 static func style_bar(bar: ProgressBar, fill_color: Color, radius: int = 6,
 		inset: int = 3) -> StyleBoxFlat:
-	var trough := flat(Color(0.04, 0.045, 0.07, 0.85), radius + 1)
-	trough.set_border_width_all(2)
-	trough.border_color = Color(0.0, 0.0, 0.0, 0.6)
+	var trough := flat(BAR_TROUGH, radius + 1)
+	trough.set_border_width_all(BAR_TROUGH_BORDER_WIDTH)
+	trough.border_color = BAR_TROUGH_BORDER
 	trough.set_content_margin_all(inset)
 	bar.add_theme_stylebox_override("background", trough)
 	var fill := bar_fill(fill_color, radius - 1)
@@ -354,13 +497,13 @@ static func style_bar(bar: ProgressBar, fill_color: Color, radius: int = 6,
 
 static func bar_fill(color: Color, radius: int = 5) -> StyleBoxFlat:
 	var fill := flat(color, radius)
-	fill.border_width_top = 2
-	fill.border_width_right = 3
-	fill.border_color = color.lightened(0.35)
+	fill.border_width_top = BAR_SHINE_WIDTH
+	fill.border_width_right = BAR_EDGE_WIDTH
+	fill.border_color = color.lightened(BAR_EDGE_LIGHTEN)
 	return fill
 
 
-## Keep the gloss/tick border in step when a fill is recolored live.
+## Mantiene al día el brillo y la marca cuando un relleno cambia de color.
 static func recolor_fill(fill: StyleBoxFlat, color: Color) -> void:
 	fill.bg_color = color
-	fill.border_color = color.lightened(0.35)
+	fill.border_color = color.lightened(BAR_EDGE_LIGHTEN)

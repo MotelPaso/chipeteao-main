@@ -1,69 +1,80 @@
 class_name PowerUpPickup
 extends Area3D
-## A power-up lying on the ground (iteration 53): a bobbing coloured gem
-## with the row's two-letter glyph over it, collected by walking into it.
-## Dropped by kills, or — for the star only — sent roaming by the
-## WorldDirector's star sighting.
+## Un power-up en el suelo: una gema de color que flota con el glifo de dos
+## letras de su fila encima; se recoge caminando hacia ella. La sueltan las
+## bajas o, solo la estrella, la echa a rondar el avistamiento del
+## WorldDirector.
 ##
-## Stage-scoped: parented through RunRoot.stage_parent, in group
-## `powerup_pickups` so the stage swap can free it and Stage sweep can
-## count it. It is NOT pooled: a handful exist at once, they live seconds,
-## and pooling one would buy nothing but a reset contract to get wrong.
+## De alcance de etapa: su padre es RunRoot.stage_parent y está en el grupo
+## `powerup_pickups`, para que el cambio de etapa la libere y el barrido de
+## etapa la cuente. NO va en pool: hay pocas a la vez y viven segundos.
 ##
-## Lifetime is short by design. The map already carries dozens of markers
-## late in a stage; a pickup that waited forever would add to that pile
-## without ever being walked to.
+## Su vida es corta a propósito: al final de una etapa el mapa ya tiene
+## docenas de marcadores, y uno que esperara para siempre solo sumaría ruido.
+##
+## La forma, el tamaño, la altura, el brillo y la luz se ajustan en
+## PowerUpPickup.tscn (nodos CollisionShape3D, Gem, Glyph y Light); el script
+## solo los tiñe con el color y el glifo de la fila.
 
-## Seconds before an uncollected pickup fades out. The star gets its own,
-## longer one: it is moving, so it needs time to be intercepted.
+@export_group("Vida")
+## Segundos antes de que se desvanezca sin recoger.
 @export var lifetime: float = 45.0
+## Segundos de vida de la estrella: más larga porque se mueve y hay que alcanzarla.
 @export var star_lifetime: float = 60.0
-## Roam speed of the star. Zero for every other row, which just sits.
-@export var roam_speed: float = 6.0
-## Height of the roaming hop and how fast it cycles.
-@export var hop_height: float = 0.9
-@export var hop_hz: float = 1.6
-## Bob of a resting pickup.
-@export var bob_height: float = 0.22
-@export var bob_hz: float = 1.4
-@export var spin_speed: float = 1.8
-## Distance the roamer looks ahead when testing for a wall to bounce off.
-@export var roam_probe: float = 3.0
+## Segundos del desvanecimiento antes de que el nodo se libere.
+@export var fade_time: float = 0.45
 
-## Ring the raider has to step into. Generous: this is a reward, not a
-## precision test, and the raider is usually sprinting past it.
-const PICKUP_RADIUS: float = 1.6
-const GEM_SIZE: float = 0.42
-const GLYPH_FONT_SIZE: int = 48
-const GLYPH_HEIGHT: float = 1.15
-## Seconds of the fade-out before the node frees itself.
-const FADE_TIME: float = 0.45
-## Rainbow cycle of the star's tint, in full turns per second.
-const STAR_HUE_HZ: float = 0.55
+@export_group("Ronda de la estrella")
+## Velocidad de ronda de la estrella, en m/s (las demás filas no se mueven).
+@export var roam_speed: float = 6.0
+## Altura del salto mientras ronda, en metros.
+@export var hop_height: float = 0.9
+## Saltos por segundo mientras ronda, en Hz.
+@export var hop_hz: float = 1.6
+## Distancia, en metros, que mira adelante la estrella buscando un muro en
+## el que rebotar.
+@export var roam_probe: float = 3.0
+## Ciclo arcoíris del tinte de la estrella, en vueltas por segundo.
+@export var star_hue_hz: float = 0.55
+
+@export_group("Flotación y giro")
+## Altura de la flotación en reposo, en metros.
+@export var bob_height: float = 0.22
+## Frecuencia de la flotación en reposo, en Hz.
+@export var bob_hz: float = 1.4
+## Giro de la gema, en radianes por segundo.
+@export var spin_speed: float = 1.8
+@export_group("")
 
 var powerup_id: String = ""
-## True for the star row: it roams, hops and bounces instead of resting.
+## True para la fila de la estrella: ronda, salta y rebota en vez de quedarse.
 var roaming: bool = false
 
 var _row: Dictionary = {}
 var _color: Color = Color.WHITE
-var _gem: MeshInstance3D = null
-var _glyph: Label3D = null
-var _light: OmniLight3D = null
+## Material propio de esta instancia (resource_local_to_scene en la
+## escena): la estrella anima su albedo sin teñir a los demás power-ups.
 var _material: StandardMaterial3D = null
+## Altura de reposo de la gema, la que guarda la escena; la flotación oscila
+## alrededor de ella.
+var _gem_rest_y: float = 0.0
 var _time: float = 0.0
 var _left: float = 0.0
 var _ground_y: float = 0.0
-## False until the drop has been placed and _ground_y is worth reading.
+## False hasta que el drop está colocado y _ground_y vale algo.
 var _ground_captured: bool = false
 var _heading: Vector2 = Vector2.RIGHT
 var _bounces: int = 0
 var _taken: bool = false
 var _bounds: Node = null
 
+@onready var _gem: MeshInstance3D = $Gem
+@onready var _glyph: Label3D = $Glyph
+@onready var _light: OmniLight3D = $Light
 
-## MUST run before the node enters the tree: everything below is built
-## from the row.
+
+## DEBE correr antes de que el nodo entre al árbol: todo lo de abajo se
+## arma con la fila.
 func setup(id: String) -> void:
 	powerup_id = id
 	_row = PowerUpCatalog.by_id(id)
@@ -81,27 +92,18 @@ func _ready() -> void:
 		return
 	_color = _row.get("color", Color.WHITE)
 	_left = star_lifetime if roaming else lifetime
-	# NOT captured here: every spawn path sets the position AFTER
-	# add_child, so at _ready this read the PARENT's origin instead of the
-	# drop point. Taken on the first physics frame instead, when the drop
-	# has been placed. It is only the fallback for a scene with no
-	# Terrain, but a fallback that is wrong is worse than one that is
-	# missing — a star in such a scene hopped around y = 0.
+	# NO se captura aquí: todo camino de spawn fija la posición DESPUÉS de
+	# add_child, así que en _ready se leería el origen del PADRE. Se toma en
+	# el primer frame de física, con el drop ya colocado (solo es el
+	# respaldo para una escena sin Terrain).
 	_ground_captured = false
-	# The layers and `monitorable` are set in PowerUpPickup.tscn, NOT here:
-	# a drop is spawned from EnemyBase._on_died, which itself runs inside a
-	# Health.died emitted from take_damage — often mid-dispatch of some
-	# Area3D's body_entered. Godot refuses a direct write to those while a
-	# signal is in flight, and the scene has already applied them by the
-	# time _ready runs. (Collides with nothing, detects only the player
-	# layer: a pickup must never push a raider or block a shot.)
-	var shape := CollisionShape3D.new()
-	var sphere := SphereShape3D.new()
-	sphere.radius = PICKUP_RADIUS
-	shape.shape = sphere
-	shape.position.y = 0.6
-	add_child(shape)
-	_build_visual()
+	# Las capas y `monitorable` están en PowerUpPickup.tscn, NO aquí: un drop
+	# nace dentro de EnemyBase._on_died, que corre dentro de un Health.died
+	# emitido por take_damage — a menudo en medio del body_entered de alguna
+	# Area3D. Godot rechaza escribirlas mientras hay una señal en vuelo, y la
+	# escena ya las aplicó cuando corre _ready. (No choca con nada y solo
+	# detecta la capa del jugador: nunca empuja a un raider ni frena un tiro.)
+	_tint_visual()
 	_heading = Vector2(randf() * 2.0 - 1.0, randf() * 2.0 - 1.0).normalized()
 	if _heading.length_squared() < 0.01:
 		_heading = Vector2.RIGHT
@@ -109,39 +111,15 @@ func _ready() -> void:
 	body_entered.connect(_on_body_entered)
 
 
-func _build_visual() -> void:
-	_gem = MeshInstance3D.new()
-	var mesh := SphereMesh.new()
-	mesh.radius = GEM_SIZE
-	mesh.height = GEM_SIZE * 2.4
-	mesh.radial_segments = 6
-	mesh.rings = 3
-	_gem.mesh = mesh
-	# Per-instance material: the star animates its albedo, and a shared
-	# resource would tint every other pickup on the map with it.
-	_material = StandardMaterial3D.new()
+## Pinta la gema, el glifo y la luz con la fila; todo lo demás viene de la
+## escena.
+func _tint_visual() -> void:
+	_gem_rest_y = _gem.position.y
+	_material = _gem.material_override as StandardMaterial3D
 	_material.albedo_color = _color
-	_material.emission_enabled = true
 	_material.emission = _color
-	_material.emission_energy_multiplier = 2.2
-	_gem.material_override = _material
-	_gem.position.y = 0.75
-	add_child(_gem)
-	_glyph = Label3D.new()
 	_glyph.text = String(_row.get("glyph", "?"))
-	_glyph.billboard = BaseMaterial3D.BILLBOARD_ENABLED
-	_glyph.no_depth_test = true
-	_glyph.font_size = GLYPH_FONT_SIZE
-	_glyph.outline_size = 12
-	_glyph.modulate = Color(1.0, 1.0, 1.0)
-	_glyph.position.y = GLYPH_HEIGHT
-	add_child(_glyph)
-	_light = OmniLight3D.new()
 	_light.light_color = _color
-	_light.light_energy = 1.6
-	_light.omni_range = 5.0
-	_light.position.y = 0.8
-	add_child(_light)
 
 
 func _physics_process(delta: float) -> void:
@@ -153,25 +131,23 @@ func _physics_process(delta: float) -> void:
 	if _left <= 0.0:
 		_expire()
 		return
-	if _gem != null:
-		_gem.rotate_y(spin_speed * delta)
+	_gem.rotate_y(spin_speed * delta)
 	if roaming:
 		_tick_roam(delta)
 		_tick_star_tint()
-	elif _gem != null:
-		_gem.position.y = 0.75 + sin(_time * TAU * bob_hz) * bob_height
+	else:
+		_gem.position.y = _gem_rest_y + sin(_time * TAU * bob_hz) * bob_height
 
 
-## The star crosses the map instead of waiting to be found. It bounces off
-## anything the arena mask calls unwalkable and off the arena edge, which
-## is the same test every other spawn uses — so it can never end up inside
-## the rocks it is supposed to be skirting.
+## La estrella cruza el mapa en vez de esperar. Rebota en todo lo que la
+## máscara de la arena marca como no caminable y en el borde — la misma
+## prueba que usa todo spawn —, así nunca termina dentro de las rocas.
 func _tick_roam(delta: float) -> void:
 	var step := roam_speed * delta
 	var here := Vector2(global_position.x, global_position.z)
 	var ahead := here + _heading * maxf(roam_probe, step)
 	if not _walkable(ahead):
-		# Reflect off whichever axis is blocked; if both are, turn around.
+		# Refleja en el eje bloqueado; si lo están los dos, da media vuelta.
 		var flip_x := not _walkable(Vector2(ahead.x, here.y))
 		var flip_z := not _walkable(Vector2(here.x, ahead.y))
 		if not flip_x and not flip_z:
@@ -193,13 +169,10 @@ func _tick_roam(delta: float) -> void:
 
 
 func _tick_star_tint() -> void:
-	if _material == null:
-		return
-	var tint := Color.from_hsv(fmod(_time * STAR_HUE_HZ, 1.0), 0.75, 1.0)
+	var tint := Color.from_hsv(fmod(_time * star_hue_hz, 1.0), 0.75, 1.0)
 	_material.albedo_color = tint
 	_material.emission = tint
-	if _light != null:
-		_light.light_color = tint
+	_light.light_color = tint
 
 
 func _walkable(xz: Vector2) -> bool:
@@ -208,8 +181,8 @@ func _walkable(xz: Vector2) -> bool:
 	return bool(_bounds.call("is_walkable", xz))
 
 
-## Ground level under the drop, captured once the spawn has been placed.
-## Only read when there is no Terrain to ask.
+## Altura del suelo bajo el drop, tomada con el spawn ya colocado. Solo se
+## lee cuando no hay Terrain a quien preguntar.
 func _capture_ground() -> void:
 	if _ground_captured:
 		return
@@ -237,7 +210,8 @@ func _on_body_entered(body: Node3D) -> void:
 	_vanish()
 
 
-## Timed out: same fade, and the star reports the trip it made.
+## Se acabó el tiempo: el mismo desvanecimiento, y la estrella informa su
+## recorrido.
 func _expire() -> void:
 	_taken = true
 	if roaming:
@@ -247,23 +221,23 @@ func _expire() -> void:
 
 func _vanish() -> void:
 	set_physics_process(false)
-	# DEFERRED: _vanish runs from inside body_entered, and Godot refuses a
-	# direct write to monitoring while the area is dispatching that signal.
+	# DIFERIDO: _vanish corre dentro de body_entered, y Godot rechaza
+	# escribir monitoring mientras el área despacha esa señal.
 	set_deferred("monitoring", false)
 	remove_from_group(&"map_markers")
 	var tween := create_tween()
-	tween.tween_property(self, "scale", Vector3.ONE * 0.05, FADE_TIME) \
+	tween.tween_property(self, "scale", Vector3.ONE * 0.05, fade_time) \
 			.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_IN)
 	tween.tween_callback(queue_free)
 
 
-## Map marker contract (group "map_markers"): power-ups are worth walking
-## to, so they show — but only where the fog has been lifted, like every
-## other found thing.
+## Contrato de marcador de mapa (grupo "map_markers"): vale la pena
+## caminar hasta un power-up, así que se muestra — solo donde se levantó la
+## niebla, como todo lo encontrado.
 func map_marker_kind() -> StringName:
 	return &"powerup"
 
 
-## Its own colour on the map, so a star reads differently from a drop.
+## Su propio color en el mapa, para que la estrella se distinga de un drop.
 func map_marker_color() -> Color:
 	return _color

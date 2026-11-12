@@ -1,24 +1,14 @@
 class_name LuckyBlock
 extends Interactable
-## A block that looks like a chest and is not one (iteration 56): free,
-## rare, and it always pays SOMETHING. There is no price and no rarity
-## roll — the whole item is the surprise, which is why every outcome is
-## good and they differ in kind rather than in size.
+## Bloque de la suerte: parece un cofre y no lo es. Gratis, raro, y siempre
+## paga ALGO. No hay precio ni rareza: el premio entero es la sorpresa, por
+## eso todos los premios son buenos y cambian de tipo, no de tamaño.
 ##
-## Rewards are a weighted table, one branch each. A tenth reward is a row
-## plus a branch, never a special case somewhere else.
+## Los premios son una tabla con pesos y una rama por premio: uno nuevo es
+## una fila más una rama, nunca un caso especial en otro sitio.
 
-@export var sink_time: float = 0.55
-@export var block_color: Color = Color(1.0, 0.85, 0.2)
-## enemy_explosion reach, and what a boss loses instead of dying.
-@export var explosion_radius: float = 12.0
-@export var boss_hp_fraction: float = 0.15
-@export var gem_count: int = 25
-@export var gem_spread: float = 6.0
-@export var points_reward: int = 80
-
-## The table. Weights are relative; the well is the rarest because it is
-## the only one that asks the player a question.
+## La tabla. Los pesos son relativos; el pozo es el más raro porque es el
+## único que le hace una pregunta al jugador.
 const LUCKY_REWARDS: Array[Dictionary] = [
 	{"id": "enemy_explosion", "weight": 1.0},
 	{"id": "gem_rain", "weight": 1.0},
@@ -28,99 +18,94 @@ const LUCKY_REWARDS: Array[Dictionary] = [
 	{"id": "well", "weight": 0.7},
 ]
 
-const CHEST_SCENE: PackedScene = preload("res://scenes/world/chests/Chest.tscn")
-## Chance the well pays a power-up instead of the better item.
-const WELL_POWERUP_CHANCE: float = 0.3
-## Items the well offers at once, plus the "keep everything" card. TWO,
-## not three: the card UI has exactly three slots and drops the surplus
-## without a word, so three items plus the refusal made four options and
-## the refusal was the one that fell off — a raider carrying three items
-## was forced to give one away, in the one reward whose whole point is
-## that it asks a question you may answer with no.
+## Objetos que ofrece el pozo, más la carta de "quedarse con todo". DOS, no
+## tres: la UI de cartas tiene tres huecos y descarta el sobrante sin avisar,
+## y el que caería sería justo la opción de rechazar.
 const WELL_OFFERS: int = 2
-const WELL_TITLE: String = "El pozo pide una ofrenda"
-const WELL_NOTHING: String = "Nada"
-const WELL_NOTHING_LINE: String = "Te quedas con todo"
-const WELL_GIVE_LINE: String = "Lo cambias por algo mejor"
 
-## Harness override (ArenaProbe, BONK_LUCKY_REWARD): reward ids the next
-## blocks pay instead of rolling. STATIC, because the roll is static and
-## because the queue has to survive between blocks — a soak with six
-## blocks in BONK_POI_NOW is how all six branches get executed in one run,
-## and left to the weighted table that takes hundreds of blocks. The last
-## entry repeats, so one id holds for every block. Empty in every real
-## game: nothing but the probe ever writes it.
+@export_group("Bloque")
+## Color del bloque: tiñe su material (Visual/Block), su luz (Visual/Glow) y las chispas de la explosión.
+@export var block_color: Color = Color(1.0, 0.85, 0.2)
+## Velocidad del vaivén del bloque, en radianes por segundo.
+@export var bob_speed: float = 2.0
+## Altura del vaivén del bloque, en metros.
+@export var bob_height: float = 0.06
+## Giro del bloque, en radianes por segundo.
+@export var spin_speed: float = 0.9
+@export_group("Premios")
+## Alcance de enemy_explosion, en metros.
+@export var explosion_radius: float = 12.0
+## Fracción de la vida máxima (0-1) que pierde un jefe en enemy_explosion, en vez de morir.
+@export var boss_hp_fraction: float = 0.15
+## Cantidad de chispas (con block_color) sobre cada enemigo que alcanza enemy_explosion.
+@export var explosion_burst_count: int = 10
+## Sacudida de cámara de enemy_explosion, en trauma (0-1).
+@export var explosion_shake: float = 0.3
+## Gemas de XP que suelta gem_rain.
+@export var gem_count: int = 25
+## Distancia mínima a la que caen las gemas de gem_rain, en metros.
+@export var gem_min_spread: float = 1.0
+## Distancia máxima a la que caen las gemas de gem_rain, en metros.
+@export var gem_spread: float = 6.0
+## Puntos de partida que da el premio points.
+@export var points_reward: int = 80
+## Dónde cae el cofre de free_chest respecto del bloque, en metros.
+@export var free_chest_offset: Vector3 = Vector3(1.6, 0.0, 0.0)
+## Probabilidad (0-1) de que el pozo pague un power-up en vez del objeto mejor.
+@export_range(0.0, 1.0) var well_powerup_chance: float = 0.3
+@export_group("Textos del pozo")
+## Título de la elección del pozo.
+@export var well_title: String = "El pozo pide una ofrenda"
+## Descripción de cada carta de objeto que se puede entregar.
+@export var well_give_line: String = "Lo cambias por algo mejor"
+## Título de la carta de rechazo.
+@export var well_keep_title: String = "Nada"
+## Descripción de la carta de rechazo.
+@export var well_keep_line: String = "Te quedas con todo"
+
+## Cola del harness (ArenaProbe, BONK_LUCKY_REWARD): ids de premio que pagan
+## los próximos bloques en vez de tirar. ESTÁTICA porque la tirada es
+## estática y la cola tiene que sobrevivir entre bloques. La última entrada
+## se repite. Vacía en una partida real: solo el harness la escribe.
 static var _forced_rewards: Array[String] = []
 
 var _spent: bool = false
 var _time: float = 0.0
-var _body: MeshInstance3D = null
+## Altura de reposo del bloque, la de la escena.
+var _block_rest_y: float = 0.0
 
-
-func _init() -> void:
-	prompt_text = "[E] Abrir bloque de la suerte"
-	marker_kind = &"lucky_block"
-	prompt_height = 2.4
-	# No meta counter: this is not a chest, and the quests that count
-	# chests must not count these.
-	meta_stat_id = ""
-	collision_layer = 0
-	collision_mask = 1
+## El material del bloque es local a la escena: cada bloque tiene el suyo.
+@onready var _block: MeshInstance3D = $Visual/Block
+@onready var _glow: OmniLight3D = $Visual/Glow
 
 
 func _ready() -> void:
-	# Detection ring BEFORE super(), which wires body_entered on this Area3D.
-	var shape := CollisionShape3D.new()
-	var cylinder := CylinderShape3D.new()
-	cylinder.radius = 1.9
-	cylinder.height = 2.6
-	shape.shape = cylinder
-	shape.position.y = 1.3
-	add_child(shape)
 	super()
 	add_to_group(&"lucky_blocks")
-	_build_visual()
-
-
-func _build_visual() -> void:
-	_body = MeshInstance3D.new()
-	var cube := BoxMesh.new()
-	cube.size = Vector3(0.9, 0.9, 0.9)
-	_body.mesh = cube
-	# Per-instance material: the bob writes emission energy, and a shared
-	# resource would pulse every other block on the map with it.
-	var gold := StandardMaterial3D.new()
-	gold.albedo_color = block_color
-	gold.metallic = 0.55
-	gold.roughness = 0.35
-	gold.emission_enabled = true
-	gold.emission = block_color
-	gold.emission_energy_multiplier = 0.7
-	_body.material_override = gold
-	_body.position.y = 0.65
-	add_child(_body)
-	var mark := Label3D.new()
-	mark.text = "?"
-	mark.billboard = BaseMaterial3D.BILLBOARD_ENABLED
-	mark.no_depth_test = true
-	mark.font_size = 64
-	mark.outline_size = 14
-	mark.modulate = Color(0.25, 0.18, 0.05)
-	mark.position.y = 0.65
-	add_child(mark)
-	var light := OmniLight3D.new()
-	light.light_color = block_color
-	light.light_energy = 1.6
-	light.omni_range = 6.0
-	light.position.y = 1.0
-	add_child(light)
+	_block_rest_y = _block.position.y
+	_paint()
 
 
 func _physics_process(delta: float) -> void:
 	_time += delta
-	if _body != null and available:
-		_body.position.y = 0.65 + sin(_time * 2.0) * 0.06
-		_body.rotate_y(delta * 0.9)
+	if available:
+		_block.position.y = _block_rest_y + sin(_time * bob_speed) * bob_height
+		_block.rotate_y(delta * spin_speed)
+
+
+## Encola los ids que pagan los próximos bloques (solo el harness). Un id
+## desconocido es push_error y se descarta: un soak que cree probar el pozo
+## mientras la tabla tira puntos daría verde sobre una rama que no corrió.
+static func force_rewards(ids: Array[String]) -> void:
+	var known: Dictionary[String, bool] = {}
+	for row: Dictionary in LUCKY_REWARDS:
+		known[String(row.id)] = true
+	_forced_rewards.clear()
+	for id: String in ids:
+		if known.has(id):
+			_forced_rewards.append(id)
+		else:
+			push_error("LuckyBlock: unknown forced reward '%s'" % id)
 
 
 func _interact(player: Node) -> void:
@@ -142,9 +127,8 @@ func _interact(player: Node) -> void:
 		"powerup":
 			_reward_powerup(player)
 		"well":
-			# The ONE reward that asks a question. It logs its own line
-			# once it resolves, and it always resolves — including when the
-			# raider carries nothing.
+			# El ÚNICO premio que pregunta. Imprime su propia línea al
+			# resolverse, y siempre se resuelve (también sin objetos).
 			_reward_well(player)
 			_finish()
 			return
@@ -152,31 +136,24 @@ func _interact(player: Node) -> void:
 	_finish()
 
 
+## Pinta el material del bloque y su luz con block_color.
+func _paint() -> void:
+	var material := _block.material_override as StandardMaterial3D
+	if material != null:
+		material.albedo_color = block_color
+		material.emission = block_color
+	_glow.light_color = block_color
+
+
 func _finish() -> void:
 	Juice.sparkle(global_position + Vector3.UP * 1.0)
 	_emit_completed()
-	_sink()
-
-
-## Queues the reward ids the next blocks pay (harness only). An unknown
-## id is a push_error and is dropped: a soak that believed it was testing
-## the well while the table rolled points reports a green run about a
-## branch it never ran.
-static func force_rewards(ids: Array[String]) -> void:
-	var known: Dictionary[String, bool] = {}
-	for row: Dictionary in LUCKY_REWARDS:
-		known[String(row.id)] = true
-	_forced_rewards.clear()
-	for id: String in ids:
-		if known.has(id):
-			_forced_rewards.append(id)
-		else:
-			push_error("LuckyBlock: unknown forced reward '%s'" % id)
+	sink_away()
 
 
 static func _roll_reward() -> String:
-	# The harness queue, when one is loaded: consumed front to back, and
-	# the last entry stays so a one-id queue holds for every block.
+	# La cola del harness, si hay: se consume de adelante hacia atrás y la
+	# última entrada se queda.
 	if not _forced_rewards.is_empty():
 		var forced := _forced_rewards[0]
 		if _forced_rewards.size() > 1:
@@ -193,8 +170,8 @@ static func _roll_reward() -> String:
 	return String(LUCKY_REWARDS[0].id)
 
 
-## Everything nearby dies. Bosses are the exception: killing one outright
-## would turn a free block into the answer to the fight it is standing in.
+## Muere todo lo cercano. Los jefes no: matarlos de golpe convertiría un
+## bloque gratis en la respuesta a su pelea.
 func _reward_explosion() -> void:
 	var radius_sq := explosion_radius * explosion_radius
 	for node: Node in get_tree().get_nodes_in_group("enemies"):
@@ -206,12 +183,12 @@ func _reward_explosion() -> void:
 		var health := Health.find_in(body)
 		if health == null or health.is_dead:
 			continue
-		Juice.burst(body.global_position + Vector3.UP * 0.6, block_color, 10)
+		Juice.burst(body.global_position + Vector3.UP * 0.6, block_color, explosion_burst_count)
 		if body.is_in_group("boss"):
 			health.take_damage(health.max_hp * boss_hp_fraction)
 		else:
 			health.take_damage(health.current_hp + health.armor)
-	Juice.shake(0.3)
+	Juice.shake(explosion_shake)
 
 
 func _reward_gems() -> void:
@@ -220,7 +197,7 @@ func _reward_gems() -> void:
 		if gem == null:
 			return
 		var angle := randf() * TAU
-		var distance := randf_range(1.0, gem_spread)
+		var distance := randf_range(gem_min_spread, gem_spread)
 		gem.global_position = global_position \
 				+ Vector3(cos(angle), 0.0, sin(angle)) * distance + Vector3.UP * 0.6
 
@@ -230,34 +207,21 @@ func _reward_points(player: Node) -> void:
 		player.call("add_points", points_reward)
 
 
-## A free chest beside the block. EnemyBase.spawn_chest is an INSTANCE
-## method on an enemy, so these eight lines are copied rather than reached
-## for; extracting a shared helper would mean touching the death path for
-## one caller that is not a death.
+## Un cofre gratis junto al bloque.
 func _reward_chest() -> void:
-	var chest := CHEST_SCENE.instantiate() as Chest
-	if chest == null:
-		return
-	chest.free_open = true
-	var parent := RunRoot.stage_parent(get_tree())
-	if parent == null:
-		return
-	parent.add_child(chest)
-	chest.global_position = global_position + Vector3(1.6, 0.0, 0.0)
+	Chest.spawn_free(get_tree(), global_position + free_chest_offset)
 
 
 func _reward_powerup(player: Node) -> void:
 	var powerups := PowerUps.find_in(player)
 	if powerups != null:
-		# Never the star: that one is found roaming the map, which is the
-		# only thing that makes it rare.
+		# Nunca la estrella: esa se encuentra rondando el mapa.
 		powerups.apply(PowerUpCatalog.roll_id(true))
 
 
-## The well: give one item, get a better one. With nothing to give it pays
-## a power-up outright rather than opening a menu with one dead card —
-## open_choice returns early on an empty list, and a block that silently
-## did nothing would read as broken.
+## El pozo: das un objeto y recibes uno mejor. Sin nada que dar paga un
+## power-up directo en vez de abrir un menú con una sola carta muerta
+## (open_choice no hace nada con una lista vacía y el bloque se leería roto).
 func _reward_well(player: Node) -> void:
 	var bag := ItemBag.find_in(player)
 	var carried: Array[String] = bag.carried_ids() if bag != null else []
@@ -271,19 +235,18 @@ func _reward_well(player: Node) -> void:
 		var row := ItemCatalog.by_id(carried[i])
 		options.append({
 			"title": String(row.get("display_name", carried[i])),
-			"description": WELL_GIVE_LINE,
+			"description": well_give_line,
 			"color": ItemCatalog.rarity_color(String(row.get("rarity", "Common"))),
 			"item_id": carried[i],
 		})
-	# The refusal is always on the shelf, so one carried item still makes a
-	# real two-option choice.
+	# El rechazo siempre está, así que con un solo objeto hay elección real.
 	options.append({
-		"title": WELL_NOTHING,
-		"description": WELL_NOTHING_LINE,
+		"title": well_keep_title,
+		"description": well_keep_line,
 		"color": UiTheme.TEXT_DIM,
 		"item_id": "",
 	})
-	get_tree().call_group("upgrade_ui", "open_choice", WELL_TITLE, options,
+	get_tree().call_group("upgrade_ui", "open_choice", well_title, options,
 			player, _on_well_pick.bind(player), "lucky_well")
 
 
@@ -296,7 +259,7 @@ func _on_well_pick(option: Dictionary, player: Node) -> void:
 	if bag == null or not bag.remove_item(given):
 		print("Lucky block: well (nada)")
 		return
-	if randf() < WELL_POWERUP_CHANCE:
+	if randf() < well_powerup_chance:
 		_reward_powerup(player)
 		print("Lucky block: well (%s -> power-up)" % given)
 		return
@@ -309,17 +272,9 @@ func _on_well_pick(option: Dictionary, player: Node) -> void:
 	print("Lucky block: well (%s -> %s)" % [given, paid])
 
 
-## One item of the tier above `rarity_name`; Legendary has no tier above,
-## so it trades for another Legendary rather than for nothing.
+## Un objeto de la rareza siguiente a `rarity_name`; Legendario no tiene
+## siguiente, así que se cambia por otro Legendario.
 static func _next_rarity_item(rarity_name: String) -> String:
 	var index := UpgradePool.rarity_index(rarity_name)
 	var better := mini(index + 1, UpgradePool.RARITIES.size() - 1)
 	return ItemCatalog.roll_id(String(UpgradePool.RARITIES[better].name))
-
-
-func _sink() -> void:
-	set_physics_process(false)
-	var tween := create_tween()
-	tween.tween_property(self, "scale", Vector3.ONE * 0.05, sink_time) \
-			.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_IN)
-	tween.tween_callback(queue_free)

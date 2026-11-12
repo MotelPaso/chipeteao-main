@@ -1,30 +1,32 @@
 class_name Tome
 extends RefCounted
-## Static catalog of Tomes (GDD 3): stackable passive items whose stat
-## effects feed the player's PlayerStats layer. Data-driven like
-## UpgradePool.WEAPON_LIBRARY — adding a tome is one new row here.
-## Row fields:
-##   id/display_name: identity; the card title appends a stack numeral
-##             ("Tomo de Furia II") when offering the next stack. Stacks
-##             are UNCAPPED since iteration 46 (the 5-DISTINCT-tome cap
-##             stays); see stack_label(). `id` is an
-##             identifier and stays in English; display_name is player text.
-##   glyph:    2-letter tile the HUD loadout strip draws while there is no
-##             sprite. DECLARED, never derived from display_name: every row
-##             shares the "Tomo de " prefix and the rest collapses too
-##             (Persistencia/Peligro would both give "PE"). Unique across
-##             this library, WEAPON_LIBRARY, EVOLUTION_LIBRARY and
-##             ITEM_LIBRARY — the strip mixes all four.
-##   description: card text; "%d" is filled with the rarity-scaled amount
-##             of the PRIMARY (first) effect.
-##   effects:  list of {stat, amount}. amount is per stack at Common
-##             potency; the rolled rarity's potency scales it on pickup.
-##             stat names map onto PlayerStats (see _apply_effect there).
+## Catálogo estático de Tomos: objetos pasivos acumulables cuyos efectos de
+## stats alimentan la capa PlayerStats del jugador. Un tomo nuevo es una fila
+## aquí, igual que un arma en WeaponCatalog.WEAPON_LIBRARY.
+##
+## Edita aquí: una fila por tomo.
+## Se puede cambiar sin romper nada:
+##   display_name: texto para el jugador; el título de la carta le suma el
+##             numeral de la copia siguiente («Tomo de Furia II»). Las
+##             copias no tienen techo (sí lo tiene la cantidad de tomos
+##             DISTINTOS); ver stack_label().
+##   glyph:    2 letras de la casilla del HUD mientras no hay sprite. Se
+##             DECLARA, no sale de display_name: todos empiezan con
+##             «Tomo de» y el resto choca (Persistencia/Peligro darían «PE»).
+##             No debe repetirse entre armas, evoluciones, tomos, objetos,
+##             power-ups ni mascotas (el lint glyphs_unique lo revisa).
+##   description: texto de la carta; el "%d" se llena con el amount del
+##             PRIMER efecto, escalado por la rareza.
+##   effects:  lista de {stat, amount}. amount es por copia a potencia
+##             Común; la potencia de la rareza sacada lo escala al tomarlo.
+## Llave interna (la lee el código; cambiarla rompe algo):
+##   id:       identificador en inglés, nunca se muestra.
+##   effects[].stat: nombres de stat de PlayerStats (ver su _apply_effect).
 
-## Roman-numeral table for stack_label(). Tomes stack WITHOUT a ceiling
-## since iteration 46, so the numeral is built from these pairs instead of
-## being indexed out of a fixed five-entry list; it stays a numeral rather
-## than borrowing "Nv %d", which GLOSARIO rule 6 reserves for the run level.
+## Tabla de numerales romanos para stack_label(). Las copias no tienen techo,
+## así que el numeral se arma con estos pares en vez de salir de una lista
+## fija; se usa numeral y no «Nv %d», que el GLOSARIO (regla 6) reserva para
+## el nivel de la partida.
 const ROMAN_VALUES: Array[int] = [1000, 900, 500, 400, 100, 90, 50, 40, 10, 9, 5, 4, 1]
 const ROMAN_SYMBOLS: Array[String] = [
 	"M", "CM", "D", "CD", "C", "XC", "L", "XL", "X", "IX", "V", "IV", "I"]
@@ -75,8 +77,7 @@ const TOME_LIBRARY: Array[Dictionary] = [
 		"description": "Evasión: %d%% de probabilidad de esquivar golpes",
 		"effects": [{"stat": "evasion", "amount": 4.0}],
 	},
-	# Iteration 39: the new stat layer (luck, projectiles, durations, XP,
-	# gambling, difficulty).
+	# Capa de stats de suerte, proyectiles, duración, XP, azar y dificultad.
 	{
 		"id": "tome_fortune", "display_name": "Tomo de Fortuna", "glyph": "FO",
 		"description": "Suerte +%d (mejores rarezas de cartas y objetos)",
@@ -98,27 +99,26 @@ const TOME_LIBRARY: Array[Dictionary] = [
 		"effects": [{"stat": "xp_gain", "amount": 10.0}],
 	},
 	{
-		# Gambling: each stack rolls random stat boons — more of them, and
-		# bigger, at higher rarity (PlayerStats.add_tome handles the roll).
+		# Azar: cada copia saca boons de stats al azar — más y más grandes a
+		# mayor rareza (la tirada la hace PlayerStats.add_tome).
 		"id": "tome_chance", "display_name": "Tomo del Azar", "glyph": "AZ",
 		"description": "Apuesta: %d bonificación(es) de stat al azar, mayores a más rareza",
 		"effects": [{"stat": "gambling", "amount": 1.0}],
 		"gamble": true,
 	},
 	{
-		# Difficulty is RUN-WIDE (shared in co-op): enemies get tougher and
-		# pay more XP; PlayerStats forwards the total to RunState.
+		# La dificultad es DE LA PARTIDA (compartida en co-op): enemigos más
+		# duros que pagan más XP; PlayerStats manda el total a RunState.
 		"id": "tome_peril", "display_name": "Tomo del Peligro", "glyph": "PG",
 		"description": "Dificultad +%d%%: enemigos más duros, más XP",
 		"effects": [{"stat": "difficulty", "amount": 10.0}],
 	},
 ]
 
-## Stats a Tomo del Azar boon can land on: {stat, amount, label} at Common
-## potency (the rolled rarity's potency scales it and adds more boons).
-## `label` carries exactly one "%d", filled with the rolled amount: the
-## bet is invisible without it, so the HUD toast (iteration 47) reads what
-## the roll actually paid instead of just "subiste algo".
+## Stats en que puede caer un boon del Tomo del Azar: {stat, amount, label}
+## a potencia Común (la potencia de la rareza lo escala y suma más boons).
+## `label` lleva exactamente un "%d", que se llena con el amount sacado: el
+## aviso del HUD muestra lo que pagó la apuesta.
 const GAMBLE_BOONS: Array[Dictionary] = [
 	{"stat": "damage", "amount": 12.0, "label": "daño +%d%%"},
 	{"stat": "cooldown", "amount": 6.0, "label": "velocidad de ataque +%d%%"},
@@ -135,8 +135,9 @@ const GAMBLE_BOONS: Array[Dictionary] = [
 	{"stat": "duration", "amount": 15.0, "label": "duración de efectos +%d%%"},
 ]
 
-## Lazily built id -> row index (see CatalogIndex): PlayerStats.recompute()
-## resolves one row per carried stack, on every level-up and altar boon.
+## Índice id -> fila, construido al primer uso (ver CatalogIndex):
+## PlayerStats.recompute() resuelve una fila por copia llevada en cada subida
+## de nivel y cada boon de altar.
 static var _by_id: Dictionary[String, Dictionary] = {}
 
 
@@ -146,17 +147,16 @@ static func by_id(tome_id: String) -> Dictionary:
 	return _by_id.get(tome_id, {})
 
 
-## How many boons one Tomo del Azar stack grants at the given rarity
-## potency: Common 1, Rare 2, Epic 3, Legendary 4.
-## THE single source of that count — PlayerStats rolls exactly this many
-## and UpgradePool prints exactly this many, so the card can never promise
-## fewer boons than the tome hands out.
+## Cuántos boons da una copia del Tomo del Azar a la potencia dada: Común 1,
+## Raro 2, Épico 3, Legendario 4. LA única fuente de esa cuenta: PlayerStats
+## saca exactamente esta cantidad y UpgradePool imprime la misma, así la
+## carta nunca promete menos de lo que da.
 static func gamble_boon_count(potency: float) -> int:
 	return 1 + clampi(UpgradePool.potency_rank(potency), 0, 3)
 
 
-## Card title for offering the given stack (1-based): plain name for the
-## first copy, "Nombre II", "Nombre VII", "Nombre XIV"... for later ones.
+## Título de carta para ofrecer la copia dada (desde 1): el nombre solo para
+## la primera, «Nombre II», «Nombre VII», «Nombre XIV»... para las siguientes.
 static func display_title(tome: Dictionary, stack: int) -> String:
 	var title := String(tome.display_name)
 	if stack <= 1:
@@ -164,9 +164,8 @@ static func display_title(tome: Dictionary, stack: int) -> String:
 	return title + " " + stack_label(stack)
 
 
-## THE stack numeral, for the card title and the HUD loadout corner alike
-## (iteration 46 removed the five-stack ceiling, so both had to stop
-## indexing a fixed table). Any stack count from 1 up reads as a numeral.
+## EL numeral de copias, para el título de la carta y la esquina de la
+## casilla del HUD. Cualquier cantidad desde 1 se lee como numeral.
 static func stack_label(stack: int) -> String:
 	var value := maxi(stack, 1)
 	var label := ""
@@ -177,9 +176,9 @@ static func stack_label(stack: int) -> String:
 	return label
 
 
-## Reads a list of rolled boons ({stat, amount, label}) as one line, for
-## the HUD toast: "daño +18%, suerte +12". Rows without a label fall back
-## to their stat id so a new GAMBLE_BOONS row can never print nothing.
+## Lee una lista de boons sacados ({stat, amount, label}) como una línea,
+## para el aviso del HUD: "daño +18%, suerte +12". Las filas sin label usan
+## su id de stat, así una fila nueva de GAMBLE_BOONS nunca imprime vacío.
 static func boon_text(boons: Array[Dictionary]) -> String:
 	var parts: PackedStringArray = PackedStringArray()
 	for boon: Dictionary in boons:

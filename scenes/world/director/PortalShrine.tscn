@@ -1,0 +1,15 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/world/interactables/portal_shrine.gd" id="1_portal"]
+[ext_resource type="PackedScene" path="res://scenes/world/director/PortalVisual.tscn" id="2_visual"]
+
+[node name="PortalShrine" type="Area3D"]
+collision_layer = 0
+collision_mask = 1
+monitorable = false
+script = ExtResource("1_portal")
+prompt_text = "[E] Atravesar"
+prompt_height = 3.0
+marker_kind = &"portal"
+
+[node name="Visual" parent="." instance=ExtResource("2_visual")]

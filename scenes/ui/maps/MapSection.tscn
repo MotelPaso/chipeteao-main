@@ -1,0 +1,32 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scripts/ui/maps/map_section.gd" id="1_section"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_section"]
+bg_color = Color(0.09, 0.1, 0.145, 0.96)
+corner_radius_top_left = 7
+corner_radius_top_right = 7
+corner_radius_bottom_right = 7
+corner_radius_bottom_left = 7
+
+[node name="MapSection" type="PanelContainer" unique_id=2011593384]
+mouse_filter = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_section")
+script = ExtResource("1_section")
+
+[node name="Box" type="VBoxContainer" parent="." unique_id=1559668210]
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/separation = 4
+
+[node name="Title" type="Label" parent="Box" unique_id=105465912]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.3, 0.82, 0.76, 1)
+theme_override_font_sizes/font_size = 15
+
+[node name="Body" type="Label" parent="Box" unique_id=620089133]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.66, 0.69, 0.75, 1)
+theme_override_font_sizes/font_size = 13
+text = "—"
+autowrap_mode = 3

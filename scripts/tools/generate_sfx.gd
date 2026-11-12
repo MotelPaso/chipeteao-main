@@ -1,23 +1,21 @@
 extends SceneTree
-## Offline SFX synthesizer: renders every sound the game ships with as
-## original 16-bit PCM mono 44.1kHz wavs, from scratch, out of basic DSP
-## blocks (oscillators, white noise, one-pole lowpass, envelopes, pitch
-## sweeps). No external audio is ever sampled. Deterministic: every noise
-## layer uses its own fixed seed, so re-running overwrites the files with
-## identical bytes. Run once from the project root whenever a recipe is
-## tweaked:
+## Sintetizador de efectos fuera de línea: genera cada sonido del juego como
+## wav original PCM de 16 bits, mono, 44.1 kHz, desde cero, con bloques de
+## DSP básicos (osciladores, ruido blanco, pasa-bajos de un polo,
+## envolventes, barridos de tono). No se samplea audio externo. Determinista:
+## cada capa de ruido usa su propia semilla fija, así volver a correrlo
+## escribe bytes idénticos. Córrelo desde la raíz del proyecto cada vez que
+## cambies una receta:
 ##
 ##     godot --headless --path . -s res://scripts/tools/generate_sfx.gd
 ##
-## Output: assets/audio/sfx/*.wav (one-shots + the shrine channel loop)
-## and assets/audio/ambient/*.wav (the per-map ambient wind beds).
-## Loopable sounds carry no wav loop metadata — Sfx/AmbientBed force
-## LOOP_FORWARD on their own COPY of the imported streams at runtime.
+## Salida: assets/audio/sfx/*.wav (sonidos de un disparo y los bucles) y
+## assets/audio/ambient/*.wav (los fondos de viento de cada mapa).
+## Los sonidos en bucle no traen metadatos de bucle: Sfx y AmbientBed fuerzan
+## LOOP_FORWARD sobre su propia COPIA del stream importado.
 ##
-## PENDING: the shipped wavs were rendered before the PCM quantization was
-## changed from truncation to rounding (see _save_wav), so one regeneration
-## pass is owed; the difference is at most 1 LSB per sample, which is why
-## it can wait for a moment when nothing else is building the project.
+## Pendiente: los wav del repo no son los que escribe esta versión;
+## regenerarlos cambia como mucho 1 LSB por muestra.
 
 const RATE := 44100.0
 const SFX_DIR := "res://assets/audio/sfx"
@@ -63,10 +61,10 @@ func _init() -> void:
 	quit(0)
 
 
-# --- sound recipes -----------------------------------------------------------
+# --- Recetas de sonido -------------------------------------------------------
 
-## Dull thump for regular weapon hits: plays constantly, so it stays low,
-## short, and mostly lowpassed noise over a small sine drop.
+## Golpe sordo para los golpes normales de arma: suena todo el tiempo, así que
+## es bajo, corto y casi todo ruido filtrado sobre una caída de seno chica.
 func _gen_hit_soft() -> PackedFloat32Array:
 	var out := _tone(0.09, 150.0, 92.0, Wave.SINE)
 	_mix_at(out, _lowpass(_noise(0.09, _rng(11)), 750.0, 220.0), 0.0, 0.8)
@@ -77,7 +75,8 @@ func _gen_hit_soft() -> PackedFloat32Array:
 	return out
 
 
-## Sharper crit snap: fast upward saw sweep with a bright noise transient.
+## Chasquido de crítico más agudo: barrido rápido de sierra hacia arriba con
+## un transitorio de ruido brillante.
 func _gen_hit_crit() -> PackedFloat32Array:
 	var out := _tone(0.14, 620.0, 1500.0, Wave.SAW, 0.6)
 	_mix_at(out, _lowpass(_noise(0.05, _rng(22)), 7000.0, 2500.0), 0.0, 0.5)
@@ -88,7 +87,7 @@ func _gen_hit_crit() -> PackedFloat32Array:
 	return out
 
 
-## Comical descending square blip plus a little dust puff.
+## Blip cuadrado cómico que baja, más un soplo de polvo.
 func _gen_enemy_die() -> PackedFloat32Array:
 	var out := _tone(0.24, 520.0, 150.0, Wave.SQUARE, 1.3)
 	var puff := _lowpass(_noise(0.1, _rng(33)), 2200.0, 600.0)
@@ -101,7 +100,7 @@ func _gen_enemy_die() -> PackedFloat32Array:
 	return out
 
 
-## Tiny bright two-note ascending chirp (E6 -> B6).
+## Gorjeo brillante de dos notas que sube (Mi6 -> Si6).
 func _gen_gem_pickup() -> PackedFloat32Array:
 	var out := _silence(0.13)
 	_mix_at(out, _chime(0.07, 1318.5, 0.03), 0.0, 1.0)
@@ -110,9 +109,9 @@ func _gen_gem_pickup() -> PackedFloat32Array:
 	return out
 
 
-## Health-orb pickup: a warm rolled G4-D5-G5 fifth-plus-octave, lower and
-## rounder than gem_pickup's bright chirp so heals read apart from XP even
-## mid-horde (and a different key than the level_up C arpeggio).
+## Recoger un orbe de curación: un Sol4-Re5-Sol5 arpegiado y cálido, más
+## grave y redondo que el gorjeo de gem_pickup para que la cura se distinga
+## de la XP en plena horda (y en otra tonalidad que el arpegio de level_up).
 func _gen_heal() -> PackedFloat32Array:
 	var out := _silence(0.32)
 	_mix_at(out, _chime(0.18, 392.0, 0.06), 0.0, 0.9)
@@ -122,7 +121,7 @@ func _gen_heal() -> PackedFloat32Array:
 	return out
 
 
-## Rising C5-E5-G5 arpeggio with an octave shimmer on the top note.
+## Arpegio Do5-Mi5-Sol5 que sube, con un brillo de octava en la nota alta.
 func _gen_level_up() -> PackedFloat32Array:
 	var out := _silence(0.5)
 	_mix_at(out, _chime(0.2, 523.25, 0.07), 0.0, 1.0)
@@ -133,7 +132,7 @@ func _gen_level_up() -> PackedFloat32Array:
 	return out
 
 
-## Soft affirmative click-chime: a short noise tick into an A5 ring.
+## Clic-campanita afirmativo y suave: un tic de ruido corto y un La5.
 func _gen_card_pick() -> PackedFloat32Array:
 	var out := _silence(0.16)
 	var click := _lowpass(_noise(0.015, _rng(44)), 4000.0, 2000.0)
@@ -145,7 +144,7 @@ func _gen_card_pick() -> PackedFloat32Array:
 	return out
 
 
-## Low muffled thud with a downward bend for taking a hit.
+## Golpe grave y apagado que baja, para recibir un golpe.
 func _gen_player_hurt() -> PackedFloat32Array:
 	var out := _tone(0.26, 150.0, 68.0, Wave.SINE, 1.2)
 	_mix_at(out, _lowpass(_noise(0.26, _rng(55)), 400.0, 160.0), 0.0, 0.6)
@@ -156,7 +155,7 @@ func _gen_player_hurt() -> PackedFloat32Array:
 	return out
 
 
-## Airy whoosh: noise under an opening lowpass, swelling then falling.
+## Silbido de aire: ruido bajo un pasa-bajos que se abre, crece y cae.
 func _gen_dodge() -> PackedFloat32Array:
 	var out := _lowpass(_noise(0.3, _rng(66)), 500.0, 7500.0)
 	_adsr(out, 0.1, 0.19, 0.0, 0.0)
@@ -165,7 +164,7 @@ func _gen_dodge() -> PackedFloat32Array:
 	return out
 
 
-## Lower, slightly longer whoosh for the slide start.
+## Silbido más grave y algo más largo para el inicio del derrape.
 func _gen_slide() -> PackedFloat32Array:
 	var out := _lowpass(_noise(0.35, _rng(77)), 320.0, 1700.0)
 	_adsr(out, 0.08, 0.24, 0.0, 0.0)
@@ -174,9 +173,9 @@ func _gen_slide() -> PackedFloat32Array:
 	return out
 
 
-## Soft shrine hum, loopable: every partial completes integer cycles over
-## the 1.5s loop (f = k / 1.5) and the tremolo runs exactly 3 cycles, so
-## the wrap point is phase-continuous with no blend needed.
+## Zumbido suave de santuario, en bucle: cada parcial completa ciclos
+## enteros en el bucle de 1.5 s (f = k / 1.5) y el trémolo hace exactamente
+## 3 ciclos, así el empalme es continuo en fase sin mezclar.
 func _gen_shrine_channel() -> PackedFloat32Array:
 	var out := _tone(1.5, 110.0, 110.0, Wave.SINE)
 	_mix_at(out, _tone(1.5, 167.0 / 1.5, 167.0 / 1.5, Wave.SINE), 0.0, 0.55)
@@ -187,7 +186,8 @@ func _gen_shrine_channel() -> PackedFloat32Array:
 	return out
 
 
-## Warm resolved chime: rolled C major (root position) with an octave cap.
+## Campanita cálida y resuelta: Do mayor arpegiado (estado fundamental) con
+## una octava arriba.
 func _gen_shrine_done() -> PackedFloat32Array:
 	var out := _silence(0.7)
 	_mix_at(out, _chime(0.5, 523.25, 0.12), 0.0, 1.0)
@@ -198,8 +198,8 @@ func _gen_shrine_done() -> PackedFloat32Array:
 	return out
 
 
-## Same chord family as shrine_done but first inversion, so the two
-## completion chimes read as siblings without being identical.
+## La misma familia de acorde que shrine_done pero en primera inversión,
+## para que los dos sonidos de completado suenen hermanos sin ser iguales.
 func _gen_chest_open() -> PackedFloat32Array:
 	var out := _silence(0.7)
 	_mix_at(out, _chime(0.5, 659.26, 0.12), 0.0, 1.0)
@@ -210,8 +210,9 @@ func _gen_chest_open() -> PackedFloat32Array:
 	return out
 
 
-## Original monster voice: detuned low saws pitch-bent up then down, a sub
-## sine, breath noise, and a 13Hz amplitude growl, darkened by a lowpass.
+## Voz de monstruo original: sierras graves desafinadas que suben y bajan
+## de tono, un seno sub, ruido de aliento y un gruñido de amplitud a 13 Hz,
+## oscurecido con un pasa-bajos.
 func _gen_boss_roar() -> PackedFloat32Array:
 	var out := _tone3(1.8, 60.0, 95.0, 45.0, Wave.SAW)
 	_mix_at(out, _tone3(1.8, 61.1, 96.7, 45.9, Wave.SAW), 0.0, 0.7)
@@ -224,10 +225,10 @@ func _gen_boss_roar() -> PackedFloat32Array:
 	return out
 
 
-## Sarcognath's voice: the boss_roar recipe family dropped into a hollower
-## stone-resonance register — lower detuned saws bending across different
-## anchors, a square sub for the sarcophagus rattle, breathier noise, and
-## a slower 9Hz growl, so the two bosses read as kin but not clones.
+## Voz del Sarcognato: la familia de boss_roar en un registro de piedra más
+## hueco — sierras más graves con otros puntos de quiebre, un sub cuadrado
+## para el traqueteo del sarcófago, más aliento y un gruñido más lento de
+## 9 Hz, para que los dos jefes suenen parientes y no clones.
 func _gen_boss_roar_2() -> PackedFloat32Array:
 	var out := _tone3(2.0, 48.0, 78.0, 36.0, Wave.SAW)
 	_mix_at(out, _tone3(2.0, 49.0, 79.6, 36.8, Wave.SAW), 0.0, 0.7)
@@ -240,10 +241,10 @@ func _gen_boss_roar_2() -> PackedFloat32Array:
 	return out
 
 
-## Electric beam hum, loopable: every partial completes integer cycles
-## over the 0.6s loop (f = k / 0.6) and the flutter runs exactly 6 cycles,
-## so the wrap point is phase-continuous (same trick as shrine_channel).
-## The lone saw partial supplies the "energized" buzz.
+## Zumbido de rayo eléctrico, en bucle: cada parcial completa ciclos
+## enteros en el bucle de 0.6 s (f = k / 0.6) y el aleteo hace exactamente 6
+## ciclos, así el empalme es continuo en fase (el mismo truco que
+## shrine_channel). La única parcial de sierra pone el zumbido "energizado".
 func _gen_laser_hum() -> PackedFloat32Array:
 	var out := _tone(0.6, 120.0, 120.0, Wave.SINE)
 	_mix_at(out, _tone(0.6, 200.0, 200.0, Wave.SAW), 0.0, 0.22)
@@ -254,8 +255,8 @@ func _gen_laser_hum() -> PackedFloat32Array:
 	return out
 
 
-## Muffled sand-eruption thump: a fast low sine drop under a burst of
-## heavily lowpassed noise (the settling soil-shower tail).
+## Golpe apagado de erupción de arena: una caída rápida de seno grave bajo
+## una ráfaga de ruido muy filtrado (la lluvia de tierra que se asienta).
 func _gen_burrow_pop() -> PackedFloat32Array:
 	var out := _tone(0.32, 130.0, 46.0, Wave.SINE, 0.7)
 	_mix_at(out, _lowpass(_noise(0.28, _rng(144)), 1400.0, 260.0), 0.0, 0.75)
@@ -266,7 +267,7 @@ func _gen_burrow_pop() -> PackedFloat32Array:
 	return out
 
 
-## Big descending boom with a filtered noise tail.
+## Estruendo grande que baja, con una cola de ruido filtrado.
 func _gen_boss_die() -> PackedFloat32Array:
 	var out := _tone(1.5, 170.0, 34.0, Wave.SINE, 0.55)
 	_mix_at(out, _tone(1.5, 90.0, 18.0, Wave.SQUARE, 0.55), 0.0, 0.25)
@@ -278,7 +279,7 @@ func _gen_boss_die() -> PackedFloat32Array:
 	return out
 
 
-## Punchy two-note stinger (G4 -> D5 squares) with a snap transient.
+## Aviso de dos notas con golpe (cuadradas Sol4 -> Re5) y un chasquido.
 func _gen_streak() -> PackedFloat32Array:
 	var out := _silence(0.3)
 	var snap := _lowpass(_noise(0.02, _rng(111)), 5000.0, 3000.0)
@@ -296,10 +297,10 @@ func _gen_streak() -> PackedFloat32Array:
 	return out
 
 
-## Hidden-boss payoff fanfare: a rolled G-major "ta-da" climbing two
-## octaves with a faint glitter cap and a warm root under the top note —
-## deliberately a different key and wider spread than level_up's C
-## arpeggio, so finding a secret reads as its own celebration.
+## Fanfarria del jefe secreto: un "ta-da" en Sol mayor arpegiado que sube
+## dos octavas, con un brillo tenue arriba y una fundamental cálida bajo la
+## nota alta; en otra tonalidad y más abierto que el arpegio de level_up, así
+## encontrar un secreto se celebra distinto.
 func _gen_secret_fanfare() -> PackedFloat32Array:
 	var out := _silence(1.1)
 	_mix_at(out, _chime(0.3, 587.33, 0.1), 0.0, 0.9)
@@ -312,10 +313,10 @@ func _gen_secret_fanfare() -> PackedFloat32Array:
 	return out
 
 
-## Very quiet forest-wind bed, 4s loopable. Rendered 0.35s long, then the
-## surplus tail is crossfaded into the head (_loop_blend) to hide the
-## lowpass filter state mismatch at the wrap. Both LFOs complete integer
-## cycles over the 4s loop, so their phase matches across the seam.
+## Fondo de viento de bosque muy suave, bucle de 4 s. Se genera 0.35 s más
+## largo y la cola sobrante se funde con el inicio (_loop_blend) para
+## esconder el salto del filtro en el empalme. Los dos LFO completan ciclos
+## enteros en los 4 s, así su fase coincide en la costura.
 func _gen_forest_wind() -> PackedFloat32Array:
 	var out := _lowpass_lfo(_noise(4.35, _rng(123)), 520.0, 320.0, 0.5)
 	_tremolo(out, 0.25, 0.25)
@@ -324,10 +325,10 @@ func _gen_forest_wind() -> PackedFloat32Array:
 	return looped
 
 
-## Drier Ash Dunes wind bed, same 4s loop-blend treatment as the forest
-## bed but a higher, wider hiss band with a faster flutter — reads as sand
-## hiss instead of canopy rustle. LFO 0.75Hz and tremolo 0.5Hz both run
-## integer cycles over the 4s loop, keeping the seam phase-continuous.
+## Fondo de viento de las Dunas de Ceniza, más seco, con el mismo bucle de
+## 4 s que el del bosque pero un siseo más agudo y ancho con aleteo más
+## rápido: se lee como arena y no como follaje. El LFO de 0.75 Hz y el
+## trémolo de 0.5 Hz hacen ciclos enteros en los 4 s.
 func _gen_desert_wind() -> PackedFloat32Array:
 	var out := _lowpass_lfo(_noise(4.35, _rng(137)), 950.0, 550.0, 0.75)
 	_tremolo(out, 0.5, 0.35)
@@ -336,7 +337,7 @@ func _gen_desert_wind() -> PackedFloat32Array:
 	return looped
 
 
-# --- DSP building blocks ----------------------------------------------------
+# --- Bloques de DSP -----------------------------------------------------------
 
 func _rng(seed_value: int) -> RandomNumberGenerator:
 	var rng := RandomNumberGenerator.new()
@@ -363,9 +364,9 @@ func _osc(wave: Wave, phase: float) -> float:
 	return 0.0
 
 
-## Oscillator with a pitch sweep f0 -> f1. `curve` shapes the sweep
-## (t^curve): <1 moves early, >1 moves late. Phase-accumulated, so any
-## sweep stays click-free.
+## Oscilador con barrido de tono f0 -> f1. `curve` da forma al barrido
+## (t^curve): <1 se mueve temprano, >1 tarde. Acumula fase, así ningún
+## barrido hace clic.
 func _tone(duration: float, f0: float, f1: float, wave: Wave,
 		curve: float = 1.0) -> PackedFloat32Array:
 	var n := int(duration * RATE)
@@ -380,8 +381,8 @@ func _tone(duration: float, f0: float, f1: float, wave: Wave,
 	return out
 
 
-## Three-point pitch bend: f0 at the start, f_mid at the middle, f1 at the
-## end, linear between (the boss roar's up-then-down growl).
+## Curva de tono de tres puntos: f0 al inicio, f_mid a la mitad y f1 al
+## final, lineal entre ellos (el gruñido que sube y baja del jefe).
 func _tone3(duration: float, f0: float, f_mid: float, f1: float,
 		wave: Wave) -> PackedFloat32Array:
 	var n := int(duration * RATE)
@@ -406,7 +407,7 @@ func _noise(duration: float, rng: RandomNumberGenerator) -> PackedFloat32Array:
 	return out
 
 
-## Decaying sine with one octave harmonic — the shared bell/chime voice.
+## Seno que decae con un armónico de octava: la voz de campana compartida.
 func _chime(duration: float, freq: float, half_life: float) -> PackedFloat32Array:
 	var out := _tone(duration, freq, freq, Wave.SINE)
 	_mix_at(out, _tone(duration, freq * 2.0, freq * 2.0, Wave.SINE), 0.0, 0.22)
@@ -416,7 +417,7 @@ func _chime(duration: float, freq: float, half_life: float) -> PackedFloat32Arra
 	return out
 
 
-## One-pole lowpass with the cutoff sweeping start -> end over the buffer.
+## Pasa-bajos de un polo con el corte barriendo de start a end en el buffer.
 func _lowpass(samples: PackedFloat32Array, cutoff_start: float,
 		cutoff_end: float) -> PackedFloat32Array:
 	var out := PackedFloat32Array()
@@ -425,14 +426,14 @@ func _lowpass(samples: PackedFloat32Array, cutoff_start: float,
 	var last := float(maxi(samples.size() - 1, 1))
 	for i in samples.size():
 		var cutoff := lerpf(cutoff_start, cutoff_end, float(i) / last)
-		# One-pole coefficient: alpha = 1 - e^(-2*pi*fc/fs).
+		# Coeficiente de un polo: alpha = 1 - e^(-2*pi*fc/fs).
 		var alpha := 1.0 - exp(-TAU * cutoff / RATE)
 		y += alpha * (samples[i] - y)
 		out[i] = y
 	return out
 
 
-## One-pole lowpass whose cutoff breathes sinusoidally around `base`.
+## Pasa-bajos de un polo cuyo corte respira en seno alrededor de `base`.
 func _lowpass_lfo(samples: PackedFloat32Array, base: float, depth: float,
 		lfo_hz: float) -> PackedFloat32Array:
 	var out := PackedFloat32Array()
@@ -447,21 +448,22 @@ func _lowpass_lfo(samples: PackedFloat32Array, base: float, depth: float,
 	return out
 
 
-## In-place amplitude LFO; gain dips to (1 - depth) at the trough.
+## LFO de amplitud en el lugar; la ganancia baja a (1 - depth) en el valle.
 func _tremolo(samples: PackedFloat32Array, hz: float, depth: float) -> void:
 	for i in samples.size():
 		var t := float(i) / RATE
 		samples[i] *= 1.0 - depth * (0.5 + 0.5 * sin(TAU * hz * t))
 
 
-## In-place exponential decay from t=0: gain halves every half_life seconds.
+## Decaimiento exponencial en el lugar desde t=0: la ganancia se reduce a
+## la mitad cada half_life segundos.
 func _exp_decay(samples: PackedFloat32Array, half_life: float) -> void:
 	for i in samples.size():
 		samples[i] *= pow(0.5, (float(i) / RATE) / half_life)
 
 
-## In-place linear ADSR: attack then decay from the start, sustain in the
-## middle, and the last `release` seconds ramp down to silence.
+## ADSR lineal en el lugar: ataque y caída desde el inicio, sostén en el
+## medio y los últimos `release` segundos bajan a silencio.
 func _adsr(samples: PackedFloat32Array, attack: float, decay: float,
 		sustain: float, release: float) -> void:
 	var n := samples.size()
@@ -492,7 +494,7 @@ func _fade_out(samples: PackedFloat32Array, seconds: float) -> void:
 		samples[total - 1 - i] *= float(i) / float(n)
 
 
-## Adds `src * gain` into `dst` starting at `at_seconds` (clipped to dst).
+## Suma `src * gain` en `dst` desde `at_seconds` (recortado a dst).
 func _mix_at(dst: PackedFloat32Array, src: PackedFloat32Array,
 		at_seconds: float, gain: float) -> void:
 	var start := int(at_seconds * RATE)
@@ -503,7 +505,7 @@ func _mix_at(dst: PackedFloat32Array, src: PackedFloat32Array,
 		dst[j] += src[i] * gain
 
 
-## In-place peak normalization to `peak` (also the anti-clip stage).
+## Normalización de pico en el lugar a `peak` (también evita la saturación).
 func _normalize(samples: PackedFloat32Array, peak: float) -> void:
 	var max_abs := 0.0
 	for i in samples.size():
@@ -515,9 +517,9 @@ func _normalize(samples: PackedFloat32Array, peak: float) -> void:
 		samples[i] *= factor
 
 
-## Turns an over-rendered buffer into a seamless loop: the surplus tail
-## (blend_seconds) is crossfaded into the head, so sample 0 continues the
-## last sample exactly and the straight signal takes over by blend's end.
+## Convierte un buffer generado de más en un bucle sin costura: la cola
+## sobrante (blend_seconds) se funde con el inicio, así la muestra 0 sigue
+## exactamente a la última y la señal directa manda al terminar la mezcla.
 func _loop_blend(samples: PackedFloat32Array, blend_seconds: float) -> PackedFloat32Array:
 	var b := int(blend_seconds * RATE)
 	var length := samples.size() - b
@@ -531,16 +533,15 @@ func _loop_blend(samples: PackedFloat32Array, blend_seconds: float) -> PackedFlo
 	return out
 
 
-# --- output -----------------------------------------------------------------
+# --- Salida -------------------------------------------------------------------
 
 func _save_wav(dir: String, sound_name: String, samples: PackedFloat32Array) -> void:
 	var bytes := PackedByteArray()
 	bytes.resize(samples.size() * 2)
 	for i in samples.size():
-		# roundi, not int(): truncation pulls every sample toward zero by up
-		# to 1 LSB, which is an asymmetric quantization error and it shows
-		# worst exactly where these files are quietest — the long, low
-		# shrine_channel / laser_hum / wind-bed loops.
+		# roundi y no int(): truncar tira cada muestra hacia cero hasta 1 LSB,
+		# un error de cuantización asimétrico que se nota más justo donde
+		# estos archivos son más suaves (los bucles largos y graves).
 		bytes.encode_s16(i * 2, roundi(clampf(samples[i], -1.0, 1.0) * 32767.0))
 	var wav := AudioStreamWAV.new()
 	wav.format = AudioStreamWAV.FORMAT_16_BITS

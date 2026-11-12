@@ -1,132 +1,135 @@
 extends Node
-## Autoload "RunState": the current run's XP, level, kills, and elapsed
-## time, plus run-scoped stat multipliers that upgrades modify and other
-## systems read (loose coupling through this singleton instead of node
-## references). Default process_mode is pausable, so run_time freezes
-## while the upgrade-card UI has the tree paused.
+## Autoload "RunState": XP, nivel, bajas y tiempo de la partida actual, más
+## los multiplicadores de la partida que modifican las mejoras y leen otros
+## sistemas (acoplamiento suelto por este singleton en vez de referencias a
+## nodos). Su process_mode por defecto es pausable, así run_time se congela
+## mientras la UI de cartas pausa el árbol.
 
 signal xp_changed(current_xp: int, xp_to_next: int)
 signal leveled_up(new_level: int)
 signal kills_changed(total_kills: int)
-## Run-wide difficulty changed (Tome of Peril, demonic altars).
+## Cambió la dificultad de la partida (Tomo del Peligro, altares demoníacos).
 signal difficulty_changed(bonus: float)
-## A new stage is live (iteration 49): the arena is in the tree and the
-## party has been placed. `stage_index` is 0-based; everything the player
-## or a soak log reads prints it as stage_index + 1.
+## Una etapa nueva está activa: la arena está en el árbol y la party ya se
+## ubicó. `stage_index` empieza en 0; todo lo que lee el jugador o un log de
+## soak lo imprime como stage_index + 1.
 signal stage_changed(stage_index: int, map_id: String)
+
+# --- Edita aquí -------------------------------------------------------------
+# RunState es un autoload sin escena, así que sus números de diseño son estas
+# constantes y no aparecen en el Inspector.
+
+## Curva de XP: costo del nivel al que se sube, en gemas (del 1 al 2 cuesta
+## XP_BASE + XP_PER_LEVEL + el término cuadrático). Todo el ritmo de la
+## partida va en estos tres números.
+const XP_BASE: int = 5
+const XP_PER_LEVEL: int = 3
+## Término cuadrático: los primeros niveles casi no cambian (el 1 cuesta 8)
+## y los tardíos pesan: el nivel 10 cuesta 50 y el 20 cuesta 125.
+const XP_PER_LEVEL_SQUARED: float = 0.15
+## Fracción del bono de dificultad que se vuelve XP extra en cada gema.
+const DIFFICULTY_XP_SHARE: float = 0.75
+## Precios de cofres: precio base en puntos por rareza.
+const CHEST_BASE_PRICES: Dictionary[String, int] = {
+	"Common": 20, "Rare": 40, "Epic": 80, "Legendary": 160}
+## Multiplicador GLOBAL que cada cofre abierto aplica al precio de todos los demás.
+const CHEST_PRICE_GROWTH: float = 1.25
+## Precio de la ruleta: cada giro lo multiplica por esto para los siguientes
+## de la partida. Más empinado que el de cofres a propósito: un giro puede dar
+## un objeto Legendario.
+const ROULETTE_PRICE_GROWTH: float = 2.0
+## Lo que pide el vendedor de power-ups por su primera venta de la partida.
+## Cuánto sube tras cada venta: Vendor.powerup_price_growth (Vendor.tscn).
+const POWERUP_VENDOR_BASE_PRICE: int = 100
+# --- fin de edita aquí ------------------------------------------------------
+
+## Variable de entorno que hace reproducible toda una partida (ver reset()).
+## Solo pruebas; nada del juego la pone.
+const GAME_SEED_ENV: String = "BONK_GAME_SEED"
 
 var xp: int = 0
 var level: int = 1
-## Cost of the first level-up (reset() re-derives it from the curve).
+## Costo de la primera subida de nivel (reset() lo vuelve a sacar de la curva).
 var xp_to_next: int = XP_BASE + XP_PER_LEVEL
 var kills: int = 0
 var run_time: float = 0.0
-## --- Stage progression (iteration 49) -----------------------------------
-## A run is a sequence of STAGES, one map each, in MapCatalog order,
-## wrapping back to the first map with lap + 1. Everything about the party
-## carries across; only the map and its clock reset.
-## 0-based index into MapCatalog.MAP_LIBRARY.
+## --- Progresión de etapas ----------------------------------------------
+## Una partida es una secuencia de ETAPAS, un mapa cada una, en el orden de
+## MapCatalog, que vuelve al primer mapa con lap + 1. Todo lo de la party
+## cruza; solo se reinician el mapa y su reloj.
+## Índice desde 0 en MapCatalog.MAP_LIBRARY.
 var stage_index: int = 0
-## Completed loops of the map list. 0 on the first pass.
+## Vueltas completas a la lista de mapas. 0 en la primera pasada.
 var lap: int = 0
-## Seconds spent in the CURRENT stage. run_time keeps counting the whole
-## run; this one is what the stage gate, the boss schedule and the hordes
-## read, so a stage always plays out the same however late it comes.
+## Segundos en la etapa ACTUAL. run_time sigue contando toda la partida;
+## este es el que leen la puerta de etapa, el horario de jefes y las hordas,
+## así una etapa se juega igual llegue cuando llegue.
 var stage_time: float = 0.0
-## True once this stage's Elder is dead (RunManager sets it).
+## True cuando murió el Ancestral de esta etapa (lo marca EnemySpawner).
 var stage_boss_dead: bool = false
-## True once this stage's gate opened (time AND boss): the exit portal is
-## out and the pseudo-infinite ramp is running.
+## True cuando se abrió la puerta de esta etapa (tiempo Y jefe): el portal de
+## salida está afuera y corre la rampa pseudo-infinita.
 var stage_cleared: bool = false
-## Seconds since this stage was cleared — the pseudo-infinite clock.
+## Segundos desde que se superó esta etapa: el reloj pseudo-infinito.
 var pseudo_infinite_time: float = 0.0
-## Run totals, folded into the meta ledger at the end.
+## Totales de la partida, que se suman al registro meta al final.
 var stages_cleared_total: int = 0
 var endless_seconds_total: float = 0.0
 var laps_completed: int = 0
-## Maps entered / cleared this run, in order. The meta fold credits
-## runs_on_<map> for every visited one and victories_<map> for every
-## cleared one, so per-map quests keep working across a multi-map run.
+## Mapas visitados / superados en esta partida, en orden. El registro meta
+## acredita runs_on_<mapa> por cada visitado y victories_<mapa> por cada
+## superado, así las misiones por mapa funcionan en una partida de varios.
 var visited_map_ids: Array[String] = []
 var cleared_map_ids: Array[String] = []
-## True while the run is in progress; RunManager clears it when the run
-## ends (death or victory) so late same-frame events like a level-up
-## card stand down.
+## True mientras la partida está en curso; RunManager lo apaga al terminar
+## (muerte o victoria) para que eventos tardíos del mismo frame, como una
+## carta de nivel, se retiren.
 var run_active: bool = true
-## Multiplies every gem's magnet radius; raised by pickup-radius upgrades.
+## Multiplica el radio de imán de cada gema; lo suben las mejoras de alcance
+## de recolección.
 var pickup_radius_multiplier: float = 1.0
-## Demonic altar completions this run (iteration 41): bosses drop one
-## extra chest per use, elites and hordes read it too.
+## Altares demoníacos completados en esta partida: los jefes sueltan un cofre
+## extra por uso, y élites y hordas también lo leen.
 var demonic_uses: int = 0
-## Run-wide difficulty bonus (iteration 39), as a fraction: 0.3 = +30%.
-## Shared by the whole party. Fresh spawns scale HP/damage by
-## (1 + bonus) and XP by (1 + bonus * DIFFICULTY_XP_SHARE). Sources add
-## through add_difficulty (tomes re-publish their total per player via
-## set_difficulty_source so recompute-from-scratch stays exact).
+## Bono de dificultad de la partida, en fracción: 0.3 = +30%. Lo comparte
+## toda la party. Los spawns nuevos escalan HP/daño por (1 + bono) y la XP
+## por (1 + bono * DIFFICULTY_XP_SHARE). Las fuentes suman con
+## add_difficulty (los tomos vuelven a publicar su total por jugador con
+## set_difficulty_source, así el recálculo desde cero sigue exacto).
 var difficulty_bonus: float = 0.0
-## Per-source difficulty contributions (source id -> fraction).
+## Aporte de dificultad por fuente (id de fuente -> fracción).
 var _difficulty_sources: Dictionary[String, float] = {}
-## Fraction of the difficulty bonus that becomes extra XP on every gem.
-const DIFFICULTY_XP_SHARE: float = 0.75
-## Demonic pacts (iteration 47): the run-wide knobs a pact's COST writes.
-## Each is a fraction (0.1 = +10%) and each has exactly one consumer, named
-## here so a knob can never quietly become dead data:
-##   elite_chance_bonus     -> EnemySpawner.elite_chance()
-##   sky_duration_multiplier-> WorldDirector sky event length
-##   event_chance_bonus     -> WorldDirector sky event probability
-##   disaster_chance_bonus  -> WorldDirector disaster roll (iteration 55:
-##                             the first thing rolled on an event tick).
+## Pactos demoníacos: las perillas de la partida que escribe el COSTO de un
+## pacto. Cada una es una fracción (0.1 = +10%) y tiene exactamente un
+## consumidor, nombrado aquí para que ninguna quede como dato muerto:
+##   elite_chance_bonus      -> EnemySpawner.elite_chance()
+##   sky_duration_multiplier -> duración del evento de cielo (WeatherDirector)
+##   event_chance_bonus      -> probabilidad de evento de cielo (WeatherDirector)
+##   disaster_chance_bonus   -> tirada de desastre del WorldDirector (lo
+##                              primero que se tira en un tick de evento).
 var elite_chance_bonus: float = 0.0
 var sky_duration_multiplier: float = 1.0
 var event_chance_bonus: float = 0.0
 var disaster_chance_bonus: float = 0.0
-## Chest economy (iteration 40): base price in run points per rarity, and
-## the GLOBAL multiplier every opened chest applies to all the others.
-const CHEST_BASE_PRICES: Dictionary[String, int] = {
-	"Common": 20, "Rare": 40, "Epic": 80, "Legendary": 160}
-const CHEST_PRICE_GROWTH: float = 1.25
-## Party-wide chest price multiplier, one CHEST_PRICE_GROWTH step per chest
-## opened this run. It is the ONLY chest bookkeeping this run needs — the
-## lifetime "chests_opened" counter the quests read lives in SaveData and
-## is bumped by Interactable.consume, so there is no second copy here to
-## drift out of sync with it.
+## Multiplicador de precio de cofres de la party, un paso de
+## CHEST_PRICE_GROWTH por cofre abierto. Es el ÚNICO registro de cofres de la
+## partida: el contador "chests_opened" de las misiones vive en SaveData (lo
+## suma Interactable.consume).
 var chest_price_multiplier: float = 1.0
-## Roulette economy (iteration 46): each spin DOUBLES the price of every
-## later spin this run. Steeper than the chest curve on purpose — a
-## roulette outcome can be a Legendary item, so a flat price turned the
-## altar into the whole run's build once the points started flowing.
-const ROULETTE_PRICE_GROWTH: float = 2.0
+## Multiplicador de precio de la ruleta, un paso de ROULETTE_PRICE_GROWTH
+## por giro.
 var roulette_price_multiplier: float = 1.0
-## What the power-up vendor asks for its first sale of the run.
-const POWERUP_VENDOR_BASE_PRICE: int = 100
-## What the power-up vendor charges next, in run points (iteration 54).
-## A run-wide ABSOLUTE price, not a multiplier like the two above: the
-## stall sells one rolled power-up whatever it is, so there is no base to
-## multiply — the number itself is the ladder, and it climbs only when a
-## sale actually happens.
+## Lo que cobra a continuación el vendedor de power-ups, en puntos. Un precio
+## ABSOLUTO de la partida y no un multiplicador: el puesto vende un power-up
+## sacado sea cual sea, así que el número mismo es la escalera, y sube solo
+## cuando hay una venta.
 var powerup_vendor_price: int = POWERUP_VENDOR_BASE_PRICE
-## Multiplier on everything the party BUYS with run points while the
-## golden rain falls (1.0 idle, 0.5 during it). Chests, the roulette and
-## the spring read it — and therefore the item vendor, which prices its
-## shelf off chest_price. The power-up vendor and the pet prices are
-## deliberately outside it: those two ladders are the run's long-term
-## economy, and halving them for forty seconds would flatten both.
+## Multiplicador de todo lo que la party COMPRA con puntos mientras cae la
+## lluvia dorada (1.0 normal, 0.5 durante). Lo leen cofres, ruleta y
+## manantial — y con ellos el vendedor de objetos, que pone precio con
+## chest_price. El vendedor de power-ups y los precios de mascota quedan
+## fuera a propósito: son la economía de largo plazo de la partida.
 var price_discount: float = 1.0
-## XP curve: cost of the level being climbed to, in gems (level 1 -> 2
-## costs XP_BASE + XP_PER_LEVEL). The whole pacing of a run rides on these
-## three numbers, so they are named instead of buried in _xp_required.
-## Env override that makes a whole run reproducible (see reset()).
-## Test-only; nothing in the game sets it.
-const GAME_SEED_ENV: String = "BONK_GAME_SEED"
-
-const XP_BASE: int = 5
-const XP_PER_LEVEL: int = 3
-## Convex term (iteration 46): the old straight line let a late run take a
-## level every few seconds, which is what made weapons cap out and cards
-## stop meaning anything. Quadratic, so the first levels are untouched
-## (level 1 still costs 8) and the late ones bite: level 10 costs 50
-## instead of 35 (+43%), level 20 costs 125 instead of 65 (+92%).
-const XP_PER_LEVEL_SQUARED: float = 0.15
 
 
 func _ready() -> void:
@@ -134,10 +137,10 @@ func _ready() -> void:
 
 
 func _physics_process(delta: float) -> void:
-	# Only a live run advances the clock: once RunManager flags the run over
-	# (or before one starts), anything reading run_time — victory grading,
-	# timed boons, the daily score — must not see it creep forward on the
-	# frames where something unpauses the tree.
+	# Solo una partida viva avanza el reloj: cuando RunManager la da por
+	# terminada (o antes de empezar), nada que lea run_time — nota de
+	# victoria, boons temporales, puntaje diario — debe verlo avanzar en los
+	# frames en que algo despausa el árbol.
 	if run_active:
 		run_time += delta
 		stage_time += delta
@@ -146,7 +149,7 @@ func _physics_process(delta: float) -> void:
 			endless_seconds_total += delta
 
 
-## Call at the start of a new run.
+## Llamar al empezar una partida nueva.
 func reset() -> void:
 	xp = 0
 	level = 1
@@ -173,28 +176,27 @@ func reset() -> void:
 	roulette_price_multiplier = 1.0
 	powerup_vendor_price = POWERUP_VENDOR_BASE_PRICE
 	price_discount = 1.0
-	# Counters credited during a run live in a SaveData buffer that only a
-	# run END merges into the persisted ledger; starting (or abandoning) a
-	# run drops whatever is still pending, which is what makes save_data's
-	# "an abandoned run persists nothing" contract actually hold. Fetched by
-	# path: this autoload loads BEFORE SaveData, so the very first reset
-	# (app startup) must not touch it by name.
+	# Los contadores acreditados durante una partida viven en un buffer de
+	# SaveData que solo el FIN de una partida pasa al registro guardado;
+	# empezar (o abandonar) una partida tira lo pendiente, y eso cumple el
+	# contrato de save_data "una partida abandonada no guarda nada". Se busca
+	# por ruta: este autoload carga ANTES que SaveData, así que el primer
+	# reset (al abrir la app) no puede nombrarlo.
 	var ledger := get_node_or_null("/root/SaveData")
 	if ledger != null:
 		ledger.call("discard_run_counters")
-	# Daily Hunt (iteration 36): everyone rolls the same cards, spawns, and
-	# world events for a given date; normal runs re-scramble the stream.
-	# Fetched by path: this autoload loads BEFORE GameConfig, so the very
-	# first reset (app startup, never a daily) must not touch it by name.
+	# Cacería diaria: todos sacan las mismas cartas, spawns y eventos en una
+	# fecha dada; las partidas normales reordenan el flujo. Se busca por ruta:
+	# este autoload carga ANTES que GameConfig, así que el primer reset (al
+	# abrir la app, nunca diario) no puede nombrarlo.
 	var config := get_node_or_null("/root/GameConfig")
 	var game_seed := OS.get_environment(GAME_SEED_ENV)
 	if config != null and bool(config.daily_mode) and int(config.daily_seed) != 0:
 		seed(int(config.daily_seed))
 	elif game_seed.is_valid_int():
-		# Test-only (BONK_GAME_SEED): the run's own stream — cards, spawns,
-		# the scatter and therefore the terrain — becomes reproducible.
-		# Without it a soak is a fresh world every time, which makes any
-		# two-sided comparison (balance, fog coverage) measure noise.
+		# Solo pruebas (BONK_GAME_SEED): el flujo de la partida — cartas,
+		# spawns, scatter y por lo tanto el relieve — se vuelve reproducible,
+		# para que una comparación entre dos corridas no mida ruido.
 		seed(int(game_seed))
 	else:
 		randomize()
@@ -204,8 +206,8 @@ func reset() -> void:
 	difficulty_changed.emit(difficulty_bonus)
 
 
-## Clears the per-stage fields. Called by reset() and by RunRoot on every
-## stage change — the run-level counters above are deliberately NOT here.
+## Limpia los campos por etapa. Lo llaman reset() y RunRoot en cada cambio de
+## etapa; los contadores de toda la partida de arriba NO van aquí, a propósito.
 func begin_stage() -> void:
 	stage_time = 0.0
 	stage_boss_dead = false
@@ -213,8 +215,8 @@ func begin_stage() -> void:
 	pseudo_infinite_time = 0.0
 
 
-## Records that the current stage was cleared. Idempotent: the gate is
-## polled, so it would otherwise credit a stage once per frame.
+## Registra que se superó la etapa actual. Idempotente: la puerta se sondea,
+## y si no acreditaría una etapa por frame.
 func mark_stage_cleared(map_id: String) -> void:
 	if stage_cleared:
 		return
@@ -228,8 +230,8 @@ func add_xp(amount: int) -> void:
 	if amount <= 0:
 		return
 	xp += amount
-	# Loop: a single big pickup can grant several levels; one leveled_up
-	# fires per level so the card UI can queue extra picks.
+	# Bucle: una gema grande puede dar varios niveles; sale un leveled_up por
+	# nivel para que la UI de cartas encole elecciones extra.
 	while xp >= xp_to_next:
 		xp -= xp_to_next
 		level += 1
@@ -243,9 +245,10 @@ func add_kill() -> void:
 	kills_changed.emit(kills)
 
 
-## Sets one source's difficulty contribution (e.g. "tomes_p0" for player
-## 0's Tome of Peril total) and re-sums the run-wide bonus. Sources that
-## recompute from scratch (PlayerStats) call this with their whole total.
+## Fija el aporte de dificultad de una fuente (p. ej. "tomes_p0" para el total
+## del Tomo del Peligro del jugador 0) y vuelve a sumar el bono de la
+## partida. Las fuentes que recalculan desde cero (PlayerStats) llaman esto
+## con su total completo.
 func set_difficulty_source(source: String, fraction: float) -> void:
 	if is_zero_approx(fraction):
 		_difficulty_sources.erase(source)
@@ -254,7 +257,7 @@ func set_difficulty_source(source: String, fraction: float) -> void:
 	_resum_difficulty()
 
 
-## Adds a permanent one-shot contribution (demonic altar uses).
+## Suma un aporte permanente de una sola vez (usos de altar demoníaco).
 func add_difficulty(fraction: float, source: String = "altars") -> void:
 	if fraction <= 0.0:
 		return
@@ -270,30 +273,30 @@ func _resum_difficulty() -> void:
 	difficulty_changed.emit(difficulty_bonus)
 
 
-## Current price of a chest of the given rarity, in run points.
+## Precio actual de un cofre de la rareza dada, en puntos.
 func chest_price(rarity_name: String) -> int:
 	var base := int(CHEST_BASE_PRICES.get(rarity_name, CHEST_BASE_PRICES["Common"]))
 	return ceili(float(base) * chest_price_multiplier * price_discount)
 
 
-## Every opened chest makes all the others pricier (global multiplier).
+## Cada cofre abierto encarece todos los demás (multiplicador global).
 func register_chest_opened() -> void:
 	chest_price_multiplier *= CHEST_PRICE_GROWTH
 
 
-## Current price of a roulette spin, in run points: the shrine's own base
-## price times the run-wide growth below.
+## Precio actual de un giro de ruleta, en puntos: el precio base del
+## santuario por el crecimiento de la partida.
 func roulette_price(base_price: int) -> int:
 	return ceili(float(base_price) * roulette_price_multiplier * price_discount)
 
 
-## Every spin makes the next one cost ROULETTE_PRICE_GROWTH times more,
-## for the whole party and the rest of the run.
+## Cada giro hace que el siguiente cueste ROULETTE_PRICE_GROWTH veces más,
+## para toda la party y el resto de la partida.
 func register_roulette_spin() -> void:
 	roulette_price_multiplier *= ROULETTE_PRICE_GROWTH
 
 
-## XP multiplier the run-wide difficulty grants on every gem.
+## Multiplicador de XP que da la dificultad de la partida en cada gema.
 func difficulty_xp_multiplier() -> float:
 	return 1.0 + difficulty_bonus * DIFFICULTY_XP_SHARE
 

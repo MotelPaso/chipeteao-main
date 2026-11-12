@@ -1,7 +1,6 @@
-[gd_scene load_steps=17 format=3 uid="uid://bshrn2grd5me1"]
+[gd_scene load_steps=16 format=3 uid="uid://bshrn2grd5me1"]
 
 [ext_resource type="Script" path="res://scripts/world/interactables/greed_shrine.gd" id="1_greed"]
-[ext_resource type="PackedScene" path="res://scenes/systems/XpGem.tscn" id="2_gem"]
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_darkstone"]
 albedo_color = Color(0.21, 0.19, 0.24, 1)
@@ -79,8 +78,10 @@ collision_layer = 0
 collision_mask = 1
 monitorable = false
 script = ExtResource("1_greed")
-xp_gem_scene = ExtResource("2_gem")
+prompt_text = "[E] Ofrendar sangre"
 prompt_height = 2.6
+meta_stat_id = "shrines_used"
+marker_kind = &"altar_greed"
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.5, 0)

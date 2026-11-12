@@ -1,38 +1,48 @@
 class_name MagnetPickup
 extends Area3D
-## Shared chassis for the dropped pickups (XP gems, health orbs). Idles
-## with a spin/bob, then homes to the nearest standing raider with
-## accelerating speed once inside the magnet radius (scaled by
-## RunState.pickup_radius_multiplier so pickup upgrades reach every drop),
-## collects on contact, and despawns after `lifetime`.
-## Pooled: spawn via Pools.acquire_scene, every despawn is a Pools.release,
-## and pool_reset() restores the just-dropped state. Live pickups sit in
-## their subclass's LIVE_GROUP (joined on acquire, left BEFORE the release,
-## so the level-up vacuum and the health-orb soft cap never see a parked or
-## outbound node).
+## Chasis compartido de los recolectables que caen (gemas de XP, orbes de
+## curación). En reposo gira y flota; dentro del radio de imán (escalado por
+## RunState.pickup_radius_multiplier, para que las mejoras de alcance lleguen
+## a todo drop) persigue al raider en pie más cercano acelerando, se recoge
+## al contacto y desaparece tras `lifetime`.
+## Va en pool: aparece con Pools.acquire_scene, cada desaparición es un
+## Pools.release y pool_reset() restaura el estado de recién soltado. Los
+## vivos están en el LIVE_GROUP de su subclase (entran al adquirir y salen
+## ANTES de liberar, así la aspiradora y el tope de orbes nunca ven un nodo
+## guardado o de salida).
 ##
-## Subclasses supply three things — the live group, what collecting one
-## does, and any extra idle flourish. Everything else used to live twice,
-## which is why the same "never expires" bug had to be reported twice.
+## Las subclases aportan tres cosas: el grupo vivo, qué hace recogerlo y
+## cualquier floritura extra en reposo.
 
-## Squared distance at which the fast final approach counts as a pickup: a
-## max-speed last hop can cross the whole trigger area inside one physics
-## frame and never emit body_entered.
+## Distancia al cuadrado (m²) a la que el acercamiento final cuenta como
+## recogida: un último salto a máxima velocidad puede cruzar todo el área
+## en un frame de física sin emitir body_entered.
 const CATCH_RADIUS_SQ: float = 0.36
-## Aim height on the target, so pickups fly at the chest instead of
-## burrowing toward the feet.
+## Altura de puntería sobre el blanco, en metros: vuela al pecho y no a
+## los pies.
 const TARGET_HEIGHT: float = 0.9
 
-## 4.0 (was 3.5, iteration-31 balance): +~15% base pickup reach offsets
-## the extra roaming the enlarged 160x160 arenas ask for.
+@export_group("Imán")
+## Radio de imán en metros (antes del multiplicador de alcance de la partida).
 @export var magnet_radius: float = 4.0
+## Aceleración de la persecución, en m/s².
 @export var magnet_acceleration: float = 45.0
-## Starting homing speed when the level-up vacuum grabs this pickup.
+## Velocidad inicial de persecución, en m/s, cuando la aspiradora de subida
+## de nivel agarra este recolectable.
 @export var vacuum_speed: float = 26.0
+
+@export_group("Vida")
+## Segundos en el suelo antes de desaparecer sin recoger.
 @export var lifetime: float = 60.0
+
+@export_group("Reposo")
+## Giro en reposo, en radianes por segundo.
 @export var spin_speed: float = 2.5
+## Altura de la flotación en reposo, en metros.
 @export var bob_amplitude: float = 0.12
+## Velocidad de la flotación en reposo, en radianes por segundo.
 @export var bob_speed: float = 3.0
+@export_group("")
 
 @onready var _visual: Node3D = $Visual
 
@@ -48,16 +58,15 @@ func _ready() -> void:
 	_visual_rest_y = _visual.position.y
 
 
-## Pooled-node contract: back to the just-dropped state on every acquire.
+## Contrato de nodo en pool: vuelve al estado de recién soltado en cada acquire.
 func pool_reset() -> void:
 	_age = 0.0
 	_homing = false
 	_speed = 0.0
 	_collected = false
-	# The idle spin and the orb pulse accumulate on the Visual, so without
-	# these three a recycled pickup came out of the pool wearing the
-	# orientation and scale its previous life ended with — a boss ring of
-	# gems used to land at random angles once the pool warmed up.
+	# El giro y el pulso se acumulan en el Visual: sin estas tres líneas un
+	# recolectable reciclado saldría del pool con la orientación y la escala
+	# con que terminó su vida anterior.
 	_visual.position.y = _visual_rest_y
 	_visual.rotation = Vector3.ZERO
 	_visual.scale = Vector3.ONE
@@ -67,9 +76,8 @@ func pool_reset() -> void:
 		add_to_group(group)
 
 
-## Level-up vacuum (reached via the live group): force-enables homing at
-## vacuum speed regardless of the pickup radius — the genre-staple
-## "level-up hoovers the floor" moment.
+## Aspiradora de subida de nivel (llega por el grupo vivo): activa la
+## persecución a vacuum_speed sin importar el radio de recogida.
 func vacuum() -> void:
 	if _collected:
 		return
@@ -83,11 +91,10 @@ func _physics_process(delta: float) -> void:
 	_idle_visuals(delta)
 
 	var player := Coop.nearest_player(get_tree(), global_position)
-	# Expiry runs BEFORE the no-player early return and OUTSIDE the idle
-	# branch. Both guards used to sit in front of it, so a pickup that had
-	# already latched on — or any pickup at all while the whole party was
-	# down — aged forever without ever coming back: a pool slot and, for
-	# orbs, a permanent seat under the soft cap that blocked every later heal.
+	# La expiración corre ANTES del retorno sin jugador y FUERA de la rama de
+	# reposo: si no, un recolectable ya enganchado (o cualquiera con toda la
+	# party derribada) envejecería para siempre, ocupando un lugar del pool y,
+	# en los orbes, un asiento permanente bajo el tope.
 	if _age > lifetime and (player == null or not _homing):
 		_release_to_pool()
 		return
@@ -99,7 +106,7 @@ func _physics_process(delta: float) -> void:
 		_visual.position.y = _visual_rest_y + sin(_age * bob_speed) * bob_amplitude
 		var radius := magnet_radius * RunState.pickup_radius_multiplier
 		if global_position.distance_squared_to(target) <= radius * radius:
-			_homing = true  # sticky: keeps chasing even if the player outruns it
+			_homing = true  # pegajoso: sigue persiguiendo aunque el jugador se aleje
 		return
 
 	_speed += magnet_acceleration * delta
@@ -108,7 +115,7 @@ func _physics_process(delta: float) -> void:
 		collect(player)
 
 
-## Collects once and only once, then parks the node back in its pool.
+## Se recoge una sola vez y luego vuelve a su pool.
 func collect(collector: Node3D) -> void:
 	if _collected:
 		return
@@ -122,9 +129,9 @@ func _on_body_entered(body: Node3D) -> void:
 		collect(body)
 
 
-## Leaves the live group BEFORE the pooled release, so a vacuum or a soft-
-## cap count firing in the deferred-release window (the node stays in-tree
-## one more frame) never touches a pickup already on its way out.
+## Deja el grupo vivo ANTES de la liberación al pool, para que una
+## aspiradora o un conteo del tope en la ventana diferida (el nodo sigue un
+## frame más en el árbol) nunca toquen uno que ya se va.
 func _release_to_pool() -> void:
 	var group := live_group()
 	if group != &"" and is_in_group(group):
@@ -132,25 +139,25 @@ func _release_to_pool() -> void:
 	Pools.release(self)
 
 
-# --- subclass hooks ---------------------------------------------------------
+# --- Ganchos de subclase ----------------------------------------------------
 
-## Group every live (dropped, uncollected) instance belongs to.
+## Grupo al que pertenece toda instancia viva (soltada y sin recoger).
 func live_group() -> StringName:
 	return &""
 
 
-## What picking this up does for `collector` (never null on the contact
-## path; the fast-approach fallback passes the player it was flying to).
+## Qué hace recogerlo para `collector` (nunca null por contacto; el
+## acercamiento rápido pasa el jugador al que volaba).
 func _on_collected(_collector: Node3D) -> void:
 	pass
 
 
-## Extra per-frame idle flourish on top of the shared spin and bob.
+## Floritura extra por frame en reposo, sobre el giro y la flotación.
 func _idle_visuals(_delta: float) -> void:
 	pass
 
 
-## Extra state to restore on acquire (drop-scaled values the droppers
-## overwrite AFTER the reset).
+## Estado extra a restaurar al adquirir (valores que quien suelta escala
+## DESPUÉS del reinicio).
 func _reset_extra() -> void:
 	pass

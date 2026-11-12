@@ -1,10 +1,10 @@
 [gd_scene load_steps=4 format=3]
 
 [ext_resource type="Script" path="res://scripts/ui/meta/relic_shop.gd" id="1_relicshop"]
-[ext_resource type="Shader" path="res://assets/ui/menu_backdrop.gdshader" id="2_backdrop"]
+[ext_resource type="Material" path="res://assets/ui/menu_backdrop.tres" id="2_backdrop"]
 
-[sub_resource type="ShaderMaterial" id="ShaderMaterial_backdrop"]
-shader = ExtResource("2_backdrop")
+[sub_resource type="FontVariation" id="FontVariation_title"]
+spacing_glyph = 8
 
 [node name="RelicShop" type="Control"]
 anchor_right = 1.0
@@ -12,7 +12,7 @@ anchor_bottom = 1.0
 script = ExtResource("1_relicshop")
 
 [node name="Background" type="ColorRect" parent="."]
-material = SubResource("ShaderMaterial_backdrop")
+material = ExtResource("2_backdrop")
 anchor_right = 1.0
 anchor_bottom = 1.0
 color = Color(1, 1, 1, 1)
@@ -26,7 +26,10 @@ theme_override_constants/separation = 12
 
 [node name="TitleLabel" type="Label" parent="Center/VBox"]
 unique_name_in_owner = true
-theme_override_colors/font_color = Color(0.96, 0.78, 0.3, 1)
+theme_override_colors/font_color = Color(0.98, 0.76, 0.28, 1)
+theme_override_colors/font_outline_color = Color(0.03, 0.035, 0.06, 0.92)
+theme_override_constants/outline_size = 10
+theme_override_fonts/font = SubResource("FontVariation_title")
 theme_override_font_sizes/font_size = 40
 horizontal_alignment = 1
 text = "ARMERÍA"

@@ -1,21 +1,19 @@
 extends WeaponBase
-## Juno's starting weapon: looses fast, dead-straight arrows that pierce
-## through up to pierce_count enemies each (the Arrow scene disables the
-## Projectile homing). projectile_count > 1 fans a volley around the aim
-## direction, Dart Pistol style. No held model — the loose reads through
-## the thick arrow tracer plus a drawn-back charge glint at the Nock that
-## swells and pops as the volley releases.
+## Arco de caza: suelta flechas rápidas y rectas que atraviesan hasta
+## pierce_count enemigos cada una (la escena Arrow apaga la persecución del
+## Projectile). Con más de un proyectil, la ráfaga sale en abanico alrededor
+## de la puntería. Sin modelo en la mano: el disparo se lee por el trazador
+## grueso de la flecha y un destello de carga en el Nock que crece y estalla
+## al soltar (su aspecto está en MuzzleFlash.tscn, grupo «Destello de carga»).
 
+@export_group("Flechas")
+## Escena de la flecha que se dispara (Arrow.tscn).
 @export var projectile_scene: PackedScene
-## Charge glint tint (matches the arrow tracer).
-@export var glint_color: Color = Color(0.75, 0.95, 0.55)
-## Max enemies one arrow damages before despawning ("Barbed Heads" raises it).
+## Máximo de enemigos que daña una flecha antes de desaparecer; reemplaza el pierce_remaining de Arrow.tscn ("Puntas con púas" lo sube).
 @export var pierce_count: int = 3
-## Yaw between neighboring arrows when projectile_count > 1.
+## Grados entre flechas vecinas cuando hay más de una.
 @export var fan_spread_deg: float = 7.0
-## Aim above the target's origin so arrows hit body height, not feet.
-@export var aim_height: float = 0.8
-## Arrows fly a bit past attack_range so edge-of-range targets still connect.
+## Las flechas vuelan este múltiplo de attack_range, así los blancos al borde del alcance igual reciben.
 @export var range_grace: float = 1.15
 
 @onready var _nock: Node3D = $Nock
@@ -25,29 +23,29 @@ func fire(target: Node3D) -> void:
 	if projectile_scene == null:
 		push_warning("%s: projectile_scene not set" % name)
 		return
-	# Degenerate case (target on top of the nock): fire where we face.
+	# Caso degenerado (blanco encima del Nock): se dispara hacia donde miramos.
 	var base_dir := aim_dir_or(
-			target.global_position + Vector3.UP * aim_height - _nock.global_position,
+			body_aim_point(target) - _nock.global_position,
 			-global_transform.basis.z)
 	var count := maxi(effective_projectile_count(), 1)
 	for i: int in count:
 		var yaw := deg_to_rad(fan_spread_deg) * (float(i) - float(count - 1) * 0.5)
 		_spawn_arrow(base_dir.rotated(Vector3.UP, yaw), target)
-	# Draw-and-release glint: grows like a pulled string catching light,
-	# then pops as the arrows leave.
+	# Destello de tensar y soltar: crece como una cuerda tensa que atrapa luz y
+	# estalla cuando salen las flechas.
 	var glint := Pools.acquire_scene(Pools.MUZZLE_FLASH_SCENE) as MuzzleFlash
 	if glint != null:
-		glint.play(_nock.global_position, glint_color, 0.4, 0.14, 0.1)
+		glint.play(_nock.global_position, MuzzleFlash.Style.GLINT)
 
 
 func _spawn_arrow(direction: Vector3, target: Node3D) -> void:
-	# Pooled, parented to the scene root so arrows keep flying while the
-	# player moves on. Pierce is set per shot, after the pool's reset.
+	# Del pool, colgada de la arena: la flecha sigue volando mientras el
+	# jugador camina. La perforación se fija por disparo, después del reinicio del pool.
 	var arrow := Pools.acquire_scene(projectile_scene) as Projectile
 	if arrow == null:
 		return
-	# Aim can run near-colinear with UP (enemy right below a platform edge);
-	# a sideways up vector keeps the basis buildable, flight unchanged.
+	# La puntería puede quedar casi colineal con UP (enemigo justo debajo de
+	# una plataforma); un "arriba" lateral mantiene la base construible.
 	arrow.global_transform = Transform3D(
 			Basis.looking_at(direction, safe_up(direction)), _nock.global_position)
 	arrow.pierce_remaining = maxi(pierce_count, 1)

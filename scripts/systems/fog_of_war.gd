@@ -1,56 +1,55 @@
 class_name FogOfWar
 extends Node
-## Fog of war (iteration 52): what the party has SEEN of the current stage.
-## A child of RunSystems.tscn, so it survives the arena swap like the rest
-## of the run block and is reset per stage by the WorldDirector.
+## Niebla de guerra: lo que la party VIO de la etapa actual. Es hijo de
+## RunSystems.tscn, así sobrevive al cambio de arena como el resto del bloque
+## de la partida, y el WorldDirector la reinicia en cada etapa.
 ##
-## Shared by the whole party on purpose: in co-op, four raiders exploring
-## four corners are exploring ONE map. Run-scoped only — nothing about it
-## persists between runs.
+## Compartida por toda la party a propósito: en co-op, cuatro raiders en
+## cuatro esquinas exploran UN mapa. Solo dura la partida.
 ##
-## The authoritative state is a single-channel L8 Image: 255 explored,
-## 0 unknown. Painting is a disc per live raider on a slow tick, which is
-## cheap enough to leave running (a 121x121 image and a radius of 9 pixels
-## is a few hundred set_pixel calls every fifth of a second) and precise
-## enough that the map reads as "where we walked".
+## El estado es una Image L8 de un canal: 255 explorado, 0 desconocido. Se
+## pinta un disco por raider vivo en un tick lento, barato de dejar corriendo
+## (una imagen de 120x120 y un radio de 9 píxeles son unos cientos de
+## set_pixel cada quinto de segundo) y lo bastante preciso para que el mapa
+## se lea como "por donde caminamos".
 ##
-## MapDraw composites this into the picture the minimap and the overlay
-## draw; nothing outside this node writes to the image, which is what lets
-## `revision` stand in for its contents.
+## MapDraw lo compone en la imagen que dibujan el minimapa y el mapa de Tab;
+## nada fuera de este nodo escribe la imagen, y por eso `revision` puede
+## representar su contenido.
 
-## Metres per fog pixel. 2 m gives 121x121 for a 240 m arena: coarse
-## enough to paint cheaply, fine enough that a corridor between two mask
-## blobs reads as explored rather than as one fat blur.
+@export_group("Niebla")
+## Metros por píxel de niebla. 2 m da 120x120 en una arena de 240 m: lo
+## bastante grueso para pintar barato y fino para que un pasillo entre dos
+## manchas de máscara se lea como explorado.
 @export var meters_per_pixel: float = 2.0
-## How far a raider reveals around themselves, in metres.
+## Cuánto revela un raider a su alrededor, en metros.
 @export var reveal_radius: float = 18.0
-## Seconds between paint passes. Not per frame: at walking speed a raider
-## covers under a metre in this time, which is a third of a fog pixel.
+## Segundos entre pasadas de pintura. No por frame: caminando, un raider
+## recorre menos de un metro en este tiempo, un tercio de píxel de niebla.
 @export var paint_interval: float = 0.2
+@export_group("")
 
-## The authoritative state. FORMAT_L8: one byte per pixel, no alpha —
-## MapDraw is what turns it into something drawable.
+## El estado de verdad. FORMAT_L8: un byte por píxel, sin alfa; MapDraw lo
+## convierte en algo dibujable.
 var image: Image = null
 
-## Goes up every time `image` changes: a fresh image in _rebuild, or a
-## reveal_at that flipped at least one pixel. Never reset and never bumped
-## for anything else, so "same fog node, same revision" means "same
-## pixels". The minimap and the overlay key their MapDraw.composite() on it
-## (Minimap.composite_key): the fog paints at 5 Hz and most paints land on
-## ground the party has already seen, so without it their 10 Hz refresh
-## rebuilt an identical 14 400-pixel picture several times a second.
+## Sube cada vez que cambia `image`: una imagen nueva en _rebuild o un
+## reveal_at que cambió al menos un píxel. Nunca se reinicia ni sube por otra
+## cosa, así "mismo nodo de niebla, misma revisión" significa "mismos
+## píxeles". El minimapa y el mapa de Tab cachean su MapDraw.composite() con
+## esto (Minimap.composite_key) en vez de rearmar la misma imagen.
 var revision: int = 0
 
 var _pixels: int = 0
-## Half-extent of the arena the current image covers, in metres.
+## Media extensión, en metros, de la arena que cubre la imagen actual.
 var _half_extent: float = 120.0
 var _paint_left: float = 0.0
-## Explored pixels, kept as a running count so explored_fraction() is not
-## a full scan of the image on every HUD refresh.
+## Píxeles explorados, llevados como cuenta corrida para que
+## explored_fraction() no recorra toda la imagen en cada refresco del HUD.
 var _explored_pixels: int = 0
 
 
-## THE accessor, like every other cross-scene lookup in this project.
+## EL acceso, como toda búsqueda entre escenas de este proyecto.
 static func find(tree: SceneTree) -> FogOfWar:
 	if tree == null:
 		return null
@@ -59,15 +58,15 @@ static func find(tree: SceneTree) -> FogOfWar:
 
 func _ready() -> void:
 	add_to_group(&"fog")
-	# A fog with no arena yet is a fog of nothing; reset_for_stage builds
-	# the real one the moment the stage starts.
+	# Una niebla sin arena todavía es niebla de nada; reset_for_stage arma la
+	# real cuando empieza la etapa.
 	_rebuild(_half_extent)
 
 
-## Stage hook, called by WorldDirector.on_stage_started — NOT from the
-## stage_changed signal: the signal fires after the arena is placed, and
-## the minimap wants a clean fog the moment the map exists. Stage 0 goes
-## through the same call, so there is no first-stage special case.
+## Gancho de etapa que llama WorldDirector.on_stage_started — NO la señal
+## stage_changed: esa llega después de colocar la arena, y el minimapa quiere
+## una niebla limpia en cuanto existe el mapa. La etapa 0 pasa por la misma
+## llamada, sin caso especial.
 func reset_for_stage(arena: Node3D) -> void:
 	var half := _half_extent
 	var bounds := get_tree().get_first_node_in_group(&"arena_bounds")
@@ -95,8 +94,8 @@ func _physics_process(delta: float) -> void:
 	if _paint_left > 0.0:
 		return
 	_paint_left = paint_interval
-	# Downed raiders reveal too: their body is still lying there, and the
-	# party can see the ground around a fallen teammate.
+	# Los derribados también revelan: su cuerpo sigue ahí y la party ve el
+	# suelo alrededor de un compañero caído.
 	for group: String in ["player", "downed_players"]:
 		for node: Node in get_tree().get_nodes_in_group(group):
 			var body := node as Node3D
@@ -104,8 +103,8 @@ func _physics_process(delta: float) -> void:
 				reveal_at(Vector2(body.global_position.x, body.global_position.z))
 
 
-## Paints one disc of explored ground. Public so a future power-up ("read
-## the map") can reveal from somewhere nobody is standing.
+## Pinta un disco de suelo explorado. Pública para poder revelar desde un
+## lugar donde no hay nadie.
 func reveal_at(center_xz: Vector2) -> void:
 	if image == null:
 		return
@@ -123,19 +122,19 @@ func reveal_at(center_xz: Vector2) -> void:
 				continue
 			if dx * dx + dy * dy > radius_sq:
 				continue
-			# Counted here, once per pixel, so explored_fraction() never
-			# has to walk 14 641 pixels to answer.
+			# Se cuenta aquí, una vez por píxel, para que explored_fraction()
+			# no tenga que recorrer toda la imagen.
 			if image.get_pixel(px, py).r < 0.5:
 				_explored_pixels += 1
 				image.set_pixel(px, py, Color(1.0, 1.0, 1.0))
-	# Once per call, not per pixel: a consumer only needs "not what you
-	# last saw". The counter moves exactly when a set_pixel above ran, so a
-	# disc painted over ground that is already explored leaves it alone.
+	# Una vez por llamada, no por píxel: al consumidor le basta "no es lo
+	# que viste". La cuenta solo se mueve si corrió un set_pixel, así un
+	# disco sobre suelo ya explorado no la cambia.
 	if _explored_pixels != explored_before:
 		revision += 1
 
 
-## True when the party has been near this flat position.
+## True si la party estuvo cerca de esta posición plana.
 func is_explored(xz: Vector2) -> bool:
 	if image == null:
 		return false
@@ -145,19 +144,19 @@ func is_explored(xz: Vector2) -> bool:
 	return image.get_pixel(px.x, px.y).r >= 0.5
 
 
-## 0-1 share of the stage the party has uncovered. The soak reads it.
+## Fracción 0-1 de la etapa que descubrió la party. La lee el soak.
 func explored_fraction() -> float:
 	if image == null or _pixels <= 0:
 		return 0.0
 	return float(_explored_pixels) / float(_pixels * _pixels)
 
 
-## Size of the fog image in pixels (MapDraw scales its composite to it).
+## Tamaño de la imagen de niebla en píxeles (MapDraw escala su composición a él).
 func pixels() -> int:
 	return _pixels
 
 
-## Half-extent, in metres, of the arena this fog covers.
+## Media extensión, en metros, de la arena que cubre esta niebla.
 func half_extent() -> float:
 	return _half_extent
 

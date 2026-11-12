@@ -6,6 +6,12 @@
 [ext_resource type="Script" uid="uid://0p2186xko3pi" path="res://scripts/systems/player_stats.gd" id="4_stats"]
 [ext_resource type="Script" uid="uid://bj6h07uuf8ckk" path="res://scripts/systems/item_bag.gd" id="5_bag"]
 [ext_resource type="Script" uid="uid://cmnn3k6k76em8" path="res://scripts/systems/power_ups.gd" id="6_powerups"]
+[ext_resource type="Script" uid="uid://ginwod0otqua" path="res://scripts/player/components/player_camera.gd" id="7_camera"]
+[ext_resource type="Script" uid="uid://bqqg08luk7lph" path="res://scripts/player/components/player_revive.gd" id="8_revive"]
+[ext_resource type="Script" uid="uid://qcqf8asw7qkj" path="res://scripts/player/components/revive_prompt.gd" id="9_prompt"]
+[ext_resource type="Script" uid="uid://2lvnctj67fsv" path="res://scripts/player/components/player_flight.gd" id="10_flight"]
+[ext_resource type="Script" uid="uid://dxq0b27q02cjb" path="res://scripts/player/components/pet_slot.gd" id="11_pet"]
+[ext_resource type="Script" uid="uid://dlawp05r6ab51" path="res://scripts/player/components/player_wallet.gd" id="12_wallet"]
 
 [sub_resource type="CapsuleShape3D" id="CapsuleShape3D_1"]
 resource_local_to_scene = true
@@ -18,14 +24,6 @@ radius = 0.05
 [node name="Player" type="CharacterBody3D" unique_id=286333552 groups=["player"]]
 collision_mask = 3
 script = ExtResource("1_player")
-move_speed = 8.6
-acceleration = 40.0
-air_acceleration = 12.0
-jump_velocity = 8.7
-slide_speed_multiplier = 2.21
-slide_duration = 0.3
-max_weapons = 3
-max_tomes = 3
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="." unique_id=782222361]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.9, 0)
@@ -33,12 +31,13 @@ shape = SubResource("CapsuleShape3D_1")
 
 [node name="SealRig" parent="." unique_id=1718191975 instance=ExtResource("2_rig")]
 
-[node name="SpringArm3D" type="SpringArm3D" parent="." unique_id=1407797706]
+[node name="CameraRig" type="SpringArm3D" parent="." unique_id=1407797706]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.75, 0)
 shape = SubResource("SphereShape3D_1")
 spring_length = 5.0
+script = ExtResource("7_camera")
 
-[node name="Camera3D" type="Camera3D" parent="SpringArm3D" unique_id=977713088]
+[node name="Camera3D" type="Camera3D" parent="CameraRig" unique_id=977713088]
 current = true
 fov = 70.0
 
@@ -57,3 +56,24 @@ script = ExtResource("5_bag")
 
 [node name="PowerUps" type="Node" parent="." unique_id=751190086]
 script = ExtResource("6_powerups")
+
+[node name="Revive" type="Node3D" parent="."]
+script = ExtResource("8_revive")
+
+[node name="RevivePrompt" type="Label3D" parent="Revive"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.6, 0)
+visible = false
+billboard = 1
+no_depth_test = true
+font_size = 52
+outline_size = 14
+script = ExtResource("9_prompt")
+
+[node name="Flight" type="Node" parent="."]
+script = ExtResource("10_flight")
+
+[node name="PetSlot" type="Node" parent="."]
+script = ExtResource("11_pet")
+
+[node name="Wallet" type="Node" parent="."]
+script = ExtResource("12_wallet")

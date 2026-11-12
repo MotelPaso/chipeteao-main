@@ -1,8 +1,13 @@
 shader_type canvas_item;
-// Menu backdrop (CharacterSelect / QuestLog): vertical dark gradient with
-// two layers of slowly drifting value-noise fog and a corner vignette.
-// Fully procedural — no textures. Two noise layers at four taps each keep
-// it trivially cheap for a full-screen rect.
+// Fondo de los menús: degradado vertical oscuro con dos capas de niebla de
+// ruido que se mueven lento y una viñeta en las esquinas. Todo procedural,
+// sin texturas: dos capas de ruido de cuatro muestras cada una cuestan casi
+// nada a pantalla completa.
+// Lo usan las cuatro pantallas (CharacterSelect, QuestLog, Collection,
+// RelicShop) a través de un solo material, assets/ui/menu_backdrop.tres, que
+// no guarda valores propios: los colores, la fuerza de la niebla y su
+// velocidad que se ven son los valores por defecto de abajo. Edítalos aquí, o
+// en el Inspector del material (lo que guarde el material gana).
 
 uniform vec3 top_color: source_color = vec3(0.07, 0.085, 0.135);
 uniform vec3 bottom_color: source_color = vec3(0.028, 0.032, 0.052);
@@ -30,7 +35,7 @@ void fragment() {
 	float t = TIME * drift_speed;
 	float fog = vnoise(uv * vec2(3.0, 2.2) + vec2(t * 2.0, t)) * 0.65
 			+ vnoise(uv * vec2(7.0, 5.0) - vec2(t * 3.0, t * 0.6)) * 0.35;
-	// fog^3 keeps only the bright crests, reading as sparse drifting wisps.
+	// fog^3 deja solo las crestas claras: se leen como jirones sueltos.
 	col += fog_color * fog * fog * fog * fog_strength;
 	float vig = smoothstep(1.25, 0.45, length(uv - 0.5) * 1.7);
 	col *= mix(0.5, 1.0, vig);

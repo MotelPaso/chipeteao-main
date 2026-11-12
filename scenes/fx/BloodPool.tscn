@@ -6,9 +6,6 @@
 shading_mode = 0
 transparency = 1
 albedo_color = Color(0.42, 0.04, 0.08, 0.85)
-emission_enabled = true
-emission = Color(0.75, 0.08, 0.12, 1)
-emission_energy_multiplier = 1.5
 
 [sub_resource type="CylinderMesh" id="CylinderMesh_disc"]
 material = SubResource("StandardMaterial3D_disc")
@@ -22,9 +19,6 @@ rings = 1
 shading_mode = 0
 transparency = 1
 albedo_color = Color(0.16, 0.01, 0.03, 0.9)
-emission_enabled = true
-emission = Color(0.3, 0.02, 0.05, 1)
-emission_energy_multiplier = 0.8
 
 [sub_resource type="TorusMesh" id="TorusMesh_rim"]
 material = SubResource("StandardMaterial3D_rim")
@@ -36,9 +30,6 @@ ring_segments = 8
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_bubble"]
 shading_mode = 0
 albedo_color = Color(0.55, 0.06, 0.1, 1)
-emission_enabled = true
-emission = Color(0.65, 0.08, 0.12, 1)
-emission_energy_multiplier = 1.2
 
 [sub_resource type="SphereMesh" id="SphereMesh_bubble"]
 material = SubResource("StandardMaterial3D_bubble")

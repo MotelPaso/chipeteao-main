@@ -1,68 +1,85 @@
 class_name CofferMimic
 extends SecretBossBase
-## Hidden Ash Dunes miniboss (GDD 6), lured out by the Humming Skull: a
-## sandstone coffer on crab legs with a golden-toothed maw. Moves in fast
-## scuttle bursts with short rests, Snaps at melee range (brief telegraphed
-## wind-up on the bite spot), and periodically Buries itself — only the lid
-## above the sand, bonus armor while dug in — before popping out with a
-## telegraphed shockwave. Payout, HP-bar binding, and the character-unlock
-## death flow live on SecretBossBase.
+## Cofre Mímico, minijefe oculto de las Dunas de Ceniza (GDD 6), lo atrae
+## el Cráneo zumbante: un cofre de arenisca con patas de cangrejo y fauces
+## de dientes dorados. Se mueve en ráfagas rápidas con pausas cortas,
+## Muerde cuerpo a cuerpo (breve carga marcada sobre el punto del mordisco)
+## y cada tanto se Entierra (solo asoma la tapa, con armadura extra) antes
+## de salir con una onda de choque marcada. El pago, la barra de vida y el
+## desbloqueo del personaje al morir viven en SecretBossBase. Colores de
+## aviso e impacto: grupo Telegrafía de CofferMimic.tscn.
 
 enum State { ENTRANCE, PURSUE, SNAP_WINDUP, SNAP_RECOVER, BURIED }
 
-const TELEGRAPH_COLOR := Color(0.98, 0.75, 0.25)
-const IMPACT_COLOR := Color(1.0, 0.88, 0.5)
-const ENTRANCE_RING_RADIUS: float = 2.4
-## Lid angle while dug in: fully shut, so only sand shows.
+## Ángulo de la tapa enterrado: cerrada del todo, solo se ve arena.
 const LID_CLOSED_ANGLE: float = 0.0
-## How wide the maw gapes during a bite windup.
-const LID_GAPE_ANGLE: float = 1.15
 
+@export_group("Llegada")
+## Segundos del estado de llegada antes de empezar a pelear.
 @export var entrance_duration: float = 0.8
+## Radio en metros del anillo de destello de la llegada.
+@export var entrance_ring_radius: float = 2.4
 
-@export_group("Scuttle")
-## The chassis move_speed is the burst speed; rests stand still.
+@export_group("Correteo")
+## Segundos de cada ráfaga de carrera, a la move_speed del chasis.
 @export var scuttle_burst_time: float = 0.8
+## Segundos de cada pausa quieto entre ráfagas.
 @export var scuttle_rest_time: float = 0.6
 
-@export_group("Snap")
-## Player distance that triggers a bite.
+@export_group("Mordisco")
+## Distancia al raider, en metros, que dispara un mordisco.
 @export var snap_range: float = 2.4
-## Bite disc radius around the spot the maw locks onto.
+## Radio en metros del disco del mordisco alrededor del punto que fijan las fauces.
 @export var snap_radius: float = 1.8
+## Daño del mordisco a cada raider dentro del disco (valor base; apply_tier lo escala).
 @export var snap_damage: float = 14.0
+## Segundos de aviso entre el disco y el mordisco.
 @export var snap_windup: float = 0.45
+## Segundos quieto después del mordisco antes de volver a moverse.
 @export var snap_recover: float = 0.55
+## Segundos de espera entre un mordisco y el siguiente.
 @export var snap_cooldown: float = 2.2
+## Metros sobre el suelo por encima de los cuales el mordisco no golpea.
 @export var snap_height_window: float = 1.3
+## Segundos del destello del mordisco (más corto que el impacto común).
+@export var snap_flash_time: float = 0.15
+## Ángulo en radianes al que se abren las fauces (la tapa) durante la carga del mordisco.
+@export var lid_gape_angle: float = 1.15
+## Segundos que tarda la tapa en cerrarse de golpe, de vuelta a su reposo, al morder.
+@export var snap_lid_close_time: float = 0.12
 
-@export_group("Bury")
+@export_group("Enterrarse")
+## Segundos de espera entre un entierro y el siguiente.
 @export var bury_interval: float = 8.0
-## Seconds dug in (also the pop-out shockwave's telegraph time).
+## Segundos enterrado (también el aviso de la onda al salir).
 @export var bury_duration: float = 2.0
-## Flat armor added to the Health component while buried. Deliberately
-## flat, and worth knowing what that means: Health.take_damage floors every
-## hit at 1 HP, so while dug in (scene armor 2 + this = 8) any weapon tick
-## under 8 lands for exactly 1. That IS the "wait it out" window, but it is
-## also why raising this further would read as immunity, not as armor.
+## Armadura plana que se suma a Health mientras está enterrado (con la de la escena, golpes menores que el total hacen 1).
 @export var bury_armor_bonus: float = 6.0
-## How far the body sinks: tuned so only the lid clears the sand.
+## Metros que se hunde el cuerpo: ajustado para que solo asome la tapa.
 @export var bury_sink_depth: float = 0.85
+## Segundos que tarda la tapa en cerrarse al enterrarse.
+@export var bury_lid_close_time: float = 0.15
+## Segundos que tarda el cuerpo en volver a la superficie al salir.
+@export var bury_rise_time: float = 0.2
+## Segundos que tarda la tapa en volver a abrirse al salir.
+@export var bury_lid_open_time: float = 0.2
+## Radio de la onda de choque al salir y de su disco de aviso, en metros.
 @export var shockwave_radius: float = 3.0
+## Daño de la onda a cada raider dentro del radio (valor base; apply_tier lo escala).
 @export var shockwave_damage: float = 10.0
+## Metros sobre el suelo por encima de los cuales la onda no golpea.
 @export var shockwave_height_window: float = 1.5
 
 var _state: State = State.ENTRANCE
 var _state_timer: float = 0.0
-var _entrance_played: bool = false
 var _scuttle_timer: float = 0.0
 var _scuttle_resting: bool = false
 var _snap_cooldown_timer: float = 0.0
 var _snap_point: Vector3 = Vector3.ZERO
 var _bury_timer: float = 0.0
 var _buried_armor_applied: bool = false
-## The lid animates on its own slot: it runs alongside the body cues
-## (sinking, popping), so it must not share BossBase's single _cue_tween.
+## La tapa anima en su propio slot: corre junto a las señales del cuerpo
+## (hundirse, salir), así que no puede compartir el _cue_tween de BossBase.
 var _lid_tween: Tween
 
 @onready var _lid_pivot: Node3D = $Visual/LidPivot
@@ -90,11 +107,7 @@ func _behavior_tick(delta: float) -> void:
 			_scuttle_resting = not _scuttle_resting
 			_scuttle_timer = scuttle_rest_time if _scuttle_resting else scuttle_burst_time
 		return
-	if _state == State.ENTRANCE and not _entrance_played:
-		# Deferred off _ready so the trigger has assigned the real spawn
-		# position before the arrival ring appears.
-		_entrance_played = true
-		_play_entrance()
+	_tick_entrance(_state == State.ENTRANCE)
 	_state_timer -= delta
 	if _state_timer > 0.0:
 		return
@@ -131,37 +144,37 @@ func _combat_tick(player: Node3D, distance: float) -> void:
 		_start_snap(player)
 
 
-## Sand-burst arrival with the desert roar voice.
+## Llegada reventando la arena, con la voz de rugido del desierto.
 func _play_entrance() -> void:
 	Sfx.play(&"burrow_pop")
 	Sfx.play(&"boss_roar_2", -3.0)
-	_play_boss_entrance(ENTRANCE_RING_RADIUS, IMPACT_COLOR)
+	_play_boss_entrance(entrance_ring_radius, impact_color)
 
 
-# --- Snap -------------------------------------------------------------------
+# --- Mordisco ------------------------------------------------------------------
 
 func _start_snap(player: Node3D) -> void:
 	_state = State.SNAP_WINDUP
 	_state_timer = snap_windup
 	_snap_point = _clamp_to_arena(player.global_position)
-	Telegraph.spawn_disc(self, _snap_point, snap_radius, snap_windup, TELEGRAPH_COLOR)
-	_play_lid(LID_GAPE_ANGLE, snap_windup)
+	Telegraph.spawn_disc(self, _snap_point, snap_radius, snap_windup, telegraph_color)
+	_play_lid(lid_gape_angle, snap_windup)
 
 
 func _resolve_snap() -> void:
 	_state = State.SNAP_RECOVER
 	_state_timer = snap_recover
 	_snap_cooldown_timer = snap_cooldown
-	Telegraph.spawn_disc(self, _snap_point, snap_radius, 0.15, IMPACT_COLOR)
+	Telegraph.spawn_disc(self, _snap_point, snap_radius, snap_flash_time, impact_color)
 	Sfx.play(&"hit_crit", -3.0)
-	_play_lid(_lid_rest_angle, 0.12)
-	# Resolved against the telegraphed bite spot for the whole party: the
-	# raider it locked onto may not be the nearest one any more.
+	_play_lid(_lid_rest_angle, snap_lid_close_time)
+	# Contra el punto marcado del mordisco y todo el equipo: el raider que
+	# fijó puede ya no ser el más cercano.
 	damage_players_in_disc(_snap_point, snap_radius, snap_height_window,
 			snap_damage, self)
 
 
-# --- Bury -------------------------------------------------------------------
+# --- Enterrarse ----------------------------------------------------------------
 
 func _start_bury() -> void:
 	_state = State.BURIED
@@ -171,10 +184,10 @@ func _start_bury() -> void:
 		_buried_armor_applied = true
 		_health.armor += bury_armor_bonus
 	Sfx.play(&"burrow_pop", -2.0)
-	# The whole bury reads as the shockwave countdown.
+	# Todo el tiempo enterrado se lee como la cuenta de la onda.
 	Telegraph.spawn_disc(self, global_position, shockwave_radius,
-			bury_duration, TELEGRAPH_COLOR)
-	_play_lid(LID_CLOSED_ANGLE, 0.15)
+			bury_duration, telegraph_color)
+	_play_lid(LID_CLOSED_ANGLE, bury_lid_close_time)
 	_play_cue(_visual, "position:y", -bury_sink_depth, 0.25,
 			Tween.TRANS_QUAD, Tween.EASE_IN)
 
@@ -186,21 +199,20 @@ func _resolve_bury() -> void:
 	if _buried_armor_applied:
 		_buried_armor_applied = false
 		_health.armor -= bury_armor_bonus
-	Telegraph.spawn_disc(self, global_position, shockwave_radius, 0.2, IMPACT_COLOR)
 	Sfx.play(&"burrow_pop")
-	Juice.shake(0.15, 0.35)
-	_play_cue(_visual, "position:y", 0.0, 0.2, Tween.TRANS_BACK, Tween.EASE_OUT)
-	# The bury shut the lid; popping out has to open it back to its rest
-	# angle or the coffer keeps fighting sealed for the rest of the run.
-	_play_lid(_lid_rest_angle, 0.2)
-	# The shockwave ring is telegraphed for everyone, so everyone standing
-	# in it takes it.
-	damage_players_in_disc(global_position, shockwave_radius,
-			shockwave_height_window, shockwave_damage, self)
+	_play_cue(_visual, "position:y", 0.0, bury_rise_time,
+			Tween.TRANS_BACK, Tween.EASE_OUT)
+	# Enterrarse cerró la tapa; al salir hay que abrirla a su ángulo de
+	# reposo o el cofre sigue peleando sellado el resto de la partida.
+	_play_lid(_lid_rest_angle, bury_lid_open_time)
+	# El anillo de la onda se marca para todos, así que lo recibe todo el que
+	# esté dentro.
+	_resolve_ground_hit([global_position], shockwave_radius,
+			shockwave_height_window, shockwave_damage)
 
 
-## One slot for the lid, so a snap that lands during a bury (or vice versa)
-## replaces the running lid animation instead of fighting it.
+## Un slot para la tapa, así un mordisco durante un entierro (o al revés)
+## reemplaza la animación de la tapa en vez de pelearse con ella.
 func _play_lid(target_x: float, duration: float) -> void:
 	if _lid_tween != null and _lid_tween.is_valid():
 		_lid_tween.kill()

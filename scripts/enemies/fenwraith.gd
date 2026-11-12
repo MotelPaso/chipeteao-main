@@ -1,60 +1,88 @@
 class_name Fenwraith
 extends BossBase
-## Gloomfen boss (iteration 37): a drowned marsh spirit that fights at
-## range and refuses to be pinned down. State machine on the EnemyBase
-## hooks, Rotking-style. Moveset:
-##   - Miasma Nova: telegraphed poison burst around itself when crowded
-##     (jump or leave the ring during the windup to dodge).
-##   - Bog Volley: a fan of slow bolts lobbed at mid range (EnemyBolt,
-##     pooled — the skirmisher's projectile, denser).
-##   - Sink & Rise: telegraphs a spot near the player, sinks into the
-##     marsh, and erupts there — a gap-closer that keeps the fight moving.
-## Title/tier/curse/payout/arena-clamp plumbing lives on BossBase; the
-## spawner promotes the Elder rematch through apply_tier().
+## Espectro de la Ciénaga, jefe de la Ciénaga Lóbrega: un espíritu ahogado
+## del pantano que pelea a distancia y no se deja acorralar. Máquina de
+## estados sobre los hooks de EnemyBase, al estilo del Rotking. Moveset:
+##   - Nova de miasma: estallido venenoso marcado alrededor suyo cuando lo
+##     rodean (salta o sal del anillo durante la carga).
+##   - Andanada del pantano: un abanico de saetas lentas a media distancia
+##     (EnemyBolt del pool, la saeta del hostigador, más densa).
+##   - Hundirse y emerger: marca un punto cerca del raider, se hunde en el
+##     pantano y sale ahí; acorta distancia y mantiene la pelea en movimiento.
+## Título, grados, pago y recorte de arena viven en BossBase; el spawner
+## sube la revancha Elder con apply_tier(). Colores de aviso e impacto:
+## grupo Telegrafía de Fenwraith.tscn.
 
 enum State { ENTRANCE, PURSUE, NOVA, VOLLEY, BLINK }
 
-const TELEGRAPH_COLOR := Color(0.35, 0.85, 0.6)
-const IMPACT_COLOR := Color(0.6, 1.0, 0.7)
-## Sink & Rise: the disc marking both ends of the teleport, and how long
-## the shroud takes to unfold again on arrival.
-const BLINK_DISC_RADIUS: float = 2.2
-const BLINK_RISE_TIME: float = 0.3
-
+@export_group("Llegada")
+## Segundos del estado de llegada antes de empezar a pelear.
 @export var entrance_duration: float = 0.9
 
-@export_group("Miasma Nova")
+@export_group("Nova de miasma")
+## Distancia al raider, en metros, por debajo de la cual lanza la Nova.
 @export var nova_trigger_range: float = 5.0
+## Radio de la Nova y de su disco de aviso, en metros.
 @export var nova_radius: float = 5.5
+## Daño de la Nova a cada raider dentro del radio (valor base; apply_tier lo escala).
 @export var nova_damage: float = 22.0
+## Segundos de aviso entre el disco y el estallido.
 @export var nova_windup: float = 0.9
+## Segundos quieto después del estallido antes de volver a pelear.
 @export var nova_recover: float = 0.7
+## Segundos de espera entre una Nova y la siguiente.
 @export var nova_cooldown: float = 5.0
-## A player higher than this above the boss's footing is missed.
+## Metros sobre los pies del jefe por encima de los cuales la Nova no golpea.
 @export var nova_height_window: float = 1.5
 
-@export_group("Bog Volley")
+@export_group("Andanada del pantano")
+## Segundos de espera entre una andanada y la siguiente.
 @export var volley_interval: float = 5.5
+## Segundos de carga antes de soltar las saetas.
 @export var volley_windup: float = 0.5
+## Distancia mínima al raider, en metros, para lanzar la andanada.
 @export var volley_min_range: float = 6.0
+## Distancia máxima al raider, en metros, para lanzar la andanada.
 @export var volley_max_range: float = 22.0
+## Saetas por andanada.
 @export var volley_bolt_count: int = 5
+## Ancho total del abanico de saetas, en grados.
 @export var volley_spread_degrees: float = 40.0
+## Daño de cada saeta (valor base; apply_tier lo escala).
 @export var bolt_damage: float = 9.0
+## Escena de la saeta (EnemyBolt, sale de Pools).
 @export var bolt_scene: PackedScene
+## Altura en metros desde la que salen las saetas.
 @export var muzzle_height: float = 1.6
+## Altura en metros sobre los pies del raider a la que apuntan las saetas.
 @export var target_height: float = 0.9
 
-@export_group("Sink & Rise")
+@export_group("Hundirse y emerger")
+## Segundos de espera entre un hundimiento y el siguiente.
 @export var blink_interval: float = 9.0
+## Distancia mínima al raider, en metros, para hundirse y salir cerca de él.
 @export var blink_trigger_range: float = 12.0
+## Segundos que tarda en hundirse antes de salir en el punto marcado.
 @export var blink_windup: float = 0.7
-## The eruption point lands this far from the hunted player.
+## Distancia en metros del punto de salida al raider perseguido.
 @export var blink_arrival_distance: float = 5.0
+## Fracción de blink_interval que espera el primer hundimiento al aparecer (0-1).
+@export var first_blink_fraction: float = 0.6
+## Radio en metros del disco que marca la salida (y el destello al llegar).
+@export var blink_disc_radius: float = 2.2
+## Escala del sudario aplastado contra el pantano al hundirse (x, y, z).
+@export var blink_sink_squash: Vector3 = Vector3(1.2, 0.1, 1.2)
+## Fracción de blink_windup que tarda el sudario en aplastarse (0-1).
+@export var blink_sink_fraction: float = 0.8
+## Segundos que tarda el sudario en desplegarse al salir.
+@export var blink_rise_time: float = 0.3
+## Fuerza del temblor de cámara al salir (0-1).
+@export var blink_shake_strength: float = 0.15
+## Segundos del temblor de cámara al salir.
+@export var blink_shake_duration: float = 0.3
 
 var _state: State = State.ENTRANCE
 var _state_timer: float = 0.0
-var _entrance_played: bool = false
 var _nova_cooldown_timer: float = 0.0
 var _nova_resolved: bool = false
 var _volley_timer: float = 0.0
@@ -66,7 +94,7 @@ func _ready() -> void:
 	super()
 	_state_timer = entrance_duration
 	_volley_timer = volley_interval
-	_blink_timer = blink_interval * 0.6  # first sink comes a bit early
+	_blink_timer = blink_interval * first_blink_fraction
 
 
 func _scale_attack_damage(multiplier: float) -> void:
@@ -80,9 +108,7 @@ func _behavior_tick(delta: float) -> void:
 		_volley_timer = maxf(_volley_timer - delta, 0.0)
 		_blink_timer = maxf(_blink_timer - delta, 0.0)
 		return
-	if _state == State.ENTRANCE and not _entrance_played:
-		_entrance_played = true
-		_play_entrance()
+	_tick_entrance(_state == State.ENTRANCE)
 	_state_timer -= delta
 	if _state_timer > 0.0:
 		return
@@ -126,31 +152,28 @@ func _combat_tick(player: Node3D, distance: float) -> void:
 
 func _play_entrance() -> void:
 	Sfx.play(&"boss_roar_2")
-	_play_boss_entrance(nova_radius * 0.6, IMPACT_COLOR)
+	_play_boss_entrance(nova_radius * 0.6, impact_color)
 
 
-## --- Miasma Nova -------------------------------------------------------
+## --- Nova de miasma -----------------------------------------------------------
 
 func _start_nova() -> void:
 	_state = State.NOVA
 	_state_timer = nova_windup
 	_nova_resolved = false
-	Telegraph.spawn_disc(self, global_position, nova_radius, nova_windup, TELEGRAPH_COLOR)
+	Telegraph.spawn_disc(self, global_position, nova_radius, nova_windup, telegraph_color)
 
 
 func _resolve_nova() -> void:
 	_nova_resolved = true
 	_state_timer = nova_recover
 	_nova_cooldown_timer = nova_cooldown
-	Telegraph.spawn_disc(self, global_position, nova_radius, 0.2, IMPACT_COLOR)
-	Juice.shake(0.2, 0.4)
-	# Every raider caught in the ring takes it (co-op: the nova is honest),
-	# and naming ourselves as the attacker lets thorns answer back.
-	damage_players_in_disc(global_position, nova_radius, nova_height_window,
-			nova_damage, self)
+	# Todo raider dentro del anillo la recibe.
+	_resolve_ground_hit([global_position], nova_radius, nova_height_window,
+			nova_damage)
 
 
-## --- Bog Volley --------------------------------------------------------
+## --- Andanada del pantano -----------------------------------------------------
 
 func _start_volley() -> void:
 	_state = State.VOLLEY
@@ -189,7 +212,7 @@ func _resolve_volley() -> void:
 		bolt.look_at(bolt.global_position + aim, WeaponBase.safe_up(aim))
 
 
-## --- Sink & Rise -------------------------------------------------------
+## --- Hundirse y emerger -------------------------------------------------------
 
 func _start_blink(player: Node3D) -> void:
 	_state = State.BLINK
@@ -199,15 +222,13 @@ func _start_blink(player: Node3D) -> void:
 	var wanted := player.global_position \
 			+ Vector3(cos(angle), 0.0, sin(angle)) * blink_arrival_distance
 	wanted.y = global_position.y
-	# Hard teleport, so the square clamp is not enough: the arena mask
-	# (iteration 44) fills whole cells with 7 m walls, and surfacing inside
-	# one leaves the boss perched on rock where no melee can reach it while
-	# it keeps lobbing volleys. Same question the spawner asks before every
-	# ring spawn.
+	# Teletransporte duro, así que el recorte cuadrado no alcanza: la máscara
+	# de la arena llena celdas enteras con formaciones de roca, y salir en una
+	# deja al jefe encaramado en roca donde nadie lo alcanza cuerpo a cuerpo.
 	_blink_target = _safe_arena_point(wanted)
-	Telegraph.spawn_disc(self, _blink_target, BLINK_DISC_RADIUS, blink_windup, TELEGRAPH_COLOR)
-	# Sinking cue: the shroud squashes into the marsh during the windup.
-	_play_cue(_visual, "scale", Vector3(1.2, 0.1, 1.2), blink_windup * 0.8,
+	Telegraph.spawn_disc(self, _blink_target, blink_disc_radius, blink_windup, telegraph_color)
+	# Señal de hundirse: el sudario se aplasta en el pantano durante la carga.
+	_play_cue(_visual, "scale", blink_sink_squash, blink_windup * blink_sink_fraction,
 			Tween.TRANS_QUAD, Tween.EASE_IN)
 
 
@@ -215,7 +236,8 @@ func _resolve_blink() -> void:
 	_state = State.PURSUE
 	global_position = _blink_target
 	Sfx.play(&"burrow_pop")
-	Telegraph.spawn_disc(self, global_position, BLINK_DISC_RADIUS, 0.2, IMPACT_COLOR)
-	Juice.shake(0.15, 0.3)
-	_play_cue(_visual, "scale", Vector3.ONE, BLINK_RISE_TIME,
+	Telegraph.spawn_disc(self, global_position, blink_disc_radius, impact_flash_time,
+			impact_color)
+	Juice.shake(blink_shake_strength, blink_shake_duration)
+	_play_cue(_visual, "scale", Vector3.ONE, blink_rise_time,
 			Tween.TRANS_BACK, Tween.EASE_OUT)

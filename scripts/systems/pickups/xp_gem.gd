@@ -1,19 +1,20 @@
 class_name XpGem
 extends MagnetPickup
-## XP gem dropped by enemies: the shared MagnetPickup chassis (idle
-## spin/bob, sticky magnet homing, level-up vacuum, lifetime despawn,
-## pooled release) plus the one thing that is gem-specific — collecting
-## credits RunState.add_xp scaled by the COLLECTOR's XP multiplier.
-## pool_reset also restores xp_value, which droppers scale per gem on top
-## of the scene default. Live gems sit in LIVE_GROUP; the scene's separate
-## persistent "xp_gems" group is what the perf probe counts.
+## Gema de XP que sueltan los enemigos: el chasis compartido MagnetPickup
+## más lo único propio de la gema — recogerla acredita RunState.add_xp
+## escalado por el multiplicador de XP de QUIEN la recoge.
+## pool_reset también restaura xp_value, que quien suelta escala por gema
+## sobre el valor de la escena.
 
-## Group every live (dropped, uncollected) gem belongs to; the vacuum
-## reaches gems through it. Distinct from the scene's persistent
-## "xp_gems" group, which the perf probe counts.
+## Grupo de toda gema viva (soltada y sin recoger); la aspiradora llega a
+## las gemas por él. Distinto del grupo permanente "xp_gems" de la escena,
+## que cuenta la sonda de rendimiento.
 const LIVE_GROUP: StringName = &"gems"
 
+@export_group("Experiencia")
+## XP que da la gema antes de multiplicadores; quien la suelta la escala.
 @export var xp_value: int = 1
+@export_group("")
 
 var _default_xp_value: int = 1
 
@@ -31,8 +32,8 @@ func _reset_extra() -> void:
 	xp_value = _default_xp_value
 
 
-## XP is party-wide, but the COLLECTOR's XP multiplier (Tome of Wisdom)
-## and the run-wide difficulty share scale the pickup (iteration 39).
+## La XP es de toda la party, pero el multiplicador de XP de quien la
+## recoge (Tomo de Sabiduría) y la parte de dificultad de la partida la escalan.
 func _on_collected(collector: Node3D) -> void:
 	Sfx.play(&"gem_pickup")
 	var multiplier := RunState.difficulty_xp_multiplier()

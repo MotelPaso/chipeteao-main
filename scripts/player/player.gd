@@ -1,272 +1,112 @@
 class_name Player
 extends CharacterBody3D
-## Player controller: WASD movement relative to camera yaw, mouse-look,
-## jump, and a Shift+move slide (speed burst + lowered collision).
-## At spawn it applies the selected character's loadout (GameConfig ->
-## CharacterCatalog row): starting weapon, body model with a tint
-## (optional per row, the seal by default), per-level passive.
-## The visual body is the SealRig child (foca.glb); the gameplay capsule
-## collision shape is unchanged and stays authoritative for physics.
-## apply_root() (Sarcognath's Entomb) locks movement without touching the
-## camera or the auto-firing weapons.
+## Raider de un jugador: movimiento relativo a la cámara, salto con
+## multisalto, derrape (Shift + moverse), enraizamiento y rescate del vacío.
+## Al aparecer aplica la fila de su personaje (CharacterCatalog): arma
+## inicial, modelo del cuerpo con su tinte y pasiva por nivel.
 ##
-## Scene contract: the CollisionShape3D's CapsuleShape3D is marked
-## `resource_local_to_scene` in Player.tscn. _set_body_height() MUTATES it
-## while sliding, and a plain sub-resource is ONE object shared by every
-## instance of the packed scene — sliding would resize the whole party's
-## capsule and leak the crouched height into the next run.
+## Cada parte vive en su nodo hijo de Player.tscn, con sus propios valores:
+## SealRig (cuerpo visible), CameraRig (cámara y vista), Revive (caído y
+## rescate en co-op, con el cartel RevivePrompt), Flight (power-up Vuelo),
+## PetSlot (mascota), Wallet (puntos), además de Health, Stats, ItemBag,
+## PowerUps y el montaje Weapons. Player decide el orden de cada tick y
+## conserva los nombres que otros scripts llaman (add_points, set_pet,
+## view_camera, end_flight…).
+##
+## Contrato de escena: la CapsuleShape3D de CollisionShape3D lleva
+## `resource_local_to_scene` en Player.tscn porque _set_body_height() la
+## modifica al derrapar; sin esa marca la comparten todas las instancias y
+## el derrape encoge a toda la party.
 
-@export_group("Movement")
-## 6.6 (was 6.0, iteration-31 balance): the 160x160 arenas mean more
-## travel between points of interest; a ~10% base speed bump keeps the
-## loop's tempo without touching the spawn-ring pressure.
-@export var move_speed: float = 6.6
-@export var acceleration: float = 12.0
-@export var air_acceleration: float = 4.0
-@export var jump_velocity: float = 8.0
-@export_group("Flight (power-up)")
-## Vuelo: while the power-up runs and the jump action is HELD, the raider
-## climbs at this rate instead of falling.
-@export var flight_rise_speed: float = 9.0
-## Ceiling above the terrain under the raider. High enough to clear every
-## mesa and rock, low enough that the camera still frames the ground.
-@export var flight_ceiling: float = 12.0
-## Descent while flying with the jump released: a glide, not a drop, so
-## letting go is a way to steer and not a way to die.
-@export var flight_fall_speed: float = 4.0
+## Cambiaron los puntos de la partida (reemite la del nodo Wallet); el HUD
+## la conecta por nombre.
+signal points_changed(total: int)
+## Se emite al EMPEZAR un derrape, con su dirección; lo escucha el
+## Cinturón eléctrico (ItemBag).
+signal slide_started(direction: Vector3)
 
-@export_group("Slide")
-@export var slide_speed_multiplier: float = 1.8
-@export var slide_duration: float = 0.6
-@export var slide_cooldown: float = 0.8
-@export var slide_collision_height: float = 0.9
-
-## A slide needs real momentum behind it, not a standing start: the body
-## must already carry this fraction of its effective speed.
-const SLIDE_MIN_SPEED_RATIO: float = 0.5
-
-@export_group("Combat")
-## Cap on simultaneous weapons under the Weapons mount; the upgrade pool
-## stops offering new-weapon cards once it is reached (5, iteration 38).
-@export var max_weapons: int = 5
-## Cap on DISTINCT tomes this raider can carry; past it the pool only
-## offers deeper stacks of the tomes already held.
-@export var max_tomes: int = 5
-
-@export_group("Safety")
-## Fail-safe: falling below this world Y (out-of-bounds through some
-## geometry gap) teleports the player back to safe ground, no damage.
-@export var void_rescue_y: float = -10.0
-
-## Where a void-rescued DOWNED body lands relative to its rescuer: beside
-## them, not inside them, so the solver does not shove either raider.
+## Dónde queda un caído rescatado del vacío respecto de su compañero: al
+## lado y no encima, para que la física no empuje a ninguno de los dos.
 const RESCUE_MATE_OFFSET := Vector3(1.5, 0.5, 0.0)
 
-@export_group("Camera")
-@export var mouse_sensitivity: float = 0.003
-@export var initial_pitch_deg: float = -20.0
-@export var min_pitch_deg: float = -80.0
-@export var max_pitch_deg: float = 10.0
-## First-person pitch gets the full range; third/free keep the clamps above.
-@export var first_person_min_pitch_deg: float = -85.0
-@export var first_person_max_pitch_deg: float = 85.0
-## Free-orbit zoom range and per-notch step (mouse wheel / pad D-pad).
-@export var free_orbit_min_distance: float = 2.5
-@export var free_orbit_max_distance: float = 11.0
-@export var free_orbit_zoom_step: float = 1.0
-## How fast the body turns to face its movement in free-orbit mode.
-@export var free_orbit_turn_speed: float = 10.0
+@export_group("Movimiento")
+## Velocidad base al caminar, en metros por segundo; tomos y objetos la multiplican.
+@export var move_speed: float = 8.6
+## Aceleración en el suelo, en metros por segundo cada segundo.
+@export var acceleration: float = 40.0
+## Aceleración en el aire, en metros por segundo cada segundo.
+@export var air_acceleration: float = 12.0
+## Velocidad vertical al saltar, en metros por segundo.
+@export var jump_velocity: float = 8.7
 
-## Camera modes cycled per player with the "camera_mode" action:
-## THIRD_PERSON is the shipped default (look turns the body), FIRST_PERSON
-## collapses the arm to the eyes and hides the own seal, FREE_ORBIT
-## decouples look from the body — the camera orbits the player while the
-## body faces wherever it walks (weapons auto-aim, so facing is cosmetic).
-enum CameraMode { THIRD_PERSON, FIRST_PERSON, FREE_ORBIT }
+@export_group("Derrape")
+## Multiplicador de la velocidad efectiva durante el derrape.
+@export var slide_speed_multiplier: float = 2.21
+## Duración del derrape, en segundos.
+@export var slide_duration: float = 0.3
+## Espera entre un derrape y el siguiente, en segundos.
+@export var slide_cooldown: float = 0.8
+## Altura de la cápsula durante el derrape, en metros.
+@export var slide_collision_height: float = 0.9
+## Fracción de la velocidad efectiva que ya debe llevar el cuerpo para derrapar (0-1; no se derrapa desde quieto).
+@export var slide_min_speed_ratio: float = 0.5
 
-## Visual layer bit per party slot: the seal rig renders on layer
-## RIG_LAYER_BASE + slot + 1 (instead of layer 1) so a first-person camera
-## can cull ONLY its own body while teammates' cameras keep seeing it.
-const RIG_LAYER_BASE: int = 10
+@export_group("Inventario")
+## Tope de armas simultáneas; al llegar, el pool deja de ofrecer armas nuevas (upgrade_pool.gd lo lee por nombre).
+@export var max_weapons: int = 3
+## Tope de tomos distintos; al llegar, el pool solo ofrece más niveles de los que ya tiene (upgrade_pool.gd lo lee por nombre).
+@export var max_tomes: int = 3
+
+@export_group("Seguridad")
+## Altura del mundo (Y, en metros) bajo la cual el raider vuelve a suelo seguro sin daño.
+@export var void_rescue_y: float = -10.0
 
 @export_group("Co-op")
-## Party slot (0-3). Slot 0 is the scene's built-in player; RunSystems
-## assigns 1+ on the extra bodies it spawns in co-op. Decides which input
-## device drives this body (see Coop.action / Coop.look_vector).
+## Slot del jugador (0-3): decide qué dispositivo lo controla; RunSystems asigna 1+ a los cuerpos extra.
 @export var player_index: int = 0
 
-## Downed teammates revive when an alive player stands inside this radius
-## holding their interact action for revive_time seconds.
-@export var revive_radius: float = 3.0
-@export var revive_time: float = 3.0
-## Fraction of max HP a revived player comes back with.
-@export var revive_heal_fraction: float = 0.5
-## Losing rescuer contact drains progress at this rate (fraction/second).
-@export var revive_decay_rate: float = 0.5
+## Interruptor de prueba (ArenaProbe, BONK_WEAPON): id del arma con que
+## empieza el raider en vez de la de su personaje. Pasa por el mismo camino
+## de entrega (el node_name que cuenta el pool y el contador used_weapon_).
+static var starting_weapon_override: String = ""
 
-## Floating revive prompt: the Label3D metrics interactables already use
-## (interactable.gd), lifted clear of the fallen body.
-const PROMPT_FONT_SIZE: int = 52
-const PROMPT_OUTLINE_SIZE: int = 14
-const PROMPT_HEIGHT: float = 2.6
-## Sentinel for "the prompt has never been painted", distinct from the
-## "not being rescued" percentage.
-const PROMPT_PCT_UNSET: int = -2
+## Puntos actuales de la partida (los guarda el nodo Wallet); otros scripts
+## los leen con get("points").
+var points: int:
+	get:
+		return _wallet.points if _wallet != null else 0
+## Mascota que sigue al raider ("" = ninguna; la guarda el nodo PetSlot).
+## Antes del _ready de Player vale "": PlayerStats ya la lee en el suyo.
+var pet_id: String:
+	get:
+		return _pet_slot.pet_id if _pet_slot != null else ""
+## Radio de rescate en metros (solo lectura; se edita en el nodo Revive).
+var revive_radius: float:
+	get:
+		return _revive.revive_radius
+## Segundos de Interactuar para revivir (solo lectura; se edita en el nodo Revive).
+var revive_time: float:
+	get:
+		return _revive.revive_time
 
-@onready var spring_arm: SpringArm3D = $SpringArm3D
 @onready var collision_shape: CollisionShape3D = $CollisionShape3D
 @onready var seal_rig: SealRig = $SealRig
 @onready var weapons_mount: Node3D = $Weapons
 @onready var health: Health = $Health
 @onready var _stats: PlayerStats = $Stats
-@onready var item_bag: ItemBag = $ItemBag
-
-## Run points (iteration 40): earned per kill by the nearest raider,
-## spent on chests, roulettes and springs. Per player, reset every run.
-signal points_changed(total: int)
-## Emitted at the START of a dash, with the direction it went. The electric
-## belt is its only listener today; the dash had no signal before because
-## nothing outside the Player cared that it happened.
-signal slide_started(direction: Vector3)
-var points: int = 0
-
-
-## --- companion slot (iteration 54) ------------------------------------------
-
-## The one pet following this raider ("" = none). ONE slot per player: a
-## second pet REPLACES the first, weapon and stat together, so a companion
-## is a decision and not an accumulation. Filled only by the pet box and
-## the animal trafficker — never by a chest or a roulette roll, because a
-## companion you did not choose is one that threw away the one you did.
-var pet_id: String = ""
-
-
-## Swaps the companion. Frees the old Pet node before spawning the new one
-## (the swap is the whole point), announces both halves through the loot
-## toast and re-runs the stat layer, which reads `pet_id` for the level
-## scaling. Passing "" just clears the slot.
-func set_pet(new_pet_id: String) -> void:
-	if new_pet_id == pet_id:
-		return
-	var leaving := PetCatalog.by_id(pet_id)
-	# By TYPE, not by name: queue_free leaves the node a child until the
-	# end of the frame, so a second set_pet in the same frame made
-	# add_child rename the incoming Pet ("Pet_doki" -> "@Pet_doki@2") and
-	# no later call could ever find it again — two companions following
-	# one raider, both firing, forever.
-	for child: Node in get_children():
-		var old_pet := child as Pet
-		if old_pet != null:
-			old_pet.queue_free()
-	pet_id = new_pet_id
-	if not leaving.is_empty():
-		_announce_pet(PET_LEAVES % String(leaving.display_name),
-				PetCatalog.weapon_display_name(leaving), leaving)
-	if not pet_id.is_empty():
-		var row := PetCatalog.by_id(pet_id)
-		if row.is_empty():
-			push_warning("Player: unknown pet '%s'" % pet_id)
-			pet_id = ""
-		else:
-			var pet := Pet.new()
-			pet.setup(row)
-			add_child(pet)
-			_announce_pet(PET_JOINS % String(row.display_name),
-					String(row.get("stat_label", "")), row)
-			# One-line log (RunManager convention). It lives HERE and not in
-			# the two sellers: this is the only door a companion comes
-			# through, so a new source cannot forget to announce itself.
-			print("Pet joined: %s" % pet_id)
-	var stats := PlayerStats.find_in(self)
-	if stats != null:
-		stats.recompute()
-
-
-func _announce_pet(title: String, description: String, row: Dictionary) -> void:
-	get_tree().call_group("hud", "show_loot", title, description,
-			row.get("color", Color.WHITE) as Color, player_index)
-
-
-## Named multiplier sources on the points payout (iteration 53). A PRODUCT
-## of named factors, not one number: Fiebre del oro doubles it, part C2
-## adds another source, and two of them running at once must compose
-## instead of overwriting each other.
-var _points_sources: Dictionary[String, float] = {}
-
-
-## Points earned per payout, after every live source.
-func points_multiplier() -> float:
-	var factor := 1.0
-	for source_id: String in _points_sources:
-		factor *= _points_sources[source_id]
-	return factor
-
-
-func set_points_source(source_id: String, multiplier: float) -> void:
-	_points_sources[source_id] = multiplier
-
-
-func clear_points_source(source_id: String) -> void:
-	_points_sources.erase(source_id)
-
-
-func add_points(amount: int) -> void:
-	if amount <= 0:
-		return
-	# Rounded UP: a x2 on a 1-point kill has to pay 2, and a x1.5 on it
-	# must not quietly pay 1.
-	points += ceili(float(amount) * points_multiplier())
-	points_changed.emit(points)
-
-
-## Deducts if affordable; false (and no change) otherwise.
-func spend_points(amount: int) -> bool:
-	if amount <= 0:
-		# A non-positive price must never move the wallet: without this a
-		# negative amount would PAY the player and still report success.
-		# Free (0) succeeds, a negative price is a caller bug and is refused.
-		return amount == 0
-	if amount > points:
-		return false
-	points -= amount
-	points_changed.emit(points)
-	return true
-
-## Companion toast lines. Both carry the pet's name, so the player can see
-## what left as well as what arrived — a swap that only announced the
-## arrival would look like a free gift.
-const PET_JOINS: String = "%s se une"
-const PET_LEAVES: String = "%s se despide"
-
-## Walkable points sampled when Vuelo ends over a blocked cell; the
-## closest one wins. A handful is plenty — the sampler is uniform over the
-## open cells, and any of them beats standing inside a rock.
-const FLIGHT_LANDING_SAMPLES: int = 24
-## Dropped in this far above the terrain, so the body settles instead of
-## starting the frame intersecting the ground.
-const FLIGHT_LANDING_CLEARANCE: float = 1.2
-## Kept this far inside the arena edge while flying.
-const FLIGHT_EDGE_MARGIN: float = 2.0
+@onready var _camera: PlayerCamera = $CameraRig
+@onready var _revive: PlayerRevive = $Revive
+@onready var _flight: PlayerFlight = $Flight
+@onready var _pet_slot: PetSlot = $PetSlot
+@onready var _wallet: PlayerWallet = $Wallet
 
 var _gravity: float = ProjectSettings.get_setting("physics/3d/default_gravity", 9.8)
 var _default_collision_height: float = 1.8
 var _default_collision_radius: float = 0.4
 
-var _yaw: float = 0.0
-var _pitch: float = 0.0
-
-var _camera_mode: CameraMode = CameraMode.THIRD_PERSON
-## Free-orbit state: world-space camera yaw (decoupled from the body) and
-## the current zoom distance (_ready seeds it from the authored arm length).
-var _orbit_yaw: float = 0.0
-var _orbit_distance: float = 0.0
-## The scene's authored third-person arm length, restored on mode exit.
-var _third_person_arm_length: float = 5.0
-
-## This slot's action names, resolved once at ready. Coop.action() builds a
-## String and interns a StringName per call, and the movement/camera reads
-## below run several times per physics tick AND per mouse-motion event —
-## a 1000 Hz mouse in 4-player co-op turned that into constant garbage.
+## Nombres de las acciones de este slot, resueltos una vez en _ready:
+## Coop.action() arma un String por llamada, y esto se lee varias veces por
+## tick y por cada evento de mouse.
 var _actions: Dictionary[StringName, StringName] = {}
 
 var _is_sliding: bool = false
@@ -274,238 +114,200 @@ var _slide_timer: float = 0.0
 var _slide_cooldown_timer: float = 0.0
 var _slide_direction: Vector3 = Vector3.ZERO
 
-# Time left on an external root (Entomb): movement/jump/slide locked.
+## Tiempo restante de un enraizamiento externo (Entomb): sin moverse, saltar ni derrapar.
 var _root_timer: float = 0.0
-## Jumps left before touching the floor again (iteration 48): 1 plus
-## PlayerStats.extra_jumps, refilled every frame the body is grounded.
-## Starts at 1 so a raider spawned mid-air can still jump once.
+## Saltos que quedan antes de volver a pisar suelo: 1 más
+## PlayerStats.extra_jumps, recargados cada frame en el suelo. Empieza en 1
+## para que un raider que aparece en el aire pueda saltar una vez.
 var _jumps_left: int = 1
 
 var _is_dead: bool = false
 
-## Co-op downed state: the body stays, control and weapons stop, and a
-## teammate can revive it (see _tick_downed). Never true in solo.
-var _is_downed: bool = false
-var _revive_progress: float = 0.0
-var _revive_prompt: Label3D = null
-var _saved_collision_layer: int = 0
-## Last whole percentage painted on the prompt (see _update_revive_prompt).
-var _last_prompt_pct: int = PROMPT_PCT_UNSET
-
-## Where this run started; the void fail-safe returns the player here.
+## Punto de inicio de la etapa: el rescate del vacío devuelve aquí al raider.
 var _spawn_position: Vector3 = Vector3.ZERO
 
 
 func _ready() -> void:
-	# Map marker (iteration 52): raiders are always visible on the map,
-	# fog or no fog — the minimap's first job is "where am I".
+	# Marcador de mapa: los raiders siempre se ven en el mapa, con niebla o
+	# sin ella.
 	add_to_group(&"map_markers")
 	_spawn_position = global_position
 	_cache_slot_actions()
 	_apply_character(CharacterCatalog.by_id_or_default(Coop.character_for_slot(player_index)))
 	health.died.connect(_on_health_died)
-	Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
-	# The camera arm must ignore our own capsule or it pushes the camera in.
-	spring_arm.add_excluded_object(get_rid())
-	# ...and every TEAMMATE's capsule too: raiders share layer 1 with the
-	# world, so without this a mate walking behind you collapses the arm
-	# into your own head. Deferred because RunSystems spawns slots 1+ after
-	# this _ready runs.
-	_exclude_party_from_spring_arm.call_deferred()
-	if Coop.is_coop():
-		# Split-screen renders through per-viewport follow cameras; the
-		# body-local camera only serves as their transform source.
-		($SpringArm3D/Camera3D as Camera3D).current = false
+	_wallet.points_changed.connect(_on_wallet_points_changed)
+	# Después de _apply_character: la cámara pasa el modelo nuevo del rig a
+	# la capa visual del slot.
+	_camera.setup()
 	var capsule := collision_shape.shape as CapsuleShape3D
 	if capsule != null:
 		_default_collision_height = capsule.height
 		_default_collision_radius = capsule.radius
-	_yaw = rotation.y
-	_pitch = deg_to_rad(clamp(initial_pitch_deg, min_pitch_deg, max_pitch_deg))
-	spring_arm.rotation.x = _pitch
-	_third_person_arm_length = spring_arm.spring_length
-	_orbit_distance = clampf(_third_person_arm_length,
-			free_orbit_min_distance, free_orbit_max_distance)
-	# Own-body visual layer (see RIG_LAYER_BASE): every rig mesh moves off
-	# layer 1 onto this player's slot layer, which stays inside every
-	# camera's default cull mask — nothing changes until first person
-	# strips the bit from this player's own camera.
-	_apply_rig_layer(seal_rig)
-	# Anything attached to the rig LATER (VFX, an accessory, a curse mark)
-	# must get the bit too, or its owner sees it hanging inside their own
-	# first-person camera while the body itself is correctly culled.
-	seal_rig.child_entered_tree.connect(_apply_rig_layer)
-
-
-## Resolves this slot's action names once (see _actions).
-func _cache_slot_actions() -> void:
-	for base: StringName in Coop.BASE_ACTIONS:
-		_actions[base] = Coop.action(player_index, base)
-
-
-## Teammate capsules are obstacles for the camera arm; exclude them all.
-func _exclude_party_from_spring_arm() -> void:
-	for node: Node in get_tree().get_nodes_in_group("player"):
-		var mate := node as Player
-		if mate != null and mate != self:
-			spring_arm.add_excluded_object(mate.get_rid())
-
-
-## Visual layer this slot's own body renders on (see RIG_LAYER_BASE).
-func rig_visual_layer() -> int:
-	return 1 << (RIG_LAYER_BASE + player_index)
-
-
-## Moves `root` and everything under it onto this slot's rig layer.
-func _apply_rig_layer(root: Node) -> void:
-	var layer := rig_visual_layer()
-	var self_visual := root as VisualInstance3D
-	if self_visual != null:
-		self_visual.layers = layer
-	for node: Node in root.find_children("*", "VisualInstance3D", true, false):
-		(node as VisualInstance3D).layers = layer
-
-
-## This slot's name for a base action ("interact" -> "p2_interact" in
-## co-op); interactables ask through interact_action().
-func _act(base: StringName) -> StringName:
-	return _actions.get(base, base)
-
-
-func interact_action() -> StringName:
-	return _act(&"interact")
-
-
-## True while this body drives the mouse: solo always, in co-op only the
-## keyboard slot.
-func _owns_mouse() -> bool:
-	return not Coop.is_coop() or Coop.device_for_slot(player_index) == Coop.KEYBOARD_DEVICE
 
 
 func _unhandled_input(event: InputEvent) -> void:
 	if _is_dead:
 		return
-	# A DOWNED raider keeps LOOK (below) but not the camera-mode/zoom
-	# actions: cycling modes re-aims the body yaw, which would spin a
-	# face-planted corpse. Being able to turn and watch the fight — and see
-	# the rescuer coming — is the whole point.
-	if not _is_downed:
-		# Camera actions are event-driven so mouse wheel notches and pad
-		# buttons both land here, already filtered per slot by the action set.
-		if event.is_action_pressed(_act(&"camera_mode")):
-			_cycle_camera_mode()
-			return
-		if _camera_mode == CameraMode.FREE_ORBIT:
-			if event.is_action_pressed(_act(&"camera_zoom_in")):
-				_set_orbit_distance(_orbit_distance - free_orbit_zoom_step)
-				return
-			if event.is_action_pressed(_act(&"camera_zoom_out")):
-				_set_orbit_distance(_orbit_distance + free_orbit_zoom_step)
-				return
-	if not _owns_mouse():
-		return
-	# Esc is owned by the PauseMenu layer (this node is pausable, so it
-	# never even sees input while a menu holds the tree paused). Clicking
-	# stays as a recapture fallback if the mouse ever ends up free mid-run.
-	if event is InputEventMouseMotion and Input.get_mouse_mode() == Input.MOUSE_MODE_CAPTURED:
-		_apply_look(event.relative)
-	elif event is InputEventMouseButton and event.pressed \
-			and Input.get_mouse_mode() != Input.MOUSE_MODE_CAPTURED:
-		Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
+	_camera.handle_input(event, is_downed())
 
 
-## Mouse-look: the settings sensitivity (SaveData.mouse_sensitivity, a
-## 0.3x-2.0x multiplier) scales the exported base per event — one autoload
-## float read, cheap and always live. In first/third person the yaw turns
-## the body; in free orbit it turns only the camera pivot.
-func _apply_look(relative: Vector2) -> void:
-	var sensitivity: float = mouse_sensitivity * SaveData.mouse_sensitivity
-	var wide := _camera_mode == CameraMode.FIRST_PERSON
-	_pitch = clamp(_pitch - relative.y * sensitivity,
-			deg_to_rad(first_person_min_pitch_deg if wide else min_pitch_deg),
-			deg_to_rad(first_person_max_pitch_deg if wide else max_pitch_deg))
-	spring_arm.rotation.x = _pitch
-	if _camera_mode == CameraMode.FREE_ORBIT:
-		_orbit_yaw = wrapf(_orbit_yaw - relative.x * sensitivity, -PI, PI)
-	else:
-		# Wrapped like the orbit yaw: a long run spinning one way otherwise
-		# grows the angle without bound until float32 resolution turns slow
-		# mouse movement into visible steps.
-		_yaw = wrapf(_yaw - relative.x * sensitivity, -PI, PI)
-		rotation.y = _yaw
-
-
-## One physics tick, as named steps. The order matters and used to live
-## only as an implicit top-to-bottom block: timers and the void fail-safe
-## run in EVERY state, look runs before the downed cut (a downed raider
-## still owns their camera), and only body movement is gated on being up.
+## Un tick de física en pasos con nombre. El orden importa: temporizadores
+## y rescate del vacío corren en TODO estado, la vista corre antes del corte
+## de caído (el caído sigue mirando) y solo el movimiento exige estar en pie.
 func _physics_process(delta: float) -> void:
 	_tick_timers(delta)
 	_rescue_from_void()
 
-	# Vuelo owns vertical motion while it runs: gravity would fight the
-	# climb every frame and the raider would hover at whatever height the
-	# two happened to balance at.
-	if _tick_flight(delta):
-		pass
-	elif not is_on_floor():
-		velocity.y -= _gravity * delta
-	else:
-		# Landing refills the jump budget (iteration 48). Refilling HERE and
-		# not inside _try_jump is what lets a raider who walked off a ledge
-		# still spend their mid-air jumps.
+	# Vuelo manda en el eje vertical mientras dura: con gravedad, la subida y
+	# la caída se equilibrarían a una altura cualquiera.
+	var flying := _flight.tick()
+	if is_on_floor():
+		# Pisar suelo recarga los saltos, también volando. Se recarga aquí y
+		# no en _try_jump para que quien cae de un borde conserve sus saltos.
 		_jumps_left = _max_jumps()
+	elif not flying:
+		velocity.y -= _gravity * delta
 
-	_apply_stick_look(delta)
+	_camera.apply_stick_look(delta)
 
-	if _is_downed:
-		# Downed body: gravity only, plus the teammate-revive countdown.
+	if is_downed():
+		# Caído: solo gravedad y la cuenta del rescate.
 		velocity.x = 0.0
 		velocity.z = 0.0
-		_pin_orbit_arm()
+		_camera.pin_orbit_arm()
 		move_and_slide()
-		_tick_downed(delta)
+		_revive.tick(delta)
 		return
 
-	# Tome of Swiftness etc. scale on top of the exported base speed.
+	# Tomos y objetos escalan la velocidad base exportada.
 	var effective_speed: float = move_speed * _stats.move_speed_multiplier
 	var wish_dir := _read_wish_dir()
-	_face_movement(wish_dir, delta)
-	_pin_orbit_arm()
+	_camera.face_movement(wish_dir, delta)
+	_camera.pin_orbit_arm()
 	_update_slide(delta, wish_dir, effective_speed)
 	_apply_horizontal_velocity(delta, wish_dir, effective_speed)
 	_try_jump()
 	move_and_slide()
 
 
-## External timers that must keep counting down in EVERY state. The root
-## especially: Sarcognath applies Entomb and the killing damage in the same
-## call, so "rooted -> downed" is the boss's normal path, and a frozen
-## timer would hand the revived raider a fresh 3 s snare.
+## Nombre de una acción base para este slot ("interact" -> "p2_interact" en
+## co-op); también lo usan los componentes del raider.
+func slot_action(base: StringName) -> StringName:
+	return _actions.get(base, base)
+
+
+## Acción de interactuar de este slot; los interactuables la piden por nombre.
+func interact_action() -> StringName:
+	return slot_action(&"interact")
+
+
+## Guarda la posición actual como punto de rescate del vacío.
+## RunSystems.place_party la llama en cada cambio de etapa: el punto que se
+## tomó en _ready pertenece a un mapa que ya no existe.
+func anchor_here() -> void:
+	_spawn_position = global_position
+
+
+## Enraizamiento externo (el Entomb de Sarcognato): bloquea movimiento,
+## salto y derrape por `duration` segundos; las armas siguen disparando y la
+## cámara queda libre. Reaplicarlo extiende el bloqueo, nunca lo acorta.
+func apply_root(duration: float) -> void:
+	if _is_dead or duration <= 0.0:
+		return
+	if _is_sliding:
+		_end_slide()
+	_root_timer = maxf(_root_timer, duration)
+
+
+func is_rooted() -> bool:
+	return _root_timer > 0.0
+
+
+## Caído en co-op (lo lleva el nodo Revive).
+func is_downed() -> bool:
+	return _revive.is_downed()
+
+
+func camera_mode() -> PlayerCamera.CameraMode:
+	return _camera.camera_mode()
+
+
+## Camera3D propia de este raider. En co-op ninguna es la cámara activa del
+## viewport (SplitScreen pinta cada una en su SubViewport), así que lo que
+## actúa sobre una cámara (FOV, sacudida) debe recibir esta.
+func view_camera() -> Camera3D:
+	return _camera.view_camera()
+
+
+## Capa visual del cuerpo propio de este slot (ver PlayerCamera.RIG_LAYER_BASE).
+func rig_visual_layer() -> int:
+	return _camera.rig_visual_layer()
+
+
+## Cambia la mascota (la caja de mascotas y el vendedor la llaman por
+## nombre; ver PetSlot.set_pet).
+func set_pet(new_pet_id: String) -> void:
+	_pet_slot.set_pet(new_pet_id)
+
+
+## PowerUps la llama por nombre cuando termina Vuelo (ver PlayerFlight.end_flight).
+func end_flight() -> void:
+	_flight.end_flight()
+
+
+# --- Puntos (nodo Wallet) ---------------------------------------------------
+# Enemigos, cofres, santuarios, vendedores, PowerUps y WorldDirector llaman
+# a estos métodos por nombre (has_method/call).
+
+func points_multiplier() -> float:
+	return _wallet.points_multiplier()
+
+
+func set_points_source(source_id: String, multiplier: float) -> void:
+	_wallet.set_points_source(source_id, multiplier)
+
+
+func clear_points_source(source_id: String) -> void:
+	_wallet.clear_points_source(source_id)
+
+
+func add_points(amount: int) -> void:
+	_wallet.add_points(amount)
+
+
+func spend_points(amount: int) -> bool:
+	return _wallet.spend_points(amount)
+
+
+## Contrato de marcador de mapa (grupo "map_markers"): la flecha usa el giro
+## de este cuerpo, que es hacia donde mira el raider.
+func map_marker_kind() -> StringName:
+	return &"player"
+
+
+## Resuelve una vez los nombres de acción de este slot (ver _actions).
+func _cache_slot_actions() -> void:
+	for base: StringName in Coop.BASE_ACTIONS:
+		_actions[base] = Coop.action(player_index, base)
+
+
+## Temporizadores que bajan en TODO estado. Sobre todo el enraizamiento:
+## Sarcognato enraíza y daña en la misma llamada, y si se congelara al caer,
+## el revivido volvería con 3 s de enraizamiento nuevos.
 func _tick_timers(delta: float) -> void:
 	_root_timer = maxf(_root_timer - delta, 0.0)
 	_slide_cooldown_timer = maxf(_slide_cooldown_timer - delta, 0.0)
 
 
-## Belt-and-braces void rescue on top of the arena perimeter walls. A body
-## that slipped through a geometry gap is put back on solid ground with its
-## transient state (slide, root) cleared. A DOWNED body goes to the nearest
-## standing teammate rather than its own spawn: the run's start point can
-## be 100 m away and nobody would ever find the corpse to revive it.
-## Re-records the void-rescue anchor at the body's current position.
-## Called by RunSystems.place_party on every stage change (iteration 49):
-## the anchor taken at _ready belongs to a map that has been freed, and
-## falling through the floor of stage 3 must not teleport a raider to
-## where stage 1's spawn used to be.
-func anchor_here() -> void:
-	_spawn_position = global_position
-
-
+## Rescate del vacío, además de los muros del perímetro: un cuerpo que se
+## coló por un hueco vuelve a suelo firme sin derrape ni enraizamiento. Un
+## caído va junto al compañero en pie más cercano y no a su inicio, que
+## puede estar a 100 m y nadie lo encontraría para revivirlo.
 func _rescue_from_void() -> void:
 	if global_position.y >= void_rescue_y:
 		return
 	var destination := _spawn_position
-	if _is_downed:
+	if is_downed():
 		var mate := Coop.nearest_player(get_tree(), global_position)
 		if mate != null:
 			destination = mate.global_position + RESCUE_MATE_OFFSET
@@ -514,53 +316,20 @@ func _rescue_from_void() -> void:
 	if _is_sliding:
 		_end_slide()
 	_root_timer = 0.0
-	# One-line log (project convention): a soak that falls through the
-	# floor leaves a trace instead of teleporting silently.
+	# Log de una línea: un soak que atraviesa el suelo deja rastro.
 	print("Void rescue: p%d at %.1fs" % [player_index, RunState.run_time])
 
 
-## Right-stick look (assigned pad in co-op; any pad in solo) shares the
-## mouse pipeline, so sensitivity and pitch clamps apply identically.
-## Dividing by the base mouse sensitivity converts the radians/second
-## stick rate into the pixel-like units _apply_look expects, so the
-## user's sensitivity setting still scales pad look the same way.
-func _apply_stick_look(delta: float) -> void:
-	var stick := Coop.look_vector(player_index)
-	if stick == Vector2.ZERO:
-		return
-	_apply_look(stick * Coop.LOOK_SPEED * delta / maxf(mouse_sensitivity, 0.0001))
-
-
-## Movement intent for this tick, already flattened and normalized.
-## First/third person: input is body-relative (body yaw == view yaw).
-## Free orbit: input is CAMERA-relative and the body turns to face
-## wherever it walks, so the orbit never drags the character around.
+## Dirección deseada de este tick, plana y normalizada, relativa a la base
+## que da la cámara (el cuerpo, o la cámara en órbita libre).
 func _read_wish_dir() -> Vector3:
 	if is_rooted():
 		return Vector3.ZERO
-	var input_dir: Vector2 = Input.get_vector(_act(&"move_left"), _act(&"move_right"),
-			_act(&"move_forward"), _act(&"move_back"))
-	var move_basis := Basis(Vector3.UP, _orbit_yaw) \
-			if _camera_mode == CameraMode.FREE_ORBIT else transform.basis
-	var wish_dir: Vector3 = move_basis * Vector3(input_dir.x, 0.0, input_dir.y)
+	var input_dir: Vector2 = Input.get_vector(slot_action(&"move_left"), slot_action(&"move_right"),
+			slot_action(&"move_forward"), slot_action(&"move_back"))
+	var wish_dir: Vector3 = _camera.move_basis() * Vector3(input_dir.x, 0.0, input_dir.y)
 	wish_dir.y = 0.0
 	return wish_dir.normalized() if wish_dir.length_squared() > 0.0 else Vector3.ZERO
-
-
-## Free orbit only: the body chases its own movement direction.
-func _face_movement(wish_dir: Vector3, delta: float) -> void:
-	if _camera_mode != CameraMode.FREE_ORBIT or wish_dir == Vector3.ZERO:
-		return
-	rotation.y = lerp_angle(rotation.y, atan2(-wish_dir.x, -wish_dir.z),
-			minf(free_orbit_turn_speed * delta, 1.0))
-
-
-## Keeps the arm's WORLD yaw pinned to the orbit yaw regardless of how the
-## body just turned (arm yaw is body-relative). Runs while downed too, so
-## look still moves a fallen raider's camera in free orbit.
-func _pin_orbit_arm() -> void:
-	if _camera_mode == CameraMode.FREE_ORBIT:
-		spring_arm.rotation.y = wrapf(_orbit_yaw - rotation.y, -PI, PI)
 
 
 func _update_slide(delta: float, wish_dir: Vector3, effective_speed: float) -> void:
@@ -575,7 +344,7 @@ func _update_slide(delta: float, wish_dir: Vector3, effective_speed: float) -> v
 func _apply_horizontal_velocity(delta: float, wish_dir: Vector3,
 		effective_speed: float) -> void:
 	if is_rooted():
-		# Hard stop, not a decel: entombed feet plant instantly.
+		# Freno en seco, sin desacelerar: el enraizado se planta al instante.
 		velocity.x = 0.0
 		velocity.z = 0.0
 	elif _is_sliding:
@@ -590,11 +359,10 @@ func _apply_horizontal_velocity(delta: float, wish_dir: Vector3,
 
 
 func _try_jump() -> void:
-	if not Input.is_action_just_pressed(_act(&"jump")) or is_rooted():
+	if not Input.is_action_just_pressed(slot_action(&"jump")) or is_rooted():
 		return
-	# Multi-jump (iteration 48): the floor jump plus PlayerStats.extra_jumps
-	# mid-air ones, refilled on landing (see _physics_process). The rooted
-	# and sliding rules are untouched.
+	# Multisalto: el del suelo más PlayerStats.extra_jumps en el aire; se
+	# recargan al pisar suelo (ver _physics_process).
 	if _jumps_left <= 0:
 		return
 	_jumps_left -= 1
@@ -603,122 +371,15 @@ func _try_jump() -> void:
 	velocity.y = jump_velocity
 
 
-## --- flight (Vuelo power-up, iteration 53) ----------------------------------
-
-## Vertical motion while Vuelo runs. Returns true when it took the frame
-## over, so the caller skips gravity. Holding jump climbs to a ceiling
-## measured ABOVE THE TERRAIN (a fixed world Y would bury the raider in a
-## hill on one map and strand them in the sky on another); releasing it
-## glides down. Landing on the floor still refills the jump budget, so
-## flying does not eat the raider's multi-jump.
-func _tick_flight(delta: float) -> bool:
-	var powerups := PowerUps.find_in(self)
-	if powerups == null or not powerups.has("flight") or _is_downed:
-		return false
-	if is_on_floor():
-		_jumps_left = _max_jumps()
-	var ceiling := _ground_height() + flight_ceiling
-	if Input.is_action_pressed(_act(&"jump")) and global_position.y < ceiling:
-		velocity.y = flight_rise_speed
-	elif global_position.y >= ceiling:
-		# Pinned at the ceiling rather than bouncing off it.
-		velocity.y = minf(velocity.y, 0.0)
-	elif not is_on_floor():
-		velocity.y = -flight_fall_speed
-	else:
-		velocity.y = 0.0
-	# The arena edge is a wall for a walker and would be nothing for a
-	# flier: without this a raider could simply fly out over the void.
-	var limit := _arena_limit()
-	if limit > 0.0:
-		global_position.x = clampf(global_position.x, -limit, limit)
-		global_position.z = clampf(global_position.z, -limit, limit)
-	return true
-
-
-## Called by PowerUps the moment Vuelo ends. The raider can be hanging
-## over a blocked cell — the one place the arena guarantees is NOT
-## walkable — and falling into it trips the probe's blocked-cell watch,
-## which is exactly the guard this must not break. So: if there is no
-## walkable ground under us, glide to the nearest walkable point there is.
-func end_flight() -> void:
-	var bounds := get_tree().get_first_node_in_group("arena_bounds")
-	if bounds == null or not bounds.has_method("is_walkable"):
-		return
-	var here := Vector2(global_position.x, global_position.z)
-	if bool(bounds.call("is_walkable", here)):
-		return
-	var best := here
-	var best_distance := INF
-	if bounds.has_method("random_walkable_point"):
-		for attempt in FLIGHT_LANDING_SAMPLES:
-			var candidate: Variant = bounds.call("random_walkable_point")
-			if candidate is not Vector2:
-				continue
-			var distance := (candidate as Vector2).distance_squared_to(here)
-			if distance < best_distance:
-				best_distance = distance
-				best = candidate
-	if best == here:
-		return
-	global_position.x = best.x
-	global_position.z = best.y
-	var terrain := Terrain.find(get_tree())
-	if terrain != null:
-		global_position.y = terrain.height_at(best.x, best.y) + FLIGHT_LANDING_CLEARANCE
-	velocity = Vector3.ZERO
-	print("Flight landing: p%d moved to walkable ground" % player_index)
-
-
-## Ground height under the raider, for the flight ceiling.
-func _ground_height() -> float:
-	var terrain := Terrain.find(get_tree())
-	return terrain.height_at(global_position.x, global_position.z) if terrain != null else 0.0
-
-
-## Half-extent the flier is clamped to, or 0 when the arena publishes none.
-func _arena_limit() -> float:
-	var bounds := get_tree().get_first_node_in_group("arena_bounds")
-	if bounds == null:
-		return 0.0
-	var extent: Variant = bounds.get("arena_half_extent")
-	if extent is not float and extent is not int:
-		return 0.0
-	return float(extent) - FLIGHT_EDGE_MARGIN
-
-
-## Jumps available from a standing start: the floor one plus whatever the
-## stats layer grants.
+## Saltos disponibles desde el suelo: el del suelo más los que dan los stats.
 func _max_jumps() -> int:
 	var stats := PlayerStats.find_in(self)
 	return 1 + (stats.extra_jumps if stats != null else 0)
 
 
-## External snare (Sarcognath's Entomb): locks ground movement, jumping,
-## and sliding for `duration` seconds. Weapons keep auto-firing and the
-## camera stays free, so a rooted player still fights. Re-application
-## extends the lock, never shortens it.
-func apply_root(duration: float) -> void:
-	if _is_dead or duration <= 0.0:
-		return
-	if _is_sliding:
-		_end_slide()
-	_root_timer = maxf(_root_timer, duration)
-
-
-func is_rooted() -> bool:
-	return _root_timer > 0.0
-
-
-## Applies a CharacterCatalog row: instances the starting weapon under the
-## Weapons mount, swaps in the row's body model (optional; the seal by
-## default), tints it, registers the passive.
-## Test switch (ArenaProbe, BONK_WEAPON): the id of the weapon the raider
-## starts with instead of the character's. Read here so the swap rides the
-## SAME grant path — the node_name the upgrade pool counts on, and the
-## used_weapon_ bump — instead of a second, subtly different one.
-static var starting_weapon_override: String = ""
-
+## Aplica una fila de CharacterCatalog: crea el arma inicial bajo el montaje
+## Weapons, cambia el modelo del cuerpo (la foca por defecto), lo tiñe y
+## registra la pasiva.
 func _apply_character(character: Dictionary) -> void:
 	var row := character
 	if not starting_weapon_override.is_empty():
@@ -736,21 +397,20 @@ func _apply_character(character: Dictionary) -> void:
 		push_warning("Player: bad starting weapon scene '%s'" % character.weapon_scene)
 	else:
 		var weapon := scene.instantiate() as Node3D
-		# The name must match the WEAPON_LIBRARY node_name so the upgrade
-		# pool counts the starting weapon as owned.
+		# El nombre debe coincidir con el node_name de WEAPON_LIBRARY para que
+		# el pool de mejoras cuente el arma inicial como propia.
 		weapon.name = String(character.weapon_node_name)
 		weapons_mount.add_child(weapon)
-		# Collection discovery: starting weapons count as carried too.
+		# Colección: el arma inicial también cuenta como usada.
 		var weapon_id := UpgradePool.weapon_id_for_node(String(character.weapon_node_name))
 		if not weapon_id.is_empty():
 			SaveData.bump("used_weapon_" + weapon_id)
-	# Cosmetic body swap: the row's optional model data, falling back to
-	# the default seal inside SealRig.setup. Tints AFTER the swap, because
-	# setup resets the rig's material to the new model's.
+	# Modelo del cuerpo: datos opcionales de la fila, con la foca por defecto
+	# (SealRig.setup). El tinte va DESPUÉS porque setup reinicia el material.
 	seal_rig.setup(String(character.get("model_scene", "")),
 			float(character.get("model_scale", 1.0)),
 			String(character.get("tint_material_prefix", "")))
-	# SealRig duplicates the model's shared character material once per spawn.
+	# SealRig duplica el material compartido del modelo una vez por raider.
 	seal_rig.apply_tint(Color(character.tint))
 	_stats.set_character_passive(String(character.passive_stat),
 			float(character.passive_amount),
@@ -759,235 +419,41 @@ func _apply_character(character: Dictionary) -> void:
 
 
 func _on_health_died() -> void:
-	if _is_dead or _is_downed:
+	if _is_dead or is_downed():
 		return
 	if _is_sliding:
 		_end_slide()
 	if Coop.is_coop():
-		# Co-op: a fallen raider goes DOWN instead of ending the run — the
-		# body stays where it fell and a teammate can revive it. RunManager
-		# only declares defeat once every party member is down at once.
+		# Co-op: el raider queda CAÍDO en vez de terminar la partida y un
+		# compañero puede revivirlo. RunManager declara la derrota solo cuando
+		# toda la party está caída a la vez.
 		_enter_downed()
 		return
 	_is_dead = true
-	# Freeze control and physics; RunManager pauses the whole tree right
-	# after this handler. The rig's face-plant tween is pause-immune so it
-	# plays out under the fading run-end screen.
+	# Congela control y física; RunManager pausa el árbol justo después. La
+	# caída del rig ignora la pausa y se ve bajo la pantalla de fin.
 	set_physics_process(false)
 	seal_rig.play_death()
 
 
-# --- camera modes -----------------------------------------------------------
-
-func _cycle_camera_mode() -> void:
-	var was_free := _camera_mode == CameraMode.FREE_ORBIT
-	_camera_mode = ((int(_camera_mode) + 1) % CameraMode.size()) as CameraMode
-	_apply_camera_mode(was_free)
-
-
-func camera_mode() -> CameraMode:
-	return _camera_mode
-
-
-## This raider's own Camera3D. In co-op none of these is the viewport's
-## active camera (SplitScreen renders each one into its own SubViewport),
-## so anything that acts ON a camera — FOV kicks, shake — has to be handed
-## this instead of asking the viewport which camera is current.
-func view_camera() -> Camera3D:
-	return spring_arm.get_node_or_null("Camera3D") as Camera3D
-
-
-func _apply_camera_mode(was_free: bool = false) -> void:
-	var camera := view_camera()
-	var rig_bit := rig_visual_layer()
-	# Every mode change resets the transient state, then the mode sets its own.
-	camera.cull_mask |= rig_bit
-	spring_arm.rotation.y = 0.0
-	if was_free:
-		# Leaving free orbit into a body-locked mode: the camera's yaw
-		# becomes the body yaw, so the view doesn't snap on the switch.
-		_yaw = wrapf(_orbit_yaw, -PI, PI)
-		rotation.y = _yaw
-	match _camera_mode:
-		CameraMode.THIRD_PERSON:
-			spring_arm.spring_length = _third_person_arm_length
-		CameraMode.FIRST_PERSON:
-			# Arm collapsed to the eyes; the own seal is culled from THIS
-			# camera only (the rig sits on the slot's visual layer).
-			spring_arm.spring_length = 0.05
-			camera.cull_mask &= ~rig_bit
-		CameraMode.FREE_ORBIT:
-			_orbit_yaw = _yaw
-			spring_arm.spring_length = _orbit_distance
-	# Re-clamp pitch into the mode's range (first person allows more).
-	var wide := _camera_mode == CameraMode.FIRST_PERSON
-	_pitch = clamp(_pitch,
-			deg_to_rad(first_person_min_pitch_deg if wide else min_pitch_deg),
-			deg_to_rad(first_person_max_pitch_deg if wide else max_pitch_deg))
-	spring_arm.rotation.x = _pitch
-
-
-func _set_orbit_distance(distance: float) -> void:
-	_orbit_distance = clampf(distance, free_orbit_min_distance, free_orbit_max_distance)
-	if _camera_mode == CameraMode.FREE_ORBIT:
-		spring_arm.spring_length = _orbit_distance
-
-
-# --- co-op downed / revive --------------------------------------------------
-
-## The five things that flip together when a raider goes down or stands
-## back up: group membership (every targeting system keys off "player"),
-## ghost collision, weapon ticking, the rig's face-plant and the floating
-## prompt. Keeping them in ONE place is what stops the two paths drifting.
-func _set_downed(down: bool) -> void:
-	_is_downed = down
-	_revive_progress = 0.0
-	if down:
-		# Leaving the "player" group makes every targeting system (enemy
-		# seek, gem homing, interact prompts, RunManager's alive count)
-		# skip this body with zero extra checks; revive re-joins it.
-		remove_from_group("player")
-		add_to_group("downed_players")
-		# Purge BEFORE the mount stops ticking: a weapon that leaves timed
-		# fields behind (blood pools, slime puddles) advances them from its
-		# own _physics_process, so freezing the mount strands them on the
-		# ground — still throbbing, still holding pooled visuals, dealing
-		# nothing — until a revive that may never come.
-		_clear_weapon_fields()
-		# Weapons stop auto-firing with the body (mount children tick physics).
-		weapons_mount.process_mode = Node.PROCESS_MODE_DISABLED
-		# Ghost collision: the corpse must not wall off teammates or the horde.
-		_saved_collision_layer = collision_layer
-		collision_layer = 0
-		seal_rig.play_death()
-		# Total wipe (nobody left in the group): RunManager ends the run in
-		# this same frame and pauses the tree, so a prompt shown now would
-		# hang over the end screen — it is no_depth_test — begging for an
-		# interaction nobody can make any more.
-		if not get_tree().get_nodes_in_group("player").is_empty():
-			_show_revive_prompt()
-	else:
-		remove_from_group("downed_players")
-		add_to_group("player")
-		weapons_mount.process_mode = Node.PROCESS_MODE_INHERIT
-		collision_layer = _saved_collision_layer
-		seal_rig.reset_death()
-		_hide_revive_prompt()
-
-
-## Tells every carried weapon that owns a timed ground field to drop it.
-## Optional half of the contract: a weapon that keeps such a field exposes
-## clear_weapon_fields() (releasing its pooled visuals the way its
-## _exit_tree already does), and the ones that keep none need nothing.
-func _clear_weapon_fields() -> void:
-	for weapon: Node in weapons_mount.get_children():
-		if weapon.has_method("clear_weapon_fields"):
-			weapon.call("clear_weapon_fields")
+func _on_wallet_points_changed(total: int) -> void:
+	points_changed.emit(total)
 
 
 func _enter_downed() -> void:
-	# An Entomb landed with the killing blow (Sarcognath roots and damages
-	# in one call) must not outlive the downed stretch: clear it here so the
-	# revived raider comes back able to move.
+	# Un Entomb que llegó con el golpe final (Sarcognato enraíza y daña a la
+	# vez) no dura más que la caída: el revivido vuelve pudiendo moverse.
 	_root_timer = 0.0
-	_set_downed(true)
-
-
-func is_downed() -> bool:
-	return _is_downed
-
-
-## While down: any alive teammate inside revive_radius holding THEIR
-## interact action fills the revive bar; letting go drains it slowly.
-func _tick_downed(delta: float) -> void:
-	if not RunState.run_active:
-		# The run ended under us (wipe, extraction): drop the world-space
-		# prompt instead of leaving it floating over the end screen.
-		_hide_revive_prompt()
-		return
-	var rescuing := false
-	# Kept, not just counted: the revive log names WHO stood the body up,
-	# which is the only way a co-op soak can tell a real rescue from a
-	# raider that came back on its own.
-	var rescuer: Player = null
-	for node: Node in get_tree().get_nodes_in_group("player"):
-		var mate := node as Player
-		if mate == null or not mate.is_inside_tree():
-			continue
-		if global_position.distance_to(mate.global_position) > revive_radius:
-			continue
-		if Input.is_action_pressed(mate.interact_action()):
-			rescuing = true
-			rescuer = mate
-			break
-	if rescuing:
-		# Guarded: revive_time is an @export now, and a 0 there would make
-		# every downed raider pop back up on the first frame of contact.
-		_revive_progress += delta / maxf(revive_time, 0.01)
-		if _revive_progress >= 1.0:
-			_revive(rescuer)
-			return
-	else:
-		_revive_progress = maxf(_revive_progress - revive_decay_rate * delta, 0.0)
-	_update_revive_prompt(rescuing)
-
-
-func _revive(rescuer: Player = null) -> void:
-	_set_downed(false)
-	health.revive(revive_heal_fraction)
-	Juice.sparkle(global_position + Vector3.UP * 1.0)
-	Sfx.play(&"heal")
-	# One-line log (RunManager convention): the down/revive path is the
-	# one co-op rule no solo soak can reach, so it needs its own line.
-	print("Player revived: p%d by p%d" % [
-			player_index, rescuer.player_index if rescuer != null else -1])
-
-
-## Floating world-space prompt over the downed body (same Label3D scheme
-## interactables use), doubling as the revive progress readout.
-func _show_revive_prompt() -> void:
-	if _revive_prompt == null:
-		_revive_prompt = Label3D.new()
-		_revive_prompt.billboard = BaseMaterial3D.BILLBOARD_ENABLED
-		_revive_prompt.no_depth_test = true
-		_revive_prompt.font_size = PROMPT_FONT_SIZE
-		_revive_prompt.outline_size = PROMPT_OUTLINE_SIZE
-		_revive_prompt.position = Vector3.UP * PROMPT_HEIGHT
-		add_child(_revive_prompt)
-	_revive_prompt.visible = true
-	_last_prompt_pct = PROMPT_PCT_UNSET
-	_update_revive_prompt(false)
-
-
-func _update_revive_prompt(rescuing: bool) -> void:
-	if _revive_prompt == null:
-		return
-	# The readout only moves on whole-percent steps (~33 of them across the
-	# revive), so skip the String build on the other physics ticks.
-	var pct := roundi(_revive_progress * 100.0) if rescuing else -1
-	if pct == _last_prompt_pct:
-		return
-	_last_prompt_pct = pct
-	if rescuing:
-		_revive_prompt.text = "Reviviendo... %d%%" % pct
-		_revive_prompt.modulate = Color(0.5, 0.95, 0.6)
-	else:
-		_revive_prompt.text = "CAÍDO — mantén [Interactuar] cerca"
-		_revive_prompt.modulate = Color(1.0, 0.42, 0.35)
-
-
-func _hide_revive_prompt() -> void:
-	if _revive_prompt != null:
-		_revive_prompt.visible = false
+	_revive.set_downed(true)
 
 
 func _can_start_slide(wish_dir: Vector3, effective_speed: float) -> bool:
-	if not Input.is_action_pressed(_act(&"sprint")) or wish_dir == Vector3.ZERO:
+	if not Input.is_action_pressed(slot_action(&"sprint")) or wish_dir == Vector3.ZERO:
 		return false
 	if not is_on_floor() or _slide_cooldown_timer > 0.0:
 		return false
 	var horizontal_speed: float = Vector2(velocity.x, velocity.z).length()
-	return horizontal_speed > effective_speed * SLIDE_MIN_SPEED_RATIO
+	return horizontal_speed > effective_speed * slide_min_speed_ratio
 
 
 func _start_slide(direction: Vector3) -> void:
@@ -1011,18 +477,11 @@ func _set_body_height(height: float) -> void:
 	var capsule := collision_shape.shape as CapsuleShape3D
 	if capsule == null:
 		return
-	# Setting height below 2*radius makes Godot shrink the radius, so
-	# re-apply the default radius (clamped) to keep restores lossless.
-	# Safe to mutate: Player.tscn marks the capsule resource_local_to_scene,
-	# so this instance owns its own copy (see the class docstring).
+	# Con una altura menor que 2 * radio, Godot achica el radio: se vuelve a
+	# poner el radio original (acotado) para restaurar sin pérdida. Se puede
+	# modificar porque Player.tscn marca la cápsula resource_local_to_scene.
 	capsule.height = height
 	capsule.radius = minf(_default_collision_radius, height * 0.5)
 	collision_shape.position.y = height * 0.5
-	# The seal squashes flat and dips its nose to match the low collider.
+	# La foca se aplasta y baja la nariz junto con la cápsula.
 	seal_rig.set_slide_ratio(height / _default_collision_height)
-
-
-## Map marker contract (group "map_markers"). The arrow's heading comes
-## from this body's own rotation, which is where the raider is facing.
-func map_marker_kind() -> StringName:
-	return &"player"

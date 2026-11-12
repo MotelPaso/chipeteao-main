@@ -22,6 +22,7 @@
 [ext_resource type="Script" path="res://scripts/systems/ambient_bed.gd" id="22_ambient"]
 [ext_resource type="AudioStream" path="res://assets/audio/ambient/forest_wind.wav" id="23_wind"]
 [ext_resource type="Script" path="res://scripts/world/run/terrain.gd" id="90_terrain"]
+[ext_resource type="Resource" path="res://assets/world/rock_style_gloomfen.tres" id="91_rockstyle"]
 
 [sub_resource type="Shader" id="Shader_marsh"]
 code = "shader_type spatial;
@@ -213,7 +214,6 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 40.3, 0, -40.3)
 
 [node name="MarshScatter" type="Node3D" parent="."]
 script = ExtResource("9_scatter")
-scatter_seed = 47113
 tree_scene = ExtResource("10_tree")
 rock_scene = ExtResource("11_rock")
 stump_scene = ExtResource("12_stump")
@@ -227,10 +227,7 @@ perimeter_step = 8.0
 perimeter_rock_every = 7
 mesa_platform_scene = ExtResource("14_platform")
 mesa_ramp_scene = ExtResource("13_ramp")
-formation_rock_color = Color(0.27, 0.3, 0.29, 1)
-formation_cap_color = Color(0.22, 0.33, 0.2, 1)
-formation_cap_strength = 0.75
-formation_strata = 0.03
+formation_style = ExtResource("91_rockstyle")
 
 [node name="Terrain" type="StaticBody3D" parent="."]
 script = ExtResource("90_terrain")

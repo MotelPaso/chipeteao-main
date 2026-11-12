@@ -1,12 +1,13 @@
 class_name FxMesh
 extends RefCounted
-## Mesh builders shared by the procedural FX (the slash crescent and the
-## whip lash). Both are the same triangle strip — pairs of inner/outer
-## vertices with vertex-alpha shaping — so only the vertex loop differs and
-## the ArrayMesh assembly lives here once.
+## Constructores de malla que comparten los efectos procedurales (la
+## medialuna del tajo y el latigazo). Los dos son la misma tira de triángulos,
+## pares de vértices interior/exterior con alfa por vértice, así que solo
+## cambia el bucle de vértices y el armado del ArrayMesh vive aquí una vez.
 
-## Builds a triangle strip from `vertices`/`colors` given as consecutive
-## pairs (inner, outer) along the strip. Needs at least two pairs.
+## Arma una tira de triángulos con `vertices`/`colors` dados como pares
+## consecutivos (interior, exterior) a lo largo de la tira. Necesita al menos
+## dos pares.
 static func strip(vertices: PackedVector3Array,
 		colors: PackedColorArray) -> ArrayMesh:
 	var pairs := vertices.size() / 2

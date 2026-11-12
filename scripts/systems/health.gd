@@ -1,72 +1,63 @@
 class_name Health
 extends Node
-## Reusable health component. Attach as a child of any body; bodies in the
-## "enemies" group with a Health child are damageable by weapons.
-## Emits died once when HP reaches zero; heal_full() re-arms it.
+## Componente de vida reutilizable: va como hijo de cualquier cuerpo. Los
+## cuerpos del grupo "enemies" con un Health hijo reciben daño de las armas.
+## Emite died una sola vez al llegar a cero; heal_full() y revive() lo rearman.
+## Los números flotantes los dibuja DamagePopup: aquí solo se dice qué pasó.
 
 signal damaged(amount: float, current: float)
-## Emitted alongside `damaged` when the hit named its attacker (enemy
-## contact damage does); thorns-style retaliation hooks onto this.
+## Se emite junto con `damaged` cuando el golpe nombra a su atacante (el daño
+## por contacto de los enemigos lo hace); las espinas se enganchan aquí.
 signal damaged_by(attacker: Node3D)
-## Emitted instead of `damaged` when the owner fully evaded the hit (the
-## player's evasion roll); dodge-execute passives hook onto this. The
-## attacker is whatever the dodged hit named, possibly null.
+## Se emite en lugar de `damaged` cuando el dueño esquiva el golpe entero
+## (tirada de evasión del jugador); las pasivas de ejecución al esquivar se
+## enganchan aquí. `attacker` es quien nombró el golpe, o null.
 signal dodged(attacker: Node3D)
-## Non-damage HP changes (max_hp raises, full heals) so health bars can
-## re-read both values; damage keeps the dedicated signal above.
+## Cambios de vida que no son daño (subir max_hp, curar) para que las barras
+## relean ambos valores; el daño usa la señal `damaged`.
 signal hp_changed(current: float, max_hp: float)
 signal died
 
-## Max HP. The setter owns the "current_hp never exceeds max_hp" invariant
-## so no call site has to remember it: a body that was at FULL HP stays
-## full (every "scale this enemy up" site — tiers, elites, sky variants —
-## gets the tank it asked for), a wounded one keeps its HP clamped down,
-## and either way hp_changed reports both values so bars never paint a
-## current above the maximum.
+## La armadura nunca anula un golpe: todo golpe que entra quita al menos esto,
+## así un build de armadura apilada tiene que seguir esquivando.
+const MIN_CHIP_DAMAGE: float = 1.0
+
+@export_group("Vida")
+## Vida máxima, en puntos de vida.
 @export var max_hp: float = 50.0:
 	set(value):
+		# El setter mantiene current_hp <= max_hp: un cuerpo con la vida llena
+		# sigue lleno al subirla, uno herido queda recortado, y hp_changed
+		# informa ambos valores a las barras.
 		var was_full := _initialized and is_equal_approx(current_hp, max_hp)
 		max_hp = value
-		# Scene instantiation writes this export BEFORE _ready seeds
-		# current_hp: there is no invariant to keep yet (and nothing is
-		# connected to hp_changed either), so don't fake one.
+		# Al instanciar la escena este export se escribe ANTES de que _ready
+		# fije current_hp: todavía no hay invariante que mantener.
 		if not _initialized:
 			return
 		current_hp = max_hp if was_full else minf(current_hp, max_hp)
 		hp_changed.emit(current_hp, max_hp)
+## Muestra los números de daño flotantes sobre este cuerpo (su aspecto está en DamagePopup.tscn).
 @export var show_damage_popups: bool = true
-## Flat damage reduction applied before HP loss; the player's PlayerStats
-## layer writes this from Tome of Stone stacks. A hit always chips at least
-## MIN_CHIP_DAMAGE (or the raw amount when it was already below it).
+## Reducción plana de daño por golpe; en el jugador la escribe PlayerStats (Tomo de Piedra).
 @export var armor: float = 0.0
-## Floating text on a fully evaded hit (the player's evasion roll). An
-## @export so it travels with the rest of the player-facing strings.
-@export var dodge_text: String = "!"
 
-
-## Set by PowerUps while Inmortalidad runs: every hit is refused outright
-## (before armor, before the evasion roll) and counted. Deliberately NOT
-## used by the soak's godmode, which raises max_hp instead — a soak has to
-## keep exercising the real damage path.
+## Lo activa PowerUps durante Inmortalidad: rechaza todo golpe (antes de la
+## armadura y de la evasión) y lo cuenta. El godmode del soak no lo usa: sube
+## max_hp para seguir ejercitando el camino de daño real.
 var invulnerable: bool = false
-## Hits refused while invulnerable, for the record (the soak reads it to
-## prove an enemy actually tried).
+## Golpes rechazados por invulnerable (el soak lo lee para probar que un
+## enemigo sí atacó).
 var blocked_hits: int = 0
-## Fraction of an incoming hit sent back to its attacker (PowerUps sets
-## 1.0 while Reflejo runs). Evaluated BEFORE the invulnerability refusal,
-## so the two power-ups compose the way the player expects: immortal AND
-## reflecting means the horde kills itself while nothing touches you.
+## Fracción del golpe que vuelve al atacante (PowerUps pone 1.0 durante
+## Reflejo). Se evalúa ANTES del rechazo por invulnerable: inmortal y
+## reflejando a la vez devuelve todo sin recibir nada.
 var reflect_fraction: float = 0.0
-
-
-## Armor can never fully negate a hit: every landed blow chips this much,
-## so a stacked-armor build still has to dodge instead of going immortal.
-const MIN_CHIP_DAMAGE: float = 1.0
-
 var current_hp: float
 var is_dead: bool = false
-## True once _ready seeded current_hp; before that the max_hp setter has
-## no current_hp to keep coherent.
+
+## True cuando _ready ya fijó current_hp; antes, el setter de max_hp no tiene
+## invariante que cuidar.
 var _initialized: bool = false
 
 
@@ -75,7 +66,7 @@ func _ready() -> void:
 	_initialized = true
 
 
-## Finds the Health component on a body, or null if it has none.
+## El Health de un cuerpo, o null si no tiene.
 static func find_in(body: Node) -> Health:
 	for child in body.get_children():
 		if child is Health:
@@ -83,22 +74,17 @@ static func find_in(body: Node) -> Health:
 	return null
 
 
-## `attacker` (optional) is the body that dealt the hit; contact attackers
-## pass themselves so thorns can retaliate through damaged_by.
-## RETURNS the HP this hit actually removed: 0.0 when it was refused (dead
-## body, non-positive amount) or fully evaded, the armor-reduced amount
-## otherwise, and only the HP that was LEFT on a killing blow. Callers that
-## pay out on damage dealt (weapon lifesteal, the Blood Vial's drain) read
-## this instead of sampling current_hp before and after — sampling credited
-## an overkill hit for the sliver it happened to find, and could not tell a
-## dodge from a hit that landed for zero.
+## Aplica un golpe y devuelve la vida que quitó de verdad: 0.0 si se rechazó
+## (cuerpo muerto, cantidad no positiva, invulnerable) o se esquivó, la
+## cantidad tras la armadura si entró, y en un golpe letal solo la vida que
+## quedaba. `attacker` (opcional) es el cuerpo que golpea: los atacantes por
+## contacto se pasan a sí mismos para que las espinas respondan por damaged_by.
 func take_damage(amount: float, is_crit: bool = false, attacker: Node3D = null) -> float:
 	if is_dead or amount <= 0.0:
 		return 0.0
-	# Reflejo repays the RAW incoming amount, before armor and before the
-	# refusal below: what comes back is what was thrown, not what got
-	# through. A hit with no named attacker (a bolt whose caster already
-	# died) has nowhere to go back to and simply does not reflect.
+	# Reflejo devuelve la cantidad BRUTA, antes de la armadura y del rechazo de
+	# abajo: vuelve lo que se lanzó, no lo que entró. Sin atacante nombrado no
+	# hay a quién devolverlo.
 	if reflect_fraction > 0.0 and attacker != null:
 		_reflect_to(attacker, amount * reflect_fraction)
 	if invulnerable:
@@ -107,19 +93,20 @@ func take_damage(amount: float, is_crit: bool = false, attacker: Node3D = null) 
 	var evade_chance := _evasion_chance()
 	if evade_chance > 0.0 and randf() < evade_chance:
 		if show_damage_popups:
-			_spawn_popup(dodge_text, 64, false, true)
+			_show_popup(DamagePopup.Kind.DODGE)
 		Sfx.play(&"dodge")
 		dodged.emit(attacker)
 		return 0.0
 	var final_amount := minf(amount, maxf(amount - armor, MIN_CHIP_DAMAGE))
-	# What the body could still lose: an overkill blow is credited for the
-	# HP it removed, never for the raw roll.
+	# Lo que el cuerpo aún puede perder: un golpe letal cuenta solo la vida que
+	# quitó, nunca la tirada entera.
 	var applied := minf(final_amount, current_hp)
 	current_hp = maxf(current_hp - final_amount, 0.0)
 	if show_damage_popups:
-		_spawn_damage_popup(final_amount, is_crit)
+		_show_popup(DamagePopup.Kind.CRIT if is_crit else DamagePopup.Kind.DAMAGE,
+				final_amount)
 	damaged.emit(final_amount, current_hp)
-	# Before the death check so even a lethal blow is repaid.
+	# Antes de la comprobación de muerte, así hasta el golpe letal se devuelve.
 	if attacker != null:
 		damaged_by.emit(attacker)
 	if current_hp <= 0.0:
@@ -128,9 +115,9 @@ func take_damage(amount: float, is_crit: bool = false, attacker: Node3D = null) 
 	return applied
 
 
-## Voluntary HP payment (Greed Shrine): unlike take_damage it ignores
-## armor, spawns no popup, and can never kill — the cost is clamped so at
-## least min_remaining HP stays. Returns the HP actually paid.
+## Pago voluntario de vida (Santuario de la codicia): ignora la armadura, no
+## muestra número y nunca mata, porque siempre deja al menos min_remaining.
+## Devuelve la vida pagada.
 func pay(amount: float, min_remaining: float = 1.0) -> float:
 	if is_dead or amount <= 0.0:
 		return 0.0
@@ -140,7 +127,8 @@ func pay(amount: float, min_remaining: float = 1.0) -> float:
 	return paid
 
 
-## Partial heal (lifesteal etc.): clamped to max_hp, no-op once dead.
+## Curación parcial (robo de vida y similares): recortada a max_hp; no hace
+## nada con el cuerpo muerto.
 func heal(amount: float) -> void:
 	if is_dead or amount <= 0.0:
 		return
@@ -148,14 +136,15 @@ func heal(amount: float) -> void:
 	hp_changed.emit(current_hp, max_hp)
 
 
+## Cura todo y rearma died.
 func heal_full() -> void:
 	current_hp = max_hp
 	is_dead = false
 	hp_changed.emit(current_hp, max_hp)
 
 
-## Co-op revive: re-arms a dead Health at `fraction` of max HP (died can
-## fire again on the next fatal hit). No-op on a body that isn't dead.
+## Reanimación en co-op: rearma un Health muerto con `fraction` de max_hp
+## (died puede volver a emitirse). No hace nada si el cuerpo no está muerto.
 func revive(fraction: float) -> void:
 	if not is_dead:
 		return
@@ -164,10 +153,9 @@ func revive(fraction: float) -> void:
 	hp_changed.emit(current_hp, max_hp)
 
 
-## Sends `amount` back to the attacker's own Health. `self` is passed as
-## the attacker so thorns and dodge-execute see a normal hit, and the
-## reflected hit names THIS body — which cannot start a loop, because only
-## a raider ever carries a reflect_fraction.
+## Devuelve `amount` al Health del atacante. Este cuerpo va como atacante,
+## así espinas y ejecuciones ven un golpe normal; no puede hacer bucle porque
+## solo un raider tiene reflect_fraction.
 func _reflect_to(attacker: Node3D, amount: float) -> void:
 	if not is_instance_valid(attacker) or attacker == get_parent():
 		return
@@ -177,8 +165,8 @@ func _reflect_to(attacker: Node3D, amount: float) -> void:
 	target.take_damage(amount, false, get_parent() as Node3D)
 
 
-## Chance (0-1) this body fully evades a hit: only the player evades, read
-## from its PlayerStats layer (which caps the stat); enemies never roll.
+## Probabilidad (0-1) de esquivar el golpe entero. Solo el jugador esquiva,
+## leída de su PlayerStats (que ya la topa); los enemigos nunca tiran.
 func _evasion_chance() -> float:
 	var body := get_parent()
 	if body == null or not body.is_in_group("player"):
@@ -187,18 +175,15 @@ func _evasion_chance() -> float:
 	return stats.evasion if stats != null else 0.0
 
 
-func _spawn_damage_popup(amount: float, is_crit: bool) -> void:
-	_spawn_popup(str(roundi(amount)), 88 if is_crit else 64, is_crit)
-
-
-func _spawn_popup(popup_text: String, popup_font_size: int, is_crit: bool, is_dodge:bool = false) -> void:
+## Pide un número flotante sobre este cuerpo. Health solo dice qué pasó;
+## colores, tamaños, texto de esquiva y movimiento son de DamagePopup.
+func _show_popup(kind: DamagePopup.Kind, amount: float = 0.0) -> void:
 	var body := get_parent() as Node3D
 	if body == null:
 		return
-	# Pooled Label3D with the same look/motion as the old code-built one;
-	# Pools parents it to the scene root so it survives the body dying.
+	# Label3D del pool; Pools lo cuelga de la arena, así sobrevive a la muerte
+	# del cuerpo.
 	var popup := Pools.acquire_scene(Pools.DAMAGE_POPUP_SCENE) as DamagePopup
 	if popup == null:
 		return
-	popup.show_popup(popup_text, popup_font_size, is_crit, body.global_position
-			+ Vector3(randf_range(-0.3, 0.3), 2.0, randf_range(-0.3, 0.3)), is_dodge)
+	popup.show_hit(kind, body.global_position, amount)

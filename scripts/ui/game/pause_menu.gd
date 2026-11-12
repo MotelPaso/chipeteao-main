@@ -1,18 +1,38 @@
 extends CanvasLayer
-## Esc pause menu (layer 30, processes always), instanced in
-## RunSystems.tscn: pauses the tree, frees the mouse, and offers
-## Resume / Settings (the shared SettingsPanel swapped over the buttons) /
-## Quit to Menu. Esc toggles it closed again, recapturing the mouse.
+## Menú de pausa con Esc (capa 30, procesa siempre), instanciado en
+## RunSystems.tscn: pausa el árbol, libera el mouse y ofrece Continuar, Ajustes
+## (el SettingsPanel compartido reemplaza a los botones), Extraerse y Salir al
+## menú. Esc lo vuelve a cerrar y recaptura el mouse.
 ##
-## Pause ownership: this menu only ever unpauses a pause IT started, and
-## `_pause_owned` is what makes that an invariant instead of a promise.
-## Esc is also ignored while any "ui_blocking" member reports
-## is_blocking() — the card picker (including its pre-reveal window) and
-## the run-end screen — so it can never steal, or release, their pause. A
-## group member that does not expose is_blocking() counts as blocking:
-## the contract is only worth having if forgetting it fails SAFE.
+## Dueño de la pausa: este menú solo quita una pausa que puso ÉL, y
+## `_pause_owned` es lo que lo garantiza. Esc también se ignora mientras algún
+## miembro de "ui_blocking" responde is_blocking() (el selector de cartas,
+## incluida su ventana previa, y la pantalla de fin), así que nunca les roba ni
+## les suelta la pausa. Un miembro del grupo sin is_blocking() cuenta como
+## bloqueante: si alguien olvida el contrato, falla del lado SEGURO.
 
-const CHARACTER_SELECT_SCENE_PATH := "res://scenes/ui/CharacterSelect.tscn"
+@export_group("Panel")
+## Margen interior del panel, en píxeles (horizontal, vertical).
+@export var panel_margin: Vector2 = Vector2(40.0, 26.0)
+## Espaciado extra entre letras del título, en píxeles. Tamaño, color y contorno
+## del título están en el nodo TitleLabel de PauseMenu.tscn.
+@export var title_letter_spacing: int = 8
+
+@export_group("Entrada")
+## Segundos que tarda en subir el fondo oscuro al abrir.
+@export var dim_fade_time: float = 0.15
+## Segundos que tarda el panel en aparecer al abrir.
+@export var panel_fade_time: float = 0.14
+## Escala desde la que crece el panel al abrir.
+@export var panel_start_scale: float = 0.94
+## Segundos que tarda el panel en llegar a su tamaño, con un rebote al final.
+@export var panel_grow_time: float = 0.2
+
+@export_group("Textos")
+## Indicación del botón de aceptar bajo los botones.
+@export var accept_hint_text: String = "Elegir"
+## Indicación del botón de volver bajo los botones.
+@export var cancel_hint_text: String = "Continuar"
 
 @onready var _root: Control = %Root
 @onready var _dim: ColorRect = %Dim
@@ -25,94 +45,76 @@ const CHARACTER_SELECT_SCENE_PATH := "res://scenes/ui/CharacterSelect.tscn"
 @onready var _settings_panel: SettingsPanel = %SettingsPanel
 
 var _open_tween: Tween = null
-## True only between the _open() that paused the tree and its _close().
+## true solo entre el _open() que pausó el árbol y su _close().
 var _pause_owned: bool = false
 
 
 func _ready() -> void:
 	visible = false
-	# In the group it has been READING since it was written: this menu owns
-	# the tree pause while it is up, and every other blocking layer decides
-	# whether to release a pause by asking this group. Absent from it, the
-	# Esc pause was invisible to all of them — a stall opened over the menu
-	# would hand the world back on its way out.
-	add_to_group("ui_blocking")
+	# Este menú es dueño de la pausa mientras está arriba, y las demás capas que
+	# bloquean deciden si sueltan una pausa preguntándole a este grupo: fuera de
+	# él, una tienda abierta sobre el menú devolvería el mundo al cerrarse.
+	add_to_group(BlockingUi.GROUP)
 	_apply_styles()
 	_resume_button.pressed.connect(_close)
 	_settings_button.pressed.connect(_on_settings_pressed)
 	_extract_button.pressed.connect(_on_extract_pressed)
 	_quit_button.pressed.connect(_on_quit_pressed)
 	_settings_panel.closed.connect(_on_settings_closed)
-	# Button prompts under the buttons; they follow the last device used.
+	# Indicaciones de botón bajo los botones; siguen al último dispositivo usado.
 	_resume_button.get_parent().add_child(InputHints.build([
-			["ui_accept", "Elegir"], ["ui_cancel", "Continuar"]]))
+			["ui_accept", accept_hint_text], ["ui_cancel", cancel_hint_text]]))
 
 
-## pause_game (Esc / Start) toggles the menu. ui_cancel (B on a pad) only
-## CLOSES it: B is "back" everywhere else in the game, and with the pause
-## on Start alone a pad player pressing B on this menu got nothing. B does
-## not open it — in a run B is free for gameplay.
+## pause_game (Esc / Start) abre y cierra el menú. ui_cancel (B en un control)
+## solo lo CIERRA: B es "volver" en todo el juego, pero no lo abre porque en la
+## partida B queda libre para jugar.
 func _unhandled_input(event: InputEvent) -> void:
 	var toggle := event.is_action_pressed("pause_game")
 	var back := visible and event.is_action_pressed("ui_cancel")
 	if not toggle and not back:
 		return
 	if _settings_panel.visible:
-		return  # the panel handles Esc / B itself and returns to these buttons
+		return  # el panel maneja Esc / B por su cuenta y vuelve a estos botones
 	if visible:
 		_close()
 		get_viewport().set_input_as_handled()
 		return
-	if not RunState.run_active or _blocking_ui_open():
+	if not RunState.run_active or BlockingUi.any_open(get_tree()):
 		return
 	_open()
 	get_viewport().set_input_as_handled()
 
 
-## "ui_blocking" contract: true while this menu owns the pause. Its own
-## _blocking_ui_open() below skips nothing, so this has to answer honestly
-## — and it does: Esc closes a visible menu before that check is reached.
+## Contrato "ui_blocking" (BlockingUi): true mientras este menú es dueño de la
+## pausa. La comprobación de Esc (BlockingUi.any_open) no se salta a este menú,
+## así que esto debe contestar con la verdad, y lo hace: con el menú visible, Esc
+## lo cierra antes de llegar a esa comprobación.
 func is_blocking() -> bool:
 	return visible
 
 
-## Any layer that owns (or is about to own) the tree pause right now?
-## Loose coupling: members of "ui_blocking" expose is_blocking() -> bool.
-## A member without the method is treated as blocking — assuming the
-## opposite would let Esc open this menu over someone else's modal and
-## then release a pause we never took.
-func _blocking_ui_open() -> bool:
-	for node: Node in get_tree().get_nodes_in_group("ui_blocking"):
-		if not node.has_method(&"is_blocking"):
-			push_warning("ui_blocking member without is_blocking(): %s" % node.name)
-			return true
-		var blocking: Variant = node.call(&"is_blocking")
-		if blocking == true:
-			return true
-	return false
-
-
 func _open() -> void:
 	if get_tree().paused:
-		return  # somebody else already owns the pause; never steal it
+		return  # otro ya es dueño de la pausa; nunca se la roba
 	get_tree().paused = true
 	_pause_owned = true
 	Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
 	_root.visible = true
 	visible = true
 	_resume_button.grab_focus()
-	# Entrance: dim fades up, panel scales in. Interruptible — Esc-spam
-	# kills the tween and _close snaps the final state anyway.
+	# Entrada: el fondo oscuro sube y el panel crece. Se puede interrumpir:
+	# presionar Esc muchas veces mata el tween y _close deja el estado final.
 	_kill_open_tween()
 	_dim.modulate.a = 0.0
 	_menu_panel.pivot_offset = _menu_panel.size * 0.5
-	_menu_panel.scale = Vector2(0.94, 0.94)
+	_menu_panel.scale = Vector2.ONE * panel_start_scale
 	_menu_panel.modulate.a = 0.0
 	_open_tween = create_tween().set_parallel()
 	_open_tween.set_ignore_time_scale(true)
-	_open_tween.tween_property(_dim, "modulate:a", 1.0, 0.15)
-	_open_tween.tween_property(_menu_panel, "modulate:a", 1.0, 0.14)
-	_open_tween.tween_property(_menu_panel, "scale", Vector2.ONE, 0.2) \
+	_open_tween.tween_property(_dim, "modulate:a", 1.0, dim_fade_time)
+	_open_tween.tween_property(_menu_panel, "modulate:a", 1.0, panel_fade_time)
+	_open_tween.tween_property(_menu_panel, "scale", Vector2.ONE, panel_grow_time) \
 			.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 
 
@@ -123,7 +125,7 @@ func _close() -> void:
 	_menu_panel.scale = Vector2.ONE
 	_menu_panel.modulate.a = 1.0
 	if not _pause_owned:
-		return  # the pause (and the mouse) belong to whoever took them
+		return  # la pausa (y el mouse) son de quien los tomó
 	_pause_owned = false
 	get_tree().paused = false
 	Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
@@ -140,46 +142,46 @@ func _on_settings_pressed() -> void:
 
 
 func _on_settings_closed() -> void:
-	# Also fires if the panel is closed during teardown; only restore the
-	# buttons while the menu is actually up.
+	# También se dispara si el panel se cierra al desmontar la escena: solo se
+	# devuelven los botones si el menú sigue arriba.
 	if visible:
 		_root.visible = true
 		_resume_button.grab_focus()
 
 
-## Extract (iteration 38): the run has no clock, so leaving is the
-## player's call. Unlike Quit, this ENDS the run properly — RunManager
-## grades it (victory past the survival goal), folds the meta save, and
-## opens the run-end screen, which then owns the pause.
+## Extraerse: la partida no tiene reloj, así que irse es decisión del jugador. A
+## diferencia de Salir, esto TERMINA la partida como corresponde: RunManager la
+## califica (victoria si pasó la meta de supervivencia), la suma al guardado
+## meta y abre la pantalla de fin, que desde ahí es dueña de la pausa.
 func _on_extract_pressed() -> void:
 	var manager := get_tree().get_first_node_in_group("run_manager")
 	if manager == null:
 		return
 	visible = false
 	_kill_open_tween()
-	_pause_owned = false  # RunManager re-pauses for the run-end screen
+	_pause_owned = false  # RunManager vuelve a pausar para la pantalla de fin
 	get_tree().paused = false
 	manager.extract_run()
 
 
-## Abandon the run: nothing folds into the meta save (by design — the run
-## counters RunState.reset() drops never reach the ledger). Hiding the
-## menu first closes the window where Esc during the fade would run
-## _close() and hand the abandoned run a live, unpaused frame.
+## Abandona la partida: nada se suma al guardado meta (a propósito: los
+## contadores que RunState.reset() descarta nunca llegan al registro). Ocultar el
+## menú primero cierra la ventana en la que un Esc durante el fundido llamaría a
+## _close() y le daría a la partida abandonada un frame vivo y sin pausa.
 func _on_quit_pressed() -> void:
-	if not ScreenFade.leave_run(CHARACTER_SELECT_SCENE_PATH):
-		return  # a cut is already running; nothing was touched
+	if not ScreenFade.leave_run(ScenePaths.CHARACTER_SELECT):
+		return  # ya hay un corte en curso; no se tocó nada
 	visible = false
 	_kill_open_tween()
 	_pause_owned = false
 
 
-## UiTheme design system: shared panel treatment, spaced headline, teal
-## Resume as the primary action.
+## Sistema de diseño UiTheme: panel compartido, titular espaciado y Continuar en
+## verde azulado como acción principal.
 func _apply_styles() -> void:
 	_menu_panel.add_theme_stylebox_override("panel",
-			UiTheme.panel(UiTheme.PANEL_BG, UiTheme.BORDER_DIM, 40.0, 26.0))
-	UiTheme.style_title(_title_label, 44, UiTheme.TEXT_BRIGHT, 8, 10)
+			UiTheme.panel(UiTheme.PANEL_BG, UiTheme.BORDER_DIM, panel_margin.x, panel_margin.y))
+	_title_label.add_theme_font_override("font", UiTheme.spaced_font(title_letter_spacing))
 	UiTheme.style_button(_resume_button, UiTheme.ACCENT, true)
 	UiTheme.style_button(_settings_button)
 	UiTheme.style_button(_extract_button, UiTheme.ACCENT_AMBER)
