@@ -1,14 +1,14 @@
 class_name LoadoutTile
 extends PanelContainer
-## Una casilla de las franjas de equipo y de la fila de power-ups: un recuadro
-## del color de su tipo o rareza con el ícono, o con el glifo de dos letras
-## del catálogo mientras no hay ícono, y una esquina con nivel, pilas, copias
-## o segundos. Quien la usa solo le pasa una entrada (show_entry); el aspecto
+## Una casilla de las franjas de equipo y de la fila de power-ups: un sticker
+## del color de su tipo o rareza, con contorno de tinta y sombra dura, que
+## lleva el ícono o, mientras no hay ícono, el glifo de dos letras del
+## catálogo en tinta, y una esquina con nivel, pilas, copias o segundos. Quien la usa solo le pasa una entrada (show_entry); el aspecto
 ## vive aquí y en LoadoutTile.tscn.
 ##
 ## Convención de íconos: una casilla dibuja res://assets/icons/<biblioteca>/<id>.png
-## si existe y, si no, la imagen de reemplazo con el glifo encima; así se
-## agregan sprites por id sin tocar código. El `icon` propio de una fila de
+## si existe y, si no, su glifo sobre el color (o sobre la imagen de reemplazo
+## con show_placeholder_art); así se agregan sprites por id sin tocar código. El `icon` propio de una fila de
 ## catálogo gana sobre ambos.
 
 ## Carpeta raíz de los íconos por id.
@@ -23,26 +23,24 @@ const ICON_LIBRARY_POWERUPS := "powerups"
 const ICON_LIBRARY_PETS := "pets"
 
 @export_group("Recuadro")
-## Color de fondo de la casilla.
-@export var background_color: Color = Color(UiTheme.TILE_BG, 0.9)
-## Grosor del borde, en píxeles; el borde toma el color de la entrada.
-@export var border_width: int = 2
+## Grosor del contorno de tinta, en píxeles. El cuerpo toma el color de la
+## entrada.
+@export var border_width: int = 3
 ## Radio de las esquinas, en píxeles.
 @export var corner_radius: int = UiTheme.RADIUS_SMALL
-## Tamaño del brillo exterior, en píxeles; toma el color de la entrada.
-@export var glow_size: int = 6
-## Opacidad del brillo exterior (0-1).
-@export var glow_alpha: float = 0.25
+## Sombra dura bajo la casilla (desplazamiento en píxeles).
+@export var shadow_offset: Vector2 = Vector2(0.0, 3.0)
+## Dibuja la imagen de reemplazo (assets/icons/placeholder.png) bajo el glifo
+## de las entradas sin ícono propio. Apagado, el glifo va sobre el color.
+@export var show_placeholder_art: bool = false
 @export_group("Glifo")
 ## Tamaño de fuente del glifo en una casilla sin imagen, en píxeles.
-@export var glyph_font_size: int = 16
+@export var glyph_font_size: int = 18
 ## Tamaño de fuente del glifo sobre la imagen de reemplazo, en píxeles: más
 ## chico, para que se lea como etiqueta sobre el arte y no como el arte.
 @export var placeholder_glyph_font_size: int = 13
 ## Grosor del contorno del glifo sobre la imagen de reemplazo, en píxeles.
 @export var placeholder_glyph_outline: int = 4
-## Cuánto se aclara el color de la entrada para pintar el glifo (0-1).
-@export var glyph_lighten: float = 0.25
 ## Espacio extra entre las letras del glifo, en píxeles.
 @export var glyph_letter_spacing: int = 1
 
@@ -60,12 +58,14 @@ func _ready() -> void:
 func show_entry(entry: Dictionary) -> void:
 	var color: Color = entry.color
 	tooltip_text = String(entry.tip)
-	var style := UiTheme.flat(background_color, corner_radius)
-	style.border_color = color
+	var style := UiTheme.flat(color, corner_radius)
+	style.border_color = UiTheme.INK
 	style.set_border_width_all(border_width)
-	UiTheme.add_glow(style, color, glow_size, glow_alpha)
+	UiTheme.add_hard_shadow(style, shadow_offset)
 	add_theme_stylebox_override("panel", style)
 	var icon_path := icon_path_for(entry)
+	if icon_path == ICON_PLACEHOLDER and not show_placeholder_art:
+		icon_path = ""
 	var on_placeholder := icon_path == ICON_PLACEHOLDER
 	_icon.visible = not icon_path.is_empty()
 	if _icon.visible:
@@ -77,7 +77,8 @@ func show_entry(entry: Dictionary) -> void:
 		_glyph.text = String(entry.glyph)
 		_glyph.add_theme_font_size_override("font_size",
 				placeholder_glyph_font_size if on_placeholder else glyph_font_size)
-		_glyph.add_theme_color_override("font_color", color.lightened(glyph_lighten))
+		_glyph.add_theme_color_override("font_color",
+				UiTheme.TEXT_BRIGHT if on_placeholder else UiTheme.INK)
 		_glyph.add_theme_constant_override("outline_size",
 				placeholder_glyph_outline if on_placeholder else 0)
 	set_corner(String(entry.corner))

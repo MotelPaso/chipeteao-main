@@ -8,8 +8,9 @@ extends Control
 ## vive aquí, así un arreglo llega a las tres a la vez.
 ##
 ## Contrato de escena (QuestLog.tscn / RelicShop.tscn / Collection.tscn):
-## %BadgeLabel, %List (VBoxContainer dentro de un ScrollContainer) y
-## %BackButton. El título vive entero en la escena (texto, fuente, color), y
+## un hijo Center con todo el contenido, %BadgeLabel, %List (VBoxContainer
+## dentro de un ScrollContainer) y %BackButton. Volver y ui_cancel regresan al
+## menú principal. El título vive entero en la escena (texto, fuente, color), y
 ## el color de texto de %BadgeLabel en la escena también pinta su píldora.
 ##
 ## Ganchos de las subclases: _tracks_shards() y _build_rows(list). Momentos
@@ -58,6 +59,9 @@ const SCROLL_STEP := 110
 @onready var _badge_label: Label = %BadgeLabel
 @onready var _list: VBoxContainer = %List
 @onready var _back_button: Button = %BackButton
+## Todo el contenido de la pantalla (título, lista, Volver), sin el fondo: lo
+## que MenuNav hace entrar y salir.
+@onready var _content: Control = $Center
 ## El ScrollContainer de la lista (toda escena MetaScreen pone %List en uno).
 @onready var _scroll: ScrollContainer = _list.get_parent() as ScrollContainer
 
@@ -82,7 +86,10 @@ func _ready() -> void:
 		SaveData.shards_changed.connect(_on_shards_changed)
 		refresh_badge()
 	rebuild()
-	play_entrance()
+	# Una sola entrada: si la pantalla llegó deslizándose desde el menú, sus
+	# filas ya vienen con ella y no se escalonan además.
+	if not MenuNav.arrive(_content):
+		play_entrance()
 	_back_button.grab_focus()
 
 
@@ -137,8 +144,7 @@ func _can_scroll(direction: int) -> bool:
 
 
 func _on_back_pressed() -> void:
-	ScreenFade.transition(func() -> void:
-		get_tree().change_scene_to_file(ScenePaths.CHARACTER_SELECT))
+	MenuNav.go(_content, ScenePaths.MAIN_MENU, MenuNav.Direction.BACK)
 
 
 # --- insignia ---------------------------------------------------------

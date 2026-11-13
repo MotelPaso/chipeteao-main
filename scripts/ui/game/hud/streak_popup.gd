@@ -33,7 +33,7 @@ const SOUND := &"streak"
 @export var fade_time: float = 0.3
 @export_group("Letra")
 ## Espacio extra entre letras, en píxeles.
-@export var letter_spacing: int = 3
+@export var letter_spacing: int = 1
 
 ## Momentos (run_time) de las bajas recientes; se podan a window_seconds en cada baja.
 var _kill_times: Array[float] = []

@@ -131,7 +131,7 @@ docs/GLOSARIO.md         # terminología canónica es-419 (obligatoria)
 docs/AUDITORIA-RONDA-2.md  # registro de la auditoría de código (80 hallazgos)
 docs/AUDITORIA-VISUAL.md   # registro de la auditoría VISUAL: qué se vio en pantalla,
                          #   con captura de antes y después por hallazgo
-tools/verificar.sh       # import + lint + harness de UI + soaks (arenas, etapa, co-op)
+tools/verificar.sh       # import + lint + harness de UI y del selector + soaks (arenas, etapa, co-op)
 assets/
   audio/sfx/             # 20 wav sintetizados (regenerables, ver ARQUITECTURA)
   audio/ambient/         # camas de viento por bioma (forest_wind, desert_wind)
@@ -196,6 +196,7 @@ Las dos piezas nuevas de la iteración 57 y el quinto soak:
 
 - **Lint de catálogos** (`scenes/tests/CatalogLint.tscn`): las referencias cruzadas que ningún soak puede comprobar, porque una rota no revienta — simplemente no hace nada. Dieciséis comprobaciones (`ids_unique`, `glyphs_unique`, `paths_exist`, `stat_ids`, `character_weapons`, `director_methods`, `weapon_properties`, `vendor_lucky_roulette_ids`, `marker_labels`, `id_format`, `quest_stats`, `text_numbers`, `text_values`, `item_kinds_unique`, `sfx_ids`, `stat_rows`), cada una con su línea `Catalog lint: check <nombre> ok rows=N`. `rows` es lo que se inspeccionó de verdad: **cero filas es un fallo**, porque una comprobación que recorre una lista vacía pasa por el motivo equivocado.
 - **Harness de UI** (`scenes/tests/UiProbe.tscn`): arranca las escenas de UI que ningún soak abre. Trece pasos que pulsan los **controles reales** (Colección, Misiones, Armería, el rechazo de la fila de co-op, el desbloqueo de un raider con su carta de confirmación, todas las cartas, iniciar la incursión, abrir y cerrar la pausa, Ajustes con «Mostrar FPS» y los botones de «Calidad gráfica», extraerse y reintentar), cada uno con su `UiProbe: step <nombre> ok`. Un control que falta, una precondición rechazada o una pausa que no se suelta es un `push_error`.
+- **Harness del selector** (`scenes/tests/SelectProbe.tscn`): abre el selector de personaje en cuatro formas de ventana (16:9, MacBook 16:10, 4:3, ultrawide) y falla si un texto o un botón sale de la pantalla o queda cortado, si hay que desplazar para ver una carta, o si con el control no se llega a algún botón (o de él a Iniciar).
 - **Soak de co-op**: dos raiders (`BONK_PLAYERS=2`), el slot 1 **mortal** a propósito (godmode cubre solo al slot 0) y derribado a los 45 s con `BONK_DOWN_NOW`, para que el ciclo derribo/reanimación —lo único que ningún soak en solitario puede alcanzar— se ejercite de verdad. Exige `ArenaProbe: players=2`, un cruce de etapa, barridos limpios y al menos un `Player revived:`.
 
 **Guardado por corrida**: cada soak y cada harness recibe su propio `BONK_SAVE_PATH`, borrado con sus hermanos `.bak` y `.tmp` antes de arrancar. Antes todos compartían `user://soak_save.json`: los soaks godmode no doblan meta (nunca terminan la partida), pero sí acumulan los contadores que `SaveData.bump` acredita durante la corrida (bestiario `kills_<script>`, `used_weapon_<id>`), y cualquier corrida mortal o de UI le escribía encima esquirlas, misiones y desbloqueos. Borrar solo el `.json` no era un reset: `load_from_disk` cae al `.bak`.

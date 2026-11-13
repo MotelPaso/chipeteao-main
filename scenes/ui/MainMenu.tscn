@@ -1,0 +1,171 @@
+[gd_scene load_steps=11 format=3]
+
+[ext_resource type="Script" path="res://scripts/ui/menu/main_menu.gd" id="1_menu"]
+[ext_resource type="Material" path="res://assets/ui/menu_backdrop.tres" id="2_backdrop"]
+[ext_resource type="PackedScene" path="res://scenes/ui/menu/MenuTile.tscn" id="3_tile"]
+[ext_resource type="PackedScene" path="res://scenes/ui/SettingsPanel.tscn" id="4_settings"]
+[ext_resource type="FontFile" path="res://assets/ui/fonts/LilitaOne-Regular.ttf" id="5_display"]
+
+[ext_resource type="Texture2D" path="res://assets/ui/icons/menu_quests.svg" id="6_quests"]
+[ext_resource type="Texture2D" path="res://assets/ui/icons/menu_collection.svg" id="7_collection"]
+[ext_resource type="Texture2D" path="res://assets/ui/icons/menu_armory.svg" id="8_armory"]
+[ext_resource type="PackedScene" path="res://scenes/ui/meta/character_select/PortraitStudio.tscn" id="9_studio"]
+
+[node name="MainMenu" type="Control" groups=["menu_screen"]]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_menu")
+
+[node name="Background" type="ColorRect" parent="."]
+material = ExtResource("2_backdrop")
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+
+[node name="Layout" type="MarginContainer" parent="."]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+theme_override_constants/margin_left = 44
+theme_override_constants/margin_top = 36
+theme_override_constants/margin_right = 44
+theme_override_constants/margin_bottom = 16
+
+[node name="VBox" type="VBoxContainer" parent="Layout"]
+editor_description = "La separación deja aire para que la tarjeta con foco (crece, anillo y sombra más larga) no pise el subtítulo ni los botones de abajo."
+layout_mode = 2
+theme_override_constants/separation = 32
+
+[node name="TopBar" type="HBoxContainer" parent="Layout/VBox"]
+layout_mode = 2
+
+[node name="Titles" type="VBoxContainer" parent="Layout/VBox/TopBar"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = -10
+
+[node name="TitleLabel" type="Label" parent="Layout/VBox/TopBar/Titles"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_type_variation = &"TitleLabel"
+theme_override_constants/outline_size = 16
+theme_override_fonts/font = ExtResource("5_display")
+theme_override_font_sizes/font_size = 92
+text = "CHIPETIAO"
+
+[node name="SubtitleLabel" type="Label" parent="Layout/VBox/TopBar/Titles"]
+layout_mode = 2
+theme_override_constants/outline_size = 8
+theme_override_font_sizes/font_size = 19
+text = "Sobrevive a la horda. O por lo menos inténtalo."
+
+[node name="ShardsLabel" type="Label" parent="Layout/VBox/TopBar"]
+unique_name_in_owner = true
+editor_description = "El texto lo escribe main_menu.gd con UiTheme.SHARDS_BALANCE."
+layout_mode = 2
+size_flags_vertical = 4
+theme_type_variation = &"BadgeLabel"
+theme_override_colors/font_color = Color(0.498, 0.831, 0.941, 1)
+theme_override_font_sizes/font_size = 18
+text = "Esquirlas: 0"
+
+[node name="Tiles" type="HBoxContainer" parent="Layout/VBox"]
+editor_description = "Las cuatro secciones. Cacería es más ancha (Layout > Stretch Ratio) porque es la acción principal. El texto, el color y el giro de cada tarjeta están en su instancia."
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_constants/separation = 26
+
+[node name="HuntButton" parent="Layout/VBox/Tiles" instance=ExtResource("3_tile")]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_stretch_ratio = 1.5
+title_text = "Cacería"
+detail_text = "Elige tu raider y sal de incursión."
+tile_color = Color(1, 0.824, 0.247, 1)
+tilt_degrees = -1.5
+art_outline = 4.0
+art_lit_tilt = 3.0
+
+[node name="QuestsButton" parent="Layout/VBox/Tiles" instance=ExtResource("3_tile")]
+unique_name_in_owner = true
+layout_mode = 2
+title_text = "Misiones"
+detail_text = "Cumple encargos y gana esquirlas."
+tile_color = Color(0.949, 0.329, 0.176, 1)
+tilt_degrees = 1.5
+art_texture = ExtResource("6_quests")
+
+[node name="CollectionButton" parent="Layout/VBox/Tiles" instance=ExtResource("3_tile")]
+unique_name_in_owner = true
+layout_mode = 2
+title_text = "Colección"
+detail_text = "Raiders, arsenal y bestiario."
+tile_color = Color(0.357, 0.839, 0.627, 1)
+tilt_degrees = -1.0
+art_texture = ExtResource("7_collection")
+art_lit_tilt = 4.0
+
+[node name="ArmoryButton" parent="Layout/VBox/Tiles" instance=ExtResource("3_tile")]
+unique_name_in_owner = true
+layout_mode = 2
+title_text = "Armería"
+detail_text = "Reliquias que mejoran cada incursión."
+tile_color = Color(0.498, 0.831, 0.941, 1)
+tilt_degrees = 2.0
+art_texture = ExtResource("8_armory")
+
+[node name="Footer" type="HBoxContainer" parent="Layout/VBox"]
+editor_description = "Indicaciones del control a la izquierda, Ajustes y Salir al centro, versión a la derecha."
+layout_mode = 2
+theme_override_constants/separation = 16
+
+[node name="HintsSlot" type="HBoxContainer" parent="Layout/VBox/Footer"]
+unique_name_in_owner = true
+editor_description = "main_menu.gd agrega aquí las indicaciones de botones (InputHints)."
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="ButtonRow" type="HBoxContainer" parent="Layout/VBox/Footer"]
+layout_mode = 2
+theme_override_constants/separation = 14
+
+[node name="SettingsButton" type="Button" parent="Layout/VBox/Footer/ButtonRow"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(150, 46)
+layout_mode = 2
+text = "Ajustes"
+
+[node name="QuitButton" type="Button" parent="Layout/VBox/Footer/ButtonRow"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(150, 46)
+layout_mode = 2
+text = "Salir"
+
+[node name="VersionSlot" type="HBoxContainer" parent="Layout/VBox/Footer"]
+layout_mode = 2
+size_flags_horizontal = 3
+alignment = 2
+
+[node name="VersionLabel" type="Label" parent="Layout/VBox/Footer/VersionSlot"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 8
+theme_type_variation = &"DimLabel"
+theme_override_font_sizes/font_size = 12
+text = "v0.0.0"
+
+[node name="SettingsPanel" parent="." instance=ExtResource("4_settings")]
+unique_name_in_owner = true
+layout_mode = 1
+
+[node name="PortraitStudio" parent="." instance=ExtResource("9_studio")]
+unique_name_in_owner = true
+editor_description = "Saca la foto del raider que muestra la tarjeta Cacería (la misma que usan las cartas del selector)."

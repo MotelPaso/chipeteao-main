@@ -55,7 +55,7 @@ enum RowState { IN_PROGRESS, CLAIMABLE, CLAIMED }
 ## una misión en curso (0-1); las terminadas usan UiTheme.ACCENT_AMBER.
 @export var progress_fill_darken: float = 0.15
 ## Espacio extra entre las letras del sello RECLAMADA, en píxeles.
-@export var claimed_spacing: int = 2
+@export var claimed_spacing: int = 1
 
 @export_group("Textos")
 ## Botón de una misión completa sin reclamar.

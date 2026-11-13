@@ -49,7 +49,7 @@ const BESTIARY: Array[Dictionary] = [
 ## Color de los títulos de sección.
 @export var section_color: Color = UiTheme.ACCENT_AMBER
 ## Espacio extra entre las letras de los títulos de sección, en píxeles.
-@export var section_spacing: int = 3
+@export var section_spacing: int = 1
 ## Tamaño de fuente del título de cada fila, en píxeles.
 @export var title_font_size: int = 15
 ## Color del título de una fila descubierta.

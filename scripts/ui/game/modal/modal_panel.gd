@@ -25,7 +25,7 @@ const HEADLESS_LEAVE_DELAY := 3.0
 @export var panel_margin: Vector2 = Vector2(32.0, 22.0)
 ## Espaciado extra entre letras del título, en píxeles. Tamaño y contorno del
 ## título están en el nodo Title de la escena.
-@export var title_letter_spacing: int = 6
+@export var title_letter_spacing: int = 1
 
 @export_group("Textos")
 ## Línea de puntos del raider; %d son sus puntos.
