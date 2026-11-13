@@ -123,6 +123,54 @@ grupos con su nombre.
 | Velocidad de los proyectiles enemigos | `scenes/enemies/EnemyBolt.tscn` > raíz | `speed`, `max_distance` (el daño lo pone quien dispara) |
 | Nombre de un jefe en pantalla | `<Jefe>.tscn` > raíz | `boss_title` (y la tabla `BESTIARY` de `scripts/ui/meta/collection/collection_entries.gd`) |
 
+### Mythos, el jefe de etapa del Bosque Hueco
+
+Mythos llega en el minuto 11 del Bosque Hueco. Su vida **no es un número
+fijo**: se calcula para que la pelea dure lo mismo con una party débil o
+fuerte. Lo que se edita son las perillas de ese cálculo (nodo `Scaling`).
+Todo lo de esta tabla está en `scenes/enemies/Mythos.tscn` salvo que diga
+otra cosa.
+
+| Qué quieres cambiar | Dónde | Qué propiedad |
+| --- | --- | --- |
+| Qué jefe llega en el minuto 11 de un mapa | `scenes/world/<Arena>.tscn` > EnemySpawner (grupo «Jefes») | `stage_boss_scene` (vacío = la revancha Ancestral; el Bosque Hueco trae `Mythos.tscn`) |
+| Cuánto dura la pelea | Mythos.tscn > Scaling (grupo «Duración objetivo») | `target_fight_seconds` (segundos que debería durar), `min_fight_seconds` (lo mínimo, por fuerte que sea la party), `min_life_seconds` |
+| Cuántas vidas tiene y qué parte de la pelea es cada una | Mythos.tscn > Scaling («Duración objetivo») | `life_shares` (una entrada por vida; agregar una entrada agrega una vida) |
+| Vida mínima (1 jugador, primera vuelta, party recién empezada) | Mythos.tscn > Health | `max_hp` (se reparte entre las vidas con `life_shares`) |
+| Cuánta vida extra gana contra una party fuerte, y el tope | Mythos.tscn > Scaling («Vida») | `advantage_absorbed` (1 = toda pelea dura lo mismo; 0 = una party fuerte lo mata rápido), `max_hp_over_floor`, `recent_life_weight` |
+| Cómo estima el daño de la party cuando llega | Mythos.tscn > Scaling («Estimación de la primera vida») | `dps_window_seconds`, `focus_on_boss`, `expected_dps_base`, `expected_dps_growth`, `power_check_low`, `power_check_high` |
+| Cuánto más agresivo se pone con más jugadores, más poder o menos vidas | Mythos.tscn > Scaling («Agresividad») | `aggression_per_extra_player`, `aggression_per_power`, `aggression_per_life`, `aggression_cap` |
+| Daño extra por el poder de la party | Mythos.tscn > Scaling («Daño») | `damage_per_power`, `damage_power_cap` |
+| Cuánto pesa cada «poder» (armas, niveles, evoluciones, tomos, objetos, power-ups, mascota) | `scenes/world/RunSystems.tscn` > PartyPower (grupos «Peso de las armas» y «Peso del resto») | `weapon_weight`, `weapon_level_weight`, `weapon_evolved_weight`, `weapon_ascension_weight`, `tome_weight`, `tome_stack_weight`, `item_weight`, `powerup_weight`, `pet_weight` |
+| Cada cuánto sale en el log el poder de la party | RunSystems.tscn > PartyPower («Registro») | `log_interval`, `log_window` |
+| Velocidad y giro | Mythos.tscn > raíz («Movimiento») | `move_speed`, `turn_speed` |
+| Vuelo: distancias, cuánto acosa de cerca y cada cuánto cambia de raider | Mythos.tscn > raíz («Vuelo») | `close_distance`, `close_seconds`, `far_distance`, `far_seconds`, `far_band`, `orbit_speed_factor`, `focus_seconds` |
+| Pausa entre ataques | Mythos.tscn > raíz («Ritmo de ataques») | `attack_pause`, `attack_pause_at_full_aggression` |
+| Renacer: segundos en cenizas, radio y daño del estallido | Mythos.tscn > raíz («Renacer») | `rebirth_seconds`, `rebirth_radius`, `rebirth_damage`, `post_rebirth_pause`, `rebirth_sfx` |
+| Plumas ardientes (cuántas, daño, abanico) | Mythos.tscn > Moves/FeatherVolley («Plumas») | `bolt_count`, `extra_bolts_at_full_aggression`, `bolt_damage`, `spread_degrees`, `windup`, `second_wave_aggression` |
+| Velocidad y alcance de una pluma | `scenes/enemies/FireFeather.tscn` > raíz | `speed`, `max_distance` |
+| Picada (aviso, radio, daño, cuánto queda posado) | Mythos.tscn > Moves/Dive («Picada») | `windup`, `radius`, `damage`, `dash_time`, `recover` |
+| Cerco de brasas (zonas, tamaño, hueco de salida, daño) | Mythos.tscn > Moves/Ring («Cerco») | `zone_count`, `extra_zones_at_full_aggression`, `zone_radius`, `ring_radius`, `escape_gap`, `warn_seconds`, `burn_seconds`, `zone_dps` |
+| Lluvia de brasas (zonas por raider, distancia, daño) | Mythos.tscn > Moves/Rain («Lluvia») | `zones_per_raider`, `extra_zones_at_full_aggression`, `zone_radius`, `min_distance`, `max_distance`, `warn_seconds`, `burn_seconds`, `zone_dps` |
+| Cada cuánto usa un ataque, desde qué vida y a qué distancia | Mythos.tscn > Moves/<ataque> («Ritmo») | `cooldown`, `cooldown_at_full_aggression`, `unlock_life`, `first_use_fraction`, `min_range`, `max_range` |
+| Tope de zonas de fuego y distancia a la que nacen de un raider | Mythos.tscn > Zones | `max_live_zones`, `raider_clearance`, `downed_clearance` |
+| Zona de fuego: cada cuánto quema, encendido, apagado y sonido | `scenes/fx/FireZone.tscn` > raíz | `tick_interval`, `ignite_time`, `fade_time`, `downed_clearance`, `ignite_sfx` |
+| Zona de fuego: colores del aviso y de la lava | FireZone.tscn > Disc > su material (Shader Parameters) | `warn_color`, `fire_color`, `core_color`, `flow_scale`, `flow_speed`, `warn_fill_alpha` |
+| Tamaño del fénix, altura de vuelo y aleteo | Mythos.tscn > Visual (grupos «Vuelo», «Alas», «Cuerpo», «Cenizas», «Llegada») | `body_scale`, `hover_height`, `perch_height`, `flap_period`, `flap_degrees`, `ashes_scale`, `arrival_height` |
+| Colores del fénix | Mythos.tscn > los materiales de Visual/Hover | `albedo_color`, `emission` de cada material |
+| Lo que paga al morir y sus colores de aviso | Mythos.tscn > raíz («Pago», «Cofres», «Telegrafía») | `boss_gem_count`, `boss_gem_value`, `health_orb_count`, `base_chest_drops`, `telegraph_color`, `impact_color` |
+| Cuánto dura la calma (la cinemática) | `scripts/enemies/mythos/mythos_cinematic.gd` (grupo «Calma») | `calm_seconds` (tiene que ser lo que dura la calma de la canción) |
+| Canción del jefe, su volumen y cuánto tarda en apagarse | `scenes/enemies/mythos/MythosCinematic.tscn` > Music | `song` (arrastra ahí el archivo), `song_volume_db`, `fade_seconds`, `resync_threshold` |
+| Saltar la cinemática: botón, segundos y texto | `mythos_cinematic.gd` (grupo «Saltar») | `skip_action_name`, `skip_hold_seconds`, `skip_hint_text` |
+| Cámara de la cinemática | `mythos_cinematic.gd` (grupo «Cámara») | `wide_shot_fraction`, `wide_height`, `wide_distance`, `wide_push`, `close_distance`, `close_height`, `close_orbit_degrees`, `camera_fov` |
+| Cartel con el nombre, franjas negras y destello | `mythos_cinematic.gd` (grupo «Cartel»); la letra, en MythosCinematic.tscn > Overlay/Root/… | `subtitle_text`, `title_fraction`, `title_fade_seconds`, `title_letter_spacing`, `bar_height_ratio`, `bar_seconds`, `flash_color`, `flash_seconds` |
+| Cielo, sol, niebla y horizonte del infierno y del bosque carbonizado | `scripts/enemies/mythos/hell_transformation.gd` (grupos «Cielo del infierno», «Cielo carbonizado», «Horizonte») | `hell_*`, `charred_*` |
+| Avance del fuego sobre el mapa y cuánto tarda en enfriarse | `hell_transformation.gd` (grupo «Frente de fuego») | `front_reach`, `front_edge`, `front_curve`, `cool_seconds` |
+| Cómo arden árboles, rocas, tocones y mesetas | `scenes/enemies/mythos/HellTransformation.tscn` > raíz > `prop_material` (Shader Parameters); el pasto de las mesetas, en la raíz | `char_color`, `ember_color`, `fire_color`, `fire_core`, `fire_glow`; `grass_flame_amount` |
+| Suelo quemado: tierra, grietas de lava y ceniza | `assets/shaders/forest_ground.gdshader` (uniforms «Quemado») | `scorch_dark`, `scorch_light`, `lava_color`, `lava_core`, `ash_color`, `crack_scale`, `crack_width`, `lava_glow` |
+| Sonido de fuego, brasas y humo | HellTransformation.tscn > raíz («Sonido», «Partículas»), sus nodos FireBed y Embers, y `HellSmoke.tscn` | `fire_volume_db`, `smolder_volume_db`, `charred_ember_ratio`; `amount`, `lifetime` y el material de cada nube |
+| Nombre de Mythos en la Colección | `scripts/ui/meta/collection.gd` > tabla `BESTIARY`, fila `mythos` | `display_name`, `flavor` |
+
 ## Aparición de enemigos
 
 El nodo `EnemySpawner` vive dentro de cada arena (`scenes/world/<Arena>.tscn`).
@@ -135,7 +183,7 @@ La lógica vive en ayudantes de `scripts/systems/spawner/` (`SpawnScaling`, `Spa
 | Ritmo del flujo de enemigos | `enemy_spawner.gd` («Ritmo y dificultad») | `start_interval`, `min_interval`, `interval_shrink_per_minute`, `base_count_per_tick`, `extra_count_per_minute` |
 | Máximo de enemigos vivos | `enemy_spawner.gd` (grupo «Cupo de enemigos») | `max_active`, `horde_overflow`, `pressure_overflow` (si subes el multiplicador, súbelos juntos) |
 | Hordas en co-op | `enemy_spawner.gd` (grupo «Co-op») | `coop_horde_per_extra_player` |
-| Minuto del jefe, jefe ancestral y su aviso | `scenes/world/<Arena>.tscn` > EnemySpawner (grupo «Jefes») | `boss_spawn_minute`, `elder_spawn_minute`, `boss_warning_text`, `elder_title` |
+| Minuto del jefe, jefe ancestral (o jefe de etapa) y su aviso | `scenes/world/<Arena>.tscn` > EnemySpawner (grupo «Jefes») | `boss_spawn_minute`, `elder_spawn_minute`, `boss_warning_text`, `elder_title`, `stage_boss_scene` |
 | Qué enemigos salen en cada minuto | `enemy_spawner.gd`, tablas al comienzo | `FOREST_PHASES`, `DUNES_PHASES`, `MARSH_PHASES` (un bioma nuevo va al FINAL del enum `PhasePreset`) |
 | Probabilidad de que caiga un power-up | `enemy_spawner.gd` (grupo «Power-ups») | `base_powerup_drop_chance`, `shiny_powerup_drop_scale` |
 | Textos de «¡TIEMPO DETENIDO!» | `enemy_spawner.gd` (grupo «Tiempo detenido») | `time_stop_start_text`, `time_stop_end_text` |
@@ -187,6 +235,8 @@ La lógica vive en ayudantes de `scripts/systems/spawner/` (`SpawnScaling`, `Spa
 | Anillo al subir de nivel (color, duración, tamaño, altura) | Juice.tscn > Juice («Anillo de subida de nivel») | `level_pulse_color`, `level_pulse_duration`, `level_ring_alpha`, `level_ring_inner_radius`, `level_ring_outer_radius`, `level_ring_height`, `level_ring_start_scale`, `level_ring_end_scale` |
 | Volumen, tope por segundo o variación de un sonido | `scripts/systems/autoloads/sfx.gd` > su fila en `SOUND_LIBRARY` | `volume_db`, `rate_limit`, `jitter`, `loop` |
 | Voces simultáneas de sonido | `scenes/systems/Sfx.tscn` > Sfx | `pool_size`, `default_pitch_jitter` |
+| Volumen de la música antes de que el jugador mueva el slider | `scripts/systems/autoloads/save_data.gd` (constantes al comienzo) | `DEFAULT_MUSIC_VOLUME` (0-100; el slider «Volumen de música» de Ajustes lo guarda) |
+| Texto de la fila de música en Ajustes | `scenes/ui/SettingsPanel.tscn` > Center/Panel/VBox/MusicRow/MusicLabel | `text` |
 | Precio de los cofres y cuánto suben | `scripts/systems/autoloads/run_state.gd` (bloque «Edita aquí») | `CHEST_BASE_PRICES`, `CHEST_PRICE_GROWTH` |
 | Curva de experiencia por nivel | `scripts/systems/autoloads/run_state.gd` (bloque «Edita aquí») | `XP_BASE`, `XP_PER_LEVEL`, `XP_PER_LEVEL_SQUARED` |
 
@@ -255,6 +305,7 @@ de reparto se llama `ForestScatter`, `DuneScatter` o `MarshScatter`.
 | Tamaño de las ondulaciones, grietas y cumbres de la roca (todas las arenas) | `scripts/world/rock_formation.gd` (bloque «edita aquí») | `LIFT_WAVELENGTH`, `CRAG_WAVELENGTH`, `EDGE_WAVELENGTH`, `SPIRE_WAVELENGTH` (metros; más grande = rasgos más anchos), `SPIRE_FADE_FROM`/`SPIRE_FADE_TO` (desde qué profundidad asoman las cumbres) |
 | Jugar siempre el mismo mapa (para probar) | la arena > *Scatter (grupo «Semilla (solo pruebas)») | `randomize_per_run` apagado y `scatter_seed` |
 | Altura de las lomas del suelo | la arena > Terrain (grupo «Relieve») | `amplitude`, `feature_size` |
+| Verdes del pasto del Bosque Hueco | `assets/shaders/forest_ground.gdshader` (uniforms «Pasto»), o HollowWoods.tscn > Terrain > `surface_material` (Shader Parameters) | `grass_dark`, `grass_light`, `grass_scale` |
 | Color del minimapa y colinas del horizonte | la arena > Backdrop | `ground_color`, `hill_color`, `far_hill_color` (cambiar `hill_count` mueve los altares aunque la semilla sea la misma) |
 | Tamaño y variante de los pinos | `scenes/world/props/Tree.tscn` > Tree | `wide_chance`, `base_scale`, `width_scale_min/max`, `height_scale_min/max` |
 | Color de las rocas sueltas de las Dunas de Ceniza | `assets/materials/boulder_red.tres` (lo usa `scenes/world/props/DuneRock.tscn`) | `shader_parameter/albedo` |
@@ -273,6 +324,7 @@ de reparto se llama `ForestScatter`, `DuneScatter` o `MarshScatter`.
 | Palabras, colores y umbrales de las rachas («¡TRITURANDO!») | HUD.tscn > StreakLabel | `tier_kills`, `tier_words`, `tier_colors`, `window_seconds` |
 | Duración y color de los avisos en pantalla | HUD.tscn > AnnounceLabel | `fade_in_time`, `hold_time`, `fade_out_time`, `normal_color`, `major_*` |
 | Barra del jefe (y color de su flecha) | HUD.tscn > BossBar | `fill_color`, `glow_size`, `glow_alpha` |
+| Marcas de vida bajo la barra de un jefe con varias vidas (Mythos) | HUD.tscn > BossBar (grupo «Vidas») | `life_pip_size`, `life_pip_color`, `life_pip_spent_color`, `life_pip_corner_radius` |
 | Colores de las fichas de armas, evoluciones y tomos | HUD.tscn > BuildStrip | `weapon_color`, `evolved_weapon_color`, `tome_color` |
 | Contorno, sombra y glifo de cada ficha (su color es el de su tipo o rareza) | `scenes/ui/hud/LoadoutTile.tscn` > raíz | `border_width`, `corner_radius`, `shadow_offset`, `show_placeholder_art`, `glyph_font_size` |
 | Tarjeta de botín | `scenes/ui/hud/LootToast.tscn` > raíz | `hold_time`, `fade_time`, `background_color` |

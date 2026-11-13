@@ -181,6 +181,14 @@ Lo que NO se traduce nunca: los `id` de catálogo, los `node_name`, los nombres 
 | Fenwraith Elder | Espectro de la Ciénaga Ancestral |
 | X Elder (patrón) | X Ancestral (patrón para todo elder_title) |
 | Ascendant (título de rejefe) | Ascendente |
+| Mythos | Mythos (nombre propio del fénix; no se traduce) |
+| Stage boss | Jefe de etapa (el que abre la puerta de la etapa: Mythos en el Bosque Hueco, el Ancestral en los otros mapas) |
+| The ember phoenix (cartel de la cinemática) | El fénix de las brasas |
+| Burning feathers (ataque de Mythos) | Plumas ardientes |
+| Dive (ataque de Mythos) | Picada |
+| Ember ring (ataque de Mythos) | Cerco de brasas |
+| Ember rain (ataque de Mythos) | Lluvia de brasas |
+| Fire zone | Zona de fuego |
 
 ## Mapas
 
@@ -657,6 +665,8 @@ evolución.
 | `SETTINGS` | AJUSTES |
 | `SFX Volume` | Volumen de efectos |
 | `Ambient Volume` | Volumen ambiente |
+| `Music Volume` | Volumen de música |
+| `Hold to skip` | Mantén para saltar |
 | `Mouse Sensitivity` | Sensibilidad del mouse |
 | `1.00x` | 1.00x |
 | `%.2fx` | %.2fx |
@@ -917,6 +927,7 @@ evolución.
 | `boss of the Gloomfen` | jefe de la Ciénaga Lóbrega |
 | `what sleeps beneath the woods` | lo que duerme bajo el bosque |
 | `the tomb-thing of the dunes` | la cosa sepulcral de las dunas |
+| `the phoenix that sets the Hollow Woods ablaze` | el fénix que incendia el Bosque Hueco |
 | `Defeat 100 enemies.` | Derrota a 100 enemigos. |
 | `Defeat 500 enemies.` | Derrota a 500 enemigos. |
 | `Defeat 2,000 enemies.` | Derrota a 2000 enemigos. |

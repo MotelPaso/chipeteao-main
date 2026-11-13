@@ -64,8 +64,9 @@ const CATEGORY_TITLES: Dictionary[String, String] = {
 ## |              | es scenes/enemies/<IdEnPascalCase>.tscn: de ahí salen  |
 ## |              | el cuerpo 3D (nodo Visual) y las estadísticas.         |
 ## | display_name | nombre en pantalla; en los jefes copia el boss_title de |
-## |              | su escena (Rotking, Sarcognath, Fenwraith, Grubthing,  |
-## |              | CofferMimic .tscn): si cambias uno, cambia el otro.     |
+## |              | su escena (Rotking, Mythos, Sarcognath, Fenwraith,     |
+## |              | Grubthing, CofferMimic .tscn): si cambias uno, cambia  |
+## |              | el otro.                                               |
 ## | flavor       | texto corto bajo el nombre.                            |
 ## | tint         | color del fondo de su carta.                           |
 const BESTIARY: Array[Dictionary] = [
@@ -81,6 +82,8 @@ const BESTIARY: Array[Dictionary] = [
 		"tint": Color(0.62, 0.48, 0.32)},
 	{"id": "rotking", "display_name": "Rey Pútrido", "flavor": "jefe del Bosque Hueco",
 		"tint": Color(0.3, 0.46, 0.3)},
+	{"id": "mythos", "display_name": "Mythos",
+		"flavor": "el fénix que incendia el Bosque Hueco", "tint": Color(0.62, 0.24, 0.14)},
 	{"id": "sarcognath", "display_name": "Sarcognato", "flavor": "jefe de las Dunas de Ceniza",
 		"tint": Color(0.68, 0.4, 0.28)},
 	{"id": "fenwraith", "display_name": "Espectro de la Ciénaga",
