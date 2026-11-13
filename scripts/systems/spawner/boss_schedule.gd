@@ -32,6 +32,10 @@ var _relief_timer: float = 0.0
 var _stage_boss_at: float = -1.0
 ## True mientras vive un jefe de etapa PROPIO (stage_boss_scene).
 var _own_stage_boss_alive: bool = false
+## Segundo de etapa antes del cual no sale otro recurrente. Solo lo mueven
+## las arenas con jefe de etapa propio: si su pelea pasó de largo varios
+## turnos, los recurrentes atrasados llegan de a uno y no todos juntos.
+var _next_repeat_not_before: float = 0.0
 
 
 func _init(spawner: EnemySpawner) -> void:
@@ -73,7 +77,8 @@ func tick() -> void:
 		if elder != null:
 			_watch_stage_boss(elder)
 	# Después del jefe de etapa los jefes siguen volviendo, cada uno más fuerte.
-	if _elder_spawned and not _repeats_held() and spawner.boss_repeat_minutes > 0.0:
+	if _elder_spawned and not _repeats_held() and spawner.boss_repeat_minutes > 0.0 \
+			and RunState.stage_time >= _next_repeat_not_before:
 		var due := (spawner.elder_spawn_minute
 				+ spawner.boss_repeat_minutes * float(_repeat_bosses_spawned + 1)) * 60.0
 		if RunState.stage_time >= due:
@@ -82,6 +87,9 @@ func tick() -> void:
 					* pow(spawner.boss_repeat_growth, float(rank)),
 					spawner.boss_repeat_title_template % [spawner.elder_title, rank]) != null:
 				_repeat_bosses_spawned = rank
+				if spawner.stage_boss_scene != null:
+					_next_repeat_not_before = RunState.stage_time \
+							+ spawner.boss_repeat_minutes * 60.0
 
 
 ## El jefe que entró a la arena, o null si algo abortó, para que el llamador

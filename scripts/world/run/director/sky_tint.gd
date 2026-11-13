@@ -74,9 +74,12 @@ func cache(layout: StageLayout) -> void:
 
 ## Reemplaza el cielo «original» de la arena: desde ahora restore() y
 ## snap_back() vuelven a estos valores y tint() multiplica esta energía. No
-## mueve ninguna luz: quien cambia el cielo de la arena lo anima por su cuenta.
+## mueve ninguna luz: quien cambia el cielo de la arena lo anima por su
+## cuenta. Corta el tinte o la vuelta que estuviera en curso: ese tween
+## apunta al cielo anterior y lo traería de vuelta al terminar.
 func rebase(sun_color: Color, sun_energy: float, ambient_color: Color,
 		ambient_energy: float) -> void:
+	_kill_tween()
 	_sun_color = sun_color
 	_sun_energy = sun_energy
 	_ambient_color = ambient_color

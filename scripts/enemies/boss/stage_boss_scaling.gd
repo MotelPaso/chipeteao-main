@@ -7,12 +7,14 @@ extends Node
 ## plan_next_life() en cada renacer, y aplica el plan que recibe.
 ##
 ## Primera vida: el daño que las armas le harían a un solo cuerpo, medido
-## contra la horda (PartyPower.focus_dps), por focus_on_boss, y acotado
-## alrededor de lo que el puntaje de poder dice que esa party debería hacer:
-## la horda infla a las builds de área y castiga a las de un solo blanco, y
-## el puntaje no depende de qué había para golpear. El puntaje predice el
-## daño solo a grandes rasgos, así que la banda es ancha: está para frenar
-## una medida absurda, no para corregir una buena.
+## contra la horda (PartyPower.focus_dps), por focus_on_boss. En co-op el
+## aporte de cada jugador extra se rebaja (extra_player_focus): el jefe acosa
+## a un raider a la vez. El resultado se acota alrededor de lo que el puntaje
+## de poder dice que esa party debería hacer: la horda infla a las builds de
+## área y castiga a las de un solo blanco, y el puntaje no depende de qué
+## había para golpear. El puntaje predice el daño solo a grandes rasgos, así
+## que la banda es ancha: está para frenar una medida absurda, no para
+## corregir una buena.
 ## Vidas siguientes: el daño que el jefe recibió de verdad (el de la última
 ## vida mezclado con el de toda la pelea, para que una vida muy corta no
 ## engañe), y el tiempo que queda del objetivo.
@@ -71,6 +73,8 @@ class LifePlan:
 @export var dps_window_seconds: float = 45.0
 ## Fracción (0-1) del daño a un solo cuerpo que se espera que caiga sobre el jefe; el resto se va en la horda.
 @export_range(0.0, 1.0) var focus_on_boss: float = 0.6
+## Fracción (0-1) de ese daño que aporta cada jugador además del primero: en co-op el jefe acosa a un raider a la vez y los demás no siempre lo tienen a tiro.
+@export_range(0.0, 1.0) var extra_player_focus: float = 0.3
 ## Daño por segundo que se espera de un raider sin poderes.
 @export var expected_dps_base: float = 9.0
 ## Cuánto crece ese daño esperado por cada punto de poder del raider (exponencial: 0.11 lo duplica cada 6,3 puntos).
@@ -105,7 +109,7 @@ var _fight_seconds: float = 0.0
 
 ## Cantidad de vidas del jefe.
 func lives() -> int:
-	return maxi(life_shares.size(), 1)
+	return _shares().size()
 
 
 ## Plan de la primera vida. `floor_hp` es la vida de la escena del jefe ya
@@ -120,7 +124,10 @@ func plan_first_life(floor_hp: float, interlude_seconds: float) -> LifePlan:
 	var players := maxi(Coop.player_count, 1)
 	var measured := power.focus_dps(dps_window_seconds) if power != null else 0.0
 	var expected := _expected_dps(score, players)
-	var estimate := clampf(measured * focus_on_boss, expected * power_check_low,
+	# En co-op el daño medido es el de toda la party, pero al jefe le llega
+	# entero el de un raider y solo una parte del de cada uno de los demás.
+	var reach := (1.0 + extra_player_focus * float(players - 1)) / float(players)
+	var estimate := clampf(measured * focus_on_boss * reach, expected * power_check_low,
 			expected * power_check_high)
 	var plan := _plan(1, estimate, score, players, "horde", 0.0)
 	plan.measured = measured
@@ -156,6 +163,15 @@ func log_line(title: String, plan: LifePlan) -> String:
 			1.0 + plan.damage_bonus]
 
 
+## Las partes de la pelea por vida. Un arreglo vacío cuenta como una sola
+## vida que se lleva la pelea entera.
+func _shares() -> Array[float]:
+	if life_shares.is_empty():
+		var single: Array[float] = [1.0]
+		return single
+	return life_shares
+
+
 ## Daño por segundo que el puntaje de poder dice que esta party debería
 ## hacer: cada raider parte de expected_dps_base y crece con SU parte del
 ## puntaje.
@@ -172,16 +188,17 @@ func _plan(life: int, dps_estimate: float, score: float, players: int, source: S
 	plan.dps = dps_estimate
 	plan.power = score
 	plan.source = source
-	var index := clampi(life - 1, 0, lives() - 1)
+	var shares := _shares()
+	var index := clampi(life - 1, 0, shares.size() - 1)
 	var total_share := 0.0
 	var share_left := 0.0
-	for i: int in life_shares.size():
-		total_share += life_shares[i]
+	for i: int in shares.size():
+		total_share += shares[i]
 		if i >= index:
-			share_left += life_shares[i]
+			share_left += shares[i]
 	total_share = maxf(total_share, 0.001)
 	share_left = maxf(share_left, 0.001)
-	var own_share := life_shares[index] if not life_shares.is_empty() else 1.0
+	var own_share := shares[index]
 	# Lo que queda del objetivo, sin los renaceres que faltan, repartido entre
 	# las vidas que quedan: una vida que se alargó la pagan las siguientes.
 	var interludes_left := float(lives() - life) * _interlude_seconds

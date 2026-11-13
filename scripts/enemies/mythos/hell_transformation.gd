@@ -21,8 +21,10 @@ extends Node3D
 ## los colores y los tiempos se editan aquí.
 ##
 ## CLIMA. El tinte de los climas (SkyTint) vuelve a un cielo «original»; esta
-## escena lo reemplaza por el del infierno al empezar y por el carbonizado al
-## enfriarse (WorldDirector.rebase_sky), así ningún clima devuelve el verde.
+## escena lo reemplaza por el suyo (WorldDirector.rebase_sky), así ningún
+## clima devuelve el verde. Mientras el cielo está cambiando (el avance del
+## fuego y el enfriamiento) lo reemplaza en cada frame, lo que además corta
+## cualquier tinte en curso: en esos segundos solo escribe esta escena.
 ##
 ## Procesa en PAUSABLE (lo fija la escena): sigue corriendo con la arena
 ## congelada por la cinemática, y el menú de pausa la detiene.
@@ -241,7 +243,7 @@ func _apply_ignition(t: float) -> void:
 	_dressing.write(&"burn_radius", front_reach * pow(t, front_curve))
 	var eased := smoothstep(0.0, 1.0, t)
 	if _from_sky != null:
-		_sky.write(_from_sky.blend(_hell_sky(), eased))
+		_own_sky(_from_sky.blend(_hell_sky(), eased))
 	_sky.blend_backdrop(hell_backdrop_ground, hell_backdrop_hills, eased)
 	for entry: Dictionary in _wind:
 		var player := entry["player"] as AudioStreamPlayer
@@ -256,12 +258,20 @@ func _apply_ignition(t: float) -> void:
 func _apply_cooling(c: float) -> void:
 	_dressing.write(&"heat", 1.0 - c)
 	_dressing.write(&"ash", c)
-	_sky.write(_hell_sky().blend(_charred_sky(), c))
+	_own_sky(_hell_sky().blend(_charred_sky(), c))
 	_sky.set_backdrop(hell_backdrop_ground.lerp(charred_backdrop_ground, c),
 			hell_backdrop_hills.lerp(charred_backdrop_hills, c))
 	_fire_bed.volume_db = lerpf(fire_volume_db, smolder_volume_db, c)
 	for embers: GPUParticles3D in _embers:
 		embers.amount_ratio = lerpf(1.0, charred_ember_ratio, c)
+
+
+## Escribe este cielo y le dice al clima que ESE es ahora el cielo de la
+## arena. Se usa mientras el cielo cambia: corta cualquier tinte de clima en
+## curso, así no hay dos escribiendo el sol y el ambiente a la vez.
+func _own_sky(look: HellSky.Palette) -> void:
+	_sky.write(look)
+	HellSky.rebase_weather(get_tree(), look)
 
 
 func _hell_sky() -> HellSky.Palette:

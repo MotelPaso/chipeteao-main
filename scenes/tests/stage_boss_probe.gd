@@ -43,6 +43,9 @@ const FIGHT_SHOT_ZONES: int = 3
 const FIGHT_SHOT_FALLBACK: float = 30.0
 ## Segundos tras la muerte del jefe hasta la foto del mapa que queda.
 const AFTERMATH_SHOT_DELAY: float = 9.0
+## Avance de la calma (0-1) en que se toma la foto del cartel con el nombre
+## del jefe: aparece después de la mitad, cuando ya pasó la foto de la calma.
+const TITLE_SHOT_PROGRESS: float = 0.82
 ## Segundos antes de la llegada del jefe en que se toma la foto de «antes».
 const BEFORE_SHOT_LEAD: float = 6.0
 
@@ -60,6 +63,7 @@ var _calm_from_frame: int = 0
 var _calm_health: Dictionary[int, float] = {}
 var _calm_counts: Array[int] = []
 var _calm_shot: bool = false
+var _title_shot: bool = false
 var _fight_from: float = -1.0
 var _fight_shot: bool = false
 var _before_shot: bool = false
@@ -112,6 +116,7 @@ func on_stage_changed() -> void:
 	_state = &""
 	_fight_from = -1.0
 	_calm_shot = false
+	_title_shot = false
 	_fight_shot = false
 	_before_shot = false
 	_weather_seen = ""
@@ -288,8 +293,8 @@ func _print_stage(reason: String) -> void:
 		if player != null and player.playing and not player.stream_paused:
 			song = true
 	print(("Probe stage: reason=%s hud_visible=%s split_visible=%s cinematic_camera=%s"
-			+ " song_playing=%s world_frozen=%s clock_running=%s") % [
-			reason, hud, split, cinematic_camera, song, _world_frozen(),
+			+ " song_playing=%s root_camera=%s world_frozen=%s clock_running=%s") % [
+			reason, hud, split, cinematic_camera, song, _root_camera(), _world_frozen(),
 			RunState.is_physics_processing()])
 	if reason == "aftermath":
 		_print_hazards(reason)
@@ -309,6 +314,23 @@ func _print_hazards(reason: String) -> void:
 		if zone.is_burning():
 			burning += 1
 	print("Probe hazards: reason=%s live=%d burning=%d" % [reason, live, burning])
+
+
+## Qué cámara 3D tiene activa el viewport raíz: "none" (lo normal en co-op,
+## donde cada raider pinta en su propio SubViewport), "cinematic", "raider"
+## (lo normal en solitario) u "other".
+func _root_camera() -> String:
+	var camera := _tree.root.get_camera_3d()
+	if camera == null:
+		return "none"
+	if camera.is_in_group(&"cinematic_camera"):
+		return "cinematic"
+	var node: Node = camera
+	while node != null:
+		if node.is_in_group(&"player") or node.is_in_group(&"downed_players"):
+			return "raider"
+		node = node.get_parent()
+	return "other"
 
 
 ## True si la arena o algún raider siguen desactivados.
@@ -389,19 +411,22 @@ func _tick_before_shot() -> void:
 	_views.shoot("before")
 
 
-## Mitad de la calma: la cinemática a medio camino.
+## Mitad de la calma: la cinemática a medio camino. Más adelante, otra foto
+## con el cartel del nombre ya en pantalla.
 func _tick_calm_shot() -> void:
-	if _calm_shot:
+	if _calm_shot and _title_shot:
 		return
 	var progress := -1.0
 	for node: Node in _tree.get_nodes_in_group(&"boss_cinematic"):
 		if node.has_method(&"calm_progress"):
 			progress = float(node.call(&"calm_progress"))
-	if progress < 0.5:
-		return
-	_calm_shot = true
-	_camera.request("boss_calm_%.0fs" % _now)
-	_views.shoot("calm")
+	if not _calm_shot and progress >= 0.5:
+		_calm_shot = true
+		_camera.request("boss_calm_%.0fs" % _now)
+		_views.shoot("calm")
+	if not _title_shot and progress >= TITLE_SHOT_PROGRESS:
+		_title_shot = true
+		_camera.request("boss_title_%.0fs" % _now)
 
 
 ## Pelea: con zonas de fuego ardiendo a la vista (o a los 30 s, lo que pase antes).

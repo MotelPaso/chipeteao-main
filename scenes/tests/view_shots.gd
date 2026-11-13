@@ -115,7 +115,7 @@ func _shoot_moment(moment: String) -> void:
 ## terminó, la del raider líder: reactivar una cámara vieja dejaría la
 ## pantalla mirando donde ya no pasa nada.
 func _restore_camera(tree: SceneTree, previous: Camera3D) -> void:
-	_camera.current = false
+	_camera.clear_current(false)
 	var stale := previous == null or not is_instance_valid(previous) \
 			or not previous.is_inside_tree()
 	if not stale and previous.is_in_group(&"cinematic_camera"):
