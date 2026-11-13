@@ -1,9 +1,31 @@
+<<<<<<< Updated upstream
 [gd_scene load_steps=2 format=3]
+=======
+[gd_scene format=3 uid="uid://c5w6fkk7lwdwa"]
+>>>>>>> Stashed changes
 
-[ext_resource type="Script" path="res://scripts/weapons/stench.gd" id="1_stench"]
+[ext_resource type="Script" uid="uid://b8e1fruawejq8" path="res://scripts/weapons/stench.gd" id="1_stench"]
 
+<<<<<<< Updated upstream
 [node name="Stench" type="Node3D"]
+=======
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_gas"]
+transparency = 1
+cull_mode = 2
+shading_mode = 0
+albedo_color = Color(0.55, 0.8, 0.25, 0.35)
+
+[sub_resource type="SphereMesh" id="SphereMesh_cloud"]
+material = SubResource("StandardMaterial3D_gas")
+radius = 1.0
+height = 2.0
+radial_segments = 24
+rings = 12
+
+[node name="Stench" type="Node3D" unique_id=1205316739]
+>>>>>>> Stashed changes
 script = ExtResource("1_stench")
+cloud_mesh = SubResource("SphereMesh_cloud")
 damage = 9.0
 cooldown = 2.5
 attack_range = 3.6

@@ -201,9 +201,10 @@ func fire(_target: Node3D) -> void:
 func deal_damage(target_health: Health, allow_kill_hooks: bool = true) -> float:
 	var stats := _stats_or_null()
 	var amount := effective_damage()
-	var is_crit := stats != null and randf() < stats.crit_chance
+	var crit_tier := roll_crit_tier(stats.crit_chance) if stats != null else 0
+	var is_crit := crit_tier > 0
 	if is_crit:
-		amount *= stats.crit_damage
+		amount *= stats.crit_damage * float(crit_tier)
 		Juice.crit_punch()
 	Sfx.play(&"hit_crit" if is_crit else &"hit_soft")
 	# Health reports nothing back, so read the HP it actually removed.
@@ -234,6 +235,14 @@ func _lifesteal_heal(amount: float) -> void:
 	var player_health := Health.find_in(player)
 	if player_health != null:
 		player_health.heal(amount)
+
+## Nivel de crítico de un golpe: cada 100% de probabilidad es un nivel seguro,
+## y el resto es la probabilidad de un nivel extra. 0.45 -> 0 o 1;
+## 1.25 -> 1 seguro y 25% de 2; 4.5 -> 4 seguros y 50% de 5.
+static func roll_crit_tier(chance: float) -> int:
+	var guaranteed := floori(chance)
+	var remainder := chance - float(guaranteed)
+	return guaranteed + (1 if randf() < remainder else 0)
 
 
 ## Damages every body in `bodies` through the funnel above; returns the

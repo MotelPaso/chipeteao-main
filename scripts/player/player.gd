@@ -753,9 +753,12 @@ func _apply_character(character: Dictionary) -> void:
 	# SealRig duplicates the model's shared character material once per spawn.
 	seal_rig.apply_tint(Color(character.tint))
 	_stats.set_character_passive(String(character.passive_stat),
-			float(character.passive_amount),
-			String(character.get("passive_kind", "per_level")),
-			float(character.get("passive_base", 0.0)))
+		float(character.passive_amount),
+		String(character.get("passive_kind", "per_level")),
+		float(character.get("passive_base", 0.0)),
+		String(character.get("passive_stat2", "")),
+		float(character.get("passive_amount2", 0.0)),
+		int(character.get("passive_every", 0)))
 
 
 func _on_health_died() -> void:

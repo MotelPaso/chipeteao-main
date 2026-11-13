@@ -27,8 +27,40 @@ const MIN_DAMAGE_MULTIPLIER: float = 0.1
 const MIN_MOVE_MULTIPLIER: float = 0.2
 const MIN_DURATION_MULTIPLIER: float = 0.1
 const MIN_XP_MULTIPLIER: float = 0.1
+<<<<<<< Updated upstream
 
 # Derived values — change them via add_tome()/recompute(), never directly.
+=======
+## Techo de saltos extra. No es gusto: el raider no tiene más control en el
+## aire que air_acceleration, y pasado esto la verticalidad de una arena
+## (mesetas, plataformas, el borde) deja de ser un obstáculo.
+const MAX_EXTRA_JUMPS: int = 5
+## Cada tipo que _apply_character_passive sabe correr; una fila fuera de esta
+## lista se rechaza al asignarla, no una vez por recompute.
+const PASSIVE_KINDS: Array[String] = ["per_level", "evasion_execute", "speed_to_damage",
+		"per_n_levels", "hp_to_damage"]
+
+@export_group("Base")
+## Multiplicador de daño crítico antes de cualquier bono del Tomo de Ruina.
+@export var base_crit_damage: float = 2.0
+## Suerte base (puntos de inclinación de rareza) antes de cualquier bono.
+@export var base_luck: float = 0.0
+
+@export_group("Topes")
+## Por mucha velocidad de ataque acumulada, el multiplicador global de
+## enfriamiento nunca baja de esto.
+@export var min_cooldown_multiplier: float = 0.25
+## La evasión nunca supera esta probabilidad de esquivar (0-1), sumen lo que
+## sumen las fuentes.
+@export var max_evasion: float = 0.6
+## Las pasivas de esquivar-ejecutar matan a un atacante no jefe cuya
+## fracción de HP sea menor que esto al esquivar. Hoy ningún personaje usa
+## el tipo "evasion_execute", así que no ajusta nada.
+@export var execute_threshold: float = 0.25
+@export_group("")
+
+# Valores derivados: cámbialos con add_tome()/recompute(), nunca a mano.
+>>>>>>> Stashed changes
 var damage_multiplier: float = 1.0
 var cooldown_multiplier: float = 1.0
 var area_multiplier: float = 1.0
@@ -96,6 +128,7 @@ const ZENKAI_STATS: Array[String] = [
 
 var _timed_boons: Array[Dictionary] = []
 
+<<<<<<< Updated upstream
 ## Character passive (CharacterCatalog row data). Kinds:
 ##   "per_level":       _passive_stat gains _passive_base plus
 ##                      _passive_amount per level past 1.
@@ -107,10 +140,36 @@ var _timed_boons: Array[Dictionary] = []
 ## Every kind _apply_character_passive knows how to run; a catalog row
 ## outside this list is rejected at set time, not once per recompute.
 const PASSIVE_KINDS: Array[String] = ["per_level", "evasion_execute", "speed_to_damage"]
+=======
+## Pasiva del personaje (datos de la fila de CharacterCatalog). Tipos:
+##   "per_level":       _passive_stat gana _passive_base más _passive_amount
+##                      por cada nivel pasado el 1. Si hay _passive_stat2, esa
+##                      segunda stat gana _passive_amount2 por nivel igual
+##                      (Bolsa de basura: área Y duración).
+##   "per_n_levels":    _passive_stat gana _passive_base más _passive_amount por
+##                      cada _passive_every niveles completos (nivel 5, 10...;
+##                      PNG gucci morty: +1 proyectil cada 5 niveles).
+##   "hp_to_damage":    escala _passive_stat por nivel como per_level
+##                      (Backyardigan: max_hp) y además suma _passive_amount2 %
+##                      de daño por cada punto de HP máx. total.
+##   "speed_to_damage": la velocidad de movimiento extra se convierte en daño
+##                      extra a razón de _passive_amount (0.6 = +0.6% de daño
+##                      por cada +1% de velocidad). Hoy ningún personaje lo usa.
+##   "evasion_execute": escala como per_level y además cada esquive ejecuta
+##                      a un atacante no jefe debilitado (_on_dodged). Hoy
+##                      ningún personaje lo usa.
+## Un id de stat vacío con un tipo por nivel = sin pasiva.
+>>>>>>> Stashed changes
 var _passive_kind: String = "per_level"
 var _passive_stat: String = ""
 var _passive_amount: float = 0.0
 var _passive_base: float = 0.0
+## Segunda stat por nivel ("per_level") o cantidad de daño por punto de HP
+## ("hp_to_damage"). Vacía / 0 = no hay.
+var _passive_stat2: String = ""
+var _passive_amount2: float = 0.0
+## Cada cuántos niveles se aplica "per_n_levels".
+var _passive_every: int = 0
 
 ## Portion of bonus_max_hp already applied to Health, so recomputes adjust
 ## by the difference instead of re-adding the whole bonus.
@@ -269,21 +328,36 @@ func _physics_process(_delta: float) -> void:
 		recompute()
 
 
+<<<<<<< Updated upstream
 ## Registers the selected character's passive (stat ids match _apply_effect;
 ## kinds are documented on _passive_kind). base_amount is granted already at
 ## level 1 (Doc's starting lifesteal). Called by the player at spawn with
 ## catalog row data.
+=======
+## Registra la pasiva del personaje elegido (los ids de stat son los de
+## _apply_effect; los tipos se documentan en _passive_kind). base_amount ya
+## se da en el nivel 1. stat2/amount2 son la segunda stat por nivel o el daño
+## por punto de HP, y every el intervalo de niveles de "per_n_levels". Lo
+## llama el jugador al aparecer con los datos de la fila del catálogo.
+>>>>>>> Stashed changes
 func set_character_passive(stat: String, amount: float, kind: String = "per_level",
-		base_amount: float = 0.0) -> void:
+		base_amount: float = 0.0, stat2: String = "", amount2: float = 0.0,
+		every: int = 0) -> void:
 	if not PASSIVE_KINDS.has(kind):
 		# Validated ONCE, here. The old check lived in the recompute path,
 		# so a typo'd catalog row warned several times a second all run.
 		push_warning("PlayerStats: unknown passive kind '%s'" % kind)
 		kind = "per_level"
+	if kind == "per_n_levels" and every <= 0:
+		push_warning("PlayerStats: per_n_levels needs passive_every > 0")
+		kind = "per_level"
 	_passive_kind = kind
 	_passive_stat = stat
 	_passive_amount = amount
 	_passive_base = base_amount
+	_passive_stat2 = stat2
+	_passive_amount2 = amount2
+	_passive_every = every
 	recompute()
 
 
@@ -334,9 +408,15 @@ func _reset_derived() -> void:
 	powerup_drop_chance = 0.0
 
 
+<<<<<<< Updated upstream
 ## Every source, in the ONE order that matters: the character passive runs
 ## last because conversion kinds (speed_to_damage) read the totals the
 ## other sources built.
+=======
+## Todas las fuentes, en el ÚNICO orden que importa: la pasiva del personaje
+## va al final porque los tipos de conversión (speed_to_damage, hp_to_damage)
+## leen los totales que armaron las demás fuentes.
+>>>>>>> Stashed changes
 func _apply_sources() -> void:
 	_apply_tomes()
 	# Gambling boons replay in pickup order (already potency-scaled).
@@ -394,7 +474,7 @@ func _clamp_derived() -> void:
 	cooldown_multiplier = maxf(cooldown_multiplier, min_cooldown_multiplier)
 	damage_multiplier = maxf(damage_multiplier, MIN_DAMAGE_MULTIPLIER)
 	move_speed_multiplier = maxf(move_speed_multiplier, MIN_MOVE_MULTIPLIER)
-	crit_chance = clampf(crit_chance, 0.0, 1.0)
+	crit_chance = maxf(crit_chance, 0.0)
 	evasion = clampf(evasion, 0.0, max_evasion)
 	luck = maxf(luck, 0.0)
 	duration_multiplier = maxf(duration_multiplier, MIN_DURATION_MULTIPLIER)
@@ -490,6 +570,7 @@ func _apply_relics() -> void:
 func _apply_character_passive() -> void:
 	match _passive_kind:
 		"per_level", "evasion_execute":
+<<<<<<< Updated upstream
 			# Level 1 contributes only the base amount, each level gained
 			# adds one increment (no roundf — sub-percent steps must
 			# accumulate). "evasion_execute" also kills on dodge; that part
@@ -497,14 +578,49 @@ func _apply_character_passive() -> void:
 			if not _passive_stat.is_empty():
 				_apply_effect(_passive_stat, _passive_base
 						+ _passive_amount * float(maxi(RunState.level - 1, 0)))
+=======
+			# "evasion_execute" además mata al esquivar, en _on_dodged.
+			_apply_per_level_passive()
+		"per_n_levels":
+			# Escalones completos: con every = 5, el nivel 5 da el primero.
+			if not _passive_stat.is_empty() and _passive_every > 0:
+				var steps := floori(float(RunState.level) / float(_passive_every))
+				_apply_effect(_passive_stat, _passive_base + _passive_amount * float(steps))
+		"hp_to_damage":
+			_apply_per_level_passive()
+			var health := _sibling_health()
+			if health != null:
+				# HP máx. total = el del Health sin lo ya empujado, más el bono
+				# recién acumulado (incluye la vida por nivel de esta pasiva).
+				var total_hp := health.max_hp - _applied_bonus_max_hp + bonus_max_hp
+				damage_multiplier += maxf(total_hp, 0.0) * _passive_amount2 / 100.0
+>>>>>>> Stashed changes
 		"speed_to_damage":
 			# Bonus move speed (multiplier above 1) converts into a direct
 			# damage-multiplier bonus at the configured ratio.
 			damage_multiplier += maxf(move_speed_multiplier - 1.0, 0.0) * _passive_amount
 
 
+<<<<<<< Updated upstream
 ## One potency-scaled effect on top of the running totals. Percent-like
 ## stats stack additively (+15% twice = +30%); armor and luck are flat.
+=======
+## Base más incremento por nivel de la stat principal y, en "per_level", de la
+## segunda. El nivel 1 aporta solo la base; cada nivel ganado suma un
+## incremento (sin roundf: los pasos de menos de 1% deben sumarse).
+func _apply_per_level_passive() -> void:
+	var levels_gained := float(maxi(RunState.level - 1, 0))
+	if not _passive_stat.is_empty():
+		_apply_effect(_passive_stat, _passive_base + _passive_amount * levels_gained)
+	if _passive_kind == "per_level" and not _passive_stat2.is_empty():
+		_apply_effect(_passive_stat2, _passive_amount2 * levels_gained)
+
+
+## Un efecto, ya escalado por potencia, sobre los totales en curso. Las stats
+## en % se suman (+15% dos veces = +30%); armadura y suerte son fijas.
+## Los brazos del match son contrato: el lint de catálogos (catalog_lint.gd)
+## lee este bloque del código fuente para validar los ids de stat.
+>>>>>>> Stashed changes
 func _apply_effect(stat: String, amount: float) -> void:
 	match stat:
 		"damage":
