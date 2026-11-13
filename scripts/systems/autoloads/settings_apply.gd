@@ -1,8 +1,8 @@
 extends Node
 ## Autoload "Settings": el único que APLICA los ajustes guardados en
-## SaveData (volumen de efectos y ambiente, sensibilidad del mouse, pantalla
-## completa, contador de FPS, calidad gráfica).
-## Va después de Sfx para que existan los dos buses de código, y antes de
+## SaveData (volumen de efectos, ambiente y música, sensibilidad del mouse,
+## pantalla completa, contador de FPS, calidad gráfica).
+## Va después de Sfx para que existan los buses de código, y antes de
 ## cargar cualquier escena para que buses y modo de ventana estén bien desde
 ## el primer frame. El panel de ajustes escribe por la API set_* de aquí, que
 ## cambia SaveData, aplica el valor en vivo y agenda un guardado a disco
@@ -74,6 +74,7 @@ func _notification(what: int) -> void:
 func apply_all() -> void:
 	_apply_bus_volume(Sfx.BUS_NAME, SaveData.sfx_volume)
 	_apply_bus_volume(Sfx.AMBIENT_BUS_NAME, SaveData.ambient_volume)
+	_apply_bus_volume(Sfx.MUSIC_BUS_NAME, SaveData.music_volume)
 	_apply_fullscreen(SaveData.fullscreen)
 	apply_graphics()
 
@@ -89,6 +90,12 @@ func set_sfx_volume(value: float) -> void:
 func set_ambient_volume(value: float) -> void:
 	SaveData.ambient_volume = clampf(value, 0.0, 100.0)
 	_apply_bus_volume(Sfx.AMBIENT_BUS_NAME, SaveData.ambient_volume)
+	_request_save()
+
+
+func set_music_volume(value: float) -> void:
+	SaveData.music_volume = clampf(value, 0.0, 100.0)
+	_apply_bus_volume(Sfx.MUSIC_BUS_NAME, SaveData.music_volume)
 	_request_save()
 
 

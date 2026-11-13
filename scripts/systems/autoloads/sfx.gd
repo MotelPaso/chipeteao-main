@@ -22,6 +22,9 @@ const BUS_NAME := &"Sfx"
 ## él). Se crea aquí junto al bus Sfx para que los buses hechos en código
 ## tengan un solo dueño; el autoload Settings solo les pone volumen.
 const AMBIENT_BUS_NAME := &"Ambient"
+## Bus de la música (hoy, la canción de un jefe de etapa: mythos_cinematic.gd
+## sale por él). Toda música del juego va por este bus y su slider.
+const MUSIC_BUS_NAME := &"Music"
 
 ## Edita aquí cada sonido: una fila por id, el id es la llave que pasan
 ## Sfx.play(&"id") y acquire_loop(&"id") (renombrarlo rompe a quien lo
@@ -103,6 +106,20 @@ const SOUND_LIBRARY: Dictionary[StringName, Dictionary] = {
 	},
 	&"secret_fanfare": {
 		"stream": preload("res://assets/audio/sfx/secret_fanfare.wav"), "volume_db": -3.0,
+	},
+	&"phoenix_cry": {
+		"stream": preload("res://assets/audio/sfx/phoenix_cry.wav"), "volume_db": -4.0,
+	},
+	&"phoenix_rebirth": {
+		"stream": preload("res://assets/audio/sfx/phoenix_rebirth.wav"), "volume_db": -4.0,
+	},
+	&"fire_whoosh": {
+		"stream": preload("res://assets/audio/sfx/fire_whoosh.wav"), "volume_db": -9.0,
+		"rate_limit": 5,
+	},
+	&"fire_feathers": {
+		"stream": preload("res://assets/audio/sfx/fire_feathers.wav"), "volume_db": -8.0,
+		"rate_limit": 4,
 	},
 }
 
@@ -336,6 +353,7 @@ func _now() -> float:
 func _setup_bus() -> void:
 	_ensure_bus(BUS_NAME)
 	_ensure_bus(AMBIENT_BUS_NAME)
+	_ensure_bus(MUSIC_BUS_NAME)
 
 
 static func _ensure_bus(bus_name: StringName) -> void:

@@ -61,10 +61,12 @@ const VOLUME_MAX := 100.0
 @onready var _panel: PanelContainer = %Panel
 @onready var _sfx_slider: HSlider = %SfxSlider
 @onready var _ambient_slider: HSlider = %AmbientSlider
+@onready var _music_slider: HSlider = %MusicSlider
 @onready var _sensitivity_slider: HSlider = %SensitivitySlider
 @onready var _sensitivity_value: Label = %SensitivityValue
 @onready var _sfx_value: Label = %SfxValue
 @onready var _ambient_value: Label = %AmbientValue
+@onready var _music_value: Label = %MusicValue
 @onready var _fullscreen_check: CheckButton = %FullscreenCheck
 @onready var _fps_check: CheckButton = %FpsCheck
 ## Preset gráfico: un botón por índice de SaveData.graphics_quality (Alta,
@@ -83,6 +85,7 @@ func _ready() -> void:
 	_apply_styles()
 	_sfx_slider.value_changed.connect(_on_sfx_changed)
 	_ambient_slider.value_changed.connect(_on_ambient_changed)
+	_music_slider.value_changed.connect(_on_music_changed)
 	_sensitivity_slider.value_changed.connect(_on_sensitivity_changed)
 	_fullscreen_check.toggled.connect(_on_fullscreen_toggled)
 	_fps_check.toggled.connect(_on_fps_toggled)
@@ -140,6 +143,7 @@ func close() -> void:
 func _refresh_controls() -> void:
 	_sfx_slider.set_value_no_signal(SaveData.sfx_volume)
 	_ambient_slider.set_value_no_signal(SaveData.ambient_volume)
+	_music_slider.set_value_no_signal(SaveData.music_volume)
 	_sensitivity_slider.set_value_no_signal(SaveData.mouse_sensitivity)
 	_fullscreen_check.set_pressed_no_signal(SaveData.fullscreen)
 	_fps_check.set_pressed_no_signal(SaveData.show_fps)
@@ -155,12 +159,12 @@ func _refresh_controls() -> void:
 ## que quedan DETRÁS de este panel (son enfocables y, medidas borde a borde,
 ## quedan más cerca que las filas de arriba). Cada fila nombra a sus vecinos
 ## y la columna da la vuelta, así que el foco nunca sale del panel:
-##   Efectos ↕ Ambiente ↕ Sensibilidad ↕ Pantalla completa ↕ FPS
+##   Efectos ↕ Ambiente ↕ Música ↕ Sensibilidad ↕ Pantalla completa ↕ FPS
 ##   ↕ Calidad (Alta ↔ Media ↔ Baja) ↕ Volver ↕ (de vuelta a Efectos)
 ## Izquierda/derecha sobre un slider mueve su valor (lo hace HSlider); sobre
 ## un control simple no va a ningún lado en vez de salir del panel.
 func _link_focus() -> void:
-	var column: Array[Control] = [_sfx_slider, _ambient_slider,
+	var column: Array[Control] = [_sfx_slider, _ambient_slider, _music_slider,
 			_sensitivity_slider, _fullscreen_check, _fps_check,
 			_quality_buttons[0], _back_button]
 	for i in column.size():
@@ -210,11 +214,17 @@ func _on_ambient_changed(value: float) -> void:
 	_refresh_volume_labels()
 
 
+func _on_music_changed(value: float) -> void:
+	Settings.set_music_volume(value)
+	_refresh_volume_labels()
+
+
 ## Los volúmenes se leen como porcentaje junto a su slider, igual que el
-## multiplicador de sensibilidad: las tres filas terminan en un número.
+## multiplicador de sensibilidad: las cuatro filas terminan en un número.
 func _refresh_volume_labels() -> void:
 	_sfx_value.text = volume_format % roundi(_sfx_slider.value)
 	_ambient_value.text = volume_format % roundi(_ambient_slider.value)
+	_music_value.text = volume_format % roundi(_music_slider.value)
 
 
 func _on_sensitivity_changed(value: float) -> void:
@@ -242,7 +252,7 @@ func _on_quality_toggled(on: bool, index: int) -> void:
 ## guardados, no de la escena: dos copias de 0.3-2.0 se separan el día que
 ## una cambia.
 func _apply_ranges() -> void:
-	for slider: HSlider in [_sfx_slider, _ambient_slider]:
+	for slider: HSlider in [_sfx_slider, _ambient_slider, _music_slider]:
 		slider.min_value = VOLUME_MIN
 		slider.max_value = VOLUME_MAX
 	_sensitivity_slider.min_value = SaveData.MIN_MOUSE_SENSITIVITY
@@ -260,7 +270,8 @@ func _apply_styles() -> void:
 	var grabber := UiTheme.grabber_icon(UiTheme.ACCENT)
 	var grabber_hi := UiTheme.grabber_icon(
 			UiTheme.ACCENT.lightened(slider_grabber_hover_lighten))
-	for slider: HSlider in [_sfx_slider, _ambient_slider, _sensitivity_slider]:
+	for slider: HSlider in [_sfx_slider, _ambient_slider, _music_slider,
+			_sensitivity_slider]:
 		var track := UiTheme.flat(slider_track_color, slider_corner_radius)
 		track.set_border_width_all(slider_track_border_width)
 		track.border_color = slider_track_border_color

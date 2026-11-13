@@ -10,7 +10,7 @@ extends SceneTree
 ##     godot --headless --path . -s res://scripts/tools/generate_sfx.gd
 ##
 ## Salida: assets/audio/sfx/*.wav (sonidos de un disparo y los bucles) y
-## assets/audio/ambient/*.wav (los fondos de viento de cada mapa).
+## assets/audio/ambient/*.wav (los fondos de viento de cada mapa y el de fuego).
 ## Los sonidos en bucle no traen metadatos de bucle: Sfx y AmbientBed fuerzan
 ## LOOP_FORWARD sobre su propia COPIA del stream importado.
 ##
@@ -52,8 +52,13 @@ func _init() -> void:
 	_save_wav(SFX_DIR, "laser_hum", _gen_laser_hum())
 	_save_wav(SFX_DIR, "burrow_pop", _gen_burrow_pop())
 	_save_wav(SFX_DIR, "secret_fanfare", _gen_secret_fanfare())
+	_save_wav(SFX_DIR, "phoenix_cry", _gen_phoenix_cry())
+	_save_wav(SFX_DIR, "phoenix_rebirth", _gen_phoenix_rebirth())
+	_save_wav(SFX_DIR, "fire_whoosh", _gen_fire_whoosh())
+	_save_wav(SFX_DIR, "fire_feathers", _gen_fire_feathers())
 	_save_wav(AMBIENT_DIR, "forest_wind", _gen_forest_wind())
 	_save_wav(AMBIENT_DIR, "desert_wind", _gen_desert_wind())
+	_save_wav(AMBIENT_DIR, "hell_fire", _gen_hell_fire())
 	if _failed:
 		quit(1)
 		return
@@ -313,6 +318,60 @@ func _gen_secret_fanfare() -> PackedFloat32Array:
 	return out
 
 
+## Grito del fénix: dos sierras agudas desafinadas que suben y caen de tono
+## con un trino rápido, sobre un soplo de ruido brillante. Agudo donde los
+## rugidos de los otros jefes son graves.
+func _gen_phoenix_cry() -> PackedFloat32Array:
+	var out := _tone3(1.3, 1500.0, 2300.0, 950.0, Wave.SAW)
+	_mix_at(out, _tone3(1.3, 1522.0, 2334.0, 964.0, Wave.SAW), 0.0, 0.7)
+	_mix_at(out, _tone3(1.3, 750.0, 1150.0, 475.0, Wave.TRIANGLE), 0.0, 0.5)
+	_mix_at(out, _lowpass(_noise(1.3, _rng(301)), 5200.0, 1800.0), 0.0, 0.35)
+	out = _lowpass(out, 6500.0, 2600.0)
+	_tremolo(out, 26.0, 0.45)
+	_adsr(out, 0.04, 0.25, 0.75, 0.5)
+	_normalize(out, 0.9)
+	return out
+
+
+## Renacer del fénix: un soplo que crece (ruido que se abre con una sierra
+## que sube dos octavas) y estalla en una campana brillante con golpe grave.
+func _gen_phoenix_rebirth() -> PackedFloat32Array:
+	var out := _lowpass(_noise(1.5, _rng(331)), 300.0, 4200.0)
+	_mix_at(out, _tone(0.9, 180.0, 720.0, Wave.SAW, 1.6), 0.0, 0.5)
+	_adsr(out, 0.7, 0.1, 0.9, 0.5)
+	_mix_at(out, _chime(0.7, 880.0, 0.16), 0.72, 1.0)
+	_mix_at(out, _chime(0.7, 1318.5, 0.16), 0.72, 0.7)
+	_mix_at(out, _tone(0.35, 140.0, 55.0, Wave.SINE), 0.72, 0.9)
+	_normalize(out, 0.9)
+	return out
+
+
+## Llamarada: ruido que se abre y se cierra sobre un golpe grave. Suena al
+## encenderse una zona de fuego y en el golpe de la picada.
+func _gen_fire_whoosh() -> PackedFloat32Array:
+	var out := _lowpass(_noise(0.55, _rng(311)), 350.0, 2600.0)
+	out = _lowpass(out, 2600.0, 500.0)
+	_mix_at(out, _tone(0.3, 110.0, 48.0, Wave.SINE), 0.0, 0.7)
+	_adsr(out, 0.03, 0.12, 0.7, 0.3)
+	_normalize(out, 0.7)
+	return out
+
+
+## Plumas ardientes: tres soplos cortos y seguidos (el abanico al salir) con
+## un silbido que sube.
+func _gen_fire_feathers() -> PackedFloat32Array:
+	var out := _silence(0.4)
+	for i in 3:
+		var puff := _lowpass(_noise(0.12, _rng(321 + i)), 3800.0, 900.0)
+		_exp_decay(puff, 0.03)
+		_mix_at(out, puff, 0.07 * float(i), 0.8)
+	_mix_at(out, _tone(0.3, 700.0, 1900.0, Wave.TRIANGLE, 0.6), 0.02, 0.25)
+	_fade_in(out, 0.004)
+	_fade_out(out, 0.08)
+	_normalize(out, 0.6)
+	return out
+
+
 ## Fondo de viento de bosque muy suave, bucle de 4 s. Se genera 0.35 s más
 ## largo y la cola sobrante se funde con el inicio (_loop_blend) para
 ## esconder el salto del filtro en el empalme. Los dos LFO completan ciclos
@@ -334,6 +393,24 @@ func _gen_desert_wind() -> PackedFloat32Array:
 	_tremolo(out, 0.5, 0.35)
 	var looped := _loop_blend(out, 0.35)
 	_normalize(looped, 0.3)
+	return looped
+
+
+## Fondo de fuego del bosque en llamas, bucle de 4 s como los vientos: un
+## rugido de ruido grave que respira y chasquidos de brasas repartidos con
+## su propia semilla. El LFO de 0.75 Hz y el trémolo de 0.5 Hz hacen ciclos
+## enteros en los 4 s, y la cola sobrante se funde con el inicio.
+func _gen_hell_fire() -> PackedFloat32Array:
+	var out := _lowpass_lfo(_noise(4.35, _rng(341)), 420.0, 260.0, 0.75)
+	var crackle_rng := _rng(342)
+	for i in 70:
+		var click := _noise(0.02, crackle_rng)
+		_exp_decay(click, 0.004)
+		_mix_at(out, click, crackle_rng.randf_range(0.0, 4.3),
+				crackle_rng.randf_range(0.15, 0.5))
+	_tremolo(out, 0.5, 0.25)
+	var looped := _loop_blend(out, 0.35)
+	_normalize(looped, 0.4)
 	return looped
 
 
