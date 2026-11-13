@@ -290,7 +290,9 @@ func _print_stage(reason: String) -> void:
 	var song := false
 	for node: Node in _tree.get_nodes_in_group(&"boss_music"):
 		var player := node as AudioStreamPlayer
-		if player != null and player.playing and not player.stream_paused:
+		# has_stream_playback y no `playing`: con el árbol en pausa `playing`
+		# lee false aunque la canción siga ahí, esperando.
+		if player != null and player.has_stream_playback():
 			song = true
 	print(("Probe stage: reason=%s hud_visible=%s split_visible=%s cinematic_camera=%s"
 			+ " song_playing=%s root_camera=%s world_frozen=%s clock_running=%s") % [

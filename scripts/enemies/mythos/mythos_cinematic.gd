@@ -276,7 +276,7 @@ func _release() -> void:
 ## La única salida de emergencia: fin de partida, arena que se va, jefe que
 ## desaparece. Deja todo como lo espera una partida recién empezada.
 func _teardown(reason: String) -> void:
-	var was_busy := _active or _taken_over or (_music != null and _music.playing)
+	var was_busy := _active or _taken_over or (_music != null and _music.is_live())
 	_active = false
 	set_process(false)
 	_release()

@@ -29,6 +29,8 @@ const SILENT_DB: float = -60.0
 @export var fade_seconds: float = 5.0
 
 var _dummy_audio: bool = false
+## True desde start() hasta que la canción se corta o termina de apagarse.
+var _live: bool = false
 var _resync_left: float = 0.0
 var _resyncs: int = 0
 var _fade_tween: Tween = null
@@ -45,6 +47,12 @@ func has_song() -> bool:
 	return song != null
 
 
+## True mientras la canción está en curso, aunque el juego esté en pausa
+## (`playing` lee false con el árbol pausado).
+func is_live() -> bool:
+	return _live
+
+
 ## Arranca la canción desde el principio. Cuando se acaba vuelve a
 ## `loop_from` segundos (el final de la calma), no al principio.
 func start(loop_from: float) -> void:
@@ -54,6 +62,7 @@ func start(loop_from: float) -> void:
 	stream = _looped_copy(song, loop_from)
 	volume_db = song_volume_db
 	play(0.0)
+	_live = true
 	_resyncs = 0
 	_resync_left = RESYNC_COOLDOWN
 
@@ -104,6 +113,7 @@ func fade_out() -> void:
 ## Corta la canción ya (la arena se va o la partida terminó).
 func halt() -> void:
 	_kill_fade()
+	_live = false
 	stop()
 
 
@@ -126,6 +136,7 @@ func _looped_copy(source: AudioStream, loop_from: float) -> AudioStream:
 
 
 func _stop_faded() -> void:
+	_live = false
 	stop()
 	print("Boss music: stopped")
 
