@@ -8,14 +8,28 @@ bg_color = Color(0.2275, 0.3315, 0.481, 1)
 border_width_left = 2
 border_width_top = 2
 border_width_right = 2
-border_width_bottom = 4
+border_width_bottom = 3
 border_color = Color(0.545, 0.657, 0.818, 1)
-corner_radius_top_left = 10
-corner_radius_top_right = 10
-corner_radius_bottom_right = 10
-corner_radius_bottom_left = 10
-shadow_color = Color(0.35, 0.51, 0.74, 0.35)
-shadow_size = 6
+corner_radius_top_left = 8
+corner_radius_top_right = 8
+corner_radius_bottom_right = 8
+corner_radius_bottom_left = 8
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_owners"]
+content_margin_left = 6.0
+content_margin_top = 1.0
+content_margin_right = 6.0
+content_margin_bottom = 1.0
+bg_color = Color(0.07, 0.075, 0.11, 0.92)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.98, 0.76, 0.28, 1)
+corner_radius_top_left = 6
+corner_radius_top_right = 6
+corner_radius_bottom_right = 6
+corner_radius_bottom_left = 6
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_shackle"]
 draw_center = false
@@ -35,10 +49,10 @@ corner_radius_bottom_right = 3
 corner_radius_bottom_left = 3
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_price"]
-content_margin_left = 12.0
-content_margin_top = 3.0
-content_margin_right = 12.0
-content_margin_bottom = 3.0
+content_margin_left = 10.0
+content_margin_top = 2.0
+content_margin_right = 10.0
+content_margin_bottom = 2.0
 bg_color = Color(0.07, 0.1, 0.14, 0.9)
 border_width_left = 1
 border_width_top = 1
@@ -50,25 +64,48 @@ corner_radius_top_right = 7
 corner_radius_bottom_right = 7
 corner_radius_bottom_left = 7
 
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_ring"]
+resource_local_to_scene = true
+draw_center = false
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.68, 0.76, 0.87, 1)
+corner_radius_top_left = 12
+corner_radius_top_right = 12
+corner_radius_bottom_right = 12
+corner_radius_bottom_left = 12
+expand_margin_left = 2.0
+expand_margin_top = 2.0
+expand_margin_right = 2.0
+expand_margin_bottom = 2.0
+shadow_color = Color(0.35, 0.51, 0.74, 0.5)
+shadow_size = 12
+
 [node name="CharacterCard" type="Button"]
-custom_minimum_size = Vector2(184, 244)
+editor_description = "Este tamaño es el mínimo: en la cuadrícula del selector las cartas se reparten el ancho y el alto libres."
+custom_minimum_size = Vector2(150, 126)
+size_flags_horizontal = 3
+size_flags_vertical = 3
 script = ExtResource("1_card")
 
 [node name="Unlocked" type="VBoxContainer" parent="."]
 layout_mode = 1
 anchor_right = 1.0
 anchor_bottom = 1.0
-offset_left = 12.0
-offset_top = 12.0
-offset_right = -12.0
-offset_bottom = -12.0
+offset_left = 9.0
+offset_top = 9.0
+offset_right = -9.0
+offset_bottom = -7.0
 mouse_filter = 2
-theme_override_constants/separation = 8
+theme_override_constants/separation = 4
 
 [node name="Portrait" type="Panel" parent="Unlocked"]
-editor_description = "Cuerpo, borde y brillo salen del tinte del raider (grupo Retrato de character_card.gd); aquí se ve el de Rook."
-custom_minimum_size = Vector2(0, 56)
+editor_description = "Cuerpo y borde salen del tinte del raider (grupo Retrato de character_card.gd); aquí se ve el de Rook."
+custom_minimum_size = Vector2(0, 44)
 layout_mode = 2
+size_flags_vertical = 3
 mouse_filter = 2
 theme_override_styles/panel = SubResource("StyleBoxFlat_portrait")
 
@@ -80,196 +117,140 @@ mouse_filter = 2
 theme_override_colors/font_color = Color(0.96, 0.97, 0.99, 1)
 theme_override_colors/font_outline_color = Color(0.105, 0.153, 0.222, 1)
 theme_override_constants/outline_size = 6
-theme_override_font_sizes/font_size = 30
+theme_override_font_sizes/font_size = 34
 text = "R"
 horizontal_alignment = 1
 vertical_alignment = 1
 
+[node name="Owners" type="Label" parent="Unlocked/Portrait"]
+visible = false
+editor_description = "Co-op: los jugadores que eligieron este raider, en la esquina del retrato."
+layout_mode = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -4.0
+offset_top = 4.0
+offset_right = -4.0
+grow_horizontal = 0
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.98, 0.76, 0.28, 1)
+theme_override_font_sizes/font_size = 11
+theme_override_styles/normal = SubResource("StyleBoxFlat_owners")
+text = "J1 · J3"
+horizontal_alignment = 2
+
 [node name="Name" type="Label" parent="Unlocked"]
 layout_mode = 2
 theme_override_colors/font_color = Color(0.96, 0.97, 0.99, 1)
-theme_override_font_sizes/font_size = 20
+theme_override_font_sizes/font_size = 15
 text = "Rook"
 horizontal_alignment = 1
 autowrap_mode = 3
-
-[node name="Weapon" type="Label" parent="Unlocked"]
-layout_mode = 2
-theme_override_colors/font_color = Color(0.66, 0.69, 0.75, 1)
-theme_override_font_sizes/font_size = 12
-text = "Espada corta"
-horizontal_alignment = 1
-
-[node name="Passive" type="Label" parent="Unlocked"]
-layout_mode = 2
-theme_override_colors/font_color = Color(0.85, 0.78, 0.5, 1)
-theme_override_font_sizes/font_size = 12
-text = "+0.8% de daño por nivel"
-horizontal_alignment = 1
-autowrap_mode = 3
-text_overrun_behavior = 3
-max_lines_visible = 4
-
-[node name="Blurb" type="Label" parent="Unlocked"]
-editor_description = "Sin tope de líneas: usa el alto que deja la pasiva y se recorta con puntos suspensivos."
-layout_mode = 2
-size_flags_vertical = 3
-theme_override_colors/font_color = Color(0.6, 0.62, 0.68, 1)
-theme_override_font_sizes/font_size = 11
-text = "Un muro con patas: sus golpes solo se ponen más feos."
-horizontal_alignment = 1
-vertical_alignment = 1
-autowrap_mode = 3
-text_overrun_behavior = 3
-
-[node name="Owners" type="Label" parent="Unlocked"]
-visible = false
-layout_mode = 2
-theme_override_colors/font_color = Color(0.98, 0.76, 0.28, 1)
-theme_override_font_sizes/font_size = 11
-text = "J1 · J3"
-horizontal_alignment = 1
 
 [node name="Locked" type="VBoxContainer" parent="."]
 visible = false
 layout_mode = 1
 anchor_right = 1.0
 anchor_bottom = 1.0
-offset_left = 12.0
-offset_top = 12.0
-offset_right = -12.0
-offset_bottom = -12.0
+offset_left = 9.0
+offset_top = 9.0
+offset_right = -9.0
+offset_bottom = -7.0
 mouse_filter = 2
-theme_override_constants/separation = 8
+theme_override_constants/separation = 4
 
 [node name="Lock" type="Control" parent="Locked"]
-custom_minimum_size = Vector2(0, 56)
+custom_minimum_size = Vector2(0, 34)
 layout_mode = 2
+size_flags_vertical = 3
 mouse_filter = 2
 
 [node name="Shackle" type="Panel" parent="Locked/Lock"]
 layout_mode = 1
 anchor_left = 0.5
+anchor_top = 0.5
 anchor_right = 0.5
+anchor_bottom = 0.5
 offset_left = -8.0
-offset_top = 12.0
+offset_top = -15.0
 offset_right = 8.0
-offset_bottom = 28.0
+offset_bottom = 1.0
+mouse_filter = 2
 theme_override_styles/panel = SubResource("StyleBoxFlat_shackle")
 
 [node name="Body" type="Panel" parent="Locked/Lock"]
 layout_mode = 1
 anchor_left = 0.5
+anchor_top = 0.5
 anchor_right = 0.5
+anchor_bottom = 0.5
 offset_left = -11.0
-offset_top = 24.0
+offset_top = -3.0
 offset_right = 11.0
-offset_bottom = 42.0
+offset_bottom = 15.0
+mouse_filter = 2
 theme_override_styles/panel = SubResource("StyleBoxFlat_lockbody")
 
 [node name="Name" type="Label" parent="Locked"]
 layout_mode = 2
 theme_override_colors/font_color = Color(0.47, 0.5, 0.56, 1)
-theme_override_font_sizes/font_size = 20
+theme_override_font_sizes/font_size = 15
 text = "Bogg"
 horizontal_alignment = 1
-
-[node name="Weapon" type="Label" parent="Locked"]
-layout_mode = 2
-theme_override_colors/font_color = Color(0.3995, 0.425, 0.476, 1)
-theme_override_font_sizes/font_size = 12
-text = "Hedor"
-horizontal_alignment = 1
+autowrap_mode = 3
 
 [node name="Price" type="Label" parent="Locked"]
-editor_description = "Va justo bajo el nombre y el arma (una línea cada uno), así el precio queda a la misma altura en toda la fila."
 layout_mode = 2
 size_flags_horizontal = 4
 theme_override_colors/font_color = Color(0.55, 0.8, 0.92, 1)
-theme_override_font_sizes/font_size = 13
+theme_override_font_sizes/font_size = 12
 theme_override_styles/normal = SubResource("StyleBoxFlat_price")
 text = "120 esquirlas"
 horizontal_alignment = 1
-
-[node name="Hint" type="Label" parent="Locked"]
-visible = false
-editor_description = "Solo aparece si la fila del catálogo tiene unlock_hint (pista hacia el jefe que también desbloquea al raider)."
-layout_mode = 2
-theme_override_colors/font_color = Color(0.4125, 0.6, 0.69, 1)
-theme_override_font_sizes/font_size = 10
-horizontal_alignment = 1
-autowrap_mode = 3
-text_overrun_behavior = 3
-max_lines_visible = 2
-
-[node name="Passive" type="Label" parent="Locked"]
-layout_mode = 2
-theme_override_colors/font_color = Color(0.3995, 0.425, 0.476, 1)
-theme_override_font_sizes/font_size = 12
-text = "+1% de área de ataque por nivel"
-horizontal_alignment = 1
-autowrap_mode = 3
-text_overrun_behavior = 3
-max_lines_visible = 2
 
 [node name="Confirm" type="VBoxContainer" parent="."]
 visible = false
 layout_mode = 1
 anchor_right = 1.0
 anchor_bottom = 1.0
-offset_left = 12.0
-offset_top = 12.0
-offset_right = -12.0
-offset_bottom = -12.0
+offset_left = 9.0
+offset_top = 9.0
+offset_right = -9.0
+offset_bottom = -7.0
 mouse_filter = 2
-theme_override_constants/separation = 8
-
-[node name="Portrait" type="Panel" parent="Confirm"]
-editor_description = "Cuerpo, borde y brillo salen del tinte del raider (grupo Retrato de character_card.gd); aquí se ve el de Rook."
-custom_minimum_size = Vector2(0, 56)
-layout_mode = 2
-mouse_filter = 2
-theme_override_styles/panel = SubResource("StyleBoxFlat_portrait")
-
-[node name="Monogram" type="Label" parent="Confirm/Portrait"]
-layout_mode = 1
-anchor_right = 1.0
-anchor_bottom = 1.0
-mouse_filter = 2
-theme_override_colors/font_color = Color(0.96, 0.97, 0.99, 1)
-theme_override_colors/font_outline_color = Color(0.105, 0.153, 0.222, 1)
-theme_override_constants/outline_size = 6
-theme_override_font_sizes/font_size = 30
-text = "R"
-horizontal_alignment = 1
-vertical_alignment = 1
-
-[node name="Name" type="Label" parent="Confirm"]
-layout_mode = 2
-theme_override_colors/font_color = Color(0.96, 0.97, 0.99, 1)
-theme_override_font_sizes/font_size = 20
-text = "Rook"
-horizontal_alignment = 1
+theme_override_constants/separation = 4
 
 [node name="Ask" type="Label" parent="Confirm"]
 layout_mode = 2
+size_flags_vertical = 3
 theme_override_colors/font_color = Color(0.55, 0.8, 0.92, 1)
-theme_override_font_sizes/font_size = 13
+theme_override_font_sizes/font_size = 12
 text = "¿Desbloquear por 120 esquirlas?"
 horizontal_alignment = 1
+vertical_alignment = 1
 autowrap_mode = 3
 
 [node name="UnlockYes" type="Button" parent="Confirm"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(0, 36)
+custom_minimum_size = Vector2(0, 30)
 layout_mode = 2
+theme_override_font_sizes/font_size = 14
 text = "Sí"
 
 [node name="CancelHint" type="Label" parent="Confirm"]
 layout_mode = 2
-size_flags_vertical = 3
 theme_override_colors/font_color = Color(0.47, 0.5, 0.56, 1)
 theme_override_font_sizes/font_size = 10
 text = "clic en la carta para cancelar"
 horizontal_alignment = 1
-vertical_alignment = 1
+autowrap_mode = 3
+
+[node name="FocusRing" type="Panel" parent="."]
+modulate = Color(1, 1, 1, 0)
+editor_description = "Anillo y brillo de la carta con el foco del control o el mouse encima. character_card.gd lo funde (grupo Movimiento) y le pone el color del raider (grupo Bordes)."
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_ring")

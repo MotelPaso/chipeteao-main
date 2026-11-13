@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Verificación headless del proyecto: import limpio + lint de catálogos +
-# harness de UI + soak por arena + soak de etapa + soak de co-op.
+# harness de UI + harness del selector + soak por arena + soak de etapa +
+# soak de co-op.
 # Uso: tools/verificar.sh [segundos_por_arena]   (por defecto 360)
 #
 # 360 s no es arbitrario: por debajo, el recorrido del harness no da tiempo a
@@ -20,10 +21,12 @@
 # .bak porque load_from_disk cae a él cuando falta el .json.
 #
 # Falla (exit 1) si:
-#   - el import, el lint, el harness de UI o algún soak reporta
-#     errores/warnings de Godot
+#   - el import, el lint, el harness de UI, el del selector o algún soak
+#     reporta errores/warnings de Godot
 #   - el lint de catálogos no imprime CADA una de sus comprobaciones con
 #     rows > 0, o el harness de UI no completa CADA uno de sus pasos
+#   - el harness del selector no aprueba CADA tamaño de ventana (layout sin
+#     cortes y navegación con control completa)
 #   - una arena no llega al final del soak (se colgó o murió antes)
 #   - un soak no ejercita los sistemas clave (cobertura): sin esto un soak
 #     puede pasar "limpio" por no haber ejecutado nada.
@@ -98,6 +101,8 @@ LINT_CHECKS=(ids_unique glyphs_unique paths_exist stat_ids character_weapons
 	stat_rows)
 UI_STEPS=(collection quests relics coop_count_reject unlock_confirm cards_all
 	start_run pause_open settings_toggle pause_close extract retry done)
+# Lienzos que resultan de las ventanas de select_probe.gd (WINDOWS).
+SELECT_SIZES=(1280x720 1280x831 1280x960 1706x720)
 
 echo "== import =="
 fase
@@ -170,6 +175,39 @@ else
 		FALLOS=$((FALLOS + 1))
 	else
 		echo "  ok (${#UI_STEPS[@]} pasos)"
+	fi
+fi
+fase_fin
+
+# --- Harness del selector de personaje ---------------------------------------
+# El layout y la navegación con control del selector en cada forma de
+# ventana: lo que el harness de UI no mide.
+echo "== harness del selector =="
+fase
+SELECT_LOG="$LOGDIR/select_probe.log"
+BONK_SAVE_PATH="$(save_path_for select_probe)" \
+	godot --headless --fixed-fps 60 --quit-after 3600 \
+	res://scenes/tests/SelectProbe.tscn >"$SELECT_LOG" 2>&1
+if grep -qE "$PATRON_ERROR" "$SELECT_LOG"; then
+	echo "  FALLO: el harness del selector reportó problemas"
+	grep -nE "$PATRON_ERROR" "$SELECT_LOG" | head -30
+	FALLOS=$((FALLOS + 1))
+else
+	SELECT_FALTAN=0
+	for SIZE in "${SELECT_SIZES[@]}"; do
+		if ! grep -qE "^SelectProbe: size $SIZE ok " "$SELECT_LOG"; then
+			echo "  FALLO: el selector no aprobó el tamaño '$SIZE'"
+			SELECT_FALTAN=$((SELECT_FALTAN + 1))
+		fi
+	done
+	if ! grep -qE "^SelectProbe: done sizes=[0-9]+$" "$SELECT_LOG"; then
+		echo "  FALLO: el harness del selector no llegó al final"
+		SELECT_FALTAN=$((SELECT_FALTAN + 1))
+	fi
+	if [ "$SELECT_FALTAN" -ne 0 ]; then
+		FALLOS=$((FALLOS + 1))
+	else
+		echo "  ok (${#SELECT_SIZES[@]} tamaños)"
 	fi
 fi
 fase_fin

@@ -1,0 +1,121 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scripts/ui/meta/character_select/character_portrait.gd" id="1_portrait"]
+[ext_resource type="PackedScene" uid="uid://kmmhqyfs65a3" path="res://scenes/player/SealRig.tscn" id="2_rig"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_backdrop"]
+resource_local_to_scene = true
+bg_color = Color(0.098, 0.143, 0.207, 1)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.2625, 0.3825, 0.555, 1)
+corner_radius_top_left = 10
+corner_radius_top_right = 10
+corner_radius_bottom_right = 10
+corner_radius_bottom_left = 10
+
+[sub_resource type="Gradient" id="Gradient_spot"]
+offsets = PackedFloat32Array(0, 0.55, 1)
+colors = PackedColorArray(1, 1, 1, 1, 1, 1, 1, 0.3, 1, 1, 1, 0)
+
+[sub_resource type="GradientTexture2D" id="GradientTexture2D_spot"]
+gradient = SubResource("Gradient_spot")
+width = 128
+height = 128
+fill = 1
+fill_from = Vector2(0.5, 0.62)
+fill_to = Vector2(0.5, 0.0)
+
+[sub_resource type="Environment" id="Environment_stage"]
+background_mode = 1
+background_color = Color(0, 0, 0, 0)
+ambient_light_source = 2
+ambient_light_color = Color(0.86, 0.9, 1, 1)
+ambient_light_energy = 0.7
+
+[node name="CharacterPortrait" type="Control"]
+custom_minimum_size = Vector2(0, 150)
+layout_mode = 3
+anchors_preset = 0
+mouse_filter = 2
+script = ExtResource("1_portrait")
+
+[node name="Backdrop" type="Panel" parent="."]
+editor_description = "Fondo y borde salen del tinte del raider (grupo Fondo de character_portrait.gd); aquí se ve el de Rook."
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_backdrop")
+
+[node name="Spot" type="TextureRect" parent="."]
+editor_description = "Foco de luz detrás del cuerpo: un degradado radial blanco que character_portrait.gd tiñe con el color del raider (spot_alpha)."
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 2.0
+offset_top = 2.0
+offset_right = -2.0
+offset_bottom = -2.0
+mouse_filter = 2
+texture = SubResource("GradientTexture2D_spot")
+expand_mode = 1
+
+[node name="Monogram" type="Label" parent="."]
+editor_description = "Inicial de respaldo: solo se ve cuando el raider no tiene cuerpo 3D que mostrar."
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.96, 0.97, 0.99, 1)
+theme_override_colors/font_outline_color = Color(0.105, 0.153, 0.222, 1)
+theme_override_constants/outline_size = 12
+theme_override_font_sizes/font_size = 96
+text = "R"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="View" type="TextureRect" parent="."]
+editor_description = "Muestra lo que dibuja Viewport; character_portrait.gd le pone la textura al abrir."
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+expand_mode = 1
+
+[node name="Viewport" type="SubViewport" parent="."]
+own_world_3d = true
+transparent_bg = true
+msaa_3d = 2
+size = Vector2i(368, 240)
+
+[node name="Stage" type="Node3D" parent="Viewport"]
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="Viewport/Stage"]
+environment = SubResource("Environment_stage")
+
+[node name="KeyLight" type="DirectionalLight3D" parent="Viewport/Stage"]
+editor_description = "Luz principal: desde arriba y un costado de la cámara."
+transform = Transform3D(-0.8412, -0.3163, 0.4386, 0.0000, 0.8111, 0.5848, -0.5408, 0.4920, -0.6823, 0, 3, -3)
+light_energy = 1.25
+
+[node name="RimLight" type="DirectionalLight3D" parent="Viewport/Stage"]
+editor_description = "Contraluz suave desde atrás, para despegar el cuerpo del fondo."
+transform = Transform3D(0.7809, 0.2139, -0.5869, -0.0000, 0.9396, 0.3424, 0.6247, -0.2674, 0.7337, 0, 2, 3)
+light_color = Color(0.75, 0.85, 1, 1)
+light_energy = 0.55
+
+[node name="Camera" type="Camera3D" parent="Viewport/Stage"]
+editor_description = "character_portrait.gd la aleja y la apunta según el tamaño de cada cuerpo (grupo Modelo); aquí solo se cambia el campo de visión."
+transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, 0, 0.8, -4)
+fov = 28.0
+
+[node name="Pivot" type="Node3D" parent="Viewport/Stage"]
+
+[node name="Rig" parent="Viewport/Stage/Pivot" instance=ExtResource("2_rig")]

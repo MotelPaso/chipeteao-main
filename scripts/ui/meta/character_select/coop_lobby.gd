@@ -130,6 +130,14 @@ func owner_slots(character_id: String) -> Array[int]:
 	return slots
 
 
+## Raider del slot que se está editando (el que cambia el próximo clic en una
+## carta); en solo, el raider elegido.
+func editing_character_id() -> String:
+	if _characters.is_empty():
+		return GameConfig.selected_character_id
+	return _characters[clampi(_editing_slot, 0, _characters.size() - 1)]
+
+
 ## Asigna el raider al slot en edición y avanza al siguiente, así cuatro
 ## clics arman un grupo completo. El slot 0 también es la elección de
 ## GameConfig.

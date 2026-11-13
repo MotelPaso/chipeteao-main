@@ -4,9 +4,10 @@
 [ext_resource type="PackedScene" path="res://scenes/ui/SettingsPanel.tscn" id="2_settingspanel"]
 [ext_resource type="Material" path="res://assets/ui/menu_backdrop.tres" id="3_backdrop"]
 [ext_resource type="PackedScene" path="res://scenes/ui/meta/character_select/CoopLobby.tscn" id="4_lobby"]
+[ext_resource type="PackedScene" path="res://scenes/ui/meta/character_select/CharacterDetail.tscn" id="5_detail"]
 
 [sub_resource type="FontVariation" id="FontVariation_title"]
-spacing_glyph = 10
+spacing_glyph = 8
 
 [sub_resource type="FontVariation" id="FontVariation_subtitle"]
 spacing_glyph = 2
@@ -26,146 +27,194 @@ layout_mode = 0
 anchor_right = 1.0
 anchor_bottom = 1.0
 
-[node name="ShardsLabel" type="Label" parent="." unique_id=1553655346]
-unique_name_in_owner = true
-layout_mode = 0
-anchor_left = 1.0
-anchor_right = 1.0
-offset_left = -260.0
-offset_top = 18.0
-offset_right = -24.0
-offset_bottom = 46.0
-theme_override_colors/font_color = Color(0.55, 0.8, 0.92, 1)
-theme_override_font_sizes/font_size = 20
-text = "Esquirlas: 0"
-horizontal_alignment = 2
-
 [node name="Layout" type="MarginContainer" parent="." unique_id=1388084542]
 unique_name_in_owner = true
 layout_mode = 0
 anchor_right = 1.0
 anchor_bottom = 1.0
 theme_override_constants/margin_left = 24
-theme_override_constants/margin_top = 16
+theme_override_constants/margin_top = 12
 theme_override_constants/margin_right = 24
-theme_override_constants/margin_bottom = 36
+theme_override_constants/margin_bottom = 12
 
 [node name="VBox" type="VBoxContainer" parent="Layout" unique_id=1114694285]
 layout_mode = 2
-theme_override_constants/separation = 12
+theme_override_constants/separation = 8
 
-[node name="TitleLabel" type="Label" parent="Layout/VBox" unique_id=371227716]
+[node name="TopBar" type="HBoxContainer" parent="Layout/VBox"]
+unique_name_in_owner = true
+editor_description = "Ajustes a la izquierda, título al centro, esquirlas a la derecha. Left y Right se reparten el ancho por igual, así el título queda centrado en la ventana."
+layout_mode = 2
+theme_override_constants/separation = 16
+
+[node name="Left" type="HBoxContainer" parent="Layout/VBox/TopBar"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="SettingsButton" type="Button" parent="Layout/VBox/TopBar/Left" unique_id=269148445]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(132, 40)
+layout_mode = 2
+size_flags_vertical = 4
+theme_override_font_sizes/font_size = 16
+text = "Ajustes"
+
+[node name="Titles" type="VBoxContainer" parent="Layout/VBox/TopBar"]
+layout_mode = 2
+theme_override_constants/separation = -6
+
+[node name="TitleLabel" type="Label" parent="Layout/VBox/TopBar/Titles" unique_id=371227716]
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_colors/font_color = Color(0.98, 0.76, 0.28, 1)
 theme_override_colors/font_outline_color = Color(0.03, 0.035, 0.06, 0.92)
-theme_override_constants/outline_size = 12
+theme_override_constants/outline_size = 10
 theme_override_fonts/font = SubResource("FontVariation_title")
-theme_override_font_sizes/font_size = 52
+theme_override_font_sizes/font_size = 42
 text = "CHIPETIAO"
 horizontal_alignment = 1
 
-[node name="SubtitleLabel" type="Label" parent="Layout/VBox" unique_id=1758191480]
+[node name="SubtitleLabel" type="Label" parent="Layout/VBox/TopBar/Titles" unique_id=1758191480]
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_colors/font_color = Color(0.66, 0.69, 0.75, 1)
 theme_override_fonts/font = SubResource("FontVariation_subtitle")
-theme_override_font_sizes/font_size = 16
+theme_override_font_sizes/font_size = 14
 text = "Elige tu personaje!1!11!"
 horizontal_alignment = 1
 
-[node name="ContentScroll" type="ScrollContainer" parent="Layout/VBox" unique_id=2027905377]
+[node name="Right" type="HBoxContainer" parent="Layout/VBox/TopBar"]
+layout_mode = 2
+size_flags_horizontal = 3
+alignment = 2
+
+[node name="ShardsLabel" type="Label" parent="Layout/VBox/TopBar/Right" unique_id=1553655346]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(0, 180)
+editor_description = "El texto lo escribe character_select.gd con UiTheme.SHARDS_BALANCE; el fondo de píldora usa este color de texto."
+custom_minimum_size = Vector2(132, 40)
+layout_mode = 2
+size_flags_vertical = 4
+theme_override_colors/font_color = Color(0.55, 0.8, 0.92, 1)
+theme_override_font_sizes/font_size = 16
+text = "Esquirlas: 0"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="Main" type="HBoxContainer" parent="Layout/VBox"]
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_constants/separation = 12
+
+[node name="Roster" type="VBoxContainer" parent="Layout/VBox/Main"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 2
+
+[node name="CoopLobby" parent="Layout/VBox/Main/Roster" instance=ExtResource("4_lobby")]
+unique_name_in_owner = true
+layout_mode = 2
+
+[node name="ContentScroll" type="ScrollContainer" parent="Layout/VBox/Main/Roster" unique_id=2027905377]
+unique_name_in_owner = true
+editor_description = "Solo se desplaza si el plantel no cabe (ventana muy chica o muchos raiders nuevos); con el plantel actual se ve entero."
+custom_minimum_size = Vector2(0, 150)
 layout_mode = 2
 size_flags_vertical = 3
 follow_focus = true
+horizontal_scroll_mode = 0
 
-[node name="Content" type="VBoxContainer" parent="Layout/VBox/ContentScroll" unique_id=2004073487]
+[node name="GridPad" type="MarginContainer" parent="Layout/VBox/Main/Roster/ContentScroll"]
 unique_name_in_owner = true
+editor_description = "Aire alrededor de la cuadrícula: la carta con foco crece y brilla hacia afuera, y el ScrollContainer recortaría lo que salga de su borde."
 layout_mode = 2
 size_flags_horizontal = 3
-theme_override_constants/separation = 12
+size_flags_vertical = 3
+theme_override_constants/margin_left = 12
+theme_override_constants/margin_top = 12
+theme_override_constants/margin_right = 12
+theme_override_constants/margin_bottom = 12
 
-[node name="CoopLobby" parent="Layout/VBox/ContentScroll/Content" instance=ExtResource("4_lobby")]
+[node name="CardsGrid" type="GridContainer" parent="Layout/VBox/Main/Roster/ContentScroll/GridPad" unique_id=1996494530]
 unique_name_in_owner = true
 layout_mode = 2
-
-[node name="CardsGrid" type="GridContainer" parent="Layout/VBox/ContentScroll/Content" unique_id=1996494530]
-unique_name_in_owner = true
-layout_mode = 2
-size_flags_horizontal = 4
-editor_description = "Las columnas las recalcula character_select.gd al abrir y al cambiar el tamaño de la ventana (nunca menos de grid_min_columns): este 4 solo se ve en el editor."
-theme_override_constants/h_separation = 18
-theme_override_constants/v_separation = 14
+editor_description = "Las columnas las recalcula character_select.gd al abrir y al cambiar el tamaño de la ventana (grupo Cuadrícula de la raíz): este 4 solo se ve en el editor. Las cartas se reparten el ancho y el alto libres."
+theme_override_constants/h_separation = 12
+theme_override_constants/v_separation = 10
 columns = 4
 
-[node name="ButtonRow" type="HFlowContainer" parent="Layout/VBox" unique_id=2057266018]
+[node name="DetailColumn" type="VBoxContainer" parent="Layout/VBox/Main"]
 unique_name_in_owner = true
 layout_mode = 2
-size_flags_horizontal = 3
-theme_override_constants/h_separation = 16
-theme_override_constants/v_separation = 10
-alignment = 1
+theme_override_constants/separation = 10
 
-[node name="StartButton" type="Button" parent="Layout/VBox/ButtonRow" unique_id=271936123]
+[node name="CharacterDetail" parent="Layout/VBox/Main/DetailColumn" instance=ExtResource("5_detail")]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="StartButton" type="Button" parent="Layout/VBox/Main/DetailColumn" unique_id=271936123]
 unique_name_in_owner = true
 editor_description = "El texto lo escribe character_select.gd con start_solo_format / start_party_format (grupo Textos de la raíz)."
-custom_minimum_size = Vector2(300, 52)
+custom_minimum_size = Vector2(0, 52)
 layout_mode = 2
-theme_override_font_sizes/font_size = 22
+theme_override_font_sizes/font_size = 19
 text = "Iniciar incursión"
 
-[node name="DailyButton" type="Button" parent="Layout/VBox/ButtonRow"]
+[node name="Footer" type="HBoxContainer" parent="Layout/VBox"]
+unique_name_in_owner = true
+editor_description = "Indicaciones del control a la izquierda, pantallas meta al centro, versión a la derecha. HintsSlot y VersionSlot se reparten el ancho por igual."
+layout_mode = 2
+theme_override_constants/separation = 16
+
+[node name="HintsSlot" type="HBoxContainer" parent="Layout/VBox/Footer"]
+unique_name_in_owner = true
+editor_description = "character_select.gd agrega aquí las indicaciones de botones (InputHints)."
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="ButtonRow" type="HBoxContainer" parent="Layout/VBox/Footer" unique_id=2057266018]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="DailyButton" type="Button" parent="Layout/VBox/Footer/ButtonRow"]
 unique_name_in_owner = true
 editor_description = "Con una marca hoy, character_select.gd agrega la mejor marca al texto (daily_best_format)."
-custom_minimum_size = Vector2(150, 52)
+custom_minimum_size = Vector2(140, 44)
 layout_mode = 2
-theme_override_font_sizes/font_size = 20
+theme_override_font_sizes/font_size = 17
 text = "Cacería diaria"
 
-[node name="QuestsButton" type="Button" parent="Layout/VBox/ButtonRow" unique_id=518393122]
+[node name="QuestsButton" type="Button" parent="Layout/VBox/Footer/ButtonRow" unique_id=518393122]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(150, 52)
+custom_minimum_size = Vector2(140, 44)
 layout_mode = 2
-theme_override_font_sizes/font_size = 20
+theme_override_font_sizes/font_size = 17
 text = "Misiones"
 
-[node name="CollectionButton" type="Button" parent="Layout/VBox/ButtonRow"]
+[node name="CollectionButton" type="Button" parent="Layout/VBox/Footer/ButtonRow"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(150, 52)
+custom_minimum_size = Vector2(140, 44)
 layout_mode = 2
-theme_override_font_sizes/font_size = 20
+theme_override_font_sizes/font_size = 17
 text = "Colección"
 
-[node name="ArmoryButton" type="Button" parent="Layout/VBox/ButtonRow"]
+[node name="ArmoryButton" type="Button" parent="Layout/VBox/Footer/ButtonRow"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(150, 52)
+custom_minimum_size = Vector2(140, 44)
 layout_mode = 2
-theme_override_font_sizes/font_size = 20
+theme_override_font_sizes/font_size = 17
 text = "Armería"
 
-[node name="SettingsButton" type="Button" parent="." unique_id=269148445]
-unique_name_in_owner = true
-layout_mode = 0
-offset_left = 24.0
-offset_top = 18.0
-offset_right = 128.0
-offset_bottom = 46.0
-theme_override_font_sizes/font_size = 14
-text = "Ajustes"
+[node name="VersionSlot" type="HBoxContainer" parent="Layout/VBox/Footer"]
+layout_mode = 2
+size_flags_horizontal = 3
+alignment = 2
 
-[node name="VersionLabel" type="Label" parent="." unique_id=942715455]
+[node name="VersionLabel" type="Label" parent="Layout/VBox/Footer/VersionSlot" unique_id=942715455]
 unique_name_in_owner = true
-layout_mode = 0
-anchor_left = 1.0
-anchor_top = 1.0
-anchor_right = 1.0
-anchor_bottom = 1.0
-offset_left = -160.0
-offset_top = -30.0
-offset_right = -12.0
-offset_bottom = -8.0
+layout_mode = 2
+size_flags_vertical = 8
 theme_override_colors/font_color = Color(0.45, 0.47, 0.52, 1)
 theme_override_font_sizes/font_size = 12
 text = "v0.0.0"

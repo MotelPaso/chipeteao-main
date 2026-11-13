@@ -291,14 +291,19 @@ de reparto se llama `ForestScatter`, `DuneScatter` o `MarshScatter`.
 
 | Qué quieres cambiar | Dónde | Qué propiedad |
 | --- | --- | --- |
-| Título del selector de personajes | `scenes/ui/CharacterSelect.tscn` > TitleLabel | Theme Overrides |
-| Textos de los botones del selector (Iniciar, Misiones, Colección, Armería, Cacería diaria) | `CharacterSelect.tscn` > raíz (grupo «Textos») y ButtonRow | `start_solo_format`, `start_party_format`, `daily_best_format` (Cacería diaria cuando ya hay marca hoy); `text` de cada botón |
-| Columnas y filas de la cuadrícula de personajes | `CharacterSelect.tscn` > raíz (grupo «Cuadrícula») | `grid_min_columns`, `grid_target_rows` |
-| Brillo del título, entrada de las cartas y rebotes del selector | `CharacterSelect.tscn` > raíz (grupo «Movimiento») | `title_glow_color`, `title_glow_time`, `entrance_*`, `start_hover_grow`, `start_press_squash`, `shards_pop_*` |
-| Carta de personaje (letra y color del nombre, arma, pasiva, descripción) | `scenes/ui/meta/character_select/CharacterCard.tscn` > Unlocked/Name, Weapon, Passive, Blurb | Theme Overrides |
-| Carta bloqueada (precio, candado, pregunta de desbloqueo) | `CharacterCard.tscn` > Locked/* y raíz | Theme Overrides; `confirm_format` |
-| Bordes, escala y tamaño de la carta | `CharacterCard.tscn` > raíz | grupo «Bordes», `selected_scale`, `custom_minimum_size` |
-| Retrato de la carta (sale del tinte del raider) y movimiento al pasar el cursor | `CharacterCard.tscn` > raíz (grupos «Retrato», «Movimiento») | `portrait_body_darken`, `portrait_rim_lighten`, `portrait_glow_alpha`, `monogram_outline_darken`; `hover_grow`, `unselected_modulate`, `settle_time` |
+| Título y subtítulo del selector de personajes | `scenes/ui/CharacterSelect.tscn` > TopBar/Titles/TitleLabel, SubtitleLabel | Theme Overrides |
+| Botón Ajustes y píldora de esquirlas del selector (tamaño, letra) | `CharacterSelect.tscn` > TopBar/Left/SettingsButton, TopBar/Right/ShardsLabel | `custom_minimum_size`, Theme Overrides |
+| Textos de los botones del selector (Iniciar, Misiones, Colección, Armería, Cacería diaria) | `CharacterSelect.tscn` > raíz (grupo «Textos»), Main/DetailColumn/StartButton y Footer/ButtonRow | `start_solo_format`, `start_party_format`, `daily_best_format` (Cacería diaria cuando ya hay marca hoy), `choose_hint` (indicación del control); `text` de cada botón |
+| Columnas de la cuadrícula de personajes y separación entre cartas | `CharacterSelect.tscn` > raíz (grupo «Cuadrícula») y CardsGrid | `grid_min_columns`, `card_max_width`; `h_separation`, `v_separation` |
+| Brillo del título, entrada escalonada y rebotes del selector | `CharacterSelect.tscn` > raíz (grupo «Movimiento») | `title_glow_color`, `title_glow_time`, `entrance_*`, `card_stagger`, `start_hover_grow`, `start_press_squash`, `shards_pop_*` |
+| Carta de personaje (letra y color del nombre y de la inicial) | `scenes/ui/meta/character_select/CharacterCard.tscn` > Unlocked/Name, Unlocked/Portrait/Monogram | Theme Overrides |
+| Carta bloqueada (precio, candado, pregunta de desbloqueo) | `CharacterCard.tscn` > Locked/*, Confirm/* y raíz | Theme Overrides; `confirm_format` |
+| Bordes, anillo de foco y tamaño mínimo de la carta | `CharacterCard.tscn` > raíz y FocusRing | grupo «Bordes» (`ring_lighten`, `ring_glow_alpha`…), `custom_minimum_size`; grosor y brillo del anillo en el StyleBox de FocusRing |
+| Retrato de la carta (sale del tinte del raider) y movimiento con el foco o el cursor | `CharacterCard.tscn` > raíz (grupos «Retrato», «Movimiento») | `portrait_body_darken`, `portrait_rim_lighten`, `monogram_outline_darken`; `focus_scale`, `press_scale`, `pose_time`, `unselected_modulate`, `entrance_start_scale`, `entrance_time` |
+| Panel de detalle del raider (letra y color de nombre, arma, pasiva, descripción, precio; ancho del panel) | `scenes/ui/meta/character_select/CharacterDetail.tscn` > Body/Content/Info/* y raíz | Theme Overrides; `text` de los rótulos «Arma» y «Pasiva»; `custom_minimum_size` |
+| Cambio de raider en el panel de detalle (deslizamiento, fundido) y su borde | `CharacterDetail.tscn` > raíz (grupos «Movimiento», «Panel», «Textos») | `slide_distance`, `fade_from`, `swap_time`; `border_darken`, `panel_margin`; `hint_format` |
+| Retrato 3D del raider (velocidad de giro, ángulo, encuadre, foca para los raiders sin modelo) | `scenes/ui/meta/character_select/CharacterPortrait.tscn` > raíz (grupo «Modelo») | `spin_speed`, `start_angle`, `framing_margin`, `camera_lift`, `look_height`, `skin_padding`, `model_fade_time`, `seal_for_rows_without_model` |
+| Fondo, luces y cámara del retrato 3D | `CharacterPortrait.tscn` > raíz (grupo «Fondo») y Viewport/Stage/KeyLight, RimLight, Camera, WorldEnvironment | `backdrop_darken`, `backdrop_rim_darken`, `spot_alpha`; `light_energy`, `light_color`, `fov`, `ambient_light_energy` |
 | Lobby co-op (textos y botones 1-4) | `scenes/ui/meta/character_select/CoopLobby.tscn` | grupo «Textos»; PlayersRow/Count1..Count4 |
 | Colores, bordes y tamaños de los botones del lobby co-op | `CoopLobby.tscn` > raíz (grupos «Botones de cantidad», «Botones de slot») | `count_*`, `slot_*` (por ejemplo `count_selected_color`, `slot_button_size`) |
 | Fondo de niebla de los menús | `assets/ui/menu_backdrop.tres` | `top_color`, `bottom_color`, `fog_color`, `fog_strength` |

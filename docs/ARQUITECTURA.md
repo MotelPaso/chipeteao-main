@@ -7,7 +7,7 @@ Mapa de referencia por sistema: qué hace, archivos clave y cómo extenderlo. Re
 Dos documentos que este mapa da por leídos:
 
 - **`docs/GLOSARIO.md` es la ley de la terminología.** El juego está íntegramente en español latinoamericano (es-419). Toda cadena visible por el jugador sale de esa tabla; si añades contenido, extiende el glosario en vez de improvisar un término. Lo que **nunca** se traduce: `id` de catálogo, `node_name`, nombres de grupo, `StringName` (`&"..."`), rutas `res://`, claves de `SaveData` y todo `print()`/`push_warning()` — los soaks y este documento dependen de ellos en inglés. Los comentarios del código y los tooltips `##` del Inspector sí van en español (ver «Convenciones»).
-- **`tools/verificar.sh` es la puerta de salida.** Import limpio + lint de catálogos + harness de UI + soaks de las tres arenas, de etapa y de co-op. Ver «Verificación» al final.
+- **`tools/verificar.sh` es la puerta de salida.** Import limpio + lint de catálogos + harness de UI + harness del selector + soaks de las tres arenas, de etapa y de co-op. Ver «Verificación» al final.
 
 ## Vista general de una partida
 
@@ -238,7 +238,7 @@ cartel y luz) son nodos de `scenes/world/Vendor.tscn`.
 - Los campos **obligatorios** se leen duro a propósito (una fila malformada revienta de inmediato); solo los opcionales usan `.get()` con default. No conviertas los primeros a `.get()`: convierte un error de datos en un personaje silenciosamente roto.
 - `passive_kind` (opcional): `"per_level"` (defecto), `"speed_to_damage"` (Yandere-chan) o `"evasion_execute"` (ninguna fila lo usa hoy; sigue soportado por `PlayerStats`). `passive_base` = cantidad ya activa a nivel 1 (Doc). Ids de stat = los de `PlayerStats._apply_effect`.
 - Desbloqueo: `unlock_cost` en esquirlas (0 = inicial). **Trampa**: toda fila con 0 es inicial y `load_from_disk` añade los iniciales a cada guardado que carga, así que poner 0 y después volver a ponerle precio **no** la vuelve a bloquear para quien ya jugó; opcional `unlock_boss` (id de minijefe secreto cuya muerte lo regala, resuelto por `SecretBossBase` vía `CharacterCatalog.by_unlock_boss`) + `unlock_hint`.
-- El grid del selector deriva sus columnas del tamaño del catálogo y tiene scroll: añadir filas ya no descuadra la pantalla. Los textos de tarjeta se recortan con elipsis por número de líneas, no por medición — una pasiva mucho más larga que las actuales conviene mirarla en pantalla.
+- El grid del selector deriva sus columnas del ancho libre (`grid_min_columns`, `card_max_width`) y solo se desplaza si el plantel no cabe: añadir filas no descuadra la pantalla. La carta es compacta (inicial y nombre; candado y precio si está bloqueada); arma, pasiva y descripción se leen completas en el panel de detalle, que envuelve el texto en vez de recortarlo. Un nombre o una pasiva mucho más largos que los actuales los revisa `SelectProbe` (falla si un texto queda cortado). El retrato 3D del detalle arma el cuerpo con el mismo `SealRig` de la partida, así que un `model_scene` nuevo aparece ahí sin más; si la ruta no existe, queda la inicial.
 
 ## Añadir un tomo
 
@@ -1021,7 +1021,7 @@ apertura, nombrando lo que de verdad se pagó.
 - Capas (CanvasLayer): SplitScreen (capa por defecto) → viñeta de Juice 4 → HUD 5 → MapOverlay 8 → UpgradeCardUI 10 → paneles modales (vendedor, ruleta) 15 → RunEndScreen 20 → PauseMenu 30 → ScreenFade 100. Las capas de escena guardan su número en la raíz de su `.tscn`; `UiLayers` (`scripts/ui/ui_layers.gd`) solo tiene las que se crean en código (4, 8 y 100). Las rutas de las escenas entre las que navega la UI están en `ScenePaths` (`scripts/ui/scene_paths.gd`). Archivos en `scripts/ui/` + `scenes/ui/`; los componentes de una pantalla viven junto a su dueña (`scripts/ui/game/hud/`, `scripts/ui/game/modal/`, `scripts/ui/game/upgrade_card_ui/`, `scripts/ui/meta/character_select/`, con sus escenas en `scenes/ui/hud/`, `scenes/ui/modal/`, `scenes/ui/upgrade_card_ui/`, `scenes/ui/meta/character_select/`).
 - **`UiTheme`** (`scripts/ui/ui_theme.gd`, todo `static`) es el sistema de diseño: la paleta compartida (`ACCENT`, `ACCENT_AMBER`, `TEXT_BRIGHT`…), radios, `style_card()` (un único constructor de tarjeta de 4 estados), `style_button`, `style_badge`, `style_bar`, `style_toggle`, `attach_motion`, `pop`, `reject()` (la sacudida de «no alcanza»), `spaced_font(spacing)` (con caché por spacing) y los textos compartidos: `LEVEL_ABBREV` («Nv %d»), `WEAPON_LEVEL_ABBREV` («N%d»), `SHARDS_BALANCE`, `POINTS_AMOUNT`, `POINTS_BALANCE`… **No inventes styleboxes nuevas en una pantalla**: si falta un estilo, se añade aquí. Los títulos de los menús se estilan **en sus escenas** (fuente, color, contorno), y los cuatro fondos de menú comparten `assets/ui/menu_backdrop.tres`.
 - **`CardFactory`** arma las cartas de oferta del vendedor; **`MetaScreen`** es el chasis de Registro / Colección / Armería. Los encabezados de sección de Ajustes son nodos de `SettingsPanel.tscn`.
-- **Selector de personaje** (`scenes/ui/CharacterSelect.tscn`), en cuatro piezas: `scripts/ui/meta/character_select.gd` (el cableado, la selección y el flujo de desbloqueo, el foco), `CharacterCard.tscn` (`scripts/ui/meta/character_select/character_card.gd`, las caras de cada carta; señal `unlock_confirmed`), `CoopLobby.tscn` (`coop_lobby.gd`: tamaño de la party y slots J1-J4; señales `party_changed` y `slots_rebuilt`) y `DailyHunt` (`daily_hunt.gd`, `RefCounted`: semilla del día y arranque de la Cacería diaria). Los botones Colección, Armería y Cacería diaria son nodos de `CharacterSelect.tscn`, no se construyen en código.
+- **Selector de personaje** (`scenes/ui/CharacterSelect.tscn`): barra de arriba (Ajustes, título, esquirlas), plantel a la izquierda (lobby co-op y cuadrícula de cartas compactas), detalle a la derecha con el botón Iniciar, y pie con las indicaciones del control, las pantallas meta y la versión. Piezas: `scripts/ui/meta/character_select.gd` (el cableado, la selección, el flujo de desbloqueo y qué raider muestra el detalle: la carta con foco o mouse, si no la que pide confirmar, si no el elegido), `CharacterCard.tscn` (`scripts/ui/meta/character_select/character_card.gd`, las caras de cada carta, su anillo de foco y su entrada; señales `unlock_confirmed`, `highlighted`, `unhighlighted`), `CharacterDetail.tscn` (`character_detail.gd`: nombre, arma, pasiva, descripción y precio del raider mirado), `CharacterPortrait.tscn` (`character_portrait.gd`: el único SubViewport, con el cuerpo 3D girando; lo arma un `SealRig` y carga los modelos en un hilo; sin modelo cargable muestra la inicial), `CoopLobby.tscn` (`coop_lobby.gd`: tamaño de la party y slots J1-J4; señales `party_changed` y `slots_rebuilt`), `SelectFocus` (`select_focus.gd`, `RefCounted` estático: los vecinos de foco para el control) y `DailyHunt` (`daily_hunt.gd`, `RefCounted`: semilla del día y arranque de la Cacería diaria). Los botones Colección, Armería y Cacería diaria son nodos de `CharacterSelect.tscn`, no se construyen en código.
 - **`ScreenFade`** (autoload): `transition(callable)` funde a negro, ejecuta el callable (el `change_scene`/`reload` y su limpieza) y funde de vuelta; mientras está ocupado **descarta** peticiones repetidas y devuelve `false`, así que la limpieza irreversible va **dentro** del callable, nunca antes. `leave_run(ruta)` es el **único dueño del ritual de fin de partida**: guarda ajustes, para los loops de audio, deja el árbol **pausado durante el swap** (dos frames), llama `RunState.reset()` y cambia de escena. Cualquier botón que saque de una partida debe usarlo.
 
 ### Iconos
@@ -1327,6 +1327,36 @@ un cronómetro: `start_run` (1200) y `retry` (900) esperan al reloj de partida
 (`RunState.run_time` ≥ 10 y ≥ 5, o sea 600 y 300 frames por sí solos), así que
 el plazo por defecto se dispararía en una corrida **sana**. Los dos plazos
 largos están tabulados en `STEP_DEADLINES` con ese motivo escrito al lado.
+
+### `scenes/tests/SelectProbe.tscn` + `select_probe.gd`
+
+Lo que `UiProbe` no ve del selector de personaje: que **quepa** y que se pueda
+**recorrer con control** en cada forma de ventana. Abre `CharacterSelect.tscn`
+en cuatro ventanas (16:9, MacBook 16:10, 4:3 y ultrawide 21:9; con el estirado
+del proyecto dan los lienzos 1280x720, 1280x831, 1280x960 y 1706x720) y en
+cada una comprueba:
+
+- **layout**: ningún texto ni botón sale de la pantalla, ningún texto queda
+  cortado, ningún contenedor recibe menos que su mínimo y todas las cartas se
+  ven sin desplazar (con holgura para la fila de slots de co-op, que headless
+  no puede abrir porque no hay controles);
+- **foco**: con `find_valid_focus_neighbor` (la misma búsqueda de
+  `ui_left/right/up/down`) se llega a todos los botones desde Iniciar y a
+  Iniciar desde todos; cada carta llega a Iniciar por la derecha, a las
+  pantallas meta por abajo y al lobby co-op por arriba;
+- **detalle**: al enfocar cada carta el panel muestra ese raider, con cuerpo
+  3D exactamente cuando su modelo existe (hoy Yandere-chan apunta a una escena
+  que no está y muestra la inicial);
+- **desbloqueo**: la carta que pide confirmar baja a su «Sí» y de ahí se sale.
+
+```sh
+godot --headless --fixed-fps 60 --quit-after 3600 res://scenes/tests/SelectProbe.tscn
+```
+
+Imprime `SelectProbe: size <lienzo> ok ...` por ventana y cierra con
+`SelectProbe: done sizes=4`; `tools/verificar.sh` busca cada lienzo de su lista
+`SELECT_SIZES`. Con `BONK_SHOT_DIR` y sin `--headless` guarda una captura por
+ventana, una de la confirmación de desbloqueo y una por raider.
 
 ### El harness: `scenes/tests/ArenaProbe.tscn` + `arena_probe.gd`
 
