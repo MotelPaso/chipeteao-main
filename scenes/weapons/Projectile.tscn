@@ -1,6 +1,6 @@
-[gd_scene load_steps=5 format=3]
+[gd_scene format=3 uid="uid://ckkwhp30gfho8"]
 
-[ext_resource type="Script" path="res://scripts/weapons/projectile.gd" id="1_projectile"]
+[ext_resource type="Script" uid="uid://bcs1vddsnr6rt" path="res://scripts/weapons/projectile.gd" id="1_projectile"]
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_tracer"]
 shading_mode = 0
@@ -13,15 +13,15 @@ size = Vector3(0.09, 0.09, 0.55)
 [sub_resource type="SphereShape3D" id="SphereShape3D_hit"]
 radius = 0.18
 
-[node name="Projectile" type="Area3D" groups=["player_shots"]]
+[node name="Projectile" type="Area3D" unique_id=1857932799 groups=["player_shots"]]
 collision_layer = 0
 collision_mask = 2
 monitorable = false
 script = ExtResource("1_projectile")
 
-[node name="Tracer" type="MeshInstance3D" parent="."]
+[node name="Tracer" type="MeshInstance3D" parent="." unique_id=936536458]
 cast_shadow = 0
 mesh = SubResource("BoxMesh_tracer")
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="." unique_id=491391532]
 shape = SubResource("SphereShape3D_hit")

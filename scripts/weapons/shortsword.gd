@@ -12,7 +12,7 @@ extends WeaponBase
 ## Color de la medialuna del tajo.
 @export var slash_color: Color = Color(0.75, 0.85, 1.0)
 ## Radio de la medialuna como fracción del alcance del tajo (0-1).
-@export var slash_radius_scale: float = 0.9
+@export var slash_radius_scale: float = 1
 ## Giro de la medialuna como fracción de arc_angle_deg (0-1).
 @export var slash_sweep_scale: float = 0.8
 ## Color de la chispa en cada enemigo alcanzado.
