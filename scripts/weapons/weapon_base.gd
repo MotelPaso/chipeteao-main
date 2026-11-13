@@ -281,6 +281,8 @@ func deal_damage(target_health: Health, allow_kill_hooks: bool = true) -> float:
 		# corren, o envenenarían cadáveres y repetirían on_weapon_kill para un
 		# cuerpo que otro ya mató.
 		return 0.0
+	# El medidor de la party suma lo que el golpe quitó de verdad.
+	PartyPower.record_weapon_damage(self, target_health, applied)
 	if stats != null and stats.lifesteal > 0.0:
 		_lifesteal_heal(applied * stats.lifesteal)
 	# Ganchos de objetos: veneno al golpear, arañas al matar.

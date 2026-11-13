@@ -11,6 +11,7 @@
 [ext_resource type="Script" uid="uid://dl7cxjlsx8uhj" path="res://scripts/systems/fog_of_war.gd" id="9_fog"]
 [ext_resource type="Script" uid="uid://dxhi11f116ra8" path="res://scripts/world/run/director/weather_director.gd" id="10_weather"]
 [ext_resource type="Script" uid="uid://dmb3y3asfkd04" path="res://scripts/world/run/director/stage_fixtures.gd" id="11_fixtures"]
+[ext_resource type="Script" path="res://scripts/systems/party/party_power.gd" id="12_power"]
 
 [node name="RunSystems" type="Node3D" unique_id=2086446746]
 script = ExtResource("1_runsys")
@@ -19,6 +20,9 @@ script = ExtResource("1_runsys")
 
 [node name="RunManager" type="Node" parent="." unique_id=164659691]
 script = ExtResource("3_runmgr")
+
+[node name="PartyPower" type="Node" parent="."]
+script = ExtResource("12_power")
 
 [node name="WorldDirector" type="Node" parent="." unique_id=1873970074]
 script = ExtResource("8_director")
