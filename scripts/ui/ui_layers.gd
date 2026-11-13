@@ -4,9 +4,10 @@ extends RefCounted
 ## (CanvasLayer.layer): un número más alto dibuja encima. Nunca va en una
 ## escena: edita aquí.
 ## Las capas de escena guardan su número en su .tscn (nodo raíz > Layer):
-## HUD.tscn 5, UpgradeCardUI.tscn 10, modal/ModalPanel.tscn 15,
-## RunEndScreen.tscn 20 y PauseMenu.tscn 30. El orden completo que importa es: viñeta de Juice 4 <
-## HUD 5 < mapa de Tab 8 < cartas 10 < modales 15 < fin de partida 20 <
+## HUD.tscn 5, enemies/mythos/MythosCinematic.tscn 9, UpgradeCardUI.tscn 10,
+## modal/ModalPanel.tscn 15, RunEndScreen.tscn 20 y PauseMenu.tscn 30. El
+## orden completo que importa es: viñeta de Juice 4 < HUD 5 < mapa de Tab 8 <
+## cinemática de jefe 9 < cartas 10 < modales 15 < fin de partida 20 <
 ## pausa 30 < fundido 100.
 
 ## Viñeta de daño de Juice (juice.gd): sobre el mundo 3D y bajo el HUD.

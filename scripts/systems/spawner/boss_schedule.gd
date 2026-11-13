@@ -1,7 +1,7 @@
 class_name BossSchedule
 extends RefCounted
 ## Horario de jefes de una etapa, sobre RunState.stage_time: el jefe del bioma
-## en boss_spawn_minute, su revancha Ancestral en elder_spawn_minute y luego
+## en boss_spawn_minute, el jefe de etapa en elder_spawn_minute y luego
 ## un jefe recurrente cada boss_repeat_minutes, cada uno más fuerte. También
 ## lleva el ritmo más lento de los spawns mientras vive un jefe y el respiro
 ## tras su muerte.
@@ -12,6 +12,15 @@ extends RefCounted
 ## No procesa solo: EnemySpawner llama tick_relief() y tick() desde su
 ## _physics_process, así que detener al spawner (run_root.gd,
 ## run_manager.gd) también lo detiene.
+## Una arena puede traer su propio jefe de etapa (stage_boss_scene): llega
+## en el lugar del Ancestral y, mientras vive, los recurrentes esperan.
+
+## Interruptor del harness: BONK_STAGE_BOSS_AT=<segundos> trae al jefe de
+## etapa en ese segundo de la etapa y no en elder_spawn_minute. Solo
+## pruebas; nada del juego lo pone.
+const STAGE_BOSS_AT_ENV: String = "BONK_STAGE_BOSS_AT"
+## Grupo del jefe de etapa mientras vive (lo lee el harness).
+const STAGE_BOSS_GROUP: StringName = &"stage_boss"
 
 var _spawner: EnemySpawner = null
 var _boss_spawned: bool = false
@@ -19,10 +28,18 @@ var _elder_spawned: bool = false
 var _repeat_bosses_spawned: int = 0
 var _bosses_alive: int = 0
 var _relief_timer: float = 0.0
+## Segundo de etapa forzado por el harness para el jefe de etapa (-1 = sin forzar).
+var _stage_boss_at: float = -1.0
+## True mientras vive un jefe de etapa PROPIO (stage_boss_scene).
+var _own_stage_boss_alive: bool = false
 
 
 func _init(spawner: EnemySpawner) -> void:
 	_spawner = spawner
+	var forced := OS.get_environment(STAGE_BOSS_AT_ENV)
+	if forced.is_valid_float():
+		_stage_boss_at = maxf(forced.to_float(), 0.0)
+		print("BossSchedule: stage boss forced at %.0fs" % _stage_boss_at)
 
 
 ## Factor del intervalo de los spawns regulares: más lento con un jefe vivo
@@ -50,13 +67,13 @@ func tick() -> void:
 		return
 	if not _boss_spawned and RunState.stage_time >= spawner.boss_spawn_minute * 60.0:
 		_boss_spawned = spawn_boss(1.0) != null
-	if not _elder_spawned and RunState.stage_time >= spawner.elder_spawn_minute * 60.0:
-		var elder := spawn_boss(spawner.elder_stat_multiplier, spawner.elder_title)
+	if not _elder_spawned and RunState.stage_time >= _stage_boss_due():
+		var elder := _spawn_stage_boss()
 		_elder_spawned = elder != null
 		if elder != null:
 			_watch_stage_boss(elder)
-	# Después del Ancestral los jefes siguen volviendo, cada uno más fuerte.
-	if _elder_spawned and spawner.boss_repeat_minutes > 0.0:
+	# Después del jefe de etapa los jefes siguen volviendo, cada uno más fuerte.
+	if _elder_spawned and not _repeats_held() and spawner.boss_repeat_minutes > 0.0:
 		var due := (spawner.elder_spawn_minute
 				+ spawner.boss_repeat_minutes * float(_repeat_bosses_spawned + 1)) * 60.0
 		if RunState.stage_time >= due:
@@ -70,7 +87,8 @@ func tick() -> void:
 ## El jefe que entró a la arena, o null si algo abortó, para que el llamador
 ## reintente el hueco en otro tick. Devuelve la instancia porque la muerte
 ## del Ancestral abre la puerta de etapa.
-func spawn_boss(stat_multiplier: float, title_override: String = "") -> BossBase:
+func spawn_boss(stat_multiplier: float, title_override: String = "",
+		scene_override: PackedScene = null) -> BossBase:
 	var spawner := _spawner
 	var player := Coop.random_player(spawner.get_tree())
 	if player == null:
@@ -81,7 +99,8 @@ func spawn_boss(stat_multiplier: float, title_override: String = "") -> BossBase
 	if not spawner.has_player_clearance(at):
 		spawner.register_clearance_skip()
 		return null
-	var node := spawner.boss_scene.instantiate()
+	var scene := scene_override if scene_override != null else spawner.boss_scene
+	var node := scene.instantiate()
 	var boss := node as BossBase
 	if boss == null:
 		node.free()
@@ -122,21 +141,47 @@ func spawn_boss(stat_multiplier: float, title_override: String = "") -> BossBase
 	return boss
 
 
-## El Ancestral es EL jefe de etapa: su muerte es la mitad de la puerta de
-## etapa. Se ata a esa instancia y no al contador de jefes muertos, porque
-## los jefes recurrentes posteriores no deben reabrir la puerta.
+## Segundo de etapa en que llega el jefe de etapa.
+func _stage_boss_due() -> float:
+	return _stage_boss_at if _stage_boss_at >= 0.0 else _spawner.elder_spawn_minute * 60.0
+
+
+## El jefe de etapa: el propio de la arena si trae uno (con su título y sin
+## multiplicador de revancha: los números de su escena ya son los de esta
+## pelea), o la revancha Ancestral del jefe del bioma.
+func _spawn_stage_boss() -> BossBase:
+	if _spawner.stage_boss_scene != null:
+		return spawn_boss(1.0, "", _spawner.stage_boss_scene)
+	return spawn_boss(_spawner.elder_stat_multiplier, _spawner.elder_title)
+
+
+## Un jefe de etapa propio pelea solo: mientras vive, y durante el respiro
+## tras su muerte, los recurrentes esperan. Las arenas sin stage_boss_scene
+## conservan su horario de siempre.
+func _repeats_held() -> bool:
+	return _spawner.stage_boss_scene != null \
+			and (_own_stage_boss_alive or _relief_timer > 0.0)
+
+
+## El jefe de etapa es LA mitad de jefe de la puerta de etapa. Se ata a esa
+## instancia y no al contador de jefes muertos, porque los jefes recurrentes
+## posteriores no deben reabrir la puerta.
 func _watch_stage_boss(boss: BossBase) -> void:
+	boss.add_to_group(STAGE_BOSS_GROUP)
 	var health := Health.find_in(boss)
 	if health == null:
 		RunState.stage_boss_dead = true
 		return
-	health.died.connect(_on_stage_boss_died, CONNECT_ONE_SHOT)
+	_own_stage_boss_alive = _spawner.stage_boss_scene != null
+	# El título viaja en la conexión: la línea nombra al jefe que cayó.
+	health.died.connect(_on_stage_boss_died.bind(boss.boss_title), CONNECT_ONE_SHOT)
 
 
-func _on_stage_boss_died() -> void:
+func _on_stage_boss_died(title: String) -> void:
 	RunState.stage_boss_dead = true
+	_own_stage_boss_alive = false
 	# Log de una línea (convención de RunManager) para los soaks headless.
-	print("Stage boss slain: %s at %.1fs" % [_spawner.elder_title, RunState.stage_time])
+	print("Stage boss slain: %s at %.1fs" % [title, RunState.stage_time])
 
 
 func _on_boss_died() -> void:

@@ -212,6 +212,22 @@ text = "Rey Pútrido"
 horizontal_alignment = 1
 vertical_alignment = 1
 
+[node name="BossLives" type="HBoxContainer" parent="BossBar"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 1
+anchors_preset = -1
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_top = 6.0
+offset_bottom = 14.0
+grow_horizontal = 2
+mouse_filter = 2
+theme_override_constants/separation = 6
+alignment = 1
+
 [node name="StreakLabel" type="Label" parent="." unique_id=1883266101]
 unique_name_in_owner = true
 visible = false

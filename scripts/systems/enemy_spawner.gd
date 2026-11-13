@@ -209,6 +209,10 @@ const ELITE_CHANCE_CAP: float = 0.6
 ## Título del Ancestral en el HUD; cada arena pone el suyo (este vale solo
 ## para una arena que no lo ponga).
 @export var elder_title: String = "Jefe Ancestral"
+## Escena del jefe de etapa propio de esta arena. Con una escena puesta, ese
+## jefe llega en elder_spawn_minute EN LUGAR de la revancha Ancestral, con su
+## propio título y sin elder_stat_multiplier. Vacío = la revancha de siempre.
+@export var stage_boss_scene: PackedScene
 ## Minutos entre jefes recurrentes tras el Ancestral (0 = ninguno).
 @export var boss_repeat_minutes: float = 4.0
 ## Cuánto más fuerte es cada jefe recurrente que el anterior (multiplicador).

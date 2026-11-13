@@ -19,6 +19,7 @@ extends CanvasLayer
 ##   show_stage_tag(stage_index, lap)  RunRoot y RunSystems
 ##   on_stage_started(arena)           WorldDirector, al empezar cada etapa
 ##   set_quake_offset(shift)           WeatherDirector (terremoto)
+##   set_cinematic(active)             la cinemática de un jefe (mythos_cinematic.gd)
 ## El soak (scenes/tests/arena_probe.gd) lee `offset` de este nodo por el grupo "hud".
 
 @export_group("Vida")
@@ -194,6 +195,13 @@ func on_stage_started(arena: Node3D = null) -> void:
 ## se puede leer.
 func set_quake_offset(shift: Vector2) -> void:
 	offset = shift
+
+
+## Cinemática de un jefe: mientras dura, todo el HUD se oculta y los mapas
+## de Tab se cierran y no se pueden abrir.
+func set_cinematic(active: bool) -> void:
+	visible = not active
+	_view_widgets.set_cinematic(active)
 
 
 ## Color de una barra de vida según la vida: hp_low_color en 0, mezclado hasta

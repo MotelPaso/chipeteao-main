@@ -1,0 +1,119 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/enemies/mythos/mythos_cinematic.gd" id="1_cinematic"]
+[ext_resource type="Script" path="res://scripts/enemies/mythos/boss_song.gd" id="2_song"]
+
+[node name="MythosCinematic" type="Node3D"]
+process_mode = 1
+script = ExtResource("1_cinematic")
+
+[node name="Camera" type="Camera3D" parent="."]
+far = 900.0
+
+[node name="Music" type="AudioStreamPlayer" parent="."]
+script = ExtResource("2_song")
+
+[node name="Overlay" type="CanvasLayer" parent="."]
+layer = 9
+visible = false
+
+[node name="Root" type="Control" parent="Overlay"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="BarTop" type="ColorRect" parent="Overlay/Root"]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = -1
+anchor_right = 1.0
+mouse_filter = 2
+color = Color(0, 0, 0, 1)
+
+[node name="BarBottom" type="ColorRect" parent="Overlay/Root"]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = -1
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+color = Color(0, 0, 0, 1)
+
+[node name="Title" type="Label" parent="Overlay/Root"]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = -1
+anchor_top = 0.66
+anchor_right = 1.0
+anchor_bottom = 0.66
+offset_top = -52.0
+offset_bottom = 52.0
+grow_horizontal = 2
+theme_override_colors/font_color = Color(1, 0.84, 0.42, 1)
+theme_override_colors/font_outline_color = Color(0.25, 0.05, 0.02, 1)
+theme_override_constants/outline_size = 12
+theme_override_font_sizes/font_size = 84
+text = "Mythos"
+horizontal_alignment = 1
+vertical_alignment = 1
+uppercase = true
+
+[node name="Subtitle" type="Label" parent="Overlay/Root"]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = -1
+anchor_top = 0.66
+anchor_right = 1.0
+anchor_bottom = 0.66
+offset_top = 54.0
+offset_bottom = 86.0
+grow_horizontal = 2
+theme_override_colors/font_color = Color(0.99, 0.95, 0.87, 1)
+theme_override_colors/font_outline_color = Color(0.082, 0.075, 0.102, 1)
+theme_override_constants/outline_size = 6
+theme_override_font_sizes/font_size = 22
+text = "El fénix de las brasas"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="SkipHint" type="VBoxContainer" parent="Overlay/Root"]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = -1
+anchor_left = 1.0
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -250.0
+offset_top = -62.0
+offset_right = -24.0
+offset_bottom = -12.0
+grow_horizontal = 0
+grow_vertical = 0
+mouse_filter = 2
+alignment = 2
+
+[node name="SkipBar" type="ProgressBar" parent="Overlay/Root/SkipHint"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 6)
+layout_mode = 2
+mouse_filter = 2
+max_value = 1.0
+step = 0.01
+show_percentage = false
+
+[node name="Flash" type="ColorRect" parent="Overlay/Root"]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+color = Color(1, 0.82, 0.5, 0)

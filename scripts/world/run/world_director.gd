@@ -314,7 +314,8 @@ func beacon_count() -> int:
 ## --- puertas del clima -----------------------------------------------------
 ## El clima vive en el nodo Weather; estas puertas siguen aquí porque otros
 ## nodos llegan por el grupo "world_director": event_altar.gd, enemy_loot.gd,
-## arena_probe.gd y scripts/ui/game/hud/weather_badge.gd.
+## arena_probe.gd, scripts/ui/game/hud/weather_badge.gd y
+## scripts/enemies/mythos/hell_transformation.gd.
 
 ## La fila de WEATHER_CATALOG con ese id, o vacío (arena_probe.gd la usa).
 static func weather_row(id: String) -> Dictionary:
@@ -340,6 +341,13 @@ func spawn_acid_pool(at: Vector3) -> void:
 ## Verdadero mientras `id` sea el clima activo.
 func is_weather_active(id: String) -> bool:
 	return _weather.is_weather_active(id)
+
+
+## La arena cambió de cielo (HellTransformation): los climas vuelven desde
+## ahora a este sol y ambiente. Devuelve el Environment propio de la arena.
+func rebase_sky(sun_color: Color, sun_energy: float, ambient_color: Color,
+		ambient_energy: float) -> Environment:
+	return _weather.rebase_sky(sun_color, sun_energy, ambient_color, ambient_energy)
 
 
 ## Un StageLayout para `arena` (null = vacío) con las distancias del reparto.

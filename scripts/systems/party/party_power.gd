@@ -7,6 +7,15 @@ extends Node
 ## El daño llega desde WeaponBase.deal_damage (record_weapon_damage). El
 ## veneno, las espinas, los siervos y el clima no pasan por ahí y no cuentan.
 ## Lo leen los jefes de etapa (StageBossScaling) por el grupo "party_power".
+##
+## Lleva DOS medidas del mismo embudo:
+##   dps()        la vida que los golpes quitaron de verdad a la horda. Un
+##                golpe que sobra sobre un cuerpo casi muerto solo cuenta lo
+##                que quedaba, y un pulso de área cuenta una vez por cuerpo.
+##   focus_dps()  lo que esas mismas armas le harían a UN cuerpo con mucha
+##                vida: la tirada entera de cada golpe y, de un arma que
+##                golpea a varios cuerpos en el mismo frame, solo el golpe
+##                más fuerte. Es la que sirve para presupuestar un jefe.
 
 ## Cada golpe de arma que quitó vida: el arma, el cuerpo golpeado y la vida
 ## que quitó. El harness de soak la escucha.
@@ -49,10 +58,16 @@ const HISTORY_SECONDS: int = 180
 ## segundo y no puede buscar un grupo en cada golpe.
 static var _live: PartyPower = null
 
-## Segundo de partida al que pertenece cada cubo (-1 = vacío) y el daño
-## sumado en él. Se reusan en anillo: el índice es el segundo módulo HISTORY_SECONDS.
+## Segundo de partida al que pertenece cada cubo (-1 = vacío), el daño real
+## sumado en él y el daño a un solo cuerpo. Se reusan en anillo: el índice es
+## el segundo módulo HISTORY_SECONDS.
 var _bucket_second: PackedInt32Array = PackedInt32Array()
 var _bucket_damage: PackedFloat32Array = PackedFloat32Array()
+var _bucket_focus: PackedFloat32Array = PackedFloat32Array()
+## Por arma (id de instancia): el frame de física de su último golpe y la
+## tirada más alta de ese frame, para contar un pulso de área una sola vez.
+var _focus_frame: Dictionary[int, int] = {}
+var _focus_peak: Dictionary[int, float] = {}
 var _next_log: float = 0.0
 
 
@@ -71,6 +86,8 @@ func _ready() -> void:
 	_bucket_second.fill(-1)
 	_bucket_damage.resize(HISTORY_SECONDS)
 	_bucket_damage.fill(0.0)
+	_bucket_focus.resize(HISTORY_SECONDS)
+	_bucket_focus.fill(0.0)
 	_next_log = log_interval
 
 
@@ -86,29 +103,28 @@ static func find(tree: SceneTree) -> PartyPower:
 	return tree.get_first_node_in_group(GROUP) as PartyPower if tree != null else null
 
 
-## Puerta del embudo de daño (WeaponBase.deal_damage): suma la vida que el
-## golpe quitó de verdad. Estática para que el arma no busque nada.
-static func record_weapon_damage(weapon: WeaponBase, target: Health, amount: float) -> void:
-	if _live == null or amount <= 0.0:
+## Puerta del embudo de daño (WeaponBase.deal_damage): `applied` es la vida
+## que el golpe quitó de verdad y `rolled` la tirada entera (con crítico).
+## Estática para que el arma no busque nada.
+static func record_weapon_damage(weapon: WeaponBase, target: Health, applied: float,
+		rolled: float) -> void:
+	if _live == null or applied <= 0.0:
 		return
-	_live._add(amount)
-	_live.weapon_damage_dealt.emit(weapon, target.get_parent() as Node3D, amount)
+	_live._add(weapon, applied, rolled)
+	_live.weapon_damage_dealt.emit(weapon, target.get_parent() as Node3D, applied)
 
 
-## Daño de armas por segundo de toda la party en los últimos
-## `window_seconds` de partida. Con menos partida que ventana, promedia
-## sobre lo jugado.
+## Daño de armas por segundo que la party le quitó de verdad a la horda en
+## los últimos `window_seconds` de partida. Con menos partida que ventana,
+## promedia sobre lo jugado.
 func dps(window_seconds: float) -> float:
-	var now := RunState.run_time
-	var span := minf(clampf(window_seconds, 1.0, float(HISTORY_SECONDS - 1)), maxf(now, 1.0))
-	var newest := int(now)
-	var oldest := maxi(newest - ceili(span) + 1, 0)
-	var total := 0.0
-	for second: int in range(oldest, newest + 1):
-		var index := second % HISTORY_SECONDS
-		if _bucket_second[index] == second:
-			total += _bucket_damage[index]
-	return total / span
+	return _window_average(_bucket_damage, window_seconds)
+
+
+## Daño por segundo que esas mismas armas le harían a un solo cuerpo con
+## mucha vida, en los últimos `window_seconds` de partida.
+func focus_dps(window_seconds: float) -> float:
+	return _window_average(_bucket_focus, window_seconds)
 
 
 ## Puntaje de poder de toda la party (de pie y caídos).
@@ -142,20 +158,46 @@ func breakdown() -> Dictionary[String, float]:
 ## Línea de log con el DPS y el puntaje desglosado (los soaks la leen).
 func log_line() -> String:
 	var parts := breakdown()
-	return ("Party power: t=%.0fs players=%d dps=%.1f score=%.1f weapons=%.1f"
+	return ("Party power: t=%.0fs players=%d dps=%.1f focus=%.1f score=%.1f weapons=%.1f"
 			+ " tomes=%.1f items=%.1f powerups=%.1f pets=%.1f") % [
 			RunState.run_time, maxi(Coop.player_count, 1), dps(log_window),
-			parts["total"], parts["weapons"], parts["tomes"], parts["items"],
-			parts["powerups"], parts["pets"]]
+			focus_dps(log_window), parts["total"], parts["weapons"], parts["tomes"],
+			parts["items"], parts["powerups"], parts["pets"]]
 
 
-func _add(amount: float) -> void:
+func _add(weapon: WeaponBase, applied: float, rolled: float) -> void:
 	var second := int(RunState.run_time)
 	var index := second % HISTORY_SECONDS
 	if _bucket_second[index] != second:
 		_bucket_second[index] = second
 		_bucket_damage[index] = 0.0
-	_bucket_damage[index] += amount
+		_bucket_focus[index] = 0.0
+	_bucket_damage[index] += applied
+	# A un solo cuerpo: de los golpes de un arma en el mismo frame solo cuenta
+	# el más fuerte, así un pulso que alcanza a veinte cuerpos vale por uno.
+	var id := weapon.get_instance_id()
+	var frame := Engine.get_physics_frames()
+	if _focus_frame.get(id, -1) != frame:
+		_focus_frame[id] = frame
+		_focus_peak[id] = rolled
+		_bucket_focus[index] += rolled
+	elif rolled > _focus_peak[id]:
+		_bucket_focus[index] += rolled - _focus_peak[id]
+		_focus_peak[id] = rolled
+
+
+## Promedio por segundo de `buckets` sobre los últimos `window_seconds`.
+func _window_average(buckets: PackedFloat32Array, window_seconds: float) -> float:
+	var now := RunState.run_time
+	var span := minf(clampf(window_seconds, 1.0, float(HISTORY_SECONDS - 1)), maxf(now, 1.0))
+	var newest := int(now)
+	var oldest := maxi(newest - ceili(span) + 1, 0)
+	var total := 0.0
+	for second: int in range(oldest, newest + 1):
+		var index := second % HISTORY_SECONDS
+		if _bucket_second[index] == second:
+			total += buckets[index]
+	return total / span
 
 
 func _weapons_score(raider: Player) -> float:

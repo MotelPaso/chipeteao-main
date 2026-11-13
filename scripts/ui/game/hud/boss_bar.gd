@@ -2,8 +2,15 @@ class_name BossBar
 extends ProgressBar
 ## Barra de vida del jefe, arriba al centro, visible solo mientras vive el
 ## jefe seguido. Un jefe la pide al entrar a la arena (grupo "boss_ui" ->
-## HUD.track_boss -> track). Las marcas de cuarto (Tick1-3) y el nombre
-## (%BossNameLabel) son nodos de HUD.tscn.
+## HUD.track_boss -> track). Las marcas de cuarto (Tick1-3), el nombre
+## (%BossNameLabel) y la fila de vidas (%BossLives) son nodos de HUD.tscn.
+## Un jefe con varias vidas (Mythos) expone por nombre la señal
+## lives_changed(left, total) y los métodos lives_left() y lives_total(): la
+## fila muestra una marca por vida. Cuando el jefe seguido muere o se va, la
+## barra pasa a otro jefe vivo (primero el de etapa) en vez de ocultarse.
+
+## Grupos donde se busca otro jefe vivo cuando el seguido muere, en orden.
+const FALLBACK_GROUPS: Array[StringName] = [&"stage_boss", &"boss"]
 
 @export_group("Colores")
 ## Ámbar del jefe: relleno de esta barra y de la flecha que apunta al jefe
@@ -24,12 +31,23 @@ extends ProgressBar
 @export_group("Nombre")
 ## Espacio extra entre las letras del nombre del jefe, en píxeles.
 @export var name_letter_spacing: int = 1
+@export_group("Vidas")
+## Tamaño de cada marca de vida, en píxeles.
+@export var life_pip_size: Vector2 = Vector2(22.0, 8.0)
+## Color de una vida que al jefe le queda.
+@export var life_pip_color: Color = Color(1.0, 0.8, 0.32)
+## Color de una vida ya gastada.
+@export var life_pip_spent_color: Color = Color(0.22, 0.15, 0.1, 0.9)
+## Radio de las esquinas de cada marca, en píxeles.
+@export var life_pip_corner_radius: int = 3
 
 var _tracked_boss: Node3D = null
 var _boss_health: Health = null
 var _value_tween: Tween = null
+var _life_pips: Array[Panel] = []
 
 @onready var _name_label: Label = %BossNameLabel
+@onready var _lives_row: HBoxContainer = %BossLives
 
 
 func _ready() -> void:
@@ -55,6 +73,7 @@ func track(boss: Node3D, title: String) -> void:
 	boss.tree_exited.connect(_on_boss_gone)
 	_name_label.text = title
 	visible = true
+	_bind_lives(boss)
 	_on_hp_changed(boss_health.current_hp, boss_health.max_hp)
 
 
@@ -72,13 +91,34 @@ func _on_hp_changed(current: float, new_max: float) -> void:
 
 
 func _on_died() -> void:
-	visible = false
+	_follow_another_boss()
 
 
 ## Respaldo para un jefe que sale del árbol sin morir (desmontaje de escena).
 func _on_boss_gone() -> void:
+	_follow_another_boss()
+
+
+## El jefe seguido murió o se fue: la barra pasa a otro jefe vivo, o se
+## oculta si no queda ninguno.
+func _follow_another_boss() -> void:
+	var gone := _tracked_boss
 	_untrack()
 	visible = false
+	if not is_inside_tree():
+		return
+	for group: StringName in FALLBACK_GROUPS:
+		for node: Node in get_tree().get_nodes_in_group(group):
+			var boss := node as Node3D
+			if boss == null or boss == gone or boss.is_queued_for_deletion() \
+					or not boss.is_inside_tree():
+				continue
+			var health := Health.find_in(boss)
+			var title: Variant = boss.get("boss_title")
+			if health == null or health.is_dead or title == null:
+				continue
+			track(boss, String(title))
+			return
 
 
 func _untrack() -> void:
@@ -88,8 +128,38 @@ func _untrack() -> void:
 		_boss_health.died.disconnect(_on_died)
 	if _tracked_boss != null and is_instance_valid(_tracked_boss):
 		_tracked_boss.tree_exited.disconnect(_on_boss_gone)
+		if _tracked_boss.has_signal(&"lives_changed") \
+				and _tracked_boss.is_connected(&"lives_changed", _on_lives_changed):
+			_tracked_boss.disconnect(&"lives_changed", _on_lives_changed)
 	_boss_health = null
 	_tracked_boss = null
+	_lives_row.visible = false
+
+
+## Muestra una marca por vida si el jefe lleva la cuenta (ver la cabecera).
+func _bind_lives(boss: Node3D) -> void:
+	if not (boss.has_signal(&"lives_changed") and boss.has_method(&"lives_left")
+			and boss.has_method(&"lives_total")):
+		_lives_row.visible = false
+		return
+	boss.connect(&"lives_changed", _on_lives_changed)
+	_on_lives_changed(int(boss.call(&"lives_left")), int(boss.call(&"lives_total")))
+
+
+func _on_lives_changed(left: int, total: int) -> void:
+	_lives_row.visible = total > 1
+	while _life_pips.size() < total:
+		var pip := Panel.new()
+		pip.custom_minimum_size = life_pip_size
+		pip.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_lives_row.add_child(pip)
+		_life_pips.append(pip)
+	for index: int in _life_pips.size():
+		var pip := _life_pips[index]
+		pip.visible = index < total
+		pip.add_theme_stylebox_override("panel", UiTheme.flat(
+				life_pip_color if index < left else life_pip_spent_color,
+				life_pip_corner_radius))
 
 
 ## Suaviza la barra hacia `target`; mata la animación anterior para que los

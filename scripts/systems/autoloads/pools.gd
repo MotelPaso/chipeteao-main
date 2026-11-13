@@ -28,6 +28,8 @@ const WHIP_CRACK_SCENE: PackedScene = preload("res://scenes/fx/WhipCrack.tscn")
 const EMBER_BURST_SCENE: PackedScene = preload("res://scenes/fx/EmberBurst.tscn")
 const BLOOD_POOL_SCENE: PackedScene = preload("res://scenes/fx/BloodPool.tscn")
 const ACID_POOL_SCENE: PackedScene = preload("res://scenes/fx/AcidPool.tscn")
+const FIRE_ZONE_SCENE: PackedScene = preload("res://scenes/fx/FireZone.tscn")
+const FIRE_FEATHER_SCENE: PackedScene = preload("res://scenes/enemies/FireFeather.tscn")
 
 ## La lista de pools: name, scene, `warm` (instancias creadas al arrancar
 ## para que los primeros spawns no tironeen) y `cap` (máximo guardado, que
@@ -48,6 +50,8 @@ const POOLS: Array[Dictionary] = [
 	{"name": "ember_burst", "scene": EMBER_BURST_SCENE, "warm": 4, "cap": 16},
 	{"name": "blood_pool", "scene": BLOOD_POOL_SCENE, "warm": 4, "cap": 16},
 	{"name": "acid_pool", "scene": ACID_POOL_SCENE, "warm": 8, "cap": 48},
+	{"name": "fire_zone", "scene": FIRE_ZONE_SCENE, "warm": 6, "cap": 24},
+	{"name": "fire_feather", "scene": FIRE_FEATHER_SCENE, "warm": 12, "cap": 48},
 ]
 
 var _pools_by_path: Dictionary[String, NodePool] = {}

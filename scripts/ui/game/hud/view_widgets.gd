@@ -70,6 +70,20 @@ func on_stage_started(arena: Node3D = null) -> void:
 			overlay.on_stage_started(arena)
 
 
+## Durante una cinemática los minimapas se ocultan y los mapas de Tab se
+## cierran y dejan de leer su tecla. Ocultar la capa del HUD no alcanza: una
+## CanvasLayer solo oculta a sus hijos directos, y estos cuelgan de este nodo
+## (los mapas de Tab, además, en su propia capa).
+func set_cinematic(active: bool) -> void:
+	for minimap: Minimap in _minimaps:
+		if is_instance_valid(minimap):
+			minimap.visible = not active
+	for overlay: MapOverlay in _overlays:
+		if is_instance_valid(overlay):
+			overlay.visible = false
+			overlay.set_process(not active)
+
+
 func _anchor_to_cell(control: Control, cell: Rect2) -> void:
 	control.anchor_left = cell.position.x
 	control.anchor_top = cell.position.y

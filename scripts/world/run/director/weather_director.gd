@@ -276,6 +276,18 @@ func spawn_acid_pool(at: Vector3) -> void:
 	fresh.play(at, acid_pool_radius, acid_pool_lifetime, acid_pool_damage_per_second)
 
 
+## La arena cambió de cielo a mitad de etapa (HellTransformation): desde
+## ahora el tinte de cada clima vuelve a ESTE sol y ambiente. Devuelve el
+## Environment propio de la arena, que es el que hay que escribir.
+func rebase_sky(sun_color: Color, sun_energy: float, ambient_color: Color,
+		ambient_energy: float) -> Environment:
+	# cache() primero: si ningún clima corrió en esta etapa, todavía no hay
+	# copia propia del Environment ni sol guardado.
+	_sky.cache(layout)
+	_sky.rebase(sun_color, sun_energy, ambient_color, ambient_energy)
+	return _sky.environment()
+
+
 ## Verdadero mientras `id` sea el clima activo.
 func is_weather_active(id: String) -> bool:
 	return not active_weather.is_empty() and String(active_weather.id) == id

@@ -1,0 +1,401 @@
+[gd_scene load_steps=40 format=3]
+
+[ext_resource type="Script" path="res://scripts/enemies/mythos.gd" id="1_mythos"]
+[ext_resource type="Script" path="res://scripts/enemies/boss/guarded_health.gd" id="2_health"]
+[ext_resource type="PackedScene" path="res://scenes/systems/XpGem.tscn" id="3_gem"]
+[ext_resource type="Script" path="res://scripts/enemies/mythos/mythos_rig.gd" id="4_rig"]
+[ext_resource type="Script" path="res://scripts/enemies/boss/stage_boss_scaling.gd" id="5_scaling"]
+[ext_resource type="Script" path="res://scripts/enemies/mythos/mythos_volley.gd" id="6_volley"]
+[ext_resource type="Script" path="res://scripts/enemies/mythos/mythos_dive.gd" id="7_dive"]
+[ext_resource type="Script" path="res://scripts/enemies/mythos/mythos_ring.gd" id="8_ring"]
+[ext_resource type="Script" path="res://scripts/enemies/mythos/mythos_rain.gd" id="9_rain"]
+[ext_resource type="PackedScene" path="res://scenes/enemies/mythos/MythosCinematic.tscn" id="10_cinematic"]
+[ext_resource type="PackedScene" path="res://scenes/enemies/mythos/HellTransformation.tscn" id="11_hell"]
+[ext_resource type="Script" path="res://scripts/enemies/mythos/mythos_zones.gd" id="12_zones"]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_body"]
+albedo_color = Color(0.86, 0.25, 0.06, 1)
+roughness = 0.7
+emission_enabled = true
+emission = Color(1, 0.3, 0.05, 1)
+emission_energy_multiplier = 1.1
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_hot"]
+albedo_color = Color(1, 0.6, 0.12, 1)
+roughness = 0.6
+emission_enabled = true
+emission = Color(1, 0.55, 0.1, 1)
+emission_energy_multiplier = 1.8
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_core"]
+albedo_color = Color(1, 0.9, 0.5, 1)
+roughness = 0.5
+emission_enabled = true
+emission = Color(1, 0.82, 0.38, 1)
+emission_energy_multiplier = 3
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_dark"]
+albedo_color = Color(0.5, 0.08, 0.03, 1)
+roughness = 0.8
+emission_enabled = true
+emission = Color(0.85, 0.12, 0.02, 1)
+emission_energy_multiplier = 0.7
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_beak"]
+albedo_color = Color(0.16, 0.12, 0.1, 1)
+roughness = 0.5
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_ash"]
+albedo_color = Color(0.17, 0.15, 0.14, 1)
+roughness = 1
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_eye"]
+shading_mode = 0
+albedo_color = Color(1, 1, 0.85, 1)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_ember"]
+shading_mode = 0
+albedo_color = Color(1, 0.55, 0.15, 1)
+
+[sub_resource type="SphereMesh" id="SphereMesh_body"]
+material = SubResource("StandardMaterial3D_body")
+radius = 0.62
+height = 1.24
+radial_segments = 24
+rings = 12
+
+[sub_resource type="SphereMesh" id="SphereMesh_chest"]
+material = SubResource("StandardMaterial3D_core")
+radius = 0.42
+height = 0.84
+radial_segments = 24
+rings = 12
+
+[sub_resource type="SphereMesh" id="SphereMesh_head"]
+material = SubResource("StandardMaterial3D_hot")
+radius = 0.34
+height = 0.68
+radial_segments = 24
+rings = 12
+
+[sub_resource type="SphereMesh" id="SphereMesh_eye"]
+material = SubResource("StandardMaterial3D_eye")
+radius = 0.07
+height = 0.14
+radial_segments = 8
+rings = 4
+
+[sub_resource type="SphereMesh" id="SphereMesh_ash"]
+material = SubResource("StandardMaterial3D_ash")
+radius = 1
+height = 2
+radial_segments = 16
+rings = 8
+
+[sub_resource type="CapsuleMesh" id="CapsuleMesh_neck"]
+material = SubResource("StandardMaterial3D_body")
+radius = 0.2
+height = 1.0
+radial_segments = 16
+rings = 4
+
+[sub_resource type="BoxMesh" id="BoxMesh_arm"]
+material = SubResource("StandardMaterial3D_body")
+size = Vector3(1.5, 0.14, 0.5)
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_beak"]
+material = SubResource("StandardMaterial3D_beak")
+top_radius = 0.0
+bottom_radius = 0.15
+height = 0.55
+radial_segments = 12
+rings = 0
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_crest"]
+material = SubResource("StandardMaterial3D_hot")
+top_radius = 0.0
+bottom_radius = 0.09
+height = 0.6
+radial_segments = 8
+rings = 0
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_talon"]
+material = SubResource("StandardMaterial3D_beak")
+top_radius = 0.0
+bottom_radius = 0.08
+height = 0.35
+radial_segments = 8
+rings = 0
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_feather_hot"]
+material = SubResource("StandardMaterial3D_hot")
+top_radius = 0.0
+bottom_radius = 0.25
+height = 1
+radial_segments = 10
+rings = 0
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_feather_body"]
+material = SubResource("StandardMaterial3D_body")
+top_radius = 0.0
+bottom_radius = 0.25
+height = 1
+radial_segments = 10
+rings = 0
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_feather_dark"]
+material = SubResource("StandardMaterial3D_dark")
+top_radius = 0.0
+bottom_radius = 0.25
+height = 1
+radial_segments = 10
+rings = 0
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_feather_core"]
+material = SubResource("StandardMaterial3D_core")
+top_radius = 0.0
+bottom_radius = 0.25
+height = 1
+radial_segments = 10
+rings = 0
+
+[sub_resource type="BoxMesh" id="BoxMesh_ember"]
+material = SubResource("StandardMaterial3D_ember")
+size = Vector3(0.09, 0.09, 0.09)
+
+[sub_resource type="Curve" id="Curve_shrink"]
+_data = [Vector2(0, 1), 0.0, 0.0, 0, 0, Vector2(1, 0), 0.0, 0.0, 0, 0]
+point_count = 2
+
+[sub_resource type="CurveTexture" id="CurveTexture_shrink"]
+curve = SubResource("Curve_shrink")
+
+[sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_embers"]
+emission_shape = 1
+emission_sphere_radius = 0.45
+direction = Vector3(0, 0.4, 1)
+spread = 35.0
+initial_velocity_min = 0.4
+initial_velocity_max = 1.4
+gravity = Vector3(0, 1.2, 0)
+scale_min = 0.6
+scale_max = 1.3
+scale_curve = SubResource("CurveTexture_shrink")
+
+[sub_resource type="CapsuleShape3D" id="CapsuleShape3D_boss"]
+radius = 1.05
+height = 4.4
+
+[node name="Mythos" type="CharacterBody3D" groups=["boss", "enemies"]]
+collision_layer = 2
+collision_mask = 3
+script = ExtResource("1_mythos")
+cinematic_scene = ExtResource("10_cinematic")
+transformation_scene = ExtResource("11_hell")
+boss_title = "Mythos"
+telegraph_color = Color(1, 0.4, 0.08, 1)
+impact_color = Color(1, 0.75, 0.3, 1)
+boss_gem_count = 12
+boss_gem_value = 9
+health_orb_count = 3
+tier_body_scale = 1.0
+base_chest_drops = 2
+move_speed = 9.5
+turn_speed = 7.0
+separation_strength = 0.0
+xp_gem_scene = ExtResource("3_gem")
+points_value = 60
+possessable = false
+aim_height = 2.6
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.2, 0)
+shape = SubResource("CapsuleShape3D_boss")
+
+[node name="Visual" type="Node3D" parent="."]
+script = ExtResource("4_rig")
+
+[node name="Hover" type="Node3D" parent="Visual"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.6, 0)
+
+[node name="Body" type="MeshInstance3D" parent="Visual/Hover"]
+transform = Transform3D(0.95, 0, 0, 0, 0.85, 0, 0, 0, 1.55, 0, 0, 0)
+mesh = SubResource("SphereMesh_body")
+
+[node name="Chest" type="MeshInstance3D" parent="Visual/Hover"]
+transform = Transform3D(0.95, 0, 0, 0, 0.85, 0, 0, 0, 1, 0, -0.2, -0.62)
+mesh = SubResource("SphereMesh_chest")
+
+[node name="Neck" type="MeshInstance3D" parent="Visual/Hover"]
+transform = Transform3D(0, 0, -1, 0.56921, 0.822192, 0, 0.822192, -0.56921, 0, 0, 0.62, -1.02)
+mesh = SubResource("CapsuleMesh_neck")
+
+[node name="Head" type="MeshInstance3D" parent="Visual/Hover"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.05, -1.33)
+mesh = SubResource("SphereMesh_head")
+
+[node name="Beak" type="MeshInstance3D" parent="Visual/Hover"]
+transform = Transform3D(0, 0, 1, -0.968355, -0.249576, 0, 0.249576, -0.968355, 0, 0, 0.96, -1.84)
+mesh = SubResource("CylinderMesh_beak")
+
+[node name="Crest1" type="MeshInstance3D" parent="Visual/Hover"]
+transform = Transform3D(0.249184, -0.163144, 0.954616, 0.547758, 0.836637, 0, -0.798667, 0.522898, 0.29784, -0.13, 1.48, -1.03)
+cast_shadow = 0
+mesh = SubResource("CylinderMesh_crest")
+
+[node name="Crest2" type="MeshInstance3D" parent="Visual/Hover"]
+transform = Transform3D(0, 0, 1, 0.683941, 0.729537, 0, -0.729537, 0.683941, 0, 0, 1.48, -0.985)
+cast_shadow = 0
+mesh = SubResource("CylinderMesh_crest")
+
+[node name="Crest3" type="MeshInstance3D" parent="Visual/Hover"]
+transform = Transform3D(-0.249184, 0.163144, 0.954616, 0.547758, 0.836637, 0, -0.798667, 0.522898, -0.29784, 0.13, 1.48, -1.03)
+cast_shadow = 0
+mesh = SubResource("CylinderMesh_crest")
+
+[node name="EyeL" type="MeshInstance3D" parent="Visual/Hover"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.19, 1.13, -1.6)
+cast_shadow = 0
+mesh = SubResource("SphereMesh_eye")
+
+[node name="EyeR" type="MeshInstance3D" parent="Visual/Hover"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.19, 1.13, -1.6)
+cast_shadow = 0
+mesh = SubResource("SphereMesh_eye")
+
+[node name="TalonL" type="MeshInstance3D" parent="Visual/Hover"]
+transform = Transform3D(0, 0, 1, 0.242536, -0.970143, 0, 0.970143, 0.242536, 0, -0.26, -0.66, 0.05)
+cast_shadow = 0
+mesh = SubResource("CylinderMesh_talon")
+
+[node name="TalonR" type="MeshInstance3D" parent="Visual/Hover"]
+transform = Transform3D(0, 0, 1, 0.242536, -0.970143, 0, 0.970143, 0.242536, 0, 0.26, -0.66, 0.05)
+cast_shadow = 0
+mesh = SubResource("CylinderMesh_talon")
+
+[node name="WingL" type="Node3D" parent="Visual/Hover"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.5, 0.25, -0.15)
+
+[node name="Arm" type="MeshInstance3D" parent="Visual/Hover/WingL"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.8, 0, 0)
+mesh = SubResource("BoxMesh_arm")
+
+[node name="Feather1" type="MeshInstance3D" parent="Visual/Hover/WingL"]
+transform = Transform3D(-0.00554073, -0.717191, 1.00031, 0.199748, -0.0651992, 0, 0.00836146, 1.08231, 0.662856, -0.858595, -0.0325996, 0.641153)
+mesh = SubResource("CylinderMesh_feather_body")
+
+[node name="Feather2" type="MeshInstance3D" parent="Visual/Hover/WingL"]
+transform = Transform3D(-0.00723074, -1.15373, 0.830286, 0.199749, -0.0801203, 0, 0.00692946, 1.10566, 0.866386, -1.47687, -0.0400601, 0.65283)
+mesh = SubResource("CylinderMesh_feather_hot")
+
+[node name="Feather3" type="MeshInstance3D" parent="Visual/Hover/WingL"]
+transform = Transform3D(-0.00697535, -1.65416, 0.549625, 0.19984, -0.0760533, 0, 0.00392864, 0.931652, 0.975865, -2.12708, -0.0380266, 0.515826)
+mesh = SubResource("CylinderMesh_feather_body")
+
+[node name="Feather4" type="MeshInstance3D" parent="Visual/Hover/WingL"]
+transform = Transform3D(-0.00582612, -1.94058, 0.249787, 0.19991, -0.060018, 0, 0.00144151, 0.480144, 1.00956, -2.52029, -0.030009, 0.240072)
+mesh = SubResource("CylinderMesh_feather_hot")
+
+[node name="Feather5" type="MeshInstance3D" parent="Visual/Hover/WingL"]
+transform = Transform3D(0, -1.69148, -0.0879989, 0.2, 0, 0, 0, -0.169998, 0.875589, -2.44574, 0, -0.184999)
+mesh = SubResource("CylinderMesh_feather_dark")
+
+[node name="WingR" type="Node3D" parent="Visual/Hover"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, 0.25, -0.15)
+
+[node name="Arm" type="MeshInstance3D" parent="Visual/Hover/WingR"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.8, 0, 0)
+mesh = SubResource("BoxMesh_arm")
+
+[node name="Feather1" type="MeshInstance3D" parent="Visual/Hover/WingR"]
+transform = Transform3D(0.00554073, 0.717191, 1.00031, 0.199748, -0.0651992, 0, 0.00836146, 1.08231, -0.662856, 0.858595, -0.0325996, 0.641153)
+mesh = SubResource("CylinderMesh_feather_body")
+
+[node name="Feather2" type="MeshInstance3D" parent="Visual/Hover/WingR"]
+transform = Transform3D(0.00723074, 1.15373, 0.830286, 0.199749, -0.0801203, 0, 0.00692946, 1.10566, -0.866386, 1.47687, -0.0400601, 0.65283)
+mesh = SubResource("CylinderMesh_feather_hot")
+
+[node name="Feather3" type="MeshInstance3D" parent="Visual/Hover/WingR"]
+transform = Transform3D(0.00697535, 1.65416, 0.549625, 0.19984, -0.0760533, 0, 0.00392864, 0.931652, -0.975865, 2.12708, -0.0380266, 0.515826)
+mesh = SubResource("CylinderMesh_feather_body")
+
+[node name="Feather4" type="MeshInstance3D" parent="Visual/Hover/WingR"]
+transform = Transform3D(0.00582612, 1.94058, 0.249787, 0.19991, -0.060018, 0, 0.00144151, 0.480144, -1.00956, 2.52029, -0.030009, 0.240072)
+mesh = SubResource("CylinderMesh_feather_hot")
+
+[node name="Feather5" type="MeshInstance3D" parent="Visual/Hover/WingR"]
+transform = Transform3D(0, 1.69148, -0.0879989, 0.2, 0, 0, 0, -0.169998, -0.875589, 2.44574, 0, -0.184999)
+mesh = SubResource("CylinderMesh_feather_dark")
+
+[node name="Tail" type="Node3D" parent="Visual/Hover"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.1, 0.85)
+
+[node name="Plume1" type="MeshInstance3D" parent="Visual/Hover/Tail"]
+transform = Transform3D(-0.0149703, -1.0165, 0.84763, 0.177153, -0.389737, 0, 0.028155, 1.91176, 0.450693, -0.508251, -0.194868, 0.955881)
+mesh = SubResource("CylinderMesh_feather_dark")
+
+[node name="Plume2" type="MeshInstance3D" parent="Visual/Hover/Tail"]
+transform = Transform3D(-0.00771429, -0.619048, 0.931484, 0.177153, -0.460598, 0, 0.0309403, 2.48287, 0.232245, -0.309524, -0.230299, 1.24143)
+mesh = SubResource("CylinderMesh_feather_hot")
+
+[node name="Plume3" type="MeshInstance3D" parent="Visual/Hover/Tail"]
+transform = Transform3D(0, 0, 0.96, 0.177153, -0.531459, 0, 0.0318875, 2.95255, 0, 0, -0.265729, 1.47627)
+mesh = SubResource("CylinderMesh_feather_core")
+
+[node name="Plume4" type="MeshInstance3D" parent="Visual/Hover/Tail"]
+transform = Transform3D(0.00771429, 0.619048, 0.931484, 0.177153, -0.460598, 0, 0.0309403, 2.48287, -0.232245, 0.309524, -0.230299, 1.24143)
+mesh = SubResource("CylinderMesh_feather_hot")
+
+[node name="Plume5" type="MeshInstance3D" parent="Visual/Hover/Tail"]
+transform = Transform3D(0.0149703, 1.0165, 0.84763, 0.177153, -0.389737, 0, 0.028155, 1.91176, -0.450693, 0.508251, -0.194868, 0.955881)
+mesh = SubResource("CylinderMesh_feather_dark")
+
+[node name="Embers" type="GPUParticles3D" parent="Visual/Hover"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.1, 1.4)
+cast_shadow = 0
+amount = 26
+lifetime = 1.1
+process_material = SubResource("ParticleProcessMaterial_embers")
+draw_pass_1 = SubResource("BoxMesh_ember")
+
+[node name="AshMound" type="MeshInstance3D" parent="Visual"]
+transform = Transform3D(1.25, 0, 0, 0, 0.32, 0, 0, 0, 1.25, 0, 0.05, 0)
+mesh = SubResource("SphereMesh_ash")
+
+[node name="Health" type="Node" parent="."]
+script = ExtResource("2_health")
+max_hp = 2000.0
+
+[node name="Scaling" type="Node" parent="."]
+script = ExtResource("5_scaling")
+
+[node name="Zones" type="Node" parent="."]
+script = ExtResource("12_zones")
+
+[node name="Moves" type="Node" parent="."]
+
+[node name="FeatherVolley" type="Node" parent="Moves"]
+script = ExtResource("6_volley")
+cooldown = 6.0
+first_use_fraction = 0.3
+min_range = 4.5
+max_range = 28.0
+
+[node name="Dive" type="Node" parent="Moves"]
+script = ExtResource("7_dive")
+cooldown = 9.0
+first_use_fraction = 0.6
+min_range = 5.0
+max_range = 30.0
+
+[node name="Ring" type="Node" parent="Moves"]
+script = ExtResource("8_ring")
+cooldown = 13.0
+max_range = 26.0
+
+[node name="Rain" type="Node" parent="Moves"]
+script = ExtResource("9_rain")
+unlock_life = 2
+cooldown = 12.0
+cooldown_at_full_aggression = 0.55
+first_use_fraction = 0.4
