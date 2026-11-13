@@ -11,6 +11,13 @@ extends RefCounted
 ##   BONK_WEATHER_AT=a,b,c  fuerza el clima de BONK_WEATHER_NOW (o
 ##                          blood_moon) en esos segundos, en lugar de los
 ##                          30 s de siempre
+##   BONK_ADVANCE_AT=a,b,c  cambia de etapa en esos segundos, como si la
+##                          party cruzara el portal de salida, esté como
+##                          esté la etapa (RunRoot.advance_stage)
+##   BONK_UI_DISMISS=1      cierra por código la ruleta o el vendedor que
+##                          lleve más de 3 s abierto. Sin ventana se resuelven
+##                          solos; con ventana esperan a alguien, y una
+##                          corrida larga de capturas se quedaría pausada ahí
 ## Esos segundos son del RELOJ DEL PROBE (frames de física / 60) y no de
 ## RunState.run_time, que se detiene durante la calma: con run_time no se
 ## podría caer en medio de una cinemática.
@@ -21,12 +28,16 @@ const EXTRACT_AT_ENV := "BONK_EXTRACT_AT"
 const WIPE_AT_ENV := "BONK_WIPE_AT"
 const WEATHER_AT_ENV := "BONK_WEATHER_AT"
 const WEATHER_ID_ENV := "BONK_WEATHER_NOW"
+const DISMISS_ENV := "BONK_UI_DISMISS"
+const ADVANCE_AT_ENV := "BONK_ADVANCE_AT"
 const DEFAULT_WEATHER := "blood_moon"
 
 ## Segundos de cinemática antes de empezar a mantener el salto.
 const SKIP_AFTER: float = 1.0
 ## Segundos que el menú de pausa queda abierto.
 const PAUSE_HOLD: float = 3.0
+## Segundos que un panel cerrable puede tener la pausa antes de cerrarlo.
+const DISMISS_AFTER: float = 3.0
 ## Valores (0-100) que prueba el slider de Música con la pausa abierta.
 const MUSIC_SLIDER_VALUES: Array[float] = [35.0, 80.0]
 
@@ -45,6 +56,9 @@ var _wipe_at: float = -1.0
 var _exit_done: bool = false
 var _weather_times: Array[float] = []
 var _weather_id: String = DEFAULT_WEATHER
+var _advance_times: Array[float] = []
+var _dismiss: bool = false
+var _blocked_for: float = 0.0
 ## Acciones globales que hay que soltar en el frame siguiente a apretarlas.
 var _release_next: Array[StringName] = []
 
@@ -55,10 +69,9 @@ func _init(host: Node) -> void:
 	_pause_at = _env_seconds(PAUSE_AT_ENV)
 	_extract_at = _env_seconds(EXTRACT_AT_ENV)
 	_wipe_at = _env_seconds(WIPE_AT_ENV)
-	for entry: String in OS.get_environment(WEATHER_AT_ENV).split(",", false):
-		if entry.strip_edges().is_valid_float():
-			_weather_times.append(entry.strip_edges().to_float())
-	_weather_times.sort()
+	_weather_times = _env_times(WEATHER_AT_ENV)
+	_advance_times = _env_times(ADVANCE_AT_ENV)
+	_dismiss = OS.get_environment(DISMISS_ENV) == "1"
 	var weather := OS.get_environment(WEATHER_ID_ENV)
 	if not weather.is_empty():
 		_weather_id = weather
@@ -80,6 +93,8 @@ func tick(delta: float, now: float, boss_state: StringName) -> void:
 	_tick_pause(delta)
 	_tick_exits(boss_state)
 	_tick_weather()
+	_tick_advance(boss_state)
+	_tick_dismiss(delta)
 
 
 func _cinematic() -> Node:
@@ -201,6 +216,32 @@ func _tick_weather() -> void:
 		_tree.call_group("world_director", "start_sky_event", _weather_id)
 
 
+## BONK_ADVANCE_AT: un cambio de etapa en cada segundo pedido.
+func _tick_advance(boss_state: StringName) -> void:
+	while not _advance_times.is_empty() and _now >= _advance_times[0]:
+		_advance_times.remove_at(0)
+		print("Probe advance: stage change at %.1fs state=%s" % [_now, boss_state])
+		_tree.call_group("run_root", "advance_stage")
+
+
+## BONK_UI_DISMISS: cierra los paneles cerrables (ruleta, vendedor) que
+## lleven DISMISS_AFTER segundos con la pausa tomada.
+func _tick_dismiss(delta: float) -> void:
+	if not _dismiss:
+		return
+	var open: Array[Node] = []
+	for node: Node in _tree.get_nodes_in_group(BlockingUi.CLOSABLE_GROUP):
+		if node.has_method(&"is_blocking") and bool(node.call(&"is_blocking")):
+			open.append(node)
+	_blocked_for = _blocked_for + delta if not open.is_empty() else 0.0
+	if _blocked_for < DISMISS_AFTER:
+		return
+	_blocked_for = 0.0
+	for node: Node in open:
+		print("Probe dismiss: closing %s at %.1fs" % [node.name, _now])
+		node.call(&"dismiss")
+
+
 func _press_global(action: StringName) -> void:
 	_send_global(action, true)
 	_release_next.append(action)
@@ -213,6 +254,16 @@ func _send_global(action: StringName, pressed: bool) -> void:
 	event.action = action
 	event.pressed = pressed
 	Input.parse_input_event(event)
+
+
+## Lista ordenada de segundos de una variable "a,b,c".
+static func _env_times(env_name: String) -> Array[float]:
+	var times: Array[float] = []
+	for entry: String in OS.get_environment(env_name).split(",", false):
+		if entry.strip_edges().is_valid_float():
+			times.append(entry.strip_edges().to_float())
+	times.sort()
+	return times
 
 
 static func _env_seconds(env_name: String) -> float:

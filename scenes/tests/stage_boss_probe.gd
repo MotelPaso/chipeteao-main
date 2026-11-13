@@ -6,12 +6,13 @@ extends RefCounted
 ##
 ## 1. OBSERVA, siempre y sin tocar nada: mira al cuerpo del grupo "stage_boss"
 ##    y su fight_state(). Ningún soak anterior llega al minuto 11, así que en
-##    ellos no imprime nada. Con un jefe de etapa a la vista imprime:
+##    ellos solo imprime "Probe stage:" en cada cambio de etapa. Con un jefe
+##    de etapa a la vista imprime:
 ##      Probe calm:        vida de cada cuerpo y cantidad de enemigos y
 ##                         proyectiles al empezar y al terminar la calma
 ##      Probe stage:       HUD, pantalla dividida, cámara de cinemática,
-##                         canción y mundo congelado, tras la calma y al
-##                         terminar la partida
+##                         canción y mundo congelado, tras la calma, en cada
+##                         cambio de etapa y al terminar la partida
 ##      Probe boss hit:    el primer golpe de cada arma con el jefe en vuelo
 ##      Probe boss damage: al salir, el daño de cada arma al jefe por estado
 ##      Probe boss hits on raiders: golpes del jefe por slot
@@ -120,6 +121,9 @@ func on_stage_changed() -> void:
 	_fight_shot = false
 	_before_shot = false
 	_weather_seen = ""
+	_stage_reports.append({"left": STAGE_REPORT_FRAMES, "reason": "stage_change"})
+	# La etapa recién construida, desde los puntos fijos (con BONK_VIEW_SHOTS).
+	_views.shoot("arrival_stage%d_lap%d" % [RunState.stage_index + 1, RunState.lap + 1])
 
 
 ## Fin de la partida: el estado de la pantalla, unos frames después.
@@ -185,6 +189,11 @@ func _on_state_changed(from: StringName, to: StringName) -> void:
 		_calm_from_frame = _frames
 		_calm_health = _health_snapshot()
 		_calm_counts = _live_counts()
+	elif from == &"arrival" and to == &"":
+		# El jefe se fue en plena calma (cambio de etapa forzado): no hay
+		# pelea que empiece ni vidas que comparar con las de otra arena.
+		print("Probe calm: aborted after %d frames (stage boss gone)" % (
+				_frames - _calm_from_frame))
 	elif from == &"arrival":
 		_report_calm()
 		_fight_from = _now
@@ -372,7 +381,11 @@ func _print_sky(tag: String) -> void:
 			tag, look, sun.light_color.r, sun.light_color.g, sun.light_color.b,
 			sun.light_energy, ambient.r, ambient.g, ambient.b,
 			environment.ambient_light_energy, _now])
-	_camera.request("sky_%s_%.0fs" % [tag.replace(":", "_"), _now])
+	var stem := "sky_%s_%.0fs" % [tag.replace(":", "_"), _now]
+	_camera.request(stem)
+	# Con BONK_VIEW_SHOTS, además desde los puntos fijos y sin HUD: la foto
+	# normal puede caer con el mapa de Tab abierto o con un ataque delante.
+	_views.shoot(stem)
 
 
 ## Lee el cielo SKY_REPORT_DELAY después de que cada clima termina del todo,

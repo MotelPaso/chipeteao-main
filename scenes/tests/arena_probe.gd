@@ -91,9 +91,10 @@ extends Node
 ##   BONK_STAGE_GOAL=<s>    acorta SOLO la mitad de tiempo de la puerta de
 ##                          etapa; la mitad del jefe se conserva (lo lee RunManager)
 ##   BONK_CINEMATIC_SKIP, BONK_PAUSE_AT, BONK_EXTRACT_AT, BONK_WIPE_AT,
-##   BONK_WEATHER_AT, BONK_VIEW_SHOTS: las pruebas alrededor del jefe de
-##                          etapa; viven en stage_boss_switches.gd y
-##                          stage_boss_probe.gd, que las explican
+##   BONK_WEATHER_AT, BONK_ADVANCE_AT, BONK_UI_DISMISS, BONK_VIEW_SHOTS:
+##                          las pruebas alrededor del jefe de etapa; viven en
+##                          stage_boss_switches.gd y stage_boss_probe.gd,
+##                          que las explican
 ##
 ## Por defecto el raider CAMINA E INTERACTÚA. Un raider quieto se salta en
 ## silencio todo sistema que depende del movimiento (Slime Trail solo deja

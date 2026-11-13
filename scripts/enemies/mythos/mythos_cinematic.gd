@@ -254,14 +254,13 @@ func _release() -> void:
 			var split := node as CanvasItem
 			if split != null:
 				split.visible = true
-	# clear_current(false): sin pasarle el turno a otra cámara del viewport
-	# raíz. En co-op las cámaras de los raiders viven ahí, y con una activa el
-	# viewport raíz dibujaría el mundo entero detrás de la pantalla dividida.
+	# El viewport raíz vuelve a tener la MISMA cámara que tenía antes de la
+	# cinemática, en solitario y en co-op. clear_current(false) para que
+	# Godot no elija otra por su cuenta: cuando una cámara activa se suelta
+	# (o sale del árbol), le pasa el turno a cualquier otra del viewport.
 	_camera.clear_current(false)
-	# En solitario la cámara del raider vuelve a ser la activa; en co-op el
-	# viewport raíz se queda sin cámara y pinta la pantalla dividida.
-	if not Coop.is_coop() and _previous_camera != null \
-			and is_instance_valid(_previous_camera) and _previous_camera.is_inside_tree():
+	if _previous_camera != null and is_instance_valid(_previous_camera) \
+			and _previous_camera.is_inside_tree():
 		_previous_camera.make_current()
 	_previous_camera = null
 	_bar_top.visible = false

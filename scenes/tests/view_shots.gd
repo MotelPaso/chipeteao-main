@@ -5,22 +5,21 @@ extends RefCounted
 ## para juzgar cómo cambia el MAPA hacen falta los mismos encuadres antes y
 ## después. La usa StageBossProbe con BONK_VIEW_SHOTS=1 y BONK_SHOT_DIR.
 ##
-## Cada llamada a shoot("<momento>") guarda, sin HUD:
+## Cada llamada a shoot("<momento>") guarda:
 ##   view_aerial_<momento>.png   3/4 de la arena desde lo alto, SIN niebla
 ##                               (de lejos la niebla tapa el mapa entero)
 ##   view_spawn_<momento>.png    a la altura de los ojos desde el spawn
 ##   view_raider_<momento>.png   desde arriba y atrás del raider líder
-## Mientras dispara, la partida sigue: toma prestada la cámara activa unos
-## frames y la devuelve. Solo en solitario (en co-op el viewport raíz no
-## tiene cámara y la pantalla es de SplitScreen) y nunca en headless.
+## Las fotos salen de un SubViewport propio con su cámara: mira el mismo
+## mundo 3D que la partida, pero no dibuja nada 2D (ni HUD ni mapa de Tab) y
+## no le quita la cámara a nadie, así la partida y la cinemática siguen
+## igual mientras dispara. Nunca en headless: ahí no se dibuja nada.
 
 ## Frames dibujados entre mover la cámara y guardar: las cascadas de sombra
 ## van uno o dos frames atrasadas.
 const SETTLE_FRAMES: int = 4
-## Frames dibujados antes de tomar la cámara: la foto normal del mismo
-## momento (ShotCamera) se guarda un frame después de pedirse, y tiene que
-## salir con la cámara del juego.
-const LEAD_FRAMES: int = 8
+## Tamaño de cada foto, en píxeles.
+const SIZE := Vector2i(1280, 720)
 const AERIAL_FROM := Vector3(0.0, 95.0, 135.0)
 const AERIAL_LOOK := Vector3(0.0, 0.0, 10.0)
 ## Altura de los ojos sobre el suelo, en metros (como en TerrainShots).
@@ -33,6 +32,7 @@ const FOV: float = 70.0
 var _host: Node = null
 var _dir: String = ""
 var _on: bool = false
+var _viewport: SubViewport = null
 var _camera: Camera3D = null
 var _queue: Array[String] = []
 var _busy: bool = false
@@ -45,9 +45,6 @@ func _init(host: Node, dir: String, wanted: bool) -> void:
 		return
 	if DisplayServer.get_name() == "headless":
 		print("View shots skipped: headless")
-		return
-	if Coop.is_coop():
-		print("View shots skipped: co-op")
 		return
 	_on = true
 	print("View shots on: dir=%s" % _dir)
@@ -68,73 +65,56 @@ func shoot(moment: String) -> void:
 
 func _run() -> void:
 	_busy = true
+	_ensure_viewport()
+	_viewport.render_target_update_mode = SubViewport.UPDATE_ALWAYS
 	while not _queue.is_empty():
-		for frame: int in LEAD_FRAMES:
-			await RenderingServer.frame_post_draw
 		await _shoot_moment(_queue.pop_front())
+	_viewport.render_target_update_mode = SubViewport.UPDATE_DISABLED
 	_busy = false
+
+
+## El SubViewport de las fotos: sin mundo propio, así que dibuja el de la
+## partida. Solo se actualiza mientras hay fotos pendientes.
+func _ensure_viewport() -> void:
+	if _viewport != null:
+		return
+	_viewport = SubViewport.new()
+	_viewport.size = SIZE
+	_viewport.msaa_3d = _host.get_viewport().msaa_3d
+	_viewport.render_target_update_mode = SubViewport.UPDATE_DISABLED
+	_camera = Camera3D.new()
+	_camera.fov = FOV
+	_camera.far = 900.0
+	_viewport.add_child(_camera)
+	_host.add_child(_viewport)
+	_camera.make_current()
 
 
 func _shoot_moment(moment: String) -> void:
 	var tree := _host.get_tree()
-	var viewport := _host.get_viewport()
-	var previous := viewport.get_camera_3d()
-	var hidden := _hide_canvas_roots(tree.root)
-	if _camera == null:
-		_camera = Camera3D.new()
-		_camera.fov = FOV
-		_camera.far = 900.0
-		_host.add_child(_camera)
-	_camera.make_current()
 	var terrain := Terrain.find(tree)
 	var ground := terrain.height_at(0.0, 0.0) if terrain != null else 0.0
 	_camera.look_at_from_position(AERIAL_FROM, AERIAL_LOOK)
-	var environment := _environment(tree)
-	var had_fog := environment != null and environment.fog_enabled
-	if environment != null:
-		environment.fog_enabled = false
-	await _save(viewport, "view_aerial_%s" % moment)
-	if environment != null and is_instance_valid(environment):
-		environment.fog_enabled = had_fog
+	# Sin niebla solo para ESTA cámara: una copia del Environment de la arena
+	# puesta como override de la cámara, sin tocar el de la partida.
+	_camera.environment = _fogless_environment(tree)
+	await _save("view_aerial_%s" % moment)
+	_camera.environment = null
 	_camera.look_at_from_position(Vector3(0.0, ground + EYE_HEIGHT, 6.0),
 			Vector3(0.0, ground + 2.0, -30.0))
-	await _save(viewport, "view_spawn_%s" % moment)
+	await _save("view_spawn_%s" % moment)
 	var raider := _lead_raider(tree)
 	if raider != null:
 		var at := raider.global_position
 		_camera.look_at_from_position(at + Vector3(0.0, RAIDER_UP, RAIDER_BACK),
 				at + Vector3.UP * 1.5)
-		await _save(viewport, "view_raider_%s" % moment)
-	for item: CanvasItem in hidden:
-		if is_instance_valid(item):
-			item.visible = true
-	_restore_camera(tree, previous)
+		await _save("view_raider_%s" % moment)
 
 
-## Devuelve la cámara que estaba activa. Si era la de una cinemática que ya
-## terminó, la del raider líder: reactivar una cámara vieja dejaría la
-## pantalla mirando donde ya no pasa nada.
-func _restore_camera(tree: SceneTree, previous: Camera3D) -> void:
-	_camera.clear_current(false)
-	var stale := previous == null or not is_instance_valid(previous) \
-			or not previous.is_inside_tree()
-	if not stale and previous.is_in_group(&"cinematic_camera"):
-		stale = true
-		for node: Node in tree.get_nodes_in_group(&"boss_cinematic"):
-			if node.has_method(&"is_calm_active") and bool(node.call(&"is_calm_active")):
-				stale = false
-	if not stale:
-		previous.make_current()
-		return
-	var raider := _lead_raider(tree) as Player
-	if raider != null and raider.view_camera() != null:
-		raider.view_camera().make_current()
-
-
-func _save(viewport: Viewport, stem: String) -> void:
+func _save(stem: String) -> void:
 	for frame: int in SETTLE_FRAMES:
 		await RenderingServer.frame_post_draw
-	var image := viewport.get_texture().get_image()
+	var image := _viewport.get_texture().get_image()
 	var path := "%s/%s.png" % [_dir, stem]
 	if image == null or image.save_png(path) != OK:
 		push_warning("ViewShots: cannot write '%s'" % path)
@@ -151,28 +131,17 @@ func _lead_raider(tree: SceneTree) -> Node3D:
 	return null
 
 
-## El Environment que está usando la arena viva, o null.
-func _environment(tree: SceneTree) -> Environment:
+## Una copia sin niebla del Environment que está usando la arena viva, o
+## null si no hay.
+func _fogless_environment(tree: SceneTree) -> Environment:
 	var arena := RunRoot.stage_parent(tree)
 	if arena == null:
 		return null
 	for node: Node in arena.find_children("*", "WorldEnvironment", true, false):
-		return (node as WorldEnvironment).environment
+		var source := (node as WorldEnvironment).environment
+		if source == null:
+			return null
+		var copy := source.duplicate() as Environment
+		copy.fog_enabled = false
+		return copy
 	return null
-
-
-## Oculta todo lo 2D que se ve: cada CanvasItem visible que no cuelga de
-## otro CanvasItem (los hijos lo siguen). Devuelve lo que ocultó, para
-## volver a mostrarlo. Ocultar las CanvasLayer no alcanza: solo tapan a sus
-## hijos directos, y los minimapas cuelgan de un Node intermedio.
-func _hide_canvas_roots(node: Node) -> Array[CanvasItem]:
-	var hidden: Array[CanvasItem] = []
-	var item := node as CanvasItem
-	if item != null:
-		if item.visible and not node.get_parent() is CanvasItem:
-			item.visible = false
-			hidden.append(item)
-		return hidden
-	for child: Node in node.get_children():
-		hidden.append_array(_hide_canvas_roots(child))
-	return hidden

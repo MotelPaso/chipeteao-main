@@ -265,7 +265,9 @@ Variables de entorno del harness:
 | `BONK_EXTRACT_AT=<s>`                         | extrae la party a ese segundo                                                                                                                               |
 | `BONK_WIPE_AT=<s>`                            | golpe letal a toda la party a ese segundo                                                                                                                   |
 | `BONK_WEATHER_AT=a,b,c`                       | fuerza el clima de `BONK_WEATHER_NOW` (o `blood_moon`) en esos segundos en lugar de a los 30 s                                                              |
-| `BONK_VIEW_SHOTS=1`                           | con `BONK_SHOT_DIR`: fotos desde tres puntos fijos antes del jefe de etapa, en la calma, en la pelea y después (solo en solitario y con ventana)            |
+| `BONK_ADVANCE_AT=a,b,c`                       | cambia de etapa en esos segundos, como si la party cruzara el portal de salida, esté como esté la etapa                                                      |
+| `BONK_UI_DISMISS=1`                           | cierra por código la ruleta o el vendedor que lleve más de 3 s abierto: con ventana no se resuelven solos y una corrida de capturas se quedaría pausada      |
+| `BONK_VIEW_SHOTS=1`                           | con `BONK_SHOT_DIR`: fotos desde tres puntos fijos antes del jefe de etapa, en la calma, en la pelea, después y tras cada clima (solo con ventana)            |
 
 Los segundos de `BONK_PAUSE_AT`, `BONK_EXTRACT_AT`, `BONK_WIPE_AT` y `BONK_WEATHER_AT` son del reloj del harness (frames de física / 60), no de `run_time`, que se detiene durante la calma.
 
