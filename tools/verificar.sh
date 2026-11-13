@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 # Verificación headless del proyecto: import limpio + lint de catálogos +
 # harness de UI + harness del selector + soak por arena + soak de etapa +
-# soak de co-op.
+# soak de co-op + soak del jefe de etapa (Mythos).
 # Uso: tools/verificar.sh [segundos_por_arena]   (por defecto 360)
 #
 # 360 s no es arbitrario: por debajo, el recorrido del harness no da tiempo a
 # cruzar una arena de 240x240 y la puerta de cobertura no puede exigir nada.
 # La corrida completa tarda ~40 min (3 x 360 s + 1 x 720 s + 1 x 360 s de
-# co-op + el lint + el harness de UI + import).
+# co-op + 1 x 450 s del jefe de etapa + el lint + el harness de UI + import).
 #
 # BONK_GAME_SEED fija el RNG del juego (cartas, spawns, scatter y por tanto
 # el relieve). Sin él cada soak es un mundo distinto y cualquier comparación
@@ -37,6 +37,9 @@
 #     cruzar, o pierde progreso al hacerlo.
 #   - el soak de CO-OP no arranca con dos raiders, no cruza
 #     de etapa, ensucia un barrido o no reanima a nadie.
+#   - el soak del JEFE DE ETAPA no ve llegar a Mythos, la calma no congela
+#     el mundo, no renace, su muerte no sale exactamente una vez, o no abre
+#     la puerta, el portal y el cruce de etapa.
 set -uo pipefail
 cd "$(dirname "$0")/.."
 
@@ -419,6 +422,95 @@ else
 		grep -n '^Graphics: ' "$COOP_LOG" | head -5
 		FALLOS=$((FALLOS + 1))
 	fi
+fi
+
+# --- Soak del jefe de etapa ------------------------------------------------
+# El sexto soak es el único que llega a un JEFE DE ETAPA y lo mata. Ningún
+# otro alcanza el minuto 11, y BONK_STAGE_FAST quita la mitad de jefe de la
+# puerta. Aquí BONK_STAGE_BOSS_AT trae a Mythos a los 90 s y BONK_STAGE_GOAL
+# acorta SOLO la mitad de tiempo: la puerta sigue esperando su muerte. Mide
+# la llegada con su calma (el mundo congelado), al menos un renacer, la
+# muerte final, la puerta, el portal y el cruce de etapa. Fuera de la cuenta
+# de interactuables, como el de etapa.
+MYTHOS_SECS=450
+MYTHOS_FRAMES=$(( MYTHOS_SECS * 60 ))
+echo "== soak jefe de etapa (HollowWoods, Mythos, ${MYTHOS_SECS}s de partida) =="
+fase
+MYTHOS_LOG="$LOGDIR/soak_mythos.log"
+BONK_ARENA="res://scenes/world/HollowWoods.tscn" BONK_GODMODE=1 BONK_SEED=4242 \
+	BONK_GAME_SEED=4242 BONK_STAGE_BOSS_AT=90 BONK_STAGE_GOAL=120 \
+	BONK_SAVE_PATH="$(save_path_for mythos)" \
+	godot --headless --fixed-fps 60 --quit-after "$MYTHOS_FRAMES" \
+	res://scenes/tests/ArenaProbe.tscn >"$MYTHOS_LOG" 2>&1
+
+if grep -qE "$PATRON_ERROR" "$MYTHOS_LOG"; then
+	echo "  FALLO: errores en tiempo de ejecución"
+	grep -nE "$PATRON_ERROR" "$MYTHOS_LOG" | head -30
+	FALLOS=$((FALLOS + 1))
+else
+	MYTHOS_REPORTES=$(grep -c '^frame ' "$MYTHOS_LOG")
+	MYTHOS_ESPERADO=$(( MYTHOS_FRAMES / 120 ))
+	MYTHOS_VIDAS=$(grep -c '^Mythos scaling: life=' "$MYTHOS_LOG")
+	MYTHOS_MUERTES=$(grep -c '^Stage boss slain: Mythos at ' "$MYTHOS_LOG")
+	MYTHOS_SUCIOS=$(grep '^Stage sweep: ' "$MYTHOS_LOG" | grep -cv 'enemies=0 gems=0 orbs=0 chests=0 altars=0 beacons=0 pickups=0 boxes=0 vendors=0 possessed=0')
+	MYTHOS_PELEA=$(sed -n 's/^Mythos fight over: took=\([0-9.]*\)s.*/\1/p' "$MYTHOS_LOG" | head -1)
+	echo "  vidas=$MYTHOS_VIDAS muertes=$MYTHOS_MUERTES pelea=${MYTHOS_PELEA:-?}s sweeps_sucios=$MYTHOS_SUCIOS"
+	fase_fin
+	if [ "$MYTHOS_REPORTES" -lt "$MYTHOS_ESPERADO" ]; then
+		echo "  FALLO: terminó antes de tiempo ($MYTHOS_REPORTES/$MYTHOS_ESPERADO reportes)"
+		tail -15 "$MYTHOS_LOG"
+		FALLOS=$((FALLOS + 1))
+	fi
+	if grep -q '^Probe fog: skipped' "$MYTHOS_LOG"; then
+		echo "  FALLO: la partida godmode terminó sola"
+		FALLOS=$((FALLOS + 1))
+	fi
+	if ! grep -q '^Boss spawned: Mythos at ' "$MYTHOS_LOG"; then
+		echo "  FALLO: Mythos nunca llegó (¿HollowWoods perdió su stage_boss_scene?)"
+		grep -n '^Boss spawned: ' "$MYTHOS_LOG" | head -3
+		FALLOS=$((FALLOS + 1))
+	fi
+	# La calma: ninguna vida cambió y nada apareció mientras duró la cinemática.
+	if ! grep -qE '^Probe calm: .* changed=0 born=0 ' "$MYTHOS_LOG"; then
+		echo "  FALLO: el mundo no quedó congelado durante la calma de llegada"
+		grep -n '^Probe calm: ' "$MYTHOS_LOG" | head -3
+		FALLOS=$((FALLOS + 1))
+	fi
+	# ...y al terminar devolvió el HUD, el mundo y el reloj.
+	if ! grep -qE '^Probe stage: reason=calm_end hud_visible=true .* cinematic_camera=false .* world_frozen=false clock_running=true$' "$MYTHOS_LOG"; then
+		echo "  FALLO: la cinemática no devolvió el HUD, el mundo o el reloj"
+		grep -n '^Probe stage: ' "$MYTHOS_LOG" | head -3
+		FALLOS=$((FALLOS + 1))
+	fi
+	# Una línea de escalado por vida: la de llegada y la de cada renacer.
+	if [ "$MYTHOS_VIDAS" -lt 2 ]; then
+		echo "  FALLO: Mythos no renació ni una vez ($MYTHOS_VIDAS línea(s) de escalado)"
+		FALLOS=$((FALLOS + 1))
+	fi
+	# Health.died sale UNA vez: de ahí cuelgan la puerta, el respiro y el botín.
+	if [ "$MYTHOS_MUERTES" -ne 1 ]; then
+		echo "  FALLO: 'Stage boss slain: Mythos' salió $MYTHOS_MUERTES vez/veces (debe ser 1)"
+		FALLOS=$((FALLOS + 1))
+	fi
+	if ! grep -qE '^Stage gate: time=[0-9.]+ boss=true$' "$MYTHOS_LOG"; then
+		echo "  FALLO: la puerta de etapa no se abrió con la muerte del jefe"
+		grep -n '^Stage gate: ' "$MYTHOS_LOG" | head -3
+		FALLOS=$((FALLOS + 1))
+	fi
+	if ! grep -q 'Exit portal opened' "$MYTHOS_LOG"; then
+		echo "  FALLO: la etapa nunca abrió su portal de salida"
+		FALLOS=$((FALLOS + 1))
+	fi
+	if ! grep -q '^Stage advanced: 1 -> 2 (ash_dunes)' "$MYTHOS_LOG"; then
+		echo "  FALLO: no se cruzó de Bosque Hueco a Dunas de Ceniza"
+		FALLOS=$((FALLOS + 1))
+	fi
+	if [ "$MYTHOS_SUCIOS" -ne 0 ]; then
+		echo "  FALLO: el cambio de etapa dejó objetos vivos"
+		grep '^Stage sweep: ' "$MYTHOS_LOG" | head -5
+		FALLOS=$((FALLOS + 1))
+	fi
+	chequear_tope_cofres "$MYTHOS_LOG"
 fi
 
 # La cobertura de interactuables se mide SUMANDO las tres arenas, no por
