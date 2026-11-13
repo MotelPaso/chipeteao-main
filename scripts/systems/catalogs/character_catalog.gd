@@ -134,10 +134,14 @@ const DEFAULT_ID: String = "rook"
 
 ## Personaje de respaldo cuando no hubo selección (arena arrancada directo).
 const DEFAULT_ID: String = "caballerita"
+<<<<<<< Updated upstream
+>>>>>>> Stashed changes
+=======
 >>>>>>> Stashed changes
 
 const CHARACTER_LIBRARY: Array[Dictionary] = [
 	{
+<<<<<<< Updated upstream
 <<<<<<< Updated upstream
 		"id": "rook", "display_name": "Rook",
 		"blurb": "Un muro con patas: sus golpes solo se ponen más feos.",
@@ -153,10 +157,18 @@ const CHARACTER_LIBRARY: Array[Dictionary] = [
 		"passive_description": "+0.5 de armadura por nivel",
 		"passive_stat": "armor", "passive_amount": 0.5,
 >>>>>>> Stashed changes
+=======
+		"id": "caballerita", "display_name": "Pequeña caballerita",
+		"blurb": "No existe pastero mas duro que la pequeña caballerita.",
+		"weapon_node_name": "Shortsword",
+		"passive_description": "+0.5 de armadura por nivel",
+		"passive_stat": "armor", "passive_amount": 0.5,
+>>>>>>> Stashed changes
 		"unlock_cost": 0,
 		"tint": Color(0.35, 0.51, 0.74),
 	},
 	{
+<<<<<<< Updated upstream
 <<<<<<< Updated upstream
 		"id": "ash", "display_name": "Ash",
 		"blurb": "Un ermitaño cubierto de hollín cuyo fuego se abre más en cada nivel.",
@@ -211,9 +223,36 @@ const CHARACTER_LIBRARY: Array[Dictionary] = [
 		"id": "meowl", "display_name": "Meowl",
 		"blurb": "I'm a new soul, I came to this strange world hoping...",
 >>>>>>> Stashed changes
+=======
+		"id": "fuego", "display_name": "Fuego",
+		"blurb": "Del espacio le llego algo muy especial.",
+		"weapon_node_name": "EmberWand",
+		"passive_description": "+1.5% de área por nivel",
+		"passive_stat": "area", "passive_amount": 1.5,
+		"unlock_cost": 0,
+		"model_scene": "res://assets/models/fuego_character.tscn",
+		"tint": Color(0.89, 0.45, 0.18),
+	},
+	{
+		"id": "ninja", "display_name": "Ninja",
+		"blurb": "Pendiente.",
+		# Pendiente: cambiar el arco de caza por kunais en WeaponCatalog y
+		# apuntar weapon_node_name a esa fila nueva.
+		"weapon_node_name": "HuntingBow",
+		"passive_description": "+1.0% de velocidad de ataque por nivel",
+		"passive_stat": "cooldown", "passive_amount": 1.0,
+		"model_scene": "res://assets/models/yandere_character.tscn",
+		"unlock_cost": 0,
+		"tint": Color(0.24, 0.55, 0.32),
+	},
+	{
+		"id": "meowl", "display_name": "Meowl",
+		"blurb": "I'm a new soul, I came to this strange world hoping...",
+>>>>>>> Stashed changes
 		"weapon_node_name": "SpiritOrbs",
 		"weapon_display_name": "Orbes espirituales",
 		"passive_description": "+1.0% de xp por nivel",
+<<<<<<< Updated upstream
 <<<<<<< Updated upstream
 		"passive_stat": "xp", "passive_amount": 1.0,
 		"unlock_cost": 0, # 120
@@ -228,6 +267,8 @@ const CHARACTER_LIBRARY: Array[Dictionary] = [
 		"passive_description": "+1 de suerte por nivel (cartas más raras)",
 		"passive_stat": "luck", "passive_amount": 1.0,
 =======
+=======
+>>>>>>> Stashed changes
 		"passive_stat": "xp_gain", "passive_amount": 1.0,
 		"unlock_cost": 0,
 		"tint": Color(0.55, 0.85, 0.95),
@@ -238,12 +279,16 @@ const CHARACTER_LIBRARY: Array[Dictionary] = [
 		"weapon_node_name": "StormRod",
 		"passive_description": "+1.5 de suerte por nivel (cartas más raras)",
 		"passive_stat": "luck", "passive_amount": 1.5,
+<<<<<<< Updated upstream
+>>>>>>> Stashed changes
+=======
 >>>>>>> Stashed changes
 		"model_scene": "res://assets/models/storm_cat_character.tscn",
 		"unlock_cost": 0, # 130
 		"tint": Color(0.35, 0.45, 0.85),
 	},
 	{
+<<<<<<< Updated upstream
 <<<<<<< Updated upstream
 		"id": "doc", "display_name": "Doc",
 		"blurb": "Un cirujano de campaña muy alegre que le cobra a cada paciente en sangre.",
@@ -258,6 +303,11 @@ const CHARACTER_LIBRARY: Array[Dictionary] = [
 		"id": "chupacabra", "display_name": "Chupacabras",
 		"blurb": "Bart, no quiero asustarte pero creo que el chupacabras esta en el juego.",
 		"weapon_node_name": "BloodVial",
+=======
+		"id": "chupacabra", "display_name": "Chupacabras",
+		"blurb": "Bart, no quiero asustarte pero creo que el chupacabras esta en el juego.",
+		"weapon_node_name": "BloodVial",
+>>>>>>> Stashed changes
 		"passive_description": "+0.5% de robo de vida por nivel",
 		"passive_stat": "lifesteal", "passive_amount": 0.5,
 		"unlock_cost": 0,
@@ -267,9 +317,14 @@ const CHARACTER_LIBRARY: Array[Dictionary] = [
 	# Iteration 43 roster: the slime, stench and beam starters.
 	{
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
 		"id": "Moka", "display_name": "Moka",
 		"blurb": "Una foca muy watona.",
 		"weapon_scene": "res://scenes/weapons/SlimeTrail.tscn",
+=======
+		"id": "moka", "display_name": "Moka",
+		"blurb": "Una foca muy watona, muy azul y muy foca.",
+>>>>>>> Stashed changes
 =======
 		"id": "moka", "display_name": "Moka",
 		"blurb": "Una foca muy watona, muy azul y muy foca.",
@@ -282,6 +337,7 @@ const CHARACTER_LIBRARY: Array[Dictionary] = [
 		"tint": Color(0.35, 0.45, 0.85),
 	},
 	{
+<<<<<<< Updated upstream
 <<<<<<< Updated upstream
 		"id": "bogg", "display_name": "Bogg",
 		"blurb": "Nadie se sienta al lado de Bogg. Tampoco nadie sobrevive cerca de Bogg.",
@@ -311,6 +367,20 @@ const CHARACTER_LIBRARY: Array[Dictionary] = [
 		"id": "goku", "display_name": "Goku",
 		"blurb": "Kaaaaa meeeee haaaaaaa maaaaaaaa haaaaaaa!!!",
 >>>>>>> Stashed changes
+=======
+		"id": "barco_basurero", "display_name": "Bolsa de basura",
+		"blurb": "Una bolsa de basura con patas.",
+		"weapon_node_name": "Stench",
+		"passive_description": "+0.5% de área y de duración por nivel",
+		"passive_stat": "area", "passive_amount": 0.5,
+		"passive_stat2": "duration", "passive_amount2": 0.5,
+		"unlock_cost": 0,
+		"tint": Color(0.6, 0.7, 0.3),
+	},
+	{
+		"id": "goku", "display_name": "Goku",
+		"blurb": "Kaaaaa meeeee haaaaaaa maaaaaaaa haaaaaaa!!!",
+>>>>>>> Stashed changes
 		"weapon_node_name": "Kamehameha",
 		"weapon_display_name": "Kamehameha",
 		"passive_description": "+1% de daño por nivel",
@@ -326,6 +396,7 @@ const CHARACTER_LIBRARY: Array[Dictionary] = [
 	{
 		"id": "boxer", "display_name": "Boxeador",
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
 		"blurb": "Pega primero, pega dos veces y nunca pregunta nombres.",
 		"weapon_scene": "res://scenes/weapons/TwinDaggers.tscn",
 		"weapon_node_name": "TwinDaggers",
@@ -338,11 +409,19 @@ const CHARACTER_LIBRARY: Array[Dictionary] = [
 		"blurb": "Yupitaison",
 		# Pendiente: renombrar el arma a "Guantes de boxeo" en WeaponCatalog.
 		"weapon_node_name": "TwinDaggers",
+=======
+		"blurb": "Yupitaison",
+		# Pendiente: renombrar el arma a "Guantes de boxeo" en WeaponCatalog.
+		"weapon_node_name": "TwinDaggers",
+>>>>>>> Stashed changes
 		# Bajo a propósito: el arma golpea muy seguido, así que cada punto
 		# de crítico rinde más por nivel.
 		"passive_description": "+1.0% de prob. de crítico por nivel",
 		"passive_stat": "crit_chance", "passive_amount": 1.0,
 		"passive_base": 50.0,
+<<<<<<< Updated upstream
+>>>>>>> Stashed changes
+=======
 >>>>>>> Stashed changes
 		"unlock_cost": 0,
 		"tint": Color(0.726, 0.299, 0.166, 1.0),
@@ -350,6 +429,7 @@ const CHARACTER_LIBRARY: Array[Dictionary] = [
 	{
 		"id": "gucci_morty", "display_name": "PNG gucci morty",
 		"blurb": "Un recorte de baja resolución al que la suerte no deja de sonreírle.",
+<<<<<<< Updated upstream
 <<<<<<< Updated upstream
 		"weapon_scene": "res://scenes/weapons/DartPistol.tscn",
 		"weapon_node_name": "DartPistol",
@@ -365,12 +445,20 @@ const CHARACTER_LIBRARY: Array[Dictionary] = [
 		"passive_stat": "projectiles", "passive_amount": 1.0,
 		"passive_kind": "per_n_levels", "passive_every": 3,
 >>>>>>> Stashed changes
+=======
+		# Pendiente: renombrar el arma a "Pistola de portales" en WeaponCatalog.
+		"weapon_node_name": "DartPistol",
+		"passive_description": "+1 proyectil cada 3 niveles",
+		"passive_stat": "projectiles", "passive_amount": 1.0,
+		"passive_kind": "per_n_levels", "passive_every": 3,
+>>>>>>> Stashed changes
 		"model_scene": "res://assets/models/gucci_morty.tscn",
 		"unlock_cost": 0,
 		"tint": Color(0.92, 0.34, 0.62),
 	},
 	{
 		"id": "backyardigan", "display_name": "Backyardigan",
+<<<<<<< Updated upstream
 <<<<<<< Updated upstream
 		"blurb": "No corre, coreografía; y todo lo que roza se prende.",
 		"weapon_scene": "res://scenes/weapons/Aura.tscn",
@@ -380,6 +468,13 @@ const CHARACTER_LIBRARY: Array[Dictionary] = [
 		# it touches scales with how much ground the raider covers.
 		"passive_description": "+0.8% de velocidad de movimiento por nivel",
 		"passive_stat": "move_speed", "passive_amount": 0.8,
+=======
+		"blurb": "En nuestro patio hay un mundo por explorar...",
+		"weapon_node_name": "Aura",
+		"passive_description": "+2 de vida por nivel y +0.1% de daño por cada punto de vida máx.",
+		"passive_stat": "max_hp", "passive_amount": 2.0,
+		"passive_kind": "hp_to_damage", "passive_amount2": 0.1,
+>>>>>>> Stashed changes
 =======
 		"blurb": "En nuestro patio hay un mundo por explorar...",
 		"weapon_node_name": "Aura",

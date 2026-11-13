@@ -111,6 +111,10 @@ func targeting_range() -> float:
 ## Segundos entre pulsos de una misma ráfaga. Fijo: no se comprime con el enfriamiento.
 @export var burst_stagger: float = 0.15
 
+@export_group("Ráfaga")
+## Segundos entre pulsos de una misma ráfaga. Fijo: no se comprime con el enfriamiento.
+@export var burst_stagger: float = 0.15
+
 @export_group("Nube")
 ## Malla y material de la nube (color y opacidad en albedo_color); radio 1, se escala al radio del pulso.
 @export var cloud_mesh: Mesh
@@ -123,6 +127,9 @@ func targeting_range() -> float:
 ## Segundos que tarda la nube en desvanecerse.
 @export var cloud_fade_time: float = 0.6
 >>>>>>> Stashed changes
+
+## id de instancia del enemigo -> {"stacks": int, "until": float} (run_time en que acaba su veneno).
+var _poison_state: Dictionary[int, Dictionary] = {}
 
 ## id de instancia del enemigo -> {"stacks": int, "until": float} (run_time en que acaba su veneno).
 var _poison_state: Dictionary[int, Dictionary] = {}
@@ -153,8 +160,11 @@ func _pulse() -> void:
 
 
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
 ## Expanding translucent sphere that thins out — the "pfff" read.
 =======
+=======
+>>>>>>> Stashed changes
 ## Cada golpe suma un stack (más daño por segundo) y más duración al veneno vigente.
 func _stack_poison(enemy: EnemyBase, now: float) -> void:
 	var id := enemy.get_instance_id()

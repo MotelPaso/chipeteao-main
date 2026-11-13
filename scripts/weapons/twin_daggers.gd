@@ -1,5 +1,6 @@
 extends WeaponBase
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
 ## Nyx's starting weapon: very fast single-target melee — quick stabs on
 ## the nearest enemy in short range. Each stab lands exactly one hit
 ## through the shared damage funnel (a Tome of Multitude adds staggered
@@ -23,6 +24,8 @@ const EXTRA_STAB_STAGGER: float = 0.2
 ## Multitude stack from queueing stabs into the next volley.
 const STAB_CHAIN_WINDOW: float = 0.6
 =======
+=======
+>>>>>>> Stashed changes
 ## Guantes de boxeo (Dagas gemelas): cuerpo a cuerpo muy rápido, golpes veloces
 ## al enemigo más cercano a corta distancia. Cada golpe daña en área: alcanza a
 ## todos los enemigos dentro de un radio alrededor del blanco, cada uno una vez
@@ -48,6 +51,13 @@ const STAB_CHAIN_WINDOW: float = 0.6
 @export var hit_radius: float = 1.6
 ## Si la medialuna dibujada crece junto con el radio de daño, para que lo que se ve coincida con lo que pega.
 @export var scale_slash_with_area: bool = true
+<<<<<<< Updated upstream
+=======
+
+@export_group("Multitud")
+## Segundos entre los golpes extra (projectile_count y Tomo de Multitud); con el enfriamiento corto, VOLLEY_WINDOW los comprime.
+@export var extra_stagger: float = 0.2
+>>>>>>> Stashed changes
 
 @export_group("Multitud")
 ## Segundos entre los golpes extra (projectile_count y Tomo de Multitud); con el enfriamiento corto, VOLLEY_WINDOW los comprime.
@@ -72,12 +82,15 @@ func fire(target: Node3D) -> void:
 
 
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
 ## A follow-up stab from a Tome of Multitude. It picks its OWN target rather
 ## than carrying the volley's: the opening cut may have killed that one, and
 ## a long chain outlives the corpse (which frees itself a third of a second
 ## after it dies). Lands a beat after fire(), when this weapon may already
 ## have left the tree with a removed raider.
 =======
+=======
+>>>>>>> Stashed changes
 ## Un golpe extra. Elige su PROPIO blanco en vez de usar el de la ráfaga:
 ## el primer corte pudo haberlo matado, y una cadena larga dura más que el
 ## cadáver (que se libera un tercio de segundo después de morir).
@@ -91,7 +104,11 @@ func _restab() -> void:
 
 
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
 ## One stab through the shared damage funnel, plus its crescent.
+=======
+## Un golpe en área centrado en el blanco, más su medialuna.
+>>>>>>> Stashed changes
 =======
 ## Un golpe en área centrado en el blanco, más su medialuna.
 >>>>>>> Stashed changes
@@ -109,6 +126,7 @@ func _stab(target: Node3D) -> void:
 	damage_all(victims)
 	_play_slash(target)
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
 	# Left/right alternates per stab, so the extras of one volley mirror each
 	# other instead of stacking the same crescent on the same body.
 	_stab_left = not _stab_left
@@ -117,6 +135,8 @@ func _stab(target: Node3D) -> void:
 ## Mini crescent at the struck enemy, sweeping the opposite way on
 ## alternating hits (left/right dagger feel).
 =======
+=======
+>>>>>>> Stashed changes
 	# Izquierda y derecha alternan por golpe, así los extras de una ráfaga
 	# se reflejan entre sí en vez de apilar la misma medialuna en el mismo cuerpo.
 	_stab_left = not _stab_left
@@ -124,6 +144,9 @@ func _stab(target: Node3D) -> void:
 
 ## Medialuna sobre el enemigo golpeado, barriendo en sentido opuesto en golpes
 ## alternos (sensación de mano izquierda y derecha).
+<<<<<<< Updated upstream
+>>>>>>> Stashed changes
+=======
 >>>>>>> Stashed changes
 func _play_slash(target: Node3D) -> void:
 	var slash := Pools.acquire_scene(Pools.SLASH_ARC_SCENE) as SlashArc
@@ -132,9 +155,12 @@ func _play_slash(target: Node3D) -> void:
 	var aim := flat_dir_or(target.global_position - global_position,
 			-global_transform.basis.z)
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
 	slash.play(target.global_position + Vector3.UP * 0.3, aim, slash_radius,
 			slash_color, 100.0, slash_time, _stab_left)
 =======
+=======
+>>>>>>> Stashed changes
 	var visual_radius := slash_radius * (area_scale() if scale_slash_with_area else 1.0)
 	slash.play(target.global_position + Vector3.UP * slash_lift, aim, visual_radius,
 			slash_color, slash_sweep_deg, slash_time, _stab_left)

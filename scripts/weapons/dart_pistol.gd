@@ -11,6 +11,9 @@ extends WeaponBase
 ## la mano: el disparo se lee por el trazador brillante y un fogonazo del pool
 ## en el marcador Muzzle con cada dardo (su aspecto está en MuzzleFlash.tscn,
 ## grupo «Fogonazo»).
+<<<<<<< Updated upstream
+>>>>>>> Stashed changes
+=======
 >>>>>>> Stashed changes
 
 @export var projectile_scene: PackedScene
@@ -40,6 +43,7 @@ func fire(target: Node3D) -> void:
 			-global_transform.basis.z)
 	var count := maxi(effective_projectile_count(), 1)
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
 	for i in count:
 		var yaw := deg_to_rad(fan_spread_deg) * (float(i) - float(count - 1) * 0.5)
 		_spawn_dart(base_dir.rotated(Vector3.UP, yaw), target)
@@ -60,6 +64,25 @@ func _spawn_dart(direction: Vector3, target: Node3D) -> void:
 	dart.global_transform = Transform3D(
 			Basis.looking_at(direction, safe_up(direction)), _muzzle.global_position)
 	dart.launch(self, attack_range * range_grace, target)
+=======
+	fire_volley(count, base_dir, _shoot_dart.bind(target), burst_stagger, fan_spread_deg)
+
+
+## Un dardo con su fogonazo. Los dardos escalonados salen unos instantes
+## después de fire(): si el blanco ya murió, vuelan rectos en la dirección
+## calculada (el dardo ya deja de perseguir cadáveres por sí solo).
+func _shoot_dart(direction: Vector3, target: Node3D) -> void:
+	var dart := Pools.acquire_scene(projectile_scene) as Projectile
+	if dart != null:
+		# La puntería puede quedar casi colineal con UP (enemigo justo debajo de
+		# una plataforma); un "arriba" lateral mantiene la base construible.
+		dart.global_transform = Transform3D(
+				Basis.looking_at(direction, safe_up(direction)), _muzzle.global_position)
+		dart.launch(self, attack_range * range_grace, target if is_instance_valid(target) else null)
+	var flash := Pools.acquire_scene(Pools.MUZZLE_FLASH_SCENE) as MuzzleFlash
+	if flash != null:
+		flash.play(_muzzle.global_position, MuzzleFlash.Style.MUZZLE)
+>>>>>>> Stashed changes
 =======
 	fire_volley(count, base_dir, _shoot_dart.bind(target), burst_stagger, fan_spread_deg)
 

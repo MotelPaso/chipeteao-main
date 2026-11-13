@@ -84,7 +84,10 @@ size_flags_horizontal = 3
 theme_override_constants/separation = 12
 
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
 =======
+=======
+>>>>>>> Stashed changes
 [node name="CoopLobby" parent="Layout/VBox/ContentScroll/Content" unique_id=1939957330 instance=ExtResource("4_lobby")]
 unique_name_in_owner = true
 layout_mode = 2
@@ -115,7 +118,10 @@ theme_override_font_sizes/font_size = 22
 text = "Iniciar incursión"
 
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
 =======
+=======
+>>>>>>> Stashed changes
 [node name="DailyButton" type="Button" parent="Layout/VBox/ButtonRow" unique_id=549877835]
 unique_name_in_owner = true
 editor_description = "Con una marca hoy, character_select.gd agrega la mejor marca al texto (daily_best_format)."
@@ -133,7 +139,10 @@ theme_override_font_sizes/font_size = 20
 text = "Misiones"
 
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
 =======
+=======
+>>>>>>> Stashed changes
 [node name="CollectionButton" type="Button" parent="Layout/VBox/ButtonRow" unique_id=1071784196]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(150, 52)

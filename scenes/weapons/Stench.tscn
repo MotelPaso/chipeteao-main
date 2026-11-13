@@ -1,5 +1,9 @@
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
 [gd_scene load_steps=2 format=3]
+=======
+[gd_scene format=3 uid="uid://c5w6fkk7lwdwa"]
+>>>>>>> Stashed changes
 =======
 [gd_scene format=3 uid="uid://c5w6fkk7lwdwa"]
 >>>>>>> Stashed changes
@@ -23,6 +27,9 @@ radial_segments = 24
 rings = 12
 
 [node name="Stench" type="Node3D" unique_id=1205316739]
+<<<<<<< Updated upstream
+>>>>>>> Stashed changes
+=======
 >>>>>>> Stashed changes
 script = ExtResource("1_stench")
 cloud_mesh = SubResource("SphereMesh_cloud")

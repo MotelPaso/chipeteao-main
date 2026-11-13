@@ -339,6 +339,9 @@ func _physics_process(_delta: float) -> void:
 ## se da en el nivel 1. stat2/amount2 son la segunda stat por nivel o el daño
 ## por punto de HP, y every el intervalo de niveles de "per_n_levels". Lo
 ## llama el jugador al aparecer con los datos de la fila del catálogo.
+<<<<<<< Updated upstream
+>>>>>>> Stashed changes
+=======
 >>>>>>> Stashed changes
 func set_character_passive(stat: String, amount: float, kind: String = "per_level",
 		base_amount: float = 0.0, stat2: String = "", amount2: float = 0.0,
@@ -416,6 +419,9 @@ func _reset_derived() -> void:
 ## Todas las fuentes, en el ÚNICO orden que importa: la pasiva del personaje
 ## va al final porque los tipos de conversión (speed_to_damage, hp_to_damage)
 ## leen los totales que armaron las demás fuentes.
+<<<<<<< Updated upstream
+>>>>>>> Stashed changes
+=======
 >>>>>>> Stashed changes
 func _apply_sources() -> void:
 	_apply_tomes()
@@ -571,6 +577,7 @@ func _apply_character_passive() -> void:
 	match _passive_kind:
 		"per_level", "evasion_execute":
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
 			# Level 1 contributes only the base amount, each level gained
 			# adds one increment (no roundf — sub-percent steps must
 			# accumulate). "evasion_execute" also kills on dodge; that part
@@ -579,6 +586,8 @@ func _apply_character_passive() -> void:
 				_apply_effect(_passive_stat, _passive_base
 						+ _passive_amount * float(maxi(RunState.level - 1, 0)))
 =======
+=======
+>>>>>>> Stashed changes
 			# "evasion_execute" además mata al esquivar, en _on_dodged.
 			_apply_per_level_passive()
 		"per_n_levels":
@@ -594,6 +603,9 @@ func _apply_character_passive() -> void:
 				# recién acumulado (incluye la vida por nivel de esta pasiva).
 				var total_hp := health.max_hp - _applied_bonus_max_hp + bonus_max_hp
 				damage_multiplier += maxf(total_hp, 0.0) * _passive_amount2 / 100.0
+<<<<<<< Updated upstream
+>>>>>>> Stashed changes
+=======
 >>>>>>> Stashed changes
 		"speed_to_damage":
 			# Bonus move speed (multiplier above 1) converts into a direct
@@ -602,9 +614,12 @@ func _apply_character_passive() -> void:
 
 
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
 ## One potency-scaled effect on top of the running totals. Percent-like
 ## stats stack additively (+15% twice = +30%); armor and luck are flat.
 =======
+=======
+>>>>>>> Stashed changes
 ## Base más incremento por nivel de la stat principal y, en "per_level", de la
 ## segunda. El nivel 1 aporta solo la base; cada nivel ganado suma un
 ## incremento (sin roundf: los pasos de menos de 1% deben sumarse).

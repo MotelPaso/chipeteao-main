@@ -243,6 +243,10 @@ static func roll_crit_tier(chance: float) -> int:
 	var guaranteed := floori(chance)
 	var remainder := chance - float(guaranteed)
 	return guaranteed + (1 if randf() < remainder else 0)
+<<<<<<< Updated upstream
+=======
+
+>>>>>>> Stashed changes
 
 
 ## Damages every body in `bodies` through the funnel above; returns the
