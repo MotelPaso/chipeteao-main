@@ -8,7 +8,7 @@ extends PanelContainer
 ## Título del panel, tal como lo ve el jugador.
 @export var title: String = ""
 ## Espacio extra entre las letras del título, en píxeles.
-@export var title_letter_spacing: int = 2
+@export var title_letter_spacing: int = 1
 
 @onready var _title: Label = $Box/Title
 @onready var _body: Label = $Box/Body

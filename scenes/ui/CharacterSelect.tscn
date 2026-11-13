@@ -5,14 +5,17 @@
 [ext_resource type="Material" path="res://assets/ui/menu_backdrop.tres" id="3_backdrop"]
 [ext_resource type="PackedScene" path="res://scenes/ui/meta/character_select/CoopLobby.tscn" id="4_lobby"]
 [ext_resource type="PackedScene" path="res://scenes/ui/meta/character_select/CharacterDetail.tscn" id="5_detail"]
+[ext_resource type="FontFile" path="res://assets/ui/fonts/LilitaOne-Regular.ttf" id="font_display"]
+[ext_resource type="PackedScene" path="res://scenes/ui/meta/character_select/PortraitStudio.tscn" id="6_studio"]
 
 [sub_resource type="FontVariation" id="FontVariation_title"]
-spacing_glyph = 8
+base_font = ExtResource("font_display")
+spacing_glyph = 1
 
 [sub_resource type="FontVariation" id="FontVariation_subtitle"]
-spacing_glyph = 2
+spacing_glyph = 1
 
-[node name="CharacterSelect" type="Control" unique_id=183065464]
+[node name="CharacterSelect" type="Control" unique_id=183065464 groups=["menu_screen"]]
 layout_mode = 3
 anchors_preset = 15
 anchor_right = 1.0
@@ -43,13 +46,23 @@ theme_override_constants/separation = 8
 
 [node name="TopBar" type="HBoxContainer" parent="Layout/VBox"]
 unique_name_in_owner = true
-editor_description = "Ajustes a la izquierda, título al centro, esquirlas a la derecha. Left y Right se reparten el ancho por igual, así el título queda centrado en la ventana."
+editor_description = "Volver y Ajustes a la izquierda, título al centro, esquirlas a la derecha. Left y Right se reparten el ancho por igual, así el título queda centrado en la ventana."
 layout_mode = 2
 theme_override_constants/separation = 16
 
 [node name="Left" type="HBoxContainer" parent="Layout/VBox/TopBar"]
 layout_mode = 2
 size_flags_horizontal = 3
+theme_override_constants/separation = 10
+
+[node name="BackButton" type="Button" parent="Layout/VBox/TopBar/Left"]
+unique_name_in_owner = true
+editor_description = "Vuelve al menú principal, igual que ui_cancel (B / Escape)."
+custom_minimum_size = Vector2(112, 40)
+layout_mode = 2
+size_flags_vertical = 4
+theme_override_font_sizes/font_size = 16
+text = "Volver"
 
 [node name="SettingsButton" type="Button" parent="Layout/VBox/TopBar/Left" unique_id=269148445]
 unique_name_in_owner = true
@@ -66,8 +79,8 @@ theme_override_constants/separation = -6
 [node name="TitleLabel" type="Label" parent="Layout/VBox/TopBar/Titles" unique_id=371227716]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_colors/font_color = Color(0.98, 0.76, 0.28, 1)
-theme_override_colors/font_outline_color = Color(0.03, 0.035, 0.06, 0.92)
+theme_override_colors/font_color = Color(1, 0.824, 0.247, 1)
+theme_override_colors/font_outline_color = Color(0.082, 0.075, 0.102, 1)
 theme_override_constants/outline_size = 10
 theme_override_fonts/font = SubResource("FontVariation_title")
 theme_override_font_sizes/font_size = 42
@@ -77,7 +90,7 @@ horizontal_alignment = 1
 [node name="SubtitleLabel" type="Label" parent="Layout/VBox/TopBar/Titles" unique_id=1758191480]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_colors/font_color = Color(0.66, 0.69, 0.75, 1)
+theme_override_colors/font_color = Color(0.765, 0.839, 0.816, 1)
 theme_override_fonts/font = SubResource("FontVariation_subtitle")
 theme_override_font_sizes/font_size = 14
 text = "Elige tu personaje!1!11!"
@@ -94,7 +107,7 @@ editor_description = "El texto lo escribe character_select.gd con UiTheme.SHARDS
 custom_minimum_size = Vector2(132, 40)
 layout_mode = 2
 size_flags_vertical = 4
-theme_override_colors/font_color = Color(0.55, 0.8, 0.92, 1)
+theme_override_colors/font_color = Color(0.498, 0.831, 0.941, 1)
 theme_override_font_sizes/font_size = 16
 text = "Esquirlas: 0"
 horizontal_alignment = 1
@@ -162,7 +175,7 @@ text = "Iniciar incursión"
 
 [node name="Footer" type="HBoxContainer" parent="Layout/VBox"]
 unique_name_in_owner = true
-editor_description = "Indicaciones del control a la izquierda, pantallas meta al centro, versión a la derecha. HintsSlot y VersionSlot se reparten el ancho por igual."
+editor_description = "Indicaciones del control a la izquierda, la Cacería diaria al centro, versión a la derecha. HintsSlot y VersionSlot se reparten el ancho por igual."
 layout_mode = 2
 theme_override_constants/separation = 16
 
@@ -185,27 +198,6 @@ layout_mode = 2
 theme_override_font_sizes/font_size = 17
 text = "Cacería diaria"
 
-[node name="QuestsButton" type="Button" parent="Layout/VBox/Footer/ButtonRow" unique_id=518393122]
-unique_name_in_owner = true
-custom_minimum_size = Vector2(140, 44)
-layout_mode = 2
-theme_override_font_sizes/font_size = 17
-text = "Misiones"
-
-[node name="CollectionButton" type="Button" parent="Layout/VBox/Footer/ButtonRow"]
-unique_name_in_owner = true
-custom_minimum_size = Vector2(140, 44)
-layout_mode = 2
-theme_override_font_sizes/font_size = 17
-text = "Colección"
-
-[node name="ArmoryButton" type="Button" parent="Layout/VBox/Footer/ButtonRow"]
-unique_name_in_owner = true
-custom_minimum_size = Vector2(140, 44)
-layout_mode = 2
-theme_override_font_sizes/font_size = 17
-text = "Armería"
-
 [node name="VersionSlot" type="HBoxContainer" parent="Layout/VBox/Footer"]
 layout_mode = 2
 size_flags_horizontal = 3
@@ -215,10 +207,13 @@ alignment = 2
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_vertical = 8
-theme_override_colors/font_color = Color(0.45, 0.47, 0.52, 1)
+theme_override_colors/font_color = Color(0.576, 0.69, 0.671, 1)
 theme_override_font_sizes/font_size = 12
 text = "v0.0.0"
 horizontal_alignment = 2
+
+[node name="PortraitStudio" parent="." instance=ExtResource("6_studio")]
+unique_name_in_owner = true
 
 [node name="SettingsPanel" parent="." unique_id=1176860960 instance=ExtResource("2_settingspanel")]
 unique_name_in_owner = true

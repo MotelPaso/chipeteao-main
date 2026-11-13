@@ -26,7 +26,7 @@ const KIND_CHOICE := "choice"
 @export_group("Título")
 ## Espaciado extra entre letras del título, en píxeles. Tamaño, color y contorno
 ## del título están en el nodo LevelLabel de UpgradeCardUI.tscn.
-@export var title_letter_spacing: int = 4
+@export var title_letter_spacing: int = 1
 
 @export_group("Aviso del Tomo del Azar")
 ## Título del aviso de botín que lista las stats que movió el Tomo del Azar.

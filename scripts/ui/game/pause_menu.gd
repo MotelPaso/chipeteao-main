@@ -16,7 +16,7 @@ extends CanvasLayer
 @export var panel_margin: Vector2 = Vector2(40.0, 26.0)
 ## Espaciado extra entre letras del título, en píxeles. Tamaño, color y contorno
 ## del título están en el nodo TitleLabel de PauseMenu.tscn.
-@export var title_letter_spacing: int = 8
+@export var title_letter_spacing: int = 1
 
 @export_group("Entrada")
 ## Segundos que tarda en subir el fondo oscuro al abrir.

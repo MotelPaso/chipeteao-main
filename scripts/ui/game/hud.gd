@@ -23,9 +23,9 @@ extends CanvasLayer
 
 @export_group("Vida")
 ## Color de la barra de vida desde hp_full_ratio hacia arriba.
-@export var hp_full_color: Color = Color(0.36, 0.8, 0.42)
+@export var hp_full_color: Color = UiTheme.ACCENT_MINT
 ## Color de la barra de vida casi en cero; entre ambos se mezclan.
-@export var hp_low_color: Color = Color(0.9, 0.22, 0.2)
+@export var hp_low_color: Color = UiTheme.ACCENT_RED
 ## Fracción de vida (0-1) desde la que la barra usa hp_full_color. La misma
 ## rampa colorea las barras de los compañeros (%MatePanel).
 @export var hp_full_ratio: float = 0.6
@@ -47,9 +47,9 @@ extends CanvasLayer
 ## Color de la barra de XP (UiTheme.XP_GREEN, el verde de las gemas de XP).
 @export var xp_color: Color = UiTheme.XP_GREEN
 ## Fondo de la franja de XP.
-@export var xp_trough_color: Color = Color(0.04, 0.045, 0.07, 0.85)
+@export var xp_trough_color: Color = UiTheme.BAR_TROUGH
 ## Línea inferior de la franja de XP.
-@export var xp_line_color: Color = Color(0.0, 0.0, 0.0, 0.6)
+@export var xp_line_color: Color = UiTheme.INK
 ## Radio de las esquinas de la franja de XP y de su relleno, en píxeles (0 = cuadrada).
 @export var xp_corner_radius: int = 0
 ## Grosor de la línea inferior de la franja de XP, en píxeles.
@@ -81,7 +81,7 @@ extends CanvasLayer
 @export var points_pop_time: float = 0.18
 @export_group("Letra")
 ## Espacio extra entre los números del reloj, en píxeles.
-@export var timer_letter_spacing: int = 4
+@export var timer_letter_spacing: int = 1
 
 var _health: Health
 var _hp_fill: StyleBoxFlat
@@ -369,3 +369,4 @@ func _apply_styles() -> void:
 	for label: Label in [_level_label, _kills_label, _points_label, _timer_label]:
 		UiTheme.style_badge(label, label.get_theme_color(&"font_color"))
 	_timer_label.add_theme_font_override("font", UiTheme.spaced_font(timer_letter_spacing))
+	_hp_label.add_theme_font_override("font", UiTheme.display_font())

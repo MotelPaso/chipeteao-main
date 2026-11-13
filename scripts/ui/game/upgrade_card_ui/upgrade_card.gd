@@ -16,7 +16,7 @@ const WEAPON_TARGET_PREFIX := "weapon/"
 ## Color del texto de la cinta superior (la rareza o la etiqueta de la opción).
 @export var ribbon_text_color: Color = Color(0.07, 0.075, 0.1)
 ## Espaciado extra entre letras de la cinta, en píxeles.
-@export var ribbon_letter_spacing: int = 3
+@export var ribbon_letter_spacing: int = 1
 ## Cuánto se aclara el borde de la cinta respecto de su color (0-1).
 @export var ribbon_border_lighten: float = 0.2
 

@@ -3,8 +3,8 @@ extends Button
 ## Carta compacta de un raider en la cuadrícula del selector de personaje
 ## (CharacterCard.tscn). La escena tiene sus tres caras y cada etiqueta guarda
 ## ahí su fuente y su color:
-##   Unlocked: retrato (la inicial sobre el tinte) y nombre; en co-op, qué
-##             jugadores la eligieron;
+##   Unlocked: retrato (la cara del raider sobre su tinte, o su inicial si no
+##             hay foto) y nombre; en co-op, qué jugadores la eligieron;
 ##   Locked:   candado, nombre y precio en esquirlas;
 ##   Confirm:  "¿Desbloquear por N esquirlas?" con el botón «Sí» (%UnlockYes).
 ## El arma, la pasiva y la descripción se leen en el panel de detalle
@@ -12,8 +12,11 @@ extends Button
 ## catálogo y el estado (show_character); la carta decide cómo se ve.
 ##
 ## Movimiento: con el foco del control o el mouse encima, la carta crece un
-## poco y su anillo (FocusRing) aparece con un fundido; al presionarla se
-## aplasta. Solo se animan scale y modulate, nunca el tamaño del layout.
+## poco, su anillo amarillo (FocusRing) aparece con un fundido y el retrato,
+## que en reposo está apenas girado como un sticker, se endereza; al
+## presionarla se aplasta. Solo gira el retrato: el nombre queda siempre recto
+## y el rectángulo con que navega el control no cambia. Solo se animan scale,
+## rotation y modulate, nunca el tamaño del layout.
 
 ## Se presionó «Sí» en la cara de confirmación.
 signal unlock_confirmed(character_id: String)
@@ -39,16 +42,15 @@ const POSE_TWEEN_KEY := &"ui_pose_tween"
 @export var selected_border_width: int = 3
 ## Grosor del borde (píxeles) de las demás cartas.
 @export var idle_border_width: int = 2
-## Cuánto se aclara el tinte del raider para el anillo de foco (0-1).
-@export_range(0.0, 1.0) var ring_lighten: float = 0.45
-## Alfa (0-1) del brillo exterior del anillo de foco.
-@export_range(0.0, 1.0) var ring_glow_alpha: float = 0.55
 
 @export_group("Retrato")
 ## Cuánto se oscurece el tinte del raider para el cuerpo del retrato (0-1).
 @export_range(0.0, 1.0) var portrait_body_darken: float = 0.35
-## Cuánto se aclara el tinte para el borde del retrato (0-1).
-@export_range(0.0, 1.0) var portrait_rim_lighten: float = 0.3
+## Giro del retrato en reposo, en grados. Cada carta lo usa hacia un lado
+## distinto según su lugar en la cuadrícula; con foco se endereza.
+@export var portrait_tilt: float = 1.6
+## Duración (segundos) del fundido con que aparece la cara.
+@export var face_fade_time: float = 0.18
 ## Cuánto se oscurece el tinte para el contorno de la inicial (0-1).
 @export_range(0.0, 1.0) var monogram_outline_darken: float = 0.7
 
@@ -87,6 +89,8 @@ var _held: bool = false
 var _was_lit: bool = false
 
 @onready var _unlocked: VBoxContainer = $Unlocked
+@onready var _portrait: Panel = $Unlocked/Portrait
+@onready var _face: TextureRect = $Unlocked/Portrait/Face
 @onready var _monogram: Label = $Unlocked/Portrait/Monogram
 @onready var _unlocked_name: Label = $Unlocked/Name
 @onready var _owners: Label = $Unlocked/Portrait/Owners
@@ -97,8 +101,6 @@ var _was_lit: bool = false
 @onready var _ask: Label = $Confirm/Ask
 @onready var _unlock_yes: Button = %UnlockYes
 @onready var _focus_ring: Panel = $FocusRing
-@onready var _ring_style: StyleBoxFlat = \
-		($FocusRing as Panel).get_theme_stylebox(&"panel") as StyleBoxFlat
 @onready var _portrait_style: StyleBoxFlat = \
 		($Unlocked/Portrait as Panel).get_theme_stylebox(&"panel") as StyleBoxFlat
 
@@ -107,6 +109,9 @@ func _ready() -> void:
 	# La carta escala desde su centro, pero su tamaño solo se conoce después
 	# del primer layout: seguir `resized` mantiene el pivote centrado.
 	resized.connect(func() -> void: pivot_offset = size * 0.5)
+	_portrait.resized.connect(func() -> void:
+		_portrait.pivot_offset = _portrait.size * 0.5)
+	_focus_ring.add_theme_stylebox_override("panel", UiTheme.focus_ring(UiTheme.RADIUS))
 	focus_entered.connect(_on_highlight_changed)
 	focus_exited.connect(_on_highlight_changed)
 	mouse_entered.connect(_on_highlight_changed)
@@ -129,8 +134,6 @@ func show_character(row: Dictionary, face: Face, selected: bool,
 	_locked.visible = face == Face.LOCKED
 	_confirm.visible = face == Face.CONFIRM
 	var tint := Color(row.tint)
-	_ring_style.border_color = tint.lightened(ring_lighten)
-	_ring_style.shadow_color = Color(tint, ring_glow_alpha)
 	match face:
 		Face.UNLOCKED:
 			_fill_unlocked(row, tint, owner_slots)
@@ -162,7 +165,24 @@ func settle(selected: bool) -> void:
 			.set_trans(Tween.TRANS_QUINT).set_ease(Tween.EASE_OUT)
 	tween.tween_property(_focus_ring, "modulate:a", 1.0 if lit else 0.0, pose_time) \
 			.set_trans(Tween.TRANS_QUINT).set_ease(Tween.EASE_OUT)
+	tween.tween_property(_portrait, "rotation_degrees", 0.0 if lit else _rest_tilt(),
+			pose_time).set_trans(Tween.TRANS_QUINT).set_ease(Tween.EASE_OUT)
 	set_meta(POSE_TWEEN_KEY, tween)
+
+
+## Pone la cara del raider en el retrato (una foto de PortraitStudio) y oculta
+## la inicial. Con null vuelve la inicial.
+func set_face(face: Texture2D) -> void:
+	var had_face := _face.texture != null
+	_face.texture = face
+	_face.visible = face != null
+	_monogram.visible = face == null
+	if face == null or had_face:
+		return
+	_face.modulate.a = 0.0
+	var fade := _face.create_tween()
+	fade.set_ignore_time_scale(true)
+	fade.tween_property(_face, "modulate:a", 1.0, face_fade_time)
 
 
 ## Entrada al abrir el selector: tras `delay` segundos, la carta funde y crece
@@ -195,6 +215,11 @@ func rest_modulate(selected: bool) -> Color:
 	return Color.WHITE if selected or is_lit() else unselected_modulate
 
 
+## Giro del retrato en reposo: alterna de lado de una carta a la siguiente.
+func _rest_tilt() -> float:
+	return portrait_tilt if get_index() % 2 == 0 else -portrait_tilt
+
+
 ## True con el foco del control o el mouse encima.
 func is_lit() -> bool:
 	return has_focus() or is_hovered()
@@ -225,7 +250,6 @@ func _on_held_changed(held: bool) -> void:
 func _fill_unlocked(row: Dictionary, tint: Color, owner_slots: Array[int]) -> void:
 	var display_name := String(row.display_name)
 	_portrait_style.bg_color = tint.darkened(portrait_body_darken)
-	_portrait_style.border_color = tint.lightened(portrait_rim_lighten)
 	_monogram.text = display_name.left(1).to_upper()
 	_monogram.add_theme_color_override("font_outline_color",
 			tint.darkened(monogram_outline_darken))

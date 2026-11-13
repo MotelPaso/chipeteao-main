@@ -2,7 +2,7 @@ class_name SelectFocus
 extends RefCounted
 ## Navegación con control y teclado del selector de personaje: cablea a mano
 ## los vecinos de foco de la cuadrícula, del botón Iniciar y de la fila de
-## pantallas meta. La búsqueda automática de Godot elige el control más
+## abajo (la Cacería diaria). La búsqueda automática de Godot elige el control más
 ## cercano en cada dirección, y con el detalle a la derecha y los botones
 ## abajo eso deja caminos sin salida; con este cableado:
 ##   - una carta va a sus vecinas; a la derecha de la última columna está
@@ -13,7 +13,7 @@ extends RefCounted
 ##     la fila de pantallas meta;
 ##   - la fila de pantallas meta va a izquierda y derecha (tras el último
 ##     botón está Iniciar) y arriba vuelve al raider elegido;
-##   - Ajustes baja al lobby.
+##   - Volver y Ajustes van uno al otro y bajan al lobby.
 ## Es estático y nunca va en una escena; lo llama character_select.gd cada vez
 ## que cambian las cartas, los slots o las columnas.
 
@@ -22,7 +22,7 @@ extends RefCounted
 ## control del lobby al que sube la primera fila (o null), `meta_row` los
 ## botones bajo la cuadrícula y `picked` la carta del raider elegido.
 static func link(cards: Array[CharacterCard], columns: int, above: Control,
-		meta_row: Array[Button], start: Button, settings: Button,
+		meta_row: Array[Button], start: Button, settings: Button, back: Button,
 		picked: CharacterCard) -> void:
 	columns = maxi(columns, 1)
 	var below_grid: Control = meta_row[0] if not meta_row.is_empty() else start
@@ -61,8 +61,12 @@ static func link(cards: Array[CharacterCard], columns: int, above: Control,
 	if above != null:
 		_wire(start, SIDE_TOP, above)
 		_wire(settings, SIDE_BOTTOM, above)
+		_wire(back, SIDE_BOTTOM, above)
 	_wire(settings, SIDE_TOP, settings)
-	_wire(settings, SIDE_LEFT, settings)
+	_wire(settings, SIDE_LEFT, back)
+	_wire(back, SIDE_TOP, back)
+	_wire(back, SIDE_LEFT, back)
+	_wire(back, SIDE_RIGHT, settings)
 
 
 static func _wire(from: Control, side: Side, to: Control) -> void:

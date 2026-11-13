@@ -99,7 +99,7 @@ LINT_CHECKS=(ids_unique glyphs_unique paths_exist stat_ids character_weapons
 	director_methods weapon_properties vendor_lucky_roulette_ids marker_labels
 	id_format quest_stats text_numbers text_values item_kinds_unique sfx_ids
 	stat_rows)
-UI_STEPS=(collection quests relics coop_count_reject unlock_confirm cards_all
+UI_STEPS=(collection quests relics hunt_back hunt coop_count_reject unlock_confirm cards_all
 	start_run pause_open settings_toggle pause_close extract retry done)
 # Lienzos que resultan de las ventanas de select_probe.gd (WINDOWS).
 SELECT_SIZES=(1280x720 1280x831 1280x960 1706x720)

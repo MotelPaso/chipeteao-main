@@ -29,7 +29,7 @@ extends Label
 @export var major_pop_time: float = 0.4
 @export_group("Letra")
 ## Espacio extra entre letras, en píxeles.
-@export var letter_spacing: int = 3
+@export var letter_spacing: int = 1
 
 var _tween: Tween
 

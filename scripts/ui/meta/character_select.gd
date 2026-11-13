@@ -1,6 +1,7 @@
 extends Control
-## Selector de personaje (GDD 5/7), la escena de entrada del juego: elige un
-## raider (y en co-op local, el grupo) e Iniciar incursión carga Run.tscn.
+## Selector de personaje (GDD 5/7): se abre con Cacería desde el menú
+## principal; elige un raider (y en co-op local, el grupo) e Iniciar incursión
+## carga Run.tscn. Volver o ui_cancel (B / Escape) regresan al menú principal.
 ## Las cartas (CharacterCard.tscn) salen de CharacterCatalog en tiempo de
 ## ejecución, así que un personaje nuevo es una fila del catálogo; la elección
 ## queda en el autoload GameConfig.
@@ -13,16 +14,17 @@ extends Control
 ## lista de mapas, así que aquí solo se eligen el raider, el grupo (CoopLobby)
 ## y la Cacería diaria (DailyHunt).
 ##
-## Partes: CharacterCard dibuja cada carta compacta, CharacterDetail el panel
-## del raider que se está mirando (con su retrato 3D), CoopLobby es dueño del
+## Partes: CharacterCard dibuja cada carta compacta, PortraitStudio saca la
+## foto de la cara de cada raider para su carta, CharacterDetail el panel del
+## raider que se está mirando (con su retrato 3D), CoopLobby es dueño del
 ## grupo de co-op, DailyHunt prepara la diaria y SelectFocus cablea la
 ## navegación con control. Este script une la selección, el desbloqueo, el
 ## detalle y los botones de la escena.
 ##
-## Layout: barra de arriba (Ajustes, título, esquirlas); al medio, el plantel
-## a la izquierda (co-op y cuadrícula) y a la derecha el detalle con el botón
-## Iniciar; abajo, las indicaciones del control, las pantallas meta y la
-## versión. La cuadrícula calcula sus columnas según el ancho que le queda y
+## Layout: barra de arriba (Volver, Ajustes, título, esquirlas); al medio, el
+## plantel a la izquierda (co-op y cuadrícula) y a la derecha el detalle con
+## el botón Iniciar; abajo, las indicaciones del control, la Cacería diaria y
+## la versión. La cuadrícula calcula sus columnas según el ancho que le queda y
 ## solo se desplaza si el plantel no cabe.
 
 const CARD_SCENE: PackedScene = preload("res://scenes/ui/meta/character_select/CharacterCard.tscn")
@@ -39,16 +41,15 @@ const CARD_SCENE: PackedScene = preload("res://scenes/ui/meta/character_select/C
 @export var title_glow_color: Color = Color(1.14, 1.1, 1.0)
 ## Duración (segundos) de cada mitad del pulso del título.
 @export var title_glow_time: float = 1.6
-## Retraso (segundos) entre secciones en la entrada escalonada.
-@export var entrance_stagger: float = 0.05
-## Retraso (segundos) entre una carta y la siguiente en la entrada.
-@export var card_stagger: float = 0.03
-## Duración (segundos) del fundido de entrada de cada sección.
-@export var entrance_fade_time: float = 0.22
-## Duración (segundos) de la escala de entrada de cada sección.
-@export var entrance_scale_time: float = 0.26
-## Escala desde la que entra cada sección.
-@export var entrance_start_scale: float = 0.96
+## Retraso (segundos) entre la primera carta y la segunda en la entrada.
+@export var card_stagger: float = 0.045
+## Cuánto se acorta ese retraso de una carta a la siguiente (0-1; 1 = todos
+## iguales, que se ve mecánico).
+@export_range(0.5, 1.0) var card_stagger_shrink: float = 0.85
+## Desde esta carta en adelante, todas entran junto con ella.
+@export var card_stagger_cap: int = 8
+## Duración (segundos) del fundido de entrada de la barra, el detalle y el pie.
+@export var entrance_fade_time: float = 0.18
 ## Escala del botón Iniciar al pasar el mouse.
 @export var start_hover_grow: float = 1.03
 ## Escala del botón Iniciar al presionarlo.
@@ -70,6 +71,8 @@ const CARD_SCENE: PackedScene = preload("res://scenes/ui/meta/character_select/C
 @export var version_format: String = "v%s"
 ## Indicación del botón de aceptar, abajo a la izquierda.
 @export var choose_hint: String = "Elegir"
+## Indicación del botón de cancelar, abajo a la izquierda.
+@export var back_hint: String = "Volver"
 
 ## Carta por id de personaje jugable, para restilizar la selección.
 var _cards_by_id: Dictionary[String, CharacterCard] = {}
@@ -84,6 +87,8 @@ var _entrance_tween: Tween = null
 ## sobrevive a esta escena).
 var _on_shards_changed: Callable
 
+## Todo el contenido sin el fondo: lo que MenuNav hace entrar y salir.
+@onready var _layout: Control = %Layout
 @onready var _title_label: Label = %TitleLabel
 @onready var _top_bar: HBoxContainer = %TopBar
 @onready var _lobby: CoopLobby = %CoopLobby
@@ -98,11 +103,10 @@ var _on_shards_changed: Callable
 @onready var _button_row: HBoxContainer = %ButtonRow
 @onready var _start_button: Button = %StartButton
 @onready var _daily_button: Button = %DailyButton
-@onready var _quests_button: Button = %QuestsButton
-@onready var _collection_button: Button = %CollectionButton
-@onready var _armory_button: Button = %ArmoryButton
+@onready var _back_button: Button = %BackButton
 @onready var _settings_button: Button = %SettingsButton
 @onready var _settings_panel: SettingsPanel = %SettingsPanel
+@onready var _studio: PortraitStudio = %PortraitStudio
 @onready var _shards_label: Label = %ShardsLabel
 @onready var _version_label: Label = %VersionLabel
 
@@ -120,6 +124,9 @@ func _ready() -> void:
 		card.unhighlighted.connect(_on_card_unhighlighted)
 		card.unlock_confirmed.connect(_on_unlock_confirmed)
 		_cards_by_id[character_id] = card
+		card.set_face(PortraitStudio.cached_face(character_id))
+	_studio.face_ready.connect(_on_face_ready)
+	_studio.shoot_rows(CharacterCatalog.CHARACTER_LIBRARY)
 	_detail.preload_rows(CharacterCatalog.CHARACTER_LIBRARY)
 	_update_grid_columns()
 	_scroll.resized.connect(_update_grid_columns)
@@ -127,7 +134,8 @@ func _ready() -> void:
 	_style_buttons()
 	# Indicaciones de botones dentro del pie de la escena, así ninguna ventana
 	# las corta.
-	_hints_slot.add_child(InputHints.build([["ui_accept", choose_hint]]))
+	_hints_slot.add_child(InputHints.build([
+			["ui_accept", choose_hint], ["ui_cancel", back_hint]]))
 	# El SettingsPanel compartido (la misma escena que usa la pausa) cubre
 	# toda la pantalla; al cerrarse, el foco vuelve a Iniciar.
 	_settings_button.pressed.connect(_settings_panel.open)
@@ -147,7 +155,27 @@ func _ready() -> void:
 	_lobby.restore_session()
 	_refresh_detail(false)
 	_start_button.grab_focus()
+	# La entrada de esta pantalla es la de sus cartas: sin deslizar el contenido.
+	MenuNav.arrive(_layout, false)
 	_play_entrance()
+
+
+## ui_cancel (B / Escape): primero cancela una confirmación de desbloqueo
+## abierta; si no hay, vuelve al menú principal. El panel de Ajustes abierto
+## consume el evento antes de que llegue aquí.
+func _unhandled_input(event: InputEvent) -> void:
+	if not event.is_action_pressed("ui_cancel"):
+		return
+	get_viewport().set_input_as_handled()
+	if not _pending_unlock_id.is_empty():
+		var card := _cards_by_id.get(_pending_unlock_id) as CharacterCard
+		_cancel_pending_unlock()
+		_refresh_all_cards()
+		_refresh_detail()
+		if card != null:
+			card.grab_focus()
+		return
+	_on_back_pressed()
 
 
 func _exit_tree() -> void:
@@ -186,14 +214,10 @@ func _update_grid_columns() -> void:
 func _style_buttons() -> void:
 	UiTheme.attach_motion(_start_button, start_hover_grow, start_press_squash)
 	UiTheme.style_button(_start_button, UiTheme.ACCENT, true)
-	UiTheme.style_button(_quests_button)
+	UiTheme.style_button(_back_button)
 	UiTheme.style_button(_settings_button)
 	_start_button.pressed.connect(_on_start_pressed)
-	_quests_button.pressed.connect(_open_scene.bind(ScenePaths.QUEST_LOG))
-	UiTheme.style_button(_collection_button)
-	_collection_button.pressed.connect(_open_scene.bind(ScenePaths.COLLECTION))
-	UiTheme.style_button(_armory_button)
-	_armory_button.pressed.connect(_open_scene.bind(ScenePaths.RELIC_SHOP))
+	_back_button.pressed.connect(_on_back_pressed)
 	var best := DailyHunt.best_today()
 	if best > 0:
 		_daily_button.text = daily_best_format % best
@@ -218,38 +242,40 @@ func _apply_chrome() -> void:
 			Color.WHITE, title_glow_time).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 
 
-## Entrada escalonada al abrir: la barra, el lobby, las cartas una tras otra,
-## el detalle y el pie. Las secciones animan su propio modulate y cada carta
-## el suyo (CharacterCard.play_entrance), así que restilizar la selección
-## nunca pelea con la entrada. Es decorativa: nada espera a que termine.
+## Entrada al abrir. Las cartas son las protagonistas: entran una tras otra
+## (CharacterCard.play_entrance) con esperas que se acortan, así el grupo se
+## lee como una ola y no como una fila; desde la carta card_stagger_cap todas
+## llegan juntas. El resto (barra, lobby, detalle, pie) solo aparece con un
+## fundido, todo a la vez: una sola entrada por pantalla. Es decorativa: el
+## foco y los clics funcionan desde el primer frame.
 func _play_entrance() -> void:
 	if _entrance_tween != null and _entrance_tween.is_valid():
 		_entrance_tween.kill()
-	var sections: Array[Control] = [_top_bar]
-	sections.append_array(_lobby.entrance_rows())
-	var cards_delay := entrance_stagger * sections.size()
-	sections.append_array([_detail_column, _footer])
 	var card_index := 0
 	for child: Node in _cards_grid.get_children():
 		if child is CharacterCard:
-			(child as CharacterCard).play_entrance(cards_delay + card_stagger * card_index)
+			(child as CharacterCard).play_entrance(_card_delay(card_index))
 			card_index += 1
-	# Oculta al instante, pero espera un frame al primer layout para que los
-	# pivotes se centren en tamaños reales antes de escalar.
-	for section: Control in sections:
-		section.modulate.a = 0.0
-	await get_tree().process_frame
+	var sections: Array[Control] = [_top_bar]
+	sections.append_array(_lobby.entrance_rows())
+	sections.append_array([_detail_column, _footer])
 	_entrance_tween = create_tween().set_parallel()
 	_entrance_tween.set_ignore_time_scale(true)
-	for i in sections.size():
-		var section := sections[i]
-		section.pivot_offset = section.size * 0.5
-		section.scale = Vector2.ONE * entrance_start_scale
-		var delay := entrance_stagger * i
+	for section: Control in sections:
+		section.modulate.a = 0.0
 		_entrance_tween.tween_property(section, "modulate:a", 1.0, entrance_fade_time) \
-				.set_delay(delay).set_trans(Tween.TRANS_QUINT).set_ease(Tween.EASE_OUT)
-		_entrance_tween.tween_property(section, "scale", Vector2.ONE, entrance_scale_time) \
-				.set_delay(delay).set_trans(Tween.TRANS_QUINT).set_ease(Tween.EASE_OUT)
+				.set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+
+
+## Espera de la carta número `index` (desde 0): cada paso es más corto que el
+## anterior (card_stagger_shrink) y se detiene en card_stagger_cap.
+func _card_delay(index: int) -> float:
+	var delay := 0.0
+	var step := card_stagger
+	for i in mini(index, card_stagger_cap):
+		delay += step
+		step *= card_stagger_shrink
+	return delay
 
 
 func _refresh_shards() -> void:
@@ -354,6 +380,12 @@ func _card_selected(character_id: String) -> bool:
 
 ## --- Panel de detalle -------------------------------------------------------
 
+func _on_face_ready(character_id: String, face: Texture2D) -> void:
+	var card := _cards_by_id.get(character_id) as CharacterCard
+	if card != null:
+		card.set_face(face)
+
+
 func _on_card_highlighted(character_id: String) -> void:
 	_highlight_id = character_id
 	_refresh_detail()
@@ -387,7 +419,7 @@ func _refresh_detail(animate: bool = true) -> void:
 	_detail.show_character(row, not SaveData.is_unlocked(String(row.id)), animate)
 
 
-## --- Iniciar, Cacería diaria y pantallas meta ----------------------------
+## --- Iniciar, Cacería diaria y volver --------------------------------------
 
 func _on_start_pressed() -> void:
 	# Un inicio normal nunca es la Cacería diaria (la marca su propio botón).
@@ -408,15 +440,16 @@ func _on_daily_pressed() -> void:
 ## cambia la arena por etapa.
 func _launch_run() -> void:
 	ScreenFade.transition(func() -> void:
+		# El mapa de fondo del menú se va antes de que entre el de la partida.
+		MenuBackdrop.release()
 		# RunState sigue corriendo mientras esta pantalla sin pausa está
 		# arriba: la partida nueva parte de cero (igual que Reintentar).
 		RunState.reset()
 		get_tree().change_scene_to_file(ScenePaths.RUN))
 
 
-func _open_scene(scene_path: String) -> void:
-	ScreenFade.transition(func() -> void:
-		get_tree().change_scene_to_file(scene_path))
+func _on_back_pressed() -> void:
+	MenuNav.go(_layout, ScenePaths.MAIN_MENU, MenuNav.Direction.BACK)
 
 
 ## --- Navegación con control y teclado -------------------------------------
@@ -436,4 +469,4 @@ func _link_focus() -> void:
 	if picked == null and not cards.is_empty():
 		picked = cards[0]
 	SelectFocus.link(cards, _cards_grid.columns, _lobby.focus_target(), row,
-			_start_button, _settings_button, picked)
+			_start_button, _settings_button, _back_button, picked)

@@ -28,7 +28,7 @@ const TOME_NAME_PREFIXES: Array[String] = ["Tome of ", "Tomo del ", "Tomo de "]
 @export var group_gap: float = 8.0
 @export_group("Colores")
 ## Borde de las casillas de arma.
-@export var weapon_color: Color = Color(0.3, 0.82, 0.76)
+@export var weapon_color: Color = UiTheme.ACCENT_MINT
 ## Borde de un arma ya evolucionada.
 @export var evolved_weapon_color: Color = UiTheme.ACCENT_AMBER
 ## Borde de las casillas de tomo.

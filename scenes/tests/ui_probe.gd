@@ -1,6 +1,6 @@
 extends Node
 ## Arnés headless de la interfaz. Abre las escenas de UI que ningún soak
-## visita (CharacterSelect, Collection, QuestLog, RelicShop, SettingsPanel,
+## visita (MainMenu, CharacterSelect, Collection, QuestLog, RelicShop, SettingsPanel,
 ## PauseMenu, RunEndScreen) y aprieta sus controles: un handler que falla al
 ## primer clic, un menú que no devuelve la pausa o un nombre `%` cambiado en
 ## un .tscn hacen fallar el gate.
@@ -23,7 +23,7 @@ extends Node
 ## una sola cosa: crea el Driver de abajo y lo agrega a get_tree().root
 ## (diferido: agregar un hijo a la raíz desde un _ready dispara "Parent node
 ## is busy setting up children"), donde sobrevive a cada cambio de escena.
-## El driver maneja CharacterSelect y todo lo que sigue, y vuelve a tomar
+## El driver maneja el menú principal y todo lo que sigue, y vuelve a tomar
 ## current_scene después de cada corte.
 ##
 ## Aprieta los controles REALES: botones por nombre único resuelto contra su
@@ -59,6 +59,7 @@ func _spawn_driver() -> void:
 ## El arnés completo. Un Node colgado de la RAÍZ del árbol, para sobrevivir a
 ## cada change_scene_to_file que disparan los pasos de abajo.
 class Driver extends Node:
+	const MAIN_MENU_PATH := "res://scenes/ui/MainMenu.tscn"
 	const CHARACTER_SELECT_PATH := "res://scenes/ui/CharacterSelect.tscn"
 	const COLLECTION_PATH := "res://scenes/ui/Collection.tscn"
 	const QUEST_LOG_PATH := "res://scenes/ui/QuestLog.tscn"
@@ -87,7 +88,8 @@ class Driver extends Node:
 	## Todos los pasos, en orden. Cada uno es un método _step_<name> que
 	## devuelve true cuando terminó.
 	const STEPS: Array[String] = [
-		"collection", "quests", "relics", "coop_count_reject",
+		"collection", "quests", "relics", "hunt_back", "hunt",
+		"coop_count_reject",
 		"unlock_confirm", "cards_all", "start_run", "pause_open",
 		"settings_toggle", "pause_close", "extract", "retry", "done",
 	]
@@ -129,7 +131,7 @@ class Driver extends Node:
 			print("UiProbe: save path %s" % SaveData.save_path)
 		SaveData.shards = SEEDED_SHARDS
 		print("UiProbe: shards=%d" % SaveData.shards)
-		get_tree().change_scene_to_file(CHARACTER_SELECT_PATH)
+		get_tree().change_scene_to_file(MAIN_MENU_PATH)
 
 	func _process(delta: float) -> void:
 		_flush_releases()
@@ -204,6 +206,23 @@ class Driver extends Node:
 
 	func _step_relics() -> bool:
 		return _visit_meta_screen(_unique_button("%ArmoryButton"), RELIC_SHOP_PATH)
+
+	## Cacería abre el selector y su %BackButton vuelve al menú principal.
+	func _step_hunt_back() -> bool:
+		return _visit_meta_screen(_unique_button("%HuntButton"), CHARACTER_SELECT_PATH)
+
+	## Cacería otra vez: los pasos que siguen corren en el selector.
+	func _step_hunt() -> bool:
+		match _phase:
+			0:
+				if not _at_scene(MAIN_MENU_PATH):
+					return false
+				if not _press(_unique_button("%HuntButton"), "%HuntButton"):
+					return false
+				_phase = 1
+				return false
+			_:
+				return _at_scene(CHARACTER_SELECT_PATH)
 
 	## La fila co-op rechaza un grupo más grande que los mandos conectados.
 	## En headless no hay ninguno, así que 2 jugadores es siempre el camino de
@@ -489,13 +508,13 @@ class Driver extends Node:
 		var scene := get_tree().current_scene
 		return scene != null and scene.scene_file_path == scene_path
 
-	## Abre una pantalla meta, revisa que llegó y vuelve por su propio
-	## %BackButton. Las tres comparten meta_screen.gd, así que una forma cubre
-	## Colección, Misiones y Armería.
+	## Abre una pantalla desde el menú principal, revisa que llegó y vuelve por
+	## su propio %BackButton. Una forma cubre Colección, Misiones y Armería
+	## (comparten meta_screen.gd) y el selector de personaje.
 	func _visit_meta_screen(open_button: Button, scene_path: String) -> bool:
 		match _phase:
 			0:
-				if not _at_scene(CHARACTER_SELECT_PATH):
+				if not _at_scene(MAIN_MENU_PATH):
 					return false
 				if open_button == null:
 					_fail("no button to open %s" % scene_path.get_file())
@@ -520,7 +539,7 @@ class Driver extends Node:
 				_phase = 3
 				return false
 			_:
-				return _at_scene(CHARACTER_SELECT_PATH)
+				return _at_scene(MAIN_MENU_PATH)
 
 	## pressed.emit() se salta `disabled` y la visibilidad, así que un arnés que
 	## solo emite prueba que el handler corre, no que un jugador pueda llegar a

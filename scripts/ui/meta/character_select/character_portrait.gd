@@ -200,7 +200,7 @@ func _kill_fade() -> void:
 ## Aleja la cámara lo justo para que el cuerpo entre en el retrato, mida lo
 ## que mida su modelo. El ancho usa el radio de giro, así no se sale al rotar.
 func _frame_camera() -> void:
-	var bounds := _body_bounds()
+	var bounds := BodyBounds.of(_rig, _pivot, skin_padding)
 	if bounds.size.is_zero_approx():
 		return
 	var center := bounds.get_center()
@@ -214,54 +214,6 @@ func _frame_camera() -> void:
 	var target := Vector3(0.0, center.y + height * look_height, 0.0)
 	_camera.position = target + Vector3(0.0, height * camera_lift, -distance)
 	_camera.look_at(target)
-
-
-## Caja que envuelve el cuerpo nuevo, en el espacio del pivote. Una malla
-## rígida aporta su caja; una malla con esqueleto aporta las articulaciones de
-## su pose actual (su caja propia está en la pose y la escala de exportación,
-## no donde se dibuja), con skin_padding de holgura por el grosor del cuerpo.
-## El cuerpo anterior sigue en el árbol hasta el final del frame (SealRig lo
-## libera diferido) y no se cuenta.
-func _body_bounds() -> AABB:
-	var boxes: Array[AABB] = []
-	var skeletons: Array[Skeleton3D] = []
-	var to_pivot := _pivot.global_transform.affine_inverse()
-	for node: Node in _rig.find_children("*", "MeshInstance3D", true, false):
-		var mesh := node as MeshInstance3D
-		if mesh.mesh == null or not mesh.is_visible_in_tree() or _is_leaving(mesh):
-			continue
-		var skeleton := mesh.get_node_or_null(mesh.skeleton) as Skeleton3D
-		if mesh.skin == null or skeleton == null:
-			boxes.append((to_pivot * mesh.global_transform) * mesh.get_aabb())
-		elif not skeletons.has(skeleton):
-			skeletons.append(skeleton)
-	for skeleton: Skeleton3D in skeletons:
-		var joints := _joint_bounds(skeleton, to_pivot * skeleton.global_transform)
-		boxes.append(joints.grow(joints.size.y * skin_padding))
-	if boxes.is_empty():
-		return AABB()
-	var bounds := boxes[0]
-	for box: AABB in boxes:
-		bounds = bounds.merge(box)
-	return bounds
-
-
-## Caja de las articulaciones del esqueleto en su pose actual.
-func _joint_bounds(skeleton: Skeleton3D, to_pivot: Transform3D) -> AABB:
-	var bounds := AABB()
-	for bone in skeleton.get_bone_count():
-		var joint := to_pivot * skeleton.get_bone_global_pose(bone).origin
-		bounds = AABB(joint, Vector3.ZERO) if bone == 0 else bounds.expand(joint)
-	return bounds
-
-
-func _is_leaving(node: Node) -> bool:
-	var current := node
-	while current != null and current != _rig:
-		if current.is_queued_for_deletion():
-			return true
-		current = current.get_parent()
-	return false
 
 
 ## El SubViewport dibuja a la resolución real de pantalla del retrato (el
