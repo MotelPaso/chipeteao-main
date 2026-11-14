@@ -85,6 +85,33 @@ func _descend(progress: float) -> void:
 			rig.fly_pitch_degrees, 0.0)
 
 
+## Mythos parece haber muerto: la canción se apaga y las llamas del mapa
+## bajan durante `seconds`, como si la pelea hubiera terminado.
+func feign_death(seconds: float) -> void:
+	if _transformation != null and is_instance_valid(_transformation):
+		_transformation.falter(seconds)
+	if _cinematic != null and is_instance_valid(_cinematic):
+		_cinematic.fade_out_song()
+
+
+## True si el renacer lo va a llevar una cinemática, con el mundo congelado.
+func stages_rebirth() -> bool:
+	return cinematic_scene != null
+
+
+## Mythos cayó en cenizas: si hay cinemática, ella lleva el renacer y avisa
+## con Mythos.finish_rebirth(). True si lo lleva.
+func play_rebirth(boss: Mythos) -> bool:
+	return _cinematic != null and is_instance_valid(_cinematic) \
+			and _cinematic.play_rebirth(boss)
+
+
+## El fuego de la segunda fase recorre el mapa desde `origin` en `seconds`.
+func ascend_world(origin: Vector3, seconds: float) -> void:
+	if _transformation != null and is_instance_valid(_transformation):
+		_transformation.ascend(origin, seconds)
+
+
 ## Destello a pantalla completa (el de la cinemática); sin cinemática no hace nada.
 func flash() -> void:
 	if _cinematic != null and is_instance_valid(_cinematic):

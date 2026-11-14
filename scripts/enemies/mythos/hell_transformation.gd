@@ -5,6 +5,9 @@ extends Node3D
 ## dura la calma (begin), el mapa queda ardiendo durante la pelea y, cuando
 ## Mythos muere, se enfría hasta quedar carbonizado y humeando (cool_down)
 ## hasta que la party cruza el portal. Como cuelga de la arena, muere con ella.
+## Cuando Mythos renace, otro frente recorre el mapa y todo el fuego pasa al
+## color de su segunda fase (ascend): el suelo y los props con sus colores
+## «Renacido», el cielo con el de «Cielo renacido» y los ataques con FireTint.
 ##
 ## NUNCA toca un recurso compartido. La escena de la arena y los modelos glb
 ## comparten sus materiales con la vuelta siguiente, con otros mapas y con el
@@ -31,11 +34,14 @@ extends Node3D
 ## Contratos por nombre: grupo "stage_transformation" y state_name() (los
 ## lee el harness) y las líneas "Hell transformation:" del log.
 
-enum Look { GREEN, IGNITING, HELL, COOLING, CHARRED }
+enum Look { GREEN, IGNITING, HELL, ASCENDING, REBORN, COOLING, CHARRED }
+
+## Nombre de cada estado para el harness, en el orden de Look. El infierno de
+## la segunda fase sigue siendo "hell": cambia de color, no de estado.
+const LOOK_NAMES: Array[StringName] = [&"green", &"igniting", &"hell", &"hell", &"hell",
+		&"cooling", &"charred"]
 
 const GROUP := &"stage_transformation"
-## Volumen, en dB, que cuenta como silencio para los fundidos de sonido.
-const SILENT_DB: float = -60.0
 
 
 @export_group("Frente de fuego")
@@ -47,6 +53,10 @@ const SILENT_DB: float = -60.0
 @export var front_curve: float = 1.7
 ## Segundos que tarda el bosque en enfriarse cuando el jefe muere.
 @export var cool_seconds: float = 8.0
+## Segundos que tarda el fuego de los ataques en pasar al color de la segunda fase cuando el jefe renace.
+@export var ascend_tint_seconds: float = 0.9
+## Cuánto arde el mapa mientras el jefe parece muerto (0-1): las llamas bajan hasta que renace.
+@export_range(0.0, 1.0) var falter_heat: float = 0.3
 ## Material con que arden árboles, rocas, tocones, mesetas y formaciones (burnt_prop.gdshader); sus colores se editan en este recurso.
 @export var prop_material: ShaderMaterial
 
@@ -71,6 +81,28 @@ const SILENT_DB: float = -60.0
 @export var hell_fog_color: Color = Color(0.5, 0.16, 0.06)
 ## Densidad de la niebla.
 @export var hell_fog_density: float = 0.011
+
+@export_group("Cielo renacido")
+## Color del cielo en lo alto, en la segunda fase del jefe.
+@export var reborn_sky_top: Color = Color(0.02, 0.03, 0.14)
+## Color del cielo en el horizonte.
+@export var reborn_sky_horizon: Color = Color(0.12, 0.42, 0.95)
+## Color del suelo del cielo en el horizonte.
+@export var reborn_ground_horizon: Color = Color(0.06, 0.2, 0.6)
+## Color del suelo del cielo hacia abajo.
+@export var reborn_ground_bottom: Color = Color(0.02, 0.03, 0.1)
+## Color del sol.
+@export var reborn_sun_color: Color = Color(0.5, 0.78, 1.0)
+## Energía del sol.
+@export var reborn_sun_energy: float = 1.0
+## Color de la luz ambiente.
+@export var reborn_ambient_color: Color = Color(0.3, 0.5, 0.95)
+## Energía de la luz ambiente.
+@export var reborn_ambient_energy: float = 0.7
+## Color de la niebla.
+@export var reborn_fog_color: Color = Color(0.05, 0.16, 0.5)
+## Densidad de la niebla.
+@export var reborn_fog_density: float = 0.011
 
 @export_group("Cielo carbonizado")
 ## Color del cielo en lo alto.
@@ -99,6 +131,10 @@ const SILENT_DB: float = -60.0
 @export var hell_backdrop_ground: Color = Color(0.14, 0.07, 0.05)
 ## Color de las colinas del horizonte en el infierno.
 @export var hell_backdrop_hills: Color = Color(0.09, 0.04, 0.03)
+## Color del suelo lejano en la segunda fase del jefe.
+@export var reborn_backdrop_ground: Color = Color(0.05, 0.07, 0.15)
+## Color de las colinas del horizonte en la segunda fase del jefe.
+@export var reborn_backdrop_hills: Color = Color(0.03, 0.04, 0.1)
 ## Color del suelo lejano ya carbonizado.
 @export var charred_backdrop_ground: Color = Color(0.2, 0.19, 0.18)
 ## Color de las colinas del horizonte ya carbonizadas.
@@ -125,14 +161,19 @@ var _ignite_t: float = 0.0
 ## Avance de la calma (0-1) desde el que el frente de fuego empieza a correr.
 var _front_from: float = 0.0
 var _cool_t: float = 0.0
+## El frente de la segunda fase: avance (0-1), lo que tarda y si ya pasó.
+var _ascend_t: float = 0.0
+var _ascend_seconds: float = 1.0
+var _reborn: bool = false
+## Cuánto arde el mapa ahora (0-1) y el tween que lo baja mientras el jefe parece muerto.
+var _heat: float = 1.0
+var _falter_tween: Tween = null
 var _dressing: HellDressing = HellDressing.new()
 var _sky: HellSky = HellSky.new()
+var _particles: HellEmbers = HellEmbers.new()
 ## El cielo que había al empezar (puede traer el tinte de un clima).
 var _from_sky: HellSky.Palette = null
-## Fondos de viento de la arena con su volumen de bosque: {player, from}.
-var _wind: Array[Dictionary] = []
-var _embers: Array[GPUParticles3D] = []
-var _smokes: Array[GPUParticles3D] = []
+var _sound: HellSound = HellSound.new()
 ## Punto que sigue la primera nube de brasas durante la cinemática (INF = el raider).
 var _focus: Vector3 = Vector3.INF
 
@@ -142,8 +183,13 @@ var _focus: Vector3 = Vector3.INF
 
 func _ready() -> void:
 	add_to_group(GROUP)
-	_fire_bed.volume_db = SILENT_DB
+	_sound.setup(_fire_bed)
 	_ember_template.emitting = false
+
+
+func _exit_tree() -> void:
+	# El fuego de la próxima arena empieza con su color de siempre.
+	FireTint.set_amount(0.0)
 
 
 func _process(delta: float) -> void:
@@ -156,13 +202,19 @@ func _process(delta: float) -> void:
 			if _ignite_t >= 1.0:
 				_look = Look.HELL
 				print("Hell transformation: hell at %.1fs" % RunState.stage_time)
+		Look.ASCENDING:
+			_ascend_t = minf(_ascend_t + delta / maxf(_ascend_seconds, 0.01), 1.0)
+			_apply_ascension(_ascend_t)
+			if _ascend_t >= 1.0:
+				_look = Look.REBORN
+				print("Hell transformation: reborn at %.1fs" % RunState.stage_time)
 		Look.COOLING:
 			_cool_t = minf(_cool_t + delta / maxf(cool_seconds, 0.01), 1.0)
 			_apply_cooling(_cool_t)
 			if _cool_t >= 1.0:
 				_look = Look.CHARRED
 				print("Hell transformation: charred at %.1fs" % RunState.stage_time)
-	_follow_raiders()
+	_particles.follow(get_tree(), _focus)
 
 
 # --- lo que piden Mythos y su cinemática ------------------------------------------
@@ -183,8 +235,11 @@ func begin(origin: Vector3, seconds: float, front_delay: float = 0.0) -> void:
 		_dressing.dress(get_tree(), arena, prop_material, grass_flame_amount)
 		_sky.collect(get_tree(), arena, _hell_sky())
 		_from_sky = _sky.current()
-		_collect_wind(arena)
-	_spawn_particles()
+		_sound.collect(arena)
+	_particles.spawn(self, _ember_template, smoke_scene)
+	FireTint.set_amount(0.0)
+	_reborn = false
+	_dressing.write(&"ascend_radius", 0.0)
 	_dressing.write(&"burn_origin", origin)
 	_dressing.write(&"burn_edge", front_edge)
 	_dressing.write(&"heat", 1.0)
@@ -206,33 +261,61 @@ func finish_now() -> void:
 	print("Hell transformation: hell at %.1fs (skipped)" % RunState.stage_time)
 
 
+## El jefe parece haber muerto: las llamas del mapa bajan durante `seconds`.
+## Vuelven con todo cuando renace (ascend).
+func falter(seconds: float) -> void:
+	if _look != Look.HELL or seconds <= 0.0:
+		return
+	_falter_tween = create_tween()
+	_falter_tween.tween_method(_set_heat, _heat, falter_heat, seconds)
+
+
+## El jefe renació: un frente sale de `origin` y en `seconds` de juego deja
+## el mapa entero con el fuego de su segunda fase; el de sus ataques cambia
+## enseguida (ascend_tint_seconds). Con 0 segundos queda listo para ascend_now.
+func ascend(origin: Vector3, seconds: float) -> void:
+	if _look != Look.HELL and _look != Look.IGNITING:
+		return
+	finish_now()
+	if _falter_tween != null and _falter_tween.is_valid():
+		_falter_tween.kill()
+	_ascend_seconds = seconds
+	_ascend_t = 0.0
+	_reborn = true
+	_dressing.write(&"ascend_origin", origin)
+	_look = Look.ASCENDING
+	_apply_ascension(0.0)
+	print("Hell transformation: ascending seconds=%.2f at %.1fs" % [
+			seconds, RunState.stage_time])
+
+
+## Salta al fuego de la segunda fase completo (alguien saltó el renacer).
+func ascend_now() -> void:
+	if _look != Look.ASCENDING:
+		return
+	_ascend_t = 1.0
+	_apply_ascension(1.0)
+	_look = Look.REBORN
+	print("Hell transformation: reborn at %.1fs (skipped)" % RunState.stage_time)
+
+
 ## El jefe murió: los fuegos se apagan y el bosque queda carbonizado.
 func cool_down() -> void:
 	if _look == Look.GREEN or _look == Look.COOLING or _look == Look.CHARRED:
 		return
 	finish_now()
+	ascend_now()
 	_look = Look.COOLING
 	_cool_t = 0.0
 	HellSky.rebase_weather(get_tree(), _charred_sky())
-	for smoke: GPUParticles3D in _smokes:
-		smoke.emitting = true
+	_particles.start_smoke()
 	print("Hell transformation: cooling seconds=%.1f at %.1fs" % [
 			cool_seconds, RunState.stage_time])
 
 
 ## "green", "igniting", "hell", "cooling" o "charred" (lo lee el harness).
 func state_name() -> StringName:
-	match _look:
-		Look.IGNITING:
-			return &"igniting"
-		Look.HELL:
-			return &"hell"
-		Look.COOLING:
-			return &"cooling"
-		Look.CHARRED:
-			return &"charred"
-		_:
-			return &"green"
+	return LOOK_NAMES[_look]
 
 
 ## Durante la cinemática la primera nube de brasas sigue este punto (lo que
@@ -251,25 +334,40 @@ func _apply_ignition(t: float) -> void:
 	if _from_sky != null:
 		_own_sky(_from_sky.blend(_hell_sky(), eased))
 	_sky.blend_backdrop(hell_backdrop_ground, hell_backdrop_hills, eased)
-	for entry: Dictionary in _wind:
-		var player := entry["player"] as AudioStreamPlayer
-		if is_instance_valid(player):
-			player.volume_db = lerpf(float(entry["from"]), SILENT_DB, eased)
-			if t >= 1.0:
-				player.stop()
-	_fire_bed.volume_db = lerpf(SILENT_DB, fire_volume_db, eased)
+	_sound.ignite(eased, t >= 1.0, fire_volume_db)
 
 
-## Enfriamiento (0-1): infierno -> carbonizado.
+## Avance del fuego de la segunda fase (0-1): el frente recorre el mapa, el
+## cielo cambia con él y el fuego de los ataques pasa de color al principio.
+func _apply_ascension(t: float) -> void:
+	_dressing.write(&"ascend_radius", front_reach * pow(t, front_curve))
+	# Las llamas que habían bajado vuelven enseguida.
+	_set_heat(1.0 if t >= 1.0 else move_toward(_heat, 1.0, 0.1))
+	var tinted := t * _ascend_seconds / maxf(ascend_tint_seconds, 0.01)
+	FireTint.set_amount(1.0 if t >= 1.0 else tinted)
+	var eased := smoothstep(0.0, 1.0, t)
+	_own_sky(_hell_sky().blend(_reborn_sky(), eased))
+	_sky.set_backdrop(hell_backdrop_ground.lerp(reborn_backdrop_ground, eased),
+			hell_backdrop_hills.lerp(reborn_backdrop_hills, eased))
+
+
+func _set_heat(value: float) -> void:
+	_heat = value
+	_dressing.write(&"heat", value)
+
+
+## Enfriamiento (0-1): infierno (el de la fase en que murió) -> carbonizado.
 func _apply_cooling(c: float) -> void:
-	_dressing.write(&"heat", 1.0 - c)
+	_set_heat(1.0 - c)
 	_dressing.write(&"ash", c)
-	_own_sky(_hell_sky().blend(_charred_sky(), c))
-	_sky.set_backdrop(hell_backdrop_ground.lerp(charred_backdrop_ground, c),
-			hell_backdrop_hills.lerp(charred_backdrop_hills, c))
-	_fire_bed.volume_db = lerpf(fire_volume_db, smolder_volume_db, c)
-	for embers: GPUParticles3D in _embers:
-		embers.amount_ratio = lerpf(1.0, charred_ember_ratio, c)
+	var hot := _reborn_sky() if _reborn else _hell_sky()
+	_own_sky(hot.blend(_charred_sky(), c))
+	var ground := reborn_backdrop_ground if _reborn else hell_backdrop_ground
+	var hills := reborn_backdrop_hills if _reborn else hell_backdrop_hills
+	_sky.set_backdrop(ground.lerp(charred_backdrop_ground, c),
+			hills.lerp(charred_backdrop_hills, c))
+	_sound.set_fire(lerpf(fire_volume_db, smolder_volume_db, c))
+	_particles.set_ember_ratio(lerpf(1.0, charred_ember_ratio, c))
 
 
 ## Escribe este cielo y le dice al clima que ESE es ahora el cielo de la
@@ -281,77 +379,19 @@ func _own_sky(look: HellSky.Palette) -> void:
 
 
 func _hell_sky() -> HellSky.Palette:
-	var look := HellSky.Palette.new()
-	look.sky_top = hell_sky_top
-	look.sky_horizon = hell_sky_horizon
-	look.ground_horizon = hell_ground_horizon
-	look.ground_bottom = hell_ground_bottom
-	look.sun_color = hell_sun_color
-	look.sun_energy = hell_sun_energy
-	look.ambient_color = hell_ambient_color
-	look.ambient_energy = hell_ambient_energy
-	look.fog_color = hell_fog_color
-	look.fog_density = hell_fog_density
-	return look
+	return HellSky.Palette.make(hell_sky_top, hell_sky_horizon, hell_ground_horizon,
+			hell_ground_bottom, hell_sun_color, hell_sun_energy, hell_ambient_color,
+			hell_ambient_energy, hell_fog_color, hell_fog_density)
+
+
+func _reborn_sky() -> HellSky.Palette:
+	return HellSky.Palette.make(reborn_sky_top, reborn_sky_horizon, reborn_ground_horizon,
+			reborn_ground_bottom, reborn_sun_color, reborn_sun_energy, reborn_ambient_color,
+			reborn_ambient_energy, reborn_fog_color, reborn_fog_density)
 
 
 func _charred_sky() -> HellSky.Palette:
-	var look := HellSky.Palette.new()
-	look.sky_top = charred_sky_top
-	look.sky_horizon = charred_sky_horizon
-	look.ground_horizon = charred_ground_horizon
-	look.ground_bottom = charred_ground_bottom
-	look.sun_color = charred_sun_color
-	look.sun_energy = charred_sun_energy
-	look.ambient_color = charred_ambient_color
-	look.ambient_energy = charred_ambient_energy
-	look.fog_color = charred_fog_color
-	look.fog_density = charred_fog_density
-	return look
-
-
-## Los fondos de viento de la arena: se apagan mientras entra el de fuego.
-func _collect_wind(arena: Node3D) -> void:
-	for node: Node in arena.find_children("*", "AudioStreamPlayer", true, false):
-		var bed := node as AmbientBed
-		if bed != null and bed != _fire_bed:
-			_wind.append({"player": bed, "from": bed.volume_db})
-
-
-# --- partículas -------------------------------------------------------------------
-
-## Una nube de brasas y una de humo por raider: en pantalla dividida cada
-## vista tiene las suyas. Las brasas son copias del nodo Embers y el humo,
-## instancias de smoke_scene. El humo va en escena aparte porque una escena
-## con dos GPUParticles3D deja un shader sin liberar al cerrar sin ventana.
-func _spawn_particles() -> void:
-	var count := maxi(Coop.player_count, 1)
-	for slot: int in count:
-		var embers := _ember_template if slot == 0 \
-				else _ember_template.duplicate() as GPUParticles3D
-		if slot > 0:
-			add_child(embers)
-		embers.emitting = true
-		_embers.append(embers)
-		var smoke := smoke_scene.instantiate() as GPUParticles3D \
-				if smoke_scene != null else null
-		if smoke != null:
-			smoke.emitting = false
-			add_child(smoke)
-			_smokes.append(smoke)
-
-
-## Cada nube sigue a su raider, esté de pie o caído.
-func _follow_raiders() -> void:
-	for group: StringName in [&"player", &"downed_players"]:
-		for node: Node in get_tree().get_nodes_in_group(group):
-			var body := node as Node3D
-			var slot := int(node.get("player_index"))
-			if body == null or slot < 0 or slot >= _embers.size():
-				continue
-			var at := body.global_position
-			if slot == 0 and _focus != Vector3.INF:
-				at = _focus
-			_embers[slot].global_position = at
-			if slot < _smokes.size():
-				_smokes[slot].global_position = at
+	return HellSky.Palette.make(charred_sky_top, charred_sky_horizon,
+			charred_ground_horizon, charred_ground_bottom, charred_sun_color,
+			charred_sun_energy, charred_ambient_color, charred_ambient_energy,
+			charred_fog_color, charred_fog_density)

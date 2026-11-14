@@ -1,14 +1,62 @@
 class_name MythosBody
 extends BossBase
 ## El cuerpo de Mythos en la arena: lo que sus ataques le piden para ubicar
-## un punto, mover el cuerpo, golpear el suelo y marcar zonas de fuego (las
-## saca el nodo Zones). Mythos (mythos.gd) hereda de aquí y suma las fases,
-## las vidas y la elección de ataques.
+## un punto, mover el cuerpo, posarlo o hacerlo despegar (nodo Flight),
+## golpear el suelo y marcar zonas de fuego (nodo Zones). Mythos (mythos.gd)
+## hereda de aquí y suma las fases, las vidas y la elección de ataques.
+
+## Agresividad actual (0-1); la leen los ataques.
+var aggression: float = 0.0
+## El rig que vuela (nodo Visual); los ataques le piden poses y gestos.
+var rig: MythosRig = null
 
 ## Hacia dónde mira mientras un ataque lo lleva (ZERO = mira al raider).
 var _face_along: Vector3 = Vector3.ZERO
 
+## Su capa de colisión de siempre, para devolvérsela tras play_dead(). Se lee
+## al entrar al árbol: más tarde un «Tiempo detenido» puede tenerla en 0.
+@onready var _alive_layer: int = collision_layer
 @onready var _zones: MythosZones = $Zones
+@onready var _flight: MythosFlight = $Flight
+
+
+## Lo saca de la pelea como si hubiera muerto: las armas dejan de apuntarle,
+## nadie choca con él y la flecha del HUD ya no lo señala. Sigue pisando el
+## suelo (su máscara no cambia).
+func play_dead() -> void:
+	collision_layer = 0
+	remove_from_group(&"enemies")
+	remove_from_group(&"boss")
+
+
+## Lo devuelve a la pelea después de play_dead().
+func rise_again() -> void:
+	collision_layer = _alive_layer
+	add_to_group(&"enemies")
+	add_to_group(&"boss")
+
+
+## Punto del que salen sus plumas y sus bolas de fuego: el pico.
+func muzzle_point() -> Vector3:
+	return rig.beak_point()
+
+
+## Lo posa en tierra (la Picada, al caer): desde ahí usa sus ataques de tierra.
+func land() -> void:
+	_flight.land(aggression)
+	rig.set_pose(MythosRig.Pose.PERCH)
+
+
+## Lo devuelve al vuelo (el Aletazo, al terminar).
+func take_off() -> void:
+	_flight.take_off()
+	rig.set_pose(MythosRig.Pose.FLY)
+
+
+## La pose de descanso de su postura: posado o volando. Los ataques vuelven
+## a ella al terminar.
+func rest_pose() -> MythosRig.Pose:
+	return MythosRig.Pose.PERCH if _flight.is_grounded() else MythosRig.Pose.FLY
 
 
 ## `point` llevado a un lugar de la arena donde cabe el cuerpo, a ras de suelo.

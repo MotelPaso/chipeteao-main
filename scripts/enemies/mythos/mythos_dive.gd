@@ -4,7 +4,9 @@ extends MythosMove
 ## el suelo; del golpe sale una onda de fuego que hay que saltar. Después queda
 ## POSADO en tierra (Mythos.land), a tiro de las armas cortas, y pelea desde
 ## ahí con sus Garras hasta que despega con un Aletazo. El golpe cae en el
-## disco marcado, no donde esté el raider al final.
+## disco marcado, no donde esté el raider al final. Con chain es la Picada
+## en cadena (el nodo DiveChain de la segunda fase): rebota y vuelve a caer
+## varias veces antes de quedarse posado.
 
 enum Step { WINDUP, PERCHED }
 
@@ -31,6 +33,10 @@ enum Step { WINDUP, PERCHED }
 @export var recover_at_full_aggression: float = 0.7
 ## Sonido del golpe (fila de Sfx.SOUND_LIBRARY).
 @export var impact_sfx: StringName = &"fire_whoosh"
+## Picadas seguidas antes de quedarse posado (1 = una sola).
+@export var chain: int = 1
+## Segundos de aviso de cada picada después de la primera.
+@export var chain_windup: float = 0.75
 
 @export_group("Onda de fuego")
 ## Escena de la onda que sale del golpe (FireWave, sale de Pools). Vacío = sin onda.
@@ -50,6 +56,8 @@ var _step: Step = Step.WINDUP
 var _timer: float = 0.0
 var _from: Vector3 = Vector3.ZERO
 var _mark: Vector3 = Vector3.ZERO
+var _target: Node3D = null
+var _dives_left: int = 0
 
 
 func scale_damage(multiplier: float) -> void:
@@ -58,12 +66,9 @@ func scale_damage(multiplier: float) -> void:
 
 
 func begin(target: Node3D) -> void:
-	_step = Step.WINDUP
-	_timer = windup * aggression_lerp(1.0, windup_at_full_aggression)
-	_from = boss.global_position
-	_mark = boss.safe_point(MythosBolts.predicted(target, lead_seconds, max_lead))
-	Telegraph.spawn_disc(boss, _mark, radius, _timer, boss.telegraph_color)
-	boss.rig.set_pose(MythosRig.Pose.WINDUP)
+	_target = target
+	_dives_left = maxi(chain, 1)
+	_aim(windup * aggression_lerp(1.0, windup_at_full_aggression))
 
 
 func tick(delta: float) -> bool:
@@ -87,6 +92,19 @@ func cancel() -> void:
 	boss.rig.set_pose(boss.rest_pose())
 
 
+## Marca el próximo golpe adonde va el raider y avisa durante `seconds`.
+func _aim(seconds: float) -> void:
+	_step = Step.WINDUP
+	_timer = seconds
+	_from = boss.global_position
+	var aim := boss.global_position
+	if is_instance_valid(_target) and _target.is_inside_tree():
+		aim = MythosBolts.predicted(_target, lead_seconds, max_lead)
+	_mark = boss.safe_point(aim)
+	Telegraph.spawn_disc(boss, _mark, radius, _timer, boss.telegraph_color)
+	boss.rig.set_pose(MythosRig.Pose.WINDUP)
+
+
 func _impact() -> void:
 	boss.glide_to(_mark)
 	boss.strike_ground([_mark], radius, height_window, damage)
@@ -98,6 +116,11 @@ func _impact() -> void:
 	boss.rig.burst()
 	boss.rig.set_trail(false)
 	Sfx.play(impact_sfx)
+	_dives_left -= 1
+	if _dives_left > 0:
+		# Rebota: vuelve a subir y marca la siguiente.
+		_aim(chain_windup)
+		return
 	boss.land()
 	# Recién posado se sacude las plumas.
 	boss.rig.gesture(&"shake")

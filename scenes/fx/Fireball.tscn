@@ -1,8 +1,9 @@
-[gd_scene load_steps=12 format=3]
+[gd_scene load_steps=13 format=3]
 
 [ext_resource type="Script" path="res://scripts/fx/fireball.gd" id="1_script"]
 [ext_resource type="Shader" path="res://assets/shaders/fireball.gdshader" id="2_ball"]
 [ext_resource type="Shader" path="res://assets/shaders/phoenix_nova.gdshader" id="3_glow"]
+[ext_resource type="Shader" path="res://assets/shaders/fire_spark.gdshader" id="4_spark"]
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_ball"]
 shader = ExtResource("2_ball")
@@ -18,12 +19,13 @@ height = 2.0
 radial_segments = 20
 rings = 10
 
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_ember"]
-shading_mode = 0
-albedo_color = Color(1, 0.6, 0.15, 1)
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_ember"]
+shader = ExtResource("4_spark")
+shader_parameter/color = Color(1, 0.6, 0.15, 1)
+shader_parameter/ascended_color = Color(0.35, 0.78, 1, 1)
 
 [sub_resource type="BoxMesh" id="BoxMesh_ember"]
-material = SubResource("StandardMaterial3D_ember")
+material = SubResource("ShaderMaterial_ember")
 size = Vector3(0.3, 0.3, 0.3)
 
 [sub_resource type="Curve" id="Curve_shrink"]

@@ -38,6 +38,14 @@ static func fan(boss: Mythos, scene: PackedScene, origin: Vector3, target: Node3
 				Vector3(cos(angle) * reach, drop, sin(angle) * reach), damage)
 
 
+## Una sola pluma desde `origin` hacia `direction`.
+static func shot(boss: Mythos, scene: PackedScene, origin: Vector3, direction: Vector3,
+		damage: float) -> void:
+	var bolt := Pools.acquire_scene(scene) as EnemyBolt if scene != null else null
+	if bolt != null:
+		_launch(bolt, boss, origin, direction, damage)
+
+
 ## Dónde va a estar `target` dentro de `seconds` si sigue como va, nunca a
 ## más de `max_lead` metros de donde está ahora. Siempre a ras de sus pies.
 static func predicted(target: Node3D, seconds: float, max_lead: float) -> Vector3:

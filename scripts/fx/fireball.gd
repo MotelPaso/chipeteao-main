@@ -112,7 +112,7 @@ func _explode() -> void:
 		_on_land.call(_to)
 	var burst := Pools.acquire_scene(Pools.EMBER_BURST_SCENE) as EmberBurst
 	if burst != null:
-		burst.play(_to, _radius)
+		burst.play(_to, _radius, true)
 	Juice.shake(shake_strength, shake_seconds)
 	Sfx.play(blast_sfx)
 	_finish()

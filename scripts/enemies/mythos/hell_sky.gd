@@ -27,6 +27,24 @@ class Palette:
 	var fog_color: Color = Color.WHITE
 	var fog_density: float = 0.0
 
+	## Un cielo con estos valores: los cuatro colores del cielo de arriba
+	## abajo, el sol, el ambiente y la niebla.
+	static func make(top: Color, horizon: Color, low_horizon: Color, bottom: Color,
+			sun: Color, sun_power: float, ambient: Color, ambient_power: float, fog: Color,
+			fog_amount: float) -> Palette:
+		var out := Palette.new()
+		out.sky_top = top
+		out.sky_horizon = horizon
+		out.ground_horizon = low_horizon
+		out.ground_bottom = bottom
+		out.sun_color = sun
+		out.sun_energy = sun_power
+		out.ambient_color = ambient
+		out.ambient_energy = ambient_power
+		out.fog_color = fog
+		out.fog_density = fog_amount
+		return out
+
 	## El cielo a `weight` (0-1) del camino entre este y `to`.
 	func blend(to: Palette, weight: float) -> Palette:
 		var out := Palette.new()

@@ -14,6 +14,9 @@ extends RefCounted
 ##   BONK_ADVANCE_AT=a,b,c  cambia de etapa en esos segundos, como si la
 ##                          party cruzara el portal de salida, esté como
 ##                          esté la etapa (RunRoot.advance_stage)
+##   BONK_BOSS_HURT_AT=a,b  en esos segundos le da al jefe de etapa un golpe
+##                          que agota la vida que esté peleando (si está
+##                          peleando): para llegar rápido a su segunda fase
 ##   BONK_UI_DISMISS=1      cierra por código la ruleta o el vendedor que
 ##                          lleve más de 3 s abierto. Sin ventana se resuelven
 ##                          solos; con ventana esperan a alguien, y una
@@ -30,6 +33,7 @@ const WEATHER_AT_ENV := "BONK_WEATHER_AT"
 const WEATHER_ID_ENV := "BONK_WEATHER_NOW"
 const DISMISS_ENV := "BONK_UI_DISMISS"
 const ADVANCE_AT_ENV := "BONK_ADVANCE_AT"
+const BOSS_HURT_AT_ENV := "BONK_BOSS_HURT_AT"
 const DEFAULT_WEATHER := "blood_moon"
 
 ## Segundos de cinemática antes de empezar a mantener el salto.
@@ -57,6 +61,7 @@ var _exit_done: bool = false
 var _weather_times: Array[float] = []
 var _weather_id: String = DEFAULT_WEATHER
 var _advance_times: Array[float] = []
+var _boss_hurt_times: Array[float] = []
 var _dismiss: bool = false
 var _blocked_for: float = 0.0
 ## Acciones globales que hay que soltar en el frame siguiente a apretarlas.
@@ -71,6 +76,7 @@ func _init(host: Node) -> void:
 	_wipe_at = _env_seconds(WIPE_AT_ENV)
 	_weather_times = _env_times(WEATHER_AT_ENV)
 	_advance_times = _env_times(ADVANCE_AT_ENV)
+	_boss_hurt_times = _env_times(BOSS_HURT_AT_ENV)
 	_dismiss = OS.get_environment(DISMISS_ENV) == "1"
 	var weather := OS.get_environment(WEATHER_ID_ENV)
 	if not weather.is_empty():
@@ -94,6 +100,7 @@ func tick(delta: float, now: float, boss_state: StringName) -> void:
 	_tick_exits(boss_state)
 	_tick_weather()
 	_tick_advance(boss_state)
+	_tick_boss_hurt(boss_state)
 	_tick_dismiss(delta)
 
 
@@ -160,11 +167,18 @@ func _calm_elapsed() -> float:
 
 
 func _song_paused() -> String:
+	# Con una canción por fase, cuenta la que está en curso.
+	var fallback := "n/a"
 	for node: Node in _tree.get_nodes_in_group(&"boss_music"):
 		var player := node as AudioStreamPlayer
-		if player != null:
-			return str(player.stream_paused or not player.can_process())
-	return "n/a"
+		if player == null:
+			continue
+		var paused := str(player.stream_paused or not player.can_process())
+		if player.has_method(&"is_live") and bool(player.call(&"is_live")):
+			return paused
+		if fallback == "n/a":
+			fallback = paused
+	return fallback
 
 
 ## Mueve el slider de Música del panel de ajustes y lee el bus: prueba que
@@ -222,6 +236,22 @@ func _tick_advance(boss_state: StringName) -> void:
 		_advance_times.remove_at(0)
 		print("Probe advance: stage change at %.1fs state=%s" % [_now, boss_state])
 		_tree.call_group("run_root", "advance_stage")
+
+
+## BONK_BOSS_HURT_AT: un golpe enorme al jefe de etapa en cada segundo pedido.
+## Si en ese momento no está peleando (llega, renace), espera a que lo esté.
+func _tick_boss_hurt(boss_state: StringName) -> void:
+	if _boss_hurt_times.is_empty() or _now < _boss_hurt_times[0]:
+		return
+	if boss_state != &"flight" and boss_state != &"move":
+		return
+	_boss_hurt_times.remove_at(0)
+	var boss := _tree.get_first_node_in_group(BossSchedule.STAGE_BOSS_GROUP)
+	var health := Health.find_in(boss) if boss != null else null
+	if health == null:
+		return
+	print("Probe boss hurt: at %.1fs state=%s hp=%.0f" % [_now, boss_state, health.current_hp])
+	health.take_damage(health.max_hp * 10.0)
 
 
 ## BONK_UI_DISMISS: cierra los paneles cerrables (ruleta, vendedor) que

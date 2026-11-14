@@ -34,6 +34,14 @@ uniform float crack_width : hint_range(0.01, 0.5) = 0.055;
 // Fuerza del brillo de la lava.
 uniform float lava_glow = 1.6;
 
+group_uniforms Renacido;
+// Lava y centro de las grietas en la segunda fase del jefe (el fuego azul).
+uniform vec3 ascended_lava_color : source_color = vec3(0.04, 0.34, 1.0);
+uniform vec3 ascended_lava_core : source_color = vec3(0.55, 0.9, 1.0);
+// El frente del fuego azul: de dónde sale y hasta dónde llegó, en metros (0 = no empezó).
+uniform vec3 ascend_origin = vec3(0.0);
+uniform float ascend_radius = 0.0;
+
 group_uniforms Frente;
 // Punto del mundo desde el que avanza el fuego.
 uniform vec3 burn_origin = vec3(0.0);
@@ -80,8 +88,15 @@ void fragment() {
 	ground = mix(ground, ash_color, ash * (0.12 + 0.55 * patch));
 	ground = mix(ground, scorch_dark * 0.35, vein * 0.8);
 	ALBEDO = mix(grass, ground, burnt);
-	vec3 glow = mix(lava_color, lava_core, vein * pulse) * vein * pulse * lava_glow
-			+ lava_color * rim * 3.0;
+	// El fuego azul avanza igual que el primer frente, desde su propio origen.
+	float ascend_reach = distance(world_pos.xz, ascend_origin.xz)
+			+ (value_noise(world_pos.xz * 0.08) - 0.5) * burn_edge * 2.0;
+	float ascended = ascend_radius <= 0.0 ? 0.0
+			: 1.0 - smoothstep(ascend_radius - burn_edge, ascend_radius, ascend_reach);
+	vec3 lava = mix(lava_color, ascended_lava_color, ascended);
+	vec3 core = mix(lava_core, ascended_lava_core, ascended);
+	vec3 glow = mix(lava, core, vein * pulse) * vein * pulse * lava_glow
+			+ lava * rim * 3.0 + ascended_lava_core * ascended * (1.0 - ascended) * 6.0;
 	EMISSION = glow * burnt * heat;
 	ROUGHNESS = 1.0;
 }

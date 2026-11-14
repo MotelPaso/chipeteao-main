@@ -39,6 +39,8 @@ const GROUP := &"fire_tornados"
 @export_range(0.0, 1.0) var ground_alpha: float = 0.6
 ## Color de ese brillo.
 @export var ground_color: Color = Color(1.0, 0.45, 0.08)
+## Color de ese brillo en la segunda fase del jefe (el fuego azul).
+@export var ascended_ground_color: Color = Color(0.15, 0.55, 1.0)
 ## Sonido al terminar de formarse (fila de Sfx.SOUND_LIBRARY).
 @export var roar_sfx: StringName = &"fire_tornado"
 
@@ -247,7 +249,8 @@ func _set_form(amount: float) -> void:
 	_core.set_instance_shader_parameter(&"form", amount)
 	var material := _ground.material_override as StandardMaterial3D
 	if material != null:
-		material.albedo_color = Color(ground_color.r, ground_color.g, ground_color.b,
+		var tint := ground_color.lerp(ascended_ground_color, FireTint.amount())
+		material.albedo_color = Color(tint.r, tint.g, tint.b,
 				ground_alpha * amount)
 
 

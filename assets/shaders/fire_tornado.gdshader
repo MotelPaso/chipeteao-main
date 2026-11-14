@@ -19,6 +19,15 @@ uniform float strength : hint_range(0.0, 6.0) = 2.2;
 uniform vec3 smoke_color : source_color = vec3(0.17, 0.045, 0.02);
 uniform float smoke_alpha : hint_range(0.0, 1.0) = 0.6;
 
+group_uniforms Renacido;
+// Base, medio, punta y humo en la segunda fase del jefe (el fuego azul).
+uniform vec3 ascended_base_color : source_color = vec3(0.7, 0.95, 1.0);
+uniform vec3 ascended_mid_color : source_color = vec3(0.1, 0.5, 1.0);
+uniform vec3 ascended_top_color : source_color = vec3(0.04, 0.12, 0.75);
+uniform vec3 ascended_smoke_color : source_color = vec3(0.02, 0.04, 0.17);
+// 0-1: cuánto del fuego de la segunda fase (FireTint lo escribe para todo el fuego a la vez).
+global uniform float fire_ascend;
+
 group_uniforms Remolino;
 // Vetas de fuego alrededor del embudo (número entero).
 uniform float bands = 5.0;
@@ -74,10 +83,13 @@ void fragment() {
 	// Vetas de fuego angostas sobre un cuerpo de humo más ancho.
 	float fire = smoothstep(0.4, 0.72, n);
 	float body = smoothstep(0.1, 0.42, n);
-	vec3 flame = mix(base_color, mid_color, smoothstep(0.0, 0.45, height));
-	flame = mix(flame, top_color, smoothstep(0.45, 1.0, height));
-	flame = mix(flame, base_color, core * 0.6) * strength * (0.7 + 0.8 * n);
-	ALBEDO = mix(smoke_color, flame, fire);
+	vec3 base = mix(base_color, ascended_base_color, fire_ascend);
+	vec3 flame = mix(base, mix(mid_color, ascended_mid_color, fire_ascend),
+			smoothstep(0.0, 0.45, height));
+	flame = mix(flame, mix(top_color, ascended_top_color, fire_ascend),
+			smoothstep(0.45, 1.0, height));
+	flame = mix(flame, base, core * 0.6) * strength * (0.7 + 0.8 * n);
+	ALBEDO = mix(mix(smoke_color, ascended_smoke_color, fire_ascend), flame, fire);
 	// Se deshace en la base y en la punta.
 	float ends = smoothstep(0.0, 0.06, height) * (1.0 - smoothstep(0.7, 1.0, height));
 	ALPHA = clamp(max(fire, body * smoke_alpha) * ends * form * (0.85 + 0.3 * core), 0.0, 1.0);

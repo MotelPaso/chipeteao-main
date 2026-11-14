@@ -10,6 +10,8 @@ extends Node3D
 ##   PICADA   cae a plomo y golpea el suelo: ondas de fuego y escombros
 ##   COLUMNA  una columna de fuego lo tapa; sale de ella abriendo las alas
 ##   GRITO    grita de frente a la cámara
+## Con la canción de la primera fase puesta, los momentos fuertes caen sobre
+## sus golpes (uno cada 2 s desde el segundo 1,24 de una calma de 15,24 s).
 ## El recorrido lo calcula MythosEntrancePath y el anillo lo dibuja el nodo
 ## Ring (MythosFireRing). Nada de aquí hace daño ni toca a nadie: la onda del
 ## golpe solo saca de la vista a la horda congelada (MythosHordeVeil), que
@@ -31,7 +33,7 @@ class Beat:
 
 @export_group("Cometa")
 ## Fracción de la calma (0-1) en que termina de bajar y entra al anillo.
-@export_range(0.0, 1.0) var comet_until: float = 0.21
+@export_range(0.0, 1.0) var comet_until: float = 0.2126
 ## Metros que recorre, a ras de suelo, desde donde aparece hasta el anillo.
 @export var comet_distance: float = 210.0
 ## Altura en metros a la que aparece.
@@ -51,7 +53,7 @@ class Beat:
 
 @export_group("Anillo de fuego")
 ## Fracción de la calma (0-1) en que termina la vuelta.
-@export_range(0.0, 1.0) var ring_until: float = 0.47
+@export_range(0.0, 1.0) var ring_until: float = 0.4751
 ## Radio del anillo, en metros.
 @export var ring_radius: float = 34.0
 ## Metros mínimos entre el anillo y la party: si la party está lejos, el anillo se agranda.
@@ -67,7 +69,7 @@ class Beat:
 
 @export_group("Ascenso y picada")
 ## Fracción de la calma (0-1) en que llega a lo alto y abre las alas.
-@export_range(0.0, 1.0) var apex_fraction: float = 0.59
+@export_range(0.0, 1.0) var apex_fraction: float = 0.6063
 ## Altura en metros a la que llega.
 @export var apex_height: float = 58.0
 ## Vueltas que da mientras sube.
@@ -87,7 +89,7 @@ class Beat:
 ## Grito de lo alto (fila de Sfx.SOUND_LIBRARY).
 @export var apex_sfx: StringName = &"phoenix_ascend"
 ## Fracción de la calma (0-1) en que se deja caer.
-@export_range(0.0, 1.0) var plunge_fraction: float = 0.625
+@export_range(0.0, 1.0) var plunge_fraction: float = 0.69
 ## Inclinación en la caída, en grados (negativo = pico abajo).
 @export var plunge_pitch_degrees: float = -85.0
 ## Parte de la caída (0-1) que tarda en clavarse de pico.
@@ -97,7 +99,7 @@ class Beat:
 
 @export_group("Impacto")
 ## Fracción de la calma (0-1) en que golpea el suelo. Desde ahí el bosque empieza a arder.
-@export_range(0.0, 1.0) var impact_fraction: float = 0.66
+@export_range(0.0, 1.0) var impact_fraction: float = 0.7375
 ## Radio del fogonazo del golpe, en unidades del modelo.
 @export var impact_flash_radius: float = 14.0
 ## Segundos que dura ese fogonazo.
@@ -131,11 +133,11 @@ class Beat:
 ## Segundos que tarda en formarse.
 @export var pillar_form_seconds: float = 0.25
 ## Fracción de la calma (0-1) en que se yergue dentro de la columna.
-@export_range(0.0, 1.0) var rear_fraction: float = 0.72
+@export_range(0.0, 1.0) var rear_fraction: float = 0.78
 ## Fracción de la calma (0-1) en que despega dentro de la columna.
-@export_range(0.0, 1.0) var rise_fraction: float = 0.76
+@export_range(0.0, 1.0) var rise_fraction: float = 0.82
 ## Fracción de la calma (0-1) en que abre las alas y la columna se deshace.
-@export_range(0.0, 1.0) var reveal_fraction: float = 0.8
+@export_range(0.0, 1.0) var reveal_fraction: float = 0.8688
 ## Radio del fogonazo al abrir las alas, en unidades del modelo.
 @export var reveal_flash_radius: float = 10.0
 ## Segundos que dura ese fogonazo.
@@ -147,7 +149,7 @@ class Beat:
 
 @export_group("Grito")
 ## Fracción de la calma (0-1) en que grita de frente a la cámara.
-@export_range(0.0, 1.0) var roar_fraction: float = 0.83
+@export_range(0.0, 1.0) var roar_fraction: float = 0.892
 ## Su grito (fila de Sfx.SOUND_LIBRARY).
 @export var roar_sfx: StringName = &"phoenix_screech"
 ## Temblor de cámara del grito, en metros de pantalla.

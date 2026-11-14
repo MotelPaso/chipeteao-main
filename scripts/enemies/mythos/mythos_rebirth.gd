@@ -1,17 +1,42 @@
 class_name MythosRebirth
 extends Node
-## El renacer de Mythos (nodo Rebirth de Mythos.tscn): lo que pasa entre su
-## primera forma y la renacida. Mythos lleva la cuenta de vidas y avisa aquí
-## cuándo cae y cuándo renace; este nodo tiene los valores y la puesta en
-## escena. Segundos desde que cae en cenizas:
+## El renacer de Mythos (nodo Rebirth de Mythos.tscn): lo que cambia entre
+## su primera forma y la renacida (nombre, colores de la barra y de sus
+## avisos). Mythos lleva la cuenta de vidas y avisa aquí cuándo cae y cuándo
+## renace.
+## LA SORPRESA. Nada en la primera fase avisa que tiene otra. Al agotarla
+## parece morir (fall): cae con su grito de muerte, estalla como cualquier
+## jefe y suelta orbes de vida; durante fakeout_seconds la party cree que
+## terminó. Recién ahí empieza el renacer (enter_ashes).
+## CON CINEMÁTICA el renacer se ve en ella (MythosRebirthAct, con el mundo
+## congelado). SIN ella corre aquí, en plena pelea; segundos desde que
+## empieza:
 ##   0                disco de aviso del estallido y orbes de vida
-##   pillar_at        una columna de fuego sube de las cenizas y la brasa
-##                    empieza a brillar cada vez más
+##   pillar_at        una columna de fuego sube de las cenizas, la brasa
+##                    brilla cada vez más y el fuego cambia de color
 ##   rebirth_seconds  estalla: golpe, ondas de fuego que hay que saltar,
 ##                    destello, un instante de cámara lenta y el cartel
 
+@export_group("Forma renacida")
+## Vida desde la que pelea en su forma renacida (más grande y de otro color).
+@export var ascend_from_life: int = 2
+## Nombre en la barra de vida y en el cartel cuando renace.
+@export var ascended_title: String = "Mythos renacido"
+## Color de su barra de vida en la primera forma.
+@export var bar_fill_color: Color = Color(1.0, 0.52, 0.12)
+## Color de su barra de vida en la forma renacida.
+@export var ascended_bar_color: Color = Color(0.45, 0.85, 1.0)
+## Color de los discos de aviso de sus ataques en la forma renacida.
+@export var ascended_telegraph_color: Color = Color(0.2, 0.62, 1.0)
+## Color del destello de sus golpes de suelo en la forma renacida.
+@export var ascended_impact_color: Color = Color(0.6, 0.9, 1.0)
+
+@export_group("Muerte fingida")
+## Segundos que parece muerto antes de que empiece el renacer (0 = renace enseguida).
+@export var fakeout_seconds: float = 2.8
+
 @export_group("Renacer")
-## Segundos que pasa en cenizas, invulnerable, antes de renacer.
+## Segundos que pasa en cenizas, invulnerable, antes de renacer (sin cinemática; con ella dura lo que su acto).
 @export var rebirth_seconds: float = 6.5
 ## Radio del estallido al renacer y de su disco de aviso, en metros.
 @export var rebirth_radius: float = 10.0
@@ -93,15 +118,18 @@ func scale_damage(multiplier: float) -> void:
 	wave_damage *= multiplier
 
 
-## Mythos cayó en cenizas: avisa el estallido, suelta los orbes y arranca la
-## cuenta de la puesta en escena.
-func enter_ashes(boss: Mythos) -> void:
+## Segundos del reloj de pelea que pasan entre una vida y la siguiente: la
+## muerte fingida y, si no lo lleva una cinemática (`staged`), el renacer.
+func interlude_seconds(staged: bool) -> float:
+	return fakeout_seconds + (0.0 if staged else rebirth_seconds)
+
+
+## Mythos agotó su primera forma y parece morir: estalla como un jefe que
+## cae y suelta los orbes de vida. Devuelve los segundos que dura el engaño.
+func fall(boss: Mythos) -> float:
 	_boss = boss
 	_origin = boss.global_position
-	_clock = 0.0
-	_pillar_up = false
-	_waves_left = 0
-	Telegraph.spawn_disc(boss, _origin, rebirth_radius, rebirth_seconds, boss.telegraph_color)
+	Juice.boss_died(_origin + Vector3.UP * 1.5, boss.death_burst_color())
 	var count := ash_orbs + ash_orbs_per_extra_player * maxi(Coop.player_count - 1, 0)
 	var start := randf() * TAU
 	for i: int in count:
@@ -109,7 +137,21 @@ func enter_ashes(boss: Mythos) -> void:
 		var at := boss.floor_point(_origin
 				+ Vector3(cos(angle), 0.0, sin(angle)) * ash_orb_radius)
 		EnemyLoot.spawn_health_orb(get_tree(), at + Vector3.UP * 0.6)
-	set_physics_process(true)
+	return fakeout_seconds
+
+
+## Empieza el renacer. Si no lo lleva una cinemática (`staged`), avisa el
+## estallido y arranca aquí la puesta en escena.
+func enter_ashes(boss: Mythos, staged: bool) -> void:
+	_boss = boss
+	_origin = boss.global_position
+	_clock = 0.0
+	_pillar_up = false
+	_waves_left = 0
+	if not staged:
+		Telegraph.spawn_disc(boss, _origin, rebirth_radius, rebirth_seconds,
+				boss.telegraph_color)
+	set_physics_process(not staged)
 
 
 ## Mythos renace: el estallido avisado, la primera onda y todo el espectáculo.
@@ -157,6 +199,8 @@ func _raise_pillar() -> void:
 	_pillar_up = true
 	Sfx.play(charge_sfx)
 	Juice.shake(shake_strength * 0.3, rebirth_seconds - _clock)
+	# El fuego de la segunda fase recorre el mapa mientras la columna arde.
+	_boss.ascend_world(_origin, rebirth_seconds - _clock)
 	if pillar_scene == null:
 		return
 	var pillar := Pools.acquire_scene(pillar_scene) as FireTornado

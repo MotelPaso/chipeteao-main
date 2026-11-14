@@ -13,6 +13,14 @@ uniform vec3 core_color : source_color = vec3(1.0, 0.95, 0.62);
 // Brillo de la bola.
 uniform float glow : hint_range(0.0, 6.0) = 2.4;
 
+group_uniforms Renacido;
+// Costra, fuego y corazón en la segunda fase del jefe (el fuego azul).
+uniform vec3 ascended_crust_color : source_color = vec3(0.02, 0.06, 0.4);
+uniform vec3 ascended_fire_color : source_color = vec3(0.08, 0.45, 1.0);
+uniform vec3 ascended_core_color : source_color = vec3(0.7, 0.96, 1.0);
+// 0-1: cuánto del fuego de la segunda fase (FireTint lo escribe para todo el fuego a la vez).
+global uniform float fire_ascend;
+
 group_uniforms Flujo;
 // Tamaño de las vetas (más alto = vetas más chicas) y rapidez con que fluyen.
 uniform float vein_scale = 2.6;
@@ -45,8 +53,10 @@ void fragment() {
 	vec3 p = normalize(local_pos) * vein_scale;
 	float n = noise3(p + vec3(0.0, TIME * flow_speed, 0.0)) * 0.65
 			+ noise3(p * 2.1 - vec3(TIME * flow_speed * 0.7, 0.0, 0.0)) * 0.35;
-	vec3 color = mix(crust_color, fire_color, smoothstep(0.3, 0.55, n));
-	color = mix(color, core_color, smoothstep(0.55, 0.85, n));
+	vec3 color = mix(mix(crust_color, ascended_crust_color, fire_ascend),
+			mix(fire_color, ascended_fire_color, fire_ascend), smoothstep(0.3, 0.55, n));
+	color = mix(color, mix(core_color, ascended_core_color, fire_ascend),
+			smoothstep(0.55, 0.85, n));
 	float facing = clamp(dot(NORMAL, VIEW), 0.0, 1.0);
 	ALBEDO = color * glow * (0.55 + 0.45 * facing);
 }

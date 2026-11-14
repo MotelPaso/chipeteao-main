@@ -174,3 +174,10 @@ camera_zoom_out={
 
 textures/canvas_textures/default_texture_filter=0
 textures/vram_compression/import_etc2_astc=true
+
+[shader_globals]
+
+fire_ascend={
+"type": "float",
+"value": 0.0
+}

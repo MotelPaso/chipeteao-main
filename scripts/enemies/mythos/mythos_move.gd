@@ -17,6 +17,8 @@ enum Stance { AIR, GROUND, ANY }
 @export var stance: Stance = Stance.AIR
 ## Vida (1 = la primera) desde la que Mythos usa este ataque.
 @export var unlock_life: int = 1
+## Vida desde la que DEJA de usarlo, porque otro ataque lo reemplaza (0 = lo usa hasta el final).
+@export var retire_life: int = 0
 ## Segundos de espera entre un uso y el siguiente, con agresividad 0.
 @export var cooldown: float = 8.0
 ## Multiplicador de esa espera con agresividad 1 (0.6 = 40 % más seguido).
@@ -55,6 +57,8 @@ func tick_cooldown(delta: float) -> void:
 ## del raider y volando o posado (`grounded`).
 func is_ready(life: int, distance: float, grounded: bool) -> bool:
 	if stance != Stance.ANY and (stance == Stance.GROUND) != grounded:
+		return false
+	if retire_life > 0 and life >= retire_life:
 		return false
 	return life >= unlock_life and _cooldown_left <= 0.0 \
 			and distance >= min_range and distance <= max_range

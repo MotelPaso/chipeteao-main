@@ -13,6 +13,13 @@ uniform vec3 tip_color : source_color = vec3(1.0, 0.28, 0.03);
 // Brillo de las llamas.
 uniform float strength : hint_range(0.0, 6.0) = 2.0;
 
+group_uniforms Renacido;
+// Base y punta de las llamas en la segunda fase del jefe (el fuego azul).
+uniform vec3 ascended_base_color : source_color = vec3(0.4, 0.8, 1.0);
+uniform vec3 ascended_tip_color : source_color = vec3(0.04, 0.3, 1.0);
+// 0-1: cuánto del fuego de la segunda fase (FireTint lo escribe para todo el fuego a la vez).
+global uniform float fire_ascend;
+
 group_uniforms Llamas;
 // Lenguas por metro a lo largo del anillo y rapidez con que suben.
 uniform float tongue_scale = 0.9;
@@ -52,6 +59,8 @@ void fragment() {
 	// Cada lengua llega más alto donde el ruido es mayor.
 	float top = 0.3 + 0.65 * n;
 	float flame = 1.0 - smoothstep(top - 0.2, top, h);
-	ALBEDO = mix(base_color, tip_color, smoothstep(0.0, 0.8, h)) * strength;
+	vec3 base = mix(base_color, ascended_base_color, fire_ascend);
+	vec3 tip = mix(tip_color, ascended_tip_color, fire_ascend);
+	ALBEDO = mix(base, tip, smoothstep(0.0, 0.8, h)) * strength;
 	ALPHA = clamp(flame * fade, 0.0, 1.0);
 }

@@ -177,6 +177,7 @@ var _last_position: Vector3 = Vector3.ZERO
 @onready var _trail: CPUParticles3D = %Trail
 @onready var _burst: CPUParticles3D = %Burst
 @onready var _aura: CPUParticles3D = %Aura
+@onready var _halo: MythosHalo = %Halo
 @onready var _gestures: MythosGestures = $Gestures
 @onready var _motion: MythosMotion = $Motion
 @onready var _ascended_parts: Array[Node3D] = [%AscendedCrown, %AscendedBack,
@@ -389,4 +390,5 @@ func _set_ascend(amount: float) -> void:
 		part.visible = amount > 0.01
 		part.scale = Vector3.ONE * maxf(amount, 0.001)
 	_aura.emitting = amount > 0.5
+	_halo.set_ascend(amount)
 

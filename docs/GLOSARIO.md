@@ -191,6 +191,11 @@ Lo que NO se traduce nunca: los `id` de catálogo, los `node_name`, los nombres 
 | Fire deluge (ataque de Mythos, segunda fase) | Diluvio de fuego |
 | Fire tornado (ataque de Mythos) | Tornado de fuego |
 | Tornado cage (ataque de Mythos: un anillo de tornados que gira y se cierra) | Jaula de tornados |
+| Feather storm (ataque de Mythos, segunda fase: plumas en espiral) | Tormenta de plumas |
+| Tornado mill (ataque de Mythos, segunda fase: aspas de tornados que giran) | Molino de tornados |
+| Fire tide (ataque de Mythos, segunda fase: ondas que salen y vuelven) | Marea de fuego |
+| Chain dive (ataque de Mythos, segunda fase) | Picada en cadena |
+| Reborn from his ashes (cartel del renacer) | Renacido de sus cenizas |
 | Fire wave (ataque de Mythos; se esquiva saltando) | Onda de fuego |
 | Mythos reborn (nombre de su segunda fase) | Mythos renacido |
 | Phase (de un jefe) | Fase |

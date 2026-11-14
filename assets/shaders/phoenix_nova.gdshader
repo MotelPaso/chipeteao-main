@@ -18,6 +18,13 @@ uniform float softness : hint_range(0.5, 6.0) = 2.4;
 uniform float flicker_speed = 9.0;
 uniform float flicker_depth : hint_range(0.0, 1.0) = 0.15;
 
+group_uniforms Renacido;
+// Centro y borde de la bola en la segunda fase del jefe (el fuego azul).
+uniform vec3 ascended_core_color : source_color = vec3(0.75, 0.96, 1.0);
+uniform vec3 ascended_edge_color : source_color = vec3(0.05, 0.35, 1.0);
+// 0-1: cuánto del fuego de la segunda fase (FireTint lo escribe para todo el fuego a la vez).
+global uniform float fire_ascend;
+
 // 0-1: avance de la carga (lo escribe el rig).
 instance uniform float charge = 0.0;
 
@@ -25,6 +32,8 @@ void fragment() {
 	float facing = clamp(dot(NORMAL, VIEW), 0.0, 1.0);
 	float glow = pow(facing, softness);
 	float flicker = 1.0 - flicker_depth * (0.5 + 0.5 * sin(TIME * flicker_speed * TAU));
-	ALBEDO = mix(edge_color, core_color, glow) * strength * (0.35 + 0.65 * charge) * flicker;
+	vec3 edge = mix(edge_color, ascended_edge_color, fire_ascend);
+	vec3 core = mix(core_color, ascended_core_color, fire_ascend);
+	ALBEDO = mix(edge, core, glow) * strength * (0.35 + 0.65 * charge) * flicker;
 	ALPHA = glow;
 }

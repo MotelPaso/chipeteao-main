@@ -11,8 +11,8 @@ extends Node3D
 const GROUP := &"safe_circles"
 
 @export_group("Aspecto")
-## Color del anillo y de la columna de luz.
-@export var color: Color = Color(0.45, 0.95, 1.0)
+## Color del anillo y de la columna de luz (dorado: tiene que distinguirse del fuego azul de la segunda fase).
+@export var color: Color = Color(1.0, 0.86, 0.4)
 ## Opacidad del anillo del suelo (0-1).
 @export_range(0.0, 1.0) var ring_alpha: float = 0.95
 ## Opacidad de la columna de luz (0-1).

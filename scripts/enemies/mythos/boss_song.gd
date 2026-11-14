@@ -1,9 +1,10 @@
 class_name BossSong
 extends AudioStreamPlayer
-## La canción de un jefe (nodo Music de MythosCinematic.tscn). La cinemática
-## le dice cuándo arrancar y qué reloj seguir; este nodo sabe sonar por el bus
-## de música, volver al final de la calma cuando la canción se acaba, quedarse
-## pegado al reloj del juego y apagarse de a poco.
+## Una canción de un jefe (nodos Music y MusicReborn de MythosCinematic.tscn:
+## una por fase). La cinemática le dice cuándo arrancar y qué reloj seguir;
+## este nodo sabe sonar por el bus de música, volver al final de la calma
+## cuando la canción se acaba, quedarse pegado al reloj del juego y apagarse
+## de a poco.
 ##
 ## EL RELOJ lo lleva la cinemática, en tiempo de juego. Con un driver de audio
 ## real la canción se reacomoda si se desfasa de ese reloj; con el driver
@@ -27,6 +28,8 @@ const SILENT_DB: float = -60.0
 @export var resync_threshold: float = 0.12
 ## Segundos que tarda la canción en apagarse cuando el jefe muere.
 @export var fade_seconds: float = 5.0
+## Segundos que tarda en apagarse cuando la reemplaza la canción de otra fase.
+@export var handover_seconds: float = 1.2
 
 var _dummy_audio: bool = false
 ## True desde start() hasta que la canción se corta o termina de apagarse.
@@ -108,13 +111,12 @@ func resyncs() -> int:
 
 ## El jefe murió: la canción se apaga de a poco y después se detiene.
 func fade_out() -> void:
-	if not playing:
-		return
-	_kill_fade()
-	print("Boss music: fading out over %.1fs" % fade_seconds)
-	_fade_tween = create_tween()
-	_fade_tween.tween_property(self, "volume_db", SILENT_DB, fade_seconds)
-	_fade_tween.tween_callback(_stop_faded)
+	_fade(fade_seconds)
+
+
+## Le deja el lugar a la canción de otra fase: se apaga rápido.
+func hand_over() -> void:
+	_fade(handover_seconds)
 
 
 ## Corta la canción ya (la arena se va o la partida terminó).
@@ -140,6 +142,16 @@ func _looped_copy(source: AudioStream, loop_from: float) -> AudioStream:
 		wav.loop_begin = int(round(loop_from * float(wav.mix_rate)))
 		wav.loop_end = int(round(wav.get_length() * float(wav.mix_rate)))
 	return copy
+
+
+func _fade(seconds: float) -> void:
+	if not playing:
+		return
+	_kill_fade()
+	print("Boss music: fading out over %.1fs" % seconds)
+	_fade_tween = create_tween()
+	_fade_tween.tween_property(self, "volume_db", SILENT_DB, seconds)
+	_fade_tween.tween_callback(_stop_faded)
 
 
 func _stop_faded() -> void:

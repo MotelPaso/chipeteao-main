@@ -1,10 +1,10 @@
 class_name FireWave
 extends Node3D
 ## Onda de fuego del pool: un anillo de llamas que se abre a ras de suelo
-## desde un punto, siguiendo el relieve. Daña UNA vez a cada raider en pie
-## que el anillo alcance por debajo de su altura: se esquiva SALTANDO justo
-## cuando pasa. Con daño 0 es solo un efecto (así la usa la cinemática de
-## Mythos, con una instancia propia y open()).
+## desde un punto (o se cierra hacia él), siguiendo el relieve. Daña UNA vez
+## a cada raider en pie que el anillo alcance por debajo de su altura: se
+## esquiva SALTANDO justo cuando pasa. Con daño 0 es solo un efecto (así la
+## usan las cinemáticas de Mythos, con una instancia propia y open()).
 ## El anillo son tramos de llama (el cuadro de 1 x 1 del nodo Wall de
 ## FireWave.tscn) en un MultiMesh propio de cada instancia.
 ## Grupo "fire_waves": el jefe las apaga todas al morir (dissipate).
@@ -22,7 +22,7 @@ const GROUP := &"fire_waves"
 @export var fade_time: float = 0.3
 
 var _radius: float = 0.0
-var _max_radius: float = 0.0
+var _end_radius: float = 0.0
 var _speed: float = 0.0
 var _damage: float = 0.0
 var _height_window: float = 0.0
@@ -58,15 +58,16 @@ func pool_reset() -> void:
 
 
 ## Saca del pool una onda y la abre desde `center` (un punto sobre el suelo):
-## nace con `start_radius` y crece `speed` m/s hasta `max_radius`. Golpea con
+## nace con `start_radius` y avanza `speed` m/s hasta `end_radius` (si es
+## menor que el de partida, el anillo se CIERRA hacia el centro). Golpea con
 ## `damage` a los raiders en pie que estén a menos de `height_window` metros
 ## del suelo cuando el anillo (de `band` metros de ancho) les pasa.
 static func spawn(scene: PackedScene, center: Vector3, start_radius: float,
-		max_radius: float, speed: float, damage: float, height_window: float, band: float,
+		end_radius: float, speed: float, damage: float, height_window: float, band: float,
 		attacker: Node3D) -> FireWave:
 	var wave := Pools.acquire_scene(scene) as FireWave
 	if wave != null:
-		wave.open(center, start_radius, max_radius, speed, damage, height_window, band,
+		wave.open(center, start_radius, end_radius, speed, damage, height_window, band,
 				attacker)
 	return wave
 
@@ -85,13 +86,13 @@ func dissipate() -> void:
 
 ## Abre ESTA onda desde `center`, con lo mismo que pide spawn(). Para una
 ## onda que ya está en el árbol y no salió del pool.
-func open(center: Vector3, start_radius: float, max_radius: float, speed: float,
+func open(center: Vector3, start_radius: float, end_radius: float, speed: float,
 		damage: float, height_window: float, band: float, attacker: Node3D) -> void:
 	_kill_fade()
 	_terrain = Terrain.find(get_tree())
 	_radius = start_radius
-	_max_radius = max_radius
-	_speed = speed
+	_end_radius = end_radius
+	_speed = absf(speed)
 	_damage = damage
 	_height_window = height_window
 	_band = band
@@ -107,11 +108,11 @@ func open(center: Vector3, start_radius: float, max_radius: float, speed: float,
 
 
 func _physics_process(delta: float) -> void:
-	_radius += _speed * delta
+	_radius = move_toward(_radius, _end_radius, _speed * delta)
 	_place_segments()
 	if _damage > 0.0:
 		_hit_raiders()
-	if _radius >= _max_radius:
+	if is_equal_approx(_radius, _end_radius):
 		dissipate()
 
 

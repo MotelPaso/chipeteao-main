@@ -12,6 +12,8 @@ extends ProgressBar
 ##   lives_changed(left, total), lives_left(), lives_total()  -> los rombos
 ##   bar_title() -> el nombre (se vuelve a leer en cada cambio de fase)
 ##   bar_color() -> el color del relleno (ídem)
+##   bar_visible_changed(shown) -> la barra se va (el jefe parece muerto) o
+##       vuelve llenándose desde cero, con su nombre y su color de ahora
 ## Cuando el jefe seguido muere o se va, la barra pasa a otro jefe vivo
 ## (primero el de etapa) en vez de ocultarse.
 
@@ -186,6 +188,8 @@ func track(boss: Node3D, title: String) -> void:
 	boss_health.hp_changed.connect(_on_hp_changed)
 	boss_health.died.connect(_on_died)
 	boss.tree_exited.connect(_on_boss_gone)
+	if boss.has_signal(&"bar_visible_changed"):
+		boss.connect(&"bar_visible_changed", _on_bar_visible_changed)
 	_name_label.text = title
 	visible = true
 	set_process(true)
@@ -236,7 +240,9 @@ func _follow_another_boss() -> void:
 				continue
 			var health := Health.find_in(boss)
 			var title: Variant = boss.get("boss_title")
-			if health == null or health.is_dead or title == null:
+			# Un jefe que se hace el muerto sale del grupo "boss": no cuenta.
+			if health == null or health.is_dead or title == null \
+					or not boss.is_in_group(&"boss"):
 				continue
 			track(boss, String(title))
 			return
@@ -252,6 +258,9 @@ func _untrack() -> void:
 		if _tracked_boss.has_signal(&"lives_changed") \
 				and _tracked_boss.is_connected(&"lives_changed", _on_lives_changed):
 			_tracked_boss.disconnect(&"lives_changed", _on_lives_changed)
+		if _tracked_boss.has_signal(&"bar_visible_changed") \
+				and _tracked_boss.is_connected(&"bar_visible_changed", _on_bar_visible_changed):
+			_tracked_boss.disconnect(&"bar_visible_changed", _on_bar_visible_changed)
 	_boss_health = null
 	_tracked_boss = null
 	_lives_total = 0
@@ -273,6 +282,18 @@ func _on_lives_changed(left: int, total: int) -> void:
 	_lives_total = total
 	if _tracked_boss != null:
 		_read_look(_tracked_boss)
+
+
+## El jefe pide que su barra se vaya o vuelva sin dejar de seguirlo. Al
+## volver se llena desde cero con su nombre y su color de ahora.
+func _on_bar_visible_changed(shown: bool) -> void:
+	visible = shown
+	set_process(shown)
+	if not shown or _tracked_boss == null or _boss_health == null:
+		return
+	_read_look(_tracked_boss)
+	max_value = _boss_health.max_hp
+	_fill_in(_boss_health.current_hp)
 
 
 ## Nombre y color que el jefe quiera para su barra ahora (ver la cabecera).

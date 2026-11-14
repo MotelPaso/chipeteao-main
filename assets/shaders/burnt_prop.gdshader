@@ -36,6 +36,15 @@ uniform vec3 fire_core : source_color = vec3(1.0, 0.85, 0.4);
 // Fuerza del brillo de las llamas.
 uniform float fire_glow = 1.5;
 
+group_uniforms Renacido;
+// Brasas, llamas y su centro en la segunda fase del jefe (el fuego azul).
+uniform vec3 ascended_ember_color : source_color = vec3(0.05, 0.36, 1.0);
+uniform vec3 ascended_fire_color : source_color = vec3(0.06, 0.42, 1.0);
+uniform vec3 ascended_fire_core : source_color = vec3(0.6, 0.92, 1.0);
+// El frente del fuego azul: de dónde sale y hasta dónde llegó, en metros (0 = no empezó).
+uniform vec3 ascend_origin = vec3(0.0);
+uniform float ascend_radius = 0.0;
+
 group_uniforms Frente;
 // Punto del mundo desde el que avanza el fuego.
 uniform vec3 burn_origin = vec3(0.0);
@@ -94,14 +103,21 @@ void fragment() {
 	float flame = smoothstep(0.5, 0.82, flicker);
 	float ember = smoothstep(0.6, 0.9,
 			value_noise(world_pos.xz * 2.3 + vec2(world_pos.y * 1.9, 3.0)));
-	// Lo verde queda en carbón rojizo; las llamas son parches que suben.
-	vec3 canopy = mix(char_color, fire_color * 0.22, 0.5);
+	// El fuego azul avanza igual que el primer frente, desde su propio origen.
+	float ascend_reach = distance(world_pos.xz, ascend_origin.xz)
+			+ (value_noise(world_pos.xz * 0.08) - 0.5) * burn_edge * 2.0;
+	float ascended = ascend_radius <= 0.0 ? 0.0
+			: 1.0 - smoothstep(ascend_radius - burn_edge, ascend_radius, ascend_reach);
+	vec3 fire = mix(fire_color, ascended_fire_color, ascended);
+	vec3 core = mix(fire_core, ascended_fire_core, ascended);
+	// Lo verde queda en carbón del color del fuego; las llamas son parches que suben.
+	vec3 canopy = mix(char_color, fire * 0.22, 0.5);
 	vec3 charred = mix(mix(base * 0.4, char_color, 0.85), canopy, leaf);
 	ALBEDO = mix(base, charred, burnt);
 	float burning = leaf * flame_amount;
-	vec3 glow = mix(fire_color, fire_core, flame) * burning * flame * fire_glow
-			+ fire_color * burning * 0.12
-			+ ember_color * ember * (1.0 - burning) * 1.1;
+	vec3 glow = mix(fire, core, flame) * burning * flame * fire_glow
+			+ fire * burning * 0.12
+			+ mix(ember_color, ascended_ember_color, ascended) * ember * (1.0 - burning) * 1.1;
 	EMISSION = glow * burnt * heat;
 	ROUGHNESS = roughness;
 	METALLIC = 0.0;

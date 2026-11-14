@@ -1,20 +1,22 @@
-[gd_scene load_steps=12 format=3]
+[gd_scene load_steps=13 format=3]
 
 [ext_resource type="Script" path="res://scripts/enemies/mythos/hell_transformation.gd" id="1_hell"]
 [ext_resource type="Shader" path="res://assets/shaders/burnt_prop.gdshader" id="2_prop"]
 [ext_resource type="Script" path="res://scripts/systems/ambient_bed.gd" id="3_bed"]
 [ext_resource type="AudioStream" path="res://assets/audio/ambient/hell_fire.wav" id="4_fire"]
 [ext_resource type="PackedScene" path="res://scenes/enemies/mythos/HellSmoke.tscn" id="5_smoke"]
+[ext_resource type="Shader" path="res://assets/shaders/fire_spark.gdshader" id="6_spark"]
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_prop"]
 shader = ExtResource("2_prop")
 
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_ember"]
-shading_mode = 0
-albedo_color = Color(1, 0.55, 0.14, 1)
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_ember"]
+shader = ExtResource("6_spark")
+shader_parameter/color = Color(1, 0.55, 0.14, 1)
+shader_parameter/ascended_color = Color(0.3, 0.72, 1, 1)
 
 [sub_resource type="BoxMesh" id="BoxMesh_ember"]
-material = SubResource("StandardMaterial3D_ember")
+material = SubResource("ShaderMaterial_ember")
 size = Vector3(0.11, 0.11, 0.11)
 
 [sub_resource type="Curve" id="Curve_ember"]

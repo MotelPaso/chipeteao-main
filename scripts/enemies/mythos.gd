@@ -21,14 +21,17 @@ extends MythosBody
 ## Las zonas de fuego las saca el nodo Zones (MythosBody), la llegada
 ## (cinemática y mapa en llamas) el nodo Arrival, y si una fase se alarga
 ## demasiado se consume solo (nodo Burnout).
-## Contratos por nombre: lives_changed / lives_left / lives_total /
-## bar_title / bar_color (BossBar), fight_state (arena_probe), finish_calm (la
-## cinemática o el nodo Arrival, al terminar la calma) y las líneas
+## Nada en la primera fase avisa que tiene otra: al agotarla parece morir
+## (su barra se va, la música se apaga, nadie le apunta) y recién después
+## renace.
+## Contratos por nombre: bar_visible_changed / bar_title / bar_color
+## (BossBar), fight_state (arena_probe), finish_calm y finish_rebirth (la
+## cinemática o el nodo Arrival, al terminar cada acto) y las líneas
 ## "<título> scaling:", "life over:", "fight started:", "fight over:" y
 ## "move:" que leen los soaks.
 
-## Cambió la cantidad de vidas que le quedan (la barra del HUD la escucha).
-signal lives_changed(left: int, total: int)
+## Su barra de vida tiene que irse (parece muerto) o volver (renació).
+signal bar_visible_changed(shown: bool)
 
 enum Phase { ARRIVAL, FLIGHT, MOVE, ASHES, DEAD }
 
@@ -45,21 +48,6 @@ const GAZE_HEIGHT: float = 1.2
 ## Multiplicador de la pausa mientras está posado en tierra (de cerca ataca más seguido).
 @export var ground_pause_factor: float = 0.5
 
-@export_group("Forma renacida")
-## Vida desde la que pelea en su forma renacida (más grande y de otro color).
-@export var ascend_from_life: int = 2
-## Nombre en la barra de vida cuando renace.
-@export var ascended_title: String = "Mythos renacido"
-## Color de su barra de vida en la primera forma.
-@export var bar_fill_color: Color = Color(1.0, 0.52, 0.12)
-## Color de su barra de vida en la forma renacida.
-@export var ascended_bar_color: Color = Color(0.45, 0.85, 1.0)
-
-## Agresividad actual (0-1); la leen los ataques.
-var aggression: float = 0.0
-## El rig que vuela (nodo Visual); los ataques le piden poses y gestos.
-var rig: MythosRig = null
-
 var _phase: Phase = Phase.ARRIVAL
 var _guard: GuardedHealth = null
 var _lives_total: int = 1
@@ -71,13 +59,16 @@ var _life_damage: float = 0.0
 ## Segundos de pelea desde que terminó la calma, renaceres incluidos.
 var _fight_clock: float = 0.0
 var _ashes_left: float = 0.0
+## Segundos que le quedan haciéndose el muerto antes de empezar a renacer.
+var _fakeout_left: float = 0.0
+## True si el renacer lo lleva la cinemática (ella avisa con finish_rebirth).
+var _ashes_staged: bool = false
 var _pause_left: float = 0.0
 var _move: MythosMove = null
 ## Factor de daño por poder ya aplicado a los ataques (ver _apply_plan).
 var _power_damage_applied: float = 1.0
 
 @onready var _scaling: StageBossScaling = $Scaling
-@onready var _flight: MythosFlight = $Flight
 @onready var _arrival: MythosArrival = $Arrival
 @onready var _purge: MythosPurge = $Purge
 @onready var _reborn: MythosRebirth = $Rebirth
@@ -87,8 +78,6 @@ var _power_damage_applied: float = 1.0
 
 
 func _ready() -> void:
-	# Antes de super(): BossBase anuncia el jefe a la barra del HUD en su
-	# _ready, y la barra ya pregunta cuántas vidas tiene.
 	_lives_total = _scaling.lives()
 	super()
 	_guard = _health as GuardedHealth
@@ -112,21 +101,13 @@ func _physics_process(delta: float) -> void:
 		# termina, y durante la cinemática el suelo está fuera de la física.
 		_arrival.tick(delta)
 		return
+	if _phase == Phase.ASHES and _ashes_staged:
+		# Igual en el renacer: lo lleva la cinemática, con el mundo congelado.
+		return
 	super(delta)
 
 
 # --- contratos por nombre ---------------------------------------------------------
-
-## Vidas que le quedan, contando la que está peleando.
-func lives_left() -> int:
-	if _phase == Phase.DEAD:
-		return 0
-	return _lives_total - _life + (0 if _phase == Phase.ASHES else 1)
-
-
-func lives_total() -> int:
-	return _lives_total
-
 
 ## En qué anda: "arrival", "flight", "move", "ashes" o "dead" (lo lee el harness).
 func fight_state() -> StringName:
@@ -140,12 +121,29 @@ func is_fighting() -> bool:
 
 ## Nombre para la barra de vida: cambia cuando renace.
 func bar_title() -> String:
-	return ascended_title if _is_ascended() else boss_title
+	return _reborn.ascended_title if _is_ascended() else boss_title
 
 
 ## Color para la barra de vida: cambia cuando renace.
 func bar_color() -> Color:
-	return ascended_bar_color if _is_ascended() else bar_fill_color
+	return _reborn.ascended_bar_color if _is_ascended() else _reborn.bar_fill_color
+
+
+## Su nombre en la forma renacida (el cartel del renacer).
+func reborn_title() -> String:
+	return _reborn.ascended_title
+
+
+## Termina el renacer que llevaba la cinemática: `elapsed` son los segundos
+## de juego que duró y `skipped` si alguien lo saltó.
+func finish_rebirth(_elapsed: float, _skipped: bool) -> void:
+	if _phase == Phase.ASHES and _ashes_staged:
+		_rebirth()
+
+
+## El fuego de la segunda fase recorre el mapa desde `origin` en `seconds`.
+func ascend_world(origin: Vector3, seconds: float) -> void:
+	_arrival.ascend_world(origin, seconds)
 
 
 ## Termina la calma y empieza la pelea. `elapsed` son los segundos de juego
@@ -170,29 +168,6 @@ func finish_calm(elapsed: float, skipped: bool) -> void:
 
 # --- lo que piden los ataques (nodos Moves) ---------------------------------------
 
-## Punto del que salen sus plumas y sus bolas de fuego: el pico.
-func muzzle_point() -> Vector3:
-	return rig.beak_point()
-
-
-## Lo posa en tierra (la Picada, al caer): desde ahí usa sus ataques de tierra.
-func land() -> void:
-	_flight.land(aggression)
-	rig.set_pose(MythosRig.Pose.PERCH)
-
-
-## Lo devuelve al vuelo (el Aletazo, al terminar).
-func take_off() -> void:
-	_flight.take_off()
-	rig.set_pose(MythosRig.Pose.FLY)
-
-
-## La pose de descanso de su postura: posado o volando. Los ataques vuelven
-## a ella al terminar.
-func rest_pose() -> MythosRig.Pose:
-	return MythosRig.Pose.PERCH if _flight.is_grounded() else MythosRig.Pose.FLY
-
-
 ## Destello a pantalla completa (lo piden sus golpes más fuertes).
 func screen_flash() -> void:
 	_arrival.flash()
@@ -208,6 +183,11 @@ func _scale_attack_damage(multiplier: float) -> void:
 func _behavior_tick(delta: float) -> void:
 	_fight_clock += delta
 	if _phase == Phase.ASHES:
+		if _fakeout_left > 0.0:
+			_fakeout_left -= delta
+			if _fakeout_left <= 0.0:
+				_begin_rebirth()
+			return
 		_ashes_left -= delta
 		if _ashes_left <= 0.0:
 			_rebirth()
@@ -248,6 +228,8 @@ func _facing_direction(steer: Vector3, seek: Vector3) -> Vector3:
 
 
 func _combat_tick(player: Node3D, distance: float) -> void:
+	if not is_fighting():
+		return
 	# No le saca los ojos de encima al raider que tiene de blanco.
 	rig.gaze_at(player.global_position + Vector3.UP * GAZE_HEIGHT)
 	if _phase != Phase.FLIGHT or _pause_left > 0.0:
@@ -270,7 +252,8 @@ func _combat_tick(player: Node3D, distance: float) -> void:
 func _begin_arrival() -> void:
 	if not is_inside_tree() or _phase != Phase.ARRIVAL:
 		return
-	_apply_plan(_scaling.plan_first_life(_health.max_hp, _reborn.rebirth_seconds))
+	_apply_plan(_scaling.plan_first_life(_health.max_hp,
+			_reborn.interlude_seconds(_arrival.stages_rebirth())))
 	rig.set_trail(true)
 	_arrival.begin(self)
 
@@ -311,8 +294,23 @@ func _on_life_spent() -> void:
 	rig.gesture(&"spin")
 	rig.set_pose(MythosRig.Pose.ASHES)
 	rig.burst()
-	_reborn.enter_ashes(self)
-	lives_changed.emit(lives_left(), _lives_total)
+	# Parece su muerte: grita, estalla, su barra se va y la música se apaga.
+	_ashes_staged = false
+	_fakeout_left = _reborn.fall(self)
+	_voice.died()
+	_arrival.feign_death(_fakeout_left)
+	play_dead()
+	bar_visible_changed.emit(false)
+	if _fakeout_left <= 0.0:
+		_begin_rebirth()
+
+
+## Terminó de hacerse el muerto: empieza el renacer. Con cinemática lo lleva
+## ella (avisa con finish_rebirth); sin ella corre el reloj de _ashes_left.
+func _begin_rebirth() -> void:
+	_fakeout_left = 0.0
+	_ashes_staged = _arrival.play_rebirth(self)
+	_reborn.enter_ashes(self, _ashes_staged)
 
 
 ## Renace: vida nueva calculada con el daño que la party le hizo de verdad
@@ -324,14 +322,23 @@ func _rebirth() -> void:
 	_life_damage = 0.0
 	_apply_plan(plan)
 	rig.ascend(_is_ascended())
+	rig.set_nova(-1.0)
 	rig.set_pose(MythosRig.Pose.FLY)
-	rig.gesture(&"roar")
-	_reborn.burst(self)
+	if _is_ascended():
+		telegraph_color = _reborn.ascended_telegraph_color
+		impact_color = _reborn.ascended_impact_color
+	if _ashes_staged:
+		_ashes_staged = false
+	else:
+		# Sin cinemática, el estallido del renacer pasa en plena pelea.
+		rig.gesture(&"roar")
+		_reborn.burst(self)
 	_health.invulnerable = false
 	_phase = Phase.FLIGHT
 	_pause_left = _reborn.post_rebirth_pause
 	_moveset.reset_cooldowns()
-	lives_changed.emit(lives_left(), _lives_total)
+	rise_again()
+	bar_visible_changed.emit(true)
 
 
 ## Su última muerte (la única que emite Health.died): se apagan sus fuegos.
@@ -345,13 +352,12 @@ func _on_final_death() -> void:
 	_reborn.cancel()
 	_voice.died()
 	_arrival.on_boss_dead()
-	lives_changed.emit(0, _lives_total)
 
 
 # --- privados ---------------------------------------------------------------------
 
 func _is_ascended() -> bool:
-	return _life >= ascend_from_life
+	return _life >= _reborn.ascend_from_life
 
 
 ## Suma el daño de la party a la vida actual (el del desgaste no cuenta) y

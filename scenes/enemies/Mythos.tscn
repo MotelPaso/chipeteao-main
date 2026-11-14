@@ -1,4 +1,4 @@
-[gd_scene load_steps=70 format=3]
+[gd_scene load_steps=76 format=3]
 
 [ext_resource type="Script" path="res://scripts/enemies/mythos.gd" id="1_mythos"]
 [ext_resource type="Script" path="res://scripts/enemies/boss/guarded_health.gd" id="2_health"]
@@ -29,6 +29,10 @@
 [ext_resource type="Script" path="res://scripts/enemies/mythos/mythos_gestures.gd" id="27_gestures"]
 [ext_resource type="Script" path="res://scripts/enemies/mythos/mythos_nova.gd" id="28_nova"]
 [ext_resource type="Script" path="res://scripts/enemies/mythos/mythos_motion.gd" id="29_motion"]
+[ext_resource type="Shader" path="res://assets/shaders/fire_spark.gdshader" id="30_spark"]
+[ext_resource type="Script" path="res://scripts/enemies/mythos/mythos_storm.gd" id="31_storm"]
+[ext_resource type="Script" path="res://scripts/enemies/mythos/mythos_mill.gd" id="32_mill"]
+[ext_resource type="Script" path="res://scripts/enemies/mythos/mythos_halo.gd" id="33_halo"]
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_flight"]
 shader = ExtResource("13_plumage")
@@ -177,9 +181,20 @@ albedo_color = Color(1, 0.98, 0.78, 1)
 albedo_color = Color(0.17, 0.15, 0.14, 1)
 roughness = 1.0
 
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_ember"]
-shading_mode = 0
-albedo_color = Color(1, 0.6, 0.18, 1)
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_ember"]
+shader = ExtResource("30_spark")
+shader_parameter/color = Color(1, 0.6, 0.18, 1)
+shader_parameter/ascended_color = Color(0.35, 0.78, 1, 1)
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_trail"]
+shader = ExtResource("30_spark")
+shader_parameter/color = Color(1, 0.55, 0.12, 1)
+shader_parameter/ascended_color = Color(0.2, 0.68, 1, 1)
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_burst"]
+shader = ExtResource("30_spark")
+shader_parameter/color = Color(1, 0.7, 0.25, 1)
+shader_parameter/ascended_color = Color(0.55, 0.9, 1, 1)
 
 [sub_resource type="Gradient" id="Gradient_halo"]
 offsets = PackedFloat32Array(0, 0.3, 1)
@@ -310,7 +325,7 @@ radial_segments = 16
 rings = 8
 
 [sub_resource type="BoxMesh" id="BoxMesh_ember"]
-material = SubResource("StandardMaterial3D_ember")
+material = SubResource("ShaderMaterial_ember")
 size = Vector3(0.11, 0.11, 0.11)
 
 [sub_resource type="Curve" id="Curve_shrink"]
@@ -378,10 +393,12 @@ unique_name_in_owner = true
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
 
 [node name="Halo" type="MeshInstance3D" parent="Visual/Hover/Body"]
+unique_name_in_owner = true
 transform = Transform3D(7, 0, 0, 0, 7, 0, 0, 0, 7, 0, 0.15, 0.1)
 cast_shadow = 0
 mesh = SubResource("QuadMesh_halo")
 surface_material_override/0 = SubResource("StandardMaterial3D_halo")
+script = ExtResource("33_halo")
 
 [node name="Chest" type="MeshInstance3D" parent="Visual/Hover/Body"]
 transform = Transform3D(1.15, 0, 0, 0, 0, -1.08, 0, 1.4, 0, 0, 0, -0.3)
@@ -1571,6 +1588,7 @@ draw_pass_1 = SubResource("BoxMesh_ember")
 
 [node name="Trail" type="CPUParticles3D" parent="Visual/Hover/Body"]
 unique_name_in_owner = true
+material_override = SubResource("ShaderMaterial_trail")
 cast_shadow = 0
 emitting = false
 mesh = SubResource("BoxMesh_spark")
@@ -1591,6 +1609,7 @@ color = Color(1, 0.55, 0.12, 1)
 
 [node name="Burst" type="CPUParticles3D" parent="Visual/Hover/Body"]
 unique_name_in_owner = true
+material_override = SubResource("ShaderMaterial_burst")
 cast_shadow = 0
 emitting = false
 mesh = SubResource("BoxMesh_spark")
@@ -1679,6 +1698,7 @@ script = ExtResource("25_moveset")
 [node name="FeatherVolley" type="Node" parent="Moves"]
 script = ExtResource("6_volley")
 stance = 2
+retire_life = 2
 cooldown = 7.0
 first_use_fraction = 0.15
 min_range = 3.5
@@ -1687,12 +1707,14 @@ call_sfx = &"phoenix_screech"
 
 [node name="Fireballs" type="Node" parent="Moves"]
 script = ExtResource("9_fireballs")
+retire_life = 2
 cooldown = 9.0
 first_use_fraction = 0.35
 call_sfx = &"phoenix_screech"
 
 [node name="Dive" type="Node" parent="Moves"]
 script = ExtResource("7_dive")
+retire_life = 2
 cooldown = 10.0
 cooldown_at_full_aggression = 0.65
 first_use_fraction = 0.5
@@ -1707,6 +1729,7 @@ call_sfx = &"phoenix_screech"
 
 [node name="Waves" type="Node" parent="Moves"]
 script = ExtResource("24_waves")
+retire_life = 2
 cooldown = 13.0
 first_use_fraction = 0.7
 max_range = 30.0
@@ -1750,6 +1773,45 @@ unlock_life = 2
 cooldown = 40.0
 cooldown_at_full_aggression = 0.75
 first_use_fraction = 0.45
+
+[node name="Storm" type="Node" parent="Moves"]
+script = ExtResource("31_storm")
+stance = 2
+unlock_life = 2
+cooldown = 10.0
+first_use_fraction = 0.1
+max_range = 34.0
+call_sfx = &"phoenix_screech"
+
+[node name="DiveChain" type="Node" parent="Moves"]
+script = ExtResource("7_dive")
+unlock_life = 2
+cooldown = 13.0
+cooldown_at_full_aggression = 0.7
+first_use_fraction = 0.6
+max_range = 36.0
+call_sfx = &"phoenix_dive"
+windup = 0.9
+chain = 3
+
+[node name="Tide" type="Node" parent="Moves"]
+script = ExtResource("24_waves")
+unlock_life = 2
+cooldown = 14.0
+first_use_fraction = 0.75
+max_range = 30.0
+call_sfx = &"phoenix_caw"
+waves = 3
+extra_at_full_aggression = 1
+speed = 14.0
+return_waves = 2
+
+[node name="Mill" type="Node" parent="Moves"]
+script = ExtResource("32_mill")
+unlock_life = 2
+cooldown = 24.0
+first_use_fraction = 0.4
+call_sfx = &"phoenix_screech"
 
 [node name="Claws" type="Node" parent="Moves"]
 script = ExtResource("10_claws")

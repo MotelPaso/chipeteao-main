@@ -27,19 +27,9 @@ const OPEN_SPOT_STEPS: Array[Vector2] = [Vector2(0.0, 0.0), Vector2(8.0, 0.0),
 		Vector2(-16.0, 0.0), Vector2(16.0, 8.0), Vector2(-16.0, 8.0), Vector2(16.0, -8.0),
 		Vector2(-16.0, -8.0), Vector2(0.0, 16.0), Vector2(8.0, 16.0), Vector2(-8.0, 16.0),
 		Vector2(24.0, 0.0), Vector2(-24.0, 0.0), Vector2(24.0, 8.0), Vector2(-24.0, 8.0)]
-## El pasillo que tiene que estar libre es una caja a la altura de los
-## troncos: metros sobre el suelo de su centro y su alto.
-const CORRIDOR_HEIGHT: float = 2.6
-const CORRIDOR_THICKNESS: float = 1.4
-## Cuánto estorba cada cosa que pisa el pasillo: lo mínimo (lejos), lo que
-## suma si está pegada a la cámara y lo que cuenta una loma del terreno.
-const CROWD_FAR: float = 0.25
-const CROWD_NEAR: float = 1.0
-const CROWD_TERRAIN: float = 0.5
-
 @export_group("Plano del cometa")
 ## Fracción de la calma (0-1) hasta la que dura (un poco después de que entra al anillo: ahí le pasa por al lado).
-@export_range(0.0, 1.0) var comet_shot_until: float = 0.245
+@export_range(0.0, 1.0) var comet_shot_until: float = 0.249
 ## Dónde se para la cámara sobre la recta por la que baja, pasado el anillo, en veces el radio del anillo.
 @export var comet_ahead: float = 0.75
 ## Metros hacia afuera del anillo.
@@ -53,7 +43,7 @@ const CROWD_TERRAIN: float = 0.5
 
 @export_group("Plano del anillo")
 ## Fracción de la calma (0-1) hasta la que dura.
-@export_range(0.0, 1.0) var ring_shot_until: float = 0.47
+@export_range(0.0, 1.0) var ring_shot_until: float = 0.4751
 ## Distancia de la cámara al punto de llegada, en veces el radio del anillo.
 @export var ring_back: float = 1.35
 ## Altura de la cámara, en veces el radio del anillo.
@@ -68,14 +58,16 @@ const CROWD_TERRAIN: float = 0.5
 @export var ring_fov: float = 62.0
 
 @export_group("Plano del cielo")
-## Fracción de la calma (0-1) hasta la que dura (un poco después del golpe).
-@export_range(0.0, 1.0) var sky_shot_until: float = 0.725
+## Segundos después del golpe contra el suelo en que corta al plano héroe (cuando la onda de fuego ya le pasó a esa cámara).
+@export var sky_after_impact: float = 0.63
 ## Distancia al punto de llegada, en veces el radio del anillo (menos de 1 = desde adentro del anillo, que si no tapa el golpe).
 @export var sky_back: float = 0.8
 ## Metros que la cámara se corre hacia un lado.
 @export var sky_side: float = 7.0
 ## Altura de la cámara, en metros sobre el punto de llegada (por encima de la onda de fuego del golpe).
 @export var sky_eye_height: float = 3.0
+## Metros mínimos entre la cámara y el muro del anillo de fuego.
+@export var sky_wall_clearance: float = 9.0
 ## Altura mínima a la que mira, en metros sobre el punto de llegada (así el golpe no queda en el borde de abajo).
 @export var sky_min_look: float = 5.0
 ## Campo de visión con el fénix cerca del suelo, en grados.
@@ -122,6 +114,8 @@ const CROWD_TERRAIN: float = 0.5
 var _boss_point: Vector3 = Vector3.ZERO
 var _away: Vector3 = Vector3.BACK
 var _radius: float = 30.0
+## Avance de la calma (0-1) en que termina el plano del cielo.
+var _sky_shot_until: float = 0.7
 ## Dónde se paran el plano del cometa y el del cielo: un lugar sin troncos delante.
 var _comet_from: Vector3 = Vector3.ZERO
 var _sky_from: Vector3 = Vector3.ZERO
@@ -141,15 +135,19 @@ var _rng: RandomNumberGenerator = RandomNumberGenerator.new()
 
 ## Fija el encuadre: `boss_point` es donde aterriza el jefe, `away` la
 ## dirección desde ahí hacia la party y `ring_radius` el radio del anillo de
-## fuego, en metros.
-func frame(boss_point: Vector3, away: Vector3, ring_radius: float) -> void:
+## fuego, en metros. `impact_progress` es el avance de la calma (0-1) en que
+## golpea el suelo y `calm_seconds` lo que dura la calma.
+func frame(boss_point: Vector3, away: Vector3, ring_radius: float, impact_progress: float,
+		calm_seconds: float) -> void:
 	_boss_point = boss_point
 	_radius = ring_radius
+	_sky_shot_until = minf(impact_progress + sky_after_impact / maxf(calm_seconds, 0.01), 0.97)
 	_hero_turn = _freer_turn(away)
 	_away = _clearest_side(away)
 	# El cometa llega de frente y pasa hacia el lado del anillo.
-	_comet_from = _open_spot(_comet_eye(_away), [-_away, Vector3.UP.cross(_away)])
-	_sky_from = _open_spot(_sky_eye(_away), [-_away])
+	_comet_from = _open_spot(_comet_eye(_away), [-_away, Vector3.UP.cross(_away)], INF)
+	# El plano del cielo se queda adentro del anillo de fuego, lejos de su muro.
+	_sky_from = _open_spot(_sky_eye(_away), [-_away], _radius - sky_wall_clearance)
 	_shot = -1
 	fov = camera_fov
 	_shake_left = 0.0
@@ -216,7 +214,7 @@ func _shot_at(progress: float) -> Shot:
 		return Shot.COMET
 	if progress < ring_shot_until:
 		return Shot.RING
-	if progress < sky_shot_until:
+	if progress < _sky_shot_until:
 		return Shot.SKY
 	return Shot.HERO
 
@@ -251,7 +249,7 @@ func _shoot_sky(bird: Vector3) -> Vector3:
 
 ## A ras de suelo, girando despacio y acercándose.
 func _shoot_hero(progress: float, body_height: float) -> Vector3:
-	var u := _span(progress, sky_shot_until, 1.0)
+	var u := _span(progress, _sky_shot_until, 1.0)
 	fov = lerpf(camera_fov, hero_fov, smoothstep(0.0, 1.0, u))
 	_aim = _boss_point + Vector3.UP * clampf(body_height, 3.0, 40.0) * hero_look_fraction
 	return _hero_eye(_away, u)
@@ -302,6 +300,7 @@ func _freer_turn(away: Vector3) -> float:
 ## igualdad, el primero de la lista). Tiene que correr ANTES de congelar el
 ## mundo: congelada, la escenografía sale de la física y nada la toca.
 func _clearest_side(away: Vector3) -> Vector3:
+	var space := get_world_3d().direct_space_state
 	var terrain := Terrain.find(get_tree())
 	var best := away
 	var best_crowd := 1000.0
@@ -309,10 +308,9 @@ func _clearest_side(away: Vector3) -> Vector3:
 		var side := away.rotated(Vector3.UP, deg_to_rad(degrees))
 		var crowd := 0.0
 		for eye: Vector3 in _eyes(side):
-			var to_boss := _boss_point - eye
-			to_boss.y = 0.0
 			var ground := terrain.height_at(eye.x, eye.z) if terrain != null else eye.y
-			crowd += _crowd(eye, to_boss.normalized(), ground, to_boss.length())
+			crowd += MythosSightline.crowd_between(get_tree(), space, eye, _boss_point,
+					ground, open_spot_width, clear_mask)
 		if crowd < best_crowd:
 			best_crowd = crowd
 			best = side
@@ -323,57 +321,31 @@ func _clearest_side(away: Vector3) -> Vector3:
 
 ## De los lugares de OPEN_SPOT_STEPS alrededor de `base`, el que tiene menos
 ## estorbo en los pasillos que salen hacia cada dirección de `views` (a
-## igualdad, el primero). Los pasos se miden respecto de la primera
-## dirección. Corre antes de congelar el mundo, igual que _clearest_side.
-func _open_spot(base: Vector3, views: Array[Vector3]) -> Vector3:
+## igualdad, el primero), sin alejarse más de `max_distance` metros del
+## jefe. Los pasos se miden respecto de la primera dirección. Corre antes de
+## congelar el mundo, igual que _clearest_side.
+func _open_spot(base: Vector3, views: Array[Vector3], max_distance: float) -> Vector3:
+	var space := get_world_3d().direct_space_state
 	var terrain := Terrain.find(get_tree())
 	var sideways := Vector3.UP.cross(views[0]).normalized()
 	var best := base
 	var best_crowd := 1000.0
 	for step: Vector2 in OPEN_SPOT_STEPS:
 		var eye := base + sideways * step.x - views[0] * step.y
+		if Vector2(eye.x - _boss_point.x, eye.z - _boss_point.z).length() > max_distance:
+			continue
 		var ground := terrain.height_at(eye.x, eye.z) if terrain != null else _boss_point.y
 		eye.y = maxf(eye.y, ground + ground_clearance)
 		var crowd := 0.0
 		for view: Vector3 in views:
-			crowd += _crowd(eye, view, ground, open_spot_reach)
+			crowd += MythosSightline.crowd(space, eye, view, ground, open_spot_reach,
+					open_spot_width, clear_mask)
 		if crowd < best_crowd:
 			best_crowd = crowd
 			best = eye
 		if crowd <= 0.0:
 			break
 	return best
-
-
-## Cuánto estorba lo que pisa el pasillo de `reach` metros que sale de `eye`
-## hacia `view`, a la altura de los troncos sobre el suelo `ground`: cada
-## tronco, roca o meseta suma más cuanto más cerca de la cámara está (0 =
-## pasillo libre).
-func _crowd(eye: Vector3, view: Vector3, ground: float, reach: float) -> float:
-	var box := BoxShape3D.new()
-	box.size = Vector3(open_spot_width, CORRIDOR_THICKNESS, reach)
-	var center := eye + view * (reach * 0.5)
-	center.y = ground + CORRIDOR_HEIGHT
-	var query := PhysicsShapeQueryParameters3D.new()
-	query.shape = box
-	query.collision_mask = clear_mask
-	query.transform = Transform3D(Basis.looking_at(view, Vector3.UP), center)
-	var crowd := 0.0
-	var seen: Dictionary[int, bool] = {}
-	for hit: Dictionary in get_world_3d().direct_space_state.intersect_shape(query, 32):
-		var body := hit.get("collider") as Node3D
-		# Un cuerpo con varias formas (el terreno, una formación) cuenta una vez.
-		if body == null or seen.has(body.get_instance_id()):
-			continue
-		seen[body.get_instance_id()] = true
-		if body is Terrain:
-			crowd += CROWD_TERRAIN
-			continue
-		var offset := body.global_position - eye
-		offset.y = 0.0
-		var near := 1.0 - clampf(offset.length() / maxf(reach, 0.01), 0.0, 1.0)
-		crowd += CROWD_FAR + CROWD_NEAR * near * near
-	return crowd
 
 
 ## Los puntos desde donde la cámara mira al jefe si se para del lado `side`:

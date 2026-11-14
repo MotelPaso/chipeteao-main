@@ -1,7 +1,8 @@
-[gd_scene load_steps=10 format=3]
+[gd_scene load_steps=11 format=3]
 
 [ext_resource type="Script" path="res://scripts/fx/fire_zone.gd" id="1_zone"]
 [ext_resource type="Shader" path="res://assets/shaders/fire_zone.gdshader" id="2_shader"]
+[ext_resource type="Shader" path="res://assets/shaders/fire_spark.gdshader" id="3_spark"]
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_zone"]
 shader = ExtResource("2_shader")
@@ -14,12 +15,13 @@ height = 0.1
 radial_segments = 48
 rings = 0
 
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_flame"]
-shading_mode = 0
-albedo_color = Color(1, 0.6, 0.14, 1)
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_flame"]
+shader = ExtResource("3_spark")
+shader_parameter/color = Color(1, 0.6, 0.14, 1)
+shader_parameter/ascended_color = Color(0.3, 0.75, 1, 1)
 
 [sub_resource type="BoxMesh" id="BoxMesh_flame"]
-material = SubResource("StandardMaterial3D_flame")
+material = SubResource("ShaderMaterial_flame")
 size = Vector3(0.2, 0.2, 0.2)
 
 [sub_resource type="Curve" id="Curve_shrink"]
