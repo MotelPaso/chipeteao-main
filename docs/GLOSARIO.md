@@ -190,6 +190,7 @@ Lo que NO se traduce nunca: los `id` de catálogo, los `node_name`, los nombres 
 | Fireballs (ataque de Mythos) | Bolas de fuego |
 | Fire deluge (ataque de Mythos, segunda fase) | Diluvio de fuego |
 | Fire tornado (ataque de Mythos) | Tornado de fuego |
+| Tornado cage (ataque de Mythos: un anillo de tornados que gira y se cierra) | Jaula de tornados |
 | Fire wave (ataque de Mythos; se esquiva saltando) | Onda de fuego |
 | Mythos reborn (nombre de su segunda fase) | Mythos renacido |
 | Phase (de un jefe) | Fase |

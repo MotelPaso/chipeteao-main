@@ -3,7 +3,8 @@ extends Node3D
 ## Tornado de fuego del pool. Primero se FORMA (aviso: un remolino pálido que
 ## crece, sin dañar), después gira y quema a los raiders en pie que toque, y
 ## al final se deshace solo. Puede perseguir al raider más cercano (cambia de
-## rumbo de a poco, así se lo puede torear) o avanzar en línea o en curva.
+## rumbo de a poco, así se lo puede torear), avanzar en línea o en curva, o
+## girar alrededor de un punto mientras se le acerca (orbit: la jaula).
 ## Lleva su propio tick de daño, como FireZone. Nunca daña a un raider caído
 ## y se deshace si se le acerca, para que se lo pueda reanimar. El brillo del
 ## suelo marca su radio de daño.
@@ -49,7 +50,16 @@ var _chase: bool = true
 var _heading: Vector3 = Vector3.ZERO
 var _turn_rate: float = 0.0
 var _velocity: Vector3 = Vector3.ZERO
+## En órbita (orbit): el punto alrededor del que gira, los radianes por
+## segundo, los metros por segundo que se acerca y hasta dónde llega.
+var _orbiting: bool = false
+var _orbit_center: Vector3 = Vector3.ZERO
+var _orbit_speed: float = 0.0
+var _orbit_closing: float = 0.0
+var _orbit_min: float = 0.0
 var _warn_total: float = 1.0
+## Segundos que gira una vez formado.
+var _life: float = 0.0
 var _left: float = 0.0
 var _tick_left: float = 0.0
 var _retarget_left: float = 0.0
@@ -73,6 +83,7 @@ func pool_reset() -> void:
 	_stage = Stage.IDLE
 	_target = null
 	_velocity = Vector3.ZERO
+	_orbiting = false
 	_embers.emitting = false
 	_set_form(0.0)
 	set_physics_process(false)
@@ -94,7 +105,9 @@ func start(at: Vector3, radius: float, warn_seconds: float, life_seconds: float,
 	_heading = Vector3(heading.x, 0.0, heading.z).normalized()
 	_turn_rate = turn_rate
 	_velocity = Vector3.ZERO
+	_orbiting = false
 	_warn_total = maxf(warn_seconds, 0.01)
+	_life = maxf(life_seconds, 0.0)
 	_left = _warn_total
 	_tick_left = tick_interval
 	_retarget_left = 0.0
@@ -111,6 +124,19 @@ func start(at: Vector3, radius: float, warn_seconds: float, life_seconds: float,
 	_embers.emitting = false
 	_set_form(0.0)
 	set_physics_process(true)
+
+
+## Después de start(): en vez de perseguir o avanzar, gira alrededor de
+## `center` a `angular_speed` radianes por segundo (el signo es el sentido)
+## mientras se le acerca `closing_speed` metros por segundo, hasta quedar a
+## `min_distance` metros.
+func orbit(center: Vector3, angular_speed: float, closing_speed: float,
+		min_distance: float) -> void:
+	_orbiting = true
+	_orbit_center = center
+	_orbit_speed = angular_speed
+	_orbit_closing = closing_speed
+	_orbit_min = min_distance
 
 
 ## Radio de daño en metros (0 si no está en uso).
@@ -138,6 +164,7 @@ func _physics_process(delta: float) -> void:
 		_set_form(0.55 * (1.0 - clampf(_left / _warn_total, 0.0, 1.0)))
 		if _left <= 0.0:
 			_stage = Stage.SPINNING
+			_left = _life
 			_embers.emitting = true
 			_set_form(1.0)
 			Sfx.play(roar_sfx)
@@ -152,8 +179,16 @@ func _physics_process(delta: float) -> void:
 		_burn_raiders()
 
 
-## Un paso de persecución o de rumbo fijo, siempre a ras de suelo.
+## Un paso de órbita, de persecución o de rumbo fijo, siempre a ras de suelo.
 func _move(delta: float) -> void:
+	if _orbiting:
+		var arm := global_position - _orbit_center
+		arm.y = 0.0
+		var distance := maxf(arm.length() - _orbit_closing * delta,
+				minf(_orbit_min, arm.length()))
+		arm = arm.normalized().rotated(Vector3.UP, _orbit_speed * delta) * distance
+		global_position = _on_ground(_orbit_center + arm)
+		return
 	var wanted := _heading * _speed
 	if _chase:
 		_retarget_left -= delta

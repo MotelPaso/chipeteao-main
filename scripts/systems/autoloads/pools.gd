@@ -58,7 +58,7 @@ const POOLS: Array[Dictionary] = [
 	{"name": "fire_feather", "scene": FIRE_FEATHER_SCENE, "warm": 16, "cap": 96},
 	{"name": "safe_circle", "scene": SAFE_CIRCLE_SCENE, "warm": 2, "cap": 8},
 	{"name": "fireball", "scene": FIREBALL_SCENE, "warm": 4, "cap": 24},
-	{"name": "fire_tornado", "scene": FIRE_TORNADO_SCENE, "warm": 2, "cap": 6},
+	{"name": "fire_tornado", "scene": FIRE_TORNADO_SCENE, "warm": 10, "cap": 30},
 	{"name": "fire_wave", "scene": FIRE_WAVE_SCENE, "warm": 2, "cap": 8},
 ]
 
@@ -76,6 +76,17 @@ func _ready() -> void:
 	for row: Dictionary in POOLS:
 		_register(String(row["name"]), row["scene"] as PackedScene,
 				Vector2i(int(row["warm"]), int(row["cap"])))
+
+
+## Recupera lo que el pool de `packed` tiene en el mundo, y solo ese: por
+## ejemplo los números de daño, que si no quedan colgados en el aire cuando
+## una cinemática congela el mundo.
+func release_live_of(packed: PackedScene) -> void:
+	if packed == null:
+		return
+	var pool: NodePool = _pools_by_path.get(packed.resource_path, null)
+	if pool != null:
+		pool.release_all_live()
 
 
 ## Reemplazo con pool de scene.instantiate() + add_child(): devuelve una
@@ -107,7 +118,11 @@ func acquire_scene(packed: PackedScene) -> Node3D:
 func release(node: Node3D) -> void:
 	if node == null or not is_instance_valid(node):
 		return
-	var pool := node.get_meta(NodePool.META_OWNER, null) as NodePool
+	# has_meta primero: get_meta con valor por defecto null registra un error
+	# cuando el nodo no trae la marca (una instancia que no salió del pool).
+	var pool: NodePool = null
+	if node.has_meta(NodePool.META_OWNER):
+		pool = node.get_meta(NodePool.META_OWNER) as NodePool
 	if pool != null and is_instance_valid(pool):
 		pool.release(node)
 	elif not node.is_queued_for_deletion():
