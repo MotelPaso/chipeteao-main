@@ -56,6 +56,18 @@ func _init() -> void:
 	_save_wav(SFX_DIR, "phoenix_rebirth", _gen_phoenix_rebirth())
 	_save_wav(SFX_DIR, "fire_whoosh", _gen_fire_whoosh())
 	_save_wav(SFX_DIR, "fire_feathers", _gen_fire_feathers())
+	_save_wav(SFX_DIR, "phoenix_nova", _gen_phoenix_nova())
+	_save_wav(SFX_DIR, "phoenix_call", _gen_phoenix_call())
+	_save_wav(SFX_DIR, "phoenix_screech", _gen_phoenix_screech())
+	_save_wav(SFX_DIR, "phoenix_caw", _gen_phoenix_caw())
+	_save_wav(SFX_DIR, "phoenix_dive", _gen_phoenix_dive())
+	_save_wav(SFX_DIR, "phoenix_flap", _gen_phoenix_flap())
+	_save_wav(SFX_DIR, "phoenix_hurt", _gen_phoenix_hurt())
+	_save_wav(SFX_DIR, "phoenix_death", _gen_phoenix_death())
+	_save_wav(SFX_DIR, "phoenix_ascend", _gen_phoenix_ascend())
+	_save_wav(SFX_DIR, "fireball_cast", _gen_fireball_cast())
+	_save_wav(SFX_DIR, "fireball_blast", _gen_fireball_blast())
+	_save_wav(SFX_DIR, "fire_tornado", _gen_fire_tornado())
 	_save_wav(AMBIENT_DIR, "forest_wind", _gen_forest_wind())
 	_save_wav(AMBIENT_DIR, "desert_wind", _gen_desert_wind())
 	_save_wav(AMBIENT_DIR, "hell_fire", _gen_hell_fire())
@@ -369,6 +381,145 @@ func _gen_fire_feathers() -> PackedFloat32Array:
 	_fade_in(out, 0.004)
 	_fade_out(out, 0.08)
 	_normalize(out, 0.6)
+	return out
+
+
+## Amanecer de Mythos: un estallido de ruido brillante que se cierra
+## despacio sobre un trueno grave que cae de tono, con una campana encima.
+func _gen_phoenix_nova() -> PackedFloat32Array:
+	var out := _lowpass(_noise(1.6, _rng(341)), 6000.0, 300.0)
+	_mix_at(out, _tone(1.1, 150.0, 34.0, Wave.SINE), 0.0, 1.0)
+	_mix_at(out, _tone(0.6, 300.0, 60.0, Wave.TRIANGLE), 0.0, 0.5)
+	_mix_at(out, _chime(0.9, 1174.7, 0.2), 0.02, 0.35)
+	_adsr(out, 0.005, 0.3, 0.6, 1.0)
+	_normalize(out, 0.95)
+	return out
+
+
+## Una voz de pájaro: dos sierras desafinadas y una triangular una octava
+## abajo, de `f0` a `f1` pasando por `f_mid`, con el trino de la garganta.
+## Es la base de todos los gritos cortos de Mythos.
+func _bird_voice(duration: float, f0: float, f_mid: float, f1: float, trill_hz: float,
+		trill_depth: float) -> PackedFloat32Array:
+	var out := _tone3(duration, f0, f_mid, f1, Wave.SAW)
+	_mix_at(out, _tone3(duration, f0 * 1.015, f_mid * 1.015, f1 * 1.015, Wave.SAW), 0.0, 0.7)
+	_mix_at(out, _tone3(duration, f0 * 0.5, f_mid * 0.5, f1 * 0.5, Wave.TRIANGLE), 0.0, 0.45)
+	out = _lowpass(out, 7000.0, 3000.0)
+	_tremolo(out, trill_hz, trill_depth)
+	return out
+
+
+## Llamado suelto de Mythos: dos notas cortas, la segunda más alta.
+func _gen_phoenix_call() -> PackedFloat32Array:
+	var out := _silence(0.62)
+	var first := _bird_voice(0.22, 1300.0, 1750.0, 1500.0, 30.0, 0.35)
+	_adsr(first, 0.02, 0.06, 0.7, 0.1)
+	var second := _bird_voice(0.3, 1650.0, 2300.0, 1800.0, 30.0, 0.35)
+	_adsr(second, 0.02, 0.08, 0.7, 0.14)
+	_mix_at(out, first, 0.0, 0.9)
+	_mix_at(out, second, 0.28, 1.0)
+	_normalize(out, 0.75)
+	return out
+
+
+## Chillido de ataque: sube de golpe y se sostiene áspero, con un soplo.
+func _gen_phoenix_screech() -> PackedFloat32Array:
+	var out := _bird_voice(0.62, 1400.0, 2700.0, 2200.0, 42.0, 0.55)
+	_mix_at(out, _lowpass(_noise(0.62, _rng(351)), 6000.0, 2500.0), 0.0, 0.3)
+	_adsr(out, 0.03, 0.12, 0.8, 0.22)
+	_normalize(out, 0.85)
+	return out
+
+
+## Graznido de tierra: dos golpes roncos y graves, para las Garras.
+func _gen_phoenix_caw() -> PackedFloat32Array:
+	var out := _silence(0.5)
+	for i in 2:
+		var bark := _bird_voice(0.2, 900.0 - 80.0 * float(i), 1150.0, 700.0, 55.0, 0.7)
+		_mix_at(bark, _lowpass(_noise(0.2, _rng(361 + i)), 3500.0, 1200.0), 0.0, 0.4)
+		_adsr(bark, 0.01, 0.05, 0.6, 0.1)
+		_mix_at(out, bark, 0.24 * float(i), 1.0)
+	_normalize(out, 0.8)
+	return out
+
+
+## Grito de la Picada: un chillido largo que cae de tono mientras baja.
+func _gen_phoenix_dive() -> PackedFloat32Array:
+	var out := _bird_voice(0.85, 2600.0, 1900.0, 800.0, 36.0, 0.4)
+	_mix_at(out, _lowpass(_noise(0.85, _rng(371)), 900.0, 5000.0), 0.0, 0.35)
+	_adsr(out, 0.04, 0.2, 0.8, 0.25)
+	_normalize(out, 0.85)
+	return out
+
+
+## Aletazo: un golpe de aire grave que se abre y se cierra rápido.
+func _gen_phoenix_flap() -> PackedFloat32Array:
+	var out := _lowpass(_noise(0.5, _rng(381)), 250.0, 2200.0)
+	out = _lowpass(out, 2200.0, 300.0)
+	_mix_at(out, _tone(0.3, 95.0, 45.0, Wave.SINE), 0.02, 0.8)
+	_adsr(out, 0.05, 0.12, 0.5, 0.25)
+	_normalize(out, 0.8)
+	return out
+
+
+## Chillido de dolor: corto, agudo y quebrado.
+func _gen_phoenix_hurt() -> PackedFloat32Array:
+	var out := _bird_voice(0.28, 2400.0, 2900.0, 1700.0, 60.0, 0.6)
+	_adsr(out, 0.01, 0.06, 0.6, 0.12)
+	_normalize(out, 0.7)
+	return out
+
+
+## Grito de su última muerte: largo, cae dos octavas y se deshace en soplo.
+func _gen_phoenix_death() -> PackedFloat32Array:
+	var out := _bird_voice(2.2, 2300.0, 1500.0, 420.0, 22.0, 0.5)
+	_mix_at(out, _lowpass(_noise(2.2, _rng(391)), 5000.0, 400.0), 0.0, 0.4)
+	_mix_at(out, _tone(1.4, 160.0, 50.0, Wave.SINE), 0.6, 0.5)
+	_adsr(out, 0.05, 0.4, 0.75, 1.1)
+	_normalize(out, 0.9)
+	return out
+
+
+## Renacer de la segunda fase: un rugido de fuego que crece dos segundos y
+## medio, con la voz del fénix subiendo encima hasta el estallido.
+func _gen_phoenix_ascend() -> PackedFloat32Array:
+	var out := _lowpass(_noise(4.4, _rng(401)), 200.0, 5200.0)
+	_mix_at(out, _tone(4.2, 60.0, 240.0, Wave.SAW, 1.8), 0.0, 0.45)
+	_fade_in(out, 2.6)
+	var voice := _bird_voice(2.4, 700.0, 1500.0, 2900.0, 26.0, 0.45)
+	_fade_in(voice, 1.2)
+	_mix_at(out, voice, 1.9, 0.8)
+	_fade_out(out, 0.25)
+	_normalize(out, 0.9)
+	return out
+
+
+## Lanzamiento de una bola de fuego: un soplo grave que sale de golpe.
+func _gen_fireball_cast() -> PackedFloat32Array:
+	var out := _lowpass(_noise(0.45, _rng(411)), 3200.0, 500.0)
+	_mix_at(out, _tone(0.35, 220.0, 70.0, Wave.SINE), 0.0, 0.9)
+	_adsr(out, 0.01, 0.1, 0.5, 0.25)
+	_normalize(out, 0.75)
+	return out
+
+
+## Estallido de una bola de fuego: un trueno seco con chisporroteo.
+func _gen_fireball_blast() -> PackedFloat32Array:
+	var out := _lowpass(_noise(0.9, _rng(421)), 5500.0, 250.0)
+	_mix_at(out, _tone(0.7, 130.0, 36.0, Wave.SINE), 0.0, 1.0)
+	_mix_at(out, _tone(0.3, 260.0, 80.0, Wave.TRIANGLE), 0.0, 0.4)
+	_adsr(out, 0.004, 0.2, 0.45, 0.55)
+	_normalize(out, 0.9)
+	return out
+
+
+## Tornado de fuego al formarse: un remolino de ruido que sube y late.
+func _gen_fire_tornado() -> PackedFloat32Array:
+	var out := _lowpass(_noise(1.6, _rng(431)), 400.0, 3600.0)
+	_mix_at(out, _tone(1.6, 70.0, 150.0, Wave.SAW, 1.3), 0.0, 0.35)
+	_tremolo(out, 9.0, 0.5)
+	_adsr(out, 0.35, 0.2, 0.8, 0.6)
+	_normalize(out, 0.8)
 	return out
 
 

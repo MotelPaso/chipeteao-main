@@ -480,6 +480,12 @@ else
 		grep -n '^Probe calm: ' "$MYTHOS_LOG" | head -3
 		FALLOS=$((FALLOS + 1))
 	fi
+	# Mythos pelea solo: quemó a la horda que quedaba y no apareció nadie más.
+	if ! grep -qE '^Probe alone: held=true .* others_max_after_purge=0 ' "$MYTHOS_LOG"; then
+		echo "  FALLO: hubo enemigos normales durante la pelea con Mythos"
+		grep -n '^Probe alone: \|^Mythos purge: \|^Spawns ' "$MYTHOS_LOG" | head -5
+		FALLOS=$((FALLOS + 1))
+	fi
 	# ...y al terminar devolvió el HUD, el mundo y el reloj.
 	if ! grep -qE '^Probe stage: reason=calm_end hud_visible=true .* cinematic_camera=false .* world_frozen=false clock_running=true$' "$MYTHOS_LOG"; then
 		echo "  FALLO: la cinemática no devolvió el HUD, el mundo o el reloj"

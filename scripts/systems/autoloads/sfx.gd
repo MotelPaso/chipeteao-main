@@ -121,6 +121,51 @@ const SOUND_LIBRARY: Dictionary[StringName, Dictionary] = {
 		"stream": preload("res://assets/audio/sfx/fire_feathers.wav"), "volume_db": -8.0,
 		"rate_limit": 4,
 	},
+	&"phoenix_nova": {
+		"stream": preload("res://assets/audio/sfx/phoenix_nova.wav"), "volume_db": -3.0,
+	},
+	&"phoenix_call": {
+		"stream": preload("res://assets/audio/sfx/phoenix_call.wav"), "volume_db": -9.0,
+		"rate_limit": 2, "jitter": true,
+	},
+	&"phoenix_screech": {
+		"stream": preload("res://assets/audio/sfx/phoenix_screech.wav"), "volume_db": -6.0,
+		"rate_limit": 3, "jitter": true,
+	},
+	&"phoenix_caw": {
+		"stream": preload("res://assets/audio/sfx/phoenix_caw.wav"), "volume_db": -6.0,
+		"rate_limit": 3, "jitter": true,
+	},
+	&"phoenix_dive": {
+		"stream": preload("res://assets/audio/sfx/phoenix_dive.wav"), "volume_db": -5.0,
+		"rate_limit": 2,
+	},
+	&"phoenix_flap": {
+		"stream": preload("res://assets/audio/sfx/phoenix_flap.wav"), "volume_db": -6.0,
+		"rate_limit": 4, "jitter": true,
+	},
+	&"phoenix_hurt": {
+		"stream": preload("res://assets/audio/sfx/phoenix_hurt.wav"), "volume_db": -8.0,
+		"rate_limit": 2, "jitter": true,
+	},
+	&"phoenix_death": {
+		"stream": preload("res://assets/audio/sfx/phoenix_death.wav"), "volume_db": -3.0,
+	},
+	&"phoenix_ascend": {
+		"stream": preload("res://assets/audio/sfx/phoenix_ascend.wav"), "volume_db": -2.0,
+	},
+	&"fireball_cast": {
+		"stream": preload("res://assets/audio/sfx/fireball_cast.wav"), "volume_db": -7.0,
+		"rate_limit": 6, "jitter": true,
+	},
+	&"fireball_blast": {
+		"stream": preload("res://assets/audio/sfx/fireball_blast.wav"), "volume_db": -5.0,
+		"rate_limit": 6, "jitter": true,
+	},
+	&"fire_tornado": {
+		"stream": preload("res://assets/audio/sfx/fire_tornado.wav"), "volume_db": -6.0,
+		"rate_limit": 3,
+	},
 }
 
 @export_group("Voces")

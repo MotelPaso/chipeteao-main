@@ -19,6 +19,8 @@ extends RefCounted
 ##      Probe sky:         sol y ambiente de la arena en momentos fijos y
 ##                         después de cada clima
 ##      Probe hazards:     zonas de fuego vivas un rato después de morir
+##    Las cuentas de cuerpos (Probe calm, Probe hazards y Probe alone) las
+##    lleva StageBossCensus.
 ##
 ## 2. ACTÚA solo con variables de entorno nuevas. Los interruptores que tocan
 ##    la partida (BONK_CINEMATIC_SKIP, BONK_PAUSE_AT, BONK_EXTRACT_AT,
@@ -55,14 +57,13 @@ var _tree: SceneTree = null
 var _camera: ShotCamera = null
 var _views: ViewShots = null
 var _switches: StageBossSwitches = null
+var _census: StageBossCensus = null
 
 var _bound: bool = false
 var _state: StringName = &""
 var _now: float = 0.0
 var _frames: int = 0
 var _calm_from_frame: int = 0
-var _calm_health: Dictionary[int, float] = {}
-var _calm_counts: Array[int] = []
 var _calm_shot: bool = false
 var _title_shot: bool = false
 var _fight_from: float = -1.0
@@ -82,6 +83,7 @@ func _init(host: Node, camera: ShotCamera) -> void:
 	_tree = host.get_tree()
 	_camera = camera
 	_switches = StageBossSwitches.new(host)
+	_census = StageBossCensus.new(host.get_tree())
 	_views = ViewShots.new(host, OS.get_environment(ShotCamera.SHOT_DIR_ENV).strip_edges(),
 			OS.get_environment(VIEW_SHOTS_ENV) == "1")
 	if _switches.owns_weather_timing():
@@ -108,6 +110,7 @@ func tick(delta: float, frames: int) -> void:
 	_bind_once()
 	_watch_boss()
 	_switches.tick(delta, _now, _state)
+	_census.tick(_now, _state)
 	_tick_sky(delta)
 	_tick_stage_reports()
 
@@ -187,15 +190,14 @@ func _watch_boss() -> void:
 func _on_state_changed(from: StringName, to: StringName) -> void:
 	if to == &"arrival":
 		_calm_from_frame = _frames
-		_calm_health = _health_snapshot()
-		_calm_counts = _live_counts()
+		_census.begin_calm()
 	elif from == &"arrival" and to == &"":
 		# El jefe se fue en plena calma (cambio de etapa forzado): no hay
 		# pelea que empiece ni vidas que comparar con las de otra arena.
 		print("Probe calm: aborted after %d frames (stage boss gone)" % (
 				_frames - _calm_from_frame))
 	elif from == &"arrival":
-		_report_calm()
+		_census.report_calm(_frames - _calm_from_frame)
 		_fight_from = _now
 		_stage_reports.append({"left": STAGE_REPORT_FRAMES, "reason": "calm_end"})
 		_sky_reports.append({"left": 5.0, "tag": "fight"})
@@ -205,44 +207,6 @@ func _on_state_changed(from: StringName, to: StringName) -> void:
 		_stage_reports.append({"left": int(AFTERMATH_SHOT_DELAY * 60.0), "reason": "aftermath"})
 		_camera.request_in(AFTERMATH_SHOT_DELAY, "boss_aftermath_%.0fs" % _now)
 		_shoot_views_in(AFTERMATH_SHOT_DELAY, "charred")
-
-
-## Vida actual de cada cuerpo con Health de la partida, por id de instancia.
-func _health_snapshot() -> Dictionary[int, float]:
-	var out: Dictionary[int, float] = {}
-	for group: StringName in [&"player", &"downed_players", &"enemies", &"boss", &"possessed"]:
-		for node: Node in _tree.get_nodes_in_group(group):
-			var health := Health.find_in(node)
-			if health != null:
-				out[health.get_instance_id()] = health.current_hp
-	return out
-
-
-## Cuerpos y proyectiles vivos: enemigos, saetas enemigas y disparos.
-func _live_counts() -> Array[int]:
-	return [_tree.get_node_count_in_group(&"enemies"),
-			_tree.get_node_count_in_group(&"enemy_projectiles"),
-			_tree.get_node_count_in_group(&"player_shots")]
-
-
-## La calma terminó: ninguna vida debió cambiar y nada debió aparecer.
-func _report_calm() -> void:
-	var after := _health_snapshot()
-	var changed := 0
-	for id: int in _calm_health:
-		if not after.has(id) or not is_equal_approx(after[id], _calm_health[id]):
-			changed += 1
-	var born := 0
-	for id: int in after:
-		if not _calm_health.has(id):
-			born += 1
-	var counts := _live_counts()
-	var frames := _frames - _calm_from_frame
-	print(("Probe calm: frames=%d seconds=%.2f healths=%d changed=%d born=%d"
-			+ " enemies=%d->%d bolts=%d->%d shots=%d->%d") % [
-			frames, float(frames) / 60.0, _calm_health.size(), changed, born,
-			_calm_counts[0], counts[0], _calm_counts[1], counts[1],
-			_calm_counts[2], counts[2]])
 
 
 func _on_weapon_damage(weapon: WeaponBase, target: Node3D, amount: float) -> void:
@@ -308,23 +272,7 @@ func _print_stage(reason: String) -> void:
 			reason, hud, split, cinematic_camera, song, _root_camera(), _world_frozen(),
 			RunState.is_physics_processing()])
 	if reason == "aftermath":
-		_print_hazards(reason)
-
-
-## Zonas de fuego que siguen vivas (marcadas, ardiendo o apagándose) y
-## cuántas de ellas todavía hacen daño.
-func _print_hazards(reason: String) -> void:
-	var live := 0
-	var burning := 0
-	for node: Node in _tree.get_nodes_in_group(FireZone.GROUP):
-		var zone := node as FireZone
-		if zone == null:
-			continue
-		if zone.zone_radius() > 0.0:
-			live += 1
-		if zone.is_burning():
-			burning += 1
-	print("Probe hazards: reason=%s live=%d burning=%d" % [reason, live, burning])
+		_census.print_hazards(reason)
 
 
 ## Qué cámara 3D tiene activa el viewport raíz: "none" (lo normal en co-op,

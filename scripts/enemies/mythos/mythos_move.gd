@@ -6,8 +6,15 @@ extends Node
 ## hasta que devuelve true.
 ## La agresividad de Mythos (0-1, sale de StageBossScaling) acorta las
 ## esperas y suma proyectiles o zonas: cada ataque dice cuánto.
+## Cada ataque dice además desde dónde se usa (stance): en vuelo o posado
+## en tierra. La Picada lo posa (Mythos.land) y el Aletazo lo hace despegar.
+
+## Desde dónde puede usar Mythos un ataque.
+enum Stance { AIR, GROUND, ANY }
 
 @export_group("Ritmo")
+## Desde dónde lo usa: en vuelo (AIR), posado en tierra (GROUND) o en cualquiera de los dos (ANY).
+@export var stance: Stance = Stance.AIR
 ## Vida (1 = la primera) desde la que Mythos usa este ataque.
 @export var unlock_life: int = 1
 ## Segundos de espera entre un uso y el siguiente, con agresividad 0.
@@ -20,6 +27,8 @@ extends Node
 @export var min_range: float = 0.0
 ## Distancia máxima al raider, en metros, para usarlo.
 @export var max_range: float = 40.0
+## Grito de Mythos al empezar este ataque (fila de Sfx.SOUND_LIBRARY; vacío = ninguno).
+@export var call_sfx: StringName = &""
 
 ## El jefe que lleva este ataque (lo pone Mythos en su _ready).
 var boss: Mythos = null
@@ -42,9 +51,11 @@ func tick_cooldown(delta: float) -> void:
 	_cooldown_left = maxf(_cooldown_left - delta, 0.0)
 
 
-## True si Mythos puede usarlo ahora, en su vida `life` y a `distance`
-## metros del raider.
-func is_ready(life: int, distance: float) -> bool:
+## True si Mythos puede usarlo ahora: en su vida `life`, a `distance` metros
+## del raider y volando o posado (`grounded`).
+func is_ready(life: int, distance: float, grounded: bool) -> bool:
+	if stance != Stance.ANY and (stance == Stance.GROUND) != grounded:
+		return false
 	return life >= unlock_life and _cooldown_left <= 0.0 \
 			and distance >= min_range and distance <= max_range
 
@@ -72,6 +83,12 @@ func begin(_target: Node3D) -> void:
 ## Virtual: un frame de física del ataque. Devuelve true cuando terminó.
 func tick(_delta: float) -> bool:
 	return true
+
+
+## Virtual: un frame de pelea, se esté usando o no este ataque. Para lo que
+## un ataque hace de fondo (la lluvia de la última vida).
+func tick_always(_delta: float, _life: int) -> void:
+	pass
 
 
 ## Virtual: el ataque se corta a la mitad (Mythos cae en cenizas o muere).

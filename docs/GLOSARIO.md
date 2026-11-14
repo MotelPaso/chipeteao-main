@@ -187,7 +187,17 @@ Lo que NO se traduce nunca: los `id` de catálogo, los `node_name`, los nombres 
 | Burning feathers (ataque de Mythos) | Plumas ardientes |
 | Dive (ataque de Mythos) | Picada |
 | Ember ring (ataque de Mythos) | Cerco de brasas |
-| Ember rain (ataque de Mythos) | Lluvia de brasas |
+| Fireballs (ataque de Mythos) | Bolas de fuego |
+| Fire deluge (ataque de Mythos, segunda fase) | Diluvio de fuego |
+| Fire tornado (ataque de Mythos) | Tornado de fuego |
+| Fire wave (ataque de Mythos; se esquiva saltando) | Onda de fuego |
+| Mythos reborn (nombre de su segunda fase) | Mythos renacido |
+| Phase (de un jefe) | Fase |
+| Claws (ataque de Mythos en tierra) | Garras |
+| Wing blast (el despegue de Mythos) | Aletazo |
+| Fire pass (ataque de Mythos) | Pasada de fuego |
+| Dawn (el golpe más fuerte de Mythos) | Amanecer |
+| Safe circle | Círculo a salvo |
 | Fire zone | Zona de fuego |
 
 ## Mapas
@@ -763,6 +773,10 @@ evolución.
 | `The grumble swells. The mushroom quivers angrily.` | El gruñido crece. El hongo tiembla de rabia. |
 | `The roots burst apart!` | ¡Las raíces revientan! |
 | `Something hidden stirs...` | Algo oculto se remueve... |
+| `What sleeps here does not dare come out...` | Lo que duerme aquí no se atreve a salir... |
+| `Dawn! Run to a safe circle` | ¡Amanecer! Corre a un círculo a salvo |
+| `%s burns itself out` | %s se consume en su propio fuego |
+| `Mythos is reborn!` | ¡Mythos renace! |
 | `CHARACTER UNLOCKED: %s!` | ¡RAIDER DESBLOQUEADO: %s! |
 | `A charge altar rises — stand in its ring` | Se alza un altar de carga — párate en su anillo |
 | `A demonic obelisk claws out of the ground...` | Un obelisco demoníaco sale del suelo a zarpazos... |

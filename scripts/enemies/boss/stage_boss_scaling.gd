@@ -22,6 +22,9 @@ extends Node
 ## Piso: la vida que trae la escena del jefe, ya multiplicada por vuelta,
 ## dificultad y tamaño de party (BossSchedule.spawn_boss), repartida entre
 ## las vidas. Con el piso la pelea puede durar más que el objetivo.
+## Desgaste: cada plan dice además a los cuántos segundos de esa vida el jefe
+## empieza a consumirse solo y a qué ritmo (lo aplica BossBurnout). Es el
+## tope de la pelea para una party que casi no le pega.
 
 ## Lo que el jefe aplica en una vida.
 class LifePlan:
@@ -49,6 +52,10 @@ class LifePlan:
 	var aggression: float = 0.0
 	## Daño extra por poder, en fracción (0.2 = +20 %).
 	var damage_bonus: float = 0.0
+	## Segundos de esta vida tras los cuales el jefe empieza a consumirse
+	## solo (0 = nunca) y vida por segundo que pierde desde ahí.
+	var burnout_after: float = 0.0
+	var burnout_drain: float = 0.0
 
 @export_group("Duración objetivo")
 ## Segundos que debería durar la pelea entera con el daño real de la party.
@@ -56,7 +63,7 @@ class LifePlan:
 ## Segundos mínimos que dura la pelea por más fuerte que sea la party.
 @export var min_fight_seconds: float = 105.0
 ## Parte de la pelea que toca a cada vida, en orden; la cantidad de entradas es la cantidad de vidas.
-@export var life_shares: Array[float] = [0.18, 0.36, 0.46]
+@export var life_shares: Array[float] = [0.42, 0.58]
 ## Segundos mínimos presupuestados para una vida, aunque la pelea ya vaya larga.
 @export var min_life_seconds: float = 14.0
 
@@ -86,11 +93,11 @@ class LifePlan:
 
 @export_group("Agresividad")
 ## Agresividad (0-1) que suma cada jugador además del primero.
-@export var aggression_per_extra_player: float = 0.15
+@export var aggression_per_extra_player: float = 0.12
 ## Agresividad (0-1) que suma cada punto de poder de la party.
 @export var aggression_per_power: float = 0.004
 ## Agresividad (0-1) que suma cada vida después de la primera.
-@export var aggression_per_life: float = 0.15
+@export var aggression_per_life: float = 0.45
 ## Techo de la agresividad (0-1).
 @export_range(0.0, 1.0) var aggression_cap: float = 1.0
 
@@ -99,6 +106,12 @@ class LifePlan:
 @export var damage_per_power: float = 0.003
 ## Techo del daño extra por poder (0.35 = +35 %).
 @export var damage_power_cap: float = 0.35
+
+@export_group("Desgaste")
+## Veces el tiempo previsto de una vida tras las cuales el jefe empieza a consumirse solo, para que la pelea no se atasque con una party que casi no le pega (0 = nunca se consume).
+@export var burnout_after: float = 1.5
+## Segundos que tarda en consumirse una vida entera desde que empieza el desgaste.
+@export var burnout_seconds: float = 25.0
 
 var _floor_hp: float = 1.0
 var _interlude_seconds: float = 0.0
@@ -157,10 +170,11 @@ func plan_next_life(life: int, damage_taken: float, life_seconds: float,
 ## Línea de log de un plan; `title` es el nombre del jefe.
 func log_line(title: String, plan: LifePlan) -> String:
 	return ("%s scaling: life=%d players=%d dps=%.1f power=%.1f hp=%.0f budget=%.1fs"
-			+ " source=%s measured=%.1f expected=%.1f clamp=%s aggression=%.2f damage=x%.2f") % [
+			+ " source=%s measured=%.1f expected=%.1f clamp=%s aggression=%.2f damage=x%.2f"
+			+ " burnout=%.1fs") % [
 			title, plan.life, plan.players, plan.dps, plan.power, plan.hp, plan.budget,
 			plan.source, plan.measured, plan.expected, plan.clamp, plan.aggression,
-			1.0 + plan.damage_bonus]
+			1.0 + plan.damage_bonus, plan.burnout_after]
 
 
 ## Las partes de la pelea por vida. Un arreglo vacío cuenta como una sola
@@ -226,6 +240,9 @@ func _plan(life: int, dps_estimate: float, score: float, players: int, source: S
 		plan.hp = ceiling_life
 		plan.clamp = "ceiling"
 	plan.budget = plan.hp / maxf(dps_estimate, 0.01)
+	if burnout_after > 0.0:
+		plan.burnout_after = seconds * burnout_after
+		plan.burnout_drain = plan.hp / maxf(burnout_seconds, 0.1)
 	plan.aggression = clampf(aggression_per_extra_player * float(players - 1)
 			+ aggression_per_power * score + aggression_per_life * float(life - 1),
 			0.0, aggression_cap)

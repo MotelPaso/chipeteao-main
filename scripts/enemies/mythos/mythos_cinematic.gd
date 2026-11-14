@@ -44,29 +44,23 @@ const SPLIT_SCREEN_GROUP := &"split_screen"
 ## Texto de la indicación de saltar.
 @export var skip_hint_text: String = "Mantén para saltar"
 
-@export_group("Cámara")
-## Fracción de la calma (0-1) que dura el plano general del bosque.
-@export_range(0.0, 1.0) var wide_shot_fraction: float = 0.5
-## Altura de la cámara en el plano general, en metros sobre el jefe.
-@export var wide_height: float = 30.0
-## Distancia al jefe al empezar el plano general, en metros.
-@export var wide_distance: float = 52.0
-## Metros que la cámara avanza hacia el jefe durante el plano general.
-@export var wide_push: float = 14.0
-## Distancia al jefe en el plano cercano, en metros.
-@export var close_distance: float = 16.0
-## Altura de la cámara en el plano cercano, en metros sobre el jefe.
-@export var close_height: float = 4.0
-## Grados que la cámara gira alrededor del jefe durante el plano cercano.
-@export var close_orbit_degrees: float = 36.0
-## Metros mínimos entre la cámara y el suelo.
-@export var ground_clearance: float = 2.0
-## Campo de visión de la cámara, en grados.
-@export var camera_fov: float = 60.0
+@export_group("Momentos")
+## Fracción de la calma (0-1) en que Mythos frena de golpe sobre el suelo: estallido de luz y de brasas.
+@export_range(0.0, 1.0) var impact_fraction: float = 0.62
+## Radio del estallido de luz de ese momento, en unidades del modelo.
+@export var impact_flash_radius: float = 9.0
+## Sonido de ese momento (fila de Sfx.SOUND_LIBRARY).
+@export var impact_sfx: StringName = &"fireball_blast"
+## Fracción de la calma (0-1) en que abre las alas y grita.
+@export_range(0.0, 1.0) var roar_fraction: float = 0.8
+## Grito de ese momento (fila de Sfx.SOUND_LIBRARY).
+@export var roar_sfx: StringName = &"phoenix_screech"
+## Temblor de la cámara en esos dos momentos, en metros de pantalla.
+@export var beat_shake: float = 0.35
 
 @export_group("Cartel")
 ## Fracción de la calma (0-1) en que aparece el nombre del jefe.
-@export_range(0.0, 1.0) var title_fraction: float = 0.58
+@export_range(0.0, 1.0) var title_fraction: float = 0.7
 ## Segundos que tarda el nombre en aparecer.
 @export var title_fade_seconds: float = 0.6
 ## Texto bajo el nombre del jefe.
@@ -83,6 +77,8 @@ const SPLIT_SCREEN_GROUP := &"split_screen"
 @export var flash_seconds: float = 0.45
 
 var _boss: Mythos = null
+var _impact_done: bool = false
+var _roar_done: bool = false
 var _transformation: HellTransformation = null
 var _freeze: WorldFreeze = WorldFreeze.new()
 var _active: bool = false
@@ -90,14 +86,11 @@ var _elapsed: float = 0.0
 ## True mientras este nodo tiene tomados el mundo, el HUD y la cámara.
 var _taken_over: bool = false
 var _previous_camera: Camera3D = null
-var _boss_point: Vector3 = Vector3.ZERO
-## Dirección plana desde el jefe hacia la party: de ahí mira la cámara.
-var _away: Vector3 = Vector3.BACK
 var _skip_held: float = 0.0
 var _skip_armed: bool = false
 var _flash_tween: Tween = null
 
-@onready var _camera: Camera3D = $Camera
+@onready var _camera: MythosCinematicCamera = $Camera
 @onready var _music: BossSong = $Music
 @onready var _overlay: CanvasLayer = $Overlay
 @onready var _bar_top: ColorRect = %BarTop
@@ -134,7 +127,8 @@ func _process(delta: float) -> void:
 	_elapsed += delta
 	var progress := calm_progress()
 	_boss.set_calm_progress(progress)
-	_update_camera(progress)
+	_tick_beats(progress)
+	_update_camera(progress, delta)
 	_update_overlay(progress)
 	_music.follow(_elapsed, delta)
 	if _tick_skip(delta):
@@ -158,13 +152,16 @@ func play(boss: Mythos, transformation: HellTransformation) -> void:
 	_title.text = boss.boss_title
 	_frame_shot()
 	_take_over()
+	_music.set_pausable(true)
 	_music.start(calm_seconds)
 	var manager := get_tree().get_first_node_in_group("run_manager")
 	if manager != null and manager.has_signal("run_ended") \
 			and not manager.is_connected("run_ended", _on_run_ended):
 		manager.connect("run_ended", _on_run_ended)
 	set_process(true)
-	_update_camera(0.0)
+	_impact_done = false
+	_roar_done = false
+	_update_camera(0.0, 0.0)
 	_update_overlay(0.0)
 	print("Boss cinematic: started calm=%.2fs song=%s audio=%s" % [
 			calm_seconds, _music.has_song(), AudioServer.get_driver_name()])
@@ -194,6 +191,12 @@ func fade_out_song() -> void:
 	_music.fade_out()
 
 
+## Destello a pantalla completa: el del golpe con que termina la calma.
+## Mythos lo pide de nuevo en su ataque más fuerte.
+func flash() -> void:
+	_play_flash()
+
+
 # --- calma ------------------------------------------------------------------------
 
 ## La calma terminó (o alguien la saltó): devuelve la pantalla y avisa al jefe.
@@ -207,6 +210,9 @@ func _finish(skipped: bool) -> void:
 		song_target = calm_seconds
 		_music.jump_to(calm_seconds)
 	_release()
+	# Desde aquí la canción ya no sigue a la cinemática: no se corta con las
+	# pausas del juego (subidas de nivel, vendedor, menú de pausa).
+	_music.set_pausable(false)
 	_play_flash()
 	print(("Boss cinematic: ended after=%.2fs skipped=%s song_target=%.2f song_actual=%s"
 			+ " resyncs=%d") % [_elapsed, skipped, song_target, _music.position_text(),
@@ -227,7 +233,6 @@ func _take_over() -> void:
 		if split != null:
 			split.visible = false
 	_previous_camera = get_viewport().get_camera_3d()
-	_camera.fov = camera_fov
 	_camera.make_current()
 	_bar_top.visible = true
 	_bar_bottom.visible = true
@@ -296,7 +301,7 @@ func _on_run_ended(_victory: bool) -> void:
 
 ## Fija el encuadre: dónde está el jefe y de qué lado está la party.
 func _frame_shot() -> void:
-	_boss_point = _boss.global_position
+	var boss_point := _boss.global_position
 	var centroid := Vector3.ZERO
 	var count := 0
 	for group: StringName in [&"player", &"downed_players"]:
@@ -305,31 +310,35 @@ func _frame_shot() -> void:
 			if body != null:
 				centroid += body.global_position
 				count += 1
-	var toward := (centroid / float(maxi(count, 1))) - _boss_point
+	var toward := (centroid / float(maxi(count, 1))) - boss_point
 	toward.y = 0.0
-	_away = toward.normalized() if toward.length_squared() > 0.01 else Vector3.BACK
+	var away := toward.normalized() if toward.length_squared() > 0.01 else Vector3.BACK
+	# Llega de frente a la party (-Z es su frente): así el plano héroe lo
+	# toma con las alas abiertas hacia la cámara.
+	_boss.rotation.y = atan2(-away.x, -away.z)
+	_camera.frame(boss_point, away)
 
 
-## Plano general que avanza sobre el bosque y después plano cercano que gira
-## alrededor del jefe mientras baja.
-func _update_camera(progress: float) -> void:
-	var from := Vector3.ZERO
-	var look := _boss_point + Vector3.UP * 5.0
-	if progress < wide_shot_fraction:
-		var u := progress / maxf(wide_shot_fraction, 0.01)
-		from = _boss_point + _away * (wide_distance - wide_push * u) + Vector3.UP * wide_height
-	else:
-		var u := (progress - wide_shot_fraction) / maxf(1.0 - wide_shot_fraction, 0.01)
-		var angle := deg_to_rad(lerpf(-0.5, 0.5, u) * close_orbit_degrees)
-		from = _boss_point + _away.rotated(Vector3.UP, angle) * close_distance \
-				+ Vector3.UP * close_height
-		look = _boss_point + Vector3.UP * clampf(_boss.rig.body_height(), 2.0, 12.0)
-	var terrain := Terrain.find(get_tree())
-	if terrain != null:
-		from.y = maxf(from.y, terrain.height_at(from.x, from.z) + ground_clearance)
-	_camera.look_at_from_position(from, look)
+## Los tres planos los arma la cámara; aquí solo se le pasa el avance.
+func _update_camera(progress: float, delta: float) -> void:
+	var look := _camera.shoot(progress, _boss.rig.body_height(), delta)
 	if _transformation != null and is_instance_valid(_transformation):
 		_transformation.set_focus(look)
+
+
+## Los dos momentos de la llegada: el frenazo sobre el suelo y el grito.
+func _tick_beats(progress: float) -> void:
+	if not _impact_done and progress >= impact_fraction:
+		_impact_done = true
+		_boss.rig.burst()
+		_boss.rig.pop_nova(impact_flash_radius, 0.7)
+		_camera.shake(beat_shake, 0.7)
+		Sfx.play(impact_sfx)
+	if not _roar_done and progress >= roar_fraction:
+		_roar_done = true
+		_boss.rig.gesture(&"roar")
+		_camera.shake(beat_shake * 0.5, 1.0)
+		Sfx.play(roar_sfx)
 
 
 # --- cartel -----------------------------------------------------------------------

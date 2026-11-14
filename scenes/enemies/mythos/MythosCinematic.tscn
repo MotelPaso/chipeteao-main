@@ -1,7 +1,8 @@
-[gd_scene load_steps=3 format=3]
+[gd_scene load_steps=4 format=3]
 
 [ext_resource type="Script" path="res://scripts/enemies/mythos/mythos_cinematic.gd" id="1_cinematic"]
 [ext_resource type="Script" path="res://scripts/enemies/mythos/boss_song.gd" id="2_song"]
+[ext_resource type="Script" path="res://scripts/enemies/mythos/mythos_cinematic_camera.gd" id="4_camera"]
 
 [node name="MythosCinematic" type="Node3D"]
 process_mode = 1
@@ -9,6 +10,7 @@ script = ExtResource("1_cinematic")
 
 [node name="Camera" type="Camera3D" parent="."]
 far = 900.0
+script = ExtResource("4_camera")
 
 [node name="Music" type="AudioStreamPlayer" parent="."]
 script = ExtResource("2_song")
@@ -48,9 +50,9 @@ color = Color(0, 0, 0, 1)
 unique_name_in_owner = true
 layout_mode = 1
 anchors_preset = -1
-anchor_top = 0.66
+anchor_top = 0.76
 anchor_right = 1.0
-anchor_bottom = 0.66
+anchor_bottom = 0.76
 offset_top = -52.0
 offset_bottom = 52.0
 grow_horizontal = 2
@@ -67,9 +69,9 @@ uppercase = true
 unique_name_in_owner = true
 layout_mode = 1
 anchors_preset = -1
-anchor_top = 0.66
+anchor_top = 0.76
 anchor_right = 1.0
-anchor_bottom = 0.66
+anchor_bottom = 0.76
 offset_top = 54.0
 offset_bottom = 86.0
 grow_horizontal = 2

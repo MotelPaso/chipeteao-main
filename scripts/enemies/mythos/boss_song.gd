@@ -81,6 +81,13 @@ func follow(clock: float, delta: float) -> void:
 		_resyncs += 1
 
 
+## Con `on` la canción se detiene cuando el juego se pausa (durante la calma,
+## para que siga pegada a la cinemática); sin él sigue sonando aunque el
+## juego se pause por una subida de nivel, un vendedor o el menú de pausa.
+func set_pausable(on: bool) -> void:
+	process_mode = Node.PROCESS_MODE_INHERIT if on else Node.PROCESS_MODE_ALWAYS
+
+
 ## Lleva la canción a `seconds` (alguien saltó la cinemática).
 func jump_to(seconds: float) -> void:
 	if song != null and playing:

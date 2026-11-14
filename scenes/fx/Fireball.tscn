@@ -1,0 +1,67 @@
+[gd_scene load_steps=12 format=3]
+
+[ext_resource type="Script" path="res://scripts/fx/fireball.gd" id="1_script"]
+[ext_resource type="Shader" path="res://assets/shaders/fireball.gdshader" id="2_ball"]
+[ext_resource type="Shader" path="res://assets/shaders/phoenix_nova.gdshader" id="3_glow"]
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_ball"]
+shader = ExtResource("2_ball")
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_glow"]
+shader = ExtResource("3_glow")
+shader_parameter/strength = 0.85
+shader_parameter/softness = 1.5
+
+[sub_resource type="SphereMesh" id="SphereMesh_ball"]
+radius = 1.0
+height = 2.0
+radial_segments = 20
+rings = 10
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_ember"]
+shading_mode = 0
+albedo_color = Color(1, 0.6, 0.15, 1)
+
+[sub_resource type="BoxMesh" id="BoxMesh_ember"]
+material = SubResource("StandardMaterial3D_ember")
+size = Vector3(0.3, 0.3, 0.3)
+
+[sub_resource type="Curve" id="Curve_shrink"]
+_data = [Vector2(0, 1), 0.0, 0.0, 0, 0, Vector2(1, 0), 0.0, 0.0, 0, 0]
+point_count = 2
+
+[sub_resource type="CurveTexture" id="CurveTexture_shrink"]
+curve = SubResource("Curve_shrink")
+
+[sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_trail"]
+emission_shape = 1
+emission_sphere_radius = 0.9
+direction = Vector3(0, 1, 0)
+spread = 180.0
+initial_velocity_min = 0.3
+initial_velocity_max = 1.5
+gravity = Vector3(0, 2.5, 0)
+scale_min = 0.6
+scale_max = 1.6
+scale_curve = SubResource("CurveTexture_shrink")
+
+[node name="Fireball" type="Node3D"]
+script = ExtResource("1_script")
+
+[node name="Ball" type="MeshInstance3D" parent="."]
+cast_shadow = 0
+mesh = SubResource("SphereMesh_ball")
+surface_material_override/0 = SubResource("ShaderMaterial_ball")
+
+[node name="Glow" type="MeshInstance3D" parent="."]
+cast_shadow = 0
+mesh = SubResource("SphereMesh_ball")
+surface_material_override/0 = SubResource("ShaderMaterial_glow")
+
+[node name="Trail" type="GPUParticles3D" parent="."]
+cast_shadow = 0
+emitting = false
+amount = 40
+lifetime = 0.55
+process_material = SubResource("ParticleProcessMaterial_trail")
+draw_pass_1 = SubResource("BoxMesh_ember")

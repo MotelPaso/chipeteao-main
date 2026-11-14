@@ -1,0 +1,99 @@
+[gd_scene load_steps=14 format=3]
+
+[ext_resource type="Script" path="res://scripts/fx/fire_tornado.gd" id="1_script"]
+[ext_resource type="Shader" path="res://assets/shaders/fire_tornado.gdshader" id="2_funnel"]
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_funnel"]
+shader = ExtResource("2_funnel")
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_funnel"]
+top_radius = 1.0
+bottom_radius = 0.32
+height = 1.0
+radial_segments = 28
+rings = 12
+cap_top = false
+cap_bottom = false
+
+[sub_resource type="Gradient" id="Gradient_ground"]
+offsets = PackedFloat32Array(0, 0.72, 0.93, 1)
+colors = PackedColorArray(1, 1, 1, 0.3, 1, 1, 1, 0.45, 1, 1, 1, 1, 1, 1, 1, 0)
+
+[sub_resource type="GradientTexture2D" id="GradientTexture2D_ground"]
+gradient = SubResource("Gradient_ground")
+width = 128
+height = 128
+fill = 1
+fill_from = Vector2(0.5, 0.5)
+fill_to = Vector2(1, 0.5)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_ground"]
+resource_local_to_scene = true
+transparency = 1
+blend_mode = 1
+shading_mode = 0
+albedo_color = Color(1, 0.45, 0.08, 0)
+albedo_texture = SubResource("GradientTexture2D_ground")
+
+[sub_resource type="PlaneMesh" id="PlaneMesh_ground"]
+size = Vector2(2, 2)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_ember"]
+shading_mode = 0
+albedo_color = Color(1, 0.62, 0.16, 1)
+
+[sub_resource type="BoxMesh" id="BoxMesh_ember"]
+material = SubResource("StandardMaterial3D_ember")
+size = Vector3(0.22, 0.22, 0.22)
+
+[sub_resource type="Curve" id="Curve_shrink"]
+_data = [Vector2(0, 1), 0.0, 0.0, 0, 0, Vector2(1, 0), 0.0, 0.0, 0, 0]
+point_count = 2
+
+[sub_resource type="CurveTexture" id="CurveTexture_shrink"]
+curve = SubResource("Curve_shrink")
+
+[sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_embers"]
+emission_shape = 6
+emission_ring_axis = Vector3(0, 1, 0)
+emission_ring_height = 0.4
+emission_ring_radius = 2.4
+emission_ring_inner_radius = 0.6
+direction = Vector3(0, 1, 0)
+spread = 28.0
+initial_velocity_min = 5.0
+initial_velocity_max = 10.0
+gravity = Vector3(0, 3, 0)
+scale_min = 0.6
+scale_max = 1.5
+scale_curve = SubResource("CurveTexture_shrink")
+
+[node name="FireTornado" type="Node3D"]
+script = ExtResource("1_script")
+
+[node name="Funnel" type="MeshInstance3D" parent="."]
+cast_shadow = 0
+extra_cull_margin = 6.0
+mesh = SubResource("CylinderMesh_funnel")
+surface_material_override/0 = SubResource("ShaderMaterial_funnel")
+
+[node name="Core" type="MeshInstance3D" parent="."]
+cast_shadow = 0
+extra_cull_margin = 6.0
+instance_shader_parameters/core = 1.0
+mesh = SubResource("CylinderMesh_funnel")
+surface_material_override/0 = SubResource("ShaderMaterial_funnel")
+
+[node name="Ground" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.12, 0)
+cast_shadow = 0
+mesh = SubResource("PlaneMesh_ground")
+material_override = SubResource("StandardMaterial3D_ground")
+
+[node name="Embers" type="GPUParticles3D" parent="."]
+cast_shadow = 0
+emitting = false
+amount = 44
+lifetime = 1.3
+process_material = SubResource("ParticleProcessMaterial_embers")
+draw_pass_1 = SubResource("BoxMesh_ember")

@@ -1,58 +1,80 @@
 class_name MythosRing
 extends MythosMove
-## Cerco de brasas: marca un anillo de zonas de fuego alrededor del raider.
-## Ninguna nace encima de nadie y entre dos vecinas siempre queda un paso
-## libre para salir; con agresividad el anillo trae más zonas y se abre para
-## que ese paso no se cierre.
+## Cerco de brasas: encierra al raider en un anillo de zonas de fuego con una
+## sola salida y, poco después, hace estallar el centro. Hay que salir por el
+## hueco (o pagar el peaje de cruzar el fuego, o saltarlo) antes del estallido.
 
 @export_group("Cerco")
-## Zonas del anillo con agresividad 0.
-@export var zone_count: int = 5
-## Zonas extra con agresividad 1.
-@export var extra_zones_at_full_aggression: int = 3
+## Radio del anillo, en metros: del raider al centro de cada zona.
+@export var ring_radius: float = 6.2
 ## Radio de cada zona, en metros.
-@export var zone_radius: float = 2.6
-## Distancia mínima del raider al centro de cada zona, en metros.
-@export var ring_radius: float = 7.5
-## Metros libres que quedan entre dos zonas vecinas.
-@export var escape_gap: float = 2.4
-## Segundos de aviso antes de que cada zona se encienda.
-@export var warn_seconds: float = 1.3
-## Segundos que arde cada zona.
-@export var burn_seconds: float = 7.0
+@export var zone_radius: float = 2.3
+## Separación entre zonas vecinas, en diámetros (1 = se tocan apenas; menos = se pisan y no dejan pasar).
+@export_range(0.5, 1.0) var zone_spacing: float = 0.94
+## Zonas que faltan en el anillo: el hueco por donde se sale.
+@export var gap_zones: int = 1
+## Segundos de aviso antes de que el anillo se encienda.
+@export var warn_seconds: float = 0.8
+## Segundos que arde el anillo.
+@export var burn_seconds: float = 6.0
 ## Daño por segundo de cada zona (valor base).
-@export var zone_dps: float = 16.0
-## Segundos que Mythos se queda marcando el cerco.
-@export var cast_time: float = 0.8
+@export var zone_dps: float = 22.0
 
+@export_group("Estallido del centro")
+## Segundos entre que marca el cerco y estalla el centro, con agresividad 0.
+@export var blast_delay: float = 2.5
+## Multiplicador de esa espera con agresividad 1.
+@export var blast_delay_at_full_aggression: float = 0.8
+## Radio del estallido y de su disco de aviso, en metros.
+@export var blast_radius: float = 4.4
+## Daño del estallido a cada raider dentro del disco (valor base).
+@export var blast_damage: float = 45.0
+## Metros sobre el suelo por encima de los cuales el estallido no alcanza.
+@export var blast_height_window: float = 1.8
+## Segundos quieto después del estallido.
+@export var recover: float = 0.5
+## Sonido del estallido (fila de Sfx.SOUND_LIBRARY).
+@export var blast_sfx: StringName = &"fire_whoosh"
+
+var _center: Vector3 = Vector3.ZERO
 var _timer: float = 0.0
+var _blasted: bool = false
 
 
 func scale_damage(multiplier: float) -> void:
 	zone_dps *= multiplier
+	blast_damage *= multiplier
 
 
 func begin(target: Node3D) -> void:
-	_timer = cast_time
+	_center = boss.floor_point(target.global_position)
+	_blasted = false
+	_timer = blast_delay * aggression_lerp(1.0, blast_delay_at_full_aggression)
 	boss.rig.set_pose(MythosRig.Pose.CAST)
-	var count := maxi(aggression_count(zone_count, extra_zones_at_full_aggression), 1)
-	# El anillo crece con la cantidad: cada zona ocupa su diámetro más el paso libre.
-	var radius := maxf(ring_radius, float(count) * (zone_radius * 2.0 + escape_gap) / TAU)
-	var center := target.global_position
+	# Las zonas que caben en el anillo, pisándose apenas; las primeras
+	# gap_zones no salen y dejan el hueco.
+	var count := maxi(ceili(TAU * ring_radius / (zone_radius * 2.0 * zone_spacing)), 3)
 	var start := randf() * TAU
-	for i: int in count:
+	for i: int in range(gap_zones, count):
 		var angle := start + TAU * float(i) / float(count)
-		boss.spawn_fire_zone(center + Vector3(cos(angle), 0.0, sin(angle)) * radius,
-				zone_radius, warn_seconds, burn_seconds, zone_dps)
+		boss.spawn_fire_zone(_center + Vector3(cos(angle), 0.0, sin(angle)) * ring_radius,
+				zone_radius, warn_seconds, burn_seconds, zone_dps, true)
+	Telegraph.spawn_disc(boss, _center, blast_radius, _timer, boss.telegraph_color)
 
 
 func tick(delta: float) -> bool:
 	_timer -= delta
 	if _timer > 0.0:
 		return false
-	boss.rig.set_pose(MythosRig.Pose.FLY)
-	return true
+	if _blasted:
+		return true
+	_blasted = true
+	boss.strike_ground([_center], blast_radius, blast_height_window, blast_damage)
+	Sfx.play(blast_sfx)
+	boss.rig.set_pose(boss.rest_pose())
+	_timer = recover
+	return false
 
 
 func cancel() -> void:
-	boss.rig.set_pose(MythosRig.Pose.FLY)
+	boss.rig.set_pose(boss.rest_pose())
