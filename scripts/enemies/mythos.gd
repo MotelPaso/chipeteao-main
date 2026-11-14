@@ -18,11 +18,12 @@ extends MythosBody
 ##
 ## La vida de cada fase, la agresividad y el daño extra salen del nodo
 ## Scaling (StageBossScaling); la vida de Health en Mythos.tscn es el PISO.
-## Las zonas de fuego las saca el nodo Zones, la llegada (cinemática y mapa
-## en llamas) el nodo Arrival, y si una fase se alarga demasiado se consume
-## solo (nodo Burnout).
+## Las zonas de fuego las saca el nodo Zones (MythosBody), la llegada
+## (cinemática y mapa en llamas) el nodo Arrival, y si una fase se alarga
+## demasiado se consume solo (nodo Burnout).
 ## Contratos por nombre: lives_changed / lives_left / lives_total /
-## bar_title / bar_color (BossBar), fight_state (arena_probe) y las líneas
+## bar_title / bar_color (BossBar), fight_state (arena_probe), finish_calm (la
+## cinemática o el nodo Arrival, al terminar la calma) y las líneas
 ## "<título> scaling:", "life over:", "fight started:", "fight over:" y
 ## "move:" que leen los soaks.
 
@@ -33,6 +34,8 @@ enum Phase { ARRIVAL, FLIGHT, MOVE, ASHES, DEAD }
 
 ## Nombre de cada fase para el harness, en el orden de Phase.
 const PHASE_NAMES: Array[StringName] = [&"arrival", &"flight", &"move", &"ashes", &"dead"]
+## Metros sobre los pies del raider a los que le mira (el pecho).
+const GAZE_HEIGHT: float = 1.2
 
 @export_group("Ritmo de ataques")
 ## Segundos de pausa entre un ataque y el siguiente, con agresividad 0.
@@ -74,7 +77,6 @@ var _move: MythosMove = null
 var _power_damage_applied: float = 1.0
 
 @onready var _scaling: StageBossScaling = $Scaling
-@onready var _zones: MythosZones = $Zones
 @onready var _flight: MythosFlight = $Flight
 @onready var _arrival: MythosArrival = $Arrival
 @onready var _purge: MythosPurge = $Purge
@@ -146,17 +148,12 @@ func bar_color() -> Color:
 	return ascended_bar_color if _is_ascended() else bar_fill_color
 
 
-## Avance de la calma de llegada (0-1): el fénix baja del cielo.
-func set_calm_progress(progress: float) -> void:
-	rig.set_arrival_progress(progress)
-
-
 ## Termina la calma y empieza la pelea. `elapsed` son los segundos de juego
 ## que duró la calma y `skipped` si alguien la saltó.
 func finish_calm(elapsed: float, skipped: bool) -> void:
 	if _phase != Phase.ARRIVAL:
 		return
-	rig.end_arrival()
+	rig.stop_flying()
 	rig.set_trail(false)
 	rig.set_pose(MythosRig.Pose.FLY)
 	rig.gesture(&"roar")
@@ -176,18 +173,6 @@ func finish_calm(elapsed: float, skipped: bool) -> void:
 ## Punto del que salen sus plumas y sus bolas de fuego: el pico.
 func muzzle_point() -> Vector3:
 	return rig.beak_point()
-
-
-## Marca una zona de fuego si cae en suelo caminable y el nodo Zones la deja
-## salir. Con `on_raiders` puede nacer bajo un raider en pie (siempre avisa
-## antes de arder); nunca nace junto a uno caído. Devuelve true si salió.
-func spawn_fire_zone(center: Vector3, radius: float, warn_seconds: float,
-		burn_seconds: float, dps: float, on_raiders: bool = false) -> bool:
-	var at := _clamp_to_arena(center)
-	if not _is_walkable(at):
-		return false
-	at.y = _ground_height(at)
-	return _zones.mark(at, radius, warn_seconds, burn_seconds, dps, on_raiders)
 
 
 ## Lo posa en tierra (la Picada, al caer): desde ahí usa sus ataques de tierra.
@@ -235,7 +220,8 @@ func _behavior_tick(delta: float) -> void:
 		# El desgaste acaba de agotar esta vida.
 		return
 	_flight.tick(delta)
-	_voice.tick(delta)
+	if _voice.tick(delta):
+		rig.gesture(&"screech")
 	_moveset.tick(delta, _life)
 	if _phase == Phase.FLIGHT:
 		_pause_left = maxf(_pause_left - delta, 0.0)
@@ -262,6 +248,8 @@ func _facing_direction(steer: Vector3, seek: Vector3) -> Vector3:
 
 
 func _combat_tick(player: Node3D, distance: float) -> void:
+	# No le saca los ojos de encima al raider que tiene de blanco.
+	rig.gaze_at(player.global_position + Vector3.UP * GAZE_HEIGHT)
 	if _phase != Phase.FLIGHT or _pause_left > 0.0:
 		return
 	if _flight.wants_takeoff():
@@ -318,6 +306,9 @@ func _on_life_spent() -> void:
 	_health.invulnerable = true
 	_phase = Phase.ASHES
 	_ashes_left = _reborn.rebirth_seconds
+	# Cae girando sobre sí mismo.
+	rig.gaze_ahead()
+	rig.gesture(&"spin")
 	rig.set_pose(MythosRig.Pose.ASHES)
 	rig.burst()
 	_reborn.enter_ashes(self)
@@ -349,6 +340,7 @@ func _on_final_death() -> void:
 	print("%s fight over: took=%.1fs lives=%d" % [boss_title, _fight_clock, _lives_total])
 	_cancel_move()
 	_phase = Phase.DEAD
+	rig.gaze_ahead()
 	_clear_hazards()
 	_reborn.cancel()
 	_voice.died()
@@ -399,12 +391,3 @@ func _cancel_move() -> void:
 	rig.set_trail(false)
 	rig.set_nova(-1.0)
 
-
-## Apaga todo lo que sus ataques dejaron en la arena.
-func _clear_hazards() -> void:
-	_zones.extinguish_all()
-	var tree := get_tree()
-	tree.call_group(SafeCircle.GROUP, "dismiss")
-	tree.call_group(Fireball.GROUP, "fizzle")
-	tree.call_group(FireTornado.GROUP, "dissipate")
-	tree.call_group(FireWave.GROUP, "dissipate")

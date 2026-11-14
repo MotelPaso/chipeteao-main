@@ -85,6 +85,9 @@ func begin(_target: Node3D) -> void:
 	_launched = 0
 	_recovering = false
 	boss.rig.set_pose(MythosRig.Pose.CAST)
+	if from_sky:
+		# Las llama del cielo con un grito.
+		boss.rig.gesture(&"roar")
 
 
 func tick(delta: float) -> bool:

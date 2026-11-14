@@ -38,15 +38,17 @@ func fight_started() -> void:
 	Sfx.play(arrival_sfx)
 
 
-## Un frame de pelea: cada tanto suelta un llamado.
-func tick(delta: float) -> void:
+## Un frame de pelea: cada tanto suelta un llamado. True si acaba de llamar.
+func tick(delta: float) -> bool:
 	_hurt_left = maxf(_hurt_left - delta, 0.0)
 	_call_left -= delta
 	if _call_left > 0.0:
-		return
+		return false
 	_call_left = _rng.randf_range(call_min_seconds, call_max_seconds)
-	if not call_sfx.is_empty():
-		Sfx.play(call_sfx)
+	if call_sfx.is_empty():
+		return false
+	Sfx.play(call_sfx)
+	return true
 
 
 ## Empieza un ataque: suena su grito, y los llamados sueltos esperan.

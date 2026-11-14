@@ -51,6 +51,7 @@ func begin(target: Node3D) -> void:
 	_blasted = false
 	_timer = blast_delay * aggression_lerp(1.0, blast_delay_at_full_aggression)
 	boss.rig.set_pose(MythosRig.Pose.CAST)
+	boss.rig.gesture(&"screech")
 	# Las zonas que caben en el anillo, pisándose apenas; las primeras
 	# gap_zones no salen y dejan el hueco.
 	var count := maxi(ceili(TAU * ring_radius / (zone_radius * 2.0 * zone_spacing)), 3)
@@ -71,6 +72,7 @@ func tick(delta: float) -> bool:
 	_blasted = true
 	boss.strike_ground([_center], blast_radius, blast_height_window, blast_damage)
 	Sfx.play(blast_sfx)
+	boss.rig.gesture(&"slam")
 	boss.rig.set_pose(boss.rest_pose())
 	_timer = recover
 	return false

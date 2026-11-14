@@ -3,7 +3,8 @@ extends Node3D
 ## Onda de fuego del pool: un anillo de llamas que se abre a ras de suelo
 ## desde un punto, siguiendo el relieve. Daña UNA vez a cada raider en pie
 ## que el anillo alcance por debajo de su altura: se esquiva SALTANDO justo
-## cuando pasa. Con daño 0 es solo un efecto.
+## cuando pasa. Con daño 0 es solo un efecto (así la usa la cinemática de
+## Mythos, con una instancia propia y open()).
 ## El anillo son tramos de llama (el cuadro de 1 x 1 del nodo Wall de
 ## FireWave.tscn) en un MultiMesh propio de cada instancia.
 ## Grupo "fire_waves": el jefe las apaga todas al morir (dissipate).
@@ -65,7 +66,7 @@ static func spawn(scene: PackedScene, center: Vector3, start_radius: float,
 		attacker: Node3D) -> FireWave:
 	var wave := Pools.acquire_scene(scene) as FireWave
 	if wave != null:
-		wave._start(center, start_radius, max_radius, speed, damage, height_window, band,
+		wave.open(center, start_radius, max_radius, speed, damage, height_window, band,
 				attacker)
 	return wave
 
@@ -82,7 +83,9 @@ func dissipate() -> void:
 	_fade_tween.tween_callback(_release)
 
 
-func _start(center: Vector3, start_radius: float, max_radius: float, speed: float,
+## Abre ESTA onda desde `center`, con lo mismo que pide spawn(). Para una
+## onda que ya está en el árbol y no salió del pool.
+func open(center: Vector3, start_radius: float, max_radius: float, speed: float,
 		damage: float, height_window: float, band: float, attacker: Node3D) -> void:
 	_kill_fade()
 	_terrain = Terrain.find(get_tree())

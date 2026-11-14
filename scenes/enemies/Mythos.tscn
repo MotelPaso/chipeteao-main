@@ -1,4 +1,4 @@
-[gd_scene load_steps=68 format=3]
+[gd_scene load_steps=70 format=3]
 
 [ext_resource type="Script" path="res://scripts/enemies/mythos.gd" id="1_mythos"]
 [ext_resource type="Script" path="res://scripts/enemies/boss/guarded_health.gd" id="2_health"]
@@ -27,6 +27,8 @@
 [ext_resource type="Script" path="res://scripts/enemies/mythos/mythos_moveset.gd" id="25_moveset"]
 [ext_resource type="Script" path="res://scripts/enemies/mythos/mythos_voice.gd" id="26_voice"]
 [ext_resource type="Script" path="res://scripts/enemies/mythos/mythos_gestures.gd" id="27_gestures"]
+[ext_resource type="Script" path="res://scripts/enemies/mythos/mythos_nova.gd" id="28_nova"]
+[ext_resource type="Script" path="res://scripts/enemies/mythos/mythos_motion.gd" id="29_motion"]
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_flight"]
 shader = ExtResource("13_plumage")
@@ -363,6 +365,9 @@ script = ExtResource("4_rig")
 
 [node name="Gestures" type="Node" parent="Visual"]
 script = ExtResource("27_gestures")
+
+[node name="Motion" type="Node" parent="Visual"]
+script = ExtResource("29_motion")
 
 [node name="Hover" type="Node3D" parent="Visual"]
 unique_name_in_owner = true
@@ -1633,6 +1638,7 @@ cast_shadow = 0
 extra_cull_margin = 8.0
 mesh = SubResource("SphereMesh_nova")
 surface_material_override/0 = SubResource("ShaderMaterial_nova")
+script = ExtResource("28_nova")
 
 [node name="AshMound" type="MeshInstance3D" parent="Visual"]
 unique_name_in_owner = true

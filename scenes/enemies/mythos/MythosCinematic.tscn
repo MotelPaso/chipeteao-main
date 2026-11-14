@@ -1,8 +1,38 @@
-[gd_scene load_steps=4 format=3]
+[gd_scene load_steps=14 format=3]
 
 [ext_resource type="Script" path="res://scripts/enemies/mythos/mythos_cinematic.gd" id="1_cinematic"]
 [ext_resource type="Script" path="res://scripts/enemies/mythos/boss_song.gd" id="2_song"]
 [ext_resource type="Script" path="res://scripts/enemies/mythos/mythos_cinematic_camera.gd" id="4_camera"]
+[ext_resource type="Script" path="res://scripts/enemies/mythos/mythos_entrance.gd" id="5_entrance"]
+[ext_resource type="Script" path="res://scripts/enemies/mythos/mythos_fire_ring.gd" id="6_ring"]
+[ext_resource type="Shader" path="res://assets/shaders/fire_wall.gdshader" id="7_wall"]
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_ring"]
+shader = ExtResource("7_wall")
+
+[sub_resource type="QuadMesh" id="QuadMesh_ring"]
+material = SubResource("ShaderMaterial_ring")
+
+[sub_resource type="MultiMesh" id="MultiMesh_ring"]
+transform_format = 1
+mesh = SubResource("QuadMesh_ring")
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_chunk"]
+shading_mode = 0
+vertex_color_use_as_albedo = true
+vertex_color_is_srgb = true
+
+[sub_resource type="BoxMesh" id="BoxMesh_chunk"]
+material = SubResource("StandardMaterial3D_chunk")
+size = Vector3(0.32, 0.32, 0.32)
+
+[sub_resource type="Curve" id="Curve_shrink"]
+_data = [Vector2(0, 1), 0.0, 0.0, 0, 0, Vector2(1, 0), 0.0, 0.0, 0, 0]
+point_count = 2
+
+[sub_resource type="Gradient" id="Gradient_trail"]
+offsets = PackedFloat32Array(0, 0.35, 1)
+colors = PackedColorArray(1, 0.82, 0.3, 1, 1, 0.4, 0.05, 1, 0.38, 0.05, 0.02, 1)
 
 [node name="MythosCinematic" type="Node3D"]
 process_mode = 1
@@ -11,6 +41,55 @@ script = ExtResource("1_cinematic")
 [node name="Camera" type="Camera3D" parent="."]
 far = 900.0
 script = ExtResource("4_camera")
+
+[node name="Entrance" type="Node3D" parent="."]
+script = ExtResource("5_entrance")
+
+[node name="Ring" type="MultiMeshInstance3D" parent="Entrance"]
+visible = false
+cast_shadow = 0
+multimesh = SubResource("MultiMesh_ring")
+script = ExtResource("6_ring")
+
+[node name="CometTrail" type="CPUParticles3D" parent="Entrance"]
+cast_shadow = 0
+emitting = false
+mesh = SubResource("BoxMesh_chunk")
+scale_amount_curve = SubResource("Curve_shrink")
+color_ramp = SubResource("Gradient_trail")
+amount = 700
+lifetime = 1.2
+local_coords = false
+emission_shape = 1
+emission_sphere_radius = 1.5
+direction = Vector3(0, 1, 0)
+spread = 180.0
+gravity = Vector3(0, 1.5, 0)
+initial_velocity_min = 0.5
+initial_velocity_max = 3.0
+scale_amount_min = 0.9
+scale_amount_max = 2.6
+
+[node name="Debris" type="CPUParticles3D" parent="Entrance"]
+cast_shadow = 0
+emitting = false
+mesh = SubResource("BoxMesh_chunk")
+scale_amount_curve = SubResource("Curve_shrink")
+amount = 170
+lifetime = 1.9
+one_shot = true
+explosiveness = 0.96
+local_coords = false
+emission_shape = 1
+emission_sphere_radius = 2.2
+direction = Vector3(0, 1, 0)
+spread = 58.0
+gravity = Vector3(0, -24, 0)
+initial_velocity_min = 12.0
+initial_velocity_max = 34.0
+scale_amount_min = 0.7
+scale_amount_max = 2.4
+color = Color(0.13, 0.07, 0.05, 1)
 
 [node name="Music" type="AudioStreamPlayer" parent="."]
 script = ExtResource("2_song")

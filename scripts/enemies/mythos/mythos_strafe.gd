@@ -141,6 +141,7 @@ func _plan_pass(heading: Vector3, warn: float) -> void:
 	_step = Step.APPROACH
 	boss.face_along(_direction)
 	boss.rig.set_pose(MythosRig.Pose.GLIDE)
+	boss.rig.gesture(&"screech")
 
 
 func _after_pass() -> void:

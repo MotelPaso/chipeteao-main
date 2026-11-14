@@ -12,8 +12,11 @@ extends Node3D
 ##   Tail      se levanta para no clavarse en el suelo, y se mece
 ##   Legs      cuelgan, o se adelantan con las garras por delante
 ## Mythos y sus ataques piden una POSE con set_pose() y gestos sueltos con
-## gesture() (los lleva el nodo Gestures). Las plumas se mecen solas en su
-## shader.
+## gesture() (los lleva el nodo Gestures). Lo que se mueve solo (la cabeza
+## que sigue a su blanco, la cola y las patas que van atrasadas, los saltitos
+## en tierra, las manías) lo lleva el nodo Motion. Las plumas se mecen solas
+## en su shader. En la cinemática de llegada el modelo deja el cuerpo y vuela
+## por su cuenta (fly_at): la pose sigue mandando en alas, patas y tamaño.
 ## En la segunda fase toma su FORMA RENACIDA (ascend): crece, cambia de
 ## color (los shaders mezclan hacia su paleta renacida) y aparecen las piezas
 ## que cuelgan de los pivotes Ascended*: la aureola, la corona y las plumas
@@ -93,10 +96,6 @@ const ASCEND_SHADERS: Array[String] = ["phoenix_plumage.gdshader", "phoenix_body
 @export var nova_pitch_degrees: float = 76.0
 ## Tamaño al que se hincha con la carga completa (1 = no cambia).
 @export var nova_scale: float = 1.1
-## Radio de la bola de luz al empezar a cargar, en unidades del modelo.
-@export var nova_start_radius: float = 2.0
-## Radio de la bola de luz con la carga completa, en unidades del modelo.
-@export var nova_full_radius: float = 6.0
 
 @export_group("Alas")
 ## Segundos de un aleteo completo en vuelo normal.
@@ -126,9 +125,9 @@ const ASCEND_SHADERS: Array[String] = ["phoenix_plumage.gdshader", "phoenix_body
 ## Segundos de un latido de la brasa.
 @export var ashes_pulse_period: float = 0.9
 
-@export_group("Llegada")
-## Altura en metros desde la que baja al llegar.
-@export var arrival_height: float = 70.0
+@export_group("Vuelo dirigido")
+## Parte de la inclinación que el cuello y la cabeza deshacen mientras lo lleva la cinemática (bajo = la cabeza apunta adonde vuela).
+@export_range(0.0, 1.0) var directed_head_level: float = 0.25
 
 var _pose: Pose = Pose.FLY
 ## Lo que pide la pose actual; _apply lo rearma en cada frame.
@@ -149,14 +148,15 @@ var _legs_angle: float = 0.0
 var _flap: float = 0.0
 var _hand_flap: float = 0.0
 var _scale: float = 1.0
-## Avance de la llegada (0 = en lo alto, 1 = en su altura de vuelo); -1 fuera de ella.
-var _arrival: float = -1.0
-## Carga del Amanecer (0-1); -1 con la bola de luz apagada.
-var _nova_charge: float = -1.0
+## Vuelo dirigido (fly_at): dónde va el modelo y cómo se orienta, en el mundo.
+var _directed: bool = false
+var _fly_point: Vector3 = Vector3.ZERO
+var _fly_yaw: float = 0.0
+var _fly_pitch: float = 0.0
+var _fly_roll: float = 0.0
 ## Cuánto tomó la forma renacida (0-1).
 var _ascend: float = 0.0
 var _ascend_tween: Tween = null
-var _nova_tween: Tween = null
 ## Las piezas cuyo shader mezcla hacia la forma renacida.
 var _tinted: Array[MeshInstance3D] = []
 var _last_position: Vector3 = Vector3.ZERO
@@ -173,18 +173,18 @@ var _last_position: Vector3 = Vector3.ZERO
 @onready var _tail: Node3D = %Tail
 @onready var _legs: Node3D = %Legs
 @onready var _ash_mound: Node3D = %AshMound
-@onready var _nova: MeshInstance3D = %Nova
+@onready var _nova: MythosNova = %Nova
 @onready var _trail: CPUParticles3D = %Trail
 @onready var _burst: CPUParticles3D = %Burst
 @onready var _aura: CPUParticles3D = %Aura
 @onready var _gestures: MythosGestures = $Gestures
+@onready var _motion: MythosMotion = $Motion
 @onready var _ascended_parts: Array[Node3D] = [%AscendedCrown, %AscendedBack,
 		%AscendedTail, %AscendedWingL, %AscendedWingR]
 
 
 func _ready() -> void:
 	_ash_mound.visible = false
-	_nova.visible = false
 	for node: Node in _hover.find_children("*", "MeshInstance3D", true, false):
 		var mesh := node as MeshInstance3D
 		var material := mesh.get_surface_override_material(0) as ShaderMaterial
@@ -198,12 +198,13 @@ func _ready() -> void:
 
 func _process(delta: float) -> void:
 	_time += delta
-	# Metros por segundo hacia su derecha: el nodo Gestures lo ladea con eso.
-	var lateral := 0.0
-	if delta > 0.0:
-		lateral = ((global_position - _last_position) / delta).dot(global_basis.x)
+	var velocity := (global_position - _last_position) / delta if delta > 0.0 else Vector3.ZERO
 	_last_position = global_position
-	_gestures.tick(delta, lateral)
+	# Gestures lo ladea con lo que se mueve hacia su derecha; Motion suma el
+	# resto de lo que el movimiento le hace al cuerpo.
+	_gestures.tick(delta, velocity.dot(global_basis.x))
+	_motion.tick(delta, velocity, _hover.global_transform, _head.global_position,
+			_pose == Pose.PERCH, _pose == Pose.FLY or _pose == Pose.PERCH)
 	_apply(delta)
 
 
@@ -223,14 +224,32 @@ func gesture(gesture_name: StringName) -> void:
 	_gestures.play(gesture_name)
 
 
-## Avance de la llegada desde el cielo: 0 arriba, 1 en su altura de vuelo.
-## Fuera de la llegada, end_arrival().
-func set_arrival_progress(progress: float) -> void:
-	_arrival = clampf(progress, 0.0, 1.0)
+## Le da un punto del mundo para seguir con la cabeza (su blanco, la cámara).
+func gaze_at(point: Vector3) -> void:
+	_motion.gaze_at(point)
 
 
-func end_arrival() -> void:
-	_arrival = -1.0
+## Deja de seguir un punto con la cabeza.
+func gaze_ahead() -> void:
+	_motion.gaze_ahead()
+
+
+## Vuelo dirigido (la llegada): el modelo deja el cuerpo y va a `point` (en
+## el mundo) mirando hacia `yaw` (radianes, en el mundo), con `pitch_degrees`
+## de inclinación (positivo = pico arriba) y `roll_degrees` de ladeo
+## (positivo = ala izquierda abajo). Dura hasta stop_flying().
+func fly_at(point: Vector3, yaw: float, pitch_degrees: float, roll_degrees: float) -> void:
+	_directed = true
+	_fly_point = point
+	_fly_yaw = yaw
+	_fly_pitch = pitch_degrees
+	_fly_roll = roll_degrees
+	_place_body()
+
+
+## Termina el vuelo dirigido: el modelo vuelve sobre el cuerpo, en su pose.
+func stop_flying() -> void:
+	_directed = false
 
 
 ## Toma (o deja) la forma renacida de la segunda fase, de a poco.
@@ -245,25 +264,13 @@ func ascend(on: bool) -> void:
 ## Carga del Amanecer: de 0 a 1 la bola de luz crece alrededor del fénix;
 ## con un valor negativo se apaga.
 func set_nova(charge: float) -> void:
-	_kill_nova_tween()
-	_nova_charge = charge
-	_nova.visible = charge >= 0.0
-	if charge < 0.0:
-		return
-	var amount := clampf(charge, 0.0, 1.0)
-	_nova.scale = Vector3.ONE * lerpf(nova_start_radius, nova_full_radius, amount)
-	_nova.set_instance_shader_parameter(&"charge", amount)
+	_nova.charge(charge)
 
 
 ## Un estallido de luz: la bola crece de golpe hasta `radius` (unidades del
 ## modelo) y se apaga en `seconds`.
 func pop_nova(radius: float, seconds: float) -> void:
-	_kill_nova_tween()
-	_nova_charge = -1.0
-	_nova.visible = true
-	_nova_tween = create_tween()
-	_nova_tween.tween_method(_pop_step.bind(radius), 0.0, 1.0, seconds)
-	_nova_tween.tween_callback(_nova.hide)
+	_nova.pop(radius, seconds)
 
 
 ## Enciende o apaga la estela de fuego que deja al moverse rápido.
@@ -294,7 +301,7 @@ func _size() -> float:
 
 func _apply(delta: float) -> void:
 	MythosPoses.fill(_want, self, _pose, lerpf(hover_height, ascended_hover_height, _ascend),
-			_size(), _nova_charge)
+			_size(), _nova.charge_amount)
 	var speed := strike_pose_speed if _pose == Pose.SLASH or _pose == Pose.DIVE else pose_speed
 	var blend := Juice.damp(speed, delta) if delta > 0.0 else 1.0
 	_height = lerpf(_height, _want.height, blend)
@@ -307,7 +314,8 @@ func _apply(delta: float) -> void:
 	_flap = lerpf(_flap, _want.flap, blend)
 	_hand_flap = lerpf(_hand_flap, _want.hand_flap, blend)
 	_scale = lerpf(_scale, _want.scale, blend)
-	_flap_phase = fmod(_flap_phase + delta * TAU / maxf(_want.period, 0.01), TAU)
+	_flap_phase = fmod(_flap_phase
+			+ delta * _motion.flap_rate * TAU / maxf(_want.period, 0.01), TAU)
 	_place_body()
 	_place_wings()
 	_place_tail_and_legs()
@@ -316,48 +324,60 @@ func _apply(delta: float) -> void:
 ## Altura, tamaño e inclinación del cuerpo; el cuello y la cabeza deshacen la
 ## inclinación para seguir mirando al frente, y los gestos se suman encima.
 func _place_body() -> void:
-	var height := _height
-	if _arrival >= 0.0:
-		# Baja frenando: rápido en lo alto, suave al llegar a su altura.
-		var ease_out := 1.0 - pow(1.0 - _arrival, 3.0)
-		height = lerpf(arrival_height, _height, ease_out)
+	var height := _height - _gestures.drop
 	var size := _scale * _size()
 	if _pose == Pose.ASHES:
 		# La brasa late en su sitio en vez de mecerse.
 		size *= 1.0 + 0.18 * sin(_time * TAU / maxf(ashes_pulse_period, 0.01))
 	else:
-		# El cuerpo sube cuando las alas bajan.
-		height += -sin(_flap_phase) * bob_amplitude * (_flap / maxf(flap_degrees, 0.01))
-	_hover.position.y = height
+		# El cuerpo sube cuando las alas bajan, y en tierra avanza a saltitos.
+		height += -sin(_flap_phase) * bob_amplitude * (_flap / maxf(flap_degrees, 0.01)) \
+				+ _motion.hop
+	_hover.position = Vector3(0.0, height, 0.0)
 	_hover.scale = Vector3.ONE * size
 	_hover.rotation.y = _gestures.yaw
-	var pitch := deg_to_rad(_pitch + _gestures.pitch)
-	_body.rotation = Vector3(pitch, 0.0, deg_to_rad(_gestures.roll))
-	_neck.rotation.x = -pitch * head_level * 0.55 + deg_to_rad(_gestures.neck)
-	# La cabeza cabecea apenas con el aleteo.
-	_head.rotation.x = -pitch * head_level * 0.45 + deg_to_rad(2.5) * sin(_flap_phase - 0.6)
+	var pitch := deg_to_rad(_pitch + _gestures.pitch + _motion.lean)
+	var roll := _gestures.roll
+	var level := head_level
+	if _directed:
+		# La cinemática lo lleva: va donde le dicen y la cabeza apunta adonde vuela.
+		_hover.global_position = _fly_point
+		_hover.rotation.y += _fly_yaw - global_rotation.y
+		pitch = deg_to_rad(_fly_pitch + _gestures.pitch)
+		roll += _fly_roll
+		level = directed_head_level
+	_body.rotation = Vector3(pitch, deg_to_rad(_gestures.twist), deg_to_rad(roll))
+	# El cuello y la cabeza se reparten la mirada; la cabeza cabecea apenas
+	# con el aleteo y es la que se ladea.
+	var look := Vector2(deg_to_rad(_motion.head_pitch), deg_to_rad(_motion.head_yaw)) * 0.5
+	_neck.rotation.x = -pitch * level * 0.55 + deg_to_rad(_gestures.neck) + look.x
+	_neck.rotation.y = look.y
+	_head.rotation.x = -pitch * level * 0.45 + deg_to_rad(2.5) * sin(_flap_phase - 0.6) + look.x
+	_head.rotation.y = look.y
+	_head.rotation.z = deg_to_rad(_motion.head_roll)
 	_jaw.rotation.x = -deg_to_rad(_gestures.jaw)
 
 
 ## Brazo y mano de cada ala. Las alas son espejo: el mismo ángulo con signo
 ## contrario.
 func _place_wings() -> void:
-	var arm := deg_to_rad(_wing + sin(_flap_phase) * _flap + _gestures.wing)
+	var arm := _wing + sin(_flap_phase) * _flap + _gestures.wing + _motion.wing
 	var hand := deg_to_rad(_hand + sin(_flap_phase - hand_lag * TAU) * _hand_flap)
 	var sweep := deg_to_rad(_sweep)
 	var fold := deg_to_rad(_fold)
 	# El borde de ataque baja un poco en el golpe hacia abajo.
 	var twist := deg_to_rad(7.0) * cos(_flap_phase) * (_flap / maxf(flap_degrees, 0.01))
-	_wing_left.rotation = Vector3(twist, sweep, -arm)
-	_wing_right.rotation = Vector3(twist, -sweep, arm)
+	_wing_left.rotation = Vector3(twist, sweep, -deg_to_rad(arm + _gestures.wing_left))
+	_wing_right.rotation = Vector3(twist, -sweep, deg_to_rad(arm + _gestures.wing_right))
 	_hand_left.rotation = Vector3(0.0, fold, -hand)
 	_hand_right.rotation = Vector3(0.0, -fold, hand)
 
 
 func _place_tail_and_legs() -> void:
-	_tail.rotation.x = -deg_to_rad(_pitch) * tail_level
-	_tail.rotation.y = deg_to_rad(tail_sway_degrees) * sin(_time * TAU / 2.6)
-	_legs.rotation.x = deg_to_rad(_legs_angle)
+	_tail.rotation.x = -deg_to_rad(_pitch) * tail_level + deg_to_rad(_motion.tail_pitch)
+	_tail.rotation.y = deg_to_rad(tail_sway_degrees) * sin(_time * TAU / 2.6) \
+			+ deg_to_rad(_motion.tail_yaw)
+	_legs.rotation.x = deg_to_rad(_legs_angle + _motion.legs)
 
 
 ## Cuánto tomó la forma renacida: color de cada pieza, piezas de más y aura.
@@ -370,13 +390,3 @@ func _set_ascend(amount: float) -> void:
 		part.scale = Vector3.ONE * maxf(amount, 0.001)
 	_aura.emitting = amount > 0.5
 
-
-func _pop_step(t: float, radius: float) -> void:
-	_nova.scale = Vector3.ONE * lerpf(nova_start_radius, radius, 1.0 - pow(1.0 - t, 3.0))
-	_nova.set_instance_shader_parameter(&"charge", 1.0 - t)
-
-
-func _kill_nova_tween() -> void:
-	if _nova_tween != null and _nova_tween.is_valid():
-		_nova_tween.kill()
-	_nova_tween = null

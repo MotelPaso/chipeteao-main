@@ -63,6 +63,8 @@ func tick(delta: float) -> bool:
 	if _recovering:
 		return true
 	_launch()
+	# Cada oleada sale de un ala distinta.
+	boss.rig.gesture(&"swipe_left" if _wave_index % 2 == 0 else &"swipe_right")
 	_waves_left -= 1
 	_wave_index += 1
 	if _waves_left > 0:

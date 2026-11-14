@@ -78,6 +78,7 @@ func begin(_target: Node3D) -> void:
 	_harass_left = harass_interval
 	_place_circles()
 	boss.rig.set_pose(MythosRig.Pose.NOVA)
+	boss.rig.gesture(&"screech")
 	boss.rig.set_nova(0.0)
 	Sfx.play(charge_sfx)
 	get_tree().call_group("boss_ui", "announce", announce_text)
@@ -178,6 +179,7 @@ func _detonate() -> void:
 			hit += 1
 	print("%s dawn blast: hit=%d circles=%d" % [boss.boss_title, hit, _circles.size()])
 	boss.rig.set_nova(-1.0)
+	boss.rig.gesture(&"slam")
 	boss.screen_flash()
 	Juice.shake(shake_strength, shake_seconds)
 	Sfx.play(blast_sfx)

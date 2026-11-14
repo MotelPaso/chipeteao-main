@@ -3,7 +3,10 @@ extends Node3D
 ## Cinemática de llegada de Mythos. Mythos instancia esta escena bajo la
 ## arena cuando llega y llama a play(); como cuelga de la arena, muere con
 ## ella. La CANCIÓN la toca su nodo Music (BossSong), que tiene el archivo, el
-## volumen y el fundido; aquí solo se le marca el reloj.
+## volumen y el fundido; aquí solo se le marca el reloj. Lo que el fénix HACE
+## en pantalla (cae como un cometa, deja un anillo de fuego, sube, cae a plomo
+## y sale de una columna de fuego) lo lleva el nodo Entrance (MythosEntrance)
+## y los planos, el nodo Camera.
 ##
 ## LA CALMA. La canción tiene unos segundos de calma antes de arrancar:
 ## calm_seconds. Durante ellos corre la cinemática con el MUNDO CONGELADO
@@ -31,6 +34,9 @@ extends Node3D
 const GROUP := &"boss_cinematic"
 const CAMERA_GROUP := &"cinematic_camera"
 const SPLIT_SCREEN_GROUP := &"split_screen"
+## Metros sobre el punto de llegada alrededor de los que flotan las brasas
+## del mapa durante la calma.
+const EMBER_FOCUS_HEIGHT: float = 3.0
 
 @export_group("Calma")
 ## Segundos de calma al principio de la canción: lo que dura la cinemática.
@@ -44,23 +50,9 @@ const SPLIT_SCREEN_GROUP := &"split_screen"
 ## Texto de la indicación de saltar.
 @export var skip_hint_text: String = "Mantén para saltar"
 
-@export_group("Momentos")
-## Fracción de la calma (0-1) en que Mythos frena de golpe sobre el suelo: estallido de luz y de brasas.
-@export_range(0.0, 1.0) var impact_fraction: float = 0.62
-## Radio del estallido de luz de ese momento, en unidades del modelo.
-@export var impact_flash_radius: float = 9.0
-## Sonido de ese momento (fila de Sfx.SOUND_LIBRARY).
-@export var impact_sfx: StringName = &"fireball_blast"
-## Fracción de la calma (0-1) en que abre las alas y grita.
-@export_range(0.0, 1.0) var roar_fraction: float = 0.8
-## Grito de ese momento (fila de Sfx.SOUND_LIBRARY).
-@export var roar_sfx: StringName = &"phoenix_screech"
-## Temblor de la cámara en esos dos momentos, en metros de pantalla.
-@export var beat_shake: float = 0.35
-
 @export_group("Cartel")
-## Fracción de la calma (0-1) en que aparece el nombre del jefe.
-@export_range(0.0, 1.0) var title_fraction: float = 0.7
+## Fracción de la calma (0-1) en que aparece el nombre del jefe (junto con su grito: roar_fraction del nodo Entrance).
+@export_range(0.0, 1.0) var title_fraction: float = 0.83
 ## Segundos que tarda el nombre en aparecer.
 @export var title_fade_seconds: float = 0.6
 ## Texto bajo el nombre del jefe.
@@ -71,14 +63,14 @@ const SPLIT_SCREEN_GROUP := &"split_screen"
 @export_range(0.0, 0.3) var bar_height_ratio: float = 0.11
 ## Segundos que tardan las franjas negras en entrar.
 @export var bar_seconds: float = 0.7
-## Color del destello con que termina la calma.
+## Color de los destellos a pantalla completa (el golpe contra el suelo y el final de la calma).
 @export var flash_color: Color = Color(1.0, 0.82, 0.5)
-## Segundos que dura ese destello.
+## Segundos que dura cada destello.
 @export var flash_seconds: float = 0.45
+## Opacidad del destello con que termina la calma (0-1).
+@export_range(0.0, 1.0) var end_flash_alpha: float = 0.85
 
 var _boss: Mythos = null
-var _impact_done: bool = false
-var _roar_done: bool = false
 var _transformation: HellTransformation = null
 var _freeze: WorldFreeze = WorldFreeze.new()
 var _active: bool = false
@@ -91,6 +83,7 @@ var _skip_armed: bool = false
 var _flash_tween: Tween = null
 
 @onready var _camera: MythosCinematicCamera = $Camera
+@onready var _entrance: MythosEntrance = $Entrance
 @onready var _music: BossSong = $Music
 @onready var _overlay: CanvasLayer = $Overlay
 @onready var _bar_top: ColorRect = %BarTop
@@ -105,6 +98,8 @@ var _flash_tween: Tween = null
 func _ready() -> void:
 	add_to_group(GROUP)
 	_camera.add_to_group(CAMERA_GROUP)
+	_entrance.shake_requested.connect(_camera.shake)
+	_entrance.flash_requested.connect(_play_flash)
 	_overlay.visible = false
 	_title.add_theme_font_override("font", UiTheme.spaced_font(title_letter_spacing))
 	_subtitle.text = subtitle_text
@@ -126,8 +121,7 @@ func _process(delta: float) -> void:
 		return
 	_elapsed += delta
 	var progress := calm_progress()
-	_boss.set_calm_progress(progress)
-	_tick_beats(progress)
+	_entrance.advance(progress)
 	_update_camera(progress, delta)
 	_update_overlay(progress)
 	_music.follow(_elapsed, delta)
@@ -159,8 +153,6 @@ func play(boss: Mythos, transformation: HellTransformation) -> void:
 			and not manager.is_connected("run_ended", _on_run_ended):
 		manager.connect("run_ended", _on_run_ended)
 	set_process(true)
-	_impact_done = false
-	_roar_done = false
 	_update_camera(0.0, 0.0)
 	_update_overlay(0.0)
 	print("Boss cinematic: started calm=%.2fs song=%s audio=%s" % [
@@ -181,6 +173,12 @@ func calm_progress() -> float:
 	return clampf(_elapsed / maxf(calm_seconds, 0.01), 0.0, 1.0)
 
 
+## Segundos de calma que pasan hasta que Mythos golpea el suelo: desde ahí
+## arde el bosque.
+func impact_seconds() -> float:
+	return calm_seconds * _entrance.impact_fraction
+
+
 ## Nombre base de la acción de saltar (el harness la mantiene).
 func skip_action() -> StringName:
 	return skip_action_name
@@ -194,7 +192,7 @@ func fade_out_song() -> void:
 ## Destello a pantalla completa: el del golpe con que termina la calma.
 ## Mythos lo pide de nuevo en su ataque más fuerte.
 func flash() -> void:
-	_play_flash()
+	_play_flash(end_flash_alpha)
 
 
 # --- calma ------------------------------------------------------------------------
@@ -203,6 +201,7 @@ func flash() -> void:
 func _finish(skipped: bool) -> void:
 	_active = false
 	set_process(false)
+	_entrance.stop()
 	var song_target := _elapsed
 	if skipped:
 		if _transformation != null and is_instance_valid(_transformation):
@@ -213,7 +212,7 @@ func _finish(skipped: bool) -> void:
 	# Desde aquí la canción ya no sigue a la cinemática: no se corta con las
 	# pausas del juego (subidas de nivel, vendedor, menú de pausa).
 	_music.set_pausable(false)
-	_play_flash()
+	_play_flash(end_flash_alpha)
 	print(("Boss cinematic: ended after=%.2fs skipped=%s song_target=%.2f song_actual=%s"
 			+ " resyncs=%d") % [_elapsed, skipped, song_target, _music.position_text(),
 			_music.resyncs()])
@@ -227,6 +226,8 @@ func _take_over() -> void:
 	if _transformation != null:
 		keep.append(_transformation)
 	_freeze.freeze(get_tree(), keep)
+	# Los números de daño que estaban en el aire quedarían ahí toda la calma.
+	Pools.release_live_of(Pools.DAMAGE_POPUP_SCENE)
 	get_tree().call_group(&"hud", "set_cinematic", true)
 	for node: Node in get_tree().get_nodes_in_group(SPLIT_SCREEN_GROUP):
 		var split := node as CanvasItem
@@ -283,6 +284,8 @@ func _teardown(reason: String) -> void:
 	var was_busy := _active or _taken_over or (_music != null and _music.is_live())
 	_active = false
 	set_process(false)
+	if _entrance != null:
+		_entrance.stop()
 	_release()
 	_kill_tween(_flash_tween)
 	if _overlay != null:
@@ -299,7 +302,8 @@ func _on_run_ended(_victory: bool) -> void:
 
 # --- cámara -----------------------------------------------------------------------
 
-## Fija el encuadre: dónde está el jefe y de qué lado está la party.
+## Fija el encuadre y arranca la entrada: dónde aterriza el jefe, de qué
+## lado está la party y qué tan grande es el anillo de fuego.
 func _frame_shot() -> void:
 	var boss_point := _boss.global_position
 	var centroid := Vector3.ZERO
@@ -313,32 +317,24 @@ func _frame_shot() -> void:
 	var toward := (centroid / float(maxi(count, 1))) - boss_point
 	toward.y = 0.0
 	var away := toward.normalized() if toward.length_squared() > 0.01 else Vector3.BACK
-	# Llega de frente a la party (-Z es su frente): así el plano héroe lo
-	# toma con las alas abiertas hacia la cámara.
-	_boss.rotation.y = atan2(-away.x, -away.z)
-	_camera.frame(boss_point, away)
+	var radius := _entrance.ring_radius_for(toward.length())
+	_camera.frame(boss_point, away, radius)
+	# Queda de frente al plano héroe (-Z es su frente): así sale de la columna
+	# de fuego con las alas abiertas hacia la cámara.
+	var facing := _camera.hero_side()
+	_boss.rotation.y = atan2(-facing.x, -facing.z)
+	_entrance.begin(_boss, boss_point, _camera.side(), radius, calm_seconds)
 
 
-## Los tres planos los arma la cámara; aquí solo se le pasa el avance.
+## Los planos los arma la cámara; aquí solo se le pasa el avance y dónde va
+## el fénix. Las brasas del mapa se quedan alrededor del punto de llegada.
 func _update_camera(progress: float, delta: float) -> void:
-	var look := _camera.shoot(progress, _boss.rig.body_height(), delta)
+	_camera.shoot(progress, _entrance.bird_point(), _boss.rig.body_height(), delta)
+	if progress >= _entrance.reveal_fraction:
+		# Ya fuera de la columna, no le saca los ojos de encima a la cámara.
+		_boss.rig.gaze_at(_camera.global_position)
 	if _transformation != null and is_instance_valid(_transformation):
-		_transformation.set_focus(look)
-
-
-## Los dos momentos de la llegada: el frenazo sobre el suelo y el grito.
-func _tick_beats(progress: float) -> void:
-	if not _impact_done and progress >= impact_fraction:
-		_impact_done = true
-		_boss.rig.burst()
-		_boss.rig.pop_nova(impact_flash_radius, 0.7)
-		_camera.shake(beat_shake, 0.7)
-		Sfx.play(impact_sfx)
-	if not _roar_done and progress >= roar_fraction:
-		_roar_done = true
-		_boss.rig.gesture(&"roar")
-		_camera.shake(beat_shake * 0.5, 1.0)
-		Sfx.play(roar_sfx)
+		_transformation.set_focus(_boss.global_position + Vector3.UP * EMBER_FOCUS_HEIGHT)
 
 
 # --- cartel -----------------------------------------------------------------------
@@ -358,18 +354,22 @@ func _update_overlay(progress: float) -> void:
 			* _skip_bar.max_value
 
 
-## El destello del golpe con que termina la calma.
-func _play_flash() -> void:
+## Un destello a pantalla completa de opacidad `alpha` (0-1): el del golpe
+## contra el suelo y el del final de la calma.
+func _play_flash(alpha: float) -> void:
 	_kill_tween(_flash_tween)
 	_overlay.visible = true
-	_flash.color = Color(flash_color, 0.85)
+	_flash.color = Color(flash_color, alpha)
 	_flash_tween = create_tween()
 	_flash_tween.tween_property(_flash, "color:a", 0.0, flash_seconds)
 	_flash_tween.tween_callback(_hide_overlay)
 
 
+## Con el destello apagado el overlay se va, salvo en plena calma: ahí
+## siguen las franjas y el cartel.
 func _hide_overlay() -> void:
-	_overlay.visible = false
+	if not _taken_over:
+		_overlay.visible = false
 
 
 # --- saltar -----------------------------------------------------------------------

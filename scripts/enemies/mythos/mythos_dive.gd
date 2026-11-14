@@ -99,5 +99,7 @@ func _impact() -> void:
 	boss.rig.set_trail(false)
 	Sfx.play(impact_sfx)
 	boss.land()
+	# Recién posado se sacude las plumas.
+	boss.rig.gesture(&"shake")
 	_step = Step.PERCHED
 	_timer = recover * aggression_lerp(1.0, recover_at_full_aggression)

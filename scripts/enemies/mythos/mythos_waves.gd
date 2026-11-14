@@ -60,7 +60,7 @@ func tick(delta: float) -> bool:
 	FireWave.spawn(wave_scene, boss.global_position, 1.5, max_radius,
 			speed * aggression_lerp(1.0, speed_at_full_aggression), damage, height_window,
 			band, boss)
-	boss.rig.gesture(&"flap")
+	boss.rig.gesture(&"slam")
 	Sfx.play(wave_sfx)
 	_left -= 1
 	if _left > 0:

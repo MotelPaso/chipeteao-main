@@ -122,6 +122,8 @@ var _look: Look = Look.GREEN
 var _origin: Vector3 = Vector3.ZERO
 var _ignite_seconds: float = 1.0
 var _ignite_t: float = 0.0
+## Avance de la calma (0-1) desde el que el frente de fuego empieza a correr.
+var _front_from: float = 0.0
 var _cool_t: float = 0.0
 var _dressing: HellDressing = HellDressing.new()
 var _sky: HellSky = HellSky.new()
@@ -166,13 +168,16 @@ func _process(delta: float) -> void:
 # --- lo que piden Mythos y su cinemática ------------------------------------------
 
 ## Empieza a quemar el bosque desde `origin`; llega al infierno completo en
-## `seconds` de juego.
-func begin(origin: Vector3, seconds: float) -> void:
+## `seconds` de juego. El cielo cambia desde el principio; el frente de fuego
+## del suelo espera `front_delay` segundos (el golpe de Mythos contra el
+## suelo) y recorre el mapa en lo que queda.
+func begin(origin: Vector3, seconds: float, front_delay: float = 0.0) -> void:
 	if _look != Look.GREEN:
 		return
 	_origin = origin
 	_ignite_seconds = seconds
 	_ignite_t = 0.0
+	_front_from = clampf(front_delay / maxf(seconds, 0.01), 0.0, 0.95)
 	var arena := RunRoot.stage_parent(get_tree()) as Node3D
 	if arena != null:
 		_dressing.dress(get_tree(), arena, prop_material, grass_flame_amount)
@@ -240,7 +245,8 @@ func set_focus(point: Vector3) -> void:
 
 ## Avance del frente (0-1): bosque -> infierno.
 func _apply_ignition(t: float) -> void:
-	_dressing.write(&"burn_radius", front_reach * pow(t, front_curve))
+	var front := clampf((t - _front_from) / (1.0 - _front_from), 0.0, 1.0)
+	_dressing.write(&"burn_radius", front_reach * pow(front, front_curve))
 	var eased := smoothstep(0.0, 1.0, t)
 	if _from_sky != null:
 		_own_sky(_from_sky.blend(_hell_sky(), eased))
