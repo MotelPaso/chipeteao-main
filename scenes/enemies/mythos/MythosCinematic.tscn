@@ -11,6 +11,7 @@
 [ext_resource type="Script" path="res://scripts/enemies/mythos/mythos_rebirth_act.gd" id="9_rebirth"]
 [ext_resource type="Script" path="res://scripts/enemies/mythos/mythos_rebirth_camera.gd" id="10_rebirth_camera"]
 [ext_resource type="Shader" path="res://assets/shaders/fire_spark.gdshader" id="12_spark"]
+[ext_resource type="AudioStream" path="res://assets/audio/music/roar_of_the_jungle_dragon.mp3" id="3_track"]
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_ring"]
 shader = ExtResource("7_wall")
@@ -167,6 +168,8 @@ song = ExtResource("11_first")
 
 [node name="MusicReborn" type="AudioStreamPlayer" parent="."]
 script = ExtResource("2_song")
+song = ExtResource("3_track")
+lead_seconds = 1.94
 
 [node name="Overlay" type="CanvasLayer" parent="."]
 layer = 9

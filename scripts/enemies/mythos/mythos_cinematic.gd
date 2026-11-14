@@ -45,7 +45,7 @@ const ACT_NAMES: Array[String] = ["arrival", "rebirth"]
 ## Segundos de calma al principio de la canción de la primera fase: lo que dura la llegada.
 @export var calm_seconds: float = 15.24
 ## Segundos de calma al principio de la canción de la segunda fase: lo que dura el renacer.
-@export var rebirth_seconds: float = 9.0
+@export var rebirth_seconds: float = 9.7
 
 @export_group("Saltar")
 ## Acción que cada raider mantiene para saltar una cinemática.
