@@ -1,6 +1,7 @@
 [gd_scene load_steps=20 format=3]
 
 [ext_resource type="Script" path="res://scripts/enemies/mythos/mythos_cinematic.gd" id="1_cinematic"]
+[ext_resource type="AudioStream" path="res://assets/audio/music/infernal_catharsis.mp3" id="11_first"]
 [ext_resource type="Script" path="res://scripts/enemies/mythos/boss_song.gd" id="2_song"]
 [ext_resource type="Script" path="res://scripts/enemies/mythos/mythos_cinematic_camera.gd" id="4_camera"]
 [ext_resource type="Script" path="res://scripts/enemies/mythos/mythos_entrance.gd" id="5_entrance"]
@@ -162,6 +163,7 @@ scale_amount_max = 1.5
 
 [node name="Music" type="AudioStreamPlayer" parent="."]
 script = ExtResource("2_song")
+song = ExtResource("11_first")
 
 [node name="MusicReborn" type="AudioStreamPlayer" parent="."]
 script = ExtResource("2_song")
