@@ -13,7 +13,9 @@ extends RefCounted
 ## _physics_process, así que detener al spawner (run_root.gd,
 ## run_manager.gd) también lo detiene.
 ## Una arena puede traer su propio jefe de etapa (stage_boss_scene): llega
-## en el lugar del Ancestral y, mientras vive, los recurrentes esperan.
+## en el lugar del Ancestral y, mientras vive, los recurrentes esperan. Si
+## además pelea solo (stage_boss_fights_alone), tampoco sale ningún enemigo
+## normal hasta que muere y pasa el respiro (spawns_held).
 
 ## Interruptor del harness: BONK_STAGE_BOSS_AT=<segundos> trae al jefe de
 ## etapa en ese segundo de la etapa y no en elder_spawn_minute. Solo
@@ -36,6 +38,9 @@ var _own_stage_boss_alive: bool = false
 ## las arenas con jefe de etapa propio: si su pelea pasó de largo varios
 ## turnos, los recurrentes atrasados llegan de a uno y no todos juntos.
 var _next_repeat_not_before: float = 0.0
+## Segundos de respiro SIN spawns que quedan tras la muerte del jefe de etapa
+## que peleó solo.
+var _alone_breather_left: float = 0.0
 
 
 func _init(spawner: EnemySpawner) -> void:
@@ -59,6 +64,19 @@ func interval_factor() -> float:
 ## Descuenta el reloj del respiro.
 func tick_relief(delta: float) -> void:
 	_relief_timer = maxf(_relief_timer - delta, 0.0)
+	if _alone_breather_left > 0.0:
+		_alone_breather_left -= delta
+		if _alone_breather_left <= 0.0:
+			# Log de una línea para los soaks: la horda vuelve desde aquí.
+			print("Spawns resumed at %.1fs" % RunState.stage_time)
+
+
+## True mientras el jefe de etapa propio pelea solo
+## (EnemySpawner.stage_boss_fights_alone) y durante el respiro tras su
+## muerte: el spawner no saca nada.
+func spawns_held() -> bool:
+	return _spawner.stage_boss_fights_alone \
+			and (_own_stage_boss_alive or _alone_breather_left > 0.0)
 
 
 ## Dispara cada entrada del horario que ya venció. Cada una se dispara una
@@ -69,7 +87,9 @@ func tick() -> void:
 	var spawner := _spawner
 	if spawner.boss_scene == null:
 		return
-	if not _boss_spawned and RunState.stage_time >= spawner.boss_spawn_minute * 60.0:
+	# Con el jefe de etapa peleando solo, el jefe del bioma espera su turno.
+	if not _boss_spawned and not spawns_held() \
+			and RunState.stage_time >= spawner.boss_spawn_minute * 60.0:
 		_boss_spawned = spawn_boss(1.0) != null
 	if not _elder_spawned and RunState.stage_time >= _stage_boss_due():
 		var elder := _spawn_stage_boss()
@@ -181,12 +201,16 @@ func _watch_stage_boss(boss: BossBase) -> void:
 		RunState.stage_boss_dead = true
 		return
 	_own_stage_boss_alive = _spawner.stage_boss_scene != null
+	if spawns_held():
+		print("Spawns held: stage boss fights alone at %.1fs" % RunState.stage_time)
 	# El título viaja en la conexión: la línea nombra al jefe que cayó.
 	health.died.connect(_on_stage_boss_died.bind(boss.boss_title), CONNECT_ONE_SHOT)
 
 
 func _on_stage_boss_died(title: String) -> void:
 	RunState.stage_boss_dead = true
+	if spawns_held():
+		_alone_breather_left = _spawner.boss_relief_duration
 	_own_stage_boss_alive = false
 	# Log de una línea (convención de RunManager) para los soaks headless.
 	print("Stage boss slain: %s at %.1fs" % [title, RunState.stage_time])

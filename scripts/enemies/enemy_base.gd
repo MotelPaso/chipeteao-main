@@ -352,6 +352,21 @@ func make_possessed(carrier: Node3D, duration: float) -> void:
 	print("Possessed spawned: %s" % _script_name())
 
 
+## Saca este cuerpo de la partida SIN pagar nada: ni crédito, ni XP, ni
+## botín, ni contador del bestiario; solo queda la caída. Lo usa el jefe de
+## etapa que pelea solo para quemar a la horda que quedó en la arena.
+func vanish() -> void:
+	if _health.is_dead:
+		return
+	_health.is_dead = true
+	# Como en _on_died: un cuerpo congelado tiene que poder correr su caída.
+	process_mode = Node.PROCESS_MODE_INHERIT
+	remove_from_group("enemies")
+	set_physics_process(false)
+	_collision.set_deferred("disabled", true)
+	_death_tween()
+
+
 ## El raider al que sirve este siervo, o null si no está poseído.
 func possession_carrier() -> Node3D:
 	return _possession.carrier if _possession != null else null

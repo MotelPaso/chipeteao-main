@@ -16,6 +16,8 @@ extends Interactable
 @export var spawn_offset: Vector3 = Vector3(4.0, 0.1, -4.0)
 ## Línea del cartel de aviso (grupo "boss_ui") al despertar.
 @export var awaken_text: String = "Algo oculto se remueve..."
+## Aviso del HUD si se cumple la condición mientras el jefe de etapa pelea solo: el minijefe no sale hasta que esa pelea termine.
+@export var held_text: String = "Lo que duerme aquí no se atreve a salir..."
 @export_group("Frase flotante")
 ## Tamaño de letra de la frase flotante (show_flavor), en píxeles.
 @export var flavor_font_size: int = 48
@@ -64,6 +66,11 @@ func show_flavor(line: String) -> void:
 ## impide que una subclase lo despierte dos veces.
 func _awaken() -> void:
 	if not available:
+		return
+	if EnemySpawner.is_holding(get_tree()):
+		# El jefe de etapa pelea solo: el disparador no se gasta y el
+		# minijefe espera a que esa pelea termine.
+		get_tree().call_group("boss_ui", "announce", held_text)
 		return
 	consume()
 	dim_visuals()
