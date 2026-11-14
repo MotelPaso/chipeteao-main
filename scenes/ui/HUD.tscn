@@ -147,10 +147,10 @@ visible = false
 anchors_preset = 5
 anchor_left = 0.5
 anchor_right = 0.5
-offset_left = -280.0
-offset_top = 64.0
-offset_right = 280.0
-offset_bottom = 90.0
+offset_left = -330.0
+offset_top = 76.0
+offset_right = 330.0
+offset_bottom = 108.0
 grow_horizontal = 2
 mouse_filter = 2
 max_value = 800.0
@@ -158,75 +158,21 @@ value = 800.0
 show_percentage = false
 script = ExtResource("4_bossbar")
 
-[node name="Tick1" type="ColorRect" parent="BossBar" unique_id=153493330]
-layout_mode = 1
-anchors_preset = -1
-anchor_left = 0.25
-anchor_right = 0.25
-anchor_bottom = 1.0
-offset_left = -1.0
-offset_top = 4.0
-offset_right = 1.0
-offset_bottom = -4.0
-mouse_filter = 2
-color = Color(0, 0, 0, 0.5)
-
-[node name="Tick2" type="ColorRect" parent="BossBar" unique_id=2043913942]
-layout_mode = 1
-anchors_preset = -1
-anchor_left = 0.5
-anchor_right = 0.5
-anchor_bottom = 1.0
-offset_left = -1.0
-offset_top = 4.0
-offset_right = 1.0
-offset_bottom = -4.0
-mouse_filter = 2
-color = Color(0, 0, 0, 0.5)
-
-[node name="Tick3" type="ColorRect" parent="BossBar" unique_id=343052421]
-layout_mode = 1
-anchors_preset = -1
-anchor_left = 0.75
-anchor_right = 0.75
-anchor_bottom = 1.0
-offset_left = -1.0
-offset_top = 4.0
-offset_right = 1.0
-offset_bottom = -4.0
-mouse_filter = 2
-color = Color(0, 0, 0, 0.5)
-
 [node name="BossNameLabel" type="Label" parent="BossBar" unique_id=1828101216]
 unique_name_in_owner = true
-layout_mode = 0
+layout_mode = 1
+anchors_preset = -1
 anchor_right = 1.0
-anchor_bottom = 1.0
+offset_top = -40.0
+offset_bottom = -4.0
 grow_horizontal = 2
-grow_vertical = 2
 theme_override_colors/font_color = Color(0.99, 0.95, 0.87, 1)
 theme_override_colors/font_outline_color = Color(0.082, 0.075, 0.102, 1)
-theme_override_constants/outline_size = 5
-theme_override_font_sizes/font_size = 15
+theme_override_constants/outline_size = 9
+theme_override_font_sizes/font_size = 27
 text = "Rey Pútrido"
 horizontal_alignment = 1
 vertical_alignment = 1
-
-[node name="BossLives" type="HBoxContainer" parent="BossBar"]
-unique_name_in_owner = true
-visible = false
-layout_mode = 1
-anchors_preset = -1
-anchor_left = 0.5
-anchor_top = 1.0
-anchor_right = 0.5
-anchor_bottom = 1.0
-offset_top = 6.0
-offset_bottom = 14.0
-grow_horizontal = 2
-mouse_filter = 2
-theme_override_constants/separation = 6
-alignment = 1
 
 [node name="StreakLabel" type="Label" parent="." unique_id=1883266101]
 unique_name_in_owner = true
