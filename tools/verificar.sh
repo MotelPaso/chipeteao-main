@@ -427,18 +427,22 @@ fi
 # --- Soak del jefe de etapa ------------------------------------------------
 # El sexto soak es el único que llega a un JEFE DE ETAPA y lo mata. Ningún
 # otro alcanza el minuto 11, y BONK_STAGE_FAST quita la mitad de jefe de la
-# puerta. Aquí BONK_STAGE_BOSS_AT trae a Mythos a los 90 s y BONK_STAGE_GOAL
+# puerta. Aquí BONK_STAGE_BOSS_AT trae a Mythos a los 60 s y BONK_STAGE_GOAL
 # acorta SOLO la mitad de tiempo: la puerta sigue esperando su muerte. Mide
 # la llegada con su calma (el mundo congelado), al menos un renacer, la
 # muerte final, la puerta, el portal y el cruce de etapa. Fuera de la cuenta
 # de interactuables, como el de etapa.
+# A los 60 s y no más tarde: la pelea dura entre 2 y 3 minutos y el raider
+# tiene que cruzar el portal ANTES del jefe del minuto 5. Con ese jefe y su
+# horda encima, el raider del soak (casi sin daño a esa altura) queda
+# rodeado y no llega.
 MYTHOS_SECS=450
 MYTHOS_FRAMES=$(( MYTHOS_SECS * 60 ))
 echo "== soak jefe de etapa (HollowWoods, Mythos, ${MYTHOS_SECS}s de partida) =="
 fase
 MYTHOS_LOG="$LOGDIR/soak_mythos.log"
 BONK_ARENA="res://scenes/world/HollowWoods.tscn" BONK_GODMODE=1 BONK_SEED=4242 \
-	BONK_GAME_SEED=4242 BONK_STAGE_BOSS_AT=90 BONK_STAGE_GOAL=120 \
+	BONK_GAME_SEED=4242 BONK_STAGE_BOSS_AT=60 BONK_STAGE_GOAL=90 \
 	BONK_SAVE_PATH="$(save_path_for mythos)" \
 	godot --headless --fixed-fps 60 --quit-after "$MYTHOS_FRAMES" \
 	res://scenes/tests/ArenaProbe.tscn >"$MYTHOS_LOG" 2>&1
