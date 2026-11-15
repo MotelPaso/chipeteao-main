@@ -5,11 +5,12 @@ extends Button
 ## un sticker, con un dibujo grande, el título, una línea de detalle y un dato
 ## vivo arriba.
 ##
-## Solo gira y crece el MARCO (nodo Frame). El texto es hijo del botón, no del
-## marco, así que queda siempre recto y nítido, y el rectángulo que usa el
-## control para navegar tampoco gira. Con foco o mouse el marco se endereza,
-## crece y muestra el anillo amarillo; al presionar se hunde. El dibujo
-## acompaña: con foco sube, se inclina y crece un poco.
+## Gira y crece el MARCO (nodo Frame), y el texto y el dibujo son hijos suyos:
+## toda la tarjeta se mueve como una sola pieza, con un solo Tween. El
+## rectángulo que usa el control para navegar es el del botón, que no gira.
+## Con foco o mouse el marco se endereza, crece y muestra el anillo amarillo;
+## al presionar se hunde. El dibujo suma un gesto propio sobre el del marco:
+## con foco sube, se inclina y crece un poco.
 ##
 ## El texto y el color de cada tarjeta se ponen en su instancia (MainMenu.tscn).
 
@@ -32,7 +33,7 @@ const STICKER_SHADER: Shader = preload("res://assets/ui/sticker_art.gdshader")
 @export_group("Marco")
 ## Color del cuerpo de la tarjeta.
 @export var tile_color: Color = UiTheme.ACCENT
-## Giro del marco en reposo, en grados (el texto no gira).
+## Giro de la tarjeta en reposo, en grados (marco, texto y dibujo juntos).
 @export var tilt_degrees: float = -2.0
 ## Grosor del contorno de tinta, en píxeles.
 @export var border_width: int = 5
@@ -60,9 +61,10 @@ const STICKER_SHADER: Shader = preload("res://assets/ui/sticker_art.gdshader")
 @export_range(0.0, 0.3) var art_padding: float = 0.08
 ## Píxeles que sube el dibujo con foco o mouse encima.
 @export var art_lift: float = 10.0
-## Inclinación del dibujo con foco, en grados (negativo = hacia la izquierda).
+## Inclinación del dibujo con foco, en grados, sobre la del marco (negativo =
+## hacia la izquierda).
 @export var art_lit_tilt: float = -4.0
-## Escala del dibujo con foco.
+## Escala del dibujo con foco, sobre la del marco.
 @export var art_lit_scale: float = 1.06
 ## Duración de la reacción del dibujo, en segundos.
 @export var art_time: float = 0.18
@@ -70,9 +72,9 @@ const STICKER_SHADER: Shader = preload("res://assets/ui/sticker_art.gdshader")
 @export var art_fade_time: float = 0.18
 
 @export_group("Movimiento")
-## Escala del marco con foco o mouse encima.
+## Escala de la tarjeta con foco o mouse encima.
 @export var focus_scale: float = 1.05
-## Escala del marco mientras se presiona.
+## Escala de la tarjeta mientras se presiona.
 @export var press_scale: float = 0.97
 ## Duración del cambio de pose (reposo, foco, presionado), en segundos.
 @export var pose_time: float = 0.12
@@ -153,23 +155,21 @@ func set_art(texture: Texture2D) -> void:
 			.set_trans(Tween.TRANS_QUART).set_ease(Tween.EASE_OUT)
 
 
-## Entrada: el marco y el texto suben desde abajo y aparecen, tras `delay`
+## Entrada: la tarjeta sube desde abajo y aparece, tras `delay`
 ## segundos. Decorativa: el foco y los clics funcionan desde el primer frame.
 func play_entrance(delay: float) -> void:
 	if _entrance_tween != null and _entrance_tween.is_valid():
 		_entrance_tween.kill()
 	modulate.a = 0.0
-	var content := %Content as Control
 	var from := Vector2(0.0, entrance_rise)
 	_entrance_tween = create_tween().set_parallel()
 	_entrance_tween.set_ignore_time_scale(true)
 	_entrance_tween.tween_property(self, "modulate:a", 1.0, entrance_time * 0.6) \
 			.set_delay(delay)
-	for node: Control in [_frame, content]:
-		MenuNav.shift(from, node)
-		_entrance_tween.tween_method(MenuNav.shift.bind(node), from, Vector2.ZERO,
-				entrance_time).set_delay(delay) \
-				.set_trans(Tween.TRANS_QUINT).set_ease(Tween.EASE_OUT)
+	MenuNav.shift(from, _frame)
+	_entrance_tween.tween_method(MenuNav.shift.bind(_frame), from, Vector2.ZERO,
+			entrance_time).set_delay(delay) \
+			.set_trans(Tween.TRANS_QUINT).set_ease(Tween.EASE_OUT)
 
 
 ## Sin texto el dato se vuelve invisible pero conserva su alto: así el hueco
@@ -203,9 +203,9 @@ func _refresh_pose() -> void:
 	_pose_tween.tween_property(_frame, "scale", Vector2.ONE * target_scale, pose_time)
 	_pose_tween.tween_property(_frame, "rotation_degrees", target_tilt, pose_time)
 	_pose_tween.tween_property(_style, "shadow_offset", target_shadow, pose_time)
-	# El dibujo: misma curva que el marco, un poco más largo para que se lea
-	# como un gesto y no como un salto. Presionado se hunde con la tarjeta.
-	var art_scale := press_scale if held else (art_lit_scale if lit else 1.0)
+	# El dibujo ya se mueve con el marco; esto es su gesto extra: misma curva,
+	# un poco más largo para que se lea como un gesto y no como un salto.
+	var art_scale := art_lit_scale if lit and not held else 1.0
 	_pose_tween.tween_property(_art, "scale", Vector2.ONE * art_scale, art_time)
 	_pose_tween.tween_property(_art, "rotation_degrees",
 			art_lit_tilt if lit else 0.0, art_time)

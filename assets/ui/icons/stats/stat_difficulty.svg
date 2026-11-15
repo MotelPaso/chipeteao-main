@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
+  <!-- Dificultad: una calavera. Dibujo propio. -->
+  <g stroke="#15131a" stroke-width="8" stroke-linejoin="round" stroke-linecap="round">
+<path d="M64 10 C32 10 14 32 14 58 C14 74 22 86 34 92 L34 112 L94 112 L94 92 C106 86 114 74 114 58 C114 32 96 10 64 10 Z" fill="#fff4dc"/>
+<circle cx="44" cy="58" r="13" fill="#15131a"/><circle cx="84" cy="58" r="13" fill="#15131a"/>
+<path d="M64 74 L57 88 L71 88 Z" fill="#15131a" stroke-width="3"/>
+<path d="M52 98 L52 112 M64 98 L64 112 M76 98 L76 112" fill="none" stroke-width="5"/>
+  </g>
+</svg>

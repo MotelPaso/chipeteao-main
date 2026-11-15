@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
+  <!-- HP máx.: un corazón. Dibujo propio. -->
+  <g stroke="#15131a" stroke-width="8" stroke-linejoin="round" stroke-linecap="round">
+<path d="M64 110 C22 80 12 58 12 42 C12 26 24 16 38 16 C50 16 59 23 64 32 C69 23 78 16 90 16 C104 16 116 26 116 42 C116 58 106 80 64 110 Z" fill="#f2542d"/>
+<path d="M30 42 C30 35 35 30 42 30" fill="none" stroke="#fff4dc" stroke-width="7"/>
+  </g>
+</svg>

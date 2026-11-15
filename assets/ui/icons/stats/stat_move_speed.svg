@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
+  <!-- Velocidad de movimiento: una bota con ala. Dibujo propio. -->
+  <g stroke="#15131a" stroke-width="8" stroke-linejoin="round" stroke-linecap="round">
+<path d="M50 20 L82 20 L82 70 L108 82 C116 86 118 94 118 104 L50 104 Z" fill="#ffa62b"/>
+<path d="M50 90 L118 90" fill="none"/>
+<path d="M50 34 L16 26 L26 44 L10 46 L28 60 L50 62 Z" fill="#fff4dc"/>
+  </g>
+</svg>
