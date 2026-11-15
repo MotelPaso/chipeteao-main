@@ -4,6 +4,6 @@
 
 [node name="Shortsword" type="Node3D" unique_id=1613949696]
 script = ExtResource("1_sword")
-damage = 10.0
-cooldown = 1.0
-attack_range = 3.0
+damage = 7.0
+cooldown = 1.3
+attack_range = 3.5
