@@ -31,7 +31,7 @@ theme_override_constants/separation = 10
 unique_name_in_owner = true
 layout_mode = 2
 editor_description = "El texto y el color los pone el script; el tamaño va en cada escena hija."
-theme_override_colors/font_outline_color = Color(0.03, 0.035, 0.06, 0.92)
+theme_override_colors/font_outline_color = Color(0.082, 0.075, 0.102, 1)
 theme_override_constants/outline_size = 8
 horizontal_alignment = 1
 
@@ -39,7 +39,7 @@ horizontal_alignment = 1
 unique_name_in_owner = true
 layout_mode = 2
 editor_description = "El texto sale de points_template en el script."
-theme_override_colors/font_color = Color(0.66, 0.69, 0.75, 1)
+theme_override_colors/font_color = Color(0.765, 0.839, 0.816, 1)
 horizontal_alignment = 1
 
 [node name="Body" type="VBoxContainer" parent="Root/Center/Panel/VBox"]
@@ -52,7 +52,7 @@ unique_name_in_owner = true
 custom_minimum_size = Vector2(0, 30)
 layout_mode = 2
 editor_description = "La línea de resultado la escribe el script."
-theme_override_colors/font_color = Color(0.96, 0.97, 0.99, 1)
+theme_override_colors/font_color = Color(1, 0.957, 0.863, 1)
 theme_override_font_sizes/font_size = 20
 horizontal_alignment = 1
 

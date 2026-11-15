@@ -3,7 +3,7 @@
 [ext_resource type="Script" path="res://scripts/ui/maps/map_section.gd" id="1_section"]
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_section"]
-bg_color = Color(0.09, 0.1, 0.145, 0.96)
+bg_color = Color(0.078, 0.235, 0.267, 0.97)
 corner_radius_top_left = 7
 corner_radius_top_right = 7
 corner_radius_bottom_right = 7
@@ -21,12 +21,12 @@ theme_override_constants/separation = 4
 
 [node name="Title" type="Label" parent="Box" unique_id=105465912]
 layout_mode = 2
-theme_override_colors/font_color = Color(0.3, 0.82, 0.76, 1)
+theme_override_colors/font_color = Color(0.357, 0.839, 0.627, 1)
 theme_override_font_sizes/font_size = 15
 
 [node name="Body" type="Label" parent="Box" unique_id=620089133]
 layout_mode = 2
-theme_override_colors/font_color = Color(0.66, 0.69, 0.75, 1)
+theme_override_colors/font_color = Color(0.765, 0.839, 0.816, 1)
 theme_override_font_sizes/font_size = 13
 text = "—"
 autowrap_mode = 3

@@ -1,70 +1,103 @@
 class_name UiTheme
 extends RefCounted
-## Sistema de diseño de la UI: de aquí sacan menús, cartas, barras y
-## botones sus StyleBoxFlat y su movimiento al pasar el mouse o presionar,
-## para que todo el juego comparta paleta (fondo azul negro, turquesa para
-## acciones, ámbar para jefes, oro y legendario, azul de esquirla), radios,
-## bordes y estados. También es dueño del vocabulario de movimiento: crecer
-## al pasar el mouse y aplastar al presionar (attach_motion) y el golpe "pop".
-## Todos los tweens ignoran Engine.time_scale (seguros con hit-stop) y van
-## atados al control, así que las capas que procesan en pausa siguen animando.
-## Es estático y nunca va en una escena: edita los valores aquí.
+## Sistema de diseño de la UI, estilo "cómic de kiosko": contorno de tinta
+## grueso, sombra dura desplazada, colores planos y dos fuentes (Lilita One
+## para títulos y botones, Nunito para texto). De aquí sacan menús, cartas,
+## barras y botones sus StyleBoxFlat y su movimiento, para que todo el juego
+## comparta paleta, radios, bordes y estados. También es dueño del vocabulario
+## de movimiento: crecer con el mouse o el foco, aplastar al presionar
+## (attach_motion) y el golpe "pop". Todos los tweens ignoran
+## Engine.time_scale (seguros con hit-stop) y van atados al control, así que
+## las capas que procesan en pausa siguen animando.
+## Es estático y nunca va en una escena: edita los valores aquí. El Theme
+## global (assets/ui/theme/game_theme.tres) se genera desde estos valores con
+## scripts/tools/build_ui_theme.gd: después de cambiar un color o una medida
+## aquí, vuelve a correr esa herramienta.
+
+# --- fuentes -------------------------------------------------------------------
+## Títulos y botones (Lilita One) y texto de lectura (Nunito, fuente variable:
+## TEXT_WEIGHT elige su grosor). Se cargan al primer uso (display_font,
+## text_font) y no con preload: en un clon recién bajado los scripts se
+## compilan antes de que Godot importe las fuentes.
+const DISPLAY_FONT_PATH := "res://assets/ui/fonts/LilitaOne-Regular.ttf"
+const TEXT_FONT_PATH := "res://assets/ui/fonts/Nunito-Variable.ttf"
+## Grosor del texto de lectura (400 normal, 700 negrita, 900 la más gruesa).
+const TEXT_WEIGHT := 700
+## Tamaño de letra por defecto del texto y de los botones, en píxeles.
+const TEXT_SIZE := 16
+const BUTTON_TEXT_SIZE := 19
 
 # --- paleta ------------------------------------------------------------------
-const PANEL_BG := Color(0.09, 0.1, 0.145, 0.96)
-const CARD_BG := Color(0.115, 0.125, 0.17, 0.98)
-const CARD_BG_HOVER := Color(0.16, 0.175, 0.24, 0.98)
-const CARD_BG_PRESSED := Color(0.085, 0.09, 0.125, 0.98)
-const BORDER_DIM := Color(0.29, 0.315, 0.4)
-const BORDER_LOCKED := Color(0.2, 0.21, 0.26)
-const ACCENT := Color(0.3, 0.82, 0.76)  ## turquesa: acciones y botón principal
-const ACCENT_AMBER := Color(0.98, 0.76, 0.28)  ## jefes, oro, legendario
-const ACCENT_RED := Color(0.92, 0.28, 0.24)
-const SHARD_BLUE := Color(0.55, 0.8, 0.92)
-const TEXT_BRIGHT := Color(0.96, 0.97, 0.99)
-const TEXT_DIM := Color(0.66, 0.69, 0.75)
-const TEXT_FAINT := Color(0.47, 0.5, 0.56)
+## Tinta: contornos, sombras duras y texto sobre papel o amarillo.
+const INK := Color("15131a")
+## Fondo petróleo de respaldo, cuando una pantalla no muestra el mapa detrás.
+const BACKDROP := Color("12343b")
+## Papel: texto claro y cuerpo de los botones normales.
+const PAPER := Color("fff4dc")
+const PANEL_BG := Color("143c44", 0.97)
+const CARD_BG := Color("1b4b54")
+const CARD_BG_HOVER := Color("246370")
+const CARD_BG_PRESSED := Color("0f2e34")
+## Borde neutro: la tinta.
+const BORDER_DIM := INK
+const BORDER_LOCKED := Color("0c2327")
+const ACCENT := Color("ffd23f")  ## amarillo: acciones, botón principal y foco
+const ACCENT_AMBER := Color("ffa62b")  ## oro: jefes, legendario (amarillo más cálido)
+const ACCENT_RED := Color("f2542d")  ## rojo naranja: peligro y "no alcanza"
+const ACCENT_MINT := Color("5bd6a0")  ## menta: logros, vida, experiencia
+const SHARD_BLUE := Color("7fd4f0")
+const TEXT_BRIGHT := PAPER
+## Texto secundario: teñido hacia el petróleo del fondo, nunca gris puro.
+const TEXT_DIM := Color("c3d6d0")
+const TEXT_FAINT := Color("93b0ab")
 ## Texto normal sobre paneles oscuros (etiquetas de ajustes, botones de co-op).
-const TEXT_NORMAL := Color(0.85, 0.87, 0.9)
-const OUTLINE_DARK := Color(0.03, 0.035, 0.06, 0.92)
+const TEXT_NORMAL := Color("ece2ca")
+const OUTLINE_DARK := INK
 ## Fondo oscuro de chips y filas del HUD y de los modales, opaco: cada uso le
 ## pone su alfa con Color(UiTheme.TILE_BG, alfa).
-const TILE_BG := Color(0.07, 0.075, 0.11)
+const TILE_BG := Color("0d2227")
 ## Destello (modulate) de "no alcanza" (ver reject).
-const REJECT_FLASH := Color(1.0, 0.42, 0.42)
+const REJECT_FLASH := Color(1.0, 0.5, 0.4)
 ## Verde de la experiencia: barra de XP del HUD, anillo de subida de nivel
 ## (juice.gd) y baliza de essence_rift (world_director.gd). El material de las
 ## gemas (XpGem.tscn) guarda el mismo verde en su escena: cámbialo ahí también.
-const XP_GREEN := Color(0.35, 0.95, 0.6)
+const XP_GREEN := ACCENT_MINT
 
-## Sombra de los paneles (panel): color y tamaño, en píxeles.
-const PANEL_SHADOW := Color(0.0, 0.0, 0.0, 0.45)
-const PANEL_SHADOW_SIZE := 14
-## Texto de los botones sin relleno; los rellenos usan TEXT_BRIGHT.
-const BUTTON_TEXT := Color(0.88, 0.9, 0.94)
+## Sombra dura (add_hard_shadow): tinta sin difuminar, desplazada hacia abajo.
+## Desplazamiento en píxeles para paneles, cartas y botones; SHADOW_BLUR es el
+## borde suavizado mínimo que Godot necesita para dibujarla (1 = casi nítida).
+const SHADOW_COLOR := INK
+const SHADOW_BLUR := 1
+const PANEL_SHADOW_OFFSET := Vector2(0.0, 7.0)
+const CARD_SHADOW_OFFSET := Vector2(0.0, 5.0)
+const BUTTON_SHADOW_OFFSET := Vector2(0.0, 4.0)
+## Texto de los botones: tinta sobre papel o sobre su color de acento.
+const BUTTON_TEXT := INK
+## Texto de un botón deshabilitado.
+const BUTTON_TEXT_DISABLED := Color("15131a", 0.45)
 ## Borde por defecto de las chapas y píldoras (style_badge).
-const BADGE_BORDER := Color(0, 0, 0, 0.5)
+const BADGE_BORDER := INK
 ## Pista del interruptor apagado (toggle_icon); encendido usa su acento.
-const TOGGLE_TRACK_OFF := Color(0.16, 0.17, 0.23)
+const TOGGLE_TRACK_OFF := Color("0d2227")
 ## Canal de las barras (style_bar): fondo y borde.
-const BAR_TROUGH := Color(0.04, 0.045, 0.07, 0.85)
-const BAR_TROUGH_BORDER := Color(0.0, 0.0, 0.0, 0.6)
+const BAR_TROUGH := Color("0d2227")
+const BAR_TROUGH_BORDER := INK
 
 ## Radio de las esquinas (píxeles): paneles y cartas, chips y botones.
-const RADIUS := 10
-const RADIUS_SMALL := 7
+const RADIUS := 14
+const RADIUS_SMALL := 9
 
-## Brillo exterior de una carta en el color de su borde (style_card): tamaño
-## (píxeles) y alfa. El hover y el foco suman el mismo alfa extra, así que el
-## anillo de foco de un control se lee igual de fuerte que el hover del mouse.
-const CARD_GLOW_SIZE := 10
-const CARD_GLOW_ALPHA := 0.3
-const CARD_GLOW_HIGHLIGHT := 0.2
+## Anillo de foco (focus_ring): el contorno amarillo que marca dónde está el
+## mando o el teclado. Va por fuera del borde de tinta del control. Grosor y
+## cuánto sobresale, en píxeles.
+const FOCUS_COLOR := ACCENT
+const FOCUS_RING_WIDTH := 4
+const FOCUS_RING_EXPAND := 6.0
 
 ## Escala de un botón al pasar el mouse y al presionarlo, y duración del
 ## tween (segundos).
 const HOVER_GROW := 1.04
-const PRESS_SQUASH := 0.95
+const PRESS_SQUASH := 0.97
 const MOTION_TIME := 0.12
 ## Vaivén de "no alcanza" de cartas y botones (ver reject): ángulo (grados)
 ## de cada paso y su duración (segundos).
@@ -80,32 +113,25 @@ const REJECT_RESTORE_TIME := 0.18
 # --- medidas de los estilos ---------------------------------------------------
 # Los números con que las funciones de abajo dibujan cada pieza.
 
-## Panel (panel): radio de las esquinas, grosor del borde y de la línea de
-## acento de arriba, en píxeles.
+## Panel (panel): radio de las esquinas y grosor del borde de tinta, en píxeles.
 const PANEL_RADIUS := RADIUS + 2
-const PANEL_BORDER_WIDTH := 1
-const PANEL_ACCENT_WIDTH := 3
-## Botón (button_states): radio de las esquinas y grosor del borde, en píxeles.
-const BUTTON_RADIUS := RADIUS_SMALL + 2
-const BUTTON_BORDER_WIDTH := 2
-## Cuerpo de un botón relleno: cuánto de su color de acento lleva en reposo,
-## con el mouse encima y presionado (0-1), y su alfa.
-const BUTTON_FILL_SHARE := 0.22
-const BUTTON_FILL_SHARE_HOVER := 0.32
-const BUTTON_FILL_SHARE_PRESSED := 0.16
-const BUTTON_FILL_ALPHA := 0.97
-## Cuánto se oscurece el borde de un botón presionado (0-1).
-const BUTTON_PRESSED_DARKEN := 0.2
-## Brillo exterior de un botón relleno: tamaño en píxeles y alfa, normal y
-## presionado.
-const BUTTON_GLOW_SIZE := 6
-const BUTTON_GLOW_ALPHA := 0.28
-const BUTTON_GLOW_ALPHA_PRESSED := 0.12
+const PANEL_BORDER_WIDTH := 4
+## Botón (button_states): radio de las esquinas, grosor del borde de tinta y
+## margen interior (horizontal, vertical), en píxeles.
+const BUTTON_RADIUS := RADIUS_SMALL + 3
+const BUTTON_BORDER_WIDTH := 3
+const BUTTON_MARGIN := Vector2(16.0, 7.0)
+## Cuánto se aclara el cuerpo de un botón con el mouse encima y cuánto se
+## oscurece presionado (0-1).
+const BUTTON_HOVER_LIGHTEN := 0.35
+const BUTTON_PRESSED_DARKEN := 0.18
+## Cuánto se mezcla el cuerpo de un botón deshabilitado con el fondo (0-1).
+const BUTTON_DISABLED_FADE := 0.55
 ## Cuánto se aclara el borde de una carta con el mouse encima o con foco (0-1).
 const CARD_HIGHLIGHT_LIGHTEN := 0.2
 ## Píldora (style_badge): grosor del borde y margen interior (horizontal,
 ## vertical), en píxeles.
-const BADGE_BORDER_WIDTH := 1
+const BADGE_BORDER_WIDTH := 2
 const BADGE_MARGIN := Vector2(12.0, 3.0)
 ## Cuánto más oscuro que su texto es el borde de la píldora de esquirlas del
 ## selector y de las pantallas meta (0-1).
@@ -125,18 +151,15 @@ const TOGGLE_RIM_LIGHTEN := 0.2
 const TOGGLE_RIM_WIDTH := 1.5
 const TOGGLE_KNOB_INSET := 4.0
 ## Anillo de foco del interruptor (style_toggle): grosor, radio de las
-## esquinas y cuánto sobresale, en píxeles, y su brillo (tamaño en píxeles y
-## alfa).
-const TOGGLE_RING_WIDTH := 2
+## esquinas y cuánto sobresale, en píxeles.
+const TOGGLE_RING_WIDTH := 3
 const TOGGLE_RING_RADIUS := 17
 const TOGGLE_RING_EXPAND := 4.0
-const TOGGLE_RING_GLOW_SIZE := 6
-const TOGGLE_RING_GLOW_ALPHA := 0.28
 ## Barra (style_bar, bar_fill): grosor del borde del canal, de la línea de
 ## brillo de arriba y de la marca del borde de avance, en píxeles, y cuánto
 ## más claras que el relleno son esa línea y esa marca (0-1).
-const BAR_TROUGH_BORDER_WIDTH := 2
-const BAR_SHINE_WIDTH := 2
+const BAR_TROUGH_BORDER_WIDTH := 3
+const BAR_SHINE_WIDTH := 3
 const BAR_EDGE_WIDTH := 3
 const BAR_EDGE_LIGHTEN := 0.35
 
@@ -178,87 +201,99 @@ static func panel(bg: Color = PANEL_BG, border: Color = BORDER_DIM,
 	var box := flat(bg, PANEL_RADIUS)
 	box.border_color = border
 	box.set_border_width_all(PANEL_BORDER_WIDTH)
-	box.border_width_top = PANEL_ACCENT_WIDTH  # línea de acento del encabezado
 	box.content_margin_left = margin_h
 	box.content_margin_right = margin_h
 	box.content_margin_top = margin_v
 	box.content_margin_bottom = margin_v
-	box.shadow_color = PANEL_SHADOW
-	box.shadow_size = PANEL_SHADOW_SIZE
+	add_hard_shadow(box, PANEL_SHADOW_OFFSET)
 	return box
 
 
-## Brillo exterior suave con la sombra del stylebox (cartas elegidas, bordes
-## de rareza, misiones por reclamar).
+## Sombra dura de cómic: tinta sin difuminar, desplazada. Es la única forma de
+## dar altura a un panel, una carta o un botón.
+static func add_hard_shadow(box: StyleBoxFlat, offset: Vector2) -> void:
+	box.shadow_color = SHADOW_COLOR
+	box.shadow_size = SHADOW_BLUR
+	box.shadow_offset = offset
+
+
+## Brillo exterior suave con la sombra del stylebox. Reservado a lo "ganado"
+## (misiones por reclamar, bordes de rareza, barra del jefe): si todo brilla,
+## nada destaca.
 static func add_glow(box: StyleBoxFlat, color: Color, size: int = 8,
 		alpha: float = 0.35) -> void:
 	box.shadow_color = Color(color.r, color.g, color.b, alpha)
 	box.shadow_size = size
+	box.shadow_offset = Vector2.ZERO
 
 
-## Los cuatro estados de un botón en un diccionario. filled = aspecto de
-## botón principal: cuerpo teñido con el acento y texto claro encima.
+## Anillo de foco: solo contorno, por fuera del borde del control. Un Button
+## dibuja su stylebox "focus" ENCIMA del estado normal, así que el anillo se
+## suma al botón en vez de reemplazarlo.
+static func focus_ring(radius: int = RADIUS) -> StyleBoxFlat:
+	var ring := StyleBoxFlat.new()
+	ring.draw_center = false
+	ring.border_color = FOCUS_COLOR
+	ring.set_border_width_all(FOCUS_RING_WIDTH)
+	ring.set_corner_radius_all(radius + int(FOCUS_RING_EXPAND))
+	ring.set_expand_margin_all(FOCUS_RING_EXPAND)
+	return ring
+
+
+## Los estados de un botón en un diccionario. filled = botón principal: cuerpo
+## en su color de acento. Sin relleno el cuerpo es papel y, presionado, toma
+## el acento: así un botón de alternar (la calidad gráfica) muestra cuál está
+## elegido. Siempre contorno de tinta y sombra dura; presionado pierde la
+## sombra (se hunde).
 static func button_states(accent: Color = ACCENT,
 		filled: bool = false) -> Dictionary[String, StyleBoxFlat]:
-	var body := _filled_body(accent, BUTTON_FILL_SHARE) if filled else CARD_BG
-	var body_hover := _filled_body(accent, BUTTON_FILL_SHARE_HOVER) \
-			if filled else CARD_BG_HOVER
-	var body_pressed := _filled_body(accent, BUTTON_FILL_SHARE_PRESSED) \
-			if filled else CARD_BG_PRESSED
-	var edge := accent if filled else BORDER_DIM
+	var body := accent if filled else PAPER
 	var states: Dictionary[String, StyleBoxFlat] = {}
-	for state: String in ["normal", "hover", "pressed", "focus"]:
+	for state: String in ["normal", "hover", "pressed", "hover_pressed", "disabled"]:
 		var box := flat(body, BUTTON_RADIUS)
 		box.set_border_width_all(BUTTON_BORDER_WIDTH)
-		box.border_color = edge
+		box.border_color = INK
+		box.content_margin_left = BUTTON_MARGIN.x
+		box.content_margin_right = BUTTON_MARGIN.x
+		box.content_margin_top = BUTTON_MARGIN.y
+		box.content_margin_bottom = BUTTON_MARGIN.y
 		match state:
 			"hover":
-				box.bg_color = body_hover
-				box.border_color = accent
-			"pressed":
-				box.bg_color = body_pressed
-				box.border_color = accent.darkened(BUTTON_PRESSED_DARKEN)
-			"focus":
-				box.bg_color = body_hover
-				box.border_color = accent
-		if filled:
-			add_glow(box, accent, BUTTON_GLOW_SIZE,
-					BUTTON_GLOW_ALPHA if state != "pressed" else BUTTON_GLOW_ALPHA_PRESSED)
+				box.bg_color = body.lightened(BUTTON_HOVER_LIGHTEN)
+			"pressed", "hover_pressed":
+				box.bg_color = accent.darkened(BUTTON_PRESSED_DARKEN) if filled else accent
+			"disabled":
+				box.bg_color = body.lerp(PANEL_BG, BUTTON_DISABLED_FADE)
+		if not state.ends_with("pressed"):
+			add_hard_shadow(box, BUTTON_SHADOW_OFFSET)
 		states[state] = box
+	states["focus"] = focus_ring(BUTTON_RADIUS)
 	return states
 
 
-## Cuerpo de un botón relleno: su acento escalado por `share`, con el alfa de
-## BUTTON_FILL_ALPHA.
-static func _filled_body(accent: Color, share: float) -> Color:
-	return Color(accent.r * share, accent.g * share, accent.b * share, BUTTON_FILL_ALPHA)
-
-
 ## EL aspecto de carta de toda superficie de "elige una" (cartas de mejora,
-## raiders, botones de co-op): un cuerpo por estado, el acento como borde y
-## un brillo exterior que sube con el hover Y con el foco (teclado y control
-## navegan por ese anillo, así que debe leerse igual de fuerte).
+## raiders, botones de co-op): un cuerpo por estado, el acento como borde
+## grueso, sombra dura y el anillo de foco amarillo encima (teclado y control
+## navegan por ese anillo).
 ##
 ## Con `glow` apagado es el aspecto quieto de las cartas no elegidas y
-## bloqueadas: solo borde, sin sombra, para que se encienda la elegida.
+## bloqueadas: solo borde, sin sombra, para que se levante la elegida.
 static func style_card(button: Button, border: Color, width: int = 3,
 		glow: bool = true) -> void:
 	var bodies: Dictionary[String, Color] = {
 		"normal": CARD_BG,
 		"hover": CARD_BG_HOVER,
 		"pressed": CARD_BG_PRESSED,
-		"focus": CARD_BG_HOVER,
 	}
 	for state: String in bodies:
-		var highlighted := state == "hover" or state == "focus"
 		var box := flat(bodies[state], RADIUS)
-		box.border_color = border.lightened(CARD_HIGHLIGHT_LIGHTEN) if highlighted else border
+		box.border_color = border.lightened(CARD_HIGHLIGHT_LIGHTEN) \
+				if state == "hover" else border
 		box.set_border_width_all(width)
-		if glow:
-			add_glow(box, border, CARD_GLOW_SIZE,
-					(CARD_GLOW_ALPHA + CARD_GLOW_HIGHLIGHT) if highlighted
-					else CARD_GLOW_ALPHA)
+		if glow and state != "pressed":
+			add_hard_shadow(box, CARD_SHADOW_OFFSET)
 		button.add_theme_stylebox_override(state, box)
+	button.add_theme_stylebox_override("focus", focus_ring(RADIUS))
 
 
 ## Aplica el sistema completo a un Button: styleboxes por estado, colores de
@@ -269,17 +304,17 @@ static func style_button(button: Button, accent: Color = ACCENT,
 	var states := button_states(accent, filled)
 	for state: String in states:
 		button.add_theme_stylebox_override(state, states[state])
-	button.add_theme_color_override("font_color",
-			TEXT_BRIGHT if filled else BUTTON_TEXT)
-	button.add_theme_color_override("font_hover_color", TEXT_BRIGHT)
-	button.add_theme_color_override("font_pressed_color", TEXT_BRIGHT)
-	button.add_theme_color_override("font_focus_color", TEXT_BRIGHT)
+	for color_name: String in ["font_color", "font_hover_color",
+			"font_pressed_color", "font_focus_color", "font_hover_pressed_color"]:
+		button.add_theme_color_override(color_name, BUTTON_TEXT)
+	button.add_theme_color_override("font_disabled_color", BUTTON_TEXT_DISABLED)
 	attach_motion(button)
 
 
 # --- movimiento --------------------------------------------------------------
 
-## Crece al pasar el mouse y se aplasta al presionar, centrado en el pivote.
+## Crece con el mouse o el foco y se aplasta al presionar, centrado en el
+## pivote: el mando recibe la misma respuesta que el mouse.
 ## Idempotente: la primera llamada gana y conecta una sola vez por botón. La
 ## escala es solo visual dentro de un contenedor, así que el layout no se mueve.
 static func attach_motion(button: BaseButton, grow: float = HOVER_GROW,
@@ -288,10 +323,18 @@ static func attach_motion(button: BaseButton, grow: float = HOVER_GROW,
 		return
 	button.set_meta(&"ui_motion", true)
 	button.mouse_entered.connect(_scale_to.bind(button, grow))
-	button.mouse_exited.connect(_scale_to.bind(button, 1.0))
+	button.focus_entered.connect(_scale_to.bind(button, grow))
+	var rest := func() -> void:
+		_scale_to(button, grow if _is_lit(button) else 1.0)
+	button.mouse_exited.connect(rest)
+	button.focus_exited.connect(rest)
 	button.button_down.connect(_scale_to.bind(button, squash))
-	button.button_up.connect(func() -> void:
-		_scale_to(button, grow if button.is_hovered() else 1.0))
+	button.button_up.connect(rest)
+
+
+## El botón tiene el mouse encima o el foco: se queda crecido.
+static func _is_lit(button: BaseButton) -> bool:
+	return button.is_hovered() or button.has_focus()
 
 
 static func _scale_to(button: BaseButton, target: float) -> void:
@@ -364,31 +407,49 @@ static func kill_meta_tween(node: Node, key: StringName) -> void:
 ## Un FontVariation compartido por valor de espaciado. Son inmutables una vez
 ## armados, así que compartirlos es seguro; uno nuevo por llamada invalidaría
 ## la caché de shaping del TextServer cada vez.
-static var _spaced_fonts: Dictionary[int, FontVariation] = {}
+static var _display_fonts: Dictionary[int, FontVariation] = {}
+static var _text_font: FontVariation = null
 
 
-## Fuente por defecto con espacio extra entre letras: el tratamiento de
-## títulos y etiquetas espaciadas sin cargar una fuente.
-static func spaced_font(spacing: int) -> FontVariation:
-	if not _spaced_fonts.has(spacing):
+## La fuente de display (títulos, botones, chapas) con `spacing` píxeles
+## extra entre letras.
+static func display_font(spacing: int = 0) -> FontVariation:
+	if not _display_fonts.has(spacing):
 		var font := FontVariation.new()
-		font.base_font = ThemeDB.fallback_font
+		font.base_font = load(DISPLAY_FONT_PATH) as FontFile
 		font.spacing_glyph = spacing
-		_spaced_fonts[spacing] = font
-	return _spaced_fonts[spacing]
+		_display_fonts[spacing] = font
+	return _display_fonts[spacing]
+
+
+## Nunito en el grosor de TEXT_WEIGHT: la fuente por defecto del Theme.
+static func text_font() -> FontVariation:
+	if _text_font == null:
+		_text_font = FontVariation.new()
+		_text_font.base_font = load(TEXT_FONT_PATH) as FontFile
+		var weight_tag := TextServerManager.get_primary_interface().name_to_tag("wght")
+		_text_font.variation_opentype = {weight_tag: TEXT_WEIGHT}
+	return _text_font
+
+
+## Mismo nombre que usan los scripts de cada pantalla para sus rótulos:
+## devuelve la fuente de display con ese espaciado.
+static func spaced_font(spacing: int) -> FontVariation:
+	return display_font(spacing)
 
 
 ## Tratamiento de titular: letras espaciadas, contorno oscuro y color.
 static func style_title(label: Label, font_size: int, color: Color,
 		spacing: int = 6, outline: int = 10) -> void:
-	label.add_theme_font_override("font", spaced_font(spacing))
+	label.add_theme_font_override("font", display_font(spacing))
 	label.add_theme_font_size_override("font_size", font_size)
 	label.add_theme_color_override("font_color", color)
 	label.add_theme_color_override("font_outline_color", OUTLINE_DARK)
 	label.add_theme_constant_override("outline_size", outline)
 
 
-## Chapa o píldora pequeña para chips del HUD y cintas.
+## Chapa pequeña para chips del HUD, saldos y cintas: caja oscura con borde,
+## texto en la fuente de display.
 static func style_badge(label: Label, text_color: Color,
 		bg: Color = PANEL_BG, border: Color = BADGE_BORDER) -> void:
 	var box := flat(bg, RADIUS_SMALL)
@@ -400,6 +461,7 @@ static func style_badge(label: Label, text_color: Color,
 	box.content_margin_bottom = BADGE_MARGIN.y
 	label.add_theme_stylebox_override("normal", box)
 	label.add_theme_color_override("font_color", text_color)
+	label.add_theme_font_override("font", display_font())
 
 
 # --- widgets ------------------------------------------------------------------
@@ -470,11 +532,10 @@ static func style_toggle(check: CheckButton, accent: Color = ACCENT) -> void:
 		check.add_theme_stylebox_override(state, none)
 	var ring := StyleBoxFlat.new()
 	ring.draw_center = false
-	ring.border_color = accent
+	ring.border_color = FOCUS_COLOR
 	ring.set_border_width_all(TOGGLE_RING_WIDTH)
 	ring.set_corner_radius_all(TOGGLE_RING_RADIUS)
 	ring.set_expand_margin_all(TOGGLE_RING_EXPAND)
-	add_glow(ring, accent, TOGGLE_RING_GLOW_SIZE, TOGGLE_RING_GLOW_ALPHA)
 	check.add_theme_stylebox_override("focus", ring)
 	check.focus_mode = Control.FOCUS_ALL
 	check.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND

@@ -1,6 +1,6 @@
 [gd_scene format=3 uid="uid://dfuegochar01"]
 
-[ext_resource type="PackedScene" uid="uid://brxmo8b5wy5k8" path="res://assets/models/fuego.glb" id="1_fuego"]
+[ext_resource type="PackedScene" path="res://assets/models/fuego.glb" id="1_fuego"]
 [ext_resource type="Script" path="res://assets/models/fuego_character.gd" id="2_script"]
 
 [node name="FuegoCharacter" type="Node3D"]

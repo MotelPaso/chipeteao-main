@@ -33,7 +33,7 @@ extends MetaScreen
 ## Separación vertical entre nombre, efecto y rombos de rango, en píxeles.
 @export var info_separation: int = 3
 ## Espacio extra entre las letras del sello MÁX, en píxeles.
-@export var maxed_spacing: int = 2
+@export var maxed_spacing: int = 1
 
 @export_group("Textos")
 ## Rombo de un rango comprado.

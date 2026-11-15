@@ -1,0 +1,100 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/ui/menu/menu_tile.gd" id="1_tile"]
+[ext_resource type="FontFile" path="res://assets/ui/fonts/LilitaOne-Regular.ttf" id="2_display"]
+
+[node name="MenuTile" type="Button"]
+custom_minimum_size = Vector2(200, 260)
+size_flags_horizontal = 3
+size_flags_vertical = 3
+focus_mode = 2
+mouse_default_cursor_shape = 2
+script = ExtResource("1_tile")
+
+[node name="Frame" type="Panel" parent="."]
+unique_name_in_owner = true
+editor_description = "El marco de color. Es lo único que gira y crece; su StyleBox lo arma menu_tile.gd con el grupo Marco de la raíz."
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="Ring" type="Panel" parent="Frame"]
+unique_name_in_owner = true
+editor_description = "Anillo de foco amarillo (UiTheme.focus_ring). Hijo del marco para girar y crecer con él."
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="Content" type="MarginContainer" parent="."]
+unique_name_in_owner = true
+editor_description = "El texto. No es hijo del marco, así que nunca gira."
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+theme_override_constants/margin_left = 22
+theme_override_constants/margin_top = 20
+theme_override_constants/margin_right = 22
+theme_override_constants/margin_bottom = 20
+
+[node name="VBox" type="VBoxContainer" parent="Content"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/separation = 2
+
+[node name="Stat" type="Label" parent="Content/VBox"]
+unique_name_in_owner = true
+editor_description = "Dato vivo de la sección; lo escribe main_menu.gd con set_stat()."
+layout_mode = 2
+size_flags_horizontal = 0
+theme_type_variation = &"BadgeLabel"
+theme_override_font_sizes/font_size = 16
+
+[node name="ArtSlot" type="Control" parent="Content/VBox"]
+editor_description = "El hueco del dibujo: todo el espacio entre el dato de arriba y el título. No es un contenedor, así menu_tile.gd puede mover el dibujo sin que el layout lo devuelva."
+layout_mode = 2
+size_flags_vertical = 3
+mouse_filter = 2
+
+[node name="Art" type="TextureRect" parent="Content/VBox/ArtSlot"]
+unique_name_in_owner = true
+texture_filter = 4
+editor_description = "El dibujo de la sección, centrado y a escala en el hueco. Sobresale un poco a los lados (Offset Left/Right) para salir grande en las tarjetas angostas. La textura se pone en Dibujo > Art Texture de la raíz; el contorno y la sombra dura los dibuja sticker_art.gdshader."
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -12.0
+offset_right = 12.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+expand_mode = 1
+stretch_mode = 5
+
+[node name="Title" type="Label" parent="Content/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.082, 0.075, 0.102, 1)
+theme_override_fonts/font = ExtResource("2_display")
+theme_override_font_sizes/font_size = 38
+text = "Sección"
+autowrap_mode = 3
+
+[node name="Detail" type="Label" parent="Content/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.082, 0.075, 0.102, 1)
+theme_override_font_sizes/font_size = 15
+autowrap_mode = 3

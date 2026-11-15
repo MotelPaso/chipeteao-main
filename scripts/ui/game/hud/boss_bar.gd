@@ -23,7 +23,7 @@ extends ProgressBar
 @export var tween_time: float = 0.15
 @export_group("Nombre")
 ## Espacio extra entre las letras del nombre del jefe, en píxeles.
-@export var name_letter_spacing: int = 3
+@export var name_letter_spacing: int = 1
 
 var _tracked_boss: Node3D = null
 var _boss_health: Health = null

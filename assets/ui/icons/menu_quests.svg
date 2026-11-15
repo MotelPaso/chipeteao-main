@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <!-- Cartel de "se busca": papel clavado, silueta, renglones y sello de cera. Dibujo propio. -->
+  <g stroke="#15131a" stroke-width="10" stroke-linejoin="round" stroke-linecap="round">
+    <g transform="rotate(-5 256 256)">
+      <path d="M112 70 L400 70 L400 418 L372 442 L340 420 L304 444 L268 420 L232 444 L196 420 L160 444 L112 420 Z" fill="#fff4dc"/>
+      <rect x="150" y="112" width="212" height="170" rx="10" fill="#ffd23f"/>
+      <path d="M186 282 C186 232 214 214 256 214 C298 214 326 232 326 282 Z" fill="#12343b"/>
+      <circle cx="256" cy="176" r="42" fill="#12343b"/>
+      <path d="M154 322 L358 322" fill="none"/>
+      <path d="M154 362 L282 362" fill="none"/>
+      <circle cx="256" cy="70" r="17" fill="#f2542d"/>
+    </g>
+    <g transform="translate(372 368)">
+      <path d="M0 -74 L20 -56 L46 -58 L52 -32 L74 -16 L62 8 L70 34 L46 44 L34 68 L8 60 L-16 72 L-34 52 L-60 48 L-60 22 L-76 0 L-60 -22 L-60 -48 L-34 -52 Z" fill="#f2542d"/>
+      <path d="M0 -36 L11 -12 L37 -10 L17 7 L23 33 L0 19 L-23 33 L-17 7 L-37 -10 L-11 -12 Z" fill="#ffd23f" stroke-width="8"/>
+    </g>
+  </g>
+</svg>

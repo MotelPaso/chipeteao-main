@@ -1,43 +1,31 @@
 shader_type canvas_item;
-// Fondo de los menús: degradado vertical oscuro con dos capas de niebla de
-// ruido que se mueven lento y una viñeta en las esquinas. Todo procedural,
-// sin texturas: dos capas de ruido de cuatro muestras cada una cuestan casi
-// nada a pantalla completa.
-// Lo usan las cuatro pantallas (CharacterSelect, QuestLog, Collection,
-// RelicShop) a través de un solo material, assets/ui/menu_backdrop.tres, que
-// no guarda valores propios: los colores, la fuerza de la niebla y su
-// velocidad que se ven son los valores por defecto de abajo. Edítalos aquí, o
-// en el Inspector del material (lo que guarde el material gana).
+// Oscurecido de los menús: una capa de color petróleo con viñeta de tinta
+// sobre el mapa 3D que el autoload MenuBackdrop mantiene vivo detrás, para
+// que el texto se lea. Lo usan las pantallas de menú (MainMenu,
+// CharacterSelect, QuestLog, Collection, RelicShop) en su nodo Background, a
+// través de un solo material: assets/ui/menu_backdrop.tres.
+//
+// Sin mapa detrás (headless o una escena de prueba) `reveal` queda en 0 y la
+// capa es opaca: el color petróleo es el fondo de respaldo.
+// No lee la pantalla (sin screen texture): es un solo color con alfa, casi
+// gratis a pantalla completa.
+// Edita los colores y las fuerzas aquí, o en el Inspector del material (lo
+// que guarde el material gana). `reveal` lo maneja MenuBackdrop: no lo toques.
 
-uniform vec3 top_color: source_color = vec3(0.07, 0.085, 0.135);
-uniform vec3 bottom_color: source_color = vec3(0.028, 0.032, 0.052);
-uniform vec3 fog_color: source_color = vec3(0.18, 0.26, 0.33);
-uniform float fog_strength = 0.20;
-uniform float drift_speed = 0.03;
-
-float hash21(vec2 p) {
-	return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
-}
-
-float vnoise(vec2 p) {
-	vec2 i = floor(p);
-	vec2 f = fract(p);
-	f = f * f * (3.0 - 2.0 * f);
-	return mix(
-			mix(hash21(i), hash21(i + vec2(1.0, 0.0)), f.x),
-			mix(hash21(i + vec2(0.0, 1.0)), hash21(i + vec2(1.0, 1.0)), f.x),
-			f.y);
-}
+// Color del oscurecido y del fondo de respaldo.
+uniform vec3 tint_color: source_color = vec3(0.055, 0.165, 0.188);
+// Color hacia el que se cierran las esquinas.
+uniform vec3 edge_color: source_color = vec3(0.082, 0.075, 0.102);
+// Cuánto tapa el oscurecido al mapa en el centro (0 = nada, 1 = todo).
+uniform float dim: hint_range(0.0, 1.0) = 0.62;
+// Cuánto más tapa en las esquinas.
+uniform float vignette: hint_range(0.0, 1.0) = 0.34;
+// 0 = capa opaca (sin mapa); 1 = mapa visible bajo el oscurecido.
+uniform float reveal: hint_range(0.0, 1.0) = 0.0;
 
 void fragment() {
-	vec2 uv = UV;
-	vec3 col = mix(top_color, bottom_color, uv.y);
-	float t = TIME * drift_speed;
-	float fog = vnoise(uv * vec2(3.0, 2.2) + vec2(t * 2.0, t)) * 0.65
-			+ vnoise(uv * vec2(7.0, 5.0) - vec2(t * 3.0, t * 0.6)) * 0.35;
-	// fog^3 deja solo las crestas claras: se leen como jirones sueltos.
-	col += fog_color * fog * fog * fog * fog_strength;
-	float vig = smoothstep(1.25, 0.45, length(uv - 0.5) * 1.7);
-	col *= mix(0.5, 1.0, vig);
-	COLOR = vec4(col, 1.0);
+	float edge = smoothstep(0.28, 0.92, length(UV - 0.5) * 1.3);
+	vec3 col = mix(tint_color, edge_color, edge * 0.7);
+	float cover = clamp(dim + vignette * edge, 0.0, 1.0);
+	COLOR = vec4(col, mix(1.0, cover, reveal));
 }

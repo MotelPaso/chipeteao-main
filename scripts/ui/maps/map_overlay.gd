@@ -76,7 +76,7 @@ const STAT_ROWS: Array[Dictionary] = [
 @export var legend_row_separation: int = 6
 @export_group("Encabezado")
 ## Espacio extra entre las letras del encabezado, en píxeles.
-@export var header_letter_spacing: int = 3
+@export var header_letter_spacing: int = 1
 @export_group("Textos")
 ## Texto de un panel sin nada que mostrar.
 @export var empty_text: String = "—"

@@ -32,7 +32,7 @@ horizontal_alignment = 1
 [node name="Description" type="Label" parent="Column" unique_id=124921288]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_colors/font_color = Color(0.66, 0.69, 0.75, 1)
+theme_override_colors/font_color = Color(0.765, 0.839, 0.816, 1)
 theme_override_font_sizes/font_size = 13
 text = "Descripción del premio"
 horizontal_alignment = 1

@@ -1,24 +1,35 @@
 class_name CharacterCard
 extends Button
-## Carta de un raider en el selector de personaje (CharacterCard.tscn). La
-## escena tiene sus tres caras y cada etiqueta guarda ahí su fuente, color y
-## tope de líneas:
-##   Unlocked: retrato, nombre, arma, pasiva, descripción (y en co-op, qué
-##             jugadores la eligieron);
-##   Locked:   candado, nombre, arma, precio en esquirlas, pista y pasiva;
+## Carta compacta de un raider en la cuadrícula del selector de personaje
+## (CharacterCard.tscn). La escena tiene sus tres caras y cada etiqueta guarda
+## ahí su fuente y su color:
+##   Unlocked: retrato (la cara del raider sobre su tinte, o su inicial si no
+##             hay foto) y nombre; en co-op, qué jugadores la eligieron;
+##   Locked:   candado, nombre y precio en esquirlas;
 ##   Confirm:  "¿Desbloquear por N esquirlas?" con el botón «Sí» (%UnlockYes).
-## El selector solo pasa la fila del catálogo y el estado (show_character);
-## la carta decide cómo se ve. Sus styleboxes de estado salen de
-## UiTheme.style_card, el mismo aspecto que las cartas de mejora.
+## El arma, la pasiva y la descripción se leen en el panel de detalle
+## (CharacterDetail) y en el tooltip. El selector solo pasa la fila del
+## catálogo y el estado (show_character); la carta decide cómo se ve.
+##
+## Movimiento: con el foco del control o el mouse encima, la carta crece un
+## poco, su anillo amarillo (FocusRing) aparece con un fundido y el retrato,
+## que en reposo está apenas girado como un sticker, se endereza; al
+## presionarla se aplasta. Solo gira el retrato: el nombre queda siempre recto
+## y el rectángulo con que navega el control no cambia. Solo se animan scale,
+## rotation y modulate, nunca el tamaño del layout.
 
 ## Se presionó «Sí» en la cara de confirmación.
 signal unlock_confirmed(character_id: String)
+## El foco o el mouse llegó a la carta: el selector muestra su detalle.
+signal highlighted(character_id: String)
+## La carta quedó sin foco y sin mouse.
+signal unhighlighted(character_id: String)
 
 enum Face { UNLOCKED, LOCKED, CONFIRM }
 
-## Llave de metadata del tween de reposo. La comparte el vaivén de rechazo,
-## así los dos nunca animan la carta a la vez.
-const SETTLE_TWEEN_KEY := &"ui_settle_tween"
+## Llave de metadata del tween de pose. La comparten la entrada y el vaivén
+## de rechazo, así nunca hay dos animaciones moviendo la carta a la vez.
+const POSE_TWEEN_KEY := &"ui_pose_tween"
 
 @export_group("Bordes")
 ## Borde de la carta sin elegir (la elegida usa el tinte del raider).
@@ -35,28 +46,31 @@ const SETTLE_TWEEN_KEY := &"ui_settle_tween"
 @export_group("Retrato")
 ## Cuánto se oscurece el tinte del raider para el cuerpo del retrato (0-1).
 @export_range(0.0, 1.0) var portrait_body_darken: float = 0.35
-## Cuánto se aclara el tinte para el borde del retrato (0-1).
-@export_range(0.0, 1.0) var portrait_rim_lighten: float = 0.3
-## Alfa (0-1) del brillo del retrato, en el color del tinte.
-@export_range(0.0, 1.0) var portrait_glow_alpha: float = 0.35
+## Giro del retrato en reposo, en grados. Cada carta lo usa hacia un lado
+## distinto según su lugar en la cuadrícula; con foco se endereza.
+@export var portrait_tilt: float = 1.6
+## Duración (segundos) del fundido con que aparece la cara.
+@export var face_fade_time: float = 0.18
 ## Cuánto se oscurece el tinte para el contorno de la inicial (0-1).
 @export_range(0.0, 1.0) var monogram_outline_darken: float = 0.7
 
 @export_group("Movimiento")
-## Escala de la carta al pasar el mouse.
-@export var hover_grow: float = 1.03
-## Escala de la carta elegida en reposo (sube un poco).
-@export var selected_scale: float = 1.035
+## Escala de la carta con el foco del control o el mouse encima.
+@export var focus_scale: float = 1.05
+## Escala de la carta mientras se mantiene presionada.
+@export var press_scale: float = 0.97
 ## Modulate de las cartas no elegidas en reposo (un paso más oscuras).
 @export var unselected_modulate: Color = Color(0.8, 0.82, 0.86)
-## Duración (segundos) del paso a la pose de reposo.
-@export var settle_time: float = 0.16
+## Duración (segundos) del paso entre poses (crecer, anillo, aplastar).
+@export var pose_time: float = 0.14
+## Escala desde la que entra la carta al abrir el selector.
+@export var entrance_start_scale: float = 0.95
+## Duración (segundos) de la entrada de la carta.
+@export var entrance_time: float = 0.24
 
 @export_group("Textos")
 ## Pregunta de la cara de confirmación (%d = precio en esquirlas).
 @export var confirm_format: String = "¿Desbloquear por %d esquirlas?"
-## Pista de desbloqueo por jefe bajo el precio (%s = unlock_hint del catálogo).
-@export var hint_format: String = "o %s"
 ## Separador entre los jugadores que eligieron la carta ("J1 · J3").
 @export var owners_separator: String = " · "
 ## Primera línea del tooltip (%s = nombre, %s = arma).
@@ -67,51 +81,62 @@ const SETTLE_TWEEN_KEY := &"ui_settle_tween"
 ## Id de la fila del catálogo que muestra la carta.
 var character_id: String = ""
 
+## Si la carta se ve elegida (decide su borde y su modulate de reposo).
+var _selected: bool = false
+## True entre button_down y button_up.
+var _held: bool = false
+## Último estado de resalte avisado, para emitir cada señal una sola vez.
+var _was_lit: bool = false
+
 @onready var _unlocked: VBoxContainer = $Unlocked
-@onready var _unlocked_monogram: Label = $Unlocked/Portrait/Monogram
+@onready var _portrait: Panel = $Unlocked/Portrait
+@onready var _face: TextureRect = $Unlocked/Portrait/Face
+@onready var _monogram: Label = $Unlocked/Portrait/Monogram
 @onready var _unlocked_name: Label = $Unlocked/Name
-@onready var _unlocked_weapon: Label = $Unlocked/Weapon
-@onready var _unlocked_passive: Label = $Unlocked/Passive
-@onready var _unlocked_blurb: Label = $Unlocked/Blurb
-@onready var _owners: Label = $Unlocked/Owners
+@onready var _owners: Label = $Unlocked/Portrait/Owners
 @onready var _locked: VBoxContainer = $Locked
 @onready var _locked_name: Label = $Locked/Name
-@onready var _locked_weapon: Label = $Locked/Weapon
 @onready var _price: Label = $Locked/Price
-@onready var _hint: Label = $Locked/Hint
-@onready var _locked_passive: Label = $Locked/Passive
 @onready var _confirm: VBoxContainer = $Confirm
-@onready var _confirm_monogram: Label = $Confirm/Portrait/Monogram
-@onready var _confirm_name: Label = $Confirm/Name
 @onready var _ask: Label = $Confirm/Ask
 @onready var _unlock_yes: Button = %UnlockYes
-## Lo comparten los retratos de Unlocked y Confirm (local a cada carta).
+@onready var _focus_ring: Panel = $FocusRing
 @onready var _portrait_style: StyleBoxFlat = \
 		($Unlocked/Portrait as Panel).get_theme_stylebox(&"panel") as StyleBoxFlat
 
 
 func _ready() -> void:
-	UiTheme.attach_motion(self, hover_grow)
 	# La carta escala desde su centro, pero su tamaño solo se conoce después
 	# del primer layout: seguir `resized` mantiene el pivote centrado.
 	resized.connect(func() -> void: pivot_offset = size * 0.5)
+	_portrait.resized.connect(func() -> void:
+		_portrait.pivot_offset = _portrait.size * 0.5)
+	_focus_ring.add_theme_stylebox_override("panel", UiTheme.focus_ring(UiTheme.RADIUS))
+	focus_entered.connect(_on_highlight_changed)
+	focus_exited.connect(_on_highlight_changed)
+	mouse_entered.connect(_on_highlight_changed)
+	mouse_exited.connect(_on_highlight_changed)
+	button_down.connect(_on_held_changed.bind(true))
+	button_up.connect(_on_held_changed.bind(false))
 	UiTheme.style_button(_unlock_yes, UiTheme.SHARD_BLUE, true)
 	_unlock_yes.pressed.connect(func() -> void: unlock_confirmed.emit(character_id))
 
 
 ## Pinta la carta con la fila `row` del catálogo en la cara `face`. `selected`
-## la levanta y le da el borde del tinte; `owner_slots` son los slots de co-op
-## (desde 0) que la eligieron, y se escriben bajo la descripción.
+## le da el borde del tinte; `owner_slots` son los slots de co-op (desde 0)
+## que la eligieron, y se escriben en la esquina del retrato.
 func show_character(row: Dictionary, face: Face, selected: bool,
 		owner_slots: Array[int] = []) -> void:
 	character_id = String(row.id)
+	_selected = selected
 	tooltip_text = _tooltip(row, face != Face.UNLOCKED)
 	_unlocked.visible = face == Face.UNLOCKED
 	_locked.visible = face == Face.LOCKED
 	_confirm.visible = face == Face.CONFIRM
+	var tint := Color(row.tint)
 	match face:
 		Face.UNLOCKED:
-			_fill_unlocked(row, selected, owner_slots)
+			_fill_unlocked(row, tint, owner_slots)
 		Face.LOCKED:
 			_fill_locked(row)
 		Face.CONFIRM:
@@ -119,42 +144,85 @@ func show_character(row: Dictionary, face: Face, selected: bool,
 	settle(selected)
 
 
-## Pose de reposo: la elegida sube un poco y se aclara, las demás se atenúan.
-## Un tween por carta guardado en la metadata, para que los clics rápidos no
-## apilen animaciones; también cancela (y endereza) un vaivén de rechazo.
+## Lleva la carta a su pose de reposo: escala y anillo según el foco y el
+## mouse, y modulate según si está elegida. Un solo tween por carta guardado
+## en la metadata, así las pulsaciones rápidas lo redirigen en vez de apilar
+## animaciones; también cancela (y endereza) un vaivén de rechazo.
 func settle(selected: bool) -> void:
+	_selected = selected
+	var lit := is_lit()
 	pivot_offset = size * 0.5
-	UiTheme.kill_meta_tween(self, SETTLE_TWEEN_KEY)
+	# Encima de sus vecinas mientras está agrandada, para que no la tapen.
+	z_index = 1 if lit else 0
+	UiTheme.kill_meta_tween(self, POSE_TWEEN_KEY)
 	rotation_degrees = 0.0
-	var tween := create_tween()
+	var target_scale := press_scale if _held else (focus_scale if lit else 1.0)
+	var tween := create_tween().set_parallel()
 	tween.set_ignore_time_scale(true)
-	tween.set_parallel()
-	tween.tween_property(self, "scale",
-			Vector2.ONE * (selected_scale if selected else 1.0), settle_time) \
-			.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
-	tween.tween_property(self, "modulate", rest_modulate(selected), settle_time)
-	set_meta(SETTLE_TWEEN_KEY, tween)
+	tween.tween_property(self, "scale", Vector2.ONE * target_scale, pose_time) \
+			.set_trans(Tween.TRANS_QUINT).set_ease(Tween.EASE_OUT)
+	tween.tween_property(self, "modulate", rest_modulate(selected), pose_time) \
+			.set_trans(Tween.TRANS_QUINT).set_ease(Tween.EASE_OUT)
+	tween.tween_property(_focus_ring, "modulate:a", 1.0 if lit else 0.0, pose_time) \
+			.set_trans(Tween.TRANS_QUINT).set_ease(Tween.EASE_OUT)
+	tween.tween_property(_portrait, "rotation_degrees", 0.0 if lit else _rest_tilt(),
+			pose_time).set_trans(Tween.TRANS_QUINT).set_ease(Tween.EASE_OUT)
+	set_meta(POSE_TWEEN_KEY, tween)
 
 
-## El movimiento de hover de UiTheme siempre devuelve el botón a escala 1.0,
-## lo que borraría la elevación de la carta elegida al salir el mouse: se
-## mata ese tween y se vuelve a la pose de reposo. El selector lo conecta a
-## mouse_exited DESPUÉS del hover de UiTheme, para que este gane.
-func resettle(selected: bool) -> void:
-	UiTheme.kill_meta_tween(self, &"ui_motion_tween")
-	settle(selected)
+## Pone la cara del raider en el retrato (una foto de PortraitStudio) y oculta
+## la inicial. Con null vuelve la inicial.
+func set_face(face: Texture2D) -> void:
+	var had_face := _face.texture != null
+	_face.texture = face
+	_face.visible = face != null
+	_monogram.visible = face == null
+	if face == null or had_face:
+		return
+	_face.modulate.a = 0.0
+	var fade := _face.create_tween()
+	fade.set_ignore_time_scale(true)
+	fade.tween_property(_face, "modulate:a", 1.0, face_fade_time)
+
+
+## Entrada al abrir el selector: tras `delay` segundos, la carta funde y crece
+## desde entrance_start_scale hasta su pose de reposo. Es decorativa: usar la
+## carta antes de que termine la corta y la deja en su pose.
+func play_entrance(delay: float) -> void:
+	UiTheme.kill_meta_tween(self, POSE_TWEEN_KEY)
+	var rest := rest_modulate(_selected)
+	modulate = Color(rest, 0.0)
+	scale = Vector2.ONE * entrance_start_scale
+	var tween := create_tween().set_parallel()
+	tween.set_ignore_time_scale(true)
+	tween.tween_property(self, "modulate", rest, entrance_time).set_delay(delay) \
+			.set_trans(Tween.TRANS_QUINT).set_ease(Tween.EASE_OUT)
+	tween.tween_property(self, "scale", Vector2.ONE, entrance_time).set_delay(delay) \
+			.set_trans(Tween.TRANS_QUINT).set_ease(Tween.EASE_OUT)
+	set_meta(POSE_TWEEN_KEY, tween)
 
 
 ## "No alcanza": destello rojo y vaivén (UiTheme.reject) que termina en el
 ## modulate de reposo, no en blanco (una carta no elegida está atenuada).
 func reject(selected: bool) -> void:
 	UiTheme.reject(self, UiTheme.REJECT_SWINGS, UiTheme.REJECT_SWING_TIMES,
-			rest_modulate(selected), SETTLE_TWEEN_KEY)
+			rest_modulate(selected), POSE_TWEEN_KEY)
 
 
-## Modulate de reposo: blanco la elegida, atenuada el resto.
+## Modulate de reposo: blanco la elegida y la que tiene el foco o el mouse,
+## atenuada el resto.
 func rest_modulate(selected: bool) -> Color:
-	return Color.WHITE if selected else unselected_modulate
+	return Color.WHITE if selected or is_lit() else unselected_modulate
+
+
+## Giro del retrato en reposo: alterna de lado de una carta a la siguiente.
+func _rest_tilt() -> float:
+	return portrait_tilt if get_index() % 2 == 0 else -portrait_tilt
+
+
+## True con el foco del control o el mouse encima.
+func is_lit() -> bool:
+	return has_focus() or is_hovered()
 
 
 ## El «Sí» mientras la carta pide confirmar el desbloqueo, o null.
@@ -162,56 +230,61 @@ func unlock_button() -> Button:
 	return _unlock_yes if _confirm.visible else null
 
 
-func _fill_unlocked(row: Dictionary, selected: bool, owner_slots: Array[int]) -> void:
-	var tint := Color(row.tint)
-	_paint_portrait(tint, String(row.display_name))
-	_unlocked_name.text = String(row.display_name)
-	_unlocked_weapon.text = String(row.weapon_display_name)
-	_unlocked_passive.text = String(row.passive_description)
-	_unlocked_blurb.text = String(row.blurb)
+func _on_highlight_changed() -> void:
+	settle(_selected)
+	var lit := is_lit()
+	if lit:
+		# Se avisa en cada cambio, no solo en el primero: el foco y el mouse
+		# pueden estar en cartas distintas y el detalle sigue a la última.
+		highlighted.emit(character_id)
+	elif _was_lit:
+		unhighlighted.emit(character_id)
+	_was_lit = lit
+
+
+func _on_held_changed(held: bool) -> void:
+	_held = held
+	settle(_selected)
+
+
+func _fill_unlocked(row: Dictionary, tint: Color, owner_slots: Array[int]) -> void:
+	var display_name := String(row.display_name)
+	_portrait_style.bg_color = tint.darkened(portrait_body_darken)
+	_monogram.text = display_name.left(1).to_upper()
+	_monogram.add_theme_color_override("font_outline_color",
+			tint.darkened(monogram_outline_darken))
+	_unlocked_name.text = display_name
 	var owners: Array[String] = []
 	for slot in owner_slots:
 		owners.append(UiTheme.PLAYER_TAG % (slot + 1))
 	_owners.text = owners_separator.join(owners)
 	_owners.visible = not owners.is_empty()
-	UiTheme.style_card(self, tint if selected else idle_border_color,
-			selected_border_width if selected else idle_border_width, selected)
+	_style(tint if _selected else idle_border_color,
+			selected_border_width if _selected else idle_border_width, _selected)
 
 
 func _fill_locked(row: Dictionary) -> void:
 	_locked_name.text = String(row.display_name)
-	_locked_weapon.text = String(row.weapon_display_name)
 	_price.text = UiTheme.SHARDS_AMOUNT % int(row.get("unlock_cost", 0))
-	var hint := String(row.get("unlock_hint", ""))
-	_hint.visible = not hint.is_empty()
-	if not hint.is_empty():
-		_hint.text = hint_format % hint
-	_locked_passive.text = String(row.passive_description)
-	UiTheme.style_card(self, locked_border_color, idle_border_width, false)
+	_style(locked_border_color, idle_border_width, false)
 
 
 func _fill_confirm(row: Dictionary) -> void:
-	_paint_portrait(Color(row.tint), String(row.display_name))
-	_confirm_name.text = String(row.display_name)
 	_ask.text = confirm_format % int(row.get("unlock_cost", 0))
-	UiTheme.style_card(self, confirm_border_color, selected_border_width)
+	_style(confirm_border_color, selected_border_width, true)
 
 
-## Tiñe el retrato (cuerpo, borde y brillo salen del tinte) y escribe la
-## inicial del raider, que hace de cara mientras no haya arte de retrato.
-func _paint_portrait(tint: Color, display_name: String) -> void:
-	_portrait_style.bg_color = tint.darkened(portrait_body_darken)
-	_portrait_style.border_color = tint.lightened(portrait_rim_lighten)
-	_portrait_style.shadow_color = Color(tint.r, tint.g, tint.b, portrait_glow_alpha)
-	for monogram: Label in [_unlocked_monogram, _confirm_monogram]:
-		monogram.text = display_name.left(1).to_upper()
-		monogram.visible = not display_name.is_empty()
-		monogram.add_theme_color_override("font_outline_color",
-				tint.darkened(monogram_outline_darken))
+## Aspecto de carta de UiTheme.style_card, sin sus estados de hover y de
+## foco: ese resalte lo dibuja FocusRing, que puede fundirse (un stylebox
+## cambia de golpe).
+func _style(border: Color, width: int, glow: bool) -> void:
+	UiTheme.style_card(self, border, width, glow)
+	add_theme_stylebox_override("hover", get_theme_stylebox(&"normal"))
+	add_theme_stylebox_override("focus", StyleBoxEmpty.new())
 
 
-## El texto completo de la carta al pasar el mouse: la carta recorta la
-## pasiva y la descripción para caber, el tooltip nunca.
+## El texto completo de la carta al pasar el mouse: nombre, arma, pasiva y
+## descripción, y el precio si está bloqueada.
 func _tooltip(row: Dictionary, locked: bool) -> String:
 	var lines: Array[String] = [
 		tooltip_title_format % [String(row.display_name), String(row.weapon_display_name)],
