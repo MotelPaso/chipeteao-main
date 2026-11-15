@@ -11,6 +11,7 @@ const CHARACTER_SELECT := "res://scenes/ui/CharacterSelect.tscn"
 ## Pantallas entre partidas que se abren desde el menú principal.
 const QUEST_LOG := "res://scenes/ui/QuestLog.tscn"
 const COLLECTION := "res://scenes/ui/Collection.tscn"
+const COLLECTION_BROWSER := "res://scenes/ui/CollectionBrowser.tscn"
 const RELIC_SHOP := "res://scenes/ui/RelicShop.tscn"
 ## La única escena en la que arranca una partida.
 const RUN := "res://scenes/world/Run.tscn"

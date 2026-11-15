@@ -33,6 +33,27 @@ const ICON_FILES: Dictionary[String, String] = {
 }
 ## Icono de un stat que no está en ICON_FILES.
 const FALLBACK_FILE := "stat_generic.svg"
+## Edita aquí: nombre que ve el jugador de cada stat (GLOSARIO), para las
+## líneas «qué sube» de Objetos y Tomos.
+const LABELS: Dictionary[String, String] = {
+	"damage": "Daño",
+	"max_hp": "HP máx.",
+	"cooldown": "Velocidad de ataque",
+	"move_speed": "Velocidad de movimiento",
+	"armor": "Armadura",
+	"luck": "Suerte",
+	"area": "Área de ataque",
+	"crit_chance": "Prob. de crítico",
+	"crit_damage": "Daño crítico",
+	"lifesteal": "Robo de vida",
+	"evasion": "Evasión",
+	"projectiles": "Proyectiles",
+	"duration": "Duración de efectos",
+	"xp_gain": "XP ganada",
+	"jumps": "Saltos en el aire",
+	"difficulty": "Dificultad",
+	"gambling": "Azar",
+}
 
 ## Texturas ya cargadas, por nombre de archivo.
 static var _cache: Dictionary[String, Texture2D] = {}
@@ -43,6 +64,11 @@ static var _cache: Dictionary[String, Texture2D] = {}
 static func texture(stat: String) -> Texture2D:
 	var icon := _load(String(ICON_FILES.get(stat, FALLBACK_FILE)))
 	return icon if icon != null else _load(FALLBACK_FILE)
+
+
+## Nombre que ve el jugador de ese stat, o el propio id si no tiene fila.
+static func label(stat: String) -> String:
+	return String(LABELS.get(stat, stat))
 
 
 ## Los stats principales de una lista de efectos del catálogo ([{stat,

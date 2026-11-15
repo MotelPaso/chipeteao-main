@@ -1,17 +1,18 @@
 class_name MetaScreen
 extends Control
-## Chasis compartido de las tres pantallas entre partidas (Registro de
-## misiones, Armería, Colección): son la misma pantalla con distintas filas.
-## Mismo fondo de niebla, mismo título ámbar espaciado, misma insignia, mismo
-## botón Volver, misma entrada escalonada y, en las dos que gastan o ganan
-## esquirlas, el mismo conteo animado. Todo lo que NO es contenido de filas
-## vive aquí, así un arreglo llega a las tres a la vez.
+## Chasis compartido de las dos pantallas de lista entre partidas (Registro de
+## misiones y Armería): son la misma pantalla con distintas filas. Mismo fondo
+## de niebla, mismo título ámbar espaciado, misma insignia, mismo botón
+## Volver, misma entrada escalonada y el mismo conteo animado de esquirlas.
+## Todo lo que NO es contenido de filas vive aquí, así un arreglo llega a las
+## dos a la vez. (La Colección tiene sus propias pantallas: collection.gd y
+## scripts/ui/meta/collection/.)
 ##
-## Contrato de escena (QuestLog.tscn / RelicShop.tscn / Collection.tscn):
-## un hijo Center con todo el contenido, %BadgeLabel, %List (VBoxContainer
-## dentro de un ScrollContainer) y %BackButton. Volver y ui_cancel regresan al
-## menú principal. El título vive entero en la escena (texto, fuente, color), y
-## el color de texto de %BadgeLabel en la escena también pinta su píldora.
+## Contrato de escena (QuestLog.tscn / RelicShop.tscn): un hijo Center con
+## todo el contenido, %BadgeLabel, %List (VBoxContainer dentro de un
+## ScrollContainer) y %BackButton. Volver y ui_cancel regresan al menú
+## principal. El título vive entero en la escena (texto, fuente, color), y el
+## color de texto de %BadgeLabel en la escena también pinta su píldora.
 ##
 ## Ganchos de las subclases: _tracks_shards() y _build_rows(list). Momentos
 ## compartidos que llama una subclase: payoff() (reclamar / comprar),
@@ -108,8 +109,7 @@ func _unhandled_input(event: InputEvent) -> void:
 
 
 ## Desplazamiento con control o flechas. El foco solo recorre BOTONES y la
-## mayoría de las filas no tiene ninguno (toda la Colección, cada misión sin
-## reclamar), así que arriba/abajo desplazan la lista cuando mover el foco se
+## mayoría de las filas no tiene ninguno (cada misión sin reclamar), así que arriba/abajo desplazan la lista cuando mover el foco se
 ## saltaría filas que siguen fuera de vista:
 ##   - una lista sin botones: siempre (Volver conserva el foco);
 ##   - abajo desde el ÚLTIMO botón de fila / arriba desde el PRIMERO: mientras
@@ -314,8 +314,8 @@ static func label(label_text: String, font_size: int, color: Color) -> Label:
 
 # --- ganchos de las subclases -----------------------------------------
 
-## False en las pantallas cuya insignia no es un saldo de esquirlas (la
-## Colección escribe su propio porcentaje al reconstruir).
+## False en una pantalla cuya insignia no es un saldo de esquirlas (escribe
+## su propio texto al reconstruir).
 func _tracks_shards() -> bool:
 	return true
 

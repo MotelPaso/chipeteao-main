@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <!-- Libro grueso con marcador. Dibujo propio. -->
+  <g stroke="#15131a" stroke-width="10" stroke-linejoin="round" stroke-linecap="round">
+<path d="M120 96 L372 96 C392 96 404 108 404 128 L404 416 L150 416 C128 416 108 400 108 376 L108 108 Z" fill="#7fd4f0"/>
+<path d="M108 376 C108 352 128 340 150 340 L404 340 L404 416 L150 416 C128 416 108 400 108 376 Z" fill="#fff4dc"/>
+<path d="M150 378 L404 378" fill="none" stroke-width="6"/>
+<rect x="176" y="146" width="168" height="120" rx="14" fill="#ffd23f"/>
+<path d="M260 176 L272 200 L298 204 L279 222 L284 248 L260 236 L236 248 L241 222 L222 204 L248 200 Z" fill="#fff4dc" stroke-width="7"/>
+<path d="M330 340 L330 452 L352 430 L374 452 L374 340 Z" fill="#f2542d"/>
+  </g>
+</svg>

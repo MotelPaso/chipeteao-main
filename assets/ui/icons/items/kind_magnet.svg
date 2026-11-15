@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
+  <!-- Imán de herradura. Dibujo propio. -->
+  <g stroke="#15131a" stroke-width="8" stroke-linejoin="round" stroke-linecap="round">
+<path d="M20 20 L50 20 L50 70 C50 80 56 86 64 86 C72 86 78 80 78 70 L78 20 L108 20 L108 70 C108 98 90 116 64 116 C38 116 20 98 20 70 Z" fill="#f2542d"/>
+<path d="M20 20 L50 20 L50 44 L20 44 Z" fill="#fff4dc"/><path d="M78 20 L108 20 L108 44 L78 44 Z" fill="#fff4dc"/>
+  </g>
+</svg>

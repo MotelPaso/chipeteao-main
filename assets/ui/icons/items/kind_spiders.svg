@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
+  <!-- Araña. Dibujo propio. -->
+  <g stroke="#15131a" stroke-width="8" stroke-linejoin="round" stroke-linecap="round">
+<path d="M44 60 L18 40 L8 52 M44 72 L14 74 L6 90 M48 84 L26 102 L24 118 M84 60 L110 40 L120 52 M84 72 L114 74 L122 90 M80 84 L102 102 L104 118" fill="none"/>
+<ellipse cx="64" cy="78" rx="26" ry="30" fill="#12343b"/>
+<circle cx="64" cy="42" r="18" fill="#f2542d"/>
+<circle cx="57" cy="40" r="4" fill="#fff4dc" stroke-width="3"/><circle cx="71" cy="40" r="4" fill="#fff4dc" stroke-width="3"/>
+  </g>
+</svg>

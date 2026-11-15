@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <!-- Mochila de objetos. Dibujo propio. -->
+  <g stroke="#15131a" stroke-width="10" stroke-linejoin="round" stroke-linecap="round">
+<path d="M196 150 C196 96 316 96 316 150" fill="none" stroke-width="24"/>
+<path d="M196 150 C196 96 316 96 316 150" fill="none" stroke="#ffa62b" stroke-width="10"/>
+<path d="M128 180 C128 150 152 140 180 140 L332 140 C360 140 384 150 384 180 L400 392 C402 420 384 436 356 436 L156 436 C128 436 110 420 112 392 Z" fill="#ffa62b"/>
+<path d="M124 250 L388 250" fill="none"/>
+<rect x="176" y="296" width="160" height="100" rx="18" fill="#ffd23f"/>
+<rect x="232" y="232" width="48" height="56" rx="10" fill="#fff4dc"/>
+  </g>
+</svg>

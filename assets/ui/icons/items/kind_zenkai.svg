@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
+  <!-- Corazón con flecha hacia arriba. Dibujo propio. -->
+  <g stroke="#15131a" stroke-width="8" stroke-linejoin="round" stroke-linecap="round">
+<path d="M64 114 C26 86 14 66 14 50 C14 34 26 24 40 24 C50 24 59 30 64 38 C69 30 78 24 88 24 C102 24 114 34 114 50 C114 66 102 86 64 114 Z" fill="#f2542d"/>
+<path d="M64 40 L88 68 L74 68 L74 92 L54 92 L54 68 L40 68 Z" fill="#ffd23f" stroke-width="6"/>
+  </g>
+</svg>

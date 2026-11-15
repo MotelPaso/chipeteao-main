@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
+  <!-- Llave maestra. Dibujo propio. -->
+  <g stroke="#15131a" stroke-width="8" stroke-linejoin="round" stroke-linecap="round">
+<circle cx="40" cy="44" r="28" fill="#ffd23f"/><circle cx="40" cy="44" r="9" fill="#12343b"/>
+<path d="M58 62 L112 116 M90 94 L104 80 M102 106 L114 94" fill="none" stroke-width="20"/>
+<path d="M58 62 L112 116 M90 94 L104 80 M102 106 L114 94" fill="none" stroke="#ffd23f" stroke-width="9"/>
+  </g>
+</svg>

@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
+  <!-- Nube de veneno con calavera. Dibujo propio. -->
+  <g stroke="#15131a" stroke-width="8" stroke-linejoin="round" stroke-linecap="round">
+<path d="M34 96 C14 96 8 74 24 64 C14 44 36 26 54 36 C62 16 96 18 98 42 C120 44 124 76 104 84 C104 98 88 104 78 96 C68 106 46 106 34 96 Z" fill="#5bd6a0"/>
+<circle cx="52" cy="62" r="8" fill="#15131a"/><circle cx="80" cy="62" r="8" fill="#15131a"/>
+<path d="M56 82 L76 82" fill="none" stroke-width="6"/>
+  </g>
+</svg>

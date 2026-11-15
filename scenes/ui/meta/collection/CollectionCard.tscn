@@ -1,0 +1,44 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/ui/meta/collection/collection_card.gd" id="1_card"]
+[ext_resource type="PackedScene" path="res://scenes/ui/meta/collection/CollectionArt.tscn" id="2_art"]
+
+[node name="CollectionCard" type="Button"]
+editor_description = "Este tamaño es el mínimo: en la cuadrícula las cartas se reparten el ancho libre."
+custom_minimum_size = Vector2(150, 126)
+size_flags_horizontal = 3
+script = ExtResource("1_card")
+
+[node name="Box" type="VBoxContainer" parent="."]
+layout_mode = 1
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 9.0
+offset_top = 9.0
+offset_right = -9.0
+offset_bottom = -7.0
+mouse_filter = 2
+theme_override_constants/separation = 4
+
+[node name="Art" parent="Box" instance=ExtResource("2_art")]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="Name" type="Label" parent="Box"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.957, 0.863, 1)
+theme_override_font_sizes/font_size = 15
+text = "Nombre"
+horizontal_alignment = 1
+autowrap_mode = 3
+
+[node name="FocusRing" type="Panel" parent="."]
+modulate = Color(1, 1, 1, 0)
+editor_description = "Anillo amarillo de la carta con el foco del control o el mouse encima. collection_card.gd lo funde (grupo Movimiento) y le pone el StyleBox de UiTheme.focus_ring."
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
