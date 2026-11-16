@@ -1,9 +1,8 @@
-[gd_scene load_steps=2 format=3]
+[gd_scene format=3 uid="uid://d3rrmvr1knfw0"]
 
-[ext_resource type="Script" path="res://scripts/weapons/ember_wand.gd" id="1_wand"]
+[ext_resource type="Script" uid="uid://mi0pyrr2vv46" path="res://scripts/weapons/ember_wand.gd" id="1_wand"]
 
-[node name="EmberWand" type="Node3D"]
+[node name="EmberWand" type="Node3D" unique_id=619022906]
 script = ExtResource("1_wand")
-damage = 10.0
 cooldown = 1.6
 attack_range = 10.0

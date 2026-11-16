@@ -53,7 +53,7 @@ const RESCUE_MATE_OFFSET := Vector3(1.5, 0.5, 0.0)
 
 @export_group("Inventario")
 ## Tope de armas simultáneas; al llegar, el pool deja de ofrecer armas nuevas (upgrade_pool.gd lo lee por nombre).
-@export var max_weapons: int = 3
+@export var max_weapons: int = 4
 ## Tope de tomos distintos; al llegar, el pool solo ofrece más niveles de los que ya tiene (upgrade_pool.gd lo lee por nombre).
 @export var max_tomes: int = 3
 
@@ -415,7 +415,10 @@ func _apply_character(character: Dictionary) -> void:
 	_stats.set_character_passive(String(character.passive_stat),
 			float(character.passive_amount),
 			String(character.get("passive_kind", "per_level")),
-			float(character.get("passive_base", 0.0)))
+			float(character.get("passive_base", 0.0)),
+			String(character.get("passive_stat2", "")),
+			float(character.get("passive_amount2", 0.0)),
+			int(character.get("passive_every", 0)))
 
 
 func _on_health_died() -> void:

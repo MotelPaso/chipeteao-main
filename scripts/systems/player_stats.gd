@@ -15,13 +15,17 @@ const MIN_DAMAGE_MULTIPLIER: float = 0.1
 const MIN_MOVE_MULTIPLIER: float = 0.2
 const MIN_DURATION_MULTIPLIER: float = 0.1
 const MIN_XP_MULTIPLIER: float = 0.1
+## Piso del bono de radio de recolección (-0.9 = -90%): un debuff nunca deja
+## el radio en cero o negativo.
+const MIN_PICKUP_RADIUS_BONUS: float = -0.9
 ## Techo de saltos extra. No es gusto: el raider no tiene más control en el
 ## aire que air_acceleration, y pasado esto la verticalidad de una arena
 ## (mesetas, plataformas, el borde) deja de ser un obstáculo.
 const MAX_EXTRA_JUMPS: int = 5
 ## Cada tipo que _apply_character_passive sabe correr; una fila fuera de esta
 ## lista se rechaza al asignarla, no una vez por recompute.
-const PASSIVE_KINDS: Array[String] = ["per_level", "evasion_execute", "speed_to_damage"]
+const PASSIVE_KINDS: Array[String] = ["per_level", "evasion_execute", "speed_to_damage",
+		"per_n_levels", "hp_to_damage"]
 
 @export_group("Base")
 ## Multiplicador de daño crítico antes de cualquier bono del Tomo de Ruina.
@@ -82,6 +86,9 @@ var extra_jumps: int = 0
 ## Bono, en %, a la probabilidad de drop de power-ups. Lo lee
 ## EnemySpawner.roll_powerup_drop y lo venden los altares («Fortuna menor»).
 var powerup_drop_chance: float = 0.0
+## Bono (fracción, 0.25 = +25%) al radio de recolección. Se empuja a
+## RunState.pickup_radius_multiplier como DELTA, igual que bonus_max_hp.
+var pickup_radius_bonus: float = 0.0
 
 ## id de tomo -> una potencia de rareza por copia recogida. recompute()
 ## deriva todo de aquí: es la única fuente de verdad.
@@ -102,10 +109,18 @@ var _timed_boons: Array[Dictionary] = []
 
 ## Pasiva del personaje (datos de la fila de CharacterCatalog). Tipos:
 ##   "per_level":       _passive_stat gana _passive_base más _passive_amount
-##                      por cada nivel pasado el 1.
+##                      por cada nivel pasado el 1. Si hay _passive_stat2, esa
+##                      segunda stat gana _passive_amount2 por nivel igual
+##                      (Bolsa de basura: área Y duración).
+##   "per_n_levels":    _passive_stat gana _passive_base más _passive_amount por
+##                      cada _passive_every niveles completos (nivel 5, 10...;
+##                      PNG gucci morty: +1 proyectil cada 5 niveles).
+##   "hp_to_damage":    escala _passive_stat por nivel como per_level
+##                      (Backyardigan: max_hp) y además suma _passive_amount2 %
+##                      de daño por cada punto de HP máx. total.
 ##   "speed_to_damage": la velocidad de movimiento extra se convierte en daño
 ##                      extra a razón de _passive_amount (0.6 = +0.6% de daño
-##                      por cada +1% de velocidad).
+##                      por cada +1% de velocidad). Hoy ningún personaje lo usa.
 ##   "evasion_execute": escala como per_level y además cada esquive ejecuta
 ##                      a un atacante no jefe debilitado (_on_dodged). Hoy
 ##                      ningún personaje lo usa.
@@ -114,10 +129,19 @@ var _passive_kind: String = "per_level"
 var _passive_stat: String = ""
 var _passive_amount: float = 0.0
 var _passive_base: float = 0.0
+## Segunda stat por nivel ("per_level") o cantidad de daño por punto de HP
+## ("hp_to_damage"). Vacía / 0 = no hay.
+var _passive_stat2: String = ""
+var _passive_amount2: float = 0.0
+## Cada cuántos niveles se aplica "per_n_levels".
+var _passive_every: int = 0
 
 ## Parte de bonus_max_hp ya aplicada al Health, para que cada recompute
 ## ajuste por la diferencia en vez de volver a sumar todo el bono.
 var _applied_bonus_max_hp: float = 0.0
+## Parte de pickup_radius_bonus ya sumada a RunState.pickup_radius_multiplier,
+## con la misma idea de diferencia.
+var _applied_pickup_bonus: float = 0.0
 ## True mientras corre recompute() (ver is_recomputing).
 var _recomputing: bool = false
 
@@ -278,19 +302,27 @@ func _physics_process(_delta: float) -> void:
 
 ## Registra la pasiva del personaje elegido (los ids de stat son los de
 ## _apply_effect; los tipos se documentan en _passive_kind). base_amount ya
-## se da en el nivel 1 (el robo de vida inicial de Doc). Lo llama el jugador
-## al aparecer con los datos de la fila del catálogo.
+## se da en el nivel 1. stat2/amount2 son la segunda stat por nivel o el daño
+## por punto de HP, y every el intervalo de niveles de "per_n_levels". Lo
+## llama el jugador al aparecer con los datos de la fila del catálogo.
 func set_character_passive(stat: String, amount: float, kind: String = "per_level",
-		base_amount: float = 0.0) -> void:
+		base_amount: float = 0.0, stat2: String = "", amount2: float = 0.0,
+		every: int = 0) -> void:
 	if not PASSIVE_KINDS.has(kind):
 		# Se valida UNA vez, aquí; en el camino del recompute avisaría varias
 		# veces por segundo toda la partida.
 		push_warning("PlayerStats: unknown passive kind '%s'" % kind)
 		kind = "per_level"
+	if kind == "per_n_levels" and every <= 0:
+		push_warning("PlayerStats: per_n_levels needs passive_every > 0")
+		kind = "per_level"
 	_passive_kind = kind
 	_passive_stat = stat
 	_passive_amount = amount
 	_passive_base = base_amount
+	_passive_stat2 = stat2
+	_passive_amount2 = amount2
+	_passive_every = every
 	recompute()
 
 
@@ -336,11 +368,12 @@ func _reset_derived() -> void:
 	gambling_stacks = 0
 	extra_jumps = 0
 	powerup_drop_chance = 0.0
+	pickup_radius_bonus = 0.0
 
 
 ## Todas las fuentes, en el ÚNICO orden que importa: la pasiva del personaje
-## va al final porque los tipos de conversión (speed_to_damage) leen los
-## totales que armaron las demás fuentes.
+## va al final porque los tipos de conversión (speed_to_damage, hp_to_damage)
+## leen los totales que armaron las demás fuentes.
 func _apply_sources() -> void:
 	_apply_tomes()
 	# Los boons de azar se repiten en orden de recolección (ya escalados).
@@ -382,7 +415,7 @@ func _apply_tomes() -> void:
 			for effect: Dictionary in effects:
 				# roundf coincide con el texto de la carta: lo mostrado es lo
 				# aplicado.
-				_apply_effect(String(effect.stat), roundf(float(effect.amount) * potency))
+				_apply_effect(String(effect.stat), roundf(Tome.effect_amount(effect, potency)))
 
 
 ## Una lista de boons {stat, amount} por el canal de efectos. Los boons de
@@ -398,19 +431,22 @@ func _clamp_derived() -> void:
 	cooldown_multiplier = maxf(cooldown_multiplier, min_cooldown_multiplier)
 	damage_multiplier = maxf(damage_multiplier, MIN_DAMAGE_MULTIPLIER)
 	move_speed_multiplier = maxf(move_speed_multiplier, MIN_MOVE_MULTIPLIER)
-	crit_chance = clampf(crit_chance, 0.0, 1.0)
+	crit_chance = maxf(crit_chance, 0.0)
 	evasion = clampf(evasion, 0.0, max_evasion)
 	luck = maxf(luck, 0.0)
 	duration_multiplier = maxf(duration_multiplier, MIN_DURATION_MULTIPLIER)
 	xp_multiplier = maxf(xp_multiplier, MIN_XP_MULTIPLIER)
 	projectile_bonus = maxi(projectile_bonus, 0)
+	pickup_radius_bonus = maxf(pickup_radius_bonus, MIN_PICKUP_RADIUS_BONUS)
 
 
 ## Empuja los totales a los consumidores que no pueden leerlos solos: el
-## Health hermano (armadura, HP máx. extra) y la dificultad de la partida.
+## Health hermano (armadura, HP máx. extra), el radio de recolección de la
+## partida y la dificultad.
 func _publish_derived() -> void:
 	_push_armor_to_health()
 	_push_bonus_max_hp_to_health()
+	_push_pickup_radius_to_run_state()
 	_publish_difficulty()
 
 
@@ -495,16 +531,36 @@ func _apply_relics() -> void:
 func _apply_character_passive() -> void:
 	match _passive_kind:
 		"per_level", "evasion_execute":
-			# El nivel 1 aporta solo la base; cada nivel ganado suma un
-			# incremento (sin roundf: los pasos de menos de 1% deben sumarse).
 			# "evasion_execute" además mata al esquivar, en _on_dodged.
-			if not _passive_stat.is_empty():
-				_apply_effect(_passive_stat, _passive_base
-						+ _passive_amount * float(maxi(RunState.level - 1, 0)))
+			_apply_per_level_passive()
+		"per_n_levels":
+			# Escalones completos: con every = 5, el nivel 5 da el primero.
+			if not _passive_stat.is_empty() and _passive_every > 0:
+				var steps := floori(float(RunState.level) / float(_passive_every))
+				_apply_effect(_passive_stat, _passive_base + _passive_amount * float(steps))
+		"hp_to_damage":
+			_apply_per_level_passive()
+			var health := _sibling_health()
+			if health != null:
+				# HP máx. total = el del Health sin lo ya empujado, más el bono
+				# recién acumulado (incluye la vida por nivel de esta pasiva).
+				var total_hp := health.max_hp - _applied_bonus_max_hp + bonus_max_hp
+				damage_multiplier += maxf(total_hp, 0.0) * _passive_amount2 / 100.0
 		"speed_to_damage":
 			# La velocidad extra (multiplicador sobre 1) se convierte en bono
 			# directo del multiplicador de daño a la razón configurada.
 			damage_multiplier += maxf(move_speed_multiplier - 1.0, 0.0) * _passive_amount
+
+
+## Base más incremento por nivel de la stat principal y, en "per_level", de la
+## segunda. El nivel 1 aporta solo la base; cada nivel ganado suma un
+## incremento (sin roundf: los pasos de menos de 1% deben sumarse).
+func _apply_per_level_passive() -> void:
+	var levels_gained := float(maxi(RunState.level - 1, 0))
+	if not _passive_stat.is_empty():
+		_apply_effect(_passive_stat, _passive_base + _passive_amount * levels_gained)
+	if _passive_kind == "per_level" and not _passive_stat2.is_empty():
+		_apply_effect(_passive_stat2, _passive_amount2 * levels_gained)
 
 
 ## Un efecto, ya escalado por potencia, sobre los totales en curso. Las stats
@@ -549,6 +605,8 @@ func _apply_effect(stat: String, amount: float) -> void:
 			extra_jumps = mini(extra_jumps + roundi(amount), MAX_EXTRA_JUMPS)
 		"powerup_chance":
 			powerup_drop_chance += amount
+		"pickup_radius":
+			pickup_radius_bonus += amount / 100.0
 		"gambling":
 			# Sin efecto a propósito: los boons se sacaron al tomar el tomo y
 			# se repiten desde _gamble_boons, y gambling_stacks cuenta COPIAS,
@@ -588,6 +646,16 @@ func _push_bonus_max_hp_to_health() -> void:
 	health.max_hp += delta
 	if delta > 0.0:
 		health.heal(delta)
+
+
+## RunState.pickup_radius_multiplier es compartido, así que el bono se aplica
+## como delta de lo ya empujado y no pisa otras fuentes ni a otro jugador.
+func _push_pickup_radius_to_run_state() -> void:
+	var delta := pickup_radius_bonus - _applied_pickup_bonus
+	if is_zero_approx(delta):
+		return
+	_applied_pickup_bonus = pickup_radius_bonus
+	RunState.pickup_radius_multiplier += delta
 
 
 ## Esquivar-ejecutar (tipo "evasion_execute"): un esquive exitoso mata al

@@ -325,9 +325,13 @@ func _pick_choice(index: int) -> void:
 
 
 ## Muestra la tirada del Tomo del Azar en el aviso de botín del HUD.
+## Muestra la tirada del Tomo del Azar en el aviso de botín del HUD.
 func _toast_gamble(boons: Array[Dictionary], player: Node) -> void:
 	var index: Variant = player.get("player_index")
-	get_tree().call_group("hud", "show_loot", gamble_toast_title, Tome.boon_text(boons),
+	var lines: PackedStringArray = []
+	for boon: Dictionary in boons:
+		lines.append(Tome.boon_text(boon))
+	get_tree().call_group("hud", "show_loot", gamble_toast_title, "\n".join(lines),
 			gamble_toast_color, int(index) if index != null else 0)
 
 

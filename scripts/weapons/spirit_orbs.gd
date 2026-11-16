@@ -10,11 +10,13 @@ extends WeaponBase
 ##   attack_range     — radio de la órbita (Largo alcance ensancha el anillo)
 ##   projectile_count — cantidad de orbes (la carta «Otro espíritu» suma uno)
 ## La evolución «Anillo de cometas» suma un orbe y multiplica damage y cooldown.
+## Tamaño: la mejora de tamaño sube hit_radius (el contacto real) y los orbes
+## se dibujan más grandes en la misma proporción (ver size_ratio en _update_ring).
 
 @export_group("Orbes")
 ## Radio visual de cada orbe, en metros (escala la malla unitaria orb_mesh); no cambia el daño.
 @export var orb_radius: float = 0.4
-## Distancia de contacto desde el centro de un orbe hasta un enemigo, en metros; independiente de orb_radius.
+## Distancia de contacto desde el centro de un orbe hasta un enemigo, en metros; independiente de orb_radius. Las mejoras de tamaño lo suben y el visual lo sigue.
 @export var hit_radius: float = 3.1
 ## Velocidad angular del anillo, en radianes por segundo.
 @export var orbit_speed: float = 2.6
@@ -38,6 +40,12 @@ var _rehit: Dictionary[int, float] = {}
 var _rehit_expired: Array[int] = []
 ## Lista auxiliar de _touch_enemies: la posición mundial de cada orbe este frame.
 var _orb_positions: PackedVector3Array = PackedVector3Array()
+## hit_radius de la escena, para saber cuánto han crecido los orbes por mejoras.
+var _base_hit_radius: float = 0.0
+
+
+func _ready() -> void:
+	_base_hit_radius = hit_radius
 
 
 func _physics_process(delta: float) -> void:
@@ -52,6 +60,8 @@ func _physics_process(delta: float) -> void:
 func _update_ring(delta: float) -> void:
 	_angle = wrapf(_angle + orbit_speed * delta, 0.0, TAU)
 	var radius := attack_range
+	# Los orbes crecen en la misma proporción que el contacto (hit_radius).
+	var size_ratio := hit_radius / maxf(_base_hit_radius, 0.001)
 	# Anillo en espacio mundial alrededor de los pies del portador: el ángulo
 	# de la órbita tiene su propio reloj, así girar o moverse de lado no
 	# arrastra el anillo con el cuerpo (los orbes son hijos, de ahí
@@ -63,6 +73,7 @@ func _update_ring(delta: float) -> void:
 		_ring_center = carrier.global_position
 	for i in _orbs.size():
 		var orb_angle := _angle + TAU * float(i) / float(_orbs.size())
+		_orbs[i].scale = Vector3.ONE * orb_radius * size_ratio
 		_orbs[i].global_position = _ring_center + Vector3(
 				cos(orb_angle) * radius,
 				orb_height + sin(orb_angle * 2.0) * bob_height,

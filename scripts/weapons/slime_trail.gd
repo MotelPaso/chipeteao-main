@@ -22,6 +22,10 @@ extends WeaponBase
 @export var min_drop_distance: float = 0.8
 ## Altura máxima, en metros, por encima o por debajo del charco a la que alcanza.
 @export var height_window: float = 1.6
+## Capas de colisión que cuentan como suelo para el rayo que baja el charco al piso. Ajústalo a la capa de tu terreno (no incluyas enemigos ni al jugador).
+@export_flags_3d_physics var ground_collision_mask: int = 1
+## Hasta cuántos metros por debajo de los pies busca el suelo; si no hay nada, el charco cae en los pies.
+@export var ground_probe_depth: float = 50.0
 
 @export_group("Visual")
 ## Malla y material del charco (color y opacidad en albedo_color); disco de radio 1 que se escala al radio del charco.
@@ -67,19 +71,28 @@ func _ready() -> void:
 
 func _physics_process(delta: float) -> void:
 	_drop_timer = maxf(_drop_timer - delta, 0.0)
-	# El rastro sigue al montaje que lleva el arma: una mascota deja SU propio
-	# rastro en vez de pintar uno bajo el jugador al que sigue.
 	var carrier := carrier_node()
 	if carrier != null and _drop_timer <= 0.0:
-		var feet := carrier.global_position
+		var feet := _ground_point(carrier)
 		if _last_drop == Vector3.INF or feet.distance_to(_last_drop) >= min_drop_distance:
 			_drop_timer = effective_cooldown()
 			_last_drop = feet
-			# Esta arma nunca llama a fire(), así que el Tomo de Multitud se lee
-			# aquí: la caída del charco es el ataque.
 			_drop_cluster(feet, maxi(effective_projectile_count(), 1))
 	_tick_puddles(delta)
 
+## El punto del suelo justo bajo el portador. Un rayo hacia abajo desde sus
+## pies: si salta, el charco se queda en el piso y no flota en el aire. Si el
+## rayo no encuentra nada, usa la posición del portador como antes.
+func _ground_point(carrier: Node3D) -> Vector3:
+	var from := carrier.global_position + Vector3.UP * 0.2
+	var to := from + Vector3.DOWN * ground_probe_depth
+	var query := PhysicsRayQueryParameters3D.create(from, to, ground_collision_mask)
+	if carrier is CollisionObject3D:
+		query.exclude = [(carrier as CollisionObject3D).get_rid()]
+	var hit := carrier.get_world_3d().direct_space_state.intersect_ray(query)
+	if hit.is_empty():
+		return carrier.global_position
+	return hit.position
 
 ## Los visuales de los charcos cuelgan de la arena, no de esta arma, así que
 ## nada los libera cuando el arma se va: se sueltan a mano. Se liberan al

@@ -23,6 +23,9 @@ const VOLLEY_WINDOW: float = 0.6
 ## Altura de puntería, en metros sobre el origen, para un blanco que no es
 ## un EnemyBase. Cada enemigo lleva la suya en su export aim_height.
 const AIM_HEIGHT: float = 0.8
+## Multiplicador de crítico que se usa si el arma no tiene PlayerStats (un
+## arma probada fuera de un jugador) y aun así saca crítico por su bono propio.
+const DEFAULT_CRIT_MULTIPLIER: float = 1.5
 ## Escalón plano de ascenso, aplicado SOBRE lo que el arma ya es en cada hito
 ## de EvolutionCatalog.EVOLVE_AT_LEVEL después del primero. Vive aquí y no en
 ## el catálogo porque no necesita receta: toda arma mejora cada diez niveles.
@@ -41,9 +44,13 @@ const ASCEND_PROJECTILE_ADD: int = 1
 ## Distancia de búsqueda de blanco, en metros. Valor de respaldo; cada arma fija el suyo en su escena. Lo suben «Largo alcance», «Temple» y ascensos.
 @export var attack_range: float = 3.0
 ## Disparos, orbes o golpes por ráfaga (1 salvo que la escena diga otra cosa); el Tomo de Multitud y los ascensos pares suman.
-@export var projectile_count: int = 1
+@export var projectile_count: float = 1
 ## Multiplicador de enfriamiento propio del arma (1 = sin cambio); lo bajan evoluciones, ascensos y cartas como «Ráfaga».
 @export var cooldown_scale: float = 1.0
+## Prob. de crítico extra del arma, en PUNTOS porcentuales (5 = +5%); se suma a la del portador. La suben las mejoras de arma.
+@export var crit_chance_bonus: float = 0.0
+## Daño crítico extra del arma, en PUNTOS porcentuales (10 = +0.10 al multiplicador de crítico). La suben las mejoras de arma.
+@export var crit_damage_bonus: float = 0.0
 
 ## Cartas de mejora que recibió el arma en la partida (las suma
 ## UpgradePool.apply); es la puerta de evolución y ascenso (EvolutionCatalog).
@@ -143,7 +150,9 @@ func area_scale() -> float:
 ## projectile_count.
 func effective_projectile_count() -> int:
 	var stats := _stats_or_null()
-	return projectile_count + (stats.projectile_bonus if stats != null else 0)
+	# El 0.0001 evita que 2.9999999 (error de float) se quede en 2.
+	return floori(projectile_count + 0.0001) \
+			+ (stats.projectile_bonus if stats != null else 0)
 
 
 ## Multiplicador de los efectos con duración que deja un arma (ralentización,
@@ -242,6 +251,9 @@ func _fire_late(shot: Callable) -> void:
 
 ## Embudo de daño compartido: aplica el daño efectivo, tira el crítico y cura
 ## al portador por robo de vida. Todo golpe de arma pasa por aquí.
+## El crítico suma la probabilidad y el daño crítico propios del arma
+## (crit_chance_bonus, crit_damage_bonus, en puntos porcentuales) a los del
+## portador.
 ## Devuelve el daño APLICADO, no la tirada: Health resta armadura, ignora un
 ## cuerpo ya muerto y un golpe letal solo quita la vida que quedaba. Los
 ## efectos que pagan por daño (robo de vida, drenaje del Vial de sangre) usan
@@ -252,9 +264,12 @@ func _fire_late(shot: Callable) -> void:
 func deal_damage(target_health: Health, allow_kill_hooks: bool = true) -> float:
 	var stats := _stats_or_null()
 	var amount := effective_damage()
-	var is_crit := stats != null and randf() < stats.crit_chance
+	var crit_chance := (stats.crit_chance if stats != null else 0.0) \
+			+ crit_chance_bonus * 0.01
+	var is_crit := randf() < crit_chance
 	if is_crit:
-		amount *= stats.crit_damage
+		amount *= (stats.crit_damage if stats != null else DEFAULT_CRIT_MULTIPLIER) \
+				+ crit_damage_bonus * 0.01
 		Juice.crit_punch()
 	Sfx.play(&"hit_crit" if is_crit else &"hit_soft")
 	# La vida que el golpe quitó de verdad (0 si lo esquivó o ya estaba muerto).
