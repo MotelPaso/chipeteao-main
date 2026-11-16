@@ -3,8 +3,8 @@ extends RefCounted
 ## El mapa de una arena con relieve por zonas visto como lo ve la FÍSICA:
 ## una celda por metro cuadrado, con el piso que un cuerpo encuentra ahí y
 ## los pasos que puede dar a sus vecinas. Lo arma el arnés una vez por etapa
-## y lo usan los barridos de alcance (ReliefSweeps) y el ruteo del bot
-## (ReliefNav).
+## y lo usan los barridos (ReliefSweeps, ReliefPlacement) y el ruteo del bot
+## (ReliefNav); los recorridos sobre él viven en ReliefSearch.
 ##
 ## PISO de una celda: lo primero que toca un rayo desde arriba que sea suelo
 ## o un tablero (el Terrain, la cornisa de un corte, un puente, una meseta y
@@ -79,19 +79,6 @@ const FORMATION_REACH: float = 2.0
 const CORNER_LEVEL: float = 0.7
 ## "Sin paso" en raider_next y horde_next.
 const NONE: int = -1
-
-
-## Una búsqueda de camino a medio hacer (path_begin / path_advance). Se
-## reparte en frames: recorrer el mapa entero de una vez cuesta más de
-## 100 ms, y eso es un tirón en las medidas de rendimiento del soak.
-class PathSearch:
-	var to: int = NONE
-	var parent := PackedInt32Array()
-	var frontier := PackedInt32Array()
-	var cursor: int = 0
-	var done: bool = false
-	## Con `done`: el camino con las dos puntas, o vacío si no hay ninguno.
-	var path := PackedInt32Array()
 
 ## Celdas por lado y mitad del lado de la arena.
 var side: int = 0
@@ -191,113 +178,6 @@ func nearest_open(xz: Vector2, reach: float, near_y: float = INF, y_window: floa
 				best_distance = distance
 				best = index
 	return best
-
-
-## Todas las celdas a las que se llega desde `from` con los pasos de `next`
-## (raider_next u horde_next): 1 en las alcanzadas.
-func reach(from: int, next: PackedInt32Array) -> PackedByteArray:
-	var seen := PackedByteArray()
-	seen.resize(side * side)
-	if from == NONE:
-		return seen
-	seen[from] = 1
-	var frontier := PackedInt32Array([from])
-	var cursor := 0
-	while cursor < frontier.size():
-		var at := frontier[cursor]
-		cursor += 1
-		for step in WAYS:
-			var to := next[at * WAYS + step]
-			if to != NONE and seen[to] == 0:
-				seen[to] = 1
-				frontier.append(to)
-	return seen
-
-
-## Todas las celdas DESDE las que se llega a `to` con los pasos de `next`.
-func reach_back(to: int, next: PackedInt32Array) -> PackedByteArray:
-	var seen := PackedByteArray()
-	seen.resize(side * side)
-	if to == NONE:
-		return seen
-	# Lista de llegadas por celda: para cada paso a -> b, b recuerda a `a`.
-	var first := PackedInt32Array()
-	var link := PackedInt32Array()
-	first.resize(side * side)
-	first.fill(NONE)
-	link.resize(next.size())
-	for edge in next.size():
-		var target := next[edge]
-		if target == NONE:
-			continue
-		link[edge] = first[target]
-		first[target] = edge
-	seen[to] = 1
-	var frontier := PackedInt32Array([to])
-	var cursor := 0
-	while cursor < frontier.size():
-		var at := frontier[cursor]
-		cursor += 1
-		var edge := first[at]
-		while edge != NONE:
-			var from := edge / WAYS
-			if seen[from] == 0:
-				seen[from] = 1
-				frontier.append(from)
-			edge = link[edge]
-	return seen
-
-
-## Empieza la búsqueda a lo ancho de un camino de `from` a `to` con los
-## pasos de un raider. No recorre nada todavía: eso lo hace path_advance.
-func path_begin(from: int, to: int) -> PathSearch:
-	var search := PathSearch.new()
-	search.to = to
-	if from == NONE or to == NONE:
-		search.done = true
-		return search
-	search.parent.resize(side * side)
-	search.parent.fill(NONE)
-	search.parent[from] = from
-	search.frontier.append(from)
-	return search
-
-
-## Avanza `search` hasta `budget` celdas. True cuando terminó: su `path`
-## tiene el camino, o queda vacío si no hay.
-func path_advance(search: PathSearch, budget: int) -> bool:
-	if search.done:
-		return true
-	var parent := search.parent
-	var frontier := search.frontier
-	var cursor := search.cursor
-	var to := search.to
-	var stop := cursor + budget
-	while cursor < stop and cursor < frontier.size() and parent[to] == NONE:
-		var at := frontier[cursor]
-		cursor += 1
-		for step in WAYS:
-			var next := raider_next[at * WAYS + step]
-			if next != NONE and parent[next] == NONE:
-				parent[next] = at
-				frontier.append(next)
-	search.parent = parent
-	search.frontier = frontier
-	search.cursor = cursor
-	if parent[to] == NONE and cursor < frontier.size():
-		return false
-	search.done = true
-	if parent[to] != NONE:
-		# La celda de partida es su propio padre.
-		var at := to
-		while parent[at] != at:
-			search.path.append(at)
-			at = parent[at]
-		search.path.append(at)
-		search.path.reverse()
-	search.parent = PackedInt32Array()
-	search.frontier = PackedInt32Array()
-	return true
 
 
 # --- pisos -----------------------------------------------------------------------

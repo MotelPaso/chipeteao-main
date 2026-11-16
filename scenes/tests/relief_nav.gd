@@ -3,7 +3,7 @@ extends RefCounted
 ## Ruteo del bot del arnés en una arena con relieve por zonas. El bot camina
 ## en línea recta a su destino; con cortes en el mapa eso lo deja contra un
 ## acantilado. Aquí se le da, en vez del destino, el próximo punto del
-## camino que lleva hasta él por las rampas y los puentes (ReliefGraph.path_begin).
+## camino que lleva hasta él por las rampas y los puentes (ReliefSearch.begin).
 ## La búsqueda se reparte en frames; mientras llega, el bot sigue en línea recta.
 ##
 ## Sin grafo (una arena sin relieve por zonas) steer() devuelve el destino
@@ -40,7 +40,7 @@ const SEARCH_BUDGET: int = 1500
 var graph: ReliefGraph = null
 
 var _paths: Dictionary[int, PackedInt32Array] = {}
-## Búsqueda en curso de cada puesto (ReliefGraph.PathSearch); sin entrada si no hay.
+## Búsqueda en curso de cada puesto (ReliefSearch.Path); sin entrada si no hay.
 var _searches: Dictionary[int, RefCounted] = {}
 var _goals: Dictionary[int, int] = {}
 var _ages: Dictionary[int, float] = {}
@@ -67,35 +67,8 @@ func steer(slot: int, from: Vector3, goal: Vector3, delta: float) -> Vector3:
 	var there := _cell_at(goal)
 	if here == ReliefGraph.NONE or there == ReliefGraph.NONE or here == there:
 		return goal
-	var age := float(_ages.get(slot, INF)) + delta
-	var path: PackedInt32Array = _paths.get(slot, PackedInt32Array())
+	var path := _plan(slot, here, there, from, delta)
 	var at := _nearest_index(path, from)
-	var search := _searches.get(slot, null) as ReliefGraph.PathSearch
-	# Destino nuevo: se recalcula ya si saltó lejos (otro tramo del recorrido)
-	# y cada REPLAN_SECONDS si solo se corre de a poco (seguir a un compañero).
-	# Un camino que no existe o del que el bot se salió se reintenta con
-	# pausa, nunca en cada frame, y nunca con otra búsqueda a medio hacer.
-	var old_goal := int(_goals.get(slot, ReliefGraph.NONE))
-	var jumped := old_goal == ReliefGraph.NONE or (old_goal != there
-			and graph.center(old_goal).distance_to(graph.center(there)) > GOAL_JUMP)
-	var lost := search == null and age >= OFF_PATH_SECONDS and not path.is_empty() and at < 0
-	var stale := search == null and age >= REPLAN_SECONDS \
-			and (path.is_empty() or old_goal != there)
-	if jumped or lost or stale:
-		search = graph.path_begin(here, there)
-		_searches[slot] = search
-		_goals[slot] = there
-		age = 0.0
-		if jumped or lost:
-			# El camino viejo ya no lleva a nada: en línea recta hasta el nuevo.
-			path = PackedInt32Array()
-			_paths[slot] = path
-	_ages[slot] = age
-	if search != null and graph.path_advance(search, SEARCH_BUDGET):
-		path = search.path
-		_paths[slot] = path
-		_searches.erase(slot)
-	at = _nearest_index(path, from)
 	if path.is_empty() or at < 0:
 		return goal
 	if at >= path.size() - 1 - FINAL_APPROACH:
@@ -112,6 +85,40 @@ func steer(slot: int, from: Vector3, goal: Vector3, delta: float) -> Vector3:
 	if rise > JUMP_RISE and Vector2(next.x - from.x, next.z - from.z).length() < JUMP_RANGE:
 		_jumps[slot] = true
 	return graph.stand(path[target])
+
+
+## El camino vigente del puesto `slot`, de `here` a `there`: decide cuándo
+## recalcularlo y avanza la búsqueda en curso.
+func _plan(slot: int, here: int, there: int, from: Vector3, delta: float) -> PackedInt32Array:
+	var age := float(_ages.get(slot, INF)) + delta
+	var path: PackedInt32Array = _paths.get(slot, PackedInt32Array())
+	var search := _searches.get(slot, null) as ReliefSearch.Path
+	# Destino nuevo: se recalcula ya si saltó lejos (otro tramo del recorrido)
+	# y cada REPLAN_SECONDS si solo se corre de a poco (seguir a un compañero).
+	# Un camino que no existe o del que el bot se salió se reintenta con
+	# pausa, nunca en cada frame, y nunca con otra búsqueda a medio hacer.
+	var old_goal := int(_goals.get(slot, ReliefGraph.NONE))
+	var jumped := old_goal == ReliefGraph.NONE or (old_goal != there
+			and graph.center(old_goal).distance_to(graph.center(there)) > GOAL_JUMP)
+	var lost := search == null and age >= OFF_PATH_SECONDS and not path.is_empty() \
+			and _nearest_index(path, from) < 0
+	var stale := search == null and age >= REPLAN_SECONDS \
+			and (path.is_empty() or old_goal != there)
+	if jumped or lost or stale:
+		search = ReliefSearch.begin(graph, here, there)
+		_searches[slot] = search
+		_goals[slot] = there
+		age = 0.0
+		if jumped or lost:
+			# El camino viejo ya no lleva a nada: en línea recta hasta el nuevo.
+			path = PackedInt32Array()
+			_paths[slot] = path
+	_ages[slot] = age
+	if search != null and ReliefSearch.advance(graph, search, SEARCH_BUDGET):
+		path = search.path
+		_paths[slot] = path
+		_searches.erase(slot)
+	return path
 
 
 ## True si el paso que viene del puesto `slot` es una subida que pide salto.

@@ -9,7 +9,8 @@ extends RefCounted
 ##   horde      lo mismo con los pasos de la horda
 ##   placement  cosas puestas sobre un corte, rampa o puente, enterradas o
 ##              flotando, POIs que el raider no alcanza, spawns que la horda
-##              no alcanza, mesetas y formaciones pegadas a un corte
+##              no alcanza, mesetas y formaciones pegadas a un corte (lo
+##              hace ReliefPlacement)
 ##   slope      pendiente p95 del suelo abierto lejos de cortes y rampas
 ##   hell       mallas que el infierno de Mythos dejaría sin quemar, por tipo
 ##              (interactuables, que no arden a propósito; el Backdrop, que
@@ -29,34 +30,15 @@ const FACE_MIN_AREA: float = 0.03
 ## la cara se la pone, en metros.
 const TOUCH_RADIUS: float = 0.1
 const TOUCH_OFFSET: float = 0.14
-## Metros a un corte, rampa o puente bajo los cuales algo está "encima":
-## para un prop o un POI (la cornisa visible mide 3.3 m) y para un spawn.
-const ON_RELIEF_PROP: float = 3.5
-const ON_RELIEF_SPAWN: float = 2.5
-## Metros que una meseta, una plataforma o una formación guarda con el borde
-## o el pie de un corte.
-const CROWDING: float = 3.0
-## Tolerancia en metros entre la altura de algo y el piso que tiene debajo.
-const SETTLE: float = 0.4
-## Radio en metros donde se busca la celda abierta de un POI o de un spawn,
-## y ventana de altura alrededor de la suya.
-const POI_REACH: float = 2.5
-const SPAWN_REACH: float = 2.0
-const LEVEL_WINDOW: float = 1.5
-## Spawns muestreados de cada tipo (anillo y banda): 200 en total.
-const SPAWN_SAMPLES: int = 100
 ## Metros alrededor de cortes y rampas que la medida de pendiente deja fuera
 ## (la cornisa enterrada llega a 4.7 m).
 const SLOPE_KEEPOUT: float = 4.8
-## Medio lado de una plataforma y media rampa de meseta a escala 1, en metros.
-const PLATFORM_REACH: float = 4.3
-const RAMP_REACH: float = 2.5
-## Lo que una formación asoma fuera de sus celdas (RockFormationStyle.margin_max).
-const FORMATION_SKIRT: float = 2.0
 ## Muestras con nombre por barrido cuando un conteo no da cero.
-const DETAIL_LIMIT: int = 4
+const DETAIL_LIMIT: int = ReliefPlacement.DETAIL_LIMIT
 
 var graph: ReliefGraph = null
+
+var _placement := ReliefPlacement.new()
 
 var _tree: SceneTree = null
 var _arena: Node3D = null
@@ -101,6 +83,7 @@ func run(tree: SceneTree, arena: Node3D, raiders: Array[RID]) -> bool:
 	var home := graph.nearest_open(_spawn_xz(), 4.0)
 	_raider_ok = _sweep_reach("raider", home, graph.raider_next)
 	_horde_ok = _sweep_reach("horde", home, graph.horde_next)
+	_placement.setup(_tree, _arena, _terrain, _bounds, _raiders, graph, _raider_ok, _horde_ok)
 	placement("start")
 	_sweep_slope()
 	_sweep_hell()
@@ -110,21 +93,8 @@ func run(tree: SceneTree, arena: Node3D, raiders: Array[RID]) -> bool:
 
 ## El barrido de colocación, con la etiqueta `tag` (start, 120…).
 func placement(tag: String) -> void:
-	if graph == null:
-		return
-	var bad := {"on_relief": 0, "misplaced": 0, "raider_unreachable": 0,
-			"horde_unreachable": 0, "crowding": 0}
-	var notes: Array[String] = []
-	var props := _check_props(bad, notes)
-	var pois := _check_pois(bad, notes)
-	var spawns := _check_spawns(bad, notes)
-	_check_formations(bad, notes)
-	print(("Relief sweep: placement at=%s props=%d pois=%d spawns=%d on_relief=%d misplaced=%d"
-			+ " raider_unreachable=%d horde_unreachable=%d crowding=%d") % [tag, props, pois,
-			spawns, bad["on_relief"], bad["misplaced"], bad["raider_unreachable"],
-			bad["horde_unreachable"], bad["crowding"]])
-	for note: String in notes:
-		print("Relief sweep detail: placement at=%s %s" % [tag, note])
+	if graph != null:
+		_placement.run(tag)
 
 
 ## True si un raider llega del spawn a la celda `cell` y vuelve.
@@ -186,6 +156,21 @@ func _collider_height(x: float, z: float) -> float:
 ## del terreno que no tapa ninguna roca ni puente, y las de la roca de los
 ## cortes que asoman sobre el suelo.
 func _sweep_gap() -> void:
+	var notes: Array[String] = []
+	var counted := _gap_ground(notes)
+	var rock := 0
+	for node: Node in _bounds.get_children():
+		if node is CliffWall:
+			rock += _gap_rock(node as CliffWall, notes)
+	print("Relief sweep: gap faces=%d ground=%d rock=%d checked=%d" % [
+			counted.x + rock, counted.x, rock, counted.y])
+	for note: String in notes:
+		print("Relief sweep detail: gap %s" % note)
+
+
+## Celdas del colisionador del terreno con una cara de 45 a 60 grados que
+## nada tapa (x) y cuántas caras de esa franja se revisaron (y).
+func _gap_ground(notes: Array[String]) -> Vector2i:
 	var touch := SphereShape3D.new()
 	touch.radius = TOUCH_RADIUS
 	var query := PhysicsShapeQueryParameters3D.new()
@@ -196,7 +181,6 @@ func _sweep_gap() -> void:
 	query.exclude = excluded
 	var space := _terrain.get_world_3d().direct_space_state
 	var half := _terrain.size * 0.5
-	var notes: Array[String] = []
 	var ground := 0
 	var checked := 0
 	# Los cuatro triángulos de esquina de cada celda: cubren las dos formas
@@ -204,14 +188,10 @@ func _sweep_gap() -> void:
 	for iz in _samples - 1:
 		for ix in _samples - 1:
 			var row := iz * _samples + ix
-			var h00 := _heights[row]
-			var h10 := _heights[row + 1]
-			var h01 := _heights[row + _samples]
-			var h11 := _heights[row + _samples + 1]
-			var along_low := h10 - h00
-			var along_high := h11 - h01
-			var across_low := h01 - h00
-			var across_high := h11 - h10
+			var along_low := _heights[row + 1] - _heights[row]
+			var along_high := _heights[row + _samples + 1] - _heights[row + _samples]
+			var across_low := _heights[row + _samples] - _heights[row]
+			var across_high := _heights[row + _samples + 1] - _heights[row + 1]
 			var steep := maxf(maxf(absf(along_low), absf(along_high)),
 					maxf(absf(across_low), absf(across_high)))
 			if steep * steep * 2.0 <= GAP_FROM_SQ:
@@ -226,10 +206,8 @@ func _sweep_gap() -> void:
 				checked += 1
 				# Centro del triángulo de esa esquina, y un punto apenas fuera
 				# de la cara, del lado de arriba.
-				var cx := 0.33 if int(corner.z) % 2 == 0 else 0.67
-				var cz := 0.33 if int(corner.z) < 2 else 0.67
-				var x := float(ix) + cx - half
-				var z := float(iz) + cz - half
+				var x := float(ix) + (0.33 if int(corner.z) % 2 == 0 else 0.67) - half
+				var z := float(iz) + (0.33 if int(corner.z) < 2 else 0.67) - half
 				var normal := Vector3(-corner.x, 1.0, -corner.y).normalized()
 				var at := Vector3(x, _collider_height(x, z), z) + normal * TOUCH_OFFSET
 				query.transform = Transform3D(Basis(), at)
@@ -239,14 +217,7 @@ func _sweep_gap() -> void:
 						notes.append("ground face at (%.1f, %.1f, %.1f) slope=%.1f" % [
 								x, at.y, z, rad_to_deg(atan(sqrt(slope_sq)))])
 					break
-	var rock := 0
-	for node: Node in _bounds.get_children():
-		if node is CliffWall:
-			rock += _gap_rock(node as CliffWall, notes)
-	print("Relief sweep: gap faces=%d ground=%d rock=%d checked=%d" % [
-			ground + rock, ground, rock, checked])
-	for note: String in notes:
-		print("Relief sweep detail: gap %s" % note)
+	return Vector2i(ground, checked)
 
 
 ## Caras de `wall` entre 45 y 60 grados que asoman sobre el suelo.
@@ -290,8 +261,8 @@ func _spawn_xz() -> Vector2:
 ## Celdas abiertas que `home` no alcanza con los pasos `next` y celdas
 ## abiertas que no vuelven a `home`. Devuelve las que cumplen las dos cosas.
 func _sweep_reach(who: String, home: int, next: PackedInt32Array) -> PackedByteArray:
-	var forward := graph.reach(home, next)
-	var back := graph.reach_back(home, next)
+	var forward := ReliefSearch.reach(graph, home, next)
+	var back := ReliefSearch.reach_back(graph, home, next)
 	var open := 0
 	var unreachable := 0
 	var no_return := 0
@@ -322,157 +293,6 @@ func _sweep_reach(who: String, home: int, next: PackedInt32Array) -> PackedByteA
 func _cell_text(index: int) -> String:
 	var at := graph.stand(index)
 	return "(%.1f, %.1f, %.1f)" % [at.x, at.y, at.z]
-
-
-# --- colocación --------------------------------------------------------------------
-
-## Props del scatter: nada sobre un corte, rampa o puente, nada enterrado ni
-## flotando, y mesetas y plataformas lejos de los cortes.
-func _check_props(bad: Dictionary, notes: Array[String]) -> int:
-	var count := 0
-	for node: Node in _bounds.get_children():
-		var prop := node as Node3D
-		if prop == null or prop is CliffWall or prop is Bridge or prop is RockFormation:
-			continue
-		count += 1
-		var xz := Vector2(prop.global_position.x, prop.global_position.z)
-		var near := _terrain.relief_distance(xz, 24.0)
-		var what := "prop %s" % prop.scene_file_path.get_file()
-		if near < ON_RELIEF_PROP:
-			_flag(bad, "on_relief", notes, what, prop.global_position)
-		if not _settled(prop):
-			_flag(bad, "misplaced", notes, what, prop.global_position)
-		var reach := 0.0
-		if prop.scene_file_path == ReliefGraph.DECK_SCENES[0]:
-			reach = PLATFORM_REACH * prop.scale.x
-		elif prop.scene_file_path == ReliefGraph.DECK_SCENES[1]:
-			reach = RAMP_REACH * prop.scale.x
-		if reach > 0.0 and near - reach < CROWDING:
-			_flag(bad, "crowding", notes, what, prop.global_position)
-	return count
-
-
-## POIs: fuera de cortes, rampas y puentes, apoyados, y en una celda que un
-## raider alcanza y de la que vuelve. Uno ya gastado no cuenta: se está
-## hundiendo (Interactable.sink_away) y nadie tiene que llegar a él.
-func _check_pois(bad: Dictionary, notes: Array[String]) -> int:
-	var count := 0
-	for node: Node in _arena.find_children("*", "Node3D", true, false):
-		var poi := node as Interactable
-		if poi == null or poi.is_queued_for_deletion() or not poi.is_inside_tree() \
-				or not poi.available:
-			continue
-		count += 1
-		var at := poi.global_position
-		var xz := Vector2(at.x, at.z)
-		var what := "poi %s" % poi.name
-		if _terrain.relief_distance(xz, ON_RELIEF_PROP) < ON_RELIEF_PROP:
-			_flag(bad, "on_relief", notes, what, at)
-		if not _settled(poi):
-			_flag(bad, "misplaced", notes, what, at)
-		if not raider_reaches(graph.nearest_open(xz, POI_REACH, at.y, LEVEL_WINDOW)):
-			_flag(bad, "raider_unreachable", notes, what, at)
-	return count
-
-
-## Spawns muestreados del anillo y de la banda de oleadas alrededor del
-## raider líder: fuera del relieve, apoyados y donde la horda llega y vuelve.
-func _check_spawns(bad: Dictionary, notes: Array[String]) -> int:
-	var spawner: EnemySpawner = null
-	for node: Node in _tree.get_nodes_in_group(&"enemy_spawner"):
-		if _arena.is_ancestor_of(node):
-			spawner = node as EnemySpawner
-	var lead := Coop.nearest_player(_tree, Vector3.ZERO)
-	if spawner == null or lead == null:
-		return 0
-	var points: SpawnPoints = spawner.get("_points")
-	var count := 0
-	for sample in SPAWN_SAMPLES * 2:
-		var at := spawner.ring_position(lead)
-		var what := "ring spawn"
-		if sample >= SPAWN_SAMPLES:
-			what = "band spawn"
-			at = points.on_ground(points.band_position(lead.global_position,
-					spawner.surge_min_radius, spawner.surge_max_radius, randf() * TAU))
-		count += 1
-		var xz := Vector2(at.x, at.z)
-		if _terrain.relief_distance(xz, ON_RELIEF_SPAWN) < ON_RELIEF_SPAWN:
-			_flag(bad, "on_relief", notes, what, at)
-		if _buried(at, []) or at.y - _floor_under(at, []) > SETTLE:
-			_flag(bad, "misplaced", notes, what, at)
-		var cell := graph.nearest_open(xz, SPAWN_REACH, at.y, LEVEL_WINDOW)
-		if cell == ReliefGraph.NONE or _horde_ok[cell] == 0:
-			_flag(bad, "horde_unreachable", notes, what, at)
-	return count
-
-
-## Formaciones de la máscara: ninguna pegada al borde o al pie de un corte.
-func _check_formations(bad: Dictionary, notes: Array[String]) -> void:
-	var cell_size := float(_bounds.call(&"cell_size"))
-	var reach := cell_size * 0.7072 + FORMATION_SKIRT
-	var raw: Variant = _bounds.call(&"blocked_cells")
-	if not (raw is Array):
-		return
-	for cell: Variant in (raw as Array):
-		var center: Vector2 = _bounds.call(&"cell_center", cell)
-		if _terrain.relief_distance(center, reach + CROWDING) - reach < CROWDING:
-			_flag(bad, "crowding", notes, "formation cell",
-					Vector3(center.x, _terrain.height_at(center.x, center.y), center.y))
-
-
-func _flag(bad: Dictionary, key: String, notes: Array[String], what: String,
-		at: Vector3) -> void:
-	bad[key] = int(bad[key]) + 1
-	if notes.size() < DETAIL_LIMIT * 2:
-		notes.append("%s: %s at (%.1f, %.1f, %.1f)" % [key, what, at.x, at.y, at.z])
-
-
-## True si `node` está apoyado: nada sólido encima (enterrado) y un piso a
-## SETTLE metros o menos por debajo (flotando), sin contar sus propios cuerpos.
-func _settled(node: Node3D) -> bool:
-	var own: Array[RID] = []
-	if node is CollisionObject3D:
-		own.append((node as CollisionObject3D).get_rid())
-	for child: Node in node.find_children("*", "CollisionObject3D", true, false):
-		own.append((child as CollisionObject3D).get_rid())
-	var at := node.global_position
-	if _buried(at, own):
-		return false
-	return at.y - _floor_under(at, own) <= SETTLE
-
-
-## True si sobre `at` hay suelo, roca o un tablero: está enterrado. Un prop
-## encima (la copa de otro árbol del borde) no entierra a nadie.
-func _buried(at: Vector3, own: Array[RID]) -> bool:
-	var excluded: Array[RID] = _raiders.duplicate()
-	excluded.append_array(own)
-	var space := _terrain.get_world_3d().direct_space_state
-	var ray := PhysicsRayQueryParameters3D.create(
-			Vector3(at.x, _terrain.max_height + 30.0, at.z), at + Vector3.UP * (SETTLE + 0.05),
-			ReliefGraph.WORLD_LAYER)
-	for attempt in ReliefGraph.MAX_RAY_PASSES:
-		ray.exclude = excluded
-		var hit := space.intersect_ray(ray)
-		if hit.is_empty():
-			return false
-		if graph._is_ground(hit["collider"]) or hit["collider"] is RockFormation:
-			return true
-		excluded.append(hit["rid"])
-	return false
-
-
-## Altura del primer piso bajo `at` (desde SETTLE metros por encima), o
-## -INF si no hay nada en 3 m.
-func _floor_under(at: Vector3, own: Array[RID]) -> float:
-	var excluded: Array[RID] = _raiders.duplicate()
-	excluded.append_array(own)
-	var ray := PhysicsRayQueryParameters3D.create(at + Vector3.UP * SETTLE,
-			at + Vector3.DOWN * 3.0, ReliefGraph.WORLD_LAYER)
-	ray.exclude = excluded
-	var hit := _terrain.get_world_3d().direct_space_state.intersect_ray(ray)
-	if hit.is_empty():
-		return -INF
-	return (hit["position"] as Vector3).y
 
 
 # --- pendiente e infierno ----------------------------------------------------------

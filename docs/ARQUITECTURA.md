@@ -1826,8 +1826,10 @@ En una arena con relieve por zonas trabaja además `ReliefProbe`
 | Archivo | Qué hace |
 | --- | --- |
 | `relief_graph.gd` (`ReliefGraph`) | El mapa como lo ve la física: una celda por metro cuadrado con el piso que encuentra un rayo desde arriba (el `Terrain`, la cornisa de un corte, un puente, una meseta y su rampa; lo demás es obstáculo) y adónde lleva cada una de las ocho direcciones para un raider y para la horda. |
-| `relief_sweeps.gd` (`ReliefSweeps`) | Los barridos: una línea `Relief sweep:` cada uno. |
-| `relief_nav.gd` (`ReliefNav`) | El ruteo del bot: el próximo punto del camino a su destino por rampas y puentes, y cuándo saltar. La celda de un cuerpo es la más cercana **a su altura** (al pie de un corte, la más cercana a secas es una de arriba). La búsqueda del camino se reparte en frames (`SEARCH_BUDGET` celdas por frame): recorrer el mapa de una vez es un tirón de más de 100 ms en las líneas `Perf`. Sin grafo devuelve el destino tal cual. |
+| `relief_search.gd` (`ReliefSearch`) | Los recorridos sobre el grafo: qué celdas se alcanzan desde una, desde cuáles se llega a una, y el camino de un raider entre dos (una búsqueda repartida en frames). |
+| `relief_sweeps.gd` (`ReliefSweeps`) | Los barridos: una línea `Relief sweep:` cada uno (hueco 45-60, alcance, pendiente, infierno). |
+| `relief_placement.gd` (`ReliefPlacement`) | El barrido de colocación (`Relief sweep: placement …`): props, POIs, spawns y formaciones contra los cortes, con sus tolerancias. |
+| `relief_nav.gd` (`ReliefNav`) | El ruteo del bot: el próximo punto del camino a su destino por rampas y puentes, y cuándo saltar. La celda de un cuerpo es la más cercana **a su altura** (al pie de un corte, la más cercana a secas es una de arriba). La búsqueda del camino (`ReliefSearch.begin` / `advance`) se reparte en frames (`SEARCH_BUDGET` celdas por frame): recorrer el mapa de una vez es un tirón de más de 100 ms en las líneas `Perf`. Sin grafo devuelve el destino tal cual. |
 | `relief_probe.gd` (`ReliefProbe`) | Agenda los barridos (10 frames tras el cambio de etapa y la colocación otra vez a los 120 s), el paseo y `BONK_HOLD_AT`. El frame de un barrido (unos 0.7 s el de comienzo de etapa) no entra en las líneas `Perf`: `PerfMeter.skip_frame()`. |
 
 - **Celda abierta**: su piso tiene menos de 45 grados, no cae en una
