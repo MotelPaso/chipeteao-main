@@ -4,7 +4,11 @@ extends Node3D
 ## parezca una isla flotando en el cielo:
 ##
 ## - Un disco de suelo enorme y plano, apenas bajo la hondonada más honda,
-##   con el tinte del bioma: más allá de los muros "la tierra sigue".
+##   con el tinte del bioma: más allá de los muros "la tierra sigue". En una
+##   arena con relieve por zonas (Terrain.has_relief) el disco pasa a ser un
+##   MARCO alrededor de la arena, al nivel de su borde: un plano entero bajo
+##   el fondo del barranco dejaría un escalón de metros en el borde, y a
+##   nivel del borde taparía el barranco.
 ## - Dos anillos de colinas de silueta (esferas aplastadas) fuera del
 ##   perímetro, más oscuras con la distancia, para que el horizonte tenga
 ##   forma y no una costura recta.
@@ -22,6 +26,11 @@ extends Node3D
 ## Metros bajo la hondonada más honda del terreno donde queda el disco, para
 ## que los bordes nunca parpadeen (z-fighting).
 @export var ground_drop: float = 0.35
+## Con relieve por zonas: metros bajo el borde de la arena donde queda el
+## marco de suelo lejano, y metros que se mete bajo ese borde para no dejar
+## una rendija.
+@export var rim_drop: float = 0.05
+@export var rim_overlap: float = 0.5
 
 @export_group("Colinas del horizonte")
 ## Color de las colinas del anillo cercano.
@@ -71,7 +80,13 @@ var _half_extent: float = 80.0
 
 func _ready() -> void:
 	_half_extent = _arena_half_extent()
-	_build_ground(_ground_depth())
+	var terrain := Terrain.find(get_tree())
+	if terrain != null:
+		terrain.ensure_built()
+	if terrain != null and terrain.has_relief():
+		_build_ground_frame()
+	else:
+		_build_ground(_ground_depth())
 	_build_hill_ring(hill_count, near_ring_min_factor, near_ring_max_factor,
 			_hill_material(hill_color))
 	_build_hill_ring(far_hill_count, far_ring_min_factor, far_ring_max_factor,
@@ -114,6 +129,33 @@ func _build_ground(depth: float) -> void:
 	ground.position.y = -depth
 	ground.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(ground)
+
+
+## El suelo lejano como un marco de cuatro planos alrededor de la arena, a
+## rim_drop bajo su borde (que el Terrain deja a 0). PlaneMesh a propósito:
+## HellSky reconoce el suelo lejano por ese tipo de malla al teñirlo.
+func _build_ground_frame() -> void:
+	var material := StandardMaterial3D.new()
+	material.albedo_color = ground_color
+	material.roughness = 1.0
+	var inner := _half_extent - rim_overlap
+	var outer := maxf(ground_size * 0.5, inner + 1.0)
+	var band := outer - inner
+	var middle := (outer + inner) * 0.5
+	# Norte y sur de lado a lado; este y oeste, lo que queda entre los dos.
+	var pieces: Array[Rect2] = [
+		Rect2(0.0, -middle, outer * 2.0, band), Rect2(0.0, middle, outer * 2.0, band),
+		Rect2(-middle, 0.0, band, inner * 2.0), Rect2(middle, 0.0, band, inner * 2.0),
+	]
+	for piece: Rect2 in pieces:
+		var ground := MeshInstance3D.new()
+		var mesh := PlaneMesh.new()
+		mesh.size = piece.size
+		ground.mesh = mesh
+		ground.material_override = material
+		ground.position = Vector3(piece.position.x, -rim_drop, piece.position.y)
+		ground.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		add_child(ground)
 
 
 ## Un anillo de colinas (esferas aplastadas) de tamaño aleatorio entre los

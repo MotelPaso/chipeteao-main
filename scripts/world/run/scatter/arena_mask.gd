@@ -47,6 +47,9 @@ var _rng: RandomNumberGenerator
 ## Celdas bloqueadas (coordenadas de cuadrícula -> true) y celdas por lado.
 var _blocked: Dictionary[Vector2i, bool] = {}
 var _cells_per_side: int = 0
+## Aristas entre celdas vecinas que no se cruzan a pie: las separa un corte
+## del relieve por zonas (ver ReliefQueries.mask_barriers). Vacío sin relieve.
+var _barriers: Dictionary[Vector3i, bool] = {}
 
 
 func _init(rng: RandomNumberGenerator) -> void:
@@ -55,10 +58,15 @@ func _init(rng: RandomNumberGenerator) -> void:
 
 ## Construye la máscara de la etapa e imprime `Arena mask:`. `protected_seeds`
 ## son los puntos planos donde nunca hay roca (el spawn y los keepouts de
-## autor), en el orden en que el scatter los recorre.
-func build(protected_seeds: Array[Vector2]) -> void:
+## autor), en el orden en que el scatter los recorre. Una arena con relieve
+## por zonas pasa además `keep_open` (celdas que el relieve necesita sin
+## roca) y `barriers` (aristas que un corte vuelve infranqueables a pie).
+func build(protected_seeds: Array[Vector2], keep_open: Dictionary[Vector2i, bool] = {},
+		barriers: Dictionary[Vector3i, bool] = {}) -> void:
 	_cells_per_side = maxi(ceili(half_extent * 2.0 / cell_size), 3)
+	_barriers = barriers
 	var protected := _protected_cells(protected_seeds)
+	protected.merge(keep_open)
 	var formations := _rng.randi_range(blobs_min, blobs_max)
 	for attempt in 4:
 		_blocked.clear()
@@ -357,11 +365,21 @@ func _reachable_cells() -> Dictionary[Vector2i, bool]:
 		var cell: Vector2i = frontier.pop_back()
 		for step: Vector2i in STEPS:
 			var next := cell + step
-			if not _in_grid(next) or reached.has(next) or _blocked.has(next):
+			if not _in_grid(next) or reached.has(next) or _blocked.has(next) \
+					or _barred(cell, next):
 				continue
 			reached[next] = true
 			frontier.append(next)
 	return reached
+
+
+## True si un corte del relieve separa dos celdas vecinas. La llave de una
+## arista es su celda de menor coordenada más el eje (0 = +x, 1 = +y).
+func _barred(from: Vector2i, to: Vector2i) -> bool:
+	if _barriers.is_empty():
+		return false
+	return _barriers.has(Vector3i(mini(from.x, to.x), mini(from.y, to.y),
+			0 if from.y == to.y else 1))
 
 
 ## Desbloquea una escalera de celdas desde `from` hasta la celda alcanzada

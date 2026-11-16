@@ -1,13 +1,22 @@
 class_name Terrain
 extends StaticBody3D
-## El suelo de una arena: un heightmap suave de baja amplitud (lomas que se
-## caminan, hondonadas a las que se baja) más los claros planos donde se
-## apoyan los grupos de verticalidad de autor y las mesetas.
+## El suelo de una arena. Dos formas, según el export `relief`:
 ##
-## Relieve BAJO a propósito: la horda no tiene navmesh, persigue en línea
-## recta y trepa lo que la bloquea, así que un terreno que esconda a un
-## raider o corte una persecución rompería el juego. La amplitud es de
-## 1.5-3.0 m según el bioma; el relieve da lectura (sabes dónde estás) y silueta.
+## - Sin `relief` (Dunas de Ceniza, Ciénaga Lóbrega): un heightmap suave de
+##   baja amplitud (lomas que se caminan, hondonadas a las que se baja) más
+##   los claros planos donde se apoyan los grupos de verticalidad de autor y
+##   las mesetas. La amplitud es de 1.5-3.0 m según el bioma.
+## - Con `relief` (Bosque Hueco): RELIEVE POR ZONAS. Sobre ese mismo suelo
+##   suave van zonas elevadas con acantilado, un barranco, las rampas que
+##   entran a cada una y un puente. La altura va en los cortes y en las
+##   pendientes largas; dentro de cada zona el suelo sigue igual de suave.
+##
+## La regla que el relieve por zonas no puede romper: la horda no tiene
+## navmesh, persigue en línea recta y trepa lo que la bloquea. Por eso todo
+## corte mide menos de lo que un enemigo trepa de una vez, toda cara es
+## claramente caminable o claramente pared (nunca entre 45 y 60 grados), y a
+## toda zona se entra caminando por alguna rampa. El trazado lo sortea
+## ReliefPlanner y vive en scripts/world/run/terrain/.
 ##
 ## Se siembra con la semilla de partida del SCATTER (`run_seed()`, válida
 ## desde su _enter_tree), así BONK_GAME_SEED y la Cacería diaria
@@ -17,6 +26,8 @@ extends StaticBody3D
 ## (hijos primero) y DESPUÉS del _enter_tree del scatter, así la máscara y
 ## los sitios de meseta ya existen. Quien pueda correr su _ready antes
 ## (Backdrop es el hijo #2) llama primero a ensure_built(), que es idempotente.
+## El trazado del relieve por zonas se decide ANTES que la máscara: el
+## scatter llama a plan_relief() en su _enter_tree.
 ##
 ## Regla del null: quien consulta desde on_stage_started en adelante trata
 ## un find() nulo como un push_error único (el terreno ya debería existir);
@@ -24,7 +35,9 @@ extends StaticBody3D
 ## silencio y se (re)construye cuando empieza la etapa.
 ##
 ## LA regla de colocación del proyecto: nada va a y = 0. Toda colocación en
-## el mundo pasa por height_at().
+## el mundo pasa por height_at(), que responde la superficie DONDE SE PISA
+## (cornisas de roca incluidas). Y nada se coloca sobre un corte, una rampa o
+## un puente: eso se pregunta con arena_bounds.can_place().
 
 ## Lado del terreno en metros cuando no hay scatter en la escena (una escena
 ## de prueba); en una arena el lado sale de arena_half_extent del scatter.
@@ -49,6 +62,11 @@ const FALLBACK_MAP_TINT := Color(0.25, 0.27, 0.3)
 ## con FastNoiseLite desde GDScript es el costo dominante del nodo; a 2 m
 ## cuesta un cuarto y a esta amplitud no se nota la diferencia.
 @export var noise_step: float = 2.0
+## Relieve por zonas de esta arena: zonas elevadas, barranco, rampas y puente
+## (un .tres de assets/world/, ver ReliefSettings). Vacío = el suelo suave de
+## siempre. Con él, `amplitude` es la ondulación DENTRO de cada zona, y la
+## malla va a 2 m con parches de 1 m junto a los cortes (mesh_step no se usa).
+@export var relief: ReliefSettings
 
 @export_group("Claros planos")
 ## Radio en metros del disco plano bajo el spawn del equipo, para que nadie caiga en una pendiente.
@@ -90,6 +108,13 @@ var max_height: float = 0.0
 ## Muestras del colisionador por lado (241 para una arena de 240 m a 1 m).
 var _samples: int = 0
 var _heights: PackedFloat32Array = PackedFloat32Array()
+## Alturas donde se pisa, que es lo que responde height_at(). Sin relieve por
+## zonas es el mismo arreglo que _heights; con él, _heights lleva el escalón
+## de cada corte escondido bajo su cornisa de roca (ver ReliefField).
+var _surface: PackedFloat32Array = PackedFloat32Array()
+## Trazado y rejillas del relieve por zonas; null sin `relief`.
+var _layout: ReliefLayout = null
+var _field: ReliefField = null
 var _built: bool = false
 ## Discos planos aplicados tras el ruido: {center, radius}. Vienen del
 ## spawn, de los keepouts de autor y de los sitios de meseta del scatter.
@@ -125,8 +150,13 @@ func ensure_built() -> void:
 	var started := Time.get_ticks_msec()
 	size = _arena_size()
 	_samples = int(round(size / SAMPLE_METERS)) + 1
+	plan_relief(_run_seed(), size * 0.5)
 	_collect_pads()
-	_build_heights()
+	if _layout != null:
+		_build_relief()
+	else:
+		_build_heights()
+		_surface = _heights
 	_build_mesh()
 	_build_collider()
 	# Log de una línea para los soaks headless: sin él, un terreno que salió
@@ -134,6 +164,50 @@ func ensure_built() -> void:
 	print("Terrain built: %s samples=%dx%d mesh_step=%.0f min=%.1f max=%.1f in %d ms" % [
 			_biome_name(), _samples, _samples, mesh_step, min_height, max_height,
 			Time.get_ticks_msec() - started])
+	if _layout != null:
+		print(ReliefQueries.summary(_layout, _biome_name()))
+
+
+## Decide el trazado del relieve por zonas de la etapa; null (y no hace nada)
+## si la arena no tiene `relief`. Idempotente. Es puro cálculo y no necesita
+## el árbol: el scatter lo llama en su _enter_tree, antes de armar su máscara
+## y elegir sus mesetas, cuando este nodo todavía no entró.
+func plan_relief(run_seed: int, half_extent: float) -> ReliefLayout:
+	if relief != null and _layout == null:
+		_layout = ReliefPlanner.plan(relief, run_seed, half_extent)
+	return _layout
+
+
+## El trazado del relieve por zonas, o null si la arena no lo tiene.
+func relief_layout() -> ReliefLayout:
+	return _layout
+
+
+## True si esta arena tiene relieve por zonas (cortes, rampas, puente).
+func has_relief() -> bool:
+	return _layout != null
+
+
+## Metros de `xz` al corte, rampa o puente más cercano (0 encima de uno);
+## INF sin relieve por zonas o si no hay nada dentro de `limit` metros.
+func relief_distance(xz: Vector2, limit: float) -> float:
+	return ReliefQueries.distance(_layout, xz, limit) if _layout != null else INF
+
+
+## LA consulta de solo lectura del relieve de la etapa: cruces, cortes,
+## fondos, rampas y sitios planos donde cabe una estructura. Vacío sin
+## relieve por zonas. El formato está en ReliefQueries.features().
+func relief_features() -> Dictionary:
+	if _layout == null:
+		return {}
+	ensure_built()
+	return ReliefQueries.features(_layout, self)
+
+
+## Altura del suelo SIN zonas en un XZ: lo que habría bajo una zona elevada
+## o sobre el barranco. La usa la roca de los cortes para apoyar cada lado.
+func base_height_at(x: float, z: float) -> float:
+	return _field.base_at(x, z) if _field != null else height_at(x, z)
 
 
 ## Altura del suelo en un XZ de mundo, interpolada sobre la cuadrícula del
@@ -151,10 +225,10 @@ func height_at(x: float, z: float) -> float:
 	var nz := mini(iz + 1, _samples - 1)
 	var tx := fx - float(ix)
 	var tz := fz - float(iz)
-	var h00 := _heights[iz * _samples + ix]
-	var h10 := _heights[iz * _samples + nx]
-	var h01 := _heights[nz * _samples + ix]
-	var h11 := _heights[nz * _samples + nx]
+	var h00 := _surface[iz * _samples + ix]
+	var h10 := _surface[iz * _samples + nx]
+	var h01 := _surface[nz * _samples + ix]
+	var h11 := _surface[nz * _samples + nx]
 	return lerpf(lerpf(h00, h10, tx), lerpf(h01, h11, tx), tz)
 
 
@@ -257,6 +331,17 @@ func _own_arena() -> Node:
 	return node
 
 
+## Las alturas del relieve por zonas (ver ReliefField): los claros se aplanan
+## al nivel de SU suelo, no a 0, y las zonas van encima.
+func _build_relief() -> void:
+	_field = ReliefField.new()
+	_field.build(_layout, self, _run_seed(), _samples, _pads)
+	_heights = _field.heights
+	_surface = _field.surface
+	min_height = _field.min_height
+	max_height = _field.max_height
+
+
 func _build_heights() -> void:
 	var noise := FastNoiseLite.new()
 	noise.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH
@@ -336,15 +421,16 @@ func _apply_pads(x: float, z: float, h: float) -> float:
 	return lerpf(h, 0.0, flat)
 
 
-## Malla de render desde arreglos empaquetados: SurfaceTool sobre una
-## cuadrícula de este tamaño son cientos de miles de llamadas de GDScript y
-## tarda segundos; esto es una sola add_surface_from_arrays.
+## Malla de render desde arreglos empaquetados (TerrainMesh): la cuadrícula
+## de mesh_step metros, o la del relieve por zonas, con parches de 1 m junto
+## a los cortes (ReliefMesh).
 func _build_mesh() -> void:
-	var cells := maxi(int(round(size / maxf(mesh_step, 0.5))), 2)
-	var arrays := _grid_arrays(cells + 1)
-	var indices := _grid_indices(cells)
-	_assert_winding(arrays[Mesh.ARRAY_VERTEX], indices)
-	arrays[Mesh.ARRAY_INDEX] = indices
+	var arrays: Array
+	if _field != null:
+		arrays = ReliefMesh.arrays(_field, _samples, size)
+	else:
+		arrays = TerrainMesh.grid(self)
+	TerrainMesh.assert_winding(arrays[Mesh.ARRAY_VERTEX], arrays[Mesh.ARRAY_INDEX])
 	var mesh := ArrayMesh.new()
 	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
 	_mesh_instance = get_node_or_null("MeshInstance3D") as MeshInstance3D
@@ -355,87 +441,6 @@ func _build_mesh() -> void:
 	_mesh_instance.mesh = mesh
 	if surface_material != null:
 		_mesh_instance.material_override = surface_material
-
-
-## Vértices, normales y UVs de una cuadrícula de `verts` x `verts` puntos a
-## mesh_step metros, sobre la altura del colisionador.
-func _grid_arrays(verts: int) -> Array:
-	var vertices := PackedVector3Array()
-	var normals := PackedVector3Array()
-	var uvs := PackedVector2Array()
-	vertices.resize(verts * verts)
-	normals.resize(verts * verts)
-	uvs.resize(verts * verts)
-	var half := size * 0.5
-	for iz in verts:
-		var z := -half + float(iz) * mesh_step
-		for ix in verts:
-			var x := -half + float(ix) * mesh_step
-			var index := iz * verts + ix
-			vertices[index] = Vector3(x, height_at(x, z), z)
-			# Normal analítica desde las diferencias de altura a cada lado:
-			# diferencia central sobre un paso de malla, la misma pendiente
-			# que tiene el colisionador.
-			var dx := height_at(x + mesh_step, z) - height_at(x - mesh_step, z)
-			var dz := height_at(x, z + mesh_step) - height_at(x, z - mesh_step)
-			normals[index] = Vector3(-dx, 2.0 * mesh_step, -dz).normalized()
-			# UVs en XZ de mundo: los shaders de suelo del bioma leen la
-			# posición de mundo.
-			uvs[index] = Vector2(x, z)
-	var arrays := []
-	arrays.resize(Mesh.ARRAY_MAX)
-	arrays[Mesh.ARRAY_VERTEX] = vertices
-	arrays[Mesh.ARRAY_NORMAL] = normals
-	arrays[Mesh.ARRAY_TEX_UV] = uvs
-	return arrays
-
-
-## Dos triángulos por celda de una cuadrícula de `cells` x `cells`.
-## ORIENTACIÓN. La cara frontal en Godot es la HORARIA vista de frente, así
-## que un suelo para caminar debe ser horario visto desde +Y, o sea
-## cross(v1 - v0, v2 - v0) apunta hacia ABAJO. Al revés, todo el terreno se
-## descarta por cara trasera desde cualquier cámara de arriba y ningún log lo
-## dice: los soaks corren headless y no rasterizan nada. _assert_winding hace
-## que ese error falle un soak headless.
-func _grid_indices(cells: int) -> PackedInt32Array:
-	var verts := cells + 1
-	var indices := PackedInt32Array()
-	indices.resize(cells * cells * 6)
-	var cursor := 0
-	for iz in cells:
-		for ix in cells:
-			var top_left := iz * verts + ix
-			var top_right := top_left + 1
-			var bottom_left := top_left + verts
-			var bottom_right := bottom_left + 1
-			indices[cursor] = top_left
-			indices[cursor + 1] = top_right
-			indices[cursor + 2] = bottom_left
-			indices[cursor + 3] = top_right
-			indices[cursor + 4] = bottom_right
-			indices[cursor + 5] = bottom_left
-			cursor += 6
-	return indices
-
-
-## Comprueba hacia dónde miran los triángulos, lo único de esta malla que
-## un soak headless no ve. Revisa solo el PRIMER triángulo: todas las celdas
-## salen de las mismas tres líneas, así que si uno está al revés lo están todos.
-##
-## `up` es la normal de MANO DERECHA del triángulo tal como está listado.
-## Godot descarta el lado antihorario, así que una cara visible desde arriba
-## lista sus vértices en sentido horario visto desde +Y y su normal de mano
-## derecha apunta ABAJO. Una Y positiva es el error.
-func _assert_winding(vertices: PackedVector3Array, indices: PackedInt32Array) -> void:
-	if indices.size() < 3:
-		return
-	var v0 := vertices[indices[0]]
-	var v1 := vertices[indices[1]]
-	var v2 := vertices[indices[2]]
-	var up := (v1 - v0).cross(v2 - v0)
-	if up.y >= 0.0:
-		push_error("Terrain: ground triangles wound the wrong way — "
-				+ "the whole surface is back-face culled from above")
 
 
 ## HeightMapShape3D en la capa 1, una muestra por unidad de mundo, nodo sin escalar.

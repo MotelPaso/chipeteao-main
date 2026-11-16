@@ -1,0 +1,8 @@
+[gd_resource type="Resource" script_class="ReliefSettings" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/world/run/terrain/relief_settings.gd" id="1_relief"]
+[ext_resource type="PackedScene" path="res://scenes/world/props/Bridge.tscn" id="2_bridge"]
+
+[resource]
+script = ExtResource("1_relief")
+bridge_scene = ExtResource("2_bridge")

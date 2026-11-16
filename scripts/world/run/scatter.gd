@@ -117,6 +117,23 @@ extends Node3D
 ## Radio en metros alrededor de una meseta que debe quedar libre de celdas
 ## bloqueadas: la plataforma más grande más el alcance de la rampa.
 @export var mesa_clearance: float = 12.0
+## Cofre que llevan encima las primeras mesetas de la etapa (vacío = ninguna).
+@export var mesa_chest_scene: PackedScene
+## Cuántas mesetas llevan un cofre encima.
+@export var mesa_chest_count: int = 0
+## Altura del tablero de la plataforma a escala 1, en metros: ahí se apoya
+## el cofre de una meseta.
+@export var mesa_deck_height: float = 2.0
+
+@export_group("Relieve por zonas")
+## Solo cuenta si el Terrain de la arena tiene `relief`. Metros que los props
+## interiores guardan a cualquier corte, rampa o puente.
+@export var relief_prop_clearance: float = 5.0
+## Metros que el centro de una meseta guarda a cualquier corte, rampa o
+## puente: su claro plano (pad_radius + pad_blend del Terrain) no puede pisarlos.
+@export var relief_mesa_clearance: float = 18.0
+## Metros alrededor del centro de una meseta donde can_place() dice que no.
+@export var relief_mesa_keepout: float = 9.0
 
 @export_group("Formaciones de roca")
 ## Aspecto de las formaciones de roca de este bioma (un .tres en
@@ -178,6 +195,9 @@ var _mask: ArenaMask = null
 var _run_seed: int = 0
 ## Centros planos de las mesetas de esta etapa (ver mesa_sites).
 var _mesa_sites: PackedVector2Array = PackedVector2Array()
+## El Terrain de esta arena (ver _arena_terrain); se busca una sola vez.
+var _terrain: Terrain = null
+var _terrain_sought: bool = false
 ## Posiciones planas de los props interiores ya puestos y de los keepouts.
 var _placed_xz: PackedVector2Array = PackedVector2Array()
 var _keepouts_xz: PackedVector2Array = PackedVector2Array()
@@ -201,10 +221,17 @@ func _enter_tree() -> void:
 	# con esto en SU _ready, y el relieve tiene que coincidir con los props
 	# sea cual sea el orden en que se construyen.
 	_run_seed = int(_rng.seed)
+	# El relieve por zonas se decide ANTES que la máscara y las mesetas: las
+	# dos tienen que rodear sus cortes. Sin relieve, layout es null y nada cambia.
+	var terrain := _arena_terrain()
+	var layout := terrain.plan_relief(_run_seed, arena_half_extent) if terrain != null else null
 	# La máscara debe existir antes del _ready del Terrain y antes de que el
 	# WorldDirector baraje los interactuables (desde Arena._ready).
 	_mask = _new_mask()
-	if mask_enabled:
+	if mask_enabled and layout != null:
+		_mask.build(_protected_seeds(), ReliefQueries.mask_cells(layout, mask_cell_size),
+				ReliefQueries.mask_barriers(layout, mask_cell_size))
+	elif mask_enabled:
 		_mask.build(_protected_seeds())
 	# Sitios de meseta justo después de la máscara: el Terrain los lee como
 	# claros planos en su _ready, y place_props() construye cada meseta.
@@ -230,6 +257,7 @@ func mesa_sites() -> PackedVector2Array:
 func place_props() -> void:
 	if mask_enabled:
 		_raise_formations()
+	ReliefDressing.raise(self, _arena_terrain(), formation_style, _run_seed)
 	_build_mesas()
 	for node: Node in get_tree().get_nodes_in_group("scatter_keepout"):
 		var spot := node as Node3D
@@ -278,6 +306,21 @@ func is_walkable(xz: Vector2) -> bool:
 	return _mask.is_walkable(xz)
 
 
+## True si en `xz` se puede COLOCAR algo (un POI, un spawn, un cofre, un
+## jefe): celda abierta de la máscara y, con relieve por zonas, a `margin`
+## metros o más de todo corte, rampa y puente y fuera de las mesetas. Es la
+## pregunta de quien pone cosas; is_walkable sigue siendo solo la máscara.
+func can_place(xz: Vector2, margin: float = 0.0) -> bool:
+	return _mask.is_walkable(xz) and ReliefDressing.clear(_arena_terrain(), xz, margin,
+			_mesa_sites, relief_mesa_keepout)
+
+
+## El punto donde se puede colocar algo más cercano a `xz` (ver can_place):
+## el mismo `xz` si sirve. Para lo que cae donde murió alguien. Sin RNG.
+func nearest_place(xz: Vector2, margin: float = 0.0) -> Vector2:
+	return ReliefDressing.nearest(xz, margin, can_place)
+
+
 func blocked_cell_count() -> int:
 	return _mask.blocked_cell_count()
 
@@ -314,6 +357,21 @@ func cell_of(xz: Vector2) -> Vector2i:
 ## origen si 64 intentos fallan. Saca números del RNG del reparto.
 func random_walkable_point(margin: float = 4.0) -> Vector2:
 	return _mask.random_walkable_point(margin)
+
+
+## El Terrain de esta arena, o null. Entre los hermanos y no por el grupo
+## "terrain": en _enter_tree el Terrain, que va después en el árbol, todavía
+## no entró.
+func _arena_terrain() -> Terrain:
+	if _terrain_sought:
+		return _terrain
+	_terrain_sought = true
+	var parent := get_parent()
+	if parent != null:
+		for sibling: Node in parent.get_children():
+			if sibling is Terrain:
+				_terrain = sibling as Terrain
+	return _terrain
 
 
 ## Arma la máscara con los exports de este nodo y el RNG del reparto.
@@ -369,6 +427,8 @@ func _pick_mesa_sites() -> void:
 		if mask_enabled and not (_mask.clear_of(candidate, mesa_clearance)
 				and _mask.clear_of(candidate, mesa_clearance * 0.5)):
 			continue
+		if not _relief_clear(candidate, relief_mesa_clearance):
+			continue
 		var clear := true
 		for other: Vector2 in authored:
 			if other.distance_to(candidate) < mesa_min_spacing:
@@ -394,6 +454,7 @@ func _mesa_half_extent() -> float:
 func _build_mesas() -> void:
 	if mesa_platform_scene == null:
 		return
+	var chests_left := mesa_chest_count
 	for site: Vector2 in _mesa_sites:
 		var mesa_scale := _rng.randf_range(mesa_scale_min, mesa_scale_max)
 		var plat := mesa_platform_scene.instantiate() as Node3D
@@ -404,6 +465,9 @@ func _build_mesas() -> void:
 		plat.position = Vector3(site.x, ground_height(site.x, site.y), site.y)
 		plat.rotation.y = plat_angle
 		plat.scale = Vector3.ONE * mesa_scale
+		if chests_left > 0 and ReliefDressing.place_chest(self, mesa_chest_scene, plat,
+				mesa_deck_height * mesa_scale):
+			chests_left -= 1
 
 		if mesa_ramp_scene == null:
 			_keepouts_xz.append(site)
@@ -498,6 +562,8 @@ func _is_clear(pos: Vector3) -> bool:
 		return false
 	if not _mask.clear_of(flat, formation_clearance):
 		return false
+	if not _relief_clear(flat, relief_prop_clearance):
+		return false
 	for keepout in _keepouts_xz:
 		if keepout.distance_to(flat) < keepout_radius:
 			return false
@@ -505,6 +571,12 @@ func _is_clear(pos: Vector3) -> bool:
 		if other.distance_to(flat) < min_prop_spacing:
 			return false
 	return true
+
+
+## True si `xz` queda a `margin` metros o más de todo corte, rampa y puente
+## del relieve por zonas (siempre, en una arena sin él).
+func _relief_clear(xz: Vector2, margin: float) -> bool:
+	return ReliefDressing.clear(_arena_terrain(), xz, margin)
 
 
 ## Recorre los cuatro lados del suelo plantando props grandes (y algún
