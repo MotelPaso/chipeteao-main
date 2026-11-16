@@ -1,13 +1,15 @@
 #!/usr/bin/env bash
 # Verificación headless del proyecto: import limpio + lint de catálogos +
 # harness de UI + harness del selector + soak por arena + soak de etapa +
-# soak de co-op + soak del jefe de etapa (Mythos).
+# soak de co-op + soak del jefe de etapa (Mythos) + soak del minijefe (la
+# Langosta Azul).
 # Uso: tools/verificar.sh [segundos_por_arena]   (por defecto 360)
 #
 # 360 s no es arbitrario: por debajo, el recorrido del harness no da tiempo a
 # cruzar una arena de 240x240 y la puerta de cobertura no puede exigir nada.
-# La corrida completa tarda ~40 min (3 x 360 s + 1 x 720 s + 1 x 360 s de
-# co-op + 1 x 450 s del jefe de etapa + el lint + el harness de UI + import).
+# La corrida completa tarda ~45 min (3 x 360 s + 1 x 720 s + 1 x 360 s de
+# co-op + 1 x 450 s del jefe de etapa + 1 x 270 s del minijefe + el lint + el
+# harness de UI + import).
 #
 # BONK_GAME_SEED fija el RNG del juego (cartas, spawns, scatter y por tanto
 # el relieve). Sin él cada soak es un mundo distinto y cualquier comparación
@@ -43,6 +45,10 @@
 #   - una etapa con RELIEVE POR ZONAS (el Bosque Hueco) no imprime sus
 #     barridos, alguno no da cero, la pendiente pasa de su cota, o el bot
 #     del soak del bosque no pisa una zona elevada ni cruza un puente.
+#   - el soak del MINIJEFE no ve llegar a la Langosta Azul, su entrada no
+#     congela el mundo o no devuelve la pantalla, la pelea no empieza y
+#     termina exactamente una vez, o 5 s después de morir queda algo suyo.
+
 set -uo pipefail
 cd "$(dirname "$0")/.."
 
@@ -601,6 +607,89 @@ else
 	fi
 	chequear_tope_cofres "$MYTHOS_LOG"
 	chequear_relieve "$MYTHOS_LOG"
+fi
+
+# --- Soak del minijefe ------------------------------------------------------
+# El séptimo soak es el único que ve al MINIJEFE del Bosque Hueco (la Langosta
+# Azul), que llega en el minuto 5: BONK_MINI_BOSS_AT lo trae a los 60 s. Mide
+# su entrada (el mundo congelado, la pantalla tomada y devuelta), la pelea de
+# punta a punta, que su muerte salga exactamente una vez y que 5 s después no
+# quede nada suyo (ni efectos, ni cuerpo, ni canción). Fuera de la cuenta de
+# interactuables, como el del jefe de etapa. Pasa igual con la canción puesta
+# o con su hueco vacío.
+LOBSTER_SECS=270
+LOBSTER_FRAMES=$(( LOBSTER_SECS * 60 ))
+echo "== soak minijefe (HollowWoods, Langosta Azul, ${LOBSTER_SECS}s de partida) =="
+fase
+LOBSTER_LOG="$LOGDIR/soak_minijefe.log"
+BONK_ARENA="res://scenes/world/HollowWoods.tscn" BONK_GODMODE=1 BONK_SEED=4242 \
+	BONK_GAME_SEED=4242 BONK_MINI_BOSS_AT=60 \
+	BONK_SAVE_PATH="$(save_path_for minijefe)" \
+	godot --headless --fixed-fps 60 --quit-after "$LOBSTER_FRAMES" \
+	res://scenes/tests/ArenaProbe.tscn >"$LOBSTER_LOG" 2>&1
+
+if grep -qE "$PATRON_ERROR" "$LOBSTER_LOG"; then
+	echo "  FALLO: errores en tiempo de ejecución"
+	grep -nE "$PATRON_ERROR" "$LOBSTER_LOG" | head -30
+	FALLOS=$((FALLOS + 1))
+else
+	LOBSTER_REPORTES=$(grep -c '^frame ' "$LOBSTER_LOG")
+	LOBSTER_ESPERADO=$(( LOBSTER_FRAMES / 120 ))
+	LOBSTER_PLANES=$(grep -c '^Langosta Azul scaling: life=1 ' "$LOBSTER_LOG")
+	LOBSTER_MUERTES=$(grep -c '^Langosta Azul fight over: took=' "$LOBSTER_LOG")
+	LOBSTER_PELEA=$(sed -n 's/^Langosta Azul fight over: took=\([0-9.]*\)s.*/\1/p' "$LOBSTER_LOG" | head -1)
+	LOBSTER_ATAQUES=$(sed -n 's/^Langosta Azul move: \([a-z_]*\) at .*/\1/p' "$LOBSTER_LOG" | sort -u | wc -l | tr -d ' ')
+	echo "  planes=$LOBSTER_PLANES muertes=$LOBSTER_MUERTES pelea=${LOBSTER_PELEA:-?}s ataques_distintos=$LOBSTER_ATAQUES"
+	fase_fin
+	if [ "$LOBSTER_REPORTES" -lt "$LOBSTER_ESPERADO" ]; then
+		echo "  FALLO: terminó antes de tiempo ($LOBSTER_REPORTES/$LOBSTER_ESPERADO reportes)"
+		tail -15 "$LOBSTER_LOG"
+		FALLOS=$((FALLOS + 1))
+	fi
+	if grep -q '^Probe fog: skipped' "$LOBSTER_LOG"; then
+		echo "  FALLO: la partida godmode terminó sola"
+		FALLOS=$((FALLOS + 1))
+	fi
+	if ! grep -q '^Boss spawned: Langosta Azul at ' "$LOBSTER_LOG"; then
+		echo "  FALLO: la Langosta Azul nunca llegó (¿HollowWoods perdió su mini_boss_scene?)"
+		FALLOS=$((FALLOS + 1))
+	fi
+	# La entrada congela el mundo: ninguna vida cambió y nada nació mientras duró.
+	if ! grep -qE '^Probe mini calm: frames=[0-9]+ .* changed=0 born=0 ' "$LOBSTER_LOG"; then
+		echo "  FALLO: algo cambió de vida o apareció durante la entrada de la langosta"
+		grep -n '^Probe mini calm: ' "$LOBSTER_LOG" | head -3
+		FALLOS=$((FALLOS + 1))
+	fi
+	# En plena entrada la pantalla es de la langosta; al terminar vuelve entera.
+	if ! grep -qE '^Probe mini stage: reason=entrance hud_visible=false .*cinematic_camera=true .*world_frozen=true clock_running=false$' "$LOBSTER_LOG"; then
+		echo "  FALLO: en plena entrada el HUD, la cámara o el mundo no estaban tomados"
+		grep -n '^Probe mini stage: ' "$LOBSTER_LOG" | head -3
+		FALLOS=$((FALLOS + 1))
+	fi
+	if ! grep -qE '^Probe mini stage: reason=entrance_end hud_visible=true .*cinematic_camera=false .*world_frozen=false clock_running=true$' "$LOBSTER_LOG"; then
+		echo "  FALLO: la entrada no devolvió el HUD, la cámara, el mundo o el reloj"
+		grep -n '^Probe mini stage: ' "$LOBSTER_LOG" | head -3
+		FALLOS=$((FALLOS + 1))
+	fi
+	if [ "$LOBSTER_PLANES" -ne 1 ]; then
+		echo "  FALLO: 'Langosta Azul scaling: life=1' salió $LOBSTER_PLANES vez/veces (debe ser 1)"
+		FALLOS=$((FALLOS + 1))
+	fi
+	if [ "$LOBSTER_MUERTES" -ne 1 ]; then
+		echo "  FALLO: 'Langosta Azul fight over' salió $LOBSTER_MUERTES vez/veces (debe ser 1)"
+		FALLOS=$((FALLOS + 1))
+	fi
+	if [ "$LOBSTER_ATAQUES" -lt 3 ]; then
+		echo "  FALLO: la langosta usó $LOBSTER_ATAQUES ataque(s) distinto(s) (se esperan al menos 3)"
+		FALLOS=$((FALLOS + 1))
+	fi
+	# Cinco segundos después de morir no queda nada suyo.
+	if ! grep -qE '^Probe mini hazards: .* total=0 body=false song_playing=false died_signals=1$' "$LOBSTER_LOG"; then
+		echo "  FALLO: tras su muerte quedó algo de la langosta (efectos, cuerpo o canción), o murió más de una vez"
+		grep -n '^Probe mini hazards: ' "$LOBSTER_LOG" | head -3
+		FALLOS=$((FALLOS + 1))
+	fi
+	chequear_tope_cofres "$LOBSTER_LOG"
 fi
 
 # La cobertura de interactuables se mide SUMANDO las tres arenas, no por

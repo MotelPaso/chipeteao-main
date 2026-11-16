@@ -211,6 +211,17 @@ Lo que NO se traduce nunca: los `id` de catálogo, los `node_name`, los nombres 
 | Dawn (el golpe más fuerte de Mythos) | Amanecer |
 | Safe circle | Círculo a salvo |
 | Fire zone | Zona de fuego |
+| Blue Lobster | Langosta Azul (nombre propio del minijefe del Bosque Hueco) |
+| Mini-boss | Minijefe (el que llega a mitad de la etapa, antes del jefe del bioma: la Langosta Azul en el Bosque Hueco; los ocultos son «minijefe secreto») |
+| One in two million (cartel de la entrada de la Langosta Azul) | Una entre dos millones |
+| Pincers (ataque de la Langosta Azul) | Tenazas |
+| Charge (ataque de la Langosta Azul: cruza un carril de un tirón) | Embestida |
+| Crushing leap (ataque de la Langosta Azul) | Salto aplastante |
+| Shock wave (la onda que deja el Salto aplastante; se esquiva saltando) | Onda de choque |
+| Tail sweep (ataque de la Langosta Azul; se esquiva saltando) | Coletazo |
+| Ambush (ataque de la Langosta Azul: se entierra y sale junto al raider) | Emboscada |
+| %s wears out, out of the water (aviso de desgaste de la Langosta Azul) | %s se agota fuera del agua |
+| the blue scare of the Hollow Woods (Colección) | el susto azul del Bosque Hueco |
 
 ## Mapas
 
