@@ -56,9 +56,17 @@ instance uniform float near_fade = 1.0;
 
 varying vec3 local_pos;
 
-// Trama ordenada de 4x4 para deshacer la pieza cerca de la cámara.
-const float DITHER[16] = float[16](0.0, 8.0, 2.0, 10.0, 12.0, 4.0, 14.0, 6.0,
-		3.0, 11.0, 1.0, 9.0, 15.0, 7.0, 13.0, 5.0);
+// Trama ordenada de 4x4 (Bayer) para deshacer la pieza cerca de la cámara:
+// 16 niveles entre 0 y 1 según el píxel. Va como fórmula y no como tabla: una
+// tabla constante en un sombreador deja su nombre sin liberar al cerrar.
+float bayer2(vec2 cell) {
+	cell = floor(cell);
+	return fract(cell.x * 0.5 + cell.y * cell.y * 0.75);
+}
+
+float bayer4(vec2 pixel) {
+	return bayer2(pixel * 0.5) * 0.25 + bayer2(pixel);
+}
 
 float hash31(vec3 p) {
 	p = fract(p * vec3(0.1031, 0.1030, 0.0973));
@@ -83,12 +91,10 @@ void fragment() {
 	// Cerca de la cámara la pieza se deshace en puntos (VERTEX es la posición
 	// del píxel vista desde la cámara).
 	float seen = mix(1.0, smoothstep(fade_near, fade_far, length(VERTEX)), near_fade);
-	if (seen < 1.0) {
-		int cell = int(mod(FRAGCOORD.x, 4.0)) + int(mod(FRAGCOORD.y, 4.0)) * 4;
-		if (seen < (DITHER[cell] + 0.5) / 16.0) {
-			discard;
-		}
+	if (seen < 1.0 && seen < bayer4(FRAGCOORD.xy) + 0.03125) {
+		discard;
 	}
+
 	float side = dot(normalize(gradient_axis), local_pos);
 	vec3 color = mix(deep_color, bright_color, smoothstep(-gradient_soft, gradient_soft, side));
 	color *= 1.0 + tone * 0.55;
