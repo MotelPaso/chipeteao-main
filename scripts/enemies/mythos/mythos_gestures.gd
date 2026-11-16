@@ -91,9 +91,9 @@ extends Node
 
 @export_group("Ladeo")
 ## Grados que se ladea por cada metro por segundo que se mueve de costado.
-@export var bank_per_speed: float = 2.4
+@export var bank_per_speed: float = 3.0
 ## Tope de ese ladeo, en grados.
-@export var bank_max_degrees: float = 26.0
+@export var bank_max_degrees: float = 32.0
 ## Rapidez con que llega a su ladeo (por segundo).
 @export var bank_speed: float = 4.0
 

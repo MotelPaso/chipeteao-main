@@ -30,6 +30,8 @@ uniform float eye_amount : hint_range(0.0, 1.0) = 0.0;
 // Dónde va el ojo a lo largo de la pluma y su tamaño (fracciones del largo).
 uniform float eye_center : hint_range(0.0, 1.0) = 0.84;
 uniform float eye_size : hint_range(0.01, 0.5) = 0.11;
+// Cuánto se angosta el centro del ojo (1 = redondo; más alto = una pupila rasgada).
+uniform float eye_slit : hint_range(1.0, 8.0) = 1.0;
 // Centro del ojo y anillo que lo rodea.
 uniform vec3 eye_core_color : source_color = vec3(1.0, 0.97, 0.8);
 uniform vec3 eye_ring_color : source_color = vec3(0.05, 0.7, 0.8);
@@ -37,12 +39,12 @@ uniform vec3 eye_ring_color : source_color = vec3(0.05, 0.7, 0.8);
 group_uniforms Renacido;
 // Colores de la pluma en la forma renacida de Mythos (segunda fase): raíz,
 // medio, punta y anillo del ojo. El rig mezcla hacia ellos con `ascend`.
-uniform vec3 ascended_root_color : source_color = vec3(0.07, 0.04, 0.34);
-uniform vec3 ascended_mid_color : source_color = vec3(0.08, 0.34, 1.0);
-uniform vec3 ascended_tip_color : source_color = vec3(0.5, 0.88, 1.0);
+uniform vec3 ascended_root_color : source_color = vec3(0.006, 0.008, 0.05);
+uniform vec3 ascended_mid_color : source_color = vec3(0.015, 0.08, 0.45);
+uniform vec3 ascended_tip_color : source_color = vec3(0.45, 0.85, 1.0);
 // Cuánto baja el brillo en la forma renacida (el azul claro se quema a blanco antes que el rojo).
 uniform float ascended_glow : hint_range(0.0, 1.0) = 0.62;
-uniform vec3 ascended_eye_ring_color : source_color = vec3(1.0, 0.72, 0.18);
+uniform vec3 ascended_eye_ring_color : source_color = vec3(0.0, 0.01, 0.05);
 
 group_uniforms Movimiento;
 // Metros que se mece la punta y con qué rapidez.
@@ -113,8 +115,11 @@ void fragment() {
 	color = mix(color, tip, shaft * 0.45);
 	float shine = (glow + tip_glow * t * t) * mix(1.0, ascended_glow, ascend);
 	if (eye_amount > 0.0) {
-		float r = length(vec2(across, (along - eye_center) / eye_size));
-		float core = 1.0 - smoothstep(0.28, 0.42, r);
+		float lengthwise = (along - eye_center) / eye_size;
+		float r = length(vec2(across, lengthwise));
+		// La pupila rasgada es más angosta y un poco más alta que el ojo redondo.
+		float core = 1.0 - smoothstep(0.28, 0.42,
+				length(vec2(across * eye_slit, lengthwise / pow(eye_slit, 0.25))));
 		float ring = smoothstep(0.42, 0.55, r) * (1.0 - smoothstep(0.7, 0.85, r));
 		color = mix(color, mix(eye_ring_color, ascended_eye_ring_color, ascend),
 				ring * eye_amount);

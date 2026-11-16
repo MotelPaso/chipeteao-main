@@ -8,7 +8,7 @@ extends MeshInstance3D
 
 @export_group("Renacido")
 ## Color y opacidad del resplandor en la forma renacida.
-@export var ascended_color: Color = Color(0.2, 0.6, 1.0, 0.24)
+@export var ascended_color: Color = Color(0.1, 0.35, 1.0, 0.13)
 
 var _material: StandardMaterial3D = null
 var _base_color: Color = Color.WHITE

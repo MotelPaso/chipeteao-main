@@ -87,7 +87,7 @@ func take_off() -> void:
 ## La pose de descanso de su postura: posado o volando. Los ataques vuelven
 ## a ella al terminar.
 func rest_pose() -> MythosRig.Pose:
-	return MythosRig.Pose.PERCH if _flight.is_grounded() else MythosRig.Pose.FLY
+	return _flight.pose()
 
 
 ## `point` llevado a un lugar de la arena donde cabe el cuerpo, a ras de suelo.

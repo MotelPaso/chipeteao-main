@@ -5,7 +5,8 @@ shader_type spatial;
 // tamaño 1 (esfera, cono, cilindro, caja) que cada nodo estira a su medida.
 // Tiene un degradado a lo largo de un eje de la malla (lomo oscuro, vientre
 // encendido), escamas de plumas dibujadas, un borde que brilla para que la
-// silueta se lea contra el cielo del infierno, y un latido opcional.
+// silueta se lea contra el cielo del infierno, grietas de fuego entre las
+// escamas y un latido opcional.
 
 group_uniforms Color;
 // Color del lado oscuro y del lado encendido.
@@ -22,9 +23,9 @@ uniform float glow : hint_range(0.0, 4.0) = 0.6;
 group_uniforms Renacido;
 // Colores de la pieza en la forma renacida de Mythos (segunda fase): lado
 // oscuro, lado encendido y borde. El rig mezcla hacia ellos con `ascend`.
-uniform vec3 ascended_dark_color : source_color = vec3(0.05, 0.07, 0.3);
-uniform vec3 ascended_hot_color : source_color = vec3(0.55, 0.88, 1.0);
-uniform vec3 ascended_rim_color : source_color = vec3(0.75, 0.96, 1.0);
+uniform vec3 ascended_dark_color : source_color = vec3(0.012, 0.02, 0.09);
+uniform vec3 ascended_hot_color : source_color = vec3(0.14, 0.5, 1.0);
+uniform vec3 ascended_rim_color : source_color = vec3(0.55, 0.88, 1.0);
 
 group_uniforms Borde;
 // Color, fuerza y finura del borde que brilla.
@@ -36,6 +37,12 @@ group_uniforms Escamas;
 // Filas de escamas de pluma (0 = superficie lisa) y cuánto oscurecen.
 uniform float scale_rows = 0.0;
 uniform float scale_contrast : hint_range(0.0, 1.0) = 0.35;
+// Brillo de las grietas entre escamas (0 = sin grietas): cada escama queda
+// como una placa oscura y el fuego asoma por su borde.
+uniform float seam_glow : hint_range(0.0, 6.0) = 0.0;
+// Color de esas grietas, y el mismo en la forma renacida.
+uniform vec3 seam_color : source_color = vec3(1.0, 0.42, 0.07);
+uniform vec3 ascended_seam_color : source_color = vec3(0.3, 0.78, 1.0);
 
 group_uniforms Latido;
 // Cuánto sube y baja el brillo (0 = sin latido) y cuántos latidos por segundo.
@@ -76,18 +83,21 @@ void fragment() {
 	vec3 color = mix(mix(dark_color, ascended_dark_color, ascend),
 			mix(hot_color, ascended_hot_color, ascend),
 			smoothstep(-gradient_soft, gradient_soft, side));
+	float seam = 0.0;
 	if (scale_rows > 0.0) {
-		// Filas alternadas de medios discos: cada escama oscurece en su borde.
+		// Filas alternadas de medios discos: cada escama oscurece en su borde
+		// y, si hay grietas, la juntura con las vecinas se enciende.
 		vec2 grid = vec2(UV.x * scale_rows * 2.0, UV.y * scale_rows);
 		grid.x += 0.5 * mod(floor(grid.y), 2.0);
 		vec2 cell = fract(grid);
-		float edge = smoothstep(0.34, 0.5, length(vec2(cell.x - 0.5, cell.y * 0.92)));
-		color *= 1.0 - scale_contrast * edge;
+		float reach = length(vec2(cell.x - 0.5, cell.y * 0.92));
+		color *= 1.0 - scale_contrast * smoothstep(0.34, 0.5, reach);
+		seam = smoothstep(0.4, 0.5, reach) * (1.0 - smoothstep(0.5, 0.6, reach));
 	}
 	float rim = pow(1.0 - clamp(dot(NORMAL, VIEW), 0.0, 1.0), rim_power);
 	float beat = 1.0 + pulse_amount * sin(TIME * pulse_speed * TAU);
 	ALBEDO = color * 0.55;
-	EMISSION = (color * glow + mix(rim_color, ascended_rim_color, ascend) * rim * rim_strength)
-			* beat;
+	EMISSION = (color * glow + mix(rim_color, ascended_rim_color, ascend) * rim * rim_strength
+			+ mix(seam_color, ascended_seam_color, ascend) * seam * seam_glow) * beat;
 	ROUGHNESS = 0.85;
 }

@@ -14,8 +14,10 @@ extends Node
 ##   EN TIERRA  (tras una Picada) camina hacia el raider, al alcance de las
 ##              armas cortas, hasta que se le acaba el tiempo y despega. Si
 ##              el raider se le va lejos, despega antes.
-## También elige a qué raider persigue. Mythos le pide la dirección en cada
-## frame (intent); los ataques lo posan y lo hacen despegar a través de
+## También elige a qué raider persigue y con qué pose se mueve (pose): cuando
+## deja de girar para acortar la distancia va de CAZA, y en tierra lo ACECHA
+## caminando a embestidas. Mythos le pide la dirección en cada frame
+## (intent); los ataques lo posan y lo hacen despegar a través de
 ## Mythos.land() y Mythos.take_off().
 
 @export_group("En vuelo")
@@ -37,6 +39,12 @@ extends Node
 @export var lift_metres: float = 1.3
 ## Segundos de una subida y bajada completa.
 @export var lift_seconds: float = 3.1
+
+@export_group("Caza")
+## Chillido cuando deja de girar y se le viene encima al raider (fila de Sfx.SOUND_LIBRARY; vacío = ninguno).
+@export var hunt_sfx: StringName = &"phoenix_screech"
+## Segundos mínimos entre un chillido de caza y el siguiente.
+@export var hunt_sfx_cooldown: float = 6.0
 
 @export_group("Persecución")
 ## Distancia al raider, en metros, desde la que deja de girar y vuela derecho hacia él por encima de todo.
@@ -72,7 +80,7 @@ extends Node
 ## Distancia al raider, en metros, a la que se detiene cuando camina hacia él (las armas cortas llegan).
 @export var ground_distance: float = 2.3
 ## Fracción de su velocidad a la que camina en tierra (0-1). Más lento que un raider: se le puede huir.
-@export_range(0.0, 1.0) var ground_speed_factor: float = 0.36
+@export_range(0.0, 1.0) var ground_speed_factor: float = 0.32
 ## Segundos que pasa en tierra tras una Picada antes de despegar, con agresividad 0.
 @export var ground_seconds: float = 7.0
 ## Multiplicador de ese tiempo con agresividad 1.
@@ -81,6 +89,10 @@ extends Node
 @export var ground_leash: float = 13.0
 ## Segundos que el raider tiene que pasar así de lejos para que despegue.
 @export var ground_leash_seconds: float = 1.2
+## Segundos de cada zancada: en tierra no camina parejo, avanza a embestidas.
+@export var stride_seconds: float = 0.85
+## Fracción de su paso (0-1) a la que baja entre una zancada y la siguiente.
+@export_range(0.0, 1.0) var stride_rest: float = 0.65
 
 @export_group("Objetivo")
 ## Segundos que persigue al mismo raider antes de elegir otro al azar.
@@ -107,6 +119,10 @@ var _blink_wait: float = 0.0
 var _blink_left: float = 0.0
 var _blink_from: Vector3 = Vector3.ZERO
 var _blink_to: Vector3 = Vector3.ZERO
+## True mientras se le viene encima al raider (dejó de girar para acortar la
+## distancia), y segundos hasta que puede volver a chillar al hacerlo.
+var _closing: bool = false
+var _hunt_sfx_left: float = 0.0
 ## True mientras cruza la arena persiguiendo a un raider que se alejó, los
 ## segundos que le quedan a esa persecución y los que faltan para otra.
 var _chasing: bool = false
@@ -122,12 +138,16 @@ var _chase_wait: float = 0.0
 ## da un fogonazo.
 func tick(delta: float, busy: bool) -> void:
 	_focus_left -= delta
+	_clock += delta
+	_hunt_sfx_left = maxf(_hunt_sfx_left - delta, 0.0)
+	if not busy and _body != null and _body.rig != null:
+		# Entre ataques el rig lleva la pose de cómo se está moviendo.
+		_body.rig.set_pose(pose())
 	if _grounded:
 		_ground_left -= delta
 		_far_seconds = _far_seconds + delta if _distance > ground_leash else 0.0
 		_set_lift(0.0, delta)
 		return
-	_clock += delta
 	_set_lift(chase_lift if _chasing
 			else lift_metres * sin(_clock * TAU / maxf(lift_seconds, 0.1)), delta)
 	_flip_left -= delta
@@ -147,6 +167,14 @@ func tick(delta: float, busy: bool) -> void:
 
 func is_grounded() -> bool:
 	return _grounded
+
+
+## La pose de cómo se está moviendo ahora: posado o acechando a pie en
+## tierra; en vuelo, de caza si se le viene encima al raider o lo persigue.
+func pose() -> MythosRig.Pose:
+	if _grounded:
+		return MythosRig.Pose.PROWL if _distance > ground_distance else MythosRig.Pose.PERCH
+	return MythosRig.Pose.HUNT if _closing or _chasing else MythosRig.Pose.FLY
 
 
 ## True cuando le toca despegar: ya pasó su tiempo en tierra, o el raider
@@ -169,6 +197,7 @@ func land(aggression: float) -> void:
 	_far_seconds = 0.0
 	_blink_left = 0.0
 	_chasing = false
+	_closing = false
 
 
 func take_off() -> void:
@@ -184,7 +213,11 @@ func take_off() -> void:
 func intent(seek: Vector3, distance: float) -> Vector3:
 	_distance = distance
 	if _grounded:
-		return seek * ground_speed_factor if distance > ground_distance else Vector3.ZERO
+		if distance <= ground_distance:
+			return Vector3.ZERO
+		# A zancadas: embiste, afloja y vuelve a embestir.
+		var surge := 0.5 + 0.5 * sin(_clock * TAU / maxf(stride_seconds, 0.1))
+		return seek * ground_speed_factor * lerpf(stride_rest, 1.0 + (1.0 - stride_rest), surge)
 	if _blink_left > 0.0 or _chasing:
 		return Vector3.ZERO
 	var radius := air_distance \
@@ -192,7 +225,9 @@ func intent(seek: Vector3, distance: float) -> Vector3:
 	var tangent := Vector3(-seek.z, 0.0, seek.x) * _orbit_sign
 	if distance > radius + air_band:
 		# Lejos: se le viene encima a toda velocidad, entrando en espiral.
+		_set_closing(true)
 		return (seek + tangent * 0.5).normalized()
+	_set_closing(false)
 	if distance < radius - air_band:
 		return tangent * orbit_speed_factor - seek * retreat_speed_factor
 	return tangent * orbit_speed_factor
@@ -233,7 +268,8 @@ func _tick_chase(delta: float) -> void:
 		_chasing = true
 		_chase_left = chase_max_seconds
 		_body.rig.set_trail(true)
-		_body.rig.set_pose(MythosRig.Pose.GLIDE)
+		_body.rig.set_pose(MythosRig.Pose.HUNT)
+		_hunt_cry()
 	_chase_left -= delta
 	if _chase_left <= 0.0:
 		_end_chase(chase_rest_seconds)
@@ -251,7 +287,29 @@ func _end_chase(rest: float) -> void:
 		return
 	_chasing = false
 	_body.rig.set_trail(false)
-	_body.rig.set_pose(_body.rest_pose())
+	_body.rig.set_pose(pose())
+
+
+## Empieza o deja de venírsele encima al raider: al empezar deja una estela
+## de fuego y, si hace rato que no lo hacía, chilla.
+func _set_closing(on: bool) -> void:
+	if _closing == on:
+		return
+	_closing = on
+	if _body == null or _body.rig == null:
+		return
+	_body.rig.set_trail(on)
+	if on:
+		_hunt_cry()
+
+
+func _hunt_cry() -> void:
+	if _hunt_sfx_left > 0.0:
+		return
+	_hunt_sfx_left = hunt_sfx_cooldown
+	_body.rig.gesture(&"screech")
+	if hunt_sfx != &"":
+		Sfx.play(hunt_sfx)
 
 
 func _next_blink_wait() -> float:

@@ -8,9 +8,15 @@ extends Node
 ##             al avanzar y al caer, y rebotan un poco al alcanzar al cuerpo
 ##   EMPUJE    se inclina hacia donde vuela y aletea más rápido cuanto más
 ##             rápido va
-##   SALTOS    en tierra avanza a saltitos
+##   PASOS     en tierra camina de verdad: una pata apoya y barre hacia atrás
+##             mientras la otra se recoge y pasa adelante, el cuerpo sube y
+##             baja sobre la pata apoyada y se carga hacia ese lado. Motion
+##             mueve él mismo los pivotes LegL y LegR, y avisa cada pisada
 ##   MANÍAS    cada tanto, si no está atacando, ladea la cabeza o mira a
 ##             los costados
+
+## Una pata tocó el suelo al caminar; `left` dice cuál.
+signal stepped(left: bool)
 
 ## Lo que hace cuando le da una manía.
 enum Fidget { NONE, TILT, SCAN }
@@ -50,20 +56,32 @@ enum Fidget { NONE, TILT, SCAN }
 @export var lean_max: float = 18.0
 ## Rapidez con que llega a esa inclinación (por segundo).
 @export var lean_speed: float = 4.0
+## Parte de esa inclinación (0-1) que conserva en tierra: entera, las patas se le despegarían del suelo.
+@export_range(0.0, 1.0) var ground_lean_share: float = 0.3
 ## Cuánto más rápido aletea por cada metro por segundo (0.07 = 7 % más).
 @export var flap_rate_per_speed: float = 0.07
 ## Tope de esa prisa (1.7 = 70 % más rápido que quieto).
 @export var flap_rate_max: float = 1.7
 
-@export_group("Saltos")
-## Altura de cada saltito en tierra, en metros.
-@export var hop_height: float = 0.55
-## Metros que avanza con cada saltito.
-@export var hop_length: float = 2.2
-## Velocidad en metros por segundo desde la que salta en vez de quedarse posado.
-@export var hop_min_speed: float = 0.6
-## Grados que abre las alas en lo alto de cada saltito.
-@export var hop_wing_degrees: float = 10.0
+@export_group("Pasos")
+## Grados que cada pata va hacia adelante y hacia atrás al caminar (más = zancadas más largas y un cuerpo que baja más).
+@export var stride_degrees: float = 36.0
+## Largo de la pata, de la cadera a la garra, en unidades del modelo: con el valor real los pies no patinan.
+@export var leg_length: float = 1.185
+## Parte de cada paso (0-1) que da en el aire, entre que despega una pata y cae la otra.
+@export_range(0.0, 0.6) var step_air_share: float = 0.2
+## Metros que salta en esa parte del paso.
+@export var step_air_height: float = 0.14
+## Parte del largo de la pata (0-1) que la recoge mientras pasa hacia adelante.
+@export_range(0.0, 0.6) var step_tuck: float = 0.28
+## Grados que el cuerpo se carga hacia la pata apoyada.
+@export var step_sway_degrees: float = 5.0
+## Grados que abre las alas a mitad de cada paso.
+@export var step_wing_degrees: float = 6.0
+## Velocidad en metros por segundo desde la que camina en vez de quedarse posado.
+@export var step_min_speed: float = 0.6
+## Rapidez con que entra y sale del caminar (por segundo).
+@export var step_blend_speed: float = 8.0
 
 @export_group("Manías")
 ## Segundos mínimos entre una manía y la siguiente.
@@ -80,8 +98,9 @@ enum Fidget { NONE, TILT, SCAN }
 @export var scan_seconds: float = 1.6
 
 ## Lo que el rig suma en este frame. En grados: giro, cabeceo y ladeo de la
-## cabeza, cola hacia un lado y hacia arriba, patas, inclinación del cuerpo y
-## alas. En metros: el saltito (hop). flap_rate multiplica la rapidez del aleteo.
+## cabeza, cola hacia un lado y hacia arriba, patas, inclinación del cuerpo,
+## alas y lo que se carga hacia un lado al caminar (sway). En metros: lo que
+## el cuerpo baja y sube con cada paso (hop). flap_rate multiplica la rapidez del aleteo.
 var head_yaw: float = 0.0
 var head_pitch: float = 0.0
 var head_roll: float = 0.0
@@ -91,6 +110,7 @@ var legs: float = 0.0
 var lean: float = 0.0
 var wing: float = 0.0
 var hop: float = 0.0
+var sway: float = 0.0
 var flap_rate: float = 1.0
 
 ## Punto del mundo que mira (INF = mira al frente).
@@ -102,7 +122,10 @@ var _tail_yaw_speed: float = 0.0
 var _tail_pitch_speed: float = 0.0
 var _legs_speed: float = 0.0
 var _last_yaw: float = 0.0
-var _hop_phase: float = 0.0
+## Paso en curso: de 0 a PI apoya la pata izquierda, de PI a TAU la derecha.
+var _gait: float = 0.0
+## Cuánto está caminando (0 = posado, 1 = a paso entero).
+var _walk: float = 0.0
 var _fidget: Fidget = Fidget.NONE
 var _fidget_clock: float = 0.0
 var _fidget_left: float = 0.0
@@ -110,6 +133,10 @@ var _fidget_left: float = 0.0
 var _fidget_side: float = 1.0
 ## Azar propio: las manías no tocan el RNG de la partida.
 var _rng: RandomNumberGenerator = RandomNumberGenerator.new()
+
+
+@onready var _leg_left: Node3D = %LegL
+@onready var _leg_right: Node3D = %LegR
 
 
 func _ready() -> void:
@@ -140,11 +167,12 @@ func tick(delta: float, velocity: Vector3, frame: Transform3D, head: Vector3, gr
 	var forward_speed := velocity.dot(-basis.z)
 	var flat_speed := Vector2(velocity.x, velocity.z).length()
 	_tick_gaze(step, basis, head)
-	_tick_drag(step, basis, velocity.y, forward_speed)
-	lean = lerpf(lean, clampf(-forward_speed * lean_per_speed, -lean_max, lean_max),
-			Juice.damp(lean_speed, step))
+	_tick_drag(step, basis, velocity.y, 0.0 if grounded else forward_speed)
+	var wanted_lean := clampf(-forward_speed * lean_per_speed, -lean_max, lean_max) \
+			* (ground_lean_share if grounded else 1.0)
+	lean = lerpf(lean, wanted_lean, Juice.damp(lean_speed, step))
 	flap_rate = minf(1.0 + flat_speed * flap_rate_per_speed, flap_rate_max)
-	_tick_hop(step, flat_speed, grounded)
+	_tick_walk(step, flat_speed, grounded, frame.basis.get_scale().y)
 	_tick_fidget(step, idle)
 	head_yaw = clampf(head_yaw + _gaze_yaw, -gaze_yaw_max, gaze_yaw_max)
 	head_pitch = _gaze_pitch
@@ -190,15 +218,43 @@ func _spring_speed(value: float, speed: float, target: float, delta: float) -> f
 	return speed + ((target - value) * spring_stiffness - speed * spring_damping) * delta
 
 
-## En tierra avanza a saltitos: sube y baja según lo que camina.
-func _tick_hop(delta: float, flat_speed: float, grounded: bool) -> void:
-	if grounded and flat_speed > hop_min_speed:
-		_hop_phase = fmod(_hop_phase + flat_speed * delta * PI / maxf(hop_length, 0.01), PI)
-		hop = hop_height * sin(_hop_phase)
-	else:
-		_hop_phase = 0.0
-		hop = lerpf(hop, 0.0, Juice.damp(12.0, delta))
-	wing = hop_wing_degrees * hop / maxf(hop_height, 0.01)
+## En tierra camina: el paso avanza con los metros que recorre. En cada paso
+## una pata apoya y barre de adelante hacia atrás, la otra se recoge y pasa
+## adelante, y al final las dos quedan un instante en el aire.
+func _tick_walk(delta: float, flat_speed: float, grounded: bool, size: float) -> void:
+	var reach := leg_length * size
+	var swing := deg_to_rad(stride_degrees)
+	var stance := 1.0 - step_air_share
+	var walking := grounded and flat_speed > step_min_speed
+	if walking:
+		var metres := 2.0 * reach * sin(swing) / maxf(stance, 0.01)
+		var before := _gait
+		_gait = fmod(_gait + flat_speed * delta * PI / maxf(metres, 0.01), TAU)
+		if _gait < before or (before < PI and _gait >= PI):
+			stepped.emit(_gait < PI)
+	_walk = lerpf(_walk, 1.0 if walking else 0.0, Juice.damp(step_blend_speed, delta))
+	# Dentro del paso: 0 = recién apoyó, `stance` = despega, 1 = cae la otra pata.
+	var u := fposmod(_gait, PI) / PI
+	var grip := minf(u / maxf(stance, 0.01), 1.0)
+	var planted := lerpf(stride_degrees, -stride_degrees, grip)
+	var passing := lerpf(-stride_degrees, stride_degrees, smoothstep(0.0, 1.0, grip))
+	var tuck := step_tuck * sin(grip * PI)
+	var left_planted := _gait < PI
+	_pose_leg(_leg_left, planted if left_planted else passing, 0.0 if left_planted else tuck)
+	_pose_leg(_leg_right, passing if left_planted else planted, tuck if left_planted else 0.0)
+	# El cuerpo va sobre la pata apoyada: baja lo que la pata se inclina (con
+	# las patas rectas está a su altura de posado) y, sin pata apoyada, salta.
+	var air := clampf((u - stance) / maxf(1.0 - stance, 0.01), 0.0, 1.0)
+	hop = (reach * (cos(deg_to_rad(planted)) - 1.0) + step_air_height * sin(air * PI)) * _walk
+	sway = step_sway_degrees * sin(_gait) * _walk
+	wing = step_wing_degrees * sin(u * PI) * _walk
+
+
+## Una pata: `degrees` hacia adelante desde la cadera y `tuck` (0-1) de su
+## largo recogido, todo en la medida en que está caminando.
+func _pose_leg(leg: Node3D, degrees: float, tuck: float) -> void:
+	leg.rotation.x = deg_to_rad(degrees) * _walk
+	leg.scale.y = 1.0 - tuck * _walk
 
 
 ## Las manías: una a la vez, y solo si no está atacando.

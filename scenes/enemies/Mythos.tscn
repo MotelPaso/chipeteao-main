@@ -1,4 +1,4 @@
-[gd_scene load_steps=80 format=3]
+[gd_scene load_steps=82 format=3]
 
 [ext_resource type="Script" path="res://scripts/enemies/mythos.gd" id="1_mythos"]
 [ext_resource type="Script" path="res://scripts/enemies/boss/guarded_health.gd" id="2_health"]
@@ -36,16 +36,17 @@
 [ext_resource type="Script" path="res://scripts/enemies/mythos/mythos_feel.gd" id="34_feel"]
 [ext_resource type="Shader" path="res://assets/shaders/dread_vignette.gdshader" id="35_dread"]
 [ext_resource type="Script" path="res://scripts/enemies/mythos/mythos_breath.gd" id="36_breath"]
+[ext_resource type="Script" path="res://scripts/enemies/mythos/mythos_presence.gd" id="37_presence"]
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_flight"]
 shader = ExtResource("13_plumage")
-shader_parameter/root_color = Color(0.32, 0.015, 0.03, 1)
-shader_parameter/mid_color = Color(0.96, 0.2, 0.03, 1)
-shader_parameter/tip_color = Color(1, 0.78, 0.24, 1)
-shader_parameter/mid_point = 0.42
-shader_parameter/glow = 0.65
-shader_parameter/tip_glow = 1.4
-shader_parameter/vane_contrast = 0.4
+shader_parameter/root_color = Color(0.045, 0.008, 0.008, 1)
+shader_parameter/mid_color = Color(0.4, 0.035, 0.012, 1)
+shader_parameter/tip_color = Color(1, 0.46, 0.07, 1)
+shader_parameter/mid_point = 0.66
+shader_parameter/glow = 0.5
+shader_parameter/tip_glow = 2.2
+shader_parameter/vane_contrast = 0.55
 shader_parameter/barb_count = 18
 shader_parameter/sway_amount = 0.07
 shader_parameter/sway_speed = 2.4
@@ -54,12 +55,12 @@ shader_parameter/flutter_speed = 11
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_covert"]
 shader = ExtResource("13_plumage")
-shader_parameter/root_color = Color(0.15, 0.01, 0.03, 1)
-shader_parameter/mid_color = Color(0.55, 0.04, 0.03, 1)
-shader_parameter/tip_color = Color(0.98, 0.3, 0.05, 1)
-shader_parameter/mid_point = 0.5
-shader_parameter/glow = 0.45
-shader_parameter/tip_glow = 1
+shader_parameter/root_color = Color(0.03, 0.006, 0.008, 1)
+shader_parameter/mid_color = Color(0.2, 0.018, 0.015, 1)
+shader_parameter/tip_color = Color(0.9, 0.2, 0.03, 1)
+shader_parameter/mid_point = 0.6
+shader_parameter/glow = 0.4
+shader_parameter/tip_glow = 1.7
 shader_parameter/vane_contrast = 0.5
 shader_parameter/barb_count = 12
 shader_parameter/sway_amount = 0.03
@@ -69,19 +70,20 @@ shader_parameter/flutter_speed = 11
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_tail"]
 shader = ExtResource("13_plumage")
-shader_parameter/root_color = Color(0.5, 0.03, 0.02, 1)
-shader_parameter/mid_color = Color(1, 0.35, 0.04, 1)
-shader_parameter/tip_color = Color(1, 0.72, 0.2, 1)
-shader_parameter/mid_point = 0.4
-shader_parameter/glow = 0.7
-shader_parameter/tip_glow = 0.9
+shader_parameter/root_color = Color(0.05, 0.008, 0.008, 1)
+shader_parameter/mid_color = Color(0.55, 0.06, 0.015, 1)
+shader_parameter/tip_color = Color(0.9, 0.24, 0.04, 1)
+shader_parameter/mid_point = 0.5
+shader_parameter/glow = 0.55
+shader_parameter/tip_glow = 1.3
 shader_parameter/vane_contrast = 0.4
 shader_parameter/barb_count = 30
 shader_parameter/eye_amount = 1
 shader_parameter/eye_center = 0.86
-shader_parameter/eye_size = 0.085
-shader_parameter/eye_core_color = Color(1, 0.92, 0.55, 1)
-shader_parameter/eye_ring_color = Color(0, 0.5, 0.62, 1)
+shader_parameter/eye_size = 0.1
+shader_parameter/eye_slit = 2.6
+shader_parameter/eye_core_color = Color(1, 0.93, 0.6, 1)
+shader_parameter/eye_ring_color = Color(0.02, 0.004, 0.004, 1)
 shader_parameter/sway_amount = 0.28
 shader_parameter/sway_speed = 1.9
 shader_parameter/flutter_amount = 0.05
@@ -89,12 +91,12 @@ shader_parameter/flutter_speed = 9
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_crest"]
 shader = ExtResource("13_plumage")
-shader_parameter/root_color = Color(0.85, 0.14, 0.03, 1)
-shader_parameter/mid_color = Color(1, 0.5, 0.06, 1)
-shader_parameter/tip_color = Color(1, 0.88, 0.42, 1)
-shader_parameter/mid_point = 0.45
-shader_parameter/glow = 0.75
-shader_parameter/tip_glow = 1.2
+shader_parameter/root_color = Color(0.06, 0.008, 0.008, 1)
+shader_parameter/mid_color = Color(0.5, 0.05, 0.015, 1)
+shader_parameter/tip_color = Color(1, 0.5, 0.1, 1)
+shader_parameter/mid_point = 0.5
+shader_parameter/glow = 0.6
+shader_parameter/tip_glow = 2.2
 shader_parameter/vane_contrast = 0.25
 shader_parameter/barb_count = 10
 shader_parameter/sway_amount = 0.12
@@ -104,48 +106,54 @@ shader_parameter/flutter_speed = 13
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_body"]
 shader = ExtResource("14_body")
-shader_parameter/dark_color = Color(0.4, 0.02, 0.03, 1)
-shader_parameter/hot_color = Color(1, 0.5, 0.07, 1)
+shader_parameter/dark_color = Color(0.022, 0.006, 0.006, 1)
+shader_parameter/hot_color = Color(0.24, 0.035, 0.012, 1)
 shader_parameter/gradient_axis = Vector3(0, 0, 1)
 shader_parameter/gradient_center = -0.05
 shader_parameter/gradient_soft = 0.4
-shader_parameter/glow = 0.6
-shader_parameter/rim_color = Color(1, 0.72, 0.25, 1)
-shader_parameter/rim_strength = 1.2
+shader_parameter/glow = 0.55
+shader_parameter/rim_color = Color(1, 0.42, 0.08, 1)
+shader_parameter/rim_strength = 1.7
 shader_parameter/rim_power = 2.6
 shader_parameter/scale_rows = 9
-shader_parameter/scale_contrast = 0.32
+shader_parameter/scale_contrast = 0.5
+shader_parameter/seam_glow = 1.5
+shader_parameter/pulse_amount = 0.12
+shader_parameter/pulse_speed = 1.6
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_neck"]
 shader = ExtResource("14_body")
-shader_parameter/dark_color = Color(0.5, 0.03, 0.03, 1)
-shader_parameter/hot_color = Color(1, 0.55, 0.1, 1)
+shader_parameter/dark_color = Color(0.045, 0.01, 0.01, 1)
+shader_parameter/hot_color = Color(0.34, 0.05, 0.015, 1)
 shader_parameter/gradient_axis = Vector3(0, 1, 0)
 shader_parameter/gradient_center = 0
 shader_parameter/gradient_soft = 0.5
 shader_parameter/glow = 0.65
-shader_parameter/rim_color = Color(1, 0.72, 0.25, 1)
-shader_parameter/rim_strength = 1.1
+shader_parameter/rim_color = Color(1, 0.42, 0.08, 1)
+shader_parameter/rim_strength = 1.5
 shader_parameter/rim_power = 2.6
 shader_parameter/scale_rows = 7
-shader_parameter/scale_contrast = 0.28
+shader_parameter/scale_contrast = 0.5
+shader_parameter/seam_glow = 1.3
+shader_parameter/pulse_amount = 0.12
+shader_parameter/pulse_speed = 1.6
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_head"]
 shader = ExtResource("14_body")
-shader_parameter/dark_color = Color(0.8, 0.14, 0.03, 1)
-shader_parameter/hot_color = Color(1, 0.74, 0.2, 1)
+shader_parameter/dark_color = Color(0.03, 0.008, 0.008, 1)
+shader_parameter/hot_color = Color(0.32, 0.045, 0.015, 1)
 shader_parameter/gradient_axis = Vector3(0, -0.25, -1)
-shader_parameter/gradient_center = -0.05
+shader_parameter/gradient_center = 0.2
 shader_parameter/gradient_soft = 0.35
-shader_parameter/glow = 0.8
-shader_parameter/rim_color = Color(1, 0.85, 0.4, 1)
-shader_parameter/rim_strength = 1
+shader_parameter/glow = 0.55
+shader_parameter/rim_color = Color(1, 0.5, 0.12, 1)
+shader_parameter/rim_strength = 1.5
 shader_parameter/rim_power = 2.4
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_limb"]
 shader = ExtResource("14_body")
-shader_parameter/dark_color = Color(0.28, 0.015, 0.03, 1)
-shader_parameter/hot_color = Color(0.85, 0.16, 0.03, 1)
+shader_parameter/dark_color = Color(0.025, 0.006, 0.006, 1)
+shader_parameter/hot_color = Color(0.5, 0.06, 0.02, 1)
 shader_parameter/gradient_axis = Vector3(0, -1, 0)
 shader_parameter/gradient_center = 0
 shader_parameter/gradient_soft = 0.5
@@ -161,20 +169,26 @@ shader_parameter/hot_color = Color(1, 0.96, 0.72, 1)
 shader_parameter/gradient_axis = Vector3(0, 0, 1)
 shader_parameter/gradient_center = 0
 shader_parameter/gradient_soft = 0.5
-shader_parameter/glow = 2.2
+shader_parameter/glow = 3.2
 shader_parameter/rim_color = Color(1, 0.9, 0.6, 1)
 shader_parameter/rim_strength = 1.5
 shader_parameter/rim_power = 2
-shader_parameter/pulse_amount = 0.35
-shader_parameter/pulse_speed = 1.1
+shader_parameter/pulse_amount = 0.5
+shader_parameter/pulse_speed = 1.6
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_horn"]
-albedo_color = Color(0.1, 0.07, 0.08, 1)
+albedo_color = Color(0.035, 0.025, 0.028, 1)
 metallic_specular = 0.7
 roughness = 0.35
 emission_enabled = true
-emission = Color(0.35, 0.06, 0.02, 1)
-emission_energy_multiplier = 0.35
+emission = Color(0.55, 0.09, 0.02, 1)
+emission_energy_multiplier = 0.28
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_eye"]
+shader = ExtResource("30_spark")
+shader_parameter/color = Color(1, 0.8, 0.32, 1)
+shader_parameter/glow = 3.2
+shader_parameter/ascended_color = Color(0.85, 0.97, 1, 1)
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_eye"]
 shading_mode = 0
@@ -215,7 +229,7 @@ fill_to = Vector2(1, 0.5)
 transparency = 1
 blend_mode = 1
 shading_mode = 0
-albedo_color = Color(1, 0.55, 0.18, 0.24)
+albedo_color = Color(0.9, 0.16, 0.03, 0.13)
 albedo_texture = SubResource("GradientTexture2D_halo")
 billboard_mode = 1
 billboard_keep_scale = true
@@ -230,7 +244,7 @@ shader = ExtResource("21_nova")
 transparency = 1
 blend_mode = 1
 shading_mode = 0
-albedo_color = Color(1, 0.92, 0.62, 0.9)
+albedo_color = Color(0.5, 0.82, 1, 0.9)
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_spark"]
 shading_mode = 0
@@ -408,12 +422,12 @@ surface_material_override/0 = SubResource("StandardMaterial3D_halo")
 script = ExtResource("33_halo")
 
 [node name="Chest" type="MeshInstance3D" parent="Visual/Hover/Body"]
-transform = Transform3D(1.15, 0, 0, 0, 0, -1.08, 0, 1.4, 0, 0, 0, -0.3)
+transform = Transform3D(1.04, 0, 0, 0, 0, -1, 0, 1.44, 0, 0, 0, -0.3)
 mesh = SubResource("SphereMesh_ball")
 surface_material_override/0 = SubResource("ShaderMaterial_body")
 
 [node name="Belly" type="MeshInstance3D" parent="Visual/Hover/Body"]
-transform = Transform3D(0.94, 0, 0, 0, 0, -0.88, 0, 1.3, 0, 0, -0.06, 0.45)
+transform = Transform3D(0.82, 0, 0, 0, 0, -0.8, 0, 1.3, 0, 0, -0.06, 0.45)
 mesh = SubResource("SphereMesh_ball")
 surface_material_override/0 = SubResource("ShaderMaterial_body")
 
@@ -427,6 +441,60 @@ transform = Transform3D(0.183848, -0.183848, 0, 0.132249, 0.132249, 0.0694658, -
 cast_shadow = 0
 mesh = SubResource("BoxMesh_box")
 surface_material_override/0 = SubResource("ShaderMaterial_heart")
+
+[node name="Spine1" type="MeshInstance3D" parent="Visual/Hover/Body"]
+transform = Transform3D(0.15, 0, 0, 0, 0.4, -0.09, 0, 0.3, 0.12, 0, 0.64, -0.57)
+cast_shadow = 0
+mesh = SubResource("CylinderMesh_cone")
+surface_material_override/0 = SubResource("StandardMaterial3D_horn")
+
+[node name="Spine2" type="MeshInstance3D" parent="Visual/Hover/Body"]
+transform = Transform3D(0.19, 0, 0, 0, 0.576, -0.114, 0, 0.432, 0.152, 0, 0.788, -0.164)
+cast_shadow = 0
+mesh = SubResource("CylinderMesh_cone")
+surface_material_override/0 = SubResource("StandardMaterial3D_horn")
+
+[node name="Spine3" type="MeshInstance3D" parent="Visual/Hover/Body"]
+transform = Transform3D(0.2, 0, 0, 0, 0.624, -0.12, 0, 0.468, 0.16, 0, 0.782, 0.214)
+cast_shadow = 0
+mesh = SubResource("CylinderMesh_cone")
+surface_material_override/0 = SubResource("StandardMaterial3D_horn")
+
+[node name="Spine4" type="MeshInstance3D" parent="Visual/Hover/Body"]
+transform = Transform3D(0.17, 0, 0, 0, 0.496, -0.102, 0, 0.372, 0.136, 0, 0.618, 0.566)
+cast_shadow = 0
+mesh = SubResource("CylinderMesh_cone")
+surface_material_override/0 = SubResource("StandardMaterial3D_horn")
+
+[node name="Spine5" type="MeshInstance3D" parent="Visual/Hover/Body"]
+transform = Transform3D(0.14, 0, 0, 0, 0.368, -0.084, 0, 0.276, 0.112, 0, 0.444, 0.918)
+cast_shadow = 0
+mesh = SubResource("CylinderMesh_cone")
+surface_material_override/0 = SubResource("StandardMaterial3D_horn")
+
+[node name="ShoulderSpikeL" type="MeshInstance3D" parent="Visual/Hover/Body"]
+transform = Transform3D(0.207334, -0.22, 0.030525, 0.0735702, 0.62, -0.0860249, 0, 0.3, 0.20017, -0.53, 0.71, -0.23)
+cast_shadow = 0
+mesh = SubResource("CylinderMesh_cone")
+surface_material_override/0 = SubResource("StandardMaterial3D_horn")
+
+[node name="ShoulderSpikeLowL" type="MeshInstance3D" parent="Visual/Hover/Body"]
+transform = Transform3D(0.111786, -0.34, 0.0531667, 0.100019, 0.38, -0.0594216, 0, 0.32, 0.127053, -0.73, 0.53, -0.14)
+cast_shadow = 0
+mesh = SubResource("CylinderMesh_cone")
+surface_material_override/0 = SubResource("StandardMaterial3D_horn")
+
+[node name="ShoulderSpikeR" type="MeshInstance3D" parent="Visual/Hover/Body"]
+transform = Transform3D(0.207334, 0.22, -0.030525, -0.0735702, 0.62, -0.0860249, 0, 0.3, 0.20017, 0.53, 0.71, -0.23)
+cast_shadow = 0
+mesh = SubResource("CylinderMesh_cone")
+surface_material_override/0 = SubResource("StandardMaterial3D_horn")
+
+[node name="ShoulderSpikeLowR" type="MeshInstance3D" parent="Visual/Hover/Body"]
+transform = Transform3D(0.111786, 0.34, -0.0531667, -0.100019, 0.38, -0.0594216, 0, 0.32, 0.127053, 0.73, 0.53, -0.14)
+cast_shadow = 0
+mesh = SubResource("CylinderMesh_cone")
+surface_material_override/0 = SubResource("StandardMaterial3D_horn")
 
 [node name="Ruff1" type="MeshInstance3D" parent="Visual/Hover/Body"]
 transform = Transform3D(-0.209442, 0.248886, -0.592838, 0.214341, 0.209064, -0.613049, -0.0138571, -0.527966, -0.522221, -0.336575, -0.0954508, -0.476017)
@@ -529,21 +597,21 @@ surface_material_override/0 = SubResource("ShaderMaterial_neck")
 
 [node name="Head" type="Node3D" parent="Visual/Hover/Body/Neck"]
 unique_name_in_owner = true
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.8, -0.54)
+transform = Transform3D(1.32, 0, 0, 0, 1.32, 0, 0, 0, 1.32, 0, 0.8, -0.54)
 
 [node name="Skull" type="MeshInstance3D" parent="Visual/Hover/Body/Neck/Head"]
-transform = Transform3D(0.54, 0, 0, 0, 0.5, 0, 0, 0, 0.68, 0, 0.08, -0.16)
+transform = Transform3D(0.5, 0, 0, 0, 0.44, 0, 0, 0, 0.76, 0, 0.07, -0.2)
 mesh = SubResource("SphereMesh_ball")
 surface_material_override/0 = SubResource("ShaderMaterial_head")
 
 [node name="BeakUpper" type="MeshInstance3D" parent="Visual/Hover/Body/Neck/Head"]
-transform = Transform3D(0.26, 0, 0, 0, -0.15, 0.27942, 0, -0.54, -0.0776167, 0, -0.005, -0.71)
+transform = Transform3D(0.299, 0, 0, 0, -0.2025, 0.307362, 0, -0.729, -0.085378, 0, -0.031, -0.804)
 cast_shadow = 0
 mesh = SubResource("CylinderMesh_cone")
 surface_material_override/0 = SubResource("StandardMaterial3D_horn")
 
 [node name="BeakHook" type="MeshInstance3D" parent="Visual/Hover/Body/Neck/Head"]
-transform = Transform3D(0.11, 0, 0, 0, -0.19, 0.0331245, 0, -0.06, -0.104894, 0, -0.135, -0.94)
+transform = Transform3D(0.132, 0, 0, 0, -0.304, 0.039749, 0, -0.096, -0.125873, 0, -0.235, -1.13)
 cast_shadow = 0
 mesh = SubResource("CylinderMesh_cone")
 surface_material_override/0 = SubResource("StandardMaterial3D_horn")
@@ -553,19 +621,19 @@ unique_name_in_owner = true
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.06, -0.42)
 
 [node name="BeakLower" type="MeshInstance3D" parent="Visual/Hover/Body/Neck/Head/Jaw"]
-transform = Transform3D(0.18, 0, 0, 0, -0.07, 0.157058, 0, -0.36, -0.0305391, 0, -0.055, -0.18)
+transform = Transform3D(0.198, 0, 0, 0, -0.0875, 0.172764, 0, -0.45, -0.033593, 0, -0.064, -0.225)
 cast_shadow = 0
 mesh = SubResource("CylinderMesh_cone")
 surface_material_override/0 = SubResource("StandardMaterial3D_horn")
 
 [node name="EyeL" type="MeshInstance3D" parent="Visual/Hover/Body/Neck/Head"]
-transform = Transform3D(0.15, 0, 0, 0, 0.15, 0, 0, 0, 0.15, -0.215, 0.14, -0.31)
+transform = Transform3D(-0.175997, 0.0371343, -0.101949, 0.0939373, 0.0708562, 0.0522555, 0.181936, -0.000662262, -0.125602, -0.15, 0.13, -0.48)
 cast_shadow = 0
 mesh = SubResource("SphereMesh_bead")
-surface_material_override/0 = SubResource("StandardMaterial3D_eye")
+surface_material_override/0 = SubResource("ShaderMaterial_eye")
 
 [node name="BrowL" type="MeshInstance3D" parent="Visual/Hover/Body/Neck/Head"]
-transform = Transform3D(0.215711, -0.0263023, 0, 0.102084, 0.0523258, 0.0822534, -0.0254524, -0.0130463, 0.329901, -0.2, 0.25, -0.33)
+transform = Transform3D(-0.338958, 0.0557015, -0.155922, 0.180916, 0.106284, 0.0799201, 0.350395, -0.000993393, -0.192097, -0.135807, 0.218333, -0.501114)
 cast_shadow = 0
 mesh = SubResource("BoxMesh_box")
 surface_material_override/0 = SubResource("StandardMaterial3D_horn")
@@ -580,13 +648,13 @@ mesh = SubResource("RibbonTrailMesh_flame")
 surface_material_override/0 = SubResource("ShaderMaterial_crest")
 
 [node name="EyeR" type="MeshInstance3D" parent="Visual/Hover/Body/Neck/Head"]
-transform = Transform3D(0.15, 0, 0, 0, 0.15, 0, 0, 0, 0.15, 0.215, 0.14, -0.31)
+transform = Transform3D(0.175997, 0.0371343, 0.101949, 0.0939373, -0.0708562, 0.0522555, 0.181936, 0.000662262, -0.125602, 0.15, 0.13, -0.48)
 cast_shadow = 0
 mesh = SubResource("SphereMesh_bead")
-surface_material_override/0 = SubResource("StandardMaterial3D_eye")
+surface_material_override/0 = SubResource("ShaderMaterial_eye")
 
 [node name="BrowR" type="MeshInstance3D" parent="Visual/Hover/Body/Neck/Head"]
-transform = Transform3D(0.215711, 0.0263023, 0, -0.102084, 0.0523258, 0.0822534, 0.0254524, -0.0130463, 0.329901, 0.2, 0.25, -0.33)
+transform = Transform3D(0.338958, 0.0557015, 0.155922, 0.180916, -0.106284, 0.0799201, 0.350395, 0.000993393, -0.192097, 0.135807, 0.218333, -0.501114)
 cast_shadow = 0
 mesh = SubResource("BoxMesh_box")
 surface_material_override/0 = SubResource("StandardMaterial3D_horn")
@@ -601,7 +669,7 @@ mesh = SubResource("RibbonTrailMesh_flame")
 surface_material_override/0 = SubResource("ShaderMaterial_crest")
 
 [node name="Crest1" type="MeshInstance3D" parent="Visual/Hover/Body/Neck/Head"]
-transform = Transform3D(-0.179394, 0.145973, 0.201448, -0.0599531, -0.302322, -0.780374, -0.0179859, -0.448211, 0.591976, -0.177986, 0.401161, 0.154106)
+transform = Transform3D(-0.179394, 0.145973, 0.201448, -0.02675, 0.130793, -0.962096, -0.056589, -0.524581, -0.183822, -0.177986, 0.253167, 0.178294)
 cast_shadow = 0
 extra_cull_margin = 0.6
 instance_shader_parameters/bend = 0.28
@@ -610,7 +678,7 @@ mesh = SubResource("RibbonTrailMesh_flame")
 surface_material_override/0 = SubResource("ShaderMaterial_crest")
 
 [node name="Crest2" type="MeshInstance3D" parent="Visual/Hover/Body/Neck/Head"]
-transform = Transform3D(-0.186078, 0.131093, 0.0973643, -0.0367879, -0.505917, -0.703637, -0.0110364, -0.523892, 0.703858, -0.135547, 0.502958, 0.161946)
+transform = Transform3D(-0.186078, 0.131093, 0.097364, -0.016414, 0.050803, -0.993893, -0.034724, -0.726522, -0.051931, -0.135547, 0.315456, 0.25919)
 cast_shadow = 0
 extra_cull_margin = 0.6
 instance_shader_parameters/bend = 0.28
@@ -620,7 +688,7 @@ mesh = SubResource("RibbonTrailMesh_flame")
 surface_material_override/0 = SubResource("ShaderMaterial_crest")
 
 [node name="Crest3" type="MeshInstance3D" parent="Visual/Hover/Body/Neck/Head"]
-transform = Transform3D(-0.189142, 0.0824667, 0.0312502, -0.0172758, -0.741299, -0.58522, -0.00518275, -0.538586, 0.810272, -0.0762333, 0.62065, 0.139293)
+transform = Transform3D(-0.189142, 0.082467, 0.03125, -0.007708, -0.095778, -0.993738, -0.016306, -0.911277, 0.107275, -0.076233, 0.411042, 0.331495)
 cast_shadow = 0
 extra_cull_margin = 0.6
 instance_shader_parameters/bend = 0.28
@@ -630,7 +698,7 @@ mesh = SubResource("RibbonTrailMesh_flame")
 surface_material_override/0 = SubResource("ShaderMaterial_crest")
 
 [node name="Crest4" type="MeshInstance3D" parent="Visual/Hover/Body/Neck/Head"]
-transform = Transform3D(-0.19, 0, 0, 0, -0.988673, -0.438371, 0, -0.482208, 0.898794, 0, 0.744337, 0.0811041)
+transform = Transform3D(-0.19, 0, 0, 0, -0.303201, -0.961262, 0, -1.05739, 0.275637, 0, 0.537047, 0.384476)
 cast_shadow = 0
 extra_cull_margin = 0.6
 instance_shader_parameters/bend = 0.28
@@ -640,7 +708,7 @@ mesh = SubResource("RibbonTrailMesh_flame")
 surface_material_override/0 = SubResource("ShaderMaterial_crest")
 
 [node name="Crest5" type="MeshInstance3D" parent="Visual/Hover/Body/Neck/Head"]
-transform = Transform3D(-0.189142, -0.0824667, -0.0312502, 0.0172758, -0.741299, -0.58522, 0.00518275, -0.538586, 0.810272, 0.0762333, 0.62065, 0.139293)
+transform = Transform3D(-0.189142, -0.082467, -0.03125, 0.007708, -0.095778, -0.993738, 0.016306, -0.911277, 0.107275, 0.076233, 0.411042, 0.331495)
 cast_shadow = 0
 extra_cull_margin = 0.6
 instance_shader_parameters/bend = 0.28
@@ -650,7 +718,7 @@ mesh = SubResource("RibbonTrailMesh_flame")
 surface_material_override/0 = SubResource("ShaderMaterial_crest")
 
 [node name="Crest6" type="MeshInstance3D" parent="Visual/Hover/Body/Neck/Head"]
-transform = Transform3D(-0.186078, -0.131093, -0.0973643, 0.0367879, -0.505917, -0.703637, 0.0110364, -0.523892, 0.703858, 0.135547, 0.502958, 0.161946)
+transform = Transform3D(-0.186078, -0.131093, -0.097364, 0.016414, 0.050803, -0.993893, 0.034724, -0.726522, -0.051931, 0.135547, 0.315456, 0.25919)
 cast_shadow = 0
 extra_cull_margin = 0.6
 instance_shader_parameters/bend = 0.28
@@ -660,13 +728,37 @@ mesh = SubResource("RibbonTrailMesh_flame")
 surface_material_override/0 = SubResource("ShaderMaterial_crest")
 
 [node name="Crest7" type="MeshInstance3D" parent="Visual/Hover/Body/Neck/Head"]
-transform = Transform3D(-0.179394, -0.145973, -0.201448, 0.0599531, -0.302322, -0.780374, 0.0179859, -0.448211, 0.591976, 0.177986, 0.401161, 0.154106)
+transform = Transform3D(-0.179394, -0.145973, -0.201448, 0.02675, 0.130793, -0.962096, 0.056589, -0.524581, -0.183822, 0.177986, 0.253167, 0.178294)
 cast_shadow = 0
 extra_cull_margin = 0.6
 instance_shader_parameters/bend = 0.28
 instance_shader_parameters/phase = 5.50013
 mesh = SubResource("RibbonTrailMesh_flame")
 surface_material_override/0 = SubResource("ShaderMaterial_crest")
+
+[node name="HornL" type="MeshInstance3D" parent="Visual/Hover/Body/Neck/Head"]
+transform = Transform3D(0.165584, -0.50491, 0.074166, 0.11217, 0.745343, -0.109483, -0, 0.793429, 0.150043, -0.452455, 0.672671, 0.416715)
+cast_shadow = 0
+mesh = SubResource("CylinderMesh_cone")
+surface_material_override/0 = SubResource("StandardMaterial3D_horn")
+
+[node name="HornLowL" type="MeshInstance3D" parent="Visual/Hover/Body/Neck/Head"]
+transform = Transform3D(0.047118, -0.447813, 0.076573, 0.121161, 0.174149, -0.029778, -0, 0.391836, 0.100747, -0.523906, 0.247075, 0.315918)
+cast_shadow = 0
+mesh = SubResource("CylinderMesh_cone")
+surface_material_override/0 = SubResource("StandardMaterial3D_horn")
+
+[node name="HornR" type="MeshInstance3D" parent="Visual/Hover/Body/Neck/Head"]
+transform = Transform3D(0.165584, 0.50491, -0.074166, -0.11217, 0.745343, -0.109483, 0, 0.793429, 0.150043, 0.452455, 0.672671, 0.416715)
+cast_shadow = 0
+mesh = SubResource("CylinderMesh_cone")
+surface_material_override/0 = SubResource("StandardMaterial3D_horn")
+
+[node name="HornLowR" type="MeshInstance3D" parent="Visual/Hover/Body/Neck/Head"]
+transform = Transform3D(0.047118, 0.447813, -0.076573, -0.121161, 0.174149, -0.029778, 0, 0.391836, 0.100747, 0.523906, 0.247075, 0.315918)
+cast_shadow = 0
+mesh = SubResource("CylinderMesh_cone")
+surface_material_override/0 = SubResource("StandardMaterial3D_horn")
 
 [node name="AscendedCrown" type="Node3D" parent="Visual/Hover/Body/Neck/Head"]
 unique_name_in_owner = true
@@ -843,7 +935,7 @@ surface_material_override/0 = SubResource("ShaderMaterial_crest")
 
 [node name="WingL" type="Node3D" parent="Visual/Hover/Body"]
 unique_name_in_owner = true
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.48, 0.22, -0.42)
+transform = Transform3D(1.1, 0, 0, 0, 1.1, 0, 0, 0, 1.1, -0.48, 0.22, -0.42)
 
 [node name="ShoulderL" type="MeshInstance3D" parent="Visual/Hover/Body/WingL"]
 transform = Transform3D(0.46, 0, 0, 0, 0.42, 0, 0, 0, 0.5, -0.02, 0, 0)
@@ -953,12 +1045,24 @@ surface_material_override/0 = SubResource("ShaderMaterial_covert")
 
 [node name="HandL" type="Node3D" parent="Visual/Hover/Body/WingL"]
 unique_name_in_owner = true
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.25, 0.06, 0.12)
+transform = Transform3D(1.12, 0, 0, 0, 1.12, 0, 0, 0, 1.12, -1.25, 0.06, 0.12)
 
 [node name="HandLBone" type="MeshInstance3D" parent="Visual/Hover/Body/WingL/HandL"]
 transform = Transform3D(0.0524429, -0.9, 0, -0.0193437, -0.02, -0.199179, 0.212781, 0.22, -0.0181071, -0.45, -0.01, 0.11)
 mesh = SubResource("CylinderMesh_cone")
 surface_material_override/0 = SubResource("ShaderMaterial_limb")
+
+[node name="WristClawL" type="MeshInstance3D" parent="Visual/Hover/Body/WingL/HandL"]
+transform = Transform3D(0, -0.16, 0.155332, -0.158082, 0.1, 0.00592304, -0.0247003, -0.64, -0.0379075, -0.06, 0.05, -0.34)
+cast_shadow = 0
+mesh = SubResource("CylinderMesh_cone")
+surface_material_override/0 = SubResource("StandardMaterial3D_horn")
+
+[node name="WristClawLowL" type="MeshInstance3D" parent="Visual/Hover/Body/WingL/HandL"]
+transform = Transform3D(0.0316083, -0.2, -0.0943447, 0.105361, 0.06, 0.0283034, 0, -0.42, 0.0489694, -0.24, 0.03, -0.21)
+cast_shadow = 0
+mesh = SubResource("CylinderMesh_cone")
+surface_material_override/0 = SubResource("StandardMaterial3D_horn")
 
 [node name="PrimaryL1" type="MeshInstance3D" parent="Visual/Hover/Body/WingL/HandL"]
 transform = Transform3D(0.330641, 0.561461, -0.127856, 0.0438379, 0.0599521, 0.991753, 0.135479, -1.38966, -0.00887156, -0.28073, -0.059976, 0.744832)
@@ -1097,7 +1201,7 @@ surface_material_override/0 = SubResource("ShaderMaterial_flight")
 
 [node name="WingR" type="Node3D" parent="Visual/Hover/Body"]
 unique_name_in_owner = true
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.48, 0.22, -0.42)
+transform = Transform3D(1.1, 0, 0, 0, 1.1, 0, 0, 0, 1.1, 0.48, 0.22, -0.42)
 
 [node name="ShoulderR" type="MeshInstance3D" parent="Visual/Hover/Body/WingR"]
 transform = Transform3D(0.46, 0, 0, 0, 0.42, 0, 0, 0, 0.5, 0.02, 0, 0)
@@ -1207,12 +1311,24 @@ surface_material_override/0 = SubResource("ShaderMaterial_covert")
 
 [node name="HandR" type="Node3D" parent="Visual/Hover/Body/WingR"]
 unique_name_in_owner = true
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.25, 0.06, 0.12)
+transform = Transform3D(1.12, 0, 0, 0, 1.12, 0, 0, 0, 1.12, 1.25, 0.06, 0.12)
 
 [node name="HandRBone" type="MeshInstance3D" parent="Visual/Hover/Body/WingR/HandR"]
 transform = Transform3D(0.0524429, 0.9, 0, 0.0193437, -0.02, -0.199179, -0.212781, 0.22, -0.0181071, 0.45, -0.01, 0.11)
 mesh = SubResource("CylinderMesh_cone")
 surface_material_override/0 = SubResource("ShaderMaterial_limb")
+
+[node name="WristClawR" type="MeshInstance3D" parent="Visual/Hover/Body/WingR/HandR"]
+transform = Transform3D(0, 0.16, 0.155332, -0.158082, 0.1, -0.00592304, -0.0247003, -0.64, 0.0379075, 0.06, 0.05, -0.34)
+cast_shadow = 0
+mesh = SubResource("CylinderMesh_cone")
+surface_material_override/0 = SubResource("StandardMaterial3D_horn")
+
+[node name="WristClawLowR" type="MeshInstance3D" parent="Visual/Hover/Body/WingR/HandR"]
+transform = Transform3D(0.0316083, 0.2, 0.0943447, -0.105361, 0.06, 0.0283034, 0, -0.42, 0.0489694, 0.24, 0.03, -0.21)
+cast_shadow = 0
+mesh = SubResource("CylinderMesh_cone")
+surface_material_override/0 = SubResource("StandardMaterial3D_horn")
 
 [node name="PrimaryR1" type="MeshInstance3D" parent="Visual/Hover/Body/WingR/HandR"]
 transform = Transform3D(0.330641, -0.561461, 0.127856, -0.0438379, 0.0599521, 0.991753, -0.135479, -1.38966, -0.00887156, 0.28073, -0.059976, 0.744832)
@@ -1515,72 +1631,140 @@ surface_material_override/0 = SubResource("ShaderMaterial_tail")
 unique_name_in_owner = true
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.36, 0.36)
 
-[node name="ThighL" type="MeshInstance3D" parent="Visual/Hover/Body/Legs"]
-transform = Transform3D(0.3, 0, 0, 0, 0.5, 0, 0, 0, 0.34, -0.2, -0.18, 0.05)
+[node name="LegL" type="Node3D" parent="Visual/Hover/Body/Legs"]
+unique_name_in_owner = true
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.24, 0.02, 0.05)
+
+[node name="ThighL" type="MeshInstance3D" parent="Visual/Hover/Body/Legs/LegL"]
+transform = Transform3D(0.3, 0, 0, 0, 0.62, 0, 0, 0, 0.38, 0, -0.2, 0)
 mesh = SubResource("SphereMesh_ball")
 surface_material_override/0 = SubResource("ShaderMaterial_limb")
 
-[node name="ShinL" type="MeshInstance3D" parent="Visual/Hover/Body/Legs"]
-transform = Transform3D(0.0998707, -0.02, 0, -0.00491592, -0.38, 0.0254493, -0.00129366, -0.1, -0.0967075, -0.21, -0.55, 0.03)
+[node name="ShinL" type="MeshInstance3D" parent="Visual/Hover/Body/Legs/LegL"]
+transform = Transform3D(-0.149963, -0.01, -0.000476303, 0.00333251, -0.45, -0.0214336, 0, -0.065, 0.14846, -0.005, -0.645, -0.0075)
 cast_shadow = 0
 mesh = SubResource("CylinderMesh_taper")
 surface_material_override/0 = SubResource("StandardMaterial3D_horn")
 
-[node name="ToeL1" type="MeshInstance3D" parent="Visual/Hover/Body/Legs"]
-transform = Transform3D(0.0842997, -0.105069, 0, -0.0111967, -0.0998158, 0.0841305, -0.0294651, -0.262673, -0.0319696, -0.272535, -0.789908, -0.151337)
+[node name="AnkleL" type="MeshInstance3D" parent="Visual/Hover/Body/Legs/LegL"]
+transform = Transform3D(0.15, 0, 0, 0, 0.15, 0, 0, 0, 0.15, -0.01, -0.87, -0.04)
+cast_shadow = 0
+mesh = SubResource("SphereMesh_bead")
+surface_material_override/0 = SubResource("StandardMaterial3D_horn")
+
+[node name="ToeL1" type="MeshInstance3D" parent="Visual/Hover/Body/Legs/LegL"]
+transform = Transform3D(0, -0.13, 0.114682, -0.116582, -0.1, -0.00837096, 0.0284347, -0.41, -0.0343209, -0.075, -0.905, -0.225)
 cast_shadow = 0
 mesh = SubResource("CylinderMesh_cone")
 surface_material_override/0 = SubResource("StandardMaterial3D_horn")
 
-[node name="ToeL2" type="MeshInstance3D" parent="Visual/Hover/Body/Legs"]
-transform = Transform3D(0.09, 0, 0, 0, -0.106565, 0.0841305, 0, -0.280435, -0.0319696, -0.22, -0.793283, -0.160218)
+[node name="ClawL1" type="MeshInstance3D" parent="Visual/Hover/Body/Legs/LegL"]
+transform = Transform3D(-0.0955339, -0.0235514, -0.00512029, 0.00944896, -0.238116, -0.0517688, 0, -0.154277, 0.0806832, -0.128224, -1.05594, -0.432861)
 cast_shadow = 0
 mesh = SubResource("CylinderMesh_cone")
 surface_material_override/0 = SubResource("StandardMaterial3D_horn")
 
-[node name="ToeL3" type="MeshInstance3D" parent="Visual/Hover/Body/Legs"]
-transform = Transform3D(0.0842997, 0.105069, 0, 0.0111967, -0.0998158, 0.0841305, 0.0294651, -0.262673, -0.0319696, -0.167465, -0.789908, -0.151337)
+[node name="ToeL2" type="MeshInstance3D" parent="Visual/Hover/Body/Legs/LegL"]
+transform = Transform3D(0, 0, 0.12, -0.116709, -0.11, 0, 0.0279088, -0.46, 0, -0.01, -0.91, -0.25)
 cast_shadow = 0
 mesh = SubResource("CylinderMesh_cone")
 surface_material_override/0 = SubResource("StandardMaterial3D_horn")
 
-[node name="ToeLBack" type="MeshInstance3D" parent="Visual/Hover/Body/Legs"]
-transform = Transform3D(0.09, 0, 0, 0, -0.0574696, -0.0862044, 0, 0.191565, -0.0258613, -0.22, -0.768735, 0.0757826)
+[node name="ClawL2" type="MeshInstance3D" parent="Visual/Hover/Body/Legs/LegL"]
+transform = Transform3D(-0.096, 0, 0, 0, -0.238606, -0.0529571, 0, -0.157806, 0.0800721, -0.01, -1.0657, -0.481097)
 cast_shadow = 0
 mesh = SubResource("CylinderMesh_cone")
 surface_material_override/0 = SubResource("StandardMaterial3D_horn")
 
-[node name="ThighR" type="MeshInstance3D" parent="Visual/Hover/Body/Legs"]
-transform = Transform3D(0.3, 0, 0, 0, 0.5, 0, 0, 0, 0.34, 0.2, -0.18, 0.05)
+[node name="ToeL3" type="MeshInstance3D" parent="Visual/Hover/Body/Legs/LegL"]
+transform = Transform3D(0, 0.13, 0.114682, -0.116582, -0.1, 0.00837096, 0.0284347, -0.41, 0.0343209, 0.055, -0.905, -0.225)
+cast_shadow = 0
+mesh = SubResource("CylinderMesh_cone")
+surface_material_override/0 = SubResource("StandardMaterial3D_horn")
+
+[node name="ClawL3" type="MeshInstance3D" parent="Visual/Hover/Body/Legs/LegL"]
+transform = Transform3D(-0.0955339, 0.0235514, 0.00512029, -0.00944896, -0.238116, -0.0517688, 0, -0.154277, 0.0806832, 0.108224, -1.05594, -0.432861)
+cast_shadow = 0
+mesh = SubResource("CylinderMesh_cone")
+surface_material_override/0 = SubResource("StandardMaterial3D_horn")
+
+[node name="ToeLBack" type="MeshInstance3D" parent="Visual/Hover/Body/Legs/LegL"]
+transform = Transform3D(0, 0, 0.12, 0.115299, -0.075, 0, 0.0332593, 0.26, 0, -0.01, -0.8925, 0.07)
+cast_shadow = 0
+mesh = SubResource("CylinderMesh_cone")
+surface_material_override/0 = SubResource("StandardMaterial3D_horn")
+
+[node name="ClawLBack" type="MeshInstance3D" parent="Visual/Hover/Body/Legs/LegL"]
+transform = Transform3D(-0.096, 0, 0, 0, -0.192173, 0.0582927, 0, 0.146866, 0.0762756, -0.01, -1.00391, 0.196567)
+cast_shadow = 0
+mesh = SubResource("CylinderMesh_cone")
+surface_material_override/0 = SubResource("StandardMaterial3D_horn")
+
+[node name="LegR" type="Node3D" parent="Visual/Hover/Body/Legs"]
+unique_name_in_owner = true
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.24, 0.02, 0.05)
+
+[node name="ThighR" type="MeshInstance3D" parent="Visual/Hover/Body/Legs/LegR"]
+transform = Transform3D(0.3, 0, 0, 0, 0.62, 0, 0, 0, 0.38, 0, -0.2, 0)
 mesh = SubResource("SphereMesh_ball")
 surface_material_override/0 = SubResource("ShaderMaterial_limb")
 
-[node name="ShinR" type="MeshInstance3D" parent="Visual/Hover/Body/Legs"]
-transform = Transform3D(0.0998707, 0.02, 0, 0.00491592, -0.38, 0.0254493, 0.00129366, -0.1, -0.0967075, 0.21, -0.55, 0.03)
+[node name="ShinR" type="MeshInstance3D" parent="Visual/Hover/Body/Legs/LegR"]
+transform = Transform3D(-0.149963, 0.01, 0.000476303, -0.00333251, -0.45, -0.0214336, 0, -0.065, 0.14846, 0.005, -0.645, -0.0075)
 cast_shadow = 0
 mesh = SubResource("CylinderMesh_taper")
 surface_material_override/0 = SubResource("StandardMaterial3D_horn")
 
-[node name="ToeR1" type="MeshInstance3D" parent="Visual/Hover/Body/Legs"]
-transform = Transform3D(0.0842997, -0.105069, 0, -0.0111967, -0.0998158, 0.0841305, -0.0294651, -0.262673, -0.0319696, 0.167465, -0.789908, -0.151337)
+[node name="AnkleR" type="MeshInstance3D" parent="Visual/Hover/Body/Legs/LegR"]
+transform = Transform3D(0.15, 0, 0, 0, 0.15, 0, 0, 0, 0.15, 0.01, -0.87, -0.04)
+cast_shadow = 0
+mesh = SubResource("SphereMesh_bead")
+surface_material_override/0 = SubResource("StandardMaterial3D_horn")
+
+[node name="ToeR1" type="MeshInstance3D" parent="Visual/Hover/Body/Legs/LegR"]
+transform = Transform3D(0, 0.13, 0.114682, -0.116582, -0.1, 0.00837096, 0.0284347, -0.41, 0.0343209, 0.075, -0.905, -0.225)
 cast_shadow = 0
 mesh = SubResource("CylinderMesh_cone")
 surface_material_override/0 = SubResource("StandardMaterial3D_horn")
 
-[node name="ToeR2" type="MeshInstance3D" parent="Visual/Hover/Body/Legs"]
-transform = Transform3D(0.09, 0, 0, 0, -0.106565, 0.0841305, 0, -0.280435, -0.0319696, 0.22, -0.793283, -0.160218)
+[node name="ClawR1" type="MeshInstance3D" parent="Visual/Hover/Body/Legs/LegR"]
+transform = Transform3D(-0.0955339, 0.0235514, 0.00512029, -0.00944896, -0.238116, -0.0517688, 0, -0.154277, 0.0806832, 0.128224, -1.05594, -0.432861)
 cast_shadow = 0
 mesh = SubResource("CylinderMesh_cone")
 surface_material_override/0 = SubResource("StandardMaterial3D_horn")
 
-[node name="ToeR3" type="MeshInstance3D" parent="Visual/Hover/Body/Legs"]
-transform = Transform3D(0.0842997, 0.105069, 0, 0.0111967, -0.0998158, 0.0841305, 0.0294651, -0.262673, -0.0319696, 0.272535, -0.789908, -0.151337)
+[node name="ToeR2" type="MeshInstance3D" parent="Visual/Hover/Body/Legs/LegR"]
+transform = Transform3D(0, 0, 0.12, -0.116709, -0.11, 0, 0.0279088, -0.46, 0, 0.01, -0.91, -0.25)
 cast_shadow = 0
 mesh = SubResource("CylinderMesh_cone")
 surface_material_override/0 = SubResource("StandardMaterial3D_horn")
 
-[node name="ToeRBack" type="MeshInstance3D" parent="Visual/Hover/Body/Legs"]
-transform = Transform3D(0.09, 0, 0, 0, -0.0574696, -0.0862044, 0, 0.191565, -0.0258613, 0.22, -0.768735, 0.0757826)
+[node name="ClawR2" type="MeshInstance3D" parent="Visual/Hover/Body/Legs/LegR"]
+transform = Transform3D(-0.096, 0, 0, 0, -0.238606, -0.0529571, 0, -0.157806, 0.0800721, 0.01, -1.0657, -0.481097)
+cast_shadow = 0
+mesh = SubResource("CylinderMesh_cone")
+surface_material_override/0 = SubResource("StandardMaterial3D_horn")
+
+[node name="ToeR3" type="MeshInstance3D" parent="Visual/Hover/Body/Legs/LegR"]
+transform = Transform3D(0, -0.13, 0.114682, -0.116582, -0.1, -0.00837096, 0.0284347, -0.41, -0.0343209, -0.055, -0.905, -0.225)
+cast_shadow = 0
+mesh = SubResource("CylinderMesh_cone")
+surface_material_override/0 = SubResource("StandardMaterial3D_horn")
+
+[node name="ClawR3" type="MeshInstance3D" parent="Visual/Hover/Body/Legs/LegR"]
+transform = Transform3D(-0.0955339, -0.0235514, -0.00512029, 0.00944896, -0.238116, -0.0517688, 0, -0.154277, 0.0806832, -0.108224, -1.05594, -0.432861)
+cast_shadow = 0
+mesh = SubResource("CylinderMesh_cone")
+surface_material_override/0 = SubResource("StandardMaterial3D_horn")
+
+[node name="ToeRBack" type="MeshInstance3D" parent="Visual/Hover/Body/Legs/LegR"]
+transform = Transform3D(0, 0, 0.12, 0.115299, -0.075, 0, 0.0332593, 0.26, 0, 0.01, -0.8925, 0.07)
+cast_shadow = 0
+mesh = SubResource("CylinderMesh_cone")
+surface_material_override/0 = SubResource("StandardMaterial3D_horn")
+
+[node name="ClawRBack" type="MeshInstance3D" parent="Visual/Hover/Body/Legs/LegR"]
+transform = Transform3D(-0.096, 0, 0, 0, -0.192173, 0.0582927, 0, 0.146866, 0.0762756, 0.01, -1.00391, 0.196567)
 cast_shadow = 0
 mesh = SubResource("CylinderMesh_cone")
 surface_material_override/0 = SubResource("StandardMaterial3D_horn")
@@ -1671,6 +1855,64 @@ unique_name_in_owner = true
 transform = Transform3D(1.25, 0, 0, 0, 0.32, 0, 0, 0, 1.25, 0, 0.05, 0)
 mesh = SubResource("SphereMesh_ash")
 
+[node name="StepEmbers" type="CPUParticles3D" parent="Visual"]
+unique_name_in_owner = true
+top_level = true
+material_override = SubResource("ShaderMaterial_burst")
+cast_shadow = 0
+emitting = false
+mesh = SubResource("BoxMesh_spark")
+scale_amount_curve = SubResource("Curve_shrink")
+amount = 28
+lifetime = 0.6
+one_shot = true
+explosiveness = 1.0
+local_coords = false
+emission_shape = 6
+emission_ring_axis = Vector3(0, 1, 0)
+emission_ring_height = 0.1
+emission_ring_radius = 0.8
+emission_ring_inner_radius = 0.3
+direction = Vector3(0, 1, 0)
+spread = 70.0
+gravity = Vector3(0, -9, 0)
+initial_velocity_min = 2.0
+initial_velocity_max = 5.5
+radial_accel_min = 4.0
+radial_accel_max = 10.0
+scale_amount_min = 0.9
+scale_amount_max = 2.2
+color = Color(1, 0.7, 0.25, 1)
+
+[node name="GustEmbers" type="CPUParticles3D" parent="Visual"]
+unique_name_in_owner = true
+top_level = true
+material_override = SubResource("ShaderMaterial_burst")
+cast_shadow = 0
+emitting = false
+mesh = SubResource("BoxMesh_spark")
+scale_amount_curve = SubResource("Curve_shrink")
+amount = 46
+lifetime = 0.75
+one_shot = true
+explosiveness = 0.9
+local_coords = false
+emission_shape = 6
+emission_ring_axis = Vector3(0, 1, 0)
+emission_ring_height = 0.2
+emission_ring_radius = 2.6
+emission_ring_inner_radius = 0.8
+direction = Vector3(0, 1, 0)
+spread = 55.0
+gravity = Vector3(0, -3, 0)
+initial_velocity_min = 1.0
+initial_velocity_max = 3.5
+radial_accel_min = 14.0
+radial_accel_max = 26.0
+scale_amount_min = 0.9
+scale_amount_max = 2.4
+color = Color(1, 0.7, 0.25, 1)
+
 [node name="Health" type="Node" parent="."]
 script = ExtResource("2_health")
 max_hp = 2000.0
@@ -1712,6 +1954,9 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
+
+[node name="Presence" type="Node" parent="."]
+script = ExtResource("37_presence")
 
 [node name="Moves" type="Node" parent="."]
 script = ExtResource("25_moveset")

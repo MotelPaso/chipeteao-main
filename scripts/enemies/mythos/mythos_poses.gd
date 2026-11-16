@@ -3,6 +3,37 @@ extends RefCounted
 ## Las poses del fénix: qué le pide cada una al rig (MythosRig). Los valores
 ## son exports del rig (grupos «Vuelo», «Cuerpo», «En tierra», «Amanecer»,
 ## «Alas» y «Cenizas»); aquí solo está cómo se combinan en cada pose.
+## Las dos poses con que va hacia el raider llevan sus números aquí abajo.
+
+# --- Edita aquí: cómo se ve cuando va hacia el raider ----------------------------
+## CAZA (en vuelo, se le viene encima): metros que baja de su altura de vuelo.
+const HUNT_DROP: float = 1.1
+## Inclinación del cuerpo en grados (bajo = tendido, con la cabeza por delante).
+const HUNT_PITCH: float = 4.0
+## Grados que lleva las alas levantadas y echadas hacia atrás.
+const HUNT_WING: float = 16.0
+const HUNT_SWEEP: float = 22.0
+## Su aleteo: cuántas veces más amplio y más lento que en vuelo normal.
+const HUNT_FLAP: float = 1.35
+const HUNT_PERIOD: float = 0.8
+## Grados que adelanta las patas, con las garras abiertas hacia el raider.
+const HUNT_LEGS: float = 48.0
+## Cuánto se agranda (1 = igual).
+const HUNT_SCALE: float = 1.06
+## Grados que lleva el pico abierto y metros que se lanza hacia adelante con cada golpe de alas.
+const HUNT_JAW: float = 14.0
+const HUNT_LUNGE: float = 0.7
+## ACECHO (en tierra, camina hacia el raider): parte de su altura de posado a la
+## que queda al tenderse hacia adelante (0-1). Lo que baja al dar cada paso lo pone Motion.
+const PROWL_CROUCH: float = 0.93
+## Inclinación del cuerpo en grados (bajo = cabeza gacha, por delante).
+const PROWL_PITCH: float = 3.0
+## Grados que abre las alas a los costados, como un manto, y cuánto las pliega.
+const PROWL_WING: float = 12.0
+const PROWL_SWEEP: float = 30.0
+const PROWL_FOLD: float = 26.0
+## Grados que lleva el pico abierto mientras acecha.
+const PROWL_JAW: float = 9.0
 
 
 ## Rellena `want` con lo que pide `pose`. `fly_height` es la altura de vuelo
@@ -13,9 +44,11 @@ static func fill(want: MythosPoseTarget, rig: MythosRig, pose: MythosRig.Pose,
 	want.reset(fly_height, rig.fly_pitch_degrees, rig.flap_degrees, rig.hand_flap_degrees,
 			rig.flap_period)
 	match pose:
-		MythosRig.Pose.WINDUP, MythosRig.Pose.CAST, MythosRig.Pose.GLIDE, MythosRig.Pose.NOVA:
+		MythosRig.Pose.WINDUP, MythosRig.Pose.CAST, MythosRig.Pose.GLIDE, MythosRig.Pose.NOVA, \
+				MythosRig.Pose.HUNT:
 			_in_air(want, rig, pose, nova_charge)
-		MythosRig.Pose.DIVE, MythosRig.Pose.PERCH, MythosRig.Pose.REAR, MythosRig.Pose.SLASH:
+		MythosRig.Pose.DIVE, MythosRig.Pose.PERCH, MythosRig.Pose.REAR, MythosRig.Pose.SLASH, \
+				MythosRig.Pose.PROWL:
 			_on_ground(want, rig, pose, size)
 		MythosRig.Pose.ASHES:
 			want.height = rig.ashes_height
@@ -62,6 +95,21 @@ static func _in_air(want: MythosPoseTarget, rig: MythosRig, pose: MythosRig.Pose
 			want.flap = rig.flap_degrees * 0.08
 			want.hand_flap = rig.hand_flap_degrees * 0.08
 			want.legs = -rig.dive_legs_degrees
+		MythosRig.Pose.HUNT:
+			# Se le viene encima: tendido, la cabeza por delante, las alas en
+			# alto batiendo hondo y las garras abiertas hacia el raider.
+			want.height -= HUNT_DROP
+			want.pitch = HUNT_PITCH
+			want.wing = HUNT_WING
+			want.hand = 6.0
+			want.sweep = HUNT_SWEEP
+			want.flap = rig.flap_degrees * HUNT_FLAP
+			want.hand_flap = rig.hand_flap_degrees * HUNT_FLAP
+			want.legs = HUNT_LEGS
+			want.scale = HUNT_SCALE
+			want.period = rig.flap_period * HUNT_PERIOD
+			want.jaw = HUNT_JAW
+			want.lunge = HUNT_LUNGE
 		MythosRig.Pose.NOVA:
 			# Carga el Amanecer: arriba, erguido, alas abiertas que baten lento.
 			want.height += rig.nova_rise
@@ -101,6 +149,20 @@ static func _on_ground(want: MythosPoseTarget, rig: MythosRig, pose: MythosRig.P
 			want.hand_flap = rig.perch_flap_degrees * 0.6
 			want.legs = -rig.perch_pitch_degrees
 			want.period = rig.flap_period * 2.4
+		MythosRig.Pose.PROWL:
+			# Lo acecha a pie: agazapado, la cabeza gacha por delante y las
+			# alas abiertas a los costados como un manto.
+			want.height *= PROWL_CROUCH
+			want.pitch = PROWL_PITCH
+			want.wing = PROWL_WING
+			want.hand = -34.0
+			want.sweep = PROWL_SWEEP
+			want.fold = PROWL_FOLD
+			want.flap = rig.perch_flap_degrees * 1.6
+			want.hand_flap = rig.perch_flap_degrees
+			want.legs = -PROWL_PITCH
+			want.period = rig.flap_period * 1.6
+			want.jaw = PROWL_JAW
 		MythosRig.Pose.REAR:
 			# Erguido y con las alas en alto: el aviso de un golpe en tierra.
 			want.height += rig.rear_rise

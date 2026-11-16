@@ -11,10 +11,11 @@ extends Node3D
 ##   HandL/R   el tramo de afuera: va un poco atrasado y se pliega
 ##   Tail      se levanta para no clavarse en el suelo, y se mece
 ##   Legs      cuelgan, o se adelantan con las garras por delante
+##   LegL/R    cada pata: las mueve Motion cuando camina
 ## Mythos y sus ataques piden una POSE con set_pose() y gestos sueltos con
 ## gesture() (los lleva el nodo Gestures). Lo que se mueve solo (la cabeza
-## que sigue a su blanco, la cola y las patas que van atrasadas, los saltitos
-## en tierra, las manías) lo lleva el nodo Motion. Las plumas se mecen solas
+## que sigue a su blanco, la cola y las patas que van atrasadas, los pasos en
+## tierra, las manías) lo lleva el nodo Motion. Las plumas se mecen solas
 ## en su shader. En la cinemática de llegada el modelo deja el cuerpo y vuela
 ## por su cuenta (fly_at): la pose sigue mandando en alas, patas y tamaño.
 ## En la segunda fase toma su FORMA RENACIDA (ascend): crece, cambia de
@@ -24,16 +25,17 @@ extends Node3D
 ## Visual (este nodo) queda libre para los tweens de BossBase y la caída al
 ## morir: aquí solo se mueve lo que cuelga de Hover.
 
-## FLY, WINDUP, CAST, GLIDE y NOVA son poses de vuelo; PERCH, REAR y SLASH,
-## de tierra; DIVE es la caída de una a otra y ASHES la brasa entre vidas.
-enum Pose { FLY, WINDUP, DIVE, PERCH, CAST, ASHES, REAR, SLASH, GLIDE, NOVA }
+## FLY, WINDUP, CAST, GLIDE, NOVA y HUNT (se le viene encima al raider) son
+## poses de vuelo; PERCH, REAR, SLASH y PROWL (lo acecha a pie), de tierra;
+## DIVE es la caída de una a otra y ASHES la brasa entre vidas.
+enum Pose { FLY, WINDUP, DIVE, PERCH, CAST, ASHES, REAR, SLASH, GLIDE, NOVA, HUNT, PROWL }
 
 ## Shaders del fénix que saben mezclar hacia la forma renacida.
 const ASCEND_SHADERS: Array[String] = ["phoenix_plumage.gdshader", "phoenix_body.gdshader"]
 
 @export_group("Tamaño")
 ## Tamaño del fénix en su primera forma (1 = como está armado en la escena).
-@export var body_scale: float = 1.7
+@export var body_scale: float = 1.85
 ## Cuántas veces más grande es su forma renacida.
 @export var ascended_scale: float = 1.35
 ## Segundos que tarda en tomar la forma renacida.
@@ -45,11 +47,11 @@ const ASCEND_SHADERS: Array[String] = ["phoenix_plumage.gdshader", "phoenix_body
 ## Esa altura en su forma renacida.
 @export var ascended_hover_height: float = 6.2
 ## Altura del cuerpo mientras está posado, en metros por cada unidad de tamaño.
-@export var perch_height: float = 1.2
+@export var perch_height: float = 1.62
 ## Metros que sube al cargar un ataque.
 @export var windup_rise: float = 1.1
 ## Metros que el cuerpo sube y baja con cada aleteo.
-@export var bob_amplitude: float = 0.2
+@export var bob_amplitude: float = 0.3
 ## Rapidez con que pasa de una pose a otra (por segundo).
 @export var pose_speed: float = 6.0
 ## Rapidez con que entra a las poses de golpe (zarpazo y picada), por segundo.
@@ -61,7 +63,7 @@ const ASCEND_SHADERS: Array[String] = ["phoenix_plumage.gdshader", "phoenix_body
 
 @export_group("Cuerpo")
 ## Inclinación del cuerpo en vuelo normal, en grados (positivo = pico arriba, cuerpo erguido).
-@export var fly_pitch_degrees: float = 44.0
+@export var fly_pitch_degrees: float = 32.0
 ## Inclinación al cargar un ataque, en grados.
 @export var windup_pitch_degrees: float = 64.0
 ## Inclinación al conjurar, en grados.
@@ -99,9 +101,9 @@ const ASCEND_SHADERS: Array[String] = ["phoenix_plumage.gdshader", "phoenix_body
 
 @export_group("Alas")
 ## Segundos de un aleteo completo en vuelo normal.
-@export var flap_period: float = 1.05
+@export var flap_period: float = 1.25
 ## Amplitud del aleteo del brazo del ala, en grados.
-@export var flap_degrees: float = 30.0
+@export var flap_degrees: float = 36.0
 ## Amplitud del aleteo del tramo de afuera (la mano), en grados.
 @export var hand_flap_degrees: float = 26.0
 ## Atraso de la mano respecto del brazo, como fracción de un aleteo (0-0.5).
@@ -133,26 +135,16 @@ const ASCEND_SHADERS: Array[String] = ["phoenix_plumage.gdshader", "phoenix_body
 ## (sube y baja mientras gira) y lift el ataque en curso (la Picada).
 var flight_lift: float = 0.0
 var lift: float = 0.0
+## Fase del aleteo, en radianes (avanza según el período de la pose): las alas
+## bajan entre PI/2 y 3·PI/2. La lee quien acompaña cada golpe de alas.
+var flap_phase: float = 0.0
 
 var _pose: Pose = Pose.FLY
 ## Lo que pide la pose actual; _apply lo rearma en cada frame.
 var _want: MythosPoseTarget = MythosPoseTarget.new()
 var _time: float = 0.0
-## Fase del aleteo, en radianes: avanza según el período de la pose.
-var _flap_phase: float = 0.0
-## Valores actuales, que persiguen a los de la pose: altura (m), inclinación,
-## ala, mano, barrido del ala, pliegue de la mano y patas (grados), amplitudes
-## del aleteo (grados) y escala.
-var _height: float = 0.0
-var _pitch: float = 0.0
-var _wing: float = 0.0
-var _hand: float = 0.0
-var _sweep: float = 0.0
-var _fold: float = 0.0
-var _legs_angle: float = 0.0
-var _flap: float = 0.0
-var _hand_flap: float = 0.0
-var _scale: float = 1.0
+## Lo que se ve ahora: persigue en cada frame a lo que pide la pose.
+var _now: MythosPoseTarget = MythosPoseTarget.new()
 ## Vuelo dirigido (fly_at): dónde va el modelo y cómo se orienta, en el mundo.
 var _directed: bool = false
 var _fly_point: Vector3 = Vector3.ZERO
@@ -210,7 +202,7 @@ func _process(delta: float) -> void:
 	# resto de lo que el movimiento le hace al cuerpo.
 	_gestures.tick(delta, velocity.dot(global_basis.x))
 	_motion.tick(delta, velocity, _hover.global_transform, _head.global_position,
-			_pose == Pose.PERCH, _pose == Pose.FLY or _pose == Pose.PERCH)
+			_pose == Pose.PERCH or _pose == Pose.PROWL, _pose == Pose.FLY or _pose == Pose.PERCH)
 	_apply(delta)
 
 
@@ -309,19 +301,8 @@ func _apply(delta: float) -> void:
 	MythosPoses.fill(_want, self, _pose, lerpf(hover_height, ascended_hover_height, _ascend),
 			_size(), _nova.charge_amount)
 	var speed := strike_pose_speed if _pose == Pose.SLASH or _pose == Pose.DIVE else pose_speed
-	var blend := Juice.damp(speed, delta) if delta > 0.0 else 1.0
-	_height = lerpf(_height, _want.height, blend)
-	_pitch = lerpf(_pitch, _want.pitch, blend)
-	_wing = lerpf(_wing, _want.wing, blend)
-	_hand = lerpf(_hand, _want.hand, blend)
-	_sweep = lerpf(_sweep, _want.sweep, blend)
-	_fold = lerpf(_fold, _want.fold, blend)
-	_legs_angle = lerpf(_legs_angle, _want.legs, blend)
-	_flap = lerpf(_flap, _want.flap, blend)
-	_hand_flap = lerpf(_hand_flap, _want.hand_flap, blend)
-	_scale = lerpf(_scale, _want.scale, blend)
-	_flap_phase = fmod(_flap_phase
-			+ delta * _motion.flap_rate * TAU / maxf(_want.period, 0.01), TAU)
+	_now.approach(_want, Juice.damp(speed, delta) if delta > 0.0 else 1.0)
+	flap_phase = fmod(flap_phase + delta * _motion.flap_rate * TAU / maxf(_now.period, 0.01), TAU)
 	_place_body()
 	_place_wings()
 	_place_tail_and_legs()
@@ -330,20 +311,22 @@ func _apply(delta: float) -> void:
 ## Altura, tamaño e inclinación del cuerpo; el cuello y la cabeza deshacen la
 ## inclinación para seguir mirando al frente, y los gestos se suman encima.
 func _place_body() -> void:
-	var height := _height - _gestures.drop
-	var size := _scale * _size()
+	var height := _now.height - _gestures.drop
+	var size := _now.scale * _size()
+	# Cuánto llevan empujado las alas (positivo cuando están abajo).
+	var beat := -sin(flap_phase) * (_now.flap / maxf(flap_degrees, 0.01))
 	if _pose == Pose.ASHES:
 		# La brasa late en su sitio en vez de mecerse.
 		size *= 1.0 + 0.18 * sin(_time * TAU / maxf(ashes_pulse_period, 0.01))
 	else:
-		# El cuerpo sube cuando las alas bajan, y en tierra avanza a saltitos.
-		height += -sin(_flap_phase) * bob_amplitude * (_flap / maxf(flap_degrees, 0.01)) \
-				+ _motion.hop + flight_lift + lift
-	_hover.position = Vector3(0.0, height, 0.0)
+		# El cuerpo sube cuando las alas bajan, y en tierra sube con cada paso.
+		height += beat * bob_amplitude + _motion.hop + flight_lift + lift
+	# De caza además se lanza hacia adelante con cada golpe de alas.
+	_hover.position = Vector3(0.0, height, -beat * _now.lunge)
 	_hover.scale = Vector3.ONE * size
 	_hover.rotation.y = _gestures.yaw
-	var pitch := deg_to_rad(_pitch + _gestures.pitch + _motion.lean)
-	var roll := _gestures.roll
+	var pitch := deg_to_rad(_now.pitch + _gestures.pitch + _motion.lean)
+	var roll := _gestures.roll + _motion.sway
 	var level := head_level
 	if _directed:
 		# La cinemática lo lleva: va donde le dicen y la cabeza apunta adonde vuela.
@@ -358,21 +341,21 @@ func _place_body() -> void:
 	var look := Vector2(deg_to_rad(_motion.head_pitch), deg_to_rad(_motion.head_yaw)) * 0.5
 	_neck.rotation.x = -pitch * level * 0.55 + deg_to_rad(_gestures.neck) + look.x
 	_neck.rotation.y = look.y
-	_head.rotation.x = -pitch * level * 0.45 + deg_to_rad(2.5) * sin(_flap_phase - 0.6) + look.x
+	_head.rotation.x = -pitch * level * 0.45 + deg_to_rad(2.5) * sin(flap_phase - 0.6) + look.x
 	_head.rotation.y = look.y
 	_head.rotation.z = deg_to_rad(_motion.head_roll)
-	_jaw.rotation.x = -deg_to_rad(_gestures.jaw)
+	_jaw.rotation.x = -deg_to_rad(maxf(_gestures.jaw, _now.jaw))
 
 
 ## Brazo y mano de cada ala. Las alas son espejo: el mismo ángulo con signo
 ## contrario.
 func _place_wings() -> void:
-	var arm := _wing + sin(_flap_phase) * _flap + _gestures.wing + _motion.wing
-	var hand := deg_to_rad(_hand + sin(_flap_phase - hand_lag * TAU) * _hand_flap)
-	var sweep := deg_to_rad(_sweep)
-	var fold := deg_to_rad(_fold)
+	var arm := _now.wing + sin(flap_phase) * _now.flap + _gestures.wing + _motion.wing
+	var hand := deg_to_rad(_now.hand + sin(flap_phase - hand_lag * TAU) * _now.hand_flap)
+	var sweep := deg_to_rad(_now.sweep)
+	var fold := deg_to_rad(_now.fold)
 	# El borde de ataque baja un poco en el golpe hacia abajo.
-	var twist := deg_to_rad(7.0) * cos(_flap_phase) * (_flap / maxf(flap_degrees, 0.01))
+	var twist := deg_to_rad(7.0) * cos(flap_phase) * (_now.flap / maxf(flap_degrees, 0.01))
 	_wing_left.rotation = Vector3(twist, sweep, -deg_to_rad(arm + _gestures.wing_left))
 	_wing_right.rotation = Vector3(twist, -sweep, deg_to_rad(arm + _gestures.wing_right))
 	_hand_left.rotation = Vector3(0.0, fold, -hand)
@@ -380,10 +363,10 @@ func _place_wings() -> void:
 
 
 func _place_tail_and_legs() -> void:
-	_tail.rotation.x = -deg_to_rad(_pitch) * tail_level + deg_to_rad(_motion.tail_pitch)
+	_tail.rotation.x = -deg_to_rad(_now.pitch) * tail_level + deg_to_rad(_motion.tail_pitch)
 	_tail.rotation.y = deg_to_rad(tail_sway_degrees) * sin(_time * TAU / 2.6) \
 			+ deg_to_rad(_motion.tail_yaw)
-	_legs.rotation.x = deg_to_rad(_legs_angle + _motion.legs)
+	_legs.rotation.x = deg_to_rad(_now.legs + _motion.legs)
 
 
 ## Cuánto tomó la forma renacida: color de cada pieza, piezas de más y aura.

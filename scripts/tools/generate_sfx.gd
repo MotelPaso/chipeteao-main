@@ -63,6 +63,7 @@ func _init() -> void:
 	_save_wav(SFX_DIR, "phoenix_dive", _gen_phoenix_dive())
 	_save_wav(SFX_DIR, "phoenix_breath", _gen_phoenix_breath())
 	_save_wav(SFX_DIR, "phoenix_flap", _gen_phoenix_flap())
+	_save_wav(SFX_DIR, "phoenix_step", _gen_phoenix_step())
 	_save_wav(SFX_DIR, "phoenix_hurt", _gen_phoenix_hurt())
 	_save_wav(SFX_DIR, "phoenix_death", _gen_phoenix_death())
 	_save_wav(SFX_DIR, "phoenix_ascend", _gen_phoenix_ascend())
@@ -472,6 +473,16 @@ func _gen_phoenix_flap() -> PackedFloat32Array:
 	_mix_at(out, _tone(0.3, 95.0, 45.0, Wave.SINE), 0.02, 0.8)
 	_adsr(out, 0.05, 0.12, 0.5, 0.25)
 	_normalize(out, 0.8)
+	return out
+
+
+## Pisada de Mythos en tierra: un golpe sordo y grave, con algo de grava.
+func _gen_phoenix_step() -> PackedFloat32Array:
+	var out := _tone(0.45, 84.0, 34.0, Wave.SINE, 0.6)
+	_mix_at(out, _lowpass(_noise(0.3, _rng(613)), 1500.0, 160.0), 0.0, 0.5)
+	_exp_decay(out, 0.1)
+	_adsr(out, 0.004, 0.08, 0.7, 0.2)
+	_normalize(out, 0.9)
 	return out
 
 
