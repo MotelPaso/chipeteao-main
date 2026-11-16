@@ -66,7 +66,7 @@ func begin(target: Node3D) -> void:
 		var angle := start + TAU * float(i) / float(count)
 		boss.spawn_fire_zone(_center + Vector3(cos(angle), 0.0, sin(angle)) * ring_radius,
 				zone_radius, warn_seconds, burn_seconds, zone_dps, true)
-	Telegraph.spawn_disc(boss, _center, blast_radius, _timer, boss.telegraph_color)
+	boss.warn_disc(_center, blast_radius, _timer)
 
 
 func tick(delta: float) -> bool:
@@ -78,6 +78,7 @@ func tick(delta: float) -> bool:
 	_blasted = true
 	boss.strike_ground([_center], blast_radius, blast_height_window, blast_damage)
 	FireBurst.spawn(burst_scene, _center, blast_radius * burst_radius_factor, burst_height)
+	boss.blast(_center, blast_radius)
 	boss.feel.shock(MythosFeel.Shock.HEAVY, _center)
 	Sfx.play(blast_sfx)
 	boss.rig.gesture(&"slam")

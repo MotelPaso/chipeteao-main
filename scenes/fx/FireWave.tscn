@@ -5,6 +5,7 @@
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_wall"]
 shader = ExtResource("2_wall")
+shader_parameter/seam = 0.167
 
 [sub_resource type="QuadMesh" id="QuadMesh_segment"]
 material = SubResource("ShaderMaterial_wall")

@@ -5,7 +5,8 @@
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_wall"]
 shader = ExtResource("2_wall")
-shader_parameter/strength = 2.6
+shader_parameter/seam = 0.2
+shader_parameter/strength = 2.2
 shader_parameter/tongue_scale = 0.7
 shader_parameter/rise_speed = 5.5
 

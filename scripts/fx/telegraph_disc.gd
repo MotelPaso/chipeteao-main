@@ -48,11 +48,6 @@ func show_disc(center: Vector3, radius: float, duration: float, color: Color) ->
 	_tween.chain().tween_callback(_on_disc_done)
 
 
-## Corre el aviso a `center` sin cortar su animación (un aviso que persigue).
-func move_to(center: Vector3) -> void:
-	global_position = center + Vector3.UP * lift
-
-
 func _on_disc_done() -> void:
 	Pools.release(self)
 

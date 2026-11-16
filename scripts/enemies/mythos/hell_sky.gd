@@ -4,12 +4,24 @@ extends RefCounted
 ## PROPIO de la arena, su Sky y el horizonte (Backdrop). Los encuentra, deja
 ## copias propias donde hace falta y escribe en ellos un cielo completo
 ## (HellSky.Palette). No decide ningún color: los pone HellTransformation,
-## que es quien los muestra en el Inspector.
+## que es quien los muestra en el Inspector. Lo único suyo es el RESPLANDOR
+## del fuego (set_glow): el halo de luz alrededor de todo lo que brilla
+## mientras dura el infierno, que sube y baja con el calor del mapa.
 ##
 ## NUNCA escribe en un recurso compartido. El Environment es el que entrega
 ## el director del clima (el mismo que usa SkyTint); el Sky y su material se
 ## copian, porque la copia del Environment todavía los comparte con la escena
 ## de la arena. Los materiales del Backdrop ya son de cada instancia.
+
+# --- Edita aquí: resplandor del fuego -------------------------------------------
+## Fuerza del resplandor con el infierno a pleno (0 = sin resplandor).
+const GLOW_INTENSITY: float = 0.6
+## Tamaño del halo alrededor de lo que brilla.
+const GLOW_STRENGTH: float = 1.05
+## Cuánto resplandece también lo que no brilla tanto (0-1): sube el clima de horno de toda la imagen.
+const GLOW_BLOOM: float = 0.05
+## Brillo desde el que algo empieza a resplandecer (1 = solo el fuego).
+const GLOW_THRESHOLD: float = 1.15
 
 
 ## Un cielo completo: lo que se le cambia al sol, al ambiente, a la niebla y
@@ -109,6 +121,22 @@ func write(look: Palette) -> void:
 		_sky_material.sky_horizon_color = look.sky_horizon
 		_sky_material.ground_horizon_color = look.ground_horizon
 		_sky_material.ground_bottom_color = look.ground_bottom
+
+
+## Deja el resplandor del fuego a `amount` (0-1) de su fuerza; 0 lo apaga.
+func set_glow(amount: float) -> void:
+	if _environment != null:
+		style_glow(_environment, amount)
+
+
+## El resplandor del fuego sobre `environment`, a `amount` (0-1) de su fuerza.
+static func style_glow(environment: Environment, amount: float) -> void:
+	environment.glow_enabled = amount > 0.01
+	environment.glow_intensity = GLOW_INTENSITY * clampf(amount, 0.0, 1.0)
+	environment.glow_strength = GLOW_STRENGTH
+	environment.glow_bloom = GLOW_BLOOM * clampf(amount, 0.0, 1.0)
+	environment.glow_hdr_threshold = GLOW_THRESHOLD
+	environment.glow_blend_mode = Environment.GLOW_BLEND_MODE_ADDITIVE
 
 
 ## El horizonte a `weight` (0-1) del camino entre el color que tenía al

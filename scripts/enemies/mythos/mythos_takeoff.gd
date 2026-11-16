@@ -53,7 +53,7 @@ func scale_damage(multiplier: float) -> void:
 func begin(_target: Node3D) -> void:
 	_timer = windup
 	_blasted = false
-	Telegraph.spawn_disc(boss, boss.global_position, radius, windup, boss.telegraph_color)
+	boss.warn_disc(boss.floor_point(boss.global_position), radius, windup)
 	boss.rig.set_pose(MythosRig.Pose.REAR)
 
 
@@ -70,6 +70,7 @@ func tick(delta: float) -> bool:
 		FireWave.spawn(wave_scene, at, radius, wave_radius, wave_speed, wave_damage,
 				wave_height_window, wave_band, boss)
 	FireBurst.spawn(burst_scene, at, radius * burst_radius_factor, burst_height)
+	boss.blast(boss.floor_point(at), radius)
 	boss.feel.shock(MythosFeel.Shock.HEAVY, at)
 	boss.rig.gesture(&"flap")
 	boss.rig.burst()

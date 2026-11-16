@@ -143,7 +143,7 @@ func _launch_at(raider: Node3D, index: int) -> void:
 	var ball := Pools.acquire_scene(ball_scene) as Fireball
 	if ball == null:
 		return
-	Telegraph.spawn_disc(boss, to, blast_radius, seconds, boss.telegraph_color)
+	boss.warn_disc(to, blast_radius, seconds)
 	ball.launch(from, to, blast_radius, seconds, damage, height_window, boss, _on_landed)
 	boss.rig.gesture(&"spit")
 	Sfx.play(launch_sfx)

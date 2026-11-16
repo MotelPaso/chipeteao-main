@@ -110,9 +110,7 @@ func _explode() -> void:
 		_attacker.damage_players_in_discs(spots, _radius, _height_window, _damage, _attacker)
 	if _on_land.is_valid():
 		_on_land.call(_to)
-	var burst := Pools.acquire_scene(Pools.EMBER_BURST_SCENE) as EmberBurst
-	if burst != null:
-		burst.play(_to, _radius, true)
+	FireBlast.spawn(Pools.FIRE_BLAST_SCENE, _to, _radius)
 	Juice.shake(shake_strength, shake_seconds)
 	Sfx.play(blast_sfx)
 	_finish()

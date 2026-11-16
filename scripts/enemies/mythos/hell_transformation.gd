@@ -354,6 +354,7 @@ func _apply_ascension(t: float) -> void:
 func _set_heat(value: float) -> void:
 	_heat = value
 	_dressing.write(&"heat", value)
+	_sky.set_glow(value)
 
 
 ## Enfriamiento (0-1): infierno (el de la fase en que murió) -> carbonizado.

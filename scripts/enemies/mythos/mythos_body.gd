@@ -116,6 +116,23 @@ func face_along(direction: Vector3) -> void:
 	_face_along = Vector3(direction.x, 0.0, direction.z)
 
 
+## Aviso en el suelo de un golpe suyo: un sigilo de `radius` metros en
+## `center` que se llena en `seconds`; con `locked` se ve clavado. Devuelve
+## el aviso por si hay que correrlo mientras carga (FireSigil.move_to).
+func warn_disc(center: Vector3, radius: float, seconds: float,
+		locked: bool = false) -> FireSigil:
+	var sigil := Pools.acquire_scene(Pools.FIRE_SIGIL_SCENE) as FireSigil
+	if sigil != null:
+		sigil.show_disc(center, radius, seconds, locked)
+	return sigil
+
+
+## El estallido de fuego de un golpe de `radius` metros en `at` (solo el
+## efecto: el daño lo hace el ataque).
+func blast(at: Vector3, radius: float) -> void:
+	FireBlast.spawn(Pools.FIRE_BLAST_SCENE, at, radius)
+
+
 ## Golpe de suelo avisado contra todos los raiders dentro de algún disco.
 func strike_ground(spots: Array[Vector3], radius: float, height_window: float,
 		damage: float) -> Array[Node3D]:

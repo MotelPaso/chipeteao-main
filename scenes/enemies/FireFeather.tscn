@@ -6,11 +6,13 @@
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_core"]
 shader = ExtResource("2_spark")
 shader_parameter/color = Color(1, 0.82, 0.3, 1)
+shader_parameter/glow = 2.4
 shader_parameter/ascended_color = Color(0.75, 0.95, 1, 1)
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_plume"]
 shader = ExtResource("2_spark")
 shader_parameter/color = Color(1, 0.38, 0.06, 1)
+shader_parameter/glow = 1.6
 shader_parameter/ascended_color = Color(0.08, 0.42, 1, 1)
 
 [sub_resource type="SphereMesh" id="SphereMesh_core"]

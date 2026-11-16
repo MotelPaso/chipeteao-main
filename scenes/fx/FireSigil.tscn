@@ -1,0 +1,16 @@
+[gd_scene load_steps=5 format=3]
+
+[ext_resource type="Script" path="res://scripts/fx/fire_sigil.gd" id="1_script"]
+[ext_resource type="Shader" path="res://assets/shaders/fire_sigil.gdshader" id="2_sigil"]
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_sigil"]
+shader = ExtResource("2_sigil")
+
+[sub_resource type="PlaneMesh" id="PlaneMesh_sigil"]
+material = SubResource("ShaderMaterial_sigil")
+
+[node name="FireSigil" type="MeshInstance3D"]
+visible = false
+cast_shadow = 0
+mesh = SubResource("PlaneMesh_sigil")
+script = ExtResource("1_script")

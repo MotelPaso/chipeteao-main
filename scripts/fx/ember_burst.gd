@@ -5,9 +5,6 @@ extends Node3D
 ## dura y se desvanece, y una ráfaga de brasas que suben. Mallas y materiales
 ## son recursos compartidos de la escena; cada instancia se desvanece con
 ## MeshInstance3D.transparency.
-## Las bolas de fuego de Mythos estallan con este mismo efecto: avisan que es
-## fuego del jefe (boss_fire) y en su segunda fase la cáscara y las brasas
-## salen con los colores del grupo «Fuego renacido».
 
 @export_group("Tiempos")
 ## Segundos que tarda la cáscara en crecer hasta el radio y desvanecerse.
@@ -21,25 +18,11 @@ extends Node3D
 ## build de área no es una burbuja hueca con un soplo de chispas en el centro.
 @export var embers_reference_radius: float = 2.5
 
-@export_group("Fuego renacido")
-## Color de la cáscara cuando estalla fuego de la segunda fase de Mythos.
-@export var reborn_shell_color: Color = Color(0.3, 0.72, 1.0)
-## Color de las brasas en ese caso.
-@export var reborn_ember_color: Color = Color(0.6, 0.9, 1.0)
-
 @onready var _shell: MeshInstance3D = $Shell
 @onready var _scorch: MeshInstance3D = $Scorch
 @onready var _embers: GPUParticles3D = $Embers
 
 var _tween: Tween = null
-## Copias propias de los materiales de la escena, con los colores renacidos.
-var _reborn_shell: StandardMaterial3D = null
-var _reborn_embers: StandardMaterial3D = null
-
-
-func _ready() -> void:
-	_reborn_shell = _recolored(_shell.mesh.surface_get_material(0), reborn_shell_color)
-	_reborn_embers = _recolored(_embers.draw_pass_1.surface_get_material(0), reborn_ember_color)
 
 
 ## Contrato del pool: mata un estallido viejo para que el reuso empiece limpio.
@@ -54,11 +37,7 @@ func pool_reset() -> void:
 
 ## Detona en `center` (el origen del enemigo golpeado) con el radio de daño
 ## dado: la cáscara crece hasta ese radio y la quemadura marca el suelo.
-## `boss_fire` avisa que es fuego de Mythos: toma el color de su fase.
-func play(center: Vector3, radius: float, boss_fire: bool = false) -> void:
-	var reborn := boss_fire and FireTint.amount() >= 0.5
-	_shell.material_override = _reborn_shell if reborn else null
-	_embers.material_override = _reborn_embers if reborn else null
+func play(center: Vector3, radius: float) -> void:
 	global_position = center
 	_shell.transparency = 0.0
 	_shell.scale = Vector3.ONE * 0.2
@@ -80,9 +59,3 @@ func play(center: Vector3, radius: float, boss_fire: bool = false) -> void:
 
 func _release() -> void:
 	Pools.release(self)
-
-
-func _recolored(source: Material, color: Color) -> StandardMaterial3D:
-	var copy := source.duplicate() as StandardMaterial3D
-	copy.albedo_color = color
-	return copy

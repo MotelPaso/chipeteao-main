@@ -1,0 +1,113 @@
+[gd_scene load_steps=17 format=3]
+
+[ext_resource type="Script" path="res://scripts/fx/fire_blast.gd" id="1_script"]
+[ext_resource type="Shader" path="res://assets/shaders/fire_blast.gdshader" id="2_ball"]
+[ext_resource type="Shader" path="res://assets/shaders/fire_shock.gdshader" id="3_shock"]
+[ext_resource type="Shader" path="res://assets/shaders/fire_spark.gdshader" id="4_spark"]
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_ball"]
+shader = ExtResource("2_ball")
+
+[sub_resource type="SphereMesh" id="SphereMesh_ball"]
+material = SubResource("ShaderMaterial_ball")
+radius = 1.0
+height = 2.0
+radial_segments = 32
+rings = 16
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_ring"]
+shader = ExtResource("3_shock")
+shader_parameter/cracks = 0.0
+
+[sub_resource type="PlaneMesh" id="PlaneMesh_ring"]
+material = SubResource("ShaderMaterial_ring")
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_spark"]
+shader = ExtResource("4_spark")
+shader_parameter/color = Color(1, 0.72, 0.25, 1)
+shader_parameter/glow = 3.2
+shader_parameter/ascended_color = Color(0.45, 0.82, 1, 1)
+
+[sub_resource type="BoxMesh" id="BoxMesh_spark"]
+material = SubResource("ShaderMaterial_spark")
+size = Vector3(0.16, 0.16, 0.16)
+
+[sub_resource type="Curve" id="Curve_shrink"]
+_data = [Vector2(0, 1), 0.0, 0.0, 0, 0, Vector2(0.6, 0.8), 0.0, 0.0, 0, 0, Vector2(1, 0), 0.0, 0.0, 0, 0]
+point_count = 3
+
+[sub_resource type="Gradient" id="Gradient_scorch"]
+offsets = PackedFloat32Array(0, 0.55, 1)
+colors = PackedColorArray(0.02, 0.01, 0.01, 0.78, 0.03, 0.015, 0.01, 0.6, 0.03, 0.015, 0.01, 0)
+
+[sub_resource type="GradientTexture2D" id="GradientTexture2D_scorch"]
+gradient = SubResource("Gradient_scorch")
+width = 128
+height = 128
+fill = 1
+fill_from = Vector2(0.5, 0.5)
+fill_to = Vector2(1, 0.5)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_scorch"]
+transparency = 1
+shading_mode = 0
+albedo_texture = SubResource("GradientTexture2D_scorch")
+
+[sub_resource type="PlaneMesh" id="PlaneMesh_scorch"]
+material = SubResource("StandardMaterial3D_scorch")
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_cracks"]
+shader = ExtResource("3_shock")
+shader_parameter/strength = 2.0
+shader_parameter/cracks = 1.0
+shader_parameter/front_gain = 0.0
+
+[sub_resource type="PlaneMesh" id="PlaneMesh_cracks"]
+material = SubResource("ShaderMaterial_cracks")
+
+[node name="FireBlast" type="Node3D"]
+script = ExtResource("1_script")
+
+[node name="Ball" type="MeshInstance3D" parent="."]
+cast_shadow = 0
+mesh = SubResource("SphereMesh_ball")
+
+[node name="Ring" type="MeshInstance3D" parent="."]
+cast_shadow = 0
+mesh = SubResource("PlaneMesh_ring")
+
+[node name="Sparks" type="CPUParticles3D" parent="."]
+cast_shadow = 0
+emitting = false
+amount = 72
+lifetime = 0.95
+one_shot = true
+explosiveness = 0.96
+randomness = 0.4
+local_coords = false
+mesh = SubResource("BoxMesh_spark")
+emission_shape = 1
+emission_sphere_radius = 0.6
+direction = Vector3(0, 1, 0)
+spread = 68.0
+gravity = Vector3(0, -22, 0)
+initial_velocity_min = 6.0
+initial_velocity_max = 14.0
+angular_velocity_min = -360.0
+angular_velocity_max = 360.0
+scale_amount_min = 0.6
+scale_amount_max = 1.6
+scale_amount_curve = SubResource("Curve_shrink")
+
+[node name="Light" type="OmniLight3D" parent="."]
+omni_attenuation = 1.4
+
+[node name="Scorch" type="MeshInstance3D" parent="."]
+cast_shadow = 0
+mesh = SubResource("PlaneMesh_scorch")
+
+[node name="Cracks" type="MeshInstance3D" parent="Scorch"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.02, 0)
+cast_shadow = 0
+mesh = SubResource("PlaneMesh_cracks")
+instance_shader_parameters/reach = 1.0

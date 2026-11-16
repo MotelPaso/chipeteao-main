@@ -19,6 +19,8 @@ enum Step { CHARGE, REST }
 @export var blast_radius: float = 40.0
 ## Daño del estallido a cada raider fuera de los círculos (valor base).
 @export var damage: float = 75.0
+## Radio de la bola de fuego con que se ve el estallido, en metros (el golpe llega hasta blast_radius).
+@export var burst_radius: float = 16.0
 ## Segundos quieto después del estallido.
 @export var recover: float = 1.4
 ## Aviso en el HUD al empezar a cargar.
@@ -178,6 +180,7 @@ func _detonate() -> void:
 	print("%s dawn blast: hit=%d circles=%d" % [boss.boss_title, hit, _circles.size()])
 	boss.rig.set_nova(-1.0)
 	boss.rig.gesture(&"slam")
+	boss.blast(boss.floor_point(origin), burst_radius)
 	boss.feel.shock(MythosFeel.Shock.CATACLYSM, origin)
 	Sfx.play(blast_sfx)
 	get_tree().call_group(SafeCircle.GROUP, "dismiss")

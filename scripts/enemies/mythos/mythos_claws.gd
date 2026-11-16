@@ -91,7 +91,7 @@ func _rear() -> void:
 	_to = boss.safe_point(_from + direction * lunge)
 	_mark = boss.floor_point(_from + direction * reach)
 	_timer = windup * aggression_lerp(1.0, windup_at_full_aggression)
-	Telegraph.spawn_disc(boss, _mark, radius, _timer, boss.telegraph_color)
+	boss.warn_disc(_mark, radius, _timer)
 	boss.rig.set_pose(MythosRig.Pose.REAR)
 	_step = Step.REAR
 
@@ -99,6 +99,7 @@ func _rear() -> void:
 func _strike() -> void:
 	boss.glide_to(_to)
 	boss.strike_ground([_mark], radius, height_window, damage)
+	boss.blast(_mark, radius * 0.7)
 	boss.feel.shock(MythosFeel.Shock.LIGHT, _mark)
 	# Un zarpazo con cada ala, alternando.
 	boss.rig.gesture(&"swipe_left" if _swipes_left % 2 == 0 else &"swipe_right")

@@ -14,7 +14,7 @@ uniform vec3 base_color : source_color = vec3(1.0, 0.85, 0.4);
 uniform vec3 mid_color : source_color = vec3(1.0, 0.42, 0.05);
 uniform vec3 top_color : source_color = vec3(0.7, 0.1, 0.02);
 // Brillo de las vetas de fuego.
-uniform float strength : hint_range(0.0, 6.0) = 2.2;
+uniform float strength : hint_range(0.0, 6.0) = 1.3;
 // Color y opacidad del humo entre las vetas.
 uniform vec3 smoke_color : source_color = vec3(0.17, 0.045, 0.02);
 uniform float smoke_alpha : hint_range(0.0, 1.0) = 0.6;

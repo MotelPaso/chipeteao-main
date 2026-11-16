@@ -145,8 +145,7 @@ func _raise_cage(center: Vector3, amount: int, turn: float) -> void:
 	var reach := maxf(blast_radius, ring)
 	if blast_scene != null:
 		# El disco grande es la cuenta regresiva del estallido.
-		Telegraph.spawn_disc(boss, boss.floor_point(center), reach,
-				warn_seconds + closing_seconds, boss.telegraph_color)
+		boss.warn_disc(boss.floor_point(center), reach, warn_seconds + closing_seconds)
 		_cages.append({"center": center, "radius": reach,
 				"left": warn_seconds + closing_seconds})
 		set_physics_process(true)
@@ -166,5 +165,6 @@ func _raise_cage(center: Vector3, amount: int, turn: float) -> void:
 func _blast(center: Vector3, reach: float) -> void:
 	FireWave.spawn(blast_scene, boss.floor_point(center), 0.5, reach, blast_speed,
 			blast_damage, blast_height_window, blast_band, boss)
+	boss.blast(boss.floor_point(center), closed_radius)
 	boss.feel.shock(MythosFeel.Shock.HEAVY, center)
 	Sfx.play(blast_sfx)

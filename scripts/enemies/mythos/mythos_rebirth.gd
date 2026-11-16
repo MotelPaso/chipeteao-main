@@ -149,8 +149,7 @@ func enter_ashes(boss: Mythos, staged: bool) -> void:
 	_pillar_up = false
 	_waves_left = 0
 	if not staged:
-		Telegraph.spawn_disc(boss, _origin, rebirth_radius, rebirth_seconds,
-				boss.telegraph_color)
+		boss.warn_disc(_origin, rebirth_radius, rebirth_seconds)
 	set_physics_process(not staged)
 
 

@@ -23,6 +23,8 @@ global uniform float fire_ascend;
 uniform float flow_scale : hint_range(0.2, 4.0) = 1.1;
 // Velocidad con que se mueve la lava.
 uniform float flow_speed : hint_range(0.0, 3.0) = 0.6;
+// Cuánto brillan de más las vetas calientes de la lava (0 = nada).
+uniform float vein_glow : hint_range(0.0, 2.0) = 0.55;
 // Opacidad del relleno del aviso (0-1).
 uniform float warn_fill_alpha : hint_range(0.0, 1.0) = 0.3;
 // Metros que el disco se acerca a la cámara al dibujarse: así una loma del
@@ -79,6 +81,7 @@ void fragment() {
 	vec3 core = mix(core_color, ascended_core_color, fire_ascend);
 	vec3 lava = mix(fire, core, max(heat, ring * 0.7));
 	float lava_alpha = max(mix(0.6, 0.94, heat) * inside, ring);
-	ALBEDO = mix(mix(warn_color, ascended_warn_color, fire_ascend), lava, burn);
+	// Las vetas más calientes de la lava brillan de más, para que resplandezcan.
+	ALBEDO = mix(mix(warn_color, ascended_warn_color, fire_ascend), lava * (1.0 + vein_glow * heat), burn);
 	ALPHA = mix(warn_alpha, lava_alpha, burn) * fade;
 }

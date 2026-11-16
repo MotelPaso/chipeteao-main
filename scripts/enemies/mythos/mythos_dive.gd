@@ -87,7 +87,7 @@ var _fall_lift: float = 0.0
 var _target: Node3D = null
 var _dives_left: int = 0
 ## El disco que persigue al raider; se suelta en cuanto se clava.
-var _disc: TelegraphDisc = null
+var _disc: FireSigil = null
 
 
 func scale_damage(multiplier: float) -> void:
@@ -144,7 +144,7 @@ func _aim(seconds: float) -> void:
 	_from = boss.global_position
 	_mark = _from
 	_mark = _aim_point()
-	_disc = Telegraph.spawn_moving_disc(_mark, radius, _timer, boss.telegraph_color)
+	_disc = boss.warn_disc(_mark, radius, _timer)
 	boss.rig.set_pose(MythosRig.Pose.WINDUP)
 	boss.rig.set_trail(true)
 
@@ -161,7 +161,7 @@ func _aim_point() -> Vector3:
 func _lock() -> void:
 	_step = Step.LOCKED
 	_disc = null
-	Telegraph.spawn_disc(boss, _mark, radius, _timer, boss.impact_color)
+	boss.warn_disc(_mark, radius, _timer, true)
 	boss.rig.gesture(&"screech")
 	Sfx.play(lock_sfx)
 
@@ -189,6 +189,7 @@ func _impact() -> void:
 		FireWave.spawn(wave_scene, _mark, radius, wave_radius, wave_speed, wave_damage,
 				wave_height_window, wave_band, boss)
 	FireBurst.spawn(burst_scene, _mark, radius * burst_radius_factor, burst_height)
+	boss.blast(_mark, radius)
 	boss.feel.shock(MythosFeel.Shock.HEAVY, _mark)
 	boss.rig.burst()
 	Sfx.play(impact_sfx)

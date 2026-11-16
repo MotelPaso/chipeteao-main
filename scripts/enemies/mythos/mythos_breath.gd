@@ -178,6 +178,7 @@ func _burn(angle: float) -> void:
 		if raider.global_position.y - ground > height_window:
 			continue
 		_burned[id] = true
+		boss.blast(boss.floor_point(raider.global_position), width)
 		var health := Health.find_in(raider)
 		if health != null and not health.is_dead:
 			health.take_damage(damage, false, boss)

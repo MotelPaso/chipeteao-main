@@ -14,15 +14,3 @@ static func spawn_disc(_host: Node, center: Vector3, radius: float,
 	if disc == null:
 		return
 	disc.show_disc(center, radius, duration, color)
-
-
-## Igual que spawn_disc, pero devuelve el disco para que quien avisa lo vaya
-## moviendo con TelegraphDisc.move_to() durante la carga (un aviso que
-## persigue al raider). Pasada la carga el disco vuelve solo al pool: no hay
-## que guardarlo más allá de `duration`.
-static func spawn_moving_disc(center: Vector3, radius: float, duration: float,
-		color: Color) -> TelegraphDisc:
-	var disc := Pools.acquire_scene(Pools.TELEGRAPH_DISC_SCENE) as TelegraphDisc
-	if disc != null:
-		disc.show_disc(center, radius, duration, color)
-	return disc
