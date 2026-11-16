@@ -80,6 +80,19 @@ const CORNER_LEVEL: float = 0.7
 ## "Sin paso" en raider_next y horde_next.
 const NONE: int = -1
 
+
+## Una búsqueda de camino a medio hacer (path_begin / path_advance). Se
+## reparte en frames: recorrer el mapa entero de una vez cuesta más de
+## 100 ms, y eso es un tirón en las medidas de rendimiento del soak.
+class PathSearch:
+	var to: int = NONE
+	var parent := PackedInt32Array()
+	var frontier := PackedInt32Array()
+	var cursor: int = 0
+	var done: bool = false
+	## Con `done`: el camino con las dos puntas, o vacío si no hay ninguno.
+	var path := PackedInt32Array()
+
 ## Celdas por lado y mitad del lado de la arena.
 var side: int = 0
 var half: float = 0.0
@@ -235,19 +248,32 @@ func reach_back(to: int, next: PackedInt32Array) -> PackedByteArray:
 	return seen
 
 
-## Camino de celdas de `from` a `to` con los pasos de un raider (búsqueda a
-## lo ancho), o vacío si no hay. Incluye las dos puntas.
-func raider_path(from: int, to: int) -> PackedInt32Array:
-	var path := PackedInt32Array()
+## Empieza la búsqueda a lo ancho de un camino de `from` a `to` con los
+## pasos de un raider. No recorre nada todavía: eso lo hace path_advance.
+func path_begin(from: int, to: int) -> PathSearch:
+	var search := PathSearch.new()
+	search.to = to
 	if from == NONE or to == NONE:
-		return path
-	var parent := PackedInt32Array()
-	parent.resize(side * side)
-	parent.fill(NONE)
-	parent[from] = from
-	var frontier := PackedInt32Array([from])
-	var cursor := 0
-	while cursor < frontier.size() and parent[to] == NONE:
+		search.done = true
+		return search
+	search.parent.resize(side * side)
+	search.parent.fill(NONE)
+	search.parent[from] = from
+	search.frontier.append(from)
+	return search
+
+
+## Avanza `search` hasta `budget` celdas. True cuando terminó: su `path`
+## tiene el camino, o queda vacío si no hay.
+func path_advance(search: PathSearch, budget: int) -> bool:
+	if search.done:
+		return true
+	var parent := search.parent
+	var frontier := search.frontier
+	var cursor := search.cursor
+	var to := search.to
+	var stop := cursor + budget
+	while cursor < stop and cursor < frontier.size() and parent[to] == NONE:
 		var at := frontier[cursor]
 		cursor += 1
 		for step in WAYS:
@@ -255,15 +281,23 @@ func raider_path(from: int, to: int) -> PackedInt32Array:
 			if next != NONE and parent[next] == NONE:
 				parent[next] = at
 				frontier.append(next)
-	if parent[to] == NONE:
-		return path
-	var at := to
-	while at != from:
-		path.append(at)
-		at = parent[at]
-	path.append(from)
-	path.reverse()
-	return path
+	search.parent = parent
+	search.frontier = frontier
+	search.cursor = cursor
+	if parent[to] == NONE and cursor < frontier.size():
+		return false
+	search.done = true
+	if parent[to] != NONE:
+		# La celda de partida es su propio padre.
+		var at := to
+		while parent[at] != at:
+			search.path.append(at)
+			at = parent[at]
+		search.path.append(at)
+		search.path.reverse()
+	search.parent = PackedInt32Array()
+	search.frontier = PackedInt32Array()
+	return true
 
 
 # --- pisos -----------------------------------------------------------------------

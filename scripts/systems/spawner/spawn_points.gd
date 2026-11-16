@@ -26,6 +26,14 @@ const PROBE_UNDERSHOOT: float = 2.0
 ## Media placa usable, en metros, solo si la escena no tiene nodo en el grupo
 ## "arena_bounds" (las arenas lo tienen: es su scatter).
 const FALLBACK_HALF_EXTENT: float = 78.0
+## Metros que un spawn guarda con un corte, una rampa o un puente del
+## relieve por zonas: nadie nace sobre una cornisa ni en mitad de una rampa.
+## En una arena sin relieve no cuenta.
+const RELIEF_MARGIN: float = 4.0
+## Con relieve por zonas, metros sobre el suelo a partir de los cuales lo
+## que hay bajo un punto es la punta de un prop (el tronco de un árbol mide
+## 3-4.5 m) y no un lugar donde nacer. Una roca suelta queda por debajo.
+const PROP_TOP: float = 1.2
 
 var _spawner: EnemySpawner = null
 ## Nodo de límites de arena (el scatter): también responde is_walkable()
@@ -148,7 +156,25 @@ func ground_height(pos: Vector3) -> float:
 	return hit_position.y
 
 
+## True si un cuerpo puede aparecer en `pos`: celda abierta de la máscara y,
+## con relieve por zonas, lejos de cortes, rampas y puentes
+## (arena_bounds.can_place).
 func _walkable(pos: Vector3) -> bool:
-	if _bounds == null or not _bounds.has_method("is_walkable"):
+	if _bounds == null:
+		return true
+	if _bounds.has_method("can_place"):
+		return bool(_bounds.call("can_place", Vector2(pos.x, pos.z), RELIEF_MARGIN)) \
+				and _lands_on_ground(pos)
+	if not _bounds.has_method("is_walkable"):
 		return true
 	return bool(_bounds.call("is_walkable", Vector2(pos.x, pos.z)))
+
+
+## True si lo que hay bajo `pos` es suelo y no la punta de un prop. Solo se
+## pregunta con relieve por zonas; en las demás arenas un spawn cae sobre lo
+## que toque el rayo, como siempre.
+func _lands_on_ground(pos: Vector3) -> bool:
+	var terrain := Terrain.find(_spawner.get_tree())
+	if terrain == null or not terrain.has_relief():
+		return true
+	return ground_height(pos) - terrain.height_at(pos.x, pos.z) <= PROP_TOP

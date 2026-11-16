@@ -1076,7 +1076,8 @@ func _physics_process(delta: float) -> void:
 	if not _swept and _frames >= _sweep_at_frame:
 		_swept = true
 		_run_mask_sweep()
-	_relief.tick(delta, _frames, _lead_raider(), _raider_rids())
+	if _relief.tick(delta, _frames, _lead_raider(), _raider_rids()):
+		_perf.skip_frame()
 	_tick_stage_flow(delta)
 	_tick_map_overlay(delta)
 	_watch_shot_events()

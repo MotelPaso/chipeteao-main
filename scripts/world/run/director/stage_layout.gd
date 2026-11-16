@@ -23,6 +23,13 @@ const PROBE_UNDERSHOOT: float = 2.0
 const POI_PLATFORM_Y: float = 0.5
 ## Semiancho (metros) que se usa si la arena no publica el suyo.
 const DEFAULT_HALF_EXTENT: float = 80.0
+## Metros que todo lo que coloca el director guarda con un corte, una rampa
+## o un puente del relieve por zonas (la cornisa de roca de un corte mide
+## 3.3 m). En una arena sin relieve no cuenta.
+const RELIEF_MARGIN: float = 5.0
+## Veces que se le pide a la máscara otro punto al azar cuando el que dio
+## cae sobre el relieve.
+const FALLBACK_ATTEMPTS: int = 8
 
 ## Distancias del reparto (metros). Sin valor propio: el director les copia
 ## sus exports del grupo "Reparto de POI" al crear el layout; edítalas ahí.
@@ -96,8 +103,15 @@ func spawn_at(scene: PackedScene, at: Vector3) -> Node3D:
 
 ## --- máscara y suelo --------------------------------------------------------
 
+## True si en `xz` se puede poner algo: celda abierta de la máscara y, con
+## relieve por zonas, lejos de cortes, rampas, puentes y mesetas
+## (arena_bounds.can_place). Todo muestreo de este archivo pasa por aquí.
 func walkable_xz(xz: Vector2) -> bool:
-	if _bounds == null or not _bounds.has_method("is_walkable"):
+	if _bounds == null:
+		return true
+	if _bounds.has_method("can_place"):
+		return bool(_bounds.call("can_place", xz, RELIEF_MARGIN))
+	if not _bounds.has_method("is_walkable"):
 		return true
 	return bool(_bounds.call("is_walkable", xz))
 
@@ -110,7 +124,13 @@ func walkable(pos: Vector3) -> bool:
 ## propia máscara, que sabe dónde están las celdas abiertas.
 func random_walkable_point() -> Vector2:
 	if _bounds != null and _bounds.has_method("random_walkable_point"):
-		var point: Variant = _bounds.call("random_walkable_point", bounds_margin)
+		# La máscara no sabe del relieve: se le pide otro punto mientras el
+		# suyo caiga sobre un corte. En una arena sin relieve sirve el primero.
+		var point: Variant = Vector2.ZERO
+		for attempt in FALLBACK_ATTEMPTS:
+			point = _bounds.call("random_walkable_point", bounds_margin)
+			if point is Vector2 and walkable_xz(point):
+				return point
 		if point is Vector2:
 			return point
 	return Vector2.ZERO

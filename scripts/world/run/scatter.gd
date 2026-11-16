@@ -316,8 +316,15 @@ func is_walkable(xz: Vector2) -> bool:
 ## metros o más de todo corte, rampa y puente y fuera de las mesetas. Es la
 ## pregunta de quien pone cosas; is_walkable sigue siendo solo la máscara.
 func can_place(xz: Vector2, margin: float = 0.0) -> bool:
-	return _mask.is_walkable(xz) and ReliefDressing.clear(_arena_terrain(), xz, margin,
-			_mesa_sites, relief_mesa_keepout)
+	if not _mask.is_walkable(xz):
+		return false
+	var terrain := _arena_terrain()
+	if terrain == null or not terrain.has_relief():
+		return true
+	# Con relieve por zonas, además fuera del faldón de roca que cada
+	# formación asoma más allá de sus celdas.
+	return _mask.clear_of(xz, formation_clearance) \
+			and ReliefDressing.clear(terrain, xz, margin, _mesa_sites, relief_mesa_keepout)
 
 
 ## El punto donde se puede colocar algo más cercano a `xz` (ver can_place):

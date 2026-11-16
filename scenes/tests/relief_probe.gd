@@ -7,6 +7,7 @@ extends RefCounted
 ##
 ## 1. BARRE, al empezar cada etapa y otra vez a los 120 s (ReliefSweeps):
 ##    las líneas `Relief graph:` y `Relief sweep:` que lee tools/verificar.sh.
+##    Si a los 120 s el mundo está congelado por una cinemática, espera.
 ## 2. RUTEA: route() le da al bot el próximo punto del camino a su destino
 ##    por rampas y puentes (ReliefNav), en vez de la línea recta.
 ## 3. PASEA: antes del recorrido de siempre, lleva al raider a la zona más
@@ -55,6 +56,8 @@ var _start_frame: int = -1
 var _active: bool = false
 var _clock: float = 0.0
 var _placement_again: bool = false
+## Frames seguidos con la arena dentro de la física (ver tick).
+var _thawed_frames: int = 0
 var _terrain: Terrain = null
 var _layout: ReliefLayout = null
 var _tour: Array[Vector3] = []
@@ -89,6 +92,7 @@ func on_stage_changed(frames: int) -> void:
 	_active = false
 	_clock = 0.0
 	_placement_again = false
+	_thawed_frames = 0
 	_tour.clear()
 	_tour_index = 0
 	_holding = false
@@ -97,24 +101,33 @@ func on_stage_changed(frames: int) -> void:
 	nav.reset()
 
 
-## Una vez por frame de física del arnés.
-func tick(delta: float, frames: int, lead: CharacterBody3D, raiders: Array[RID]) -> void:
+## Una vez por frame de física del arnés. True si este frame corrió un
+## barrido: su costo es del arnés y el PerfMeter no lo cuenta.
+func tick(delta: float, frames: int, lead: CharacterBody3D, raiders: Array[RID]) -> bool:
+	var swept := false
 	if _start_frame >= 0 and frames >= _start_frame:
 		_start_frame = -1
 		_begin(lead, raiders)
+		swept = _active
 	if not _active:
-		return
+		return swept
 	_clock += delta
 	if not _placement_again and _clock >= PLACEMENT_AGAIN_AT:
-		_placement_again = true
-		sweeps.placement("120")
+		# Con el mundo congelado (la cinemática de un jefe: WorldFreeze saca la
+		# arena de la física) los rayos no tocan nada. Se barre cuando vuelve.
+		_thawed_frames = 0 if _world_frozen() else _thawed_frames + 1
+		if _thawed_frames >= START_FRAMES:
+			_placement_again = true
+			sweeps.placement("120")
+			swept = true
 	if lead == null:
-		return
+		return swept
 	_watch_feats(lead)
 	if _holding:
 		_watch_hold(lead)
 	elif _tour_index < _tour.size():
 		_advance_tour(delta, lead)
+	return swept
 
 
 ## Hacia dónde tiene que caminar el cuerpo del puesto `slot` para llegar a
@@ -185,6 +198,12 @@ func _begin(lead: CharacterBody3D, raiders: Array[RID]) -> void:
 		_plan_tour()
 	elif lead != null:
 		_start_hold(lead)
+
+
+## True mientras la arena de la etapa está desactivada (WorldFreeze).
+func _world_frozen() -> bool:
+	var arena := RunRoot.stage_parent(_tree)
+	return arena != null and arena.process_mode == Node.PROCESS_MODE_DISABLED
 
 
 ## El punto a HOLD_INSET metros hacia dentro del corte más alto de la zona

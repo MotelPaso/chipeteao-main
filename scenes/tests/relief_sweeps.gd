@@ -13,7 +13,8 @@ extends RefCounted
 ##   slope      pendiente p95 del suelo abierto lejos de cortes y rampas
 ##   hell       mallas que el infierno de Mythos dejaría sin quemar, por tipo
 ##              (interactuables, que no arden a propósito; el Backdrop, que
-##              tiñe HellSky; cuerpos vivos; y el resto, que quedaría verde)
+##              tiñe HellSky; cuerpos vivos; lo que salió del pool; y el
+##              resto, que quedaría verde)
 ##
 ## Todos los conteos tienen que dar cero (slope y hell tienen cota en el
 ## gate). NUNCA se afloja una tolerancia de aquí para hacerlos pasar: lo que
@@ -352,12 +353,14 @@ func _check_props(bad: Dictionary, notes: Array[String]) -> int:
 
 
 ## POIs: fuera de cortes, rampas y puentes, apoyados, y en una celda que un
-## raider alcanza y de la que vuelve.
+## raider alcanza y de la que vuelve. Uno ya gastado no cuenta: se está
+## hundiendo (Interactable.sink_away) y nadie tiene que llegar a él.
 func _check_pois(bad: Dictionary, notes: Array[String]) -> int:
 	var count := 0
 	for node: Node in _arena.find_children("*", "Node3D", true, false):
 		var poi := node as Interactable
-		if poi == null or poi.is_queued_for_deletion() or not poi.is_inside_tree():
+		if poi == null or poi.is_queued_for_deletion() or not poi.is_inside_tree() \
+				or not poi.available:
 			continue
 		count += 1
 		var at := poi.global_position
@@ -395,7 +398,7 @@ func _check_spawns(bad: Dictionary, notes: Array[String]) -> int:
 		var xz := Vector2(at.x, at.z)
 		if _terrain.relief_distance(xz, ON_RELIEF_SPAWN) < ON_RELIEF_SPAWN:
 			_flag(bad, "on_relief", notes, what, at)
-		if absf(at.y - _floor_under(at, [])) > SETTLE:
+		if _buried(at, []) or at.y - _floor_under(at, []) > SETTLE:
 			_flag(bad, "misplaced", notes, what, at)
 		var cell := graph.nearest_open(xz, SPAWN_REACH, at.y, LEVEL_WINDOW)
 		if cell == ReliefGraph.NONE or _horde_ok[cell] == 0:
@@ -424,24 +427,47 @@ func _flag(bad: Dictionary, key: String, notes: Array[String], what: String,
 		notes.append("%s: %s at (%.1f, %.1f, %.1f)" % [key, what, at.x, at.y, at.z])
 
 
-## True si `node` está apoyado: a SETTLE metros o menos del piso que tiene
-## debajo (sin contar sus propios cuerpos).
+## True si `node` está apoyado: nada sólido encima (enterrado) y un piso a
+## SETTLE metros o menos por debajo (flotando), sin contar sus propios cuerpos.
 func _settled(node: Node3D) -> bool:
 	var own: Array[RID] = []
 	if node is CollisionObject3D:
 		own.append((node as CollisionObject3D).get_rid())
 	for child: Node in node.find_children("*", "CollisionObject3D", true, false):
 		own.append((child as CollisionObject3D).get_rid())
-	return absf(node.global_position.y - _floor_under(node.global_position, own)) <= SETTLE
+	var at := node.global_position
+	if _buried(at, own):
+		return false
+	return at.y - _floor_under(at, own) <= SETTLE
 
 
-## Altura del primer piso bajo `at` (desde 1.5 m por encima), o -INF si no
-## hay nada en 5 m.
+## True si sobre `at` hay suelo, roca o un tablero: está enterrado. Un prop
+## encima (la copa de otro árbol del borde) no entierra a nadie.
+func _buried(at: Vector3, own: Array[RID]) -> bool:
+	var excluded: Array[RID] = _raiders.duplicate()
+	excluded.append_array(own)
+	var space := _terrain.get_world_3d().direct_space_state
+	var ray := PhysicsRayQueryParameters3D.create(
+			Vector3(at.x, _terrain.max_height + 30.0, at.z), at + Vector3.UP * (SETTLE + 0.05),
+			ReliefGraph.WORLD_LAYER)
+	for attempt in ReliefGraph.MAX_RAY_PASSES:
+		ray.exclude = excluded
+		var hit := space.intersect_ray(ray)
+		if hit.is_empty():
+			return false
+		if graph._is_ground(hit["collider"]) or hit["collider"] is RockFormation:
+			return true
+		excluded.append(hit["rid"])
+	return false
+
+
+## Altura del primer piso bajo `at` (desde SETTLE metros por encima), o
+## -INF si no hay nada en 3 m.
 func _floor_under(at: Vector3, own: Array[RID]) -> float:
 	var excluded: Array[RID] = _raiders.duplicate()
 	excluded.append_array(own)
-	var ray := PhysicsRayQueryParameters3D.create(at + Vector3.UP * 1.5,
-			at + Vector3.DOWN * 3.5, ReliefGraph.WORLD_LAYER)
+	var ray := PhysicsRayQueryParameters3D.create(at + Vector3.UP * SETTLE,
+			at + Vector3.DOWN * 3.0, ReliefGraph.WORLD_LAYER)
 	ray.exclude = excluded
 	var hit := _terrain.get_world_3d().direct_space_state.intersect_ray(ray)
 	if hit.is_empty():
@@ -461,8 +487,10 @@ func _sweep_slope() -> void:
 
 
 ## Las mallas que HellDressing no quemaría, por tipo: bajo un Interactable
-## (no arden a propósito), bajo el Backdrop (las tiñe HellSky) y el resto,
-## que es lo que quedaría verde en el infierno.
+## (no arden a propósito), bajo el Backdrop (las tiñe HellSky), las de un
+## cuerpo vivo, las de algo que salió del pool (un dardo en vuelo, una gema:
+## Pools los cuelga de la arena) y el resto, que es lo que quedaría verde en
+## el infierno.
 func _sweep_hell() -> void:
 	var burning: Dictionary[int, bool] = {}
 	for child: Node in _terrain.find_children("*", "MeshInstance3D", true, false):
@@ -479,7 +507,7 @@ func _sweep_hell() -> void:
 				if WorldDigest._prop_burns(child as MeshInstance3D):
 					burning[child.get_instance_id()] = true
 	var backdrop := _terrain.get_node_or_null(_terrain.backdrop_path)
-	var counts := {"interactable": 0, "backdrop": 0, "body": 0, "other": 0}
+	var counts := {"interactable": 0, "backdrop": 0, "body": 0, "pooled": 0, "other": 0}
 	var skipped := 0
 	var notes: Array[String] = []
 	for child: Node in _arena.find_children("*", "MeshInstance3D", true, false):
@@ -499,12 +527,16 @@ func _sweep_hell() -> void:
 			if up is CharacterBody3D:
 				kind = "body"
 				break
+			# Tampoco lo que NodePool creó: lleva su marca desde que nace.
+			if up.has_meta(NodePool.META_OWNER):
+				kind = "pooled"
+				break
 			up = up.get_parent()
 		counts[kind] = int(counts[kind]) + 1
 		if kind == "other" and notes.size() < DETAIL_LIMIT:
 			notes.append(String(_arena.get_path_to(child)))
-	print("Relief sweep: hell skipped=%d interactable=%d backdrop=%d bodies=%d unburnt=%d" % [
-			skipped, counts["interactable"], counts["backdrop"], counts["body"],
-			counts["other"]])
+	print(("Relief sweep: hell skipped=%d interactable=%d backdrop=%d bodies=%d pooled=%d"
+			+ " unburnt=%d") % [skipped, counts["interactable"], counts["backdrop"],
+			counts["body"], counts["pooled"], counts["other"]])
 	for note: String in notes:
 		print("Relief sweep detail: hell unburnt %s" % note)

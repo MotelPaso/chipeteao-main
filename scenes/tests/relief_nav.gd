@@ -3,7 +3,8 @@ extends RefCounted
 ## Ruteo del bot del arnés en una arena con relieve por zonas. El bot camina
 ## en línea recta a su destino; con cortes en el mapa eso lo deja contra un
 ## acantilado. Aquí se le da, en vez del destino, el próximo punto del
-## camino que lleva hasta él por las rampas y los puentes (ReliefGraph.raider_path).
+## camino que lleva hasta él por las rampas y los puentes (ReliefGraph.path_begin).
+## La búsqueda se reparte en frames; mientras llega, el bot sigue en línea recta.
 ##
 ## Sin grafo (una arena sin relieve por zonas) steer() devuelve el destino
 ## tal cual: el recorrido de siempre.
@@ -23,14 +24,24 @@ const JUMP_RISE: float = 0.55
 const JUMP_RANGE: float = 1.8
 ## Radio en metros donde se busca la celda abierta del bot y la del destino.
 const SNAP_REACH: float = 4.0
+## Cuánto más alto o más bajo que un cuerpo puede estar el piso de "su"
+## celda, en metros: por encima, un escalón; por debajo, lo que sube un salto.
+## Sin esto, al pie de un corte la celda más cercana es una de arriba.
+const LEVEL_ABOVE: float = 0.8
+const LEVEL_BELOW: float = 2.4
 ## Al llegar a esta distancia (celdas) del final, apunta al destino real.
 const FINAL_APPROACH: int = 2
 ## Metros que tiene que saltar el destino para recalcular sin esperar.
 const GOAL_JUMP: float = 6.0
+## Celdas que la búsqueda de un camino recorre por frame y por puesto: el
+## mapa entero (57 600 celdas) se reparte en unos 40 frames.
+const SEARCH_BUDGET: int = 1500
 
 var graph: ReliefGraph = null
 
 var _paths: Dictionary[int, PackedInt32Array] = {}
+## Búsqueda en curso de cada puesto (ReliefGraph.PathSearch); sin entrada si no hay.
+var _searches: Dictionary[int, RefCounted] = {}
 var _goals: Dictionary[int, int] = {}
 var _ages: Dictionary[int, float] = {}
 var _jumps: Dictionary[int, bool] = {}
@@ -40,6 +51,7 @@ var _jumps: Dictionary[int, bool] = {}
 func reset() -> void:
 	graph = null
 	_paths.clear()
+	_searches.clear()
 	_goals.clear()
 	_ages.clear()
 	_jumps.clear()
@@ -51,31 +63,39 @@ func steer(slot: int, from: Vector3, goal: Vector3, delta: float) -> Vector3:
 	_jumps[slot] = false
 	if graph == null:
 		return goal
-	var here := graph.nearest_open(Vector2(from.x, from.z), SNAP_REACH)
-	var there := graph.nearest_open(Vector2(goal.x, goal.z), SNAP_REACH)
+	var here := _cell_at(from)
+	var there := _cell_at(goal)
 	if here == ReliefGraph.NONE or there == ReliefGraph.NONE or here == there:
 		return goal
 	var age := float(_ages.get(slot, INF)) + delta
 	var path: PackedInt32Array = _paths.get(slot, PackedInt32Array())
 	var at := _nearest_index(path, from)
+	var search := _searches.get(slot, null) as ReliefGraph.PathSearch
 	# Destino nuevo: se recalcula ya si saltó lejos (otro tramo del recorrido)
 	# y cada REPLAN_SECONDS si solo se corre de a poco (seguir a un compañero).
 	# Un camino que no existe o del que el bot se salió se reintenta con
-	# pausa, nunca en cada frame: cada búsqueda recorre medio mapa.
+	# pausa, nunca en cada frame, y nunca con otra búsqueda a medio hacer.
 	var old_goal := int(_goals.get(slot, ReliefGraph.NONE))
-	var replan := old_goal == ReliefGraph.NONE or (old_goal != there
+	var jumped := old_goal == ReliefGraph.NONE or (old_goal != there
 			and graph.center(old_goal).distance_to(graph.center(there)) > GOAL_JUMP)
-	if not replan and age >= OFF_PATH_SECONDS and not path.is_empty() and at < 0:
-		replan = true
-	if not replan and age >= REPLAN_SECONDS:
-		replan = path.is_empty() or old_goal != there
-	if replan:
-		path = graph.raider_path(here, there)
-		_paths[slot] = path
+	var lost := search == null and age >= OFF_PATH_SECONDS and not path.is_empty() and at < 0
+	var stale := search == null and age >= REPLAN_SECONDS \
+			and (path.is_empty() or old_goal != there)
+	if jumped or lost or stale:
+		search = graph.path_begin(here, there)
+		_searches[slot] = search
 		_goals[slot] = there
 		age = 0.0
-		at = 0
+		if jumped or lost:
+			# El camino viejo ya no lleva a nada: en línea recta hasta el nuevo.
+			path = PackedInt32Array()
+			_paths[slot] = path
 	_ages[slot] = age
+	if search != null and graph.path_advance(search, SEARCH_BUDGET):
+		path = search.path
+		_paths[slot] = path
+		_searches.erase(slot)
+	at = _nearest_index(path, from)
 	if path.is_empty() or at < 0:
 		return goal
 	if at >= path.size() - 1 - FINAL_APPROACH:
@@ -99,13 +119,26 @@ func wants_jump(slot: int) -> bool:
 	return bool(_jumps.get(slot, false))
 
 
-## Índice de la celda de `path` más cercana a `from`, o -1 si el cuerpo se
-## salió del camino.
+## La celda abierta de lo que está en `at` (un cuerpo o un destino): la más
+## cercana con el piso a su altura, y si a su altura no hay ninguna (va por
+## el aire), la más cercana a secas.
+func _cell_at(at: Vector3) -> int:
+	var flat := Vector2(at.x, at.z)
+	var cell := graph.nearest_open(flat, SNAP_REACH, at.y + (LEVEL_ABOVE - LEVEL_BELOW) * 0.5,
+			(LEVEL_ABOVE + LEVEL_BELOW) * 0.5)
+	return cell if cell != ReliefGraph.NONE else graph.nearest_open(flat, SNAP_REACH)
+
+
+## Índice de la celda de `path` más cercana a `from` y a su altura, o -1 si
+## el cuerpo se salió del camino (también si se cayó de él a otro nivel).
 func _nearest_index(path: PackedInt32Array, from: Vector3) -> int:
 	var best := -1
 	var best_distance := OFF_PATH
 	var flat := Vector2(from.x, from.z)
 	for index in path.size():
+		var rise := graph.floor_y[path[index]] - from.y
+		if rise > LEVEL_ABOVE or rise < -LEVEL_BELOW:
+			continue
 		var distance := graph.center(path[index]).distance_to(flat)
 		if distance <= best_distance:
 			best_distance = distance

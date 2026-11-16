@@ -34,6 +34,8 @@ extends Area3D
 ## Distancia, en metros, que mira adelante la estrella buscando un muro en
 ## el que rebotar.
 @export var roam_probe: float = 3.0
+## Metros que puede subir el suelo en la distancia de `roam_probe` sin que la estrella rebote: una rampa pasa, un acantilado es un muro (solo en un mapa con relieve por zonas; bajar, baja siempre).
+@export var roam_max_rise: float = 2.0
 ## Ciclo arcoíris del tinte de la estrella, en vueltas por segundo.
 @export var star_hue_hz: float = 0.55
 
@@ -141,7 +143,8 @@ func _physics_process(delta: float) -> void:
 
 ## La estrella cruza el mapa en vez de esperar. Rebota en todo lo que la
 ## máscara de la arena marca como no caminable y en el borde — la misma
-## prueba que usa todo spawn —, así nunca termina dentro de las rocas.
+## prueba que usa todo spawn —, así nunca termina dentro de las rocas. Con
+## relieve por zonas rebota también al pie de un corte: sube por las rampas.
 func _tick_roam(delta: float) -> void:
 	var step := roam_speed * delta
 	var here := Vector2(global_position.x, global_position.z)
@@ -178,7 +181,12 @@ func _tick_star_tint() -> void:
 func _walkable(xz: Vector2) -> bool:
 	if _bounds == null or not _bounds.has_method("is_walkable"):
 		return true
-	return bool(_bounds.call("is_walkable", xz))
+	if not bool(_bounds.call("is_walkable", xz)):
+		return false
+	var terrain := Terrain.find(get_tree())
+	if terrain == null or not terrain.has_relief():
+		return true
+	return terrain.height_at(xz.x, xz.y) - _ground_y <= roam_max_rise
 
 
 ## Altura del suelo bajo el drop, tomada con el spawn ya colocado. Solo se
