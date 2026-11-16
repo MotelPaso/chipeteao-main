@@ -202,6 +202,11 @@ const ELITE_CHANCE_CAP: float = 0.6
 @export var boss_scene: PackedScene
 ## Minuto de etapa en que llega el jefe del bioma.
 @export var boss_spawn_minute: float = 5.0
+## Escena del minijefe de esta arena: llega sin aviso en mini_boss_spawn_minute
+## y el jefe del bioma espera a que muera. Vacío = la arena no tiene minijefe.
+@export var mini_boss_scene: PackedScene
+## Minuto de etapa en que llega el minijefe.
+@export var mini_boss_spawn_minute: float = 5.0
 ## Minuto de etapa en que llega su revancha Ancestral (el jefe de etapa).
 @export var elder_spawn_minute: float = 11.0
 ## Multiplicador de stats del Ancestral (y base de los jefes recurrentes).

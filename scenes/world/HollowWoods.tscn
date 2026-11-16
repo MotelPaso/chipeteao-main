@@ -7,6 +7,7 @@
 [ext_resource type="PackedScene" path="res://scenes/enemies/Skirmisher.tscn" id="15_skirmisher"]
 [ext_resource type="PackedScene" path="res://scenes/enemies/Tank.tscn" id="16_tank"]
 [ext_resource type="PackedScene" path="res://scenes/enemies/Rotking.tscn" id="17_boss"]
+[ext_resource type="PackedScene" path="res://scenes/enemies/BlueLobster.tscn" id="94_lobster"]
 [ext_resource type="Script" path="res://scripts/world/run/scatter.gd" id="9_scatter"]
 [ext_resource type="PackedScene" uid="uid://ctree3hw7ka2f" path="res://scenes/world/props/Tree.tscn" id="10_tree"]
 [ext_resource type="PackedScene" uid="uid://brock5hw2mv8d" path="res://scenes/world/props/Rock.tscn" id="11_rock"]
@@ -200,6 +201,9 @@ grunt_scene = ExtResource("4_grunt")
 skirmisher_scene = ExtResource("15_skirmisher")
 tank_scene = ExtResource("16_tank")
 boss_scene = ExtResource("17_boss")
+boss_spawn_minute = 8.0
+mini_boss_scene = ExtResource("94_lobster")
+mini_boss_spawn_minute = 5.0
 elder_title = "Rey Pútrido Ancestral"
 stage_boss_scene = ExtResource("92_mythos")
 boss_warning_text = "Una presencia monstruosa se acerca..."

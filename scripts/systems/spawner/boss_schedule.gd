@@ -16,6 +16,9 @@ extends RefCounted
 ## en el lugar del Ancestral y, mientras vive, los recurrentes esperan. Si
 ## además pelea solo (stage_boss_fights_alone), tampoco sale ningún enemigo
 ## normal hasta que muere y pasa el respiro (spawns_held).
+## Una arena puede traer además un MINIJEFE (mini_boss_scene): llega en
+## mini_boss_spawn_minute, sin aviso, y el jefe del bioma espera a que muera
+## y pase su respiro.
 
 ## Interruptor del harness: BONK_STAGE_BOSS_AT=<segundos> trae al jefe de
 ## etapa en ese segundo de la etapa y no en elder_spawn_minute. Solo
@@ -23,6 +26,12 @@ extends RefCounted
 const STAGE_BOSS_AT_ENV: String = "BONK_STAGE_BOSS_AT"
 ## Grupo del jefe de etapa mientras vive (lo lee el harness).
 const STAGE_BOSS_GROUP: StringName = &"stage_boss"
+## Interruptor del harness: BONK_MINI_BOSS_AT=<segundos> trae al minijefe en
+## ese segundo de la etapa y no en mini_boss_spawn_minute. Solo pruebas; nada
+## del juego lo pone.
+const MINI_BOSS_AT_ENV: String = "BONK_MINI_BOSS_AT"
+## Grupo del minijefe (lo lee el harness; nunca es el del jefe de etapa).
+const MINI_BOSS_GROUP: StringName = &"mini_boss"
 
 var _spawner: EnemySpawner = null
 var _boss_spawned: bool = false
@@ -41,6 +50,11 @@ var _next_repeat_not_before: float = 0.0
 ## Segundos de respiro SIN spawns que quedan tras la muerte del jefe de etapa
 ## que peleó solo.
 var _alone_breather_left: float = 0.0
+## El minijefe de esta etapa: si ya llegó, quién es y el segundo de etapa
+## forzado por el harness (-1 = sin forzar).
+var _mini_boss_spawned: bool = false
+var _mini_boss: BossBase = null
+var _mini_boss_at: float = -1.0
 
 
 func _init(spawner: EnemySpawner) -> void:
@@ -49,6 +63,10 @@ func _init(spawner: EnemySpawner) -> void:
 	if forced.is_valid_float():
 		_stage_boss_at = maxf(forced.to_float(), 0.0)
 		print("BossSchedule: stage boss forced at %.0fs" % _stage_boss_at)
+	var forced_mini := OS.get_environment(MINI_BOSS_AT_ENV)
+	if forced_mini.is_valid_float():
+		_mini_boss_at = maxf(forced_mini.to_float(), 0.0)
+		print("BossSchedule: mini boss forced at %.0fs" % _mini_boss_at)
 
 
 ## Factor del intervalo de los spawns regulares: más lento con un jefe vivo
@@ -85,10 +103,12 @@ func spawns_held() -> bool:
 ## hueco marcado como gastado perdería ese jefe para siempre.
 func tick() -> void:
 	var spawner := _spawner
+	_tick_mini_boss()
 	if spawner.boss_scene == null:
 		return
-	# Con el jefe de etapa peleando solo, el jefe del bioma espera su turno.
-	if not _boss_spawned and not spawns_held() \
+	# Con el jefe de etapa peleando solo, o con el minijefe por llegar o en la
+	# arena, el jefe del bioma espera su turno.
+	if not _boss_spawned and not spawns_held() and not _mini_boss_holds_boss() \
 			and RunState.stage_time >= spawner.boss_spawn_minute * 60.0:
 		_boss_spawned = spawn_boss(1.0) != null
 	if not _elder_spawned and RunState.stage_time >= _stage_boss_due():
@@ -114,9 +134,10 @@ func tick() -> void:
 
 ## El jefe que entró a la arena, o null si algo abortó, para que el llamador
 ## reintente el hueco en otro tick. Devuelve la instancia porque la muerte
-## del Ancestral abre la puerta de etapa.
+## del Ancestral abre la puerta de etapa. Con `warn` apagado llega sin el
+## aviso del HUD.
 func spawn_boss(stat_multiplier: float, title_override: String = "",
-		scene_override: PackedScene = null) -> BossBase:
+		scene_override: PackedScene = null, warn: bool = true) -> BossBase:
 	var spawner := _spawner
 	var player := Coop.random_player(spawner.get_tree())
 	if player == null:
@@ -162,11 +183,50 @@ func spawn_boss(stat_multiplier: float, title_override: String = "",
 	var health := Health.find_in(boss)
 	if health != null:
 		health.died.connect(_on_boss_died)
-	spawner.get_tree().call_group("boss_ui", "announce", spawner.boss_warning_text)
+	if warn:
+		spawner.get_tree().call_group("boss_ui", "announce", spawner.boss_warning_text)
 	# Log de una línea (convención de RunManager) para que los soaks
 	# confirmen que el horario de jefes se disparó.
 	print("Boss spawned: %s at %.1fs" % [boss.boss_title, RunState.stage_time])
 	return boss
+
+
+## El minijefe de la arena: llega una vez por etapa y sin aviso. Como el
+## jefe del bioma, espera mientras un jefe de etapa pelea solo.
+func _tick_mini_boss() -> void:
+	var spawner := _spawner
+	if spawner.mini_boss_scene == null or _mini_boss_spawned or spawns_held() \
+			or RunState.stage_time < _mini_boss_due():
+		return
+	var boss := spawn_boss(1.0, "", spawner.mini_boss_scene, false)
+	if boss == null:
+		return
+	_mini_boss_spawned = true
+	_mini_boss = boss
+	boss.add_to_group(MINI_BOSS_GROUP)
+
+
+## Segundo de etapa en que llega el minijefe.
+func _mini_boss_due() -> float:
+	return _mini_boss_at if _mini_boss_at >= 0.0 else _spawner.mini_boss_spawn_minute * 60.0
+
+
+## True mientras el jefe del bioma tiene que esperar al minijefe: ya le toca
+## llegar y todavía no llegó, sigue vivo, o corre el respiro tras su muerte.
+func _mini_boss_holds_boss() -> bool:
+	if _spawner.mini_boss_scene == null:
+		return false
+	if not _mini_boss_spawned:
+		return RunState.stage_time >= _mini_boss_due()
+	return _mini_boss_alive() or _relief_timer > 0.0
+
+
+func _mini_boss_alive() -> bool:
+	if _mini_boss == null or not is_instance_valid(_mini_boss) \
+			or not _mini_boss.is_inside_tree():
+		return false
+	var health := Health.find_in(_mini_boss)
+	return health != null and not health.is_dead
 
 
 ## Segundo de etapa en que llega el jefe de etapa.

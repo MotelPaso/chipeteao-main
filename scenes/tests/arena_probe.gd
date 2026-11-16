@@ -90,6 +90,9 @@ extends Node
 ##                          vez de en el minuto 11 (lo lee BossSchedule)
 ##   BONK_STAGE_GOAL=<s>    acorta SOLO la mitad de tiempo de la puerta de
 ##                          etapa; la mitad del jefe se conserva (lo lee RunManager)
+##   BONK_MINI_BOSS_AT=<s>  trae al minijefe de la arena a ese segundo de la
+##                          etapa en vez de en su minuto (lo lee BossSchedule);
+##                          lo que el arnés observa de él está en mini_boss_probe.gd
 ##   BONK_CINEMATIC_SKIP, BONK_PAUSE_AT, BONK_EXTRACT_AT, BONK_WIPE_AT,
 ##   BONK_WEATHER_AT, BONK_ADVANCE_AT, BONK_UI_DISMISS, BONK_VIEW_SHOTS:
 ##                          las pruebas alrededor del jefe de etapa; viven en
@@ -292,6 +295,8 @@ var _boss_probe: StageBossProbe = null
 ## Barridos, ruteo, paseo y retención en arenas con relieve por zonas
 ## (relief_probe.gd). En las demás no hace nada.
 var _relief: ReliefProbe = null
+## Lo que se observa del minijefe de la arena: ver mini_boss_probe.gd.
+var _mini_probe: MiniBossProbe = null
 ## Medidor del costo por frame: una línea `Perf` cada 10 s de juego y un
 ## `Perf summary` al salir. Siempre activo: solo lee el reloj.
 var _perf: PerfMeter = null
@@ -553,6 +558,7 @@ func _ready() -> void:
 	_camera = ShotCamera.new(get_viewport())
 	_boss_probe = StageBossProbe.new(self, _camera)
 	_relief = ReliefProbe.new(get_tree())
+	_mini_probe = MiniBossProbe.new(self, _camera)
 	_perf = PerfMeter.new(get_tree())
 	# Nunca mezclar un soak con el guardado real: SaveData apunta a un archivo
 	# temporal (valores por defecto) antes de arrancar la arena. BONK_SAVE_PATH
@@ -741,6 +747,7 @@ func _on_stage_changed(stage_index: int, map_id: String) -> void:
 	_exit_rush = false
 	_boss_probe.on_stage_changed()
 	_relief.on_stage_changed(_frames)
+	_mini_probe.on_stage_changed()
 	print("ArenaProbe: stage %d is %s" % [stage_index + 1, map_id])
 	# El mundo ya está construido y vestido: RunRoot emite stage_changed
 	# después del add_child de la arena y de colocar al equipo.
@@ -881,6 +888,7 @@ func _exit_tree() -> void:
 	print("Party pets: %s" % _party_pets_seen)
 	_boss_probe.summary()
 	_relief.report()
+	_mini_probe.summary()
 	if _saiyan_watch:
 		# Un aura son SAIYAN_BOONS_PER_AURA bonos. Más a la vez significa que un
 		# re-disparo se apiló con el aura que debía reemplazar, y la primera
@@ -1092,6 +1100,7 @@ func _physics_process(delta: float) -> void:
 	_watch_airborne(delta)
 	_watch_blocked_cell(delta)
 	_boss_probe.tick(delta, _frames)
+	_mini_probe.tick(delta, _frames)
 	if _frames % 120 == 0:
 		# Solo se le AGREGAN campos al final, nunca se reordena: verificar.sh lee
 		# level= de la última de estas líneas.
