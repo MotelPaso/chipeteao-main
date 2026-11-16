@@ -303,6 +303,7 @@ La lógica vive en ayudantes de `scripts/systems/spawner/` (`SpawnScaling`, `Spa
 | Textos «¡Aura sayayin!» y «¡Zenkai!» | Player.tscn > ItemBag (grupo «Textos») | `saiyan_aura_text`, `zenkai_text` |
 | Texto bajo el nombre en el aviso de un power-up («… (10 s)») | Player.tscn > PowerUps (grupo «Textos») | `toast_template` (%s = descripción, %d = segundos) |
 | Power-up en el suelo (tamaño, brillo, luz, duración, desvanecimiento, arcoíris de la estrella) | `scenes/systems/PowerUpPickup.tscn` > sus nodos y la raíz | la malla de `Gem`, `light_energy`; `lifetime`, `fade_time`, `spin_speed`, `star_hue_hz` en la raíz |
+| Ronda de la estrella (velocidad, saltos, a qué distancia mira un muro, cuánto desnivel la hace rebotar al pie de un acantilado) | `scripts/systems/pickups/powerup_pickup.gd` → grupo «Ronda de la estrella» | `roam_speed`, `hop_height`, `hop_hz`, `roam_probe`, `roam_max_rise` |
 | Orbe de vida (imán, curación, duración) | `scenes/systems/HealthOrb.tscn` > HealthOrb | `magnet_radius`, `heal_fraction`, `lifetime` |
 | Sacudida de cámara | `scenes/systems/Juice.tscn` > Juice (grupo «Sacudida de cámara») | `kill_shake_*`, `hurt_shake_*`, `boss_death_shake_*`, `crit_shake_*` |
 | Cámara lenta al crítico o al matar un jefe | Juice.tscn > Juice («Hit-stop») | `crit_stop_scale`, `crit_stop_duration`, `boss_death_stop_*` |
@@ -375,12 +376,26 @@ de reparto se llama `ForestScatter`, `DuneScatter` o `MarshScatter`.
 | Cuántos árboles, rocas o tocones hay y su tamaño | la arena > *Scatter (grupo «Reparto interior») | `tree_count`, `rock_count`, `stump_count`, `*_scale_min/max` |
 | Ancho de los pasillos y zona libre del inicio | la arena > *Scatter («Reparto interior») | `min_prop_spacing`, `spawn_clear_radius`, `keepout_radius` |
 | Línea de props del borde | la arena > *Scatter (grupo «Borde») | `perimeter_step`, `perimeter_rock_every`, `perimeter_jitter` |
-| Mesetas | la arena > *Scatter (grupo «Mesetas») | `mesa_count`, `mesa_scale_min/max`, `mesa_ramp_offset` |
+| Mesetas | la arena > *Scatter (grupo «Mesetas») | `mesa_count`, `mesa_scale_min/max`, `mesa_ramp_offset`, `mesa_ramp_attached` (encendido pega la rampa a la plataforma a cualquier escala; solo el Bosque Hueco lo enciende) |
+| Cofres sobre las mesetas | la arena > *Scatter (grupo «Mesetas») | `mesa_chest_scene`, `mesa_chest_count`, `mesa_deck_height` (en el Bosque Hueco, 3 mesetas llevan cofre) |
 | Formaciones de roca (cuántas y qué tan grandes) | la arena > *Scatter (grupo «Máscara de la arena») | `mask_blobs_min/max`, `mask_blob_cells_min/max`, `mask_min_open_fraction` |
 | Color y forma de la roca de un bioma | `assets/world/rock_style_<mapa>.tres` | `rock_color`, `cap_color`, `cliff_height`, `peak_height`, `max_height` (bajar `margin_min` o `cliff_height` puede abrir huecos en el sello del mapa) |
 | Tamaño de las ondulaciones, grietas y cumbres de la roca (todas las arenas) | `scripts/world/rock_formation.gd` (bloque «edita aquí») | `LIFT_WAVELENGTH`, `CRAG_WAVELENGTH`, `EDGE_WAVELENGTH`, `SPIRE_WAVELENGTH` (metros; más grande = rasgos más anchos), `SPIRE_FADE_FROM`/`SPIRE_FADE_TO` (desde qué profundidad asoman las cumbres) |
 | Jugar siempre el mismo mapa (para probar) | la arena > *Scatter (grupo «Semilla (solo pruebas)») | `randomize_per_run` apagado y `scatter_seed` |
-| Altura de las lomas del suelo | la arena > Terrain (grupo «Relieve») | `amplitude`, `feature_size` |
+| Altura de las lomas del suelo | la arena > Terrain (grupo «Relieve») | `amplitude`, `feature_size` (en el Bosque Hueco, que tiene relieve por zonas, es la ondulación DENTRO de cada zona) |
+| Quitarle o ponerle a una arena el relieve por zonas (acantilados, barranco, rampas, puente) | la arena > Terrain (grupo «Relieve») | `relief` (un `.tres` de `assets/world/`; vacío = suelo suave) |
+| Zonas elevadas del Bosque Hueco: cuántas, qué tan grandes y qué tan altas | `assets/world/relief_hollow_woods.tres` (grupo «Zonas elevadas») | `raised_min/max`, `zone_radius_min/max`, `zone_stretch_max`, `zone_lobes`, `zone_height_min/max`, `zone_top_height` (ningún corte sobre 8 m: la horda trepa 10) |
+| Lomas anchas sobre las que se apoya cada zona, y lomas sueltas | `relief_hollow_woods.tres` («Zonas elevadas», «Lomas sueltas») | `zone_swell_min/max`, `zone_top_swell_min/max`, `swell_reach`; `hill_count`, `hill_height_min/max`, `hill_radius_min/max` |
+| Rampas de entrada a las zonas: cuántas, ancho y pendiente | `relief_hollow_woods.tres` (grupo «Rampas») | `ways_min/max`, `way_every`, `ramp_width`, `ramp_slope_degrees` (bajo 30: sobre 45 nadie camina) |
+| Barranco: largo, ancho, profundidad y curva | `relief_hollow_woods.tres` (grupo «Barranco») | `ravine_length_min/max`, `ravine_width_min/max`, `ravine_depth_min/max`, `ravine_valley`, `ravine_bend_max`, `ravine_ramp_slope_degrees`, `ravine_floor_detail` (el fondo no puede bajar de -7 m) |
+| Puente del barranco: escena, ancho y claro de las cabeceras | `relief_hollow_woods.tres` (grupo «Puente») | `bridge_scene` (vacío = sin puente), `bridge_width`, `bridgehead_radius` |
+| Grosor del tablero del puente y sus materiales | `scenes/world/props/Bridge.tscn` > Bridge («Medidas»); las mallas `Deck` y `Body` | `deck_thickness`; el material de cada malla (`wood_cut.tres`, `rock.tres`) |
+| Dónde cae el relieve: lejos del spawn, del borde y entre sí | `relief_hollow_woods.tres` (grupo «Reparto en el mapa») | `spawn_clearance`, `view_distance_min/max` (a cuánto del spawn queda la primera zona), `edge_margin`, `feature_gap` |
+| Forma de la roca de los acantilados (cornisa, labio, inclinación de la cara) | `scripts/world/cliff_wall.gd` (bloque «edita aquí») | `LEDGE_BURIED`, `LEDGE_INNER`, `LIP_MIN/MAX`, `FACE_RUN` (más alto = cara más acostada; no pasar de 0.28, que en las esquinas la cara ya se acuesta un 40% más y bajo 60 grados la horda no la trepa), `JITTER_ALONG`; los colores salen del `rock_style_<mapa>.tres` |
+| Distancia de árboles, rocas y mesetas a un corte | la arena > *Scatter (grupo «Relieve por zonas») | `relief_prop_clearance`, `relief_mesa_clearance`, `relief_mesa_keepout` |
+| Distancia de POIs, spawns y cofres soltados a un corte | `stage_layout.gd`, `spawn_points.gd`, `enemy_loot.gd` (constantes al comienzo) | `RELIEF_MARGIN` (POIs 5 m, spawns 4 m), `DROP_RELIEF_MARGIN`; `PROP_TOP` (un spawn no cae sobre la punta de un árbol) |
+| Distancia de un jefe a un corte al elegir dónde ponerse | `scripts/enemies/boss_base.gd` → grupo «Jefe» | `relief_margin` |
+| Suelo lejano de una arena con relieve por zonas | la arena > Backdrop (grupo «Suelo lejano») | `rim_drop`, `rim_overlap` (el marco que rodea la arena al nivel de su borde) |
 | Verdes del pasto del Bosque Hueco | `assets/shaders/forest_ground.gdshader` (uniforms «Pasto»), o HollowWoods.tscn > Terrain > `surface_material` (Shader Parameters) | `grass_dark`, `grass_light`, `grass_scale` |
 | Color del minimapa y colinas del horizonte | la arena > Backdrop | `ground_color`, `hill_color`, `far_hill_color` (cambiar `hill_count` mueve los altares aunque la semilla sea la misma) |
 | Tamaño y variante de los pinos | `scenes/world/props/Tree.tscn` > Tree | `wide_chance`, `base_scale`, `width_scale_min/max`, `height_scale_min/max` |
