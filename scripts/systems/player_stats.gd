@@ -29,7 +29,7 @@ const PASSIVE_KINDS: Array[String] = ["per_level", "evasion_execute", "speed_to_
 
 @export_group("Base")
 ## Multiplicador de daño crítico antes de cualquier bono del Tomo de Ruina.
-@export var base_crit_damage: float = 5.0
+@export var base_crit_damage: float = 2.0
 ## Suerte base (puntos de inclinación de rareza) antes de cualquier bono.
 @export var base_luck: float = 0.0
 

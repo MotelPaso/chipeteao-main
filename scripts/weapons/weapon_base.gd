@@ -301,6 +301,14 @@ func _lifesteal_heal(amount: float) -> void:
 	if player_health != null:
 		player_health.heal(amount)
 
+## Nivel de crítico de un golpe: cada 100% de probabilidad es un nivel seguro,
+## y el resto es la probabilidad de un nivel extra. 0.45 -> 0 o 1;
+## 1.25 -> 1 seguro y 25% de 2; 4.5 -> 4 seguros y 50% de 5.
+static func roll_crit_tier(chance: float) -> int:
+	var guaranteed := floori(chance)
+	var remainder := chance - float(guaranteed)
+	return guaranteed + (1 if randf() < remainder else 0)
+
 
 ## Daña cada cuerpo de `bodies` por el embudo de arriba; devuelve el daño
 ## total aplicado (el drenaje del Vial de sangre lo lee).
