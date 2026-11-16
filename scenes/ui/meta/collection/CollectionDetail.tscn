@@ -1,0 +1,82 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/ui/meta/collection/collection_detail.gd" id="1_detail"]
+[ext_resource type="PackedScene" path="res://scenes/ui/meta/collection/CollectionArt.tscn" id="2_art"]
+
+[node name="CollectionDetail" type="PanelContainer"]
+custom_minimum_size = Vector2(400, 0)
+mouse_filter = 2
+script = ExtResource("1_detail")
+
+[node name="Body" type="Control" parent="."]
+editor_description = "No es un contenedor a propósito: Content se desliza aquí dentro al cambiar de entrada (grupo Movimiento de collection_detail.gd)."
+layout_mode = 2
+mouse_filter = 2
+
+[node name="Content" type="VBoxContainer" parent="Body"]
+editor_description = "Sin anclas: collection_detail.gd le da el tamaño de Body, así mover su posición al deslizar no cambia su ancho."
+layout_mode = 0
+mouse_filter = 2
+theme_override_constants/separation = 6
+
+[node name="ArtSlot" type="Control" parent="Body/Content"]
+editor_description = "El dibujo grande. Abajo el marco (Art); encima, cuando hay modelo, el retrato 3D giratorio que collection_detail.gd agrega en LiveSlot."
+custom_minimum_size = Vector2(0, 150)
+layout_mode = 2
+size_flags_vertical = 3
+mouse_filter = 2
+
+[node name="Art" parent="Body/Content/ArtSlot" instance=ExtResource("2_art")]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+
+[node name="LiveSlot" type="Control" parent="Body/Content/ArtSlot"]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+
+[node name="Info" type="VBoxContainer" parent="Body/Content"]
+editor_description = "Su alto mínimo alcanza para el caso más largo (descripción de tres líneas y cuatro estadísticas), así el dibujo no cambia de tamaño al pasar de una entrada a otra."
+custom_minimum_size = Vector2(0, 286)
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/separation = 6
+
+[node name="Name" type="Label" parent="Body/Content/Info"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.957, 0.863, 1)
+theme_override_font_sizes/font_size = 26
+text = "Nombre"
+horizontal_alignment = 1
+autowrap_mode = 3
+
+[node name="Caption" type="Label" parent="Body/Content/Info"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.85, 0.78, 0.5, 1)
+theme_override_font_sizes/font_size = 14
+text = "Línea corta"
+horizontal_alignment = 1
+autowrap_mode = 3
+
+[node name="Text" type="Label" parent="Body/Content/Info"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.765, 0.839, 0.816, 1)
+theme_override_font_sizes/font_size = 14
+text = "Descripción de la entrada."
+autowrap_mode = 3
+
+[node name="Lines" type="VBoxContainer" parent="Body/Content/Info"]
+unique_name_in_owner = true
+editor_description = "Las líneas de estadística; las arma collection_detail.gd (grupo Líneas)."
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/separation = 6

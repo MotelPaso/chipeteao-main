@@ -1,0 +1,25 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/ui/meta/collection/enemy_portrait.gd" id="1_portrait"]
+[ext_resource type="PackedScene" path="res://scenes/ui/meta/collection/EnemyStage.tscn" id="2_stage"]
+
+[node name="EnemyPortrait" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+script = ExtResource("1_portrait")
+
+[node name="View" type="TextureRect" parent="."]
+editor_description = "Muestra lo que dibuja Stage; la textura la pone enemy_portrait.gd."
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+expand_mode = 1
+stretch_mode = 5
+
+[node name="Stage" parent="." instance=ExtResource("2_stage")]
+editor_description = "El único SubViewport vivo de la Colección: enemy_portrait.gd lo deja en «When Visible» y le da el tamaño del retrato."

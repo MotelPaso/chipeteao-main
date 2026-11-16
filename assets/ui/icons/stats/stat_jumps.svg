@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
+  <!-- Saltos: un resorte con flecha. Dibujo propio. -->
+  <g stroke="#15131a" stroke-width="8" stroke-linejoin="round" stroke-linecap="round">
+<path d="M64 6 L98 44 L78 44 L78 62 L50 62 L50 44 L30 44 Z" fill="#5bd6a0"/>
+<path d="M36 74 L92 74 L36 90 L92 90 L36 106 L92 106" fill="none" stroke-width="18"/>
+<path d="M36 74 L92 74 L36 90 L92 90 L36 106 L92 106" fill="none" stroke="#fff4dc" stroke-width="7"/>
+<path d="M24 120 L104 120" fill="none" stroke-width="10"/>
+  </g>
+</svg>

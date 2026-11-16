@@ -1,0 +1,148 @@
+[gd_scene load_steps=6 format=3]
+
+[ext_resource type="Script" path="res://scripts/ui/meta/collection/collection_art.gd" id="1_art"]
+[ext_resource type="Script" path="res://scripts/ui/meta/collection/map_postcard.gd" id="2_postcard"]
+[ext_resource type="FontFile" path="res://assets/ui/fonts/LilitaOne-Regular.ttf" id="3_display"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_shackle"]
+draw_center = false
+border_width_left = 3
+border_width_top = 3
+border_width_right = 3
+border_width_bottom = 3
+border_color = Color(0.576, 0.69, 0.671, 1)
+corner_radius_top_left = 8
+corner_radius_top_right = 8
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_lockbody"]
+bg_color = Color(0.576, 0.69, 0.671, 1)
+corner_radius_top_left = 3
+corner_radius_top_right = 3
+corner_radius_bottom_right = 3
+corner_radius_bottom_left = 3
+
+[node name="CollectionArt" type="Panel"]
+editor_description = "Fondo y contorno salen del color de la entrada (grupo Marco de collection_art.gd)."
+custom_minimum_size = Vector2(0, 44)
+mouse_filter = 2
+clip_contents = true
+script = ExtResource("1_art")
+
+[node name="Postcard" type="Control" parent="."]
+unique_name_in_owner = true
+visible = false
+editor_description = "Postal del mapa, dibujada con la paleta del bioma (grupo Postal)."
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 3.0
+offset_top = 3.0
+offset_right = -3.0
+offset_bottom = -3.0
+mouse_filter = 2
+script = ExtResource("2_postcard")
+
+[node name="Photo" type="TextureRect" parent="."]
+unique_name_in_owner = true
+visible = false
+texture_filter = 4
+editor_description = "Foto de un raider (PortraitStudio) o de un enemigo (EnemyStudio)."
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 3.0
+offset_top = 3.0
+offset_right = -3.0
+offset_bottom = -4.0
+mouse_filter = 2
+expand_mode = 1
+stretch_mode = 6
+
+[node name="Icon" type="TextureRect" parent="."]
+unique_name_in_owner = true
+visible = false
+texture_filter = 4
+editor_description = "Icono de un objeto o de un tomo. Su aire lo pone collection_art.gd (icon_padding)."
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+expand_mode = 1
+stretch_mode = 5
+
+[node name="Glyph" type="Label" parent="."]
+unique_name_in_owner = true
+texture_filter = 2
+editor_description = "Sigla grande de un arma, o la inicial de un raider o enemigo sin foto. El tamaño lo pone collection_art.gd (glyph_height)."
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+theme_override_colors/font_color = Color(1, 0.957, 0.863, 1)
+theme_override_colors/font_outline_color = Color(0.105, 0.153, 0.222, 1)
+theme_override_constants/outline_size = 6
+theme_override_fonts/font = ExtResource("3_display")
+theme_override_font_sizes/font_size = 34
+text = "R"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="Badge" type="Label" parent="."]
+unique_name_in_owner = true
+visible = false
+editor_description = "Sigla del objeto o del tomo, en la esquina."
+layout_mode = 1
+anchors_preset = 3
+anchor_left = 1.0
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -8.0
+offset_top = -8.0
+offset_right = -8.0
+offset_bottom = -8.0
+grow_horizontal = 0
+grow_vertical = 0
+mouse_filter = 2
+theme_type_variation = &"BadgeLabel"
+theme_override_font_sizes/font_size = 12
+text = "PA"
+
+[node name="Lock" type="Control" parent="."]
+unique_name_in_owner = true
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+
+[node name="Shackle" type="Panel" parent="Lock"]
+layout_mode = 1
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -8.0
+offset_top = -15.0
+offset_right = 8.0
+offset_bottom = 1.0
+mouse_filter = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_shackle")
+
+[node name="Body" type="Panel" parent="Lock"]
+layout_mode = 1
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -11.0
+offset_top = -3.0
+offset_right = 11.0
+offset_bottom = 15.0
+mouse_filter = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_lockbody")

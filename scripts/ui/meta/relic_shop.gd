@@ -1,11 +1,15 @@
 extends MetaScreen
 ## Armería: gasta esquirlas en rangos permanentes de reliquias (filas de
 ## RelicCatalog; SaveData guarda los rangos y PlayerStats los aplica en cada
-## partida). Una fila por reliquia: nombre, línea de efecto, rombos de rango y
+## partida). Una fila por reliquia: el icono del stat que mejora (StatIconChip
+## lo saca del campo `stat` del catálogo), nombre, línea de efecto, rombos de rango y
 ## un botón de compra con el precio del rango siguiente, o MÁX al llegar al
 ## tope. Comprar hace destellar la fila y descuenta el saldo
 ## (MetaScreen.payoff), igual que reclamar una misión; un rango que no
 ## alcanza recibe el vaivén de rechazo compartido.
+
+## Ficha con el icono del stat de cada reliquia.
+const STAT_CHIP_SCENE: PackedScene = preload("res://scenes/ui/meta/StatIconChip.tscn")
 
 @export_group("Filas")
 ## Tamaño de fuente del nombre de la reliquia, en píxeles.
@@ -28,7 +32,7 @@ extends MetaScreen
 @export var maxed_color: Color = UiTheme.ACCENT_AMBER
 ## Tamaño mínimo del botón de compra, en píxeles (ancho, alto).
 @export var buy_button_size: Vector2 = Vector2(130.0, 34.0)
-## Separación entre la columna de la reliquia y la del precio, en píxeles.
+## Separación entre el icono, la columna de la reliquia y la del precio, en píxeles.
 @export var columns_separation: int = 16
 ## Separación vertical entre nombre, efecto y rombos de rango, en píxeles.
 @export var info_separation: int = 3
@@ -69,6 +73,10 @@ func _build_row(relic: Dictionary) -> PanelContainer:
 	var columns := HBoxContainer.new()
 	columns.add_theme_constant_override("separation", columns_separation)
 	row.add_child(columns)
+
+	var chip := STAT_CHIP_SCENE.instantiate() as StatIconChip
+	chip.show_stat(String(relic.get("stat", "")))
+	columns.add_child(chip)
 
 	var info := VBoxContainer.new()
 	info.size_flags_horizontal = Control.SIZE_EXPAND_FILL

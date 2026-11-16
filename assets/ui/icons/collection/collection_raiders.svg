@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <!-- Retrato de un raider en su marco. Dibujo propio. -->
+  <g stroke="#15131a" stroke-width="10" stroke-linejoin="round" stroke-linecap="round">
+<rect x="96" y="64" width="320" height="384" rx="28" fill="#fff4dc" transform="rotate(-4 256 256)"/>
+<g transform="rotate(-4 256 256)"><rect x="128" y="96" width="256" height="250" rx="16" fill="#7fd4f0"/>
+<path d="M150 346 C150 286 196 262 256 262 C316 262 362 286 362 346 Z" fill="#12343b"/>
+<circle cx="256" cy="196" r="62" fill="#ffa62b"/>
+<path d="M140 392 L372 392 M140 420 L300 420" fill="none"/></g>
+  </g>
+</svg>

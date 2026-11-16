@@ -1,0 +1,146 @@
+[gd_scene load_steps=8 format=3]
+
+[ext_resource type="Script" path="res://scripts/ui/meta/collection/collection_browser.gd" id="1_browser"]
+[ext_resource type="Material" path="res://assets/ui/menu_backdrop.tres" id="2_backdrop"]
+[ext_resource type="FontFile" path="res://assets/ui/fonts/LilitaOne-Regular.ttf" id="3_display"]
+[ext_resource type="PackedScene" path="res://scenes/ui/meta/collection/CollectionDetail.tscn" id="4_detail"]
+[ext_resource type="PackedScene" path="res://scenes/ui/meta/character_select/PortraitStudio.tscn" id="5_studio"]
+[ext_resource type="PackedScene" path="res://scenes/ui/meta/collection/EnemyStudio.tscn" id="6_enemies"]
+
+[sub_resource type="FontVariation" id="FontVariation_title"]
+base_font = ExtResource("3_display")
+spacing_glyph = 1
+
+[node name="CollectionBrowser" type="Control" groups=["menu_screen"]]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+script = ExtResource("1_browser")
+
+[node name="Background" type="ColorRect" parent="."]
+material = ExtResource("2_backdrop")
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+
+[node name="Layout" type="MarginContainer" parent="."]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+theme_override_constants/margin_left = 24
+theme_override_constants/margin_top = 12
+theme_override_constants/margin_right = 24
+theme_override_constants/margin_bottom = 12
+
+[node name="VBox" type="VBoxContainer" parent="Layout"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="TopBar" type="HBoxContainer" parent="Layout/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_constants/separation = 16
+
+[node name="Left" type="HBoxContainer" parent="Layout/VBox/TopBar"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="BackButton" type="Button" parent="Layout/VBox/TopBar/Left"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(112, 40)
+layout_mode = 2
+size_flags_vertical = 4
+theme_override_font_sizes/font_size = 16
+text = "Volver"
+
+[node name="Titles" type="VBoxContainer" parent="Layout/VBox/TopBar"]
+layout_mode = 2
+theme_override_constants/separation = -6
+
+[node name="TitleLabel" type="Label" parent="Layout/VBox/TopBar/Titles"]
+unique_name_in_owner = true
+editor_description = "El nombre de la categoría; lo escribe collection_browser.gd con CollectionEntries.CATEGORY_TITLES."
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.824, 0.247, 1)
+theme_override_colors/font_outline_color = Color(0.082, 0.075, 0.102, 1)
+theme_override_constants/outline_size = 10
+theme_override_fonts/font = SubResource("FontVariation_title")
+theme_override_font_sizes/font_size = 42
+text = "PERSONAJES"
+horizontal_alignment = 1
+
+[node name="ProgressLabel" type="Label" parent="Layout/VBox/TopBar/Titles"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_constants/outline_size = 6
+theme_override_font_sizes/font_size = 14
+text = "0 / 0 descubiertos"
+horizontal_alignment = 1
+
+[node name="Right" type="Control" parent="Layout/VBox/TopBar"]
+editor_description = "Pesa lo mismo que Left, así el título queda al centro."
+layout_mode = 2
+size_flags_horizontal = 3
+mouse_filter = 2
+
+[node name="Main" type="HBoxContainer" parent="Layout/VBox"]
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_constants/separation = 12
+
+[node name="ContentScroll" type="ScrollContainer" parent="Layout/VBox/Main"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 150)
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+horizontal_scroll_mode = 0
+
+[node name="GridPad" type="MarginContainer" parent="Layout/VBox/Main/ContentScroll"]
+unique_name_in_owner = true
+editor_description = "Aire alrededor de la cuadrícula: la carta con foco crece y su anillo no debe cortarse contra el borde de la lista."
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/margin_left = 12
+theme_override_constants/margin_top = 12
+theme_override_constants/margin_right = 12
+theme_override_constants/margin_bottom = 12
+
+[node name="CardsGrid" type="GridContainer" parent="Layout/VBox/Main/ContentScroll/GridPad"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_constants/h_separation = 12
+theme_override_constants/v_separation = 10
+columns = 4
+
+[node name="DetailColumn" type="VBoxContainer" parent="Layout/VBox/Main"]
+layout_mode = 2
+
+[node name="CollectionDetail" parent="Layout/VBox/Main/DetailColumn" instance=ExtResource("4_detail")]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="Footer" type="HBoxContainer" parent="Layout/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+
+[node name="HintsSlot" type="HBoxContainer" parent="Layout/VBox/Footer"]
+unique_name_in_owner = true
+editor_description = "collection_browser.gd agrega aquí las indicaciones de botones (InputHints)."
+custom_minimum_size = Vector2(0, 30)
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="PortraitStudio" parent="." instance=ExtResource("5_studio")]
+unique_name_in_owner = true
+editor_description = "Saca las fotos de los raiders (las mismas de las cartas del selector; si ya existen no se repiten)."
+
+[node name="EnemyStudio" parent="." instance=ExtResource("6_enemies")]
+unique_name_in_owner = true
+editor_description = "Saca las fotos de los enemigos."

@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
+  <!-- Daño crítico: un estallido. Dibujo propio. -->
+  <g stroke="#15131a" stroke-width="8" stroke-linejoin="round" stroke-linecap="round">
+<path d="M64 6 L78 36 L108 20 L96 52 L124 64 L96 76 L108 108 L78 92 L64 122 L50 92 L20 108 L32 76 L4 64 L32 52 L20 20 L50 36 Z" fill="#f2542d"/>
+<path d="M64 38 L72 56 L90 64 L72 72 L64 90 L56 72 L38 64 L56 56 Z" fill="#ffd23f"/>
+  </g>
+</svg>

@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
+  <!-- Velocidad de ataque: un rayo. Dibujo propio. -->
+  <g stroke="#15131a" stroke-width="8" stroke-linejoin="round" stroke-linecap="round">
+<path d="M74 8 L26 70 L58 70 L48 120 L102 52 L68 52 Z" fill="#ffd23f"/>
+  </g>
+</svg>

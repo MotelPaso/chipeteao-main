@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
+  <!-- Respaldo para un stat sin icono propio: una chispa. Dibujo propio. -->
+  <g stroke="#15131a" stroke-width="8" stroke-linejoin="round" stroke-linecap="round">
+<path d="M64 6 C68 44 84 60 122 64 C84 68 68 84 64 122 C60 84 44 68 6 64 C44 60 60 44 64 6 Z" fill="#ffd23f"/>
+  </g>
+</svg>

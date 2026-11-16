@@ -1,60 +1,166 @@
-[gd_scene load_steps=5 format=3]
+[gd_scene load_steps=11 format=3]
 
 [ext_resource type="Script" path="res://scripts/ui/meta/collection.gd" id="1_collection"]
 [ext_resource type="Material" path="res://assets/ui/menu_backdrop.tres" id="2_backdrop"]
+[ext_resource type="PackedScene" path="res://scenes/ui/menu/MenuTile.tscn" id="3_tile"]
 [ext_resource type="FontFile" path="res://assets/ui/fonts/LilitaOne-Regular.ttf" id="font_display"]
+[ext_resource type="Texture2D" path="res://assets/ui/icons/collection/collection_raiders.svg" id="art_raiders"]
+[ext_resource type="Texture2D" path="res://assets/ui/icons/collection/collection_enemies.svg" id="art_enemies"]
+[ext_resource type="Texture2D" path="res://assets/ui/icons/collection/collection_maps.svg" id="art_maps"]
+[ext_resource type="Texture2D" path="res://assets/ui/icons/collection/collection_items.svg" id="art_items"]
+[ext_resource type="Texture2D" path="res://assets/ui/icons/collection/collection_tomes.svg" id="art_tomes"]
+[ext_resource type="Texture2D" path="res://assets/ui/icons/collection/collection_weapons.svg" id="art_weapons"]
 
 [sub_resource type="FontVariation" id="FontVariation_title"]
 base_font = ExtResource("font_display")
 spacing_glyph = 1
 
 [node name="Collection" type="Control" groups=["menu_screen"]]
+layout_mode = 3
+anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
 script = ExtResource("1_collection")
 
 [node name="Background" type="ColorRect" parent="."]
 material = ExtResource("2_backdrop")
+layout_mode = 1
+anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
-color = Color(1, 1, 1, 1)
+mouse_filter = 2
 
-[node name="Center" type="CenterContainer" parent="."]
-anchor_right = 1.0
-anchor_bottom = 1.0
-
-[node name="VBox" type="VBoxContainer" parent="Center"]
-theme_override_constants/separation = 12
-
-[node name="TitleLabel" type="Label" parent="Center/VBox"]
+[node name="Layout" type="MarginContainer" parent="."]
 unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+theme_override_constants/margin_left = 44
+theme_override_constants/margin_top = 16
+theme_override_constants/margin_right = 44
+theme_override_constants/margin_bottom = 12
+
+[node name="VBox" type="VBoxContainer" parent="Layout"]
+editor_description = "La separación deja aire para que la tarjeta con foco (crece, anillo y sombra más larga) no pise el título ni el botón de abajo."
+layout_mode = 2
+theme_override_constants/separation = 18
+
+[node name="TopBar" type="HBoxContainer" parent="Layout/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+
+[node name="TitleLabel" type="Label" parent="Layout/VBox/TopBar"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
 theme_override_colors/font_color = Color(1, 0.824, 0.247, 1)
 theme_override_colors/font_outline_color = Color(0.082, 0.075, 0.102, 1)
-theme_override_constants/outline_size = 10
+theme_override_constants/outline_size = 12
 theme_override_fonts/font = SubResource("FontVariation_title")
-theme_override_font_sizes/font_size = 40
-horizontal_alignment = 1
+theme_override_font_sizes/font_size = 52
 text = "COLECCIÓN"
 
-[node name="BadgeLabel" type="Label" parent="Center/VBox"]
+[node name="BadgeLabel" type="Label" parent="Layout/VBox/TopBar"]
 unique_name_in_owner = true
-theme_override_colors/font_color = Color(0.357, 0.839, 0.627, 1)
+editor_description = "Avance total; lo escribe collection.gd (badge_format)."
+layout_mode = 2
+size_flags_vertical = 4
+theme_type_variation = &"BadgeLabel"
+theme_override_colors/font_color = Color(1, 0.651, 0.169, 1)
 theme_override_font_sizes/font_size = 18
-horizontal_alignment = 1
-text = "Colección: 0 / 0 — 0%"
+text = "0 / 0 — 0%"
 
-[node name="Scroll" type="ScrollContainer" parent="Center/VBox"]
-custom_minimum_size = Vector2(700, 420)
-horizontal_scroll_mode = 0
-
-[node name="List" type="VBoxContainer" parent="Center/VBox/Scroll"]
+[node name="Tiles" type="GridContainer" parent="Layout/VBox"]
 unique_name_in_owner = true
-size_flags_horizontal = 3
-theme_override_constants/separation = 8
+editor_description = "Las seis categorías, en tres columnas. El texto, el color, el giro y el dibujo de cada tarjeta están en su instancia; qué categoría abre cada una está en TILE_CATEGORIES de collection.gd (por el nombre del nodo)."
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_constants/h_separation = 26
+theme_override_constants/v_separation = 24
+columns = 3
 
-[node name="BackButton" type="Button" parent="Center/VBox"]
+[node name="RaidersTile" parent="Layout/VBox/Tiles" instance=ExtResource("3_tile")]
+custom_minimum_size = Vector2(200, 210)
+layout_mode = 2
+title_text = "Personajes"
+detail_text = "Los raiders y sus retratos."
+tile_color = Color(1, 0.824, 0.247, 1)
+tilt_degrees = -1.5
+art_texture = ExtResource("art_raiders")
+art_lit_tilt = 3.0
+
+[node name="EnemiesTile" parent="Layout/VBox/Tiles" instance=ExtResource("3_tile")]
+custom_minimum_size = Vector2(200, 210)
+layout_mode = 2
+title_text = "Enemigos"
+detail_text = "El bestiario y sus estadísticas."
+tile_color = Color(0.949, 0.329, 0.176, 1)
+tilt_degrees = 1.5
+art_texture = ExtResource("art_enemies")
+art_lit_tilt = -4.0
+
+[node name="MapsTile" parent="Layout/VBox/Tiles" instance=ExtResource("3_tile")]
+custom_minimum_size = Vector2(200, 210)
+layout_mode = 2
+title_text = "Mapas"
+detail_text = "Los biomas de la incursión."
+tile_color = Color(0.357, 0.839, 0.627, 1)
+tilt_degrees = -1.0
+art_texture = ExtResource("art_maps")
+art_lit_tilt = 4.0
+
+[node name="ItemsTile" parent="Layout/VBox/Tiles" instance=ExtResource("3_tile")]
+custom_minimum_size = Vector2(200, 210)
+layout_mode = 2
+title_text = "Objetos"
+detail_text = "Lo que pagan los cofres."
+tile_color = Color(1, 0.651, 0.169, 1)
+tilt_degrees = 1.0
+art_texture = ExtResource("art_items")
+art_lit_tilt = -4.0
+
+[node name="TomesTile" parent="Layout/VBox/Tiles" instance=ExtResource("3_tile")]
+custom_minimum_size = Vector2(200, 210)
+layout_mode = 2
+title_text = "Tomos"
+detail_text = "Estadísticas que suben por copia."
+tile_color = Color(0.498, 0.831, 0.941, 1)
+tilt_degrees = -1.5
+art_texture = ExtResource("art_tomes")
+art_lit_tilt = 4.0
+
+[node name="WeaponsTile" parent="Layout/VBox/Tiles" instance=ExtResource("3_tile")]
+custom_minimum_size = Vector2(200, 210)
+layout_mode = 2
+title_text = "Armas"
+detail_text = "El arsenal y sus evoluciones."
+tile_color = Color(1, 0.957, 0.863, 1)
+tilt_degrees = 2.0
+art_texture = ExtResource("art_weapons")
+art_lit_tilt = -4.0
+
+[node name="Footer" type="HBoxContainer" parent="Layout/VBox"]
+unique_name_in_owner = true
+editor_description = "Indicaciones del control a la izquierda, Volver al centro."
+layout_mode = 2
+theme_override_constants/separation = 16
+
+[node name="HintsSlot" type="HBoxContainer" parent="Layout/VBox/Footer"]
+unique_name_in_owner = true
+editor_description = "collection.gd agrega aquí las indicaciones de botones (InputHints)."
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="BackButton" type="Button" parent="Layout/VBox/Footer"]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(200, 46)
-size_flags_horizontal = 4
+layout_mode = 2
 theme_override_font_sizes/font_size = 20
 text = "Volver"
+
+[node name="Spacer" type="Control" parent="Layout/VBox/Footer"]
+editor_description = "Pesa lo mismo que HintsSlot, así Volver queda al centro."
+layout_mode = 2
+size_flags_horizontal = 3
+mouse_filter = 2

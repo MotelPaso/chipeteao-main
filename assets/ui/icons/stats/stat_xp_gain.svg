@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
+  <!-- XP ganada: una gema. Dibujo propio. -->
+  <g stroke="#15131a" stroke-width="8" stroke-linejoin="round" stroke-linecap="round">
+<path d="M36 14 L92 14 L118 46 L64 118 L10 46 Z" fill="#5bd6a0"/>
+<path d="M10 46 L118 46 M36 14 L50 46 L64 118 L78 46 L92 14" fill="none" stroke-width="5"/>
+  </g>
+</svg>

@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <!-- Cabeza de un monstruo con cuernos. Dibujo propio. -->
+  <g stroke="#15131a" stroke-width="10" stroke-linejoin="round" stroke-linecap="round">
+<path d="M150 190 C110 170 86 120 96 62 C126 104 160 118 196 130 M362 190 C402 170 426 120 416 62 C386 104 352 118 316 130" fill="#fff4dc"/>
+<path d="M256 110 C160 110 104 176 104 262 C104 356 168 436 256 436 C344 436 408 356 408 262 C408 176 352 110 256 110 Z" fill="#f2542d"/>
+<path d="M170 250 L236 276 L170 296 Z" fill="#ffd23f"/><path d="M342 250 L276 276 L342 296 Z" fill="#ffd23f"/>
+<path d="M178 350 L206 376 L232 350 L256 376 L280 350 L306 376 L334 350" fill="none"/>
+  </g>
+</svg>

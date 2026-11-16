@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
+  <!-- Robo de vida: una gota de sangre. Dibujo propio. -->
+  <g stroke="#15131a" stroke-width="8" stroke-linejoin="round" stroke-linecap="round">
+<path d="M64 8 C64 8 22 58 22 82 C22 104 40 120 64 120 C88 120 106 104 106 82 C106 58 64 8 64 8 Z" fill="#f2542d"/>
+<path d="M42 82 C42 94 50 102 60 104" fill="none" stroke="#fff4dc" stroke-width="7"/>
+  </g>
+</svg>

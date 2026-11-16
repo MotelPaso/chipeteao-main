@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
+  <!-- Daño: una espada. Dibujo propio. -->
+  <g stroke="#15131a" stroke-width="8" stroke-linejoin="round" stroke-linecap="round">
+<g transform="rotate(45 64 64)">
+<path d="M54 84 L54 22 L64 8 L74 22 L74 84 Z" fill="#fff4dc"/>
+<rect x="38" y="84" width="52" height="13" rx="5" fill="#ffd23f"/>
+<rect x="57" y="97" width="14" height="20" rx="4" fill="#f2542d"/></g>
+  </g>
+</svg>

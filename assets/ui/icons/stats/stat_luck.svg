@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
+  <!-- Suerte: un trébol de cuatro hojas. Dibujo propio. -->
+  <g stroke="#15131a" stroke-width="8" stroke-linejoin="round" stroke-linecap="round">
+<path d="M64 66 L84 118" fill="none"/>
+<circle cx="42" cy="42" r="24" fill="#5bd6a0"/><circle cx="86" cy="42" r="24" fill="#5bd6a0"/>
+<circle cx="42" cy="82" r="24" fill="#5bd6a0"/><circle cx="86" cy="82" r="24" fill="#5bd6a0"/>
+<circle cx="64" cy="62" r="9" fill="#ffd23f"/>
+  </g>
+</svg>

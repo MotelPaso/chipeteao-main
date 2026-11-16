@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
+  <!-- Rayo con líneas de carrera. Dibujo propio. -->
+  <g stroke="#15131a" stroke-width="8" stroke-linejoin="round" stroke-linecap="round">
+<path d="M84 8 L44 66 L70 66 L58 120 L108 52 L80 52 Z" fill="#7fd4f0"/>
+<path d="M8 40 L36 40 M8 64 L28 64 M8 88 L36 88" fill="none"/>
+  </g>
+</svg>

@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
+  <!-- Área de ataque: anillos que se abren. Dibujo propio. -->
+  <g stroke="#15131a" stroke-width="8" stroke-linejoin="round" stroke-linecap="round">
+<circle cx="64" cy="64" r="52" fill="#7fd4f0"/>
+<circle cx="64" cy="64" r="32" fill="#fff4dc"/>
+<circle cx="64" cy="64" r="12" fill="#f2542d"/>
+  </g>
+</svg>

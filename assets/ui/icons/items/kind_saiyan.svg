@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
+  <!-- Llama dorada. Dibujo propio. -->
+  <g stroke="#15131a" stroke-width="8" stroke-linejoin="round" stroke-linecap="round">
+<path d="M64 6 C70 30 96 40 100 72 C104 100 86 120 64 120 C42 120 24 100 28 72 C30 56 40 48 44 34 C52 40 54 50 54 56 C60 44 64 28 64 6 Z" fill="#ffd23f"/>
+<path d="M64 62 C68 76 80 80 80 96 C80 108 72 114 64 114 C56 114 48 108 48 96 C48 86 58 80 64 62 Z" fill="#fff4dc" stroke-width="5"/>
+  </g>
+</svg>

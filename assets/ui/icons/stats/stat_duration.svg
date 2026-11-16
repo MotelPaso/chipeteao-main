@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
+  <!-- Duración de efectos: un reloj de arena. Dibujo propio. -->
+  <g stroke="#15131a" stroke-width="8" stroke-linejoin="round" stroke-linecap="round">
+<path d="M30 14 L98 14 L98 30 C98 46 78 56 70 64 C78 72 98 82 98 98 L98 114 L30 114 L30 98 C30 82 50 72 58 64 C50 56 30 46 30 30 Z" fill="#fff4dc"/>
+<path d="M42 104 C42 92 58 86 64 78 C70 86 86 92 86 104 Z" fill="#ffa62b" stroke-width="5"/>
+<path d="M20 14 L108 14 M20 114 L108 114" fill="none" stroke-width="12"/>
+  </g>
+</svg>

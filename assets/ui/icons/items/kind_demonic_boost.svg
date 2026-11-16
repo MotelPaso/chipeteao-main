@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
+  <!-- Gota de sangre con cuernos. Dibujo propio. -->
+  <g stroke="#15131a" stroke-width="8" stroke-linejoin="round" stroke-linecap="round">
+<path d="M34 50 C22 44 16 30 20 14 C28 26 38 30 48 34 M94 50 C106 44 112 30 108 14 C100 26 90 30 80 34" fill="#12343b"/>
+<path d="M64 22 C64 22 28 68 28 88 C28 108 44 120 64 120 C84 120 100 108 100 88 C100 68 64 22 64 22 Z" fill="#f2542d"/>
+<path d="M46 88 C46 98 52 104 60 106" fill="none" stroke="#fff4dc" stroke-width="6"/>
+  </g>
+</svg>

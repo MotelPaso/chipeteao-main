@@ -1,0 +1,10 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/ui/meta/collection/enemy_studio.gd" id="1_studio"]
+[ext_resource type="PackedScene" path="res://scenes/ui/meta/collection/EnemyStage.tscn" id="2_stage"]
+
+[node name="EnemyStudio" type="Node"]
+script = ExtResource("1_studio")
+
+[node name="Stage" parent="." instance=ExtResource("2_stage")]
+editor_description = "Solo dibuja cuando enemy_studio.gd pide una foto (Update Mode: Disabled)."

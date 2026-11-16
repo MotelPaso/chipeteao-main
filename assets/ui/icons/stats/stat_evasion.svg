@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
+  <!-- Evasión: una ráfaga de bruma. Dibujo propio. -->
+  <g stroke="#15131a" stroke-width="8" stroke-linejoin="round" stroke-linecap="round">
+<path d="M14 44 L78 44 C96 44 100 20 82 18 C72 17 66 24 68 32" fill="none" stroke-width="18"/>
+<path d="M14 44 L78 44 C96 44 100 20 82 18 C72 17 66 24 68 32" fill="none" stroke="#7fd4f0" stroke-width="8"/>
+<path d="M30 70 L100 70 C120 70 122 100 102 102 C92 103 86 96 88 88" fill="none" stroke-width="18"/>
+<path d="M30 70 L100 70 C120 70 122 100 102 102 C92 103 86 96 88 88" fill="none" stroke="#fff4dc" stroke-width="8"/>
+<path d="M12 96 L56 96" fill="none" stroke-width="18"/>
+<path d="M12 96 L56 96" fill="none" stroke="#7fd4f0" stroke-width="8"/>
+  </g>
+</svg>

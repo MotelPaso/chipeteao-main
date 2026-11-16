@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
+  <!-- Armadura: un escudo. Dibujo propio. -->
+  <g stroke="#15131a" stroke-width="8" stroke-linejoin="round" stroke-linecap="round">
+<path d="M18 22 L64 10 L110 22 L110 62 C110 90 90 108 64 118 C38 108 18 90 18 62 Z" fill="#7fd4f0"/>
+<path d="M64 10 L110 22 L110 62 C110 90 90 108 64 118 Z" fill="#12343b"/>
+  </g>
+</svg>
