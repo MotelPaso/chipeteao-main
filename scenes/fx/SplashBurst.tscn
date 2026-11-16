@@ -1,0 +1,58 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scripts/fx/splash_burst.gd" id="1_script"]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_speck"]
+shading_mode = 0
+vertex_color_use_as_albedo = true
+vertex_color_is_srgb = true
+
+[sub_resource type="BoxMesh" id="BoxMesh_speck"]
+material = SubResource("StandardMaterial3D_speck")
+size = Vector3(0.18, 0.18, 0.18)
+
+[sub_resource type="Curve" id="Curve_shrink"]
+_data = [Vector2(0, 1), 0.0, 0.0, 0, 0, Vector2(1, 0), 0.0, 0.0, 0, 0]
+point_count = 2
+
+[node name="SplashBurst" type="Node3D" unique_id=1746634642]
+script = ExtResource("1_script")
+
+[node name="Clods" type="CPUParticles3D" parent="." unique_id=199041992]
+cast_shadow = 0
+emitting = false
+amount = 26
+one_shot = true
+explosiveness = 0.95
+mesh = SubResource("BoxMesh_speck")
+emission_shape = 1
+emission_sphere_radius = 0.9
+direction = Vector3(0, 1, 0)
+spread = 55.0
+gravity = Vector3(0, -22, 0)
+initial_velocity_min = 5.0
+initial_velocity_max = 11.0
+scale_amount_min = 0.8
+scale_amount_max = 2.2
+scale_amount_curve = SubResource("Curve_shrink")
+color = Color(0.26, 0.19, 0.12, 1)
+
+[node name="Spray" type="CPUParticles3D" parent="." unique_id=1632372915]
+cast_shadow = 0
+emitting = false
+amount = 22
+lifetime = 0.8
+one_shot = true
+explosiveness = 0.92
+mesh = SubResource("BoxMesh_speck")
+emission_shape = 1
+emission_sphere_radius = 0.7
+direction = Vector3(0, 1, 0)
+spread = 75.0
+gravity = Vector3(0, -16, 0)
+initial_velocity_min = 4.0
+initial_velocity_max = 9.0
+scale_amount_min = 0.4
+scale_amount_max = 1.1
+scale_amount_curve = SubResource("Curve_shrink")
+color = Color(0.6, 0.88, 1, 1)

@@ -2,9 +2,10 @@ class_name LobsterStalk
 extends Node
 ## Cómo ronda la Langosta Azul entre un ataque y otro (nodo Stalk de
 ## BlueLobster.tscn): a qué raider persigue y hacia dónde camina. De lejos va
-## derecho hacia él; de cerca lo rodea de costado, sin quedarse quieta, y
-## cambia de sentido cada tanto. En co-op cambia de raider cada focus_seconds,
-## así sus ataques no caen siempre sobre el mismo.
+## derecho hacia él (corriendo, si se le fue muy lejos); de cerca lo rodea de
+## costado, sin quedarse quieta, y cambia de sentido cada tanto. En co-op
+## cambia de raider cada focus_seconds, así sus ataques no caen siempre sobre
+## el mismo.
 
 @export_group("Objetivo")
 ## Segundos que persigue al mismo raider antes de elegir otro (co-op).
@@ -12,9 +13,9 @@ extends Node
 
 @export_group("Ronda")
 ## Distancia al raider, en metros, a la que deja de acercarse y empieza a rodearlo.
-@export var orbit_distance: float = 4.4
+@export var orbit_distance: float = 3.3
 ## Margen en metros alrededor de esa distancia dentro del cual solo rodea.
-@export var orbit_band: float = 1.3
+@export var orbit_band: float = 0.7
 ## Fracción de su velocidad con que rodea al raider (0-1).
 @export_range(0.0, 1.0) var orbit_speed_factor: float = 0.72
 ## Fracción de su velocidad con que retrocede si el raider se le pega (0-1).
@@ -24,12 +25,22 @@ extends Node
 ## Segundos máximos entre un cambio de sentido y el siguiente.
 @export var flip_max_seconds: float = 3.8
 
+@export_group("Persecución")
+## Metros al raider desde los que deja de caminar y CORRE a alcanzarlo.
+@export var chase_distance: float = 16.0
+## Metros al raider a los que vuelve a caminar.
+@export var chase_stop_distance: float = 9.0
+## Multiplicador de su velocidad mientras corre (un raider camina a 8,6 m/s).
+@export var chase_speed_factor: float = 1.7
+
 ## El raider que persigue ahora.
 var _focus: Node3D = null
 var _focus_left: float = 0.0
 ## Sentido en que lo rodea: 1 o -1.
 var _side: float = 1.0
 var _flip_left: float = 0.0
+## True mientras corre a alcanzar a un raider que se le fue lejos.
+var _chasing: bool = false
 ## Azar propio: la ronda no toca el RNG de la partida.
 var _rng: RandomNumberGenerator = RandomNumberGenerator.new()
 
@@ -86,6 +97,16 @@ func intent(seek: Vector3, distance: float) -> Vector3:
 	# En su distancia: gira y corrige apenas hacia el radio que quiere.
 	var radial := (distance - orbit_distance) / maxf(orbit_band, 0.01)
 	return (tangent + seek * radial * 0.6).normalized() * orbit_speed_factor
+
+
+## Multiplicador de su velocidad a `distance` metros del raider: corre si se
+## le fue lejos y vuelve a caminar cuando lo tiene cerca.
+func pace(distance: float) -> float:
+	if distance > chase_distance:
+		_chasing = true
+	elif distance < chase_stop_distance:
+		_chasing = false
+	return chase_speed_factor if _chasing else 1.0
 
 
 ## Cambia ya el sentido en que lo rodea (un ataque lo pide al terminar).

@@ -1,21 +1,90 @@
-[gd_scene load_steps=24 format=3]
+[gd_scene format=3]
 
 [ext_resource type="Shader" path="res://assets/shaders/lobster_shell.gdshader" id="1_lobster_shell"]
 [ext_resource type="Script" path="res://scripts/enemies/blue_lobster.gd" id="2_blue_lobster"]
 [ext_resource type="PackedScene" path="res://scenes/systems/XpGem.tscn" id="3_XpGem"]
-[ext_resource type="Script" path="res://scripts/systems/health.gd" id="4_health"]
-[ext_resource type="Script" path="res://scripts/enemies/boss/stage_boss_scaling.gd" id="5_stage_boss_scaling"]
-[ext_resource type="Script" path="res://scripts/enemies/boss/boss_burnout.gd" id="6_boss_burnout"]
-[ext_resource type="Script" path="res://scripts/enemies/blue_lobster/lobster_stalk.gd" id="7_lobster_stalk"]
-[ext_resource type="Script" path="res://scripts/enemies/blue_lobster/lobster_arrival.gd" id="8_lobster_arrival"]
+[ext_resource type="Script" path="res://scripts/enemies/blue_lobster/lobster_rig.gd" id="4_lobster_rig"]
+[ext_resource type="Script" path="res://scripts/enemies/blue_lobster/lobster_gestures.gd" id="5_lobster_gestures"]
+[ext_resource type="Script" path="res://scripts/enemies/blue_lobster/lobster_motion.gd" id="6_lobster_motion"]
+[ext_resource type="Script" path="res://scripts/enemies/blue_lobster/lobster_head.gd" id="7_lobster_head"]
+[ext_resource type="Script" path="res://scripts/enemies/blue_lobster/lobster_gait.gd" id="8_lobster_gait"]
+[ext_resource type="Script" path="res://scripts/systems/health.gd" id="9_health"]
+[ext_resource type="Script" path="res://scripts/enemies/boss/stage_boss_scaling.gd" id="10_stage_boss_scaling"]
+[ext_resource type="Script" path="res://scripts/enemies/boss/boss_burnout.gd" id="11_boss_burnout"]
+[ext_resource type="Script" path="res://scripts/enemies/blue_lobster/lobster_life.gd" id="12_lobster_life"]
+[ext_resource type="Script" path="res://scripts/enemies/blue_lobster/lobster_stalk.gd" id="13_lobster_stalk"]
+[ext_resource type="Script" path="res://scripts/enemies/blue_lobster/lobster_arrival.gd" id="14_lobster_arrival"]
+[ext_resource type="Script" path="res://scripts/enemies/blue_lobster/lobster_voice.gd" id="15_lobster_voice"]
+[ext_resource type="Shader" path="res://assets/shaders/lobster_dread.gdshader" id="16_lobster_dread"]
+[ext_resource type="Script" path="res://scripts/enemies/blue_lobster/lobster_feel.gd" id="17_lobster_feel"]
+[ext_resource type="Script" path="res://scripts/enemies/blue_lobster/lobster_moveset.gd" id="18_lobster_moveset"]
+[ext_resource type="Script" path="res://scripts/enemies/blue_lobster/lobster_pincers.gd" id="19_lobster_pincers"]
+[ext_resource type="Script" path="res://scripts/enemies/blue_lobster/lobster_charge.gd" id="20_lobster_charge"]
+[ext_resource type="Script" path="res://scripts/enemies/blue_lobster/lobster_leap.gd" id="21_lobster_leap"]
+[ext_resource type="Script" path="res://scripts/enemies/blue_lobster/lobster_tail_spin.gd" id="22_lobster_tail_spin"]
+[ext_resource type="Script" path="res://scripts/enemies/blue_lobster/lobster_burrow.gd" id="23_lobster_burrow"]
+
+[sub_resource type="CapsuleShape3D" id="CapsuleShape3D_body"]
+radius = 1.1
+height = 2.8
+
+[sub_resource type="SphereMesh" id="SphereMesh_big"]
+radial_segments = 24
+rings = 12
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_shell"]
+render_priority = 0
 shader = ExtResource("1_lobster_shell")
+shader_parameter/deep_color = null
+shader_parameter/bright_color = null
+shader_parameter/pale_color = null
+shader_parameter/gradient_axis = null
+shader_parameter/gradient_soft = null
+shader_parameter/glow = null
+shader_parameter/speckle_scale = null
+shader_parameter/speckle_amount = null
+shader_parameter/speckle_color = null
+shader_parameter/rim_color = null
+shader_parameter/rim_strength = null
+shader_parameter/rim_power = null
+shader_parameter/anger_color = null
+shader_parameter/anger_glow = null
+shader_parameter/fade_near = null
+shader_parameter/fade_far = null
+
+[sub_resource type="SphereMesh" id="SphereMesh_mid"]
+radial_segments = 16
+rings = 8
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_cone"]
+top_radius = 0.0
+height = 1.0
+radial_segments = 12
+rings = 0
+
+[sub_resource type="SphereMesh" id="SphereMesh_small"]
+radial_segments = 12
+rings = 6
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_taper"]
+top_radius = 0.2
+height = 1.0
+radial_segments = 10
+rings = 0
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_limb"]
+height = 1.0
+radial_segments = 10
+rings = 0
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_eye"]
 albedo_color = Color(0.02, 0.02, 0.04, 1)
 metallic = 0.4
 roughness = 0.12
+
+[sub_resource type="SphereMesh" id="SphereMesh_tiny"]
+radial_segments = 8
+rings = 4
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_pupil"]
 shading_mode = 0
@@ -23,57 +92,11 @@ albedo_color = Color(0.65, 0.97, 1, 1)
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_dirt"]
 albedo_color = Color(0.2, 0.15, 0.1, 1)
-roughness = 1
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_speck"]
 shading_mode = 0
 vertex_color_use_as_albedo = true
 vertex_color_is_srgb = true
-
-[sub_resource type="SphereMesh" id="SphereMesh_big"]
-radius = 0.5
-height = 1
-radial_segments = 24
-rings = 12
-
-[sub_resource type="SphereMesh" id="SphereMesh_mid"]
-radius = 0.5
-height = 1
-radial_segments = 16
-rings = 8
-
-[sub_resource type="SphereMesh" id="SphereMesh_small"]
-radius = 0.5
-height = 1
-radial_segments = 12
-rings = 6
-
-[sub_resource type="SphereMesh" id="SphereMesh_tiny"]
-radius = 0.5
-height = 1
-radial_segments = 8
-rings = 4
-
-[sub_resource type="CylinderMesh" id="CylinderMesh_limb"]
-top_radius = 0.5
-bottom_radius = 0.5
-height = 1
-radial_segments = 10
-rings = 0
-
-[sub_resource type="CylinderMesh" id="CylinderMesh_taper"]
-top_radius = 0.2
-bottom_radius = 0.5
-height = 1
-radial_segments = 10
-rings = 0
-
-[sub_resource type="CylinderMesh" id="CylinderMesh_cone"]
-top_radius = 0
-bottom_radius = 0.5
-height = 1
-radial_segments = 12
-rings = 0
 
 [sub_resource type="BoxMesh" id="BoxMesh_speck"]
 material = SubResource("StandardMaterial3D_speck")
@@ -83,906 +106,1010 @@ size = Vector3(0.16, 0.16, 0.16)
 _data = [Vector2(0, 1), 0.0, 0.0, 0, 0, Vector2(1, 0), 0.0, 0.0, 0, 0]
 point_count = 2
 
-[sub_resource type="CapsuleShape3D" id="CapsuleShape3D_body"]
-radius = 1.15
-height = 2.4
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_dread"]
+shader = ExtResource("16_lobster_dread")
+shader_parameter/tint = null
+shader_parameter/amount = null
+shader_parameter/inner = null
+shader_parameter/outer = null
+shader_parameter/ripples = null
+shader_parameter/ripple_speed = null
+shader_parameter/ripple_strength = null
 
-[node name="BlueLobster" type="CharacterBody3D" groups=["boss", "enemies"]]
+[node name="BlueLobster" type="CharacterBody3D" unique_id=1471040298 groups=["boss", "enemies"]]
 collision_layer = 2
-collision_mask = 1
 script = ExtResource("2_blue_lobster")
 boss_title = "Langosta Azul"
 telegraph_color = Color(0.22, 0.78, 1, 1)
 impact_color = Color(0.8, 0.96, 1, 1)
-tier_body_scale = 1
+tier_body_scale = 1.0
 move_speed = 7.4
-turn_speed = 7
-separation_strength = 0
+turn_speed = 7.0
+separation_strength = 0.0
 xp_gem_scene = ExtResource("3_XpGem")
 points_value = 25
 possessable = false
-aim_height = 0.9
+aim_height = 1.4
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.2, 0)
+[node name="CollisionShape3D" type="CollisionShape3D" parent="." unique_id=318249890]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.4, 0)
 shape = SubResource("CapsuleShape3D_body")
 
-[node name="Visual" type="Node3D" parent="."]
+[node name="Visual" type="Node3D" parent="." unique_id=209335130]
+script = ExtResource("4_lobster_rig")
 
-[node name="Root" type="Node3D" parent="Visual"]
+[node name="Gestures" type="Node" parent="Visual" unique_id=2072012170]
+script = ExtResource("5_lobster_gestures")
+
+[node name="Motion" type="Node" parent="Visual" unique_id=944774155]
+script = ExtResource("6_lobster_motion")
+
+[node name="HeadLife" type="Node" parent="Visual" unique_id=571968294]
+script = ExtResource("7_lobster_head")
+
+[node name="Gait" type="Node" parent="Visual" unique_id=2077681423]
+script = ExtResource("8_lobster_gait")
+
+[node name="Root" type="Node3D" parent="Visual" unique_id=351767233]
 unique_name_in_owner = true
 
-[node name="Thorax" type="Node3D" parent="Visual/Root"]
+[node name="Thorax" type="Node3D" parent="Visual/Root" unique_id=2095452663]
 unique_name_in_owner = true
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.78, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.82, 0)
 
-[node name="Shell" type="MeshInstance3D" parent="Visual/Root/Thorax"]
-transform = Transform3D(1.05, 0, 0, 0, 0.8, 0, 0, 0, 1.95, 0, 0.02, -0.1)
+[node name="Shell" type="MeshInstance3D" parent="Visual/Root/Thorax" unique_id=474998024]
+transform = Transform3D(1.16, 0, 0, 0, 0.94, 0, 0, 0, 1.95, 0, 0.04, -0.1)
 mesh = SubResource("SphereMesh_big")
 surface_material_override/0 = SubResource("ShaderMaterial_shell")
 
-[node name="Hump" type="MeshInstance3D" parent="Visual/Root/Thorax"]
-transform = Transform3D(0.78, 0, 0, 0, 0.56, 0, 0, 0, 1.5, 0, 0.2, 0.05)
-mesh = SubResource("SphereMesh_big")
-surface_material_override/0 = SubResource("ShaderMaterial_shell")
+[node name="Hump" type="MeshInstance3D" parent="Visual/Root/Thorax" unique_id=797547053]
+transform = Transform3D(0.88, 0, 0, 0, 0.66, 0, 0, 0, 1.5, 0, 0.26, 0.05)
 instance_shader_parameters/tone = 0.18
-
-[node name="SideL" type="MeshInstance3D" parent="Visual/Root/Thorax"]
-transform = Transform3D(0.36, 0, 0, 0, 0.58, 0, 0, 0, 1.55, -0.4, -0.1, -0.05)
-mesh = SubResource("SphereMesh_mid")
+mesh = SubResource("SphereMesh_big")
 surface_material_override/0 = SubResource("ShaderMaterial_shell")
+
+[node name="SideL" type="MeshInstance3D" parent="Visual/Root/Thorax" unique_id=254831353]
+transform = Transform3D(0.38, 0, 0, 0, 0.66, 0, 0, 0, 1.55, -0.45, -0.08, -0.05)
 instance_shader_parameters/tone = -0.25
-
-[node name="SideR" type="MeshInstance3D" parent="Visual/Root/Thorax"]
-transform = Transform3D(0.36, 0, 0, 0, 0.58, 0, 0, 0, 1.55, 0.4, -0.1, -0.05)
 mesh = SubResource("SphereMesh_mid")
 surface_material_override/0 = SubResource("ShaderMaterial_shell")
+
+[node name="SideR" type="MeshInstance3D" parent="Visual/Root/Thorax" unique_id=788654546]
+transform = Transform3D(0.38, 0, 0, 0, 0.66, 0, 0, 0, 1.55, 0.45, -0.08, -0.05)
 instance_shader_parameters/tone = -0.25
-
-[node name="Belly" type="MeshInstance3D" parent="Visual/Root/Thorax"]
-transform = Transform3D(0.84, 0, 0, 0, 0.42, 0, 0, 0, 1.7, 0, -0.24, -0.02)
 mesh = SubResource("SphereMesh_mid")
 surface_material_override/0 = SubResource("ShaderMaterial_shell")
-instance_shader_parameters/pale = 0.75
 
-[node name="Rostrum" type="MeshInstance3D" parent="Visual/Root/Thorax"]
-transform = Transform3D(0.2, 0, 0, 0, 0, 0.2, 0, -0.62, 0, 0, 0.2, -1.29)
+[node name="Belly" type="MeshInstance3D" parent="Visual/Root/Thorax" unique_id=284424023]
+transform = Transform3D(0.8, 0, 0, 0, 0.36, 0, 0, 0, 1.6, 0, -0.27, 0)
+instance_shader_parameters/pale = 0.42
+instance_shader_parameters/tone = -0.1
+mesh = SubResource("SphereMesh_mid")
+surface_material_override/0 = SubResource("ShaderMaterial_shell")
+
+[node name="Rostrum" type="MeshInstance3D" parent="Visual/Root/Thorax" unique_id=821445722]
+transform = Transform3D(0.24, 0, 0, 0, 0, 0.24, 0, -0.66, 0, 0, 0.24, -1.31)
+instance_shader_parameters/tone = 0.12
 mesh = SubResource("CylinderMesh_cone")
 surface_material_override/0 = SubResource("ShaderMaterial_shell")
-instance_shader_parameters/tone = 0.12
 
-[node name="SpineL" type="MeshInstance3D" parent="Visual/Root/Thorax"]
+[node name="SpineL" type="MeshInstance3D" parent="Visual/Root/Thorax" unique_id=1963859043]
 transform = Transform3D(0.09613, -0.08269, 0, 0, 0, 0.1, -0.02756, -0.28838, 0, -0.28135, 0.17, -1.06419)
 cast_shadow = 0
+instance_shader_parameters/tone = 0.12
 mesh = SubResource("CylinderMesh_cone")
 surface_material_override/0 = SubResource("ShaderMaterial_shell")
-instance_shader_parameters/tone = 0.12
 
-[node name="SpineR" type="MeshInstance3D" parent="Visual/Root/Thorax"]
+[node name="SpineR" type="MeshInstance3D" parent="Visual/Root/Thorax" unique_id=1580289014]
 transform = Transform3D(0.09613, 0.08269, 0, 0, 0, 0.1, 0.02756, -0.28838, 0, 0.28135, 0.17, -1.06419)
 cast_shadow = 0
+instance_shader_parameters/tone = 0.12
 mesh = SubResource("CylinderMesh_cone")
 surface_material_override/0 = SubResource("ShaderMaterial_shell")
-instance_shader_parameters/tone = 0.12
 
-[node name="Head" type="Node3D" parent="Visual/Root/Thorax"]
+[node name="Head" type="Node3D" parent="Visual/Root/Thorax" unique_id=1648798933]
 unique_name_in_owner = true
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.14, -0.92)
 
-[node name="Maw" type="Node3D" parent="Visual/Root/Thorax/Head"]
+[node name="Maw" type="Node3D" parent="Visual/Root/Thorax/Head" unique_id=1696726171]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.26, -0.06)
 
-[node name="EyeL" type="Node3D" parent="Visual/Root/Thorax/Head"]
-unique_name_in_owner = true
-transform = Transform3D(0.91355, -0.40674, 0, 0.38683, 0.86883, 0.30902, -0.12569, -0.2823, 0.95106, -0.19, 0.1, -0.12)
-
-[node name="StalkL" type="MeshInstance3D" parent="Visual/Root/Thorax/Head/EyeL"]
-transform = Transform3D(0.075, 0, 0, 0, 0.28, 0, 0, 0, 0.075, 0, 0.14, 0)
-cast_shadow = 0
-mesh = SubResource("CylinderMesh_limb")
-surface_material_override/0 = SubResource("ShaderMaterial_shell")
-instance_shader_parameters/tone = 0.1
-
-[node name="BallL" type="MeshInstance3D" parent="Visual/Root/Thorax/Head/EyeL"]
-transform = Transform3D(0.2, 0, 0, 0, 0.2, 0, 0, 0, 0.2, 0, 0.31, 0)
-cast_shadow = 0
-mesh = SubResource("SphereMesh_small")
-surface_material_override/0 = SubResource("StandardMaterial3D_eye")
-
-[node name="PupilL" type="MeshInstance3D" parent="Visual/Root/Thorax/Head/EyeL"]
-transform = Transform3D(0.07, 0, 0, 0, 0.07, 0, 0, 0, 0.05, 0, 0.33, -0.075)
-cast_shadow = 0
-mesh = SubResource("SphereMesh_tiny")
-surface_material_override/0 = SubResource("StandardMaterial3D_pupil")
-
-[node name="AntennaL1" type="Node3D" parent="Visual/Root/Thorax/Head"]
-unique_name_in_owner = true
-transform = Transform3D(0.91355, 0.20337, 0.35224, 0, 0.86603, -0.5, -0.40674, 0.45677, 0.79115, -0.12, 0.02, -0.24)
-
-[node name="WhipL1" type="MeshInstance3D" parent="Visual/Root/Thorax/Head/AntennaL1"]
-transform = Transform3D(0.05, 0, 0, 0, 0, 0.05, 0, -0.9, 0, 0, 0, -0.45)
-cast_shadow = 0
-mesh = SubResource("CylinderMesh_limb")
-surface_material_override/0 = SubResource("ShaderMaterial_shell")
-instance_shader_parameters/tone = 0.25
-instance_shader_parameters/pale = 0.3
-
-[node name="AntennaL2" type="Node3D" parent="Visual/Root/Thorax/Head/AntennaL1"]
-unique_name_in_owner = true
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -0.9)
-
-[node name="WhipL2" type="MeshInstance3D" parent="Visual/Root/Thorax/Head/AntennaL1/AntennaL2"]
-transform = Transform3D(0.038, 0, 0, 0, 0, 0.038, 0, -0.9, 0, 0, 0, -0.45)
-cast_shadow = 0
-mesh = SubResource("CylinderMesh_limb")
-surface_material_override/0 = SubResource("ShaderMaterial_shell")
-instance_shader_parameters/tone = 0.25
-instance_shader_parameters/pale = 0.3
-
-[node name="AntennaL3" type="Node3D" parent="Visual/Root/Thorax/Head/AntennaL1/AntennaL2"]
-unique_name_in_owner = true
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -0.9)
-
-[node name="WhipL3" type="MeshInstance3D" parent="Visual/Root/Thorax/Head/AntennaL1/AntennaL2/AntennaL3"]
-transform = Transform3D(0.03, 0, 0, 0, 0, 0.03, 0, -0.84, 0, 0, 0, -0.42)
-cast_shadow = 0
-mesh = SubResource("CylinderMesh_taper")
-surface_material_override/0 = SubResource("ShaderMaterial_shell")
-instance_shader_parameters/tone = 0.25
-instance_shader_parameters/pale = 0.3
-
-[node name="AntennuleL" type="MeshInstance3D" parent="Visual/Root/Thorax/Head"]
-transform = Transform3D(0.02911, -0.08971, 0.00341, 0, 0.19718, 0.02649, -0.00726, -0.35982, 0.01367, -0.09486, 0.07859, -0.47991)
-cast_shadow = 0
-mesh = SubResource("CylinderMesh_taper")
-surface_material_override/0 = SubResource("ShaderMaterial_shell")
-instance_shader_parameters/tone = 0.3
-instance_shader_parameters/pale = 0.3
-
-[node name="MandibleL" type="Node3D" parent="Visual/Root/Thorax/Head/Maw"]
+[node name="MandibleL" type="Node3D" parent="Visual/Root/Thorax/Head/Maw" unique_id=1012230921]
 unique_name_in_owner = true
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.075, 0, 0)
 
-[node name="JawL" type="MeshInstance3D" parent="Visual/Root/Thorax/Head/Maw/MandibleL"]
+[node name="JawL" type="MeshInstance3D" parent="Visual/Root/Thorax/Head/Maw/MandibleL" unique_id=1623864730]
 transform = Transform3D(0.15, 0, 0, 0, 0.2, 0, 0, 0, 0.2, -0.02, -0.02, -0.06)
 cast_shadow = 0
+instance_shader_parameters/pale = 0.6
+instance_shader_parameters/tone = 0.1
 mesh = SubResource("SphereMesh_small")
 surface_material_override/0 = SubResource("ShaderMaterial_shell")
-instance_shader_parameters/tone = 0.1
-instance_shader_parameters/pale = 0.6
 
-[node name="FeelerL" type="Node3D" parent="Visual/Root/Thorax/Head/Maw"]
+[node name="FeelerL" type="Node3D" parent="Visual/Root/Thorax/Head/Maw" unique_id=459858401]
 unique_name_in_owner = true
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.14, -0.02, -0.02)
 
-[node name="PalpL" type="MeshInstance3D" parent="Visual/Root/Thorax/Head/Maw/FeelerL"]
+[node name="PalpL" type="MeshInstance3D" parent="Visual/Root/Thorax/Head/Maw/FeelerL" unique_id=1896270339]
 transform = Transform3D(0.04456, -0.03876, -0.00359, 0, -0.19502, 0.03686, -0.00626, -0.2758, -0.02556, -0.01938, -0.09751, -0.1379)
 cast_shadow = 0
+instance_shader_parameters/pale = 0.5
 mesh = SubResource("CylinderMesh_taper")
 surface_material_override/0 = SubResource("ShaderMaterial_shell")
-instance_shader_parameters/pale = 0.5
 
-[node name="EyeR" type="Node3D" parent="Visual/Root/Thorax/Head"]
+[node name="MandibleR" type="Node3D" parent="Visual/Root/Thorax/Head/Maw" unique_id=3114143]
 unique_name_in_owner = true
-transform = Transform3D(0.91355, 0.40674, 0, -0.38683, 0.86883, 0.30902, 0.12569, -0.2823, 0.95106, 0.19, 0.1, -0.12)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.075, 0, 0)
 
-[node name="StalkR" type="MeshInstance3D" parent="Visual/Root/Thorax/Head/EyeR"]
-transform = Transform3D(0.075, 0, 0, 0, 0.28, 0, 0, 0, 0.075, 0, 0.14, 0)
+[node name="JawR" type="MeshInstance3D" parent="Visual/Root/Thorax/Head/Maw/MandibleR" unique_id=2120537528]
+transform = Transform3D(0.15, 0, 0, 0, 0.2, 0, 0, 0, 0.2, 0.02, -0.02, -0.06)
 cast_shadow = 0
+instance_shader_parameters/pale = 0.6
+instance_shader_parameters/tone = 0.1
+mesh = SubResource("SphereMesh_small")
+surface_material_override/0 = SubResource("ShaderMaterial_shell")
+
+[node name="FeelerR" type="Node3D" parent="Visual/Root/Thorax/Head/Maw" unique_id=358635831]
+unique_name_in_owner = true
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.14, -0.02, -0.02)
+
+[node name="PalpR" type="MeshInstance3D" parent="Visual/Root/Thorax/Head/Maw/FeelerR" unique_id=1774942942]
+transform = Transform3D(0.04456, 0.03876, 0.00359, 0, -0.19502, 0.03686, 0.00626, -0.2758, -0.02556, 0.01938, -0.09751, -0.1379)
+cast_shadow = 0
+instance_shader_parameters/pale = 0.5
+mesh = SubResource("CylinderMesh_taper")
+surface_material_override/0 = SubResource("ShaderMaterial_shell")
+
+[node name="EyeL" type="Node3D" parent="Visual/Root/Thorax/Head" unique_id=2103306656]
+unique_name_in_owner = true
+transform = Transform3D(0.91355, -0.40674, 0, 0.38683, 0.86883, 0.30902, -0.12569, -0.2823, 0.95106, -0.19, 0.1, -0.12)
+
+[node name="StalkL" type="MeshInstance3D" parent="Visual/Root/Thorax/Head/EyeL" unique_id=1640610985]
+transform = Transform3D(0.1, 0, 0, 0, 0.3, 0, 0, 0, 0.1, 0, 0.15, 0)
+cast_shadow = 0
+instance_shader_parameters/tone = 0.1
 mesh = SubResource("CylinderMesh_limb")
 surface_material_override/0 = SubResource("ShaderMaterial_shell")
-instance_shader_parameters/tone = 0.1
 
-[node name="BallR" type="MeshInstance3D" parent="Visual/Root/Thorax/Head/EyeR"]
-transform = Transform3D(0.2, 0, 0, 0, 0.2, 0, 0, 0, 0.2, 0, 0.31, 0)
+[node name="BallL" type="MeshInstance3D" parent="Visual/Root/Thorax/Head/EyeL" unique_id=490850083]
+transform = Transform3D(0.27, 0, 0, 0, 0.27, 0, 0, 0, 0.27, 0, 0.34, 0)
 cast_shadow = 0
 mesh = SubResource("SphereMesh_small")
 surface_material_override/0 = SubResource("StandardMaterial3D_eye")
 
-[node name="PupilR" type="MeshInstance3D" parent="Visual/Root/Thorax/Head/EyeR"]
-transform = Transform3D(0.07, 0, 0, 0, 0.07, 0, 0, 0, 0.05, 0, 0.33, -0.075)
+[node name="PupilL" type="MeshInstance3D" parent="Visual/Root/Thorax/Head/EyeL" unique_id=2002343672]
+transform = Transform3D(0.11, 0, 0, 0, 0.11, 0, 0, 0, 0.07, 0, 0.36, -0.105)
 cast_shadow = 0
 mesh = SubResource("SphereMesh_tiny")
 surface_material_override/0 = SubResource("StandardMaterial3D_pupil")
 
-[node name="AntennaR1" type="Node3D" parent="Visual/Root/Thorax/Head"]
+[node name="AntennaL1" type="Node3D" parent="Visual/Root/Thorax/Head" unique_id=711750728]
 unique_name_in_owner = true
-transform = Transform3D(0.91355, -0.20337, -0.35224, 0, 0.86603, -0.5, 0.40674, 0.45677, 0.79115, 0.12, 0.02, -0.24)
+transform = Transform3D(0.80902, 0.18164, 0.55902, 0, 0.95106, -0.30902, -0.58779, 0.25, 0.76942, -0.13, 0.02, -0.24)
 
-[node name="WhipR1" type="MeshInstance3D" parent="Visual/Root/Thorax/Head/AntennaR1"]
-transform = Transform3D(0.05, 0, 0, 0, 0, 0.05, 0, -0.9, 0, 0, 0, -0.45)
+[node name="WhipL1" type="MeshInstance3D" parent="Visual/Root/Thorax/Head/AntennaL1" unique_id=1026141955]
+transform = Transform3D(0.08, 0, 0, 0, 0, 0.08, 0, -0.9, 0, 0, 0, -0.45)
 cast_shadow = 0
+instance_shader_parameters/pale = 0.3
+instance_shader_parameters/tone = 0.25
 mesh = SubResource("CylinderMesh_limb")
 surface_material_override/0 = SubResource("ShaderMaterial_shell")
-instance_shader_parameters/tone = 0.25
-instance_shader_parameters/pale = 0.3
 
-[node name="AntennaR2" type="Node3D" parent="Visual/Root/Thorax/Head/AntennaR1"]
+[node name="AntennaL2" type="Node3D" parent="Visual/Root/Thorax/Head/AntennaL1" unique_id=83127956]
 unique_name_in_owner = true
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -0.9)
+transform = Transform3D(0.98769, -0.03519, -0.15243, 0, 0.97437, -0.22495, 0.15643, 0.22218, 0.96237, 0, 0, -0.9)
 
-[node name="WhipR2" type="MeshInstance3D" parent="Visual/Root/Thorax/Head/AntennaR1/AntennaR2"]
-transform = Transform3D(0.038, 0, 0, 0, 0, 0.038, 0, -0.9, 0, 0, 0, -0.45)
+[node name="WhipL2" type="MeshInstance3D" parent="Visual/Root/Thorax/Head/AntennaL1/AntennaL2" unique_id=1824665403]
+transform = Transform3D(0.058, 0, 0, 0, 0, 0.058, 0, -0.9, 0, 0, 0, -0.45)
 cast_shadow = 0
+instance_shader_parameters/pale = 0.3
+instance_shader_parameters/tone = 0.25
 mesh = SubResource("CylinderMesh_limb")
 surface_material_override/0 = SubResource("ShaderMaterial_shell")
-instance_shader_parameters/tone = 0.25
-instance_shader_parameters/pale = 0.3
 
-[node name="AntennaR3" type="Node3D" parent="Visual/Root/Thorax/Head/AntennaR1/AntennaR2"]
+[node name="AntennaL3" type="Node3D" parent="Visual/Root/Thorax/Head/AntennaL1/AntennaL2" unique_id=1957653261]
 unique_name_in_owner = true
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -0.9)
+transform = Transform3D(0.98769, -0.03519, -0.15243, 0, 0.97437, -0.22495, 0.15643, 0.22218, 0.96237, 0, 0, -0.9)
 
-[node name="WhipR3" type="MeshInstance3D" parent="Visual/Root/Thorax/Head/AntennaR1/AntennaR2/AntennaR3"]
-transform = Transform3D(0.03, 0, 0, 0, 0, 0.03, 0, -0.84, 0, 0, 0, -0.42)
+[node name="WhipL3" type="MeshInstance3D" parent="Visual/Root/Thorax/Head/AntennaL1/AntennaL2/AntennaL3" unique_id=679593989]
+transform = Transform3D(0.042, 0, 0, 0, 0, 0.042, 0, -0.84, 0, 0, 0, -0.42)
 cast_shadow = 0
-mesh = SubResource("CylinderMesh_taper")
-surface_material_override/0 = SubResource("ShaderMaterial_shell")
-instance_shader_parameters/tone = 0.25
 instance_shader_parameters/pale = 0.3
-
-[node name="AntennuleR" type="MeshInstance3D" parent="Visual/Root/Thorax/Head"]
-transform = Transform3D(0.02911, 0.08971, -0.00341, 0, 0.19718, 0.02649, 0.00726, -0.35982, 0.01367, 0.09486, 0.07859, -0.47991)
-cast_shadow = 0
+instance_shader_parameters/tone = 0.25
 mesh = SubResource("CylinderMesh_taper")
 surface_material_override/0 = SubResource("ShaderMaterial_shell")
+
+[node name="AntennuleL" type="MeshInstance3D" parent="Visual/Root/Thorax/Head" unique_id=264038191]
+transform = Transform3D(0.04366, -0.08971, 0.00511, 0, 0.19718, 0.03973, -0.01089, -0.35982, 0.0205, -0.09486, 0.07859, -0.47991)
+cast_shadow = 0
+instance_shader_parameters/pale = 0.3
 instance_shader_parameters/tone = 0.3
-instance_shader_parameters/pale = 0.3
+mesh = SubResource("CylinderMesh_taper")
+surface_material_override/0 = SubResource("ShaderMaterial_shell")
 
-[node name="MandibleR" type="Node3D" parent="Visual/Root/Thorax/Head/Maw"]
+[node name="EyeR" type="Node3D" parent="Visual/Root/Thorax/Head" unique_id=1760429779]
 unique_name_in_owner = true
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.075, 0, 0)
+transform = Transform3D(0.91355, 0.40674, 0, -0.38683, 0.86883, 0.30902, 0.12569, -0.2823, 0.95106, 0.19, 0.1, -0.12)
 
-[node name="JawR" type="MeshInstance3D" parent="Visual/Root/Thorax/Head/Maw/MandibleR"]
-transform = Transform3D(0.15, 0, 0, 0, 0.2, 0, 0, 0, 0.2, 0.02, -0.02, -0.06)
+[node name="StalkR" type="MeshInstance3D" parent="Visual/Root/Thorax/Head/EyeR" unique_id=2143910770]
+transform = Transform3D(0.1, 0, 0, 0, 0.3, 0, 0, 0, 0.1, 0, 0.15, 0)
+cast_shadow = 0
+instance_shader_parameters/tone = 0.1
+mesh = SubResource("CylinderMesh_limb")
+surface_material_override/0 = SubResource("ShaderMaterial_shell")
+
+[node name="BallR" type="MeshInstance3D" parent="Visual/Root/Thorax/Head/EyeR" unique_id=685292811]
+transform = Transform3D(0.27, 0, 0, 0, 0.27, 0, 0, 0, 0.27, 0, 0.34, 0)
 cast_shadow = 0
 mesh = SubResource("SphereMesh_small")
-surface_material_override/0 = SubResource("ShaderMaterial_shell")
-instance_shader_parameters/tone = 0.1
-instance_shader_parameters/pale = 0.6
+surface_material_override/0 = SubResource("StandardMaterial3D_eye")
 
-[node name="FeelerR" type="Node3D" parent="Visual/Root/Thorax/Head/Maw"]
-unique_name_in_owner = true
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.14, -0.02, -0.02)
-
-[node name="PalpR" type="MeshInstance3D" parent="Visual/Root/Thorax/Head/Maw/FeelerR"]
-transform = Transform3D(0.04456, 0.03876, 0.00359, 0, -0.19502, 0.03686, 0.00626, -0.2758, -0.02556, 0.01938, -0.09751, -0.1379)
+[node name="PupilR" type="MeshInstance3D" parent="Visual/Root/Thorax/Head/EyeR" unique_id=185532852]
+transform = Transform3D(0.11, 0, 0, 0, 0.11, 0, 0, 0, 0.07, 0, 0.36, -0.105)
 cast_shadow = 0
+mesh = SubResource("SphereMesh_tiny")
+surface_material_override/0 = SubResource("StandardMaterial3D_pupil")
+
+[node name="AntennaR1" type="Node3D" parent="Visual/Root/Thorax/Head" unique_id=207029329]
+unique_name_in_owner = true
+transform = Transform3D(0.80902, -0.18164, -0.55902, 0, 0.95106, -0.30902, 0.58779, 0.25, 0.76942, 0.13, 0.02, -0.24)
+
+[node name="WhipR1" type="MeshInstance3D" parent="Visual/Root/Thorax/Head/AntennaR1" unique_id=392043893]
+transform = Transform3D(0.08, 0, 0, 0, 0, 0.08, 0, -0.9, 0, 0, 0, -0.45)
+cast_shadow = 0
+instance_shader_parameters/pale = 0.3
+instance_shader_parameters/tone = 0.25
+mesh = SubResource("CylinderMesh_limb")
+surface_material_override/0 = SubResource("ShaderMaterial_shell")
+
+[node name="AntennaR2" type="Node3D" parent="Visual/Root/Thorax/Head/AntennaR1" unique_id=1631529593]
+unique_name_in_owner = true
+transform = Transform3D(0.98769, 0.03519, 0.15243, 0, 0.97437, -0.22495, -0.15643, 0.22218, 0.96237, 0, 0, -0.9)
+
+[node name="WhipR2" type="MeshInstance3D" parent="Visual/Root/Thorax/Head/AntennaR1/AntennaR2" unique_id=1392657030]
+transform = Transform3D(0.058, 0, 0, 0, 0, 0.058, 0, -0.9, 0, 0, 0, -0.45)
+cast_shadow = 0
+instance_shader_parameters/pale = 0.3
+instance_shader_parameters/tone = 0.25
+mesh = SubResource("CylinderMesh_limb")
+surface_material_override/0 = SubResource("ShaderMaterial_shell")
+
+[node name="AntennaR3" type="Node3D" parent="Visual/Root/Thorax/Head/AntennaR1/AntennaR2" unique_id=974888030]
+unique_name_in_owner = true
+transform = Transform3D(0.98769, 0.03519, 0.15243, 0, 0.97437, -0.22495, -0.15643, 0.22218, 0.96237, 0, 0, -0.9)
+
+[node name="WhipR3" type="MeshInstance3D" parent="Visual/Root/Thorax/Head/AntennaR1/AntennaR2/AntennaR3" unique_id=713004960]
+transform = Transform3D(0.042, 0, 0, 0, 0, 0.042, 0, -0.84, 0, 0, 0, -0.42)
+cast_shadow = 0
+instance_shader_parameters/pale = 0.3
+instance_shader_parameters/tone = 0.25
 mesh = SubResource("CylinderMesh_taper")
 surface_material_override/0 = SubResource("ShaderMaterial_shell")
-instance_shader_parameters/pale = 0.5
 
-[node name="ArmL" type="Node3D" parent="Visual/Root/Thorax"]
+[node name="AntennuleR" type="MeshInstance3D" parent="Visual/Root/Thorax/Head" unique_id=975521486]
+transform = Transform3D(0.04366, 0.08971, -0.00511, 0, 0.19718, 0.03973, 0.01089, -0.35982, 0.0205, 0.09486, 0.07859, -0.47991)
+cast_shadow = 0
+instance_shader_parameters/pale = 0.3
+instance_shader_parameters/tone = 0.3
+mesh = SubResource("CylinderMesh_taper")
+surface_material_override/0 = SubResource("ShaderMaterial_shell")
+
+[node name="ArmL" type="Node3D" parent="Visual/Root/Thorax" unique_id=1365460638]
 unique_name_in_owner = true
 transform = Transform3D(0.86603, 0, 0.5, 0, 1, 0, -0.5, 0, 0.86603, -0.36, -0.1, -0.8)
 
-[node name="ShoulderL" type="MeshInstance3D" parent="Visual/Root/Thorax/ArmL"]
-transform = Transform3D(0.26, 0, 0, 0, 0.26, 0, 0, 0, 0.26, 0, 0, 0)
+[node name="ShoulderL" type="MeshInstance3D" parent="Visual/Root/Thorax/ArmL" unique_id=253793659]
+transform = Transform3D(0.34, 0, 0, 0, 0.34, 0, 0, 0, 0.34, 0, 0, 0)
+instance_shader_parameters/pale = 0.45
 mesh = SubResource("SphereMesh_small")
 surface_material_override/0 = SubResource("ShaderMaterial_shell")
-instance_shader_parameters/pale = 0.45
 
-[node name="UpperL" type="MeshInstance3D" parent="Visual/Root/Thorax/ArmL"]
-transform = Transform3D(0.2, 0, 0, 0, 0, 0.2, 0, -0.62, 0, 0, 0, -0.31)
+[node name="UpperL" type="MeshInstance3D" parent="Visual/Root/Thorax/ArmL" unique_id=2002013248]
+transform = Transform3D(0.28, 0, 0, 0, 0, 0.28, 0, -0.62, 0, 0, 0, -0.31)
+instance_shader_parameters/tone = -0.12
 mesh = SubResource("CylinderMesh_limb")
 surface_material_override/0 = SubResource("ShaderMaterial_shell")
-instance_shader_parameters/tone = -0.12
 
-[node name="ElbowL" type="Node3D" parent="Visual/Root/Thorax/ArmL"]
+[node name="ElbowL" type="Node3D" parent="Visual/Root/Thorax/ArmL" unique_id=950276935]
 unique_name_in_owner = true
 transform = Transform3D(0.69466, 0, -0.71934, 0, 1, 0, 0.71934, 0, 0.69466, 0, 0, -0.62)
 
-[node name="ElbowJointL" type="MeshInstance3D" parent="Visual/Root/Thorax/ArmL/ElbowL"]
-transform = Transform3D(0.27, 0, 0, 0, 0.27, 0, 0, 0, 0.27, 0, 0, 0)
+[node name="ElbowJointL" type="MeshInstance3D" parent="Visual/Root/Thorax/ArmL/ElbowL" unique_id=1367204377]
+transform = Transform3D(0.36, 0, 0, 0, 0.36, 0, 0, 0, 0.36, 0, 0, 0)
+instance_shader_parameters/pale = 0.45
 mesh = SubResource("SphereMesh_small")
 surface_material_override/0 = SubResource("ShaderMaterial_shell")
-instance_shader_parameters/pale = 0.45
 
-[node name="ForeL" type="MeshInstance3D" parent="Visual/Root/Thorax/ArmL/ElbowL"]
-transform = Transform3D(0.23, 0, 0, 0, 0, 0.23, 0, -0.56, 0, 0, 0, -0.28)
+[node name="ForeL" type="MeshInstance3D" parent="Visual/Root/Thorax/ArmL/ElbowL" unique_id=1468355117]
+transform = Transform3D(0.31, 0, 0, 0, 0, 0.31, 0, -0.56, 0, 0, 0, -0.28)
+instance_shader_parameters/tone = -0.05
 mesh = SubResource("CylinderMesh_limb")
 surface_material_override/0 = SubResource("ShaderMaterial_shell")
-instance_shader_parameters/tone = -0.05
 
-[node name="ClawL" type="Node3D" parent="Visual/Root/Thorax/ArmL/ElbowL"]
+[node name="ClawL" type="Node3D" parent="Visual/Root/Thorax/ArmL/ElbowL" unique_id=1233705730]
 unique_name_in_owner = true
 transform = Transform3D(0.9703, 0, 0.24192, 0, 1, 0, -0.24192, 0, 0.9703, 0, 0, -0.56)
 
-[node name="WristL" type="MeshInstance3D" parent="Visual/Root/Thorax/ArmL/ElbowL/ClawL"]
-transform = Transform3D(0.29, 0, 0, 0, 0.29, 0, 0, 0, 0.29, 0, 0, 0)
+[node name="WristL" type="MeshInstance3D" parent="Visual/Root/Thorax/ArmL/ElbowL/ClawL" unique_id=615407500]
+transform = Transform3D(0.38, 0, 0, 0, 0.38, 0, 0, 0, 0.38, 0, 0, 0)
+instance_shader_parameters/pale = 0.45
 mesh = SubResource("SphereMesh_small")
 surface_material_override/0 = SubResource("ShaderMaterial_shell")
-instance_shader_parameters/pale = 0.45
 
-[node name="PalmL" type="MeshInstance3D" parent="Visual/Root/Thorax/ArmL/ElbowL/ClawL"]
-transform = Transform3D(0.64, 0, 0, 0, 0.34, 0, 0, 0, 0.9, 0, 0, -0.42)
+[node name="PalmL" type="MeshInstance3D" parent="Visual/Root/Thorax/ArmL/ElbowL/ClawL" unique_id=2037248726]
+transform = Transform3D(0.832, 0, 0, 0, 0.442, 0, 0, 0, 1.17, 0, 0, -0.546)
+instance_shader_parameters/tone = 0.05
 mesh = SubResource("SphereMesh_big")
 surface_material_override/0 = SubResource("ShaderMaterial_shell")
-instance_shader_parameters/tone = 0.05
 
-[node name="FingerL" type="MeshInstance3D" parent="Visual/Root/Thorax/ArmL/ElbowL/ClawL"]
-transform = Transform3D(0.23869, 0, -0.08362, 0, 0.2, 0, 0.02509, 0, 0.79562, -0.17, -0.01, -1.02)
-mesh = SubResource("SphereMesh_mid")
-surface_material_override/0 = SubResource("ShaderMaterial_shell")
+[node name="FingerL" type="MeshInstance3D" parent="Visual/Root/Thorax/ArmL/ElbowL/ClawL" unique_id=1176603432]
+transform = Transform3D(0.31029, 0, -0.10871, 0, 0.26, 0, 0.03261, 0, 1.0343, -0.221, -0.01, -1.326)
 instance_shader_parameters/tone = 0.15
-
-[node name="ThumbL" type="Node3D" parent="Visual/Root/Thorax/ArmL/ElbowL/ClawL"]
-unique_name_in_owner = true
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.15, 0.02, -0.7)
-
-[node name="DactylL" type="MeshInstance3D" parent="Visual/Root/Thorax/ArmL/ElbowL/ClawL/ThumbL"]
-transform = Transform3D(0.21, 0, 0, 0, 0.19, 0, 0, 0, 0.74, 0, 0, -0.36)
 mesh = SubResource("SphereMesh_mid")
 surface_material_override/0 = SubResource("ShaderMaterial_shell")
+
+[node name="ThumbL" type="Node3D" parent="Visual/Root/Thorax/ArmL/ElbowL/ClawL" unique_id=2143342675]
+unique_name_in_owner = true
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.195, 0.02, -0.91)
+
+[node name="DactylL" type="MeshInstance3D" parent="Visual/Root/Thorax/ArmL/ElbowL/ClawL/ThumbL" unique_id=1524089677]
+transform = Transform3D(0.273, 0, 0, 0, 0.247, 0, 0, 0, 0.962, 0, 0, -0.468)
 instance_shader_parameters/tone = 0.22
+mesh = SubResource("SphereMesh_mid")
+surface_material_override/0 = SubResource("ShaderMaterial_shell")
 
-[node name="ToothL1" type="MeshInstance3D" parent="Visual/Root/Thorax/ArmL/ElbowL/ClawL"]
-transform = Transform3D(0.09, 0, 0, 0, 0.09, 0, 0, 0, 0.09, -0.07, 0, -0.82)
+[node name="ToothL1" type="MeshInstance3D" parent="Visual/Root/Thorax/ArmL/ElbowL/ClawL" unique_id=1158274779]
+transform = Transform3D(0.117, 0, 0, 0, 0.117, 0, 0, 0, 0.117, -0.091, 0, -1.066)
 cast_shadow = 0
+instance_shader_parameters/pale = 0.9
 mesh = SubResource("SphereMesh_tiny")
 surface_material_override/0 = SubResource("ShaderMaterial_shell")
-instance_shader_parameters/pale = 0.9
 
-[node name="ToothL2" type="MeshInstance3D" parent="Visual/Root/Thorax/ArmL/ElbowL/ClawL"]
-transform = Transform3D(0.09, 0, 0, 0, 0.09, 0, 0, 0, 0.09, -0.07, 0, -0.98)
+[node name="ToothL2" type="MeshInstance3D" parent="Visual/Root/Thorax/ArmL/ElbowL/ClawL" unique_id=665089455]
+transform = Transform3D(0.117, 0, 0, 0, 0.117, 0, 0, 0, 0.117, -0.091, 0, -1.274)
 cast_shadow = 0
+instance_shader_parameters/pale = 0.9
 mesh = SubResource("SphereMesh_tiny")
 surface_material_override/0 = SubResource("ShaderMaterial_shell")
-instance_shader_parameters/pale = 0.9
 
-[node name="ToothL3" type="MeshInstance3D" parent="Visual/Root/Thorax/ArmL/ElbowL/ClawL"]
-transform = Transform3D(0.09, 0, 0, 0, 0.09, 0, 0, 0, 0.09, -0.07, 0, -1.14)
+[node name="ToothL3" type="MeshInstance3D" parent="Visual/Root/Thorax/ArmL/ElbowL/ClawL" unique_id=550323086]
+transform = Transform3D(0.117, 0, 0, 0, 0.117, 0, 0, 0, 0.117, -0.091, 0, -1.482)
 cast_shadow = 0
+instance_shader_parameters/pale = 0.9
 mesh = SubResource("SphereMesh_tiny")
 surface_material_override/0 = SubResource("ShaderMaterial_shell")
-instance_shader_parameters/pale = 0.9
 
-[node name="ArmR" type="Node3D" parent="Visual/Root/Thorax"]
+[node name="ArmR" type="Node3D" parent="Visual/Root/Thorax" unique_id=992616079]
 unique_name_in_owner = true
 transform = Transform3D(0.86603, 0, -0.5, 0, 1, 0, 0.5, 0, 0.86603, 0.36, -0.1, -0.8)
 
-[node name="ShoulderR" type="MeshInstance3D" parent="Visual/Root/Thorax/ArmR"]
-transform = Transform3D(0.26, 0, 0, 0, 0.26, 0, 0, 0, 0.26, 0, 0, 0)
+[node name="ShoulderR" type="MeshInstance3D" parent="Visual/Root/Thorax/ArmR" unique_id=94672116]
+transform = Transform3D(0.34, 0, 0, 0, 0.34, 0, 0, 0, 0.34, 0, 0, 0)
+instance_shader_parameters/pale = 0.45
 mesh = SubResource("SphereMesh_small")
 surface_material_override/0 = SubResource("ShaderMaterial_shell")
-instance_shader_parameters/pale = 0.45
 
-[node name="UpperR" type="MeshInstance3D" parent="Visual/Root/Thorax/ArmR"]
-transform = Transform3D(0.2, 0, 0, 0, 0, 0.2, 0, -0.62, 0, 0, 0, -0.31)
+[node name="UpperR" type="MeshInstance3D" parent="Visual/Root/Thorax/ArmR" unique_id=131375536]
+transform = Transform3D(0.28, 0, 0, 0, 0, 0.28, 0, -0.62, 0, 0, 0, -0.31)
+instance_shader_parameters/tone = -0.12
 mesh = SubResource("CylinderMesh_limb")
 surface_material_override/0 = SubResource("ShaderMaterial_shell")
-instance_shader_parameters/tone = -0.12
 
-[node name="ElbowR" type="Node3D" parent="Visual/Root/Thorax/ArmR"]
+[node name="ElbowR" type="Node3D" parent="Visual/Root/Thorax/ArmR" unique_id=1718539445]
 unique_name_in_owner = true
 transform = Transform3D(0.69466, 0, 0.71934, 0, 1, 0, -0.71934, 0, 0.69466, 0, 0, -0.62)
 
-[node name="ElbowJointR" type="MeshInstance3D" parent="Visual/Root/Thorax/ArmR/ElbowR"]
-transform = Transform3D(0.27, 0, 0, 0, 0.27, 0, 0, 0, 0.27, 0, 0, 0)
+[node name="ElbowJointR" type="MeshInstance3D" parent="Visual/Root/Thorax/ArmR/ElbowR" unique_id=1551486687]
+transform = Transform3D(0.36, 0, 0, 0, 0.36, 0, 0, 0, 0.36, 0, 0, 0)
+instance_shader_parameters/pale = 0.45
 mesh = SubResource("SphereMesh_small")
 surface_material_override/0 = SubResource("ShaderMaterial_shell")
-instance_shader_parameters/pale = 0.45
 
-[node name="ForeR" type="MeshInstance3D" parent="Visual/Root/Thorax/ArmR/ElbowR"]
-transform = Transform3D(0.23, 0, 0, 0, 0, 0.23, 0, -0.56, 0, 0, 0, -0.28)
+[node name="ForeR" type="MeshInstance3D" parent="Visual/Root/Thorax/ArmR/ElbowR" unique_id=1596383330]
+transform = Transform3D(0.31, 0, 0, 0, 0, 0.31, 0, -0.56, 0, 0, 0, -0.28)
+instance_shader_parameters/tone = -0.05
 mesh = SubResource("CylinderMesh_limb")
 surface_material_override/0 = SubResource("ShaderMaterial_shell")
-instance_shader_parameters/tone = -0.05
 
-[node name="ClawR" type="Node3D" parent="Visual/Root/Thorax/ArmR/ElbowR"]
+[node name="ClawR" type="Node3D" parent="Visual/Root/Thorax/ArmR/ElbowR" unique_id=1243635035]
 unique_name_in_owner = true
 transform = Transform3D(0.9703, 0, -0.24192, 0, 1, 0, 0.24192, 0, 0.9703, 0, 0, -0.56)
 
-[node name="WristR" type="MeshInstance3D" parent="Visual/Root/Thorax/ArmR/ElbowR/ClawR"]
-transform = Transform3D(0.29, 0, 0, 0, 0.29, 0, 0, 0, 0.29, 0, 0, 0)
+[node name="WristR" type="MeshInstance3D" parent="Visual/Root/Thorax/ArmR/ElbowR/ClawR" unique_id=1043012451]
+transform = Transform3D(0.38, 0, 0, 0, 0.38, 0, 0, 0, 0.38, 0, 0, 0)
+instance_shader_parameters/pale = 0.45
 mesh = SubResource("SphereMesh_small")
 surface_material_override/0 = SubResource("ShaderMaterial_shell")
-instance_shader_parameters/pale = 0.45
 
-[node name="PalmR" type="MeshInstance3D" parent="Visual/Root/Thorax/ArmR/ElbowR/ClawR"]
-transform = Transform3D(0.7808, 0, 0, 0, 0.4148, 0, 0, 0, 1.098, 0, 0, -0.5124)
+[node name="PalmR" type="MeshInstance3D" parent="Visual/Root/Thorax/ArmR/ElbowR/ClawR" unique_id=582950743]
+transform = Transform3D(1.0368, 0, 0, 0, 0.5508, 0, 0, 0, 1.458, 0, 0, -0.6804)
+instance_shader_parameters/tone = 0.05
 mesh = SubResource("SphereMesh_big")
 surface_material_override/0 = SubResource("ShaderMaterial_shell")
-instance_shader_parameters/tone = 0.05
 
-[node name="FingerR" type="MeshInstance3D" parent="Visual/Root/Thorax/ArmR/ElbowR/ClawR"]
-transform = Transform3D(0.2912, 0, 0.10202, 0, 0.244, 0, -0.03061, 0, 0.97065, 0.2074, -0.01, -1.2444)
-mesh = SubResource("SphereMesh_mid")
-surface_material_override/0 = SubResource("ShaderMaterial_shell")
+[node name="FingerR" type="MeshInstance3D" parent="Visual/Root/Thorax/ArmR/ElbowR/ClawR" unique_id=692787250]
+transform = Transform3D(0.38667, 0, 0.13547, 0, 0.324, 0, -0.04064, 0, 1.2889, 0.2754, -0.01, -1.6524)
 instance_shader_parameters/tone = 0.15
-
-[node name="ThumbR" type="Node3D" parent="Visual/Root/Thorax/ArmR/ElbowR/ClawR"]
-unique_name_in_owner = true
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.183, 0.02, -0.854)
-
-[node name="DactylR" type="MeshInstance3D" parent="Visual/Root/Thorax/ArmR/ElbowR/ClawR/ThumbR"]
-transform = Transform3D(0.2562, 0, 0, 0, 0.2318, 0, 0, 0, 0.9028, 0, 0, -0.4392)
 mesh = SubResource("SphereMesh_mid")
 surface_material_override/0 = SubResource("ShaderMaterial_shell")
+
+[node name="ThumbR" type="Node3D" parent="Visual/Root/Thorax/ArmR/ElbowR/ClawR" unique_id=1828471653]
+unique_name_in_owner = true
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.243, 0.02, -1.134)
+
+[node name="DactylR" type="MeshInstance3D" parent="Visual/Root/Thorax/ArmR/ElbowR/ClawR/ThumbR" unique_id=1914829663]
+transform = Transform3D(0.3402, 0, 0, 0, 0.3078, 0, 0, 0, 1.1988, 0, 0, -0.5832)
 instance_shader_parameters/tone = 0.22
+mesh = SubResource("SphereMesh_mid")
+surface_material_override/0 = SubResource("ShaderMaterial_shell")
 
-[node name="ToothR1" type="MeshInstance3D" parent="Visual/Root/Thorax/ArmR/ElbowR/ClawR"]
-transform = Transform3D(0.1098, 0, 0, 0, 0.1098, 0, 0, 0, 0.1098, 0.0854, 0, -1.0004)
+[node name="ToothR1" type="MeshInstance3D" parent="Visual/Root/Thorax/ArmR/ElbowR/ClawR" unique_id=1100062602]
+transform = Transform3D(0.1458, 0, 0, 0, 0.1458, 0, 0, 0, 0.1458, 0.1134, 0, -1.3284)
 cast_shadow = 0
+instance_shader_parameters/pale = 0.9
 mesh = SubResource("SphereMesh_tiny")
 surface_material_override/0 = SubResource("ShaderMaterial_shell")
-instance_shader_parameters/pale = 0.9
 
-[node name="ToothR2" type="MeshInstance3D" parent="Visual/Root/Thorax/ArmR/ElbowR/ClawR"]
-transform = Transform3D(0.1098, 0, 0, 0, 0.1098, 0, 0, 0, 0.1098, 0.0854, 0, -1.1956)
+[node name="ToothR2" type="MeshInstance3D" parent="Visual/Root/Thorax/ArmR/ElbowR/ClawR" unique_id=325325057]
+transform = Transform3D(0.1458, 0, 0, 0, 0.1458, 0, 0, 0, 0.1458, 0.1134, 0, -1.5876)
 cast_shadow = 0
+instance_shader_parameters/pale = 0.9
 mesh = SubResource("SphereMesh_tiny")
 surface_material_override/0 = SubResource("ShaderMaterial_shell")
-instance_shader_parameters/pale = 0.9
 
-[node name="ToothR3" type="MeshInstance3D" parent="Visual/Root/Thorax/ArmR/ElbowR/ClawR"]
-transform = Transform3D(0.1098, 0, 0, 0, 0.1098, 0, 0, 0, 0.1098, 0.0854, 0, -1.3908)
+[node name="ToothR3" type="MeshInstance3D" parent="Visual/Root/Thorax/ArmR/ElbowR/ClawR" unique_id=1428225952]
+transform = Transform3D(0.1458, 0, 0, 0, 0.1458, 0, 0, 0, 0.1458, 0.1134, 0, -1.8468)
 cast_shadow = 0
+instance_shader_parameters/pale = 0.9
 mesh = SubResource("SphereMesh_tiny")
 surface_material_override/0 = SubResource("ShaderMaterial_shell")
-instance_shader_parameters/pale = 0.9
 
-[node name="LegL1" type="Node3D" parent="Visual/Root/Thorax"]
+[node name="LegL1" type="Node3D" parent="Visual/Root/Thorax" unique_id=414624164]
 unique_name_in_owner = true
 transform = Transform3D(-0.69577, 0.36995, 0.61566, 0.46947, 0.88295, 0, -0.5436, 0.28904, -0.78801, -0.4, -0.22, -0.5)
 
-[node name="HipL1" type="MeshInstance3D" parent="Visual/Root/Thorax/LegL1"]
-transform = Transform3D(0.17, 0, 0, 0, 0.17, 0, 0, 0, 0.17, 0, 0, 0)
+[node name="HipL1" type="MeshInstance3D" parent="Visual/Root/Thorax/LegL1" unique_id=599767905]
+transform = Transform3D(0.24, 0, 0, 0, 0.24, 0, 0, 0, 0.24, 0, 0, 0)
 cast_shadow = 0
+instance_shader_parameters/pale = 0.4
 mesh = SubResource("SphereMesh_tiny")
 surface_material_override/0 = SubResource("ShaderMaterial_shell")
-instance_shader_parameters/pale = 0.4
 
-[node name="FemurL1" type="MeshInstance3D" parent="Visual/Root/Thorax/LegL1"]
-transform = Transform3D(0, 0.62, 0, -0.12, 0, 0, 0, 0, 0.12, 0.31, 0, 0)
+[node name="FemurL1" type="MeshInstance3D" parent="Visual/Root/Thorax/LegL1" unique_id=320041581]
+transform = Transform3D(0, 0.62, 0, -0.18, 0, 0, 0, 0, 0.18, 0.31, 0, 0)
+instance_shader_parameters/tone = -0.1
 mesh = SubResource("CylinderMesh_limb")
 surface_material_override/0 = SubResource("ShaderMaterial_shell")
-instance_shader_parameters/tone = -0.1
 
-[node name="KneeL1" type="Node3D" parent="Visual/Root/Thorax/LegL1"]
+[node name="KneeL1" type="Node3D" parent="Visual/Root/Thorax/LegL1" unique_id=101949969]
 unique_name_in_owner = true
 transform = Transform3D(-0.25882, 0.96593, 0, -0.96593, -0.25882, 0, 0, 0, 1, 0.62, 0, 0)
 
-[node name="KneeJointL1" type="MeshInstance3D" parent="Visual/Root/Thorax/LegL1/KneeL1"]
-transform = Transform3D(0.15, 0, 0, 0, 0.15, 0, 0, 0, 0.15, 0, 0, 0)
+[node name="KneeJointL1" type="MeshInstance3D" parent="Visual/Root/Thorax/LegL1/KneeL1" unique_id=319251221]
+transform = Transform3D(0.21, 0, 0, 0, 0.21, 0, 0, 0, 0.21, 0, 0, 0)
 cast_shadow = 0
+instance_shader_parameters/pale = 0.4
 mesh = SubResource("SphereMesh_tiny")
 surface_material_override/0 = SubResource("ShaderMaterial_shell")
-instance_shader_parameters/pale = 0.4
 
-[node name="TibiaL1" type="MeshInstance3D" parent="Visual/Root/Thorax/LegL1/KneeL1"]
-transform = Transform3D(0, 0.92, 0, -0.1, 0, 0, 0, 0, 0.1, 0.46, 0, 0)
+[node name="TibiaL1" type="MeshInstance3D" parent="Visual/Root/Thorax/LegL1/KneeL1" unique_id=497899539]
+transform = Transform3D(0, 0.92, 0, -0.15, 0, 0, 0, 0, 0.15, 0.46, 0, 0)
+instance_shader_parameters/tone = 0.1
 mesh = SubResource("CylinderMesh_taper")
 surface_material_override/0 = SubResource("ShaderMaterial_shell")
-instance_shader_parameters/tone = 0.1
 
-[node name="LegL2" type="Node3D" parent="Visual/Root/Thorax"]
+[node name="LegL2" type="Node3D" parent="Visual/Root/Thorax" unique_id=308398173]
 unique_name_in_owner = true
 transform = Transform3D(-0.85672, 0.45553, 0.24192, 0.46947, 0.88295, 0, -0.2136, 0.11358, -0.9703, -0.4, -0.22, -0.18)
 
-[node name="HipL2" type="MeshInstance3D" parent="Visual/Root/Thorax/LegL2"]
-transform = Transform3D(0.17, 0, 0, 0, 0.17, 0, 0, 0, 0.17, 0, 0, 0)
+[node name="HipL2" type="MeshInstance3D" parent="Visual/Root/Thorax/LegL2" unique_id=1175415802]
+transform = Transform3D(0.24, 0, 0, 0, 0.24, 0, 0, 0, 0.24, 0, 0, 0)
 cast_shadow = 0
+instance_shader_parameters/pale = 0.4
 mesh = SubResource("SphereMesh_tiny")
 surface_material_override/0 = SubResource("ShaderMaterial_shell")
-instance_shader_parameters/pale = 0.4
 
-[node name="FemurL2" type="MeshInstance3D" parent="Visual/Root/Thorax/LegL2"]
-transform = Transform3D(0, 0.62, 0, -0.12, 0, 0, 0, 0, 0.12, 0.31, 0, 0)
+[node name="FemurL2" type="MeshInstance3D" parent="Visual/Root/Thorax/LegL2" unique_id=999639432]
+transform = Transform3D(0, 0.62, 0, -0.18, 0, 0, 0, 0, 0.18, 0.31, 0, 0)
+instance_shader_parameters/tone = -0.1
 mesh = SubResource("CylinderMesh_limb")
 surface_material_override/0 = SubResource("ShaderMaterial_shell")
-instance_shader_parameters/tone = -0.1
 
-[node name="KneeL2" type="Node3D" parent="Visual/Root/Thorax/LegL2"]
+[node name="KneeL2" type="Node3D" parent="Visual/Root/Thorax/LegL2" unique_id=3994051]
 unique_name_in_owner = true
 transform = Transform3D(-0.25882, 0.96593, 0, -0.96593, -0.25882, 0, 0, 0, 1, 0.62, 0, 0)
 
-[node name="KneeJointL2" type="MeshInstance3D" parent="Visual/Root/Thorax/LegL2/KneeL2"]
-transform = Transform3D(0.15, 0, 0, 0, 0.15, 0, 0, 0, 0.15, 0, 0, 0)
+[node name="KneeJointL2" type="MeshInstance3D" parent="Visual/Root/Thorax/LegL2/KneeL2" unique_id=2118618507]
+transform = Transform3D(0.21, 0, 0, 0, 0.21, 0, 0, 0, 0.21, 0, 0, 0)
 cast_shadow = 0
+instance_shader_parameters/pale = 0.4
 mesh = SubResource("SphereMesh_tiny")
 surface_material_override/0 = SubResource("ShaderMaterial_shell")
-instance_shader_parameters/pale = 0.4
 
-[node name="TibiaL2" type="MeshInstance3D" parent="Visual/Root/Thorax/LegL2/KneeL2"]
-transform = Transform3D(0, 0.92, 0, -0.1, 0, 0, 0, 0, 0.1, 0.46, 0, 0)
+[node name="TibiaL2" type="MeshInstance3D" parent="Visual/Root/Thorax/LegL2/KneeL2" unique_id=1347400257]
+transform = Transform3D(0, 0.92, 0, -0.15, 0, 0, 0, 0, 0.15, 0.46, 0, 0)
+instance_shader_parameters/tone = 0.1
 mesh = SubResource("CylinderMesh_taper")
 surface_material_override/0 = SubResource("ShaderMaterial_shell")
-instance_shader_parameters/tone = 0.1
 
-[node name="LegL3" type="Node3D" parent="Visual/Root/Thorax"]
+[node name="LegL3" type="Node3D" parent="Visual/Root/Thorax" unique_id=67693823]
 unique_name_in_owner = true
 transform = Transform3D(-0.86365, 0.45921, -0.20791, 0.46947, 0.88295, 0, 0.18358, -0.09761, -0.97815, -0.4, -0.22, 0.14)
 
-[node name="HipL3" type="MeshInstance3D" parent="Visual/Root/Thorax/LegL3"]
-transform = Transform3D(0.17, 0, 0, 0, 0.17, 0, 0, 0, 0.17, 0, 0, 0)
+[node name="HipL3" type="MeshInstance3D" parent="Visual/Root/Thorax/LegL3" unique_id=771902261]
+transform = Transform3D(0.24, 0, 0, 0, 0.24, 0, 0, 0, 0.24, 0, 0, 0)
 cast_shadow = 0
+instance_shader_parameters/pale = 0.4
 mesh = SubResource("SphereMesh_tiny")
 surface_material_override/0 = SubResource("ShaderMaterial_shell")
-instance_shader_parameters/pale = 0.4
 
-[node name="FemurL3" type="MeshInstance3D" parent="Visual/Root/Thorax/LegL3"]
-transform = Transform3D(0, 0.62, 0, -0.12, 0, 0, 0, 0, 0.12, 0.31, 0, 0)
+[node name="FemurL3" type="MeshInstance3D" parent="Visual/Root/Thorax/LegL3" unique_id=2097292768]
+transform = Transform3D(0, 0.62, 0, -0.18, 0, 0, 0, 0, 0.18, 0.31, 0, 0)
+instance_shader_parameters/tone = -0.1
 mesh = SubResource("CylinderMesh_limb")
 surface_material_override/0 = SubResource("ShaderMaterial_shell")
-instance_shader_parameters/tone = -0.1
 
-[node name="KneeL3" type="Node3D" parent="Visual/Root/Thorax/LegL3"]
+[node name="KneeL3" type="Node3D" parent="Visual/Root/Thorax/LegL3" unique_id=1649258879]
 unique_name_in_owner = true
 transform = Transform3D(-0.25882, 0.96593, 0, -0.96593, -0.25882, 0, 0, 0, 1, 0.62, 0, 0)
 
-[node name="KneeJointL3" type="MeshInstance3D" parent="Visual/Root/Thorax/LegL3/KneeL3"]
-transform = Transform3D(0.15, 0, 0, 0, 0.15, 0, 0, 0, 0.15, 0, 0, 0)
+[node name="KneeJointL3" type="MeshInstance3D" parent="Visual/Root/Thorax/LegL3/KneeL3" unique_id=1050042054]
+transform = Transform3D(0.21, 0, 0, 0, 0.21, 0, 0, 0, 0.21, 0, 0, 0)
 cast_shadow = 0
+instance_shader_parameters/pale = 0.4
 mesh = SubResource("SphereMesh_tiny")
 surface_material_override/0 = SubResource("ShaderMaterial_shell")
-instance_shader_parameters/pale = 0.4
 
-[node name="TibiaL3" type="MeshInstance3D" parent="Visual/Root/Thorax/LegL3/KneeL3"]
-transform = Transform3D(0, 0.92, 0, -0.1, 0, 0, 0, 0, 0.1, 0.46, 0, 0)
+[node name="TibiaL3" type="MeshInstance3D" parent="Visual/Root/Thorax/LegL3/KneeL3" unique_id=2069953190]
+transform = Transform3D(0, 0.92, 0, -0.15, 0, 0, 0, 0, 0.15, 0.46, 0, 0)
+instance_shader_parameters/tone = 0.1
 mesh = SubResource("CylinderMesh_taper")
 surface_material_override/0 = SubResource("ShaderMaterial_shell")
-instance_shader_parameters/tone = 0.1
 
-[node name="LegL4" type="Node3D" parent="Visual/Root/Thorax"]
+[node name="LegL4" type="Node3D" parent="Visual/Root/Thorax" unique_id=427577876]
 unique_name_in_owner = true
 transform = Transform3D(-0.71432, 0.37981, -0.58779, 0.46947, 0.88295, 0, 0.51898, -0.27595, -0.80902, -0.4, -0.22, 0.46)
 
-[node name="HipL4" type="MeshInstance3D" parent="Visual/Root/Thorax/LegL4"]
-transform = Transform3D(0.17, 0, 0, 0, 0.17, 0, 0, 0, 0.17, 0, 0, 0)
+[node name="HipL4" type="MeshInstance3D" parent="Visual/Root/Thorax/LegL4" unique_id=1606836825]
+transform = Transform3D(0.24, 0, 0, 0, 0.24, 0, 0, 0, 0.24, 0, 0, 0)
 cast_shadow = 0
+instance_shader_parameters/pale = 0.4
 mesh = SubResource("SphereMesh_tiny")
 surface_material_override/0 = SubResource("ShaderMaterial_shell")
-instance_shader_parameters/pale = 0.4
 
-[node name="FemurL4" type="MeshInstance3D" parent="Visual/Root/Thorax/LegL4"]
-transform = Transform3D(0, 0.62, 0, -0.12, 0, 0, 0, 0, 0.12, 0.31, 0, 0)
+[node name="FemurL4" type="MeshInstance3D" parent="Visual/Root/Thorax/LegL4" unique_id=789562921]
+transform = Transform3D(0, 0.62, 0, -0.18, 0, 0, 0, 0, 0.18, 0.31, 0, 0)
+instance_shader_parameters/tone = -0.1
 mesh = SubResource("CylinderMesh_limb")
 surface_material_override/0 = SubResource("ShaderMaterial_shell")
-instance_shader_parameters/tone = -0.1
 
-[node name="KneeL4" type="Node3D" parent="Visual/Root/Thorax/LegL4"]
+[node name="KneeL4" type="Node3D" parent="Visual/Root/Thorax/LegL4" unique_id=1914909015]
 unique_name_in_owner = true
 transform = Transform3D(-0.25882, 0.96593, 0, -0.96593, -0.25882, 0, 0, 0, 1, 0.62, 0, 0)
 
-[node name="KneeJointL4" type="MeshInstance3D" parent="Visual/Root/Thorax/LegL4/KneeL4"]
-transform = Transform3D(0.15, 0, 0, 0, 0.15, 0, 0, 0, 0.15, 0, 0, 0)
+[node name="KneeJointL4" type="MeshInstance3D" parent="Visual/Root/Thorax/LegL4/KneeL4" unique_id=396663945]
+transform = Transform3D(0.21, 0, 0, 0, 0.21, 0, 0, 0, 0.21, 0, 0, 0)
 cast_shadow = 0
+instance_shader_parameters/pale = 0.4
 mesh = SubResource("SphereMesh_tiny")
 surface_material_override/0 = SubResource("ShaderMaterial_shell")
-instance_shader_parameters/pale = 0.4
 
-[node name="TibiaL4" type="MeshInstance3D" parent="Visual/Root/Thorax/LegL4/KneeL4"]
-transform = Transform3D(0, 0.92, 0, -0.1, 0, 0, 0, 0, 0.1, 0.46, 0, 0)
+[node name="TibiaL4" type="MeshInstance3D" parent="Visual/Root/Thorax/LegL4/KneeL4" unique_id=1368416507]
+transform = Transform3D(0, 0.92, 0, -0.15, 0, 0, 0, 0, 0.15, 0.46, 0, 0)
+instance_shader_parameters/tone = 0.1
 mesh = SubResource("CylinderMesh_taper")
 surface_material_override/0 = SubResource("ShaderMaterial_shell")
-instance_shader_parameters/tone = 0.1
 
-[node name="LegR1" type="Node3D" parent="Visual/Root/Thorax"]
+[node name="LegR1" type="Node3D" parent="Visual/Root/Thorax" unique_id=1860333532]
 unique_name_in_owner = true
 transform = Transform3D(0.69577, -0.36995, 0.61566, 0.46947, 0.88295, 0, -0.5436, 0.28904, 0.78801, 0.4, -0.22, -0.5)
 
-[node name="HipR1" type="MeshInstance3D" parent="Visual/Root/Thorax/LegR1"]
-transform = Transform3D(0.17, 0, 0, 0, 0.17, 0, 0, 0, 0.17, 0, 0, 0)
+[node name="HipR1" type="MeshInstance3D" parent="Visual/Root/Thorax/LegR1" unique_id=615326637]
+transform = Transform3D(0.24, 0, 0, 0, 0.24, 0, 0, 0, 0.24, 0, 0, 0)
 cast_shadow = 0
+instance_shader_parameters/pale = 0.4
 mesh = SubResource("SphereMesh_tiny")
 surface_material_override/0 = SubResource("ShaderMaterial_shell")
-instance_shader_parameters/pale = 0.4
 
-[node name="FemurR1" type="MeshInstance3D" parent="Visual/Root/Thorax/LegR1"]
-transform = Transform3D(0, 0.62, 0, -0.12, 0, 0, 0, 0, 0.12, 0.31, 0, 0)
+[node name="FemurR1" type="MeshInstance3D" parent="Visual/Root/Thorax/LegR1" unique_id=1836502562]
+transform = Transform3D(0, 0.62, 0, -0.18, 0, 0, 0, 0, 0.18, 0.31, 0, 0)
+instance_shader_parameters/tone = -0.1
 mesh = SubResource("CylinderMesh_limb")
 surface_material_override/0 = SubResource("ShaderMaterial_shell")
-instance_shader_parameters/tone = -0.1
 
-[node name="KneeR1" type="Node3D" parent="Visual/Root/Thorax/LegR1"]
+[node name="KneeR1" type="Node3D" parent="Visual/Root/Thorax/LegR1" unique_id=2036817558]
 unique_name_in_owner = true
 transform = Transform3D(-0.25882, 0.96593, 0, -0.96593, -0.25882, 0, 0, 0, 1, 0.62, 0, 0)
 
-[node name="KneeJointR1" type="MeshInstance3D" parent="Visual/Root/Thorax/LegR1/KneeR1"]
-transform = Transform3D(0.15, 0, 0, 0, 0.15, 0, 0, 0, 0.15, 0, 0, 0)
+[node name="KneeJointR1" type="MeshInstance3D" parent="Visual/Root/Thorax/LegR1/KneeR1" unique_id=1129280618]
+transform = Transform3D(0.21, 0, 0, 0, 0.21, 0, 0, 0, 0.21, 0, 0, 0)
 cast_shadow = 0
+instance_shader_parameters/pale = 0.4
 mesh = SubResource("SphereMesh_tiny")
 surface_material_override/0 = SubResource("ShaderMaterial_shell")
-instance_shader_parameters/pale = 0.4
 
-[node name="TibiaR1" type="MeshInstance3D" parent="Visual/Root/Thorax/LegR1/KneeR1"]
-transform = Transform3D(0, 0.92, 0, -0.1, 0, 0, 0, 0, 0.1, 0.46, 0, 0)
+[node name="TibiaR1" type="MeshInstance3D" parent="Visual/Root/Thorax/LegR1/KneeR1" unique_id=2067738116]
+transform = Transform3D(0, 0.92, 0, -0.15, 0, 0, 0, 0, 0.15, 0.46, 0, 0)
+instance_shader_parameters/tone = 0.1
 mesh = SubResource("CylinderMesh_taper")
 surface_material_override/0 = SubResource("ShaderMaterial_shell")
-instance_shader_parameters/tone = 0.1
 
-[node name="LegR2" type="Node3D" parent="Visual/Root/Thorax"]
+[node name="LegR2" type="Node3D" parent="Visual/Root/Thorax" unique_id=1985801654]
 unique_name_in_owner = true
 transform = Transform3D(0.85672, -0.45553, 0.24192, 0.46947, 0.88295, 0, -0.2136, 0.11358, 0.9703, 0.4, -0.22, -0.18)
 
-[node name="HipR2" type="MeshInstance3D" parent="Visual/Root/Thorax/LegR2"]
-transform = Transform3D(0.17, 0, 0, 0, 0.17, 0, 0, 0, 0.17, 0, 0, 0)
+[node name="HipR2" type="MeshInstance3D" parent="Visual/Root/Thorax/LegR2" unique_id=759022683]
+transform = Transform3D(0.24, 0, 0, 0, 0.24, 0, 0, 0, 0.24, 0, 0, 0)
 cast_shadow = 0
+instance_shader_parameters/pale = 0.4
 mesh = SubResource("SphereMesh_tiny")
 surface_material_override/0 = SubResource("ShaderMaterial_shell")
-instance_shader_parameters/pale = 0.4
 
-[node name="FemurR2" type="MeshInstance3D" parent="Visual/Root/Thorax/LegR2"]
-transform = Transform3D(0, 0.62, 0, -0.12, 0, 0, 0, 0, 0.12, 0.31, 0, 0)
+[node name="FemurR2" type="MeshInstance3D" parent="Visual/Root/Thorax/LegR2" unique_id=298992986]
+transform = Transform3D(0, 0.62, 0, -0.18, 0, 0, 0, 0, 0.18, 0.31, 0, 0)
+instance_shader_parameters/tone = -0.1
 mesh = SubResource("CylinderMesh_limb")
 surface_material_override/0 = SubResource("ShaderMaterial_shell")
-instance_shader_parameters/tone = -0.1
 
-[node name="KneeR2" type="Node3D" parent="Visual/Root/Thorax/LegR2"]
+[node name="KneeR2" type="Node3D" parent="Visual/Root/Thorax/LegR2" unique_id=982232908]
 unique_name_in_owner = true
 transform = Transform3D(-0.25882, 0.96593, 0, -0.96593, -0.25882, 0, 0, 0, 1, 0.62, 0, 0)
 
-[node name="KneeJointR2" type="MeshInstance3D" parent="Visual/Root/Thorax/LegR2/KneeR2"]
-transform = Transform3D(0.15, 0, 0, 0, 0.15, 0, 0, 0, 0.15, 0, 0, 0)
+[node name="KneeJointR2" type="MeshInstance3D" parent="Visual/Root/Thorax/LegR2/KneeR2" unique_id=940157979]
+transform = Transform3D(0.21, 0, 0, 0, 0.21, 0, 0, 0, 0.21, 0, 0, 0)
 cast_shadow = 0
+instance_shader_parameters/pale = 0.4
 mesh = SubResource("SphereMesh_tiny")
 surface_material_override/0 = SubResource("ShaderMaterial_shell")
-instance_shader_parameters/pale = 0.4
 
-[node name="TibiaR2" type="MeshInstance3D" parent="Visual/Root/Thorax/LegR2/KneeR2"]
-transform = Transform3D(0, 0.92, 0, -0.1, 0, 0, 0, 0, 0.1, 0.46, 0, 0)
+[node name="TibiaR2" type="MeshInstance3D" parent="Visual/Root/Thorax/LegR2/KneeR2" unique_id=1535851638]
+transform = Transform3D(0, 0.92, 0, -0.15, 0, 0, 0, 0, 0.15, 0.46, 0, 0)
+instance_shader_parameters/tone = 0.1
 mesh = SubResource("CylinderMesh_taper")
 surface_material_override/0 = SubResource("ShaderMaterial_shell")
-instance_shader_parameters/tone = 0.1
 
-[node name="LegR3" type="Node3D" parent="Visual/Root/Thorax"]
+[node name="LegR3" type="Node3D" parent="Visual/Root/Thorax" unique_id=507732422]
 unique_name_in_owner = true
 transform = Transform3D(0.86365, -0.45921, -0.20791, 0.46947, 0.88295, 0, 0.18358, -0.09761, 0.97815, 0.4, -0.22, 0.14)
 
-[node name="HipR3" type="MeshInstance3D" parent="Visual/Root/Thorax/LegR3"]
-transform = Transform3D(0.17, 0, 0, 0, 0.17, 0, 0, 0, 0.17, 0, 0, 0)
+[node name="HipR3" type="MeshInstance3D" parent="Visual/Root/Thorax/LegR3" unique_id=437703744]
+transform = Transform3D(0.24, 0, 0, 0, 0.24, 0, 0, 0, 0.24, 0, 0, 0)
 cast_shadow = 0
+instance_shader_parameters/pale = 0.4
 mesh = SubResource("SphereMesh_tiny")
 surface_material_override/0 = SubResource("ShaderMaterial_shell")
-instance_shader_parameters/pale = 0.4
 
-[node name="FemurR3" type="MeshInstance3D" parent="Visual/Root/Thorax/LegR3"]
-transform = Transform3D(0, 0.62, 0, -0.12, 0, 0, 0, 0, 0.12, 0.31, 0, 0)
+[node name="FemurR3" type="MeshInstance3D" parent="Visual/Root/Thorax/LegR3" unique_id=828666553]
+transform = Transform3D(0, 0.62, 0, -0.18, 0, 0, 0, 0, 0.18, 0.31, 0, 0)
+instance_shader_parameters/tone = -0.1
 mesh = SubResource("CylinderMesh_limb")
 surface_material_override/0 = SubResource("ShaderMaterial_shell")
-instance_shader_parameters/tone = -0.1
 
-[node name="KneeR3" type="Node3D" parent="Visual/Root/Thorax/LegR3"]
+[node name="KneeR3" type="Node3D" parent="Visual/Root/Thorax/LegR3" unique_id=1267314609]
 unique_name_in_owner = true
 transform = Transform3D(-0.25882, 0.96593, 0, -0.96593, -0.25882, 0, 0, 0, 1, 0.62, 0, 0)
 
-[node name="KneeJointR3" type="MeshInstance3D" parent="Visual/Root/Thorax/LegR3/KneeR3"]
-transform = Transform3D(0.15, 0, 0, 0, 0.15, 0, 0, 0, 0.15, 0, 0, 0)
+[node name="KneeJointR3" type="MeshInstance3D" parent="Visual/Root/Thorax/LegR3/KneeR3" unique_id=2000311300]
+transform = Transform3D(0.21, 0, 0, 0, 0.21, 0, 0, 0, 0.21, 0, 0, 0)
 cast_shadow = 0
+instance_shader_parameters/pale = 0.4
 mesh = SubResource("SphereMesh_tiny")
 surface_material_override/0 = SubResource("ShaderMaterial_shell")
-instance_shader_parameters/pale = 0.4
 
-[node name="TibiaR3" type="MeshInstance3D" parent="Visual/Root/Thorax/LegR3/KneeR3"]
-transform = Transform3D(0, 0.92, 0, -0.1, 0, 0, 0, 0, 0.1, 0.46, 0, 0)
+[node name="TibiaR3" type="MeshInstance3D" parent="Visual/Root/Thorax/LegR3/KneeR3" unique_id=1255873094]
+transform = Transform3D(0, 0.92, 0, -0.15, 0, 0, 0, 0, 0.15, 0.46, 0, 0)
+instance_shader_parameters/tone = 0.1
 mesh = SubResource("CylinderMesh_taper")
 surface_material_override/0 = SubResource("ShaderMaterial_shell")
-instance_shader_parameters/tone = 0.1
 
-[node name="LegR4" type="Node3D" parent="Visual/Root/Thorax"]
+[node name="LegR4" type="Node3D" parent="Visual/Root/Thorax" unique_id=944727566]
 unique_name_in_owner = true
 transform = Transform3D(0.71432, -0.37981, -0.58779, 0.46947, 0.88295, 0, 0.51898, -0.27595, 0.80902, 0.4, -0.22, 0.46)
 
-[node name="HipR4" type="MeshInstance3D" parent="Visual/Root/Thorax/LegR4"]
-transform = Transform3D(0.17, 0, 0, 0, 0.17, 0, 0, 0, 0.17, 0, 0, 0)
+[node name="HipR4" type="MeshInstance3D" parent="Visual/Root/Thorax/LegR4" unique_id=361815982]
+transform = Transform3D(0.24, 0, 0, 0, 0.24, 0, 0, 0, 0.24, 0, 0, 0)
 cast_shadow = 0
+instance_shader_parameters/pale = 0.4
 mesh = SubResource("SphereMesh_tiny")
 surface_material_override/0 = SubResource("ShaderMaterial_shell")
-instance_shader_parameters/pale = 0.4
 
-[node name="FemurR4" type="MeshInstance3D" parent="Visual/Root/Thorax/LegR4"]
-transform = Transform3D(0, 0.62, 0, -0.12, 0, 0, 0, 0, 0.12, 0.31, 0, 0)
+[node name="FemurR4" type="MeshInstance3D" parent="Visual/Root/Thorax/LegR4" unique_id=1272701019]
+transform = Transform3D(0, 0.62, 0, -0.18, 0, 0, 0, 0, 0.18, 0.31, 0, 0)
+instance_shader_parameters/tone = -0.1
 mesh = SubResource("CylinderMesh_limb")
 surface_material_override/0 = SubResource("ShaderMaterial_shell")
-instance_shader_parameters/tone = -0.1
 
-[node name="KneeR4" type="Node3D" parent="Visual/Root/Thorax/LegR4"]
+[node name="KneeR4" type="Node3D" parent="Visual/Root/Thorax/LegR4" unique_id=1881685842]
 unique_name_in_owner = true
 transform = Transform3D(-0.25882, 0.96593, 0, -0.96593, -0.25882, 0, 0, 0, 1, 0.62, 0, 0)
 
-[node name="KneeJointR4" type="MeshInstance3D" parent="Visual/Root/Thorax/LegR4/KneeR4"]
-transform = Transform3D(0.15, 0, 0, 0, 0.15, 0, 0, 0, 0.15, 0, 0, 0)
+[node name="KneeJointR4" type="MeshInstance3D" parent="Visual/Root/Thorax/LegR4/KneeR4" unique_id=1324950097]
+transform = Transform3D(0.21, 0, 0, 0, 0.21, 0, 0, 0, 0.21, 0, 0, 0)
 cast_shadow = 0
+instance_shader_parameters/pale = 0.4
 mesh = SubResource("SphereMesh_tiny")
 surface_material_override/0 = SubResource("ShaderMaterial_shell")
-instance_shader_parameters/pale = 0.4
 
-[node name="TibiaR4" type="MeshInstance3D" parent="Visual/Root/Thorax/LegR4/KneeR4"]
-transform = Transform3D(0, 0.92, 0, -0.1, 0, 0, 0, 0, 0.1, 0.46, 0, 0)
+[node name="TibiaR4" type="MeshInstance3D" parent="Visual/Root/Thorax/LegR4/KneeR4" unique_id=1950347891]
+transform = Transform3D(0, 0.92, 0, -0.15, 0, 0, 0, 0, 0.15, 0.46, 0, 0)
+instance_shader_parameters/tone = 0.1
 mesh = SubResource("CylinderMesh_taper")
 surface_material_override/0 = SubResource("ShaderMaterial_shell")
-instance_shader_parameters/tone = 0.1
 
-[node name="Tail1" type="Node3D" parent="Visual/Root/Thorax"]
+[node name="Tail1" type="Node3D" parent="Visual/Root/Thorax" unique_id=1255604881]
 unique_name_in_owner = true
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0.84)
 
-[node name="Seg1" type="MeshInstance3D" parent="Visual/Root/Thorax/Tail1"]
-transform = Transform3D(0.9, 0, 0, 0, 0.62, 0, 0, 0, 0.56, 0, 0, 0.2)
+[node name="Seg1" type="MeshInstance3D" parent="Visual/Root/Thorax/Tail1" unique_id=1386283076]
+transform = Transform3D(0.9, 0, 0, 0, 0.7, 0, 0, 0, 0.56, 0, 0, 0.2)
+instance_shader_parameters/tone = 0.06
 mesh = SubResource("SphereMesh_big")
 surface_material_override/0 = SubResource("ShaderMaterial_shell")
-instance_shader_parameters/tone = 0.06
 
-[node name="Band1" type="MeshInstance3D" parent="Visual/Root/Thorax/Tail1"]
-transform = Transform3D(0.95, 0, 0, 0, 0.67, 0, 0, 0, 0.1, 0, 0, 0)
+[node name="Band1" type="MeshInstance3D" parent="Visual/Root/Thorax/Tail1" unique_id=181605601]
+transform = Transform3D(0.95, 0, 0, 0, 0.75, 0, 0, 0, 0.1, 0, 0, 0)
+instance_shader_parameters/tone = -0.55
 mesh = SubResource("SphereMesh_mid")
 surface_material_override/0 = SubResource("ShaderMaterial_shell")
-instance_shader_parameters/tone = -0.55
 
-[node name="Under1" type="MeshInstance3D" parent="Visual/Root/Thorax/Tail1"]
-transform = Transform3D(0.72, 0, 0, 0, 0.31, 0, 0, 0, 0.5, 0, -0.16, 0.2)
+[node name="Under1" type="MeshInstance3D" parent="Visual/Root/Thorax/Tail1" unique_id=187149201]
+transform = Transform3D(0.72, 0, 0, 0, 0.35, 0, 0, 0, 0.5, 0, -0.16, 0.2)
 cast_shadow = 0
+instance_shader_parameters/pale = 0.7
 mesh = SubResource("SphereMesh_small")
 surface_material_override/0 = SubResource("ShaderMaterial_shell")
-instance_shader_parameters/pale = 0.7
 
-[node name="Tail2" type="Node3D" parent="Visual/Root/Thorax/Tail1"]
+[node name="Tail2" type="Node3D" parent="Visual/Root/Thorax/Tail1" unique_id=34707998]
 unique_name_in_owner = true
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0.38)
 
-[node name="Seg2" type="MeshInstance3D" parent="Visual/Root/Thorax/Tail1/Tail2"]
-transform = Transform3D(0.84, 0, 0, 0, 0.58, 0, 0, 0, 0.56, 0, 0, 0.2)
-mesh = SubResource("SphereMesh_big")
-surface_material_override/0 = SubResource("ShaderMaterial_shell")
+[node name="Seg2" type="MeshInstance3D" parent="Visual/Root/Thorax/Tail1/Tail2" unique_id=1591419503]
+transform = Transform3D(0.84, 0, 0, 0, 0.64, 0, 0, 0, 0.56, 0, 0, 0.2)
 instance_shader_parameters/tone = -0.06
-
-[node name="Band2" type="MeshInstance3D" parent="Visual/Root/Thorax/Tail1/Tail2"]
-transform = Transform3D(0.89, 0, 0, 0, 0.63, 0, 0, 0, 0.1, 0, 0, 0)
-mesh = SubResource("SphereMesh_mid")
-surface_material_override/0 = SubResource("ShaderMaterial_shell")
-instance_shader_parameters/tone = -0.55
-
-[node name="Under2" type="MeshInstance3D" parent="Visual/Root/Thorax/Tail1/Tail2"]
-transform = Transform3D(0.672, 0, 0, 0, 0.29, 0, 0, 0, 0.5, 0, -0.16, 0.2)
-cast_shadow = 0
-mesh = SubResource("SphereMesh_small")
-surface_material_override/0 = SubResource("ShaderMaterial_shell")
-instance_shader_parameters/pale = 0.7
-
-[node name="Tail3" type="Node3D" parent="Visual/Root/Thorax/Tail1/Tail2"]
-unique_name_in_owner = true
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0.38)
-
-[node name="Seg3" type="MeshInstance3D" parent="Visual/Root/Thorax/Tail1/Tail2/Tail3"]
-transform = Transform3D(0.76, 0, 0, 0, 0.52, 0, 0, 0, 0.56, 0, 0, 0.2)
 mesh = SubResource("SphereMesh_big")
 surface_material_override/0 = SubResource("ShaderMaterial_shell")
-instance_shader_parameters/tone = 0.06
 
-[node name="Band3" type="MeshInstance3D" parent="Visual/Root/Thorax/Tail1/Tail2/Tail3"]
-transform = Transform3D(0.81, 0, 0, 0, 0.57, 0, 0, 0, 0.1, 0, 0, 0)
+[node name="Band2" type="MeshInstance3D" parent="Visual/Root/Thorax/Tail1/Tail2" unique_id=755552432]
+transform = Transform3D(0.89, 0, 0, 0, 0.69, 0, 0, 0, 0.1, 0, 0, 0)
+instance_shader_parameters/tone = -0.55
 mesh = SubResource("SphereMesh_mid")
 surface_material_override/0 = SubResource("ShaderMaterial_shell")
-instance_shader_parameters/tone = -0.55
 
-[node name="Under3" type="MeshInstance3D" parent="Visual/Root/Thorax/Tail1/Tail2/Tail3"]
-transform = Transform3D(0.608, 0, 0, 0, 0.26, 0, 0, 0, 0.5, 0, -0.16, 0.2)
+[node name="Under2" type="MeshInstance3D" parent="Visual/Root/Thorax/Tail1/Tail2" unique_id=866705255]
+transform = Transform3D(0.672, 0, 0, 0, 0.32, 0, 0, 0, 0.5, 0, -0.16, 0.2)
 cast_shadow = 0
+instance_shader_parameters/pale = 0.7
 mesh = SubResource("SphereMesh_small")
 surface_material_override/0 = SubResource("ShaderMaterial_shell")
-instance_shader_parameters/pale = 0.7
 
-[node name="Tail4" type="Node3D" parent="Visual/Root/Thorax/Tail1/Tail2/Tail3"]
+[node name="Tail3" type="Node3D" parent="Visual/Root/Thorax/Tail1/Tail2" unique_id=58111316]
 unique_name_in_owner = true
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0.38)
 
-[node name="Seg4" type="MeshInstance3D" parent="Visual/Root/Thorax/Tail1/Tail2/Tail3/Tail4"]
-transform = Transform3D(0.68, 0, 0, 0, 0.46, 0, 0, 0, 0.56, 0, 0, 0.2)
+[node name="Seg3" type="MeshInstance3D" parent="Visual/Root/Thorax/Tail1/Tail2/Tail3" unique_id=1289293208]
+transform = Transform3D(0.76, 0, 0, 0, 0.57, 0, 0, 0, 0.56, 0, 0, 0.2)
+instance_shader_parameters/tone = 0.06
+mesh = SubResource("SphereMesh_big")
+surface_material_override/0 = SubResource("ShaderMaterial_shell")
+
+[node name="Band3" type="MeshInstance3D" parent="Visual/Root/Thorax/Tail1/Tail2/Tail3" unique_id=551986620]
+transform = Transform3D(0.81, 0, 0, 0, 0.62, 0, 0, 0, 0.1, 0, 0, 0)
+instance_shader_parameters/tone = -0.55
 mesh = SubResource("SphereMesh_mid")
 surface_material_override/0 = SubResource("ShaderMaterial_shell")
+
+[node name="Under3" type="MeshInstance3D" parent="Visual/Root/Thorax/Tail1/Tail2/Tail3" unique_id=1280901496]
+transform = Transform3D(0.608, 0, 0, 0, 0.285, 0, 0, 0, 0.5, 0, -0.16, 0.2)
+cast_shadow = 0
+instance_shader_parameters/pale = 0.7
+mesh = SubResource("SphereMesh_small")
+surface_material_override/0 = SubResource("ShaderMaterial_shell")
+
+[node name="Tail4" type="Node3D" parent="Visual/Root/Thorax/Tail1/Tail2/Tail3" unique_id=1634327278]
+unique_name_in_owner = true
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0.38)
+
+[node name="Seg4" type="MeshInstance3D" parent="Visual/Root/Thorax/Tail1/Tail2/Tail3/Tail4" unique_id=433563822]
+transform = Transform3D(0.68, 0, 0, 0, 0.5, 0, 0, 0, 0.56, 0, 0, 0.2)
 instance_shader_parameters/tone = -0.06
-
-[node name="Band4" type="MeshInstance3D" parent="Visual/Root/Thorax/Tail1/Tail2/Tail3/Tail4"]
-transform = Transform3D(0.73, 0, 0, 0, 0.51, 0, 0, 0, 0.1, 0, 0, 0)
 mesh = SubResource("SphereMesh_mid")
 surface_material_override/0 = SubResource("ShaderMaterial_shell")
-instance_shader_parameters/tone = -0.55
 
-[node name="Under4" type="MeshInstance3D" parent="Visual/Root/Thorax/Tail1/Tail2/Tail3/Tail4"]
-transform = Transform3D(0.544, 0, 0, 0, 0.23, 0, 0, 0, 0.5, 0, -0.16, 0.2)
+[node name="Band4" type="MeshInstance3D" parent="Visual/Root/Thorax/Tail1/Tail2/Tail3/Tail4" unique_id=1381108348]
+transform = Transform3D(0.73, 0, 0, 0, 0.55, 0, 0, 0, 0.1, 0, 0, 0)
+instance_shader_parameters/tone = -0.55
+mesh = SubResource("SphereMesh_mid")
+surface_material_override/0 = SubResource("ShaderMaterial_shell")
+
+[node name="Under4" type="MeshInstance3D" parent="Visual/Root/Thorax/Tail1/Tail2/Tail3/Tail4" unique_id=886118704]
+transform = Transform3D(0.544, 0, 0, 0, 0.25, 0, 0, 0, 0.5, 0, -0.16, 0.2)
 cast_shadow = 0
+instance_shader_parameters/pale = 0.7
 mesh = SubResource("SphereMesh_small")
 surface_material_override/0 = SubResource("ShaderMaterial_shell")
-instance_shader_parameters/pale = 0.7
 
-[node name="Tail5" type="Node3D" parent="Visual/Root/Thorax/Tail1/Tail2/Tail3/Tail4"]
+[node name="Tail5" type="Node3D" parent="Visual/Root/Thorax/Tail1/Tail2/Tail3/Tail4" unique_id=1144717354]
 unique_name_in_owner = true
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0.38)
 
-[node name="Seg5" type="MeshInstance3D" parent="Visual/Root/Thorax/Tail1/Tail2/Tail3/Tail4/Tail5"]
-transform = Transform3D(0.58, 0, 0, 0, 0.4, 0, 0, 0, 0.56, 0, 0, 0.2)
-mesh = SubResource("SphereMesh_mid")
-surface_material_override/0 = SubResource("ShaderMaterial_shell")
+[node name="Seg5" type="MeshInstance3D" parent="Visual/Root/Thorax/Tail1/Tail2/Tail3/Tail4/Tail5" unique_id=166411963]
+transform = Transform3D(0.58, 0, 0, 0, 0.43, 0, 0, 0, 0.56, 0, 0, 0.2)
 instance_shader_parameters/tone = 0.06
-
-[node name="Band5" type="MeshInstance3D" parent="Visual/Root/Thorax/Tail1/Tail2/Tail3/Tail4/Tail5"]
-transform = Transform3D(0.63, 0, 0, 0, 0.45, 0, 0, 0, 0.1, 0, 0, 0)
 mesh = SubResource("SphereMesh_mid")
 surface_material_override/0 = SubResource("ShaderMaterial_shell")
-instance_shader_parameters/tone = -0.55
 
-[node name="Under5" type="MeshInstance3D" parent="Visual/Root/Thorax/Tail1/Tail2/Tail3/Tail4/Tail5"]
-transform = Transform3D(0.464, 0, 0, 0, 0.2, 0, 0, 0, 0.5, 0, -0.16, 0.2)
+[node name="Band5" type="MeshInstance3D" parent="Visual/Root/Thorax/Tail1/Tail2/Tail3/Tail4/Tail5" unique_id=471857541]
+transform = Transform3D(0.63, 0, 0, 0, 0.48, 0, 0, 0, 0.1, 0, 0, 0)
+instance_shader_parameters/tone = -0.55
+mesh = SubResource("SphereMesh_mid")
+surface_material_override/0 = SubResource("ShaderMaterial_shell")
+
+[node name="Under5" type="MeshInstance3D" parent="Visual/Root/Thorax/Tail1/Tail2/Tail3/Tail4/Tail5" unique_id=518748031]
+transform = Transform3D(0.464, 0, 0, 0, 0.215, 0, 0, 0, 0.5, 0, -0.16, 0.2)
 cast_shadow = 0
+instance_shader_parameters/pale = 0.7
 mesh = SubResource("SphereMesh_small")
 surface_material_override/0 = SubResource("ShaderMaterial_shell")
-instance_shader_parameters/pale = 0.7
 
-[node name="Fan" type="Node3D" parent="Visual/Root/Thorax/Tail1/Tail2/Tail3/Tail4/Tail5"]
+[node name="Fan" type="Node3D" parent="Visual/Root/Thorax/Tail1/Tail2/Tail3/Tail4/Tail5" unique_id=660311009]
 unique_name_in_owner = true
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.02, 0.38)
 
-[node name="Telson" type="MeshInstance3D" parent="Visual/Root/Thorax/Tail1/Tail2/Tail3/Tail4/Tail5/Fan"]
+[node name="Telson" type="MeshInstance3D" parent="Visual/Root/Thorax/Tail1/Tail2/Tail3/Tail4/Tail5/Fan" unique_id=1104525541]
 transform = Transform3D(0.44, 0, 0, 0, 0.1, 0, 0, 0, 0.64, 0, 0, 0.3)
+instance_shader_parameters/tone = 0.2
 mesh = SubResource("SphereMesh_mid")
 surface_material_override/0 = SubResource("ShaderMaterial_shell")
-instance_shader_parameters/tone = 0.2
 
-[node name="FanL1" type="Node3D" parent="Visual/Root/Thorax/Tail1/Tail2/Tail3/Tail4/Tail5/Fan"]
+[node name="FanL1" type="Node3D" parent="Visual/Root/Thorax/Tail1/Tail2/Tail3/Tail4/Tail5/Fan" unique_id=1731616695]
 unique_name_in_owner = true
 transform = Transform3D(0.91355, 0, -0.40674, 0, 1, 0, 0.40674, 0, 0.91355, -0.1, 0, 0.04)
 
-[node name="FanL1Blade" type="MeshInstance3D" parent="Visual/Root/Thorax/Tail1/Tail2/Tail3/Tail4/Tail5/Fan/FanL1"]
+[node name="FanL1Blade" type="MeshInstance3D" parent="Visual/Root/Thorax/Tail1/Tail2/Tail3/Tail4/Tail5/Fan/FanL1" unique_id=769877511]
 transform = Transform3D(0.36, 0, 0, 0, 0.08, 0, 0, 0, 0.7, 0, 0, 0.34)
+instance_shader_parameters/pale = 0.15
+instance_shader_parameters/tone = 0.28
 mesh = SubResource("SphereMesh_mid")
 surface_material_override/0 = SubResource("ShaderMaterial_shell")
-instance_shader_parameters/tone = 0.28
-instance_shader_parameters/pale = 0.15
 
-[node name="FanL2" type="Node3D" parent="Visual/Root/Thorax/Tail1/Tail2/Tail3/Tail4/Tail5/Fan"]
+[node name="FanL2" type="Node3D" parent="Visual/Root/Thorax/Tail1/Tail2/Tail3/Tail4/Tail5/Fan" unique_id=687191876]
 unique_name_in_owner = true
 transform = Transform3D(0.64279, 0, -0.76604, 0, 1, 0, 0.76604, 0, 0.64279, -0.1, 0, 0.04)
 
-[node name="FanL2Blade" type="MeshInstance3D" parent="Visual/Root/Thorax/Tail1/Tail2/Tail3/Tail4/Tail5/Fan/FanL2"]
+[node name="FanL2Blade" type="MeshInstance3D" parent="Visual/Root/Thorax/Tail1/Tail2/Tail3/Tail4/Tail5/Fan/FanL2" unique_id=1273043352]
 transform = Transform3D(0.36, 0, 0, 0, 0.08, 0, 0, 0, 0.7, 0, 0, 0.34)
+instance_shader_parameters/pale = 0.15
+instance_shader_parameters/tone = 0.28
 mesh = SubResource("SphereMesh_mid")
 surface_material_override/0 = SubResource("ShaderMaterial_shell")
-instance_shader_parameters/tone = 0.28
-instance_shader_parameters/pale = 0.15
 
-[node name="FanR1" type="Node3D" parent="Visual/Root/Thorax/Tail1/Tail2/Tail3/Tail4/Tail5/Fan"]
+[node name="FanR1" type="Node3D" parent="Visual/Root/Thorax/Tail1/Tail2/Tail3/Tail4/Tail5/Fan" unique_id=1624342132]
 unique_name_in_owner = true
 transform = Transform3D(0.91355, 0, 0.40674, 0, 1, 0, -0.40674, 0, 0.91355, 0.1, 0, 0.04)
 
-[node name="FanR1Blade" type="MeshInstance3D" parent="Visual/Root/Thorax/Tail1/Tail2/Tail3/Tail4/Tail5/Fan/FanR1"]
+[node name="FanR1Blade" type="MeshInstance3D" parent="Visual/Root/Thorax/Tail1/Tail2/Tail3/Tail4/Tail5/Fan/FanR1" unique_id=89307602]
 transform = Transform3D(0.36, 0, 0, 0, 0.08, 0, 0, 0, 0.7, 0, 0, 0.34)
+instance_shader_parameters/pale = 0.15
+instance_shader_parameters/tone = 0.28
 mesh = SubResource("SphereMesh_mid")
 surface_material_override/0 = SubResource("ShaderMaterial_shell")
-instance_shader_parameters/tone = 0.28
-instance_shader_parameters/pale = 0.15
 
-[node name="FanR2" type="Node3D" parent="Visual/Root/Thorax/Tail1/Tail2/Tail3/Tail4/Tail5/Fan"]
+[node name="FanR2" type="Node3D" parent="Visual/Root/Thorax/Tail1/Tail2/Tail3/Tail4/Tail5/Fan" unique_id=1274424541]
 unique_name_in_owner = true
 transform = Transform3D(0.64279, 0, 0.76604, 0, 1, 0, -0.76604, 0, 0.64279, 0.1, 0, 0.04)
 
-[node name="FanR2Blade" type="MeshInstance3D" parent="Visual/Root/Thorax/Tail1/Tail2/Tail3/Tail4/Tail5/Fan/FanR2"]
+[node name="FanR2Blade" type="MeshInstance3D" parent="Visual/Root/Thorax/Tail1/Tail2/Tail3/Tail4/Tail5/Fan/FanR2" unique_id=1229277616]
 transform = Transform3D(0.36, 0, 0, 0, 0.08, 0, 0, 0, 0.7, 0, 0, 0.34)
+instance_shader_parameters/pale = 0.15
+instance_shader_parameters/tone = 0.28
 mesh = SubResource("SphereMesh_mid")
 surface_material_override/0 = SubResource("ShaderMaterial_shell")
-instance_shader_parameters/tone = 0.28
-instance_shader_parameters/pale = 0.15
 
-[node name="Health" type="Node" parent="."]
-script = ExtResource("4_health")
-max_hp = 500
+[node name="Mound" type="MeshInstance3D" parent="Visual" unique_id=1999775913]
+unique_name_in_owner = true
+transform = Transform3D(3.4, 0, 0, 0, 1.1, 0, 0, 0, 4.2, 0, 0, 0)
+visible = false
+mesh = SubResource("SphereMesh_mid")
+surface_material_override/0 = SubResource("StandardMaterial3D_dirt")
 
-[node name="Scaling" type="Node" parent="."]
-script = ExtResource("5_stage_boss_scaling")
-target_fight_seconds = 80
-min_fight_seconds = 60
-life_shares = Array[float]([1.0])
-min_life_seconds = 20
+[node name="Dust" type="CPUParticles3D" parent="Visual" unique_id=669611592]
+unique_name_in_owner = true
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.25, 0.9)
+cast_shadow = 0
+emitting = false
+amount = 28
+lifetime = 0.7
+mesh = SubResource("BoxMesh_speck")
+emission_shape = 1
+emission_sphere_radius = 1.3
+direction = Vector3(0, 1, 0)
+spread = 70.0
+gravity = Vector3(0, -6, 0)
+initial_velocity_min = 1.5
+initial_velocity_max = 4.0
+scale_amount_min = 0.8
+scale_amount_max = 2.2
+scale_amount_curve = SubResource("Curve_shrink")
+color = Color(0.33, 0.26, 0.18, 1)
+
+[node name="Health" type="Node" parent="." unique_id=1284246288]
+script = ExtResource("9_health")
+max_hp = 500.0
+
+[node name="Scaling" type="Node" parent="." unique_id=1900146571]
+script = ExtResource("10_stage_boss_scaling")
+target_fight_seconds = 94.0
+min_fight_seconds = 60.0
+life_shares = Array[float]([0.2, 0.3, 0.5])
+min_life_seconds = 16.0
 advantage_absorbed = 0.95
-burnout_after = 1.2
-burnout_seconds = 15
+focus_on_boss = 0.5
+aggression_per_life = 0.0
+damage_power_cap = 0.15
+burnout_after = 1.15
+burnout_seconds = 10.0
 
-[node name="Burnout" type="Node" parent="."]
-script = ExtResource("6_boss_burnout")
+[node name="Burnout" type="Node" parent="." unique_id=1148480433]
+script = ExtResource("11_boss_burnout")
 announce_text = "%s se agota fuera del agua"
 
-[node name="Stalk" type="Node" parent="."]
-script = ExtResource("7_lobster_stalk")
+[node name="Life" type="Node" parent="." unique_id=1247244105]
+script = ExtResource("12_lobster_life")
 
-[node name="Arrival" type="Node" parent="."]
-script = ExtResource("8_lobster_arrival")
+[node name="Stalk" type="Node" parent="." unique_id=1758364673]
+script = ExtResource("13_lobster_stalk")
+
+[node name="Arrival" type="Node" parent="." unique_id=1190242359]
+script = ExtResource("14_lobster_arrival")
+
+[node name="Voice" type="Node" parent="." unique_id=1286840023]
+script = ExtResource("15_lobster_voice")
+
+[node name="Feel" type="CanvasLayer" parent="." unique_id=589794932]
+layer = 4
+script = ExtResource("17_lobster_feel")
+
+[node name="Vignette" type="ColorRect" parent="Feel" unique_id=1396486061]
+visible = false
+material = SubResource("ShaderMaterial_dread")
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="Moves" type="Node" parent="." unique_id=1674137332]
+script = ExtResource("18_lobster_moveset")
+
+[node name="Pincers" type="Node" parent="Moves" unique_id=342768619]
+script = ExtResource("19_lobster_pincers")
+cooldown = 6.0
+first_use_fraction = 0.3
+max_range = 9.0
+call_sfx = &"lobster_chitter"
+
+[node name="Charge" type="Node" parent="Moves" unique_id=1835332759]
+script = ExtResource("20_lobster_charge")
+cooldown = 10.0
+min_range = 7.0
+max_range = 30.0
+call_sfx = &"lobster_hiss"
+
+[node name="Leap" type="Node" parent="Moves" unique_id=404751747]
+script = ExtResource("21_lobster_leap")
+cooldown = 13.0
+first_use_fraction = 0.7
+call_sfx = &"lobster_roar"
+
+[node name="TailSpin" type="Node" parent="Moves" unique_id=4212654]
+script = ExtResource("22_lobster_tail_spin")
+first_use_fraction = 0.6
+max_range = 7.0
+call_sfx = &"lobster_hiss"
+
+[node name="Burrow" type="Node" parent="Moves" unique_id=130772327]
+script = ExtResource("23_lobster_burrow")
+cooldown = 14.0
+first_use_fraction = 0.9
+call_sfx = &"lobster_chitter"

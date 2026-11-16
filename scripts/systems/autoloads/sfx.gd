@@ -90,6 +90,47 @@ const SOUND_LIBRARY: Dictionary[StringName, Dictionary] = {
 	&"boss_roar_2": {
 		"stream": preload("res://assets/audio/sfx/boss_roar_2.wav"), "volume_db": -3.0,
 	},
+	&"lobster_roar": {
+		"stream": preload("res://assets/audio/sfx/lobster_roar.wav"), "volume_db": -3.0,
+	},
+	&"lobster_chitter": {
+		"stream": preload("res://assets/audio/sfx/lobster_chitter.wav"), "volume_db": -9.0,
+		"rate_limit": 2, "jitter": true,
+	},
+	&"lobster_snap": {
+		"stream": preload("res://assets/audio/sfx/lobster_snap.wav"), "volume_db": -6.0,
+		"rate_limit": 6, "jitter": true,
+	},
+	&"lobster_hiss": {
+		"stream": preload("res://assets/audio/sfx/lobster_hiss.wav"), "volume_db": -8.0,
+		"rate_limit": 2, "jitter": true,
+	},
+	&"lobster_slam": {
+		"stream": preload("res://assets/audio/sfx/lobster_slam.wav"), "volume_db": -3.0,
+		"rate_limit": 3,
+	},
+	&"lobster_dig": {
+		"stream": preload("res://assets/audio/sfx/lobster_dig.wav"), "volume_db": -7.0,
+		"rate_limit": 2,
+	},
+	&"lobster_rumble": {
+		"stream": preload("res://assets/audio/sfx/lobster_rumble.wav"), "volume_db": -5.0,
+		"rate_limit": 2,
+	},
+	&"lobster_whoosh": {
+		"stream": preload("res://assets/audio/sfx/lobster_whoosh.wav"), "volume_db": -7.0,
+		"rate_limit": 4, "jitter": true,
+	},
+	&"lobster_lock": {
+		"stream": preload("res://assets/audio/sfx/lobster_lock.wav"), "volume_db": -7.0,
+		"rate_limit": 4,
+	},
+	&"lobster_death": {
+		"stream": preload("res://assets/audio/sfx/lobster_death.wav"), "volume_db": -2.0,
+	},
+	&"lobster_scare": {
+		"stream": preload("res://assets/audio/sfx/lobster_scare.wav"), "volume_db": -1.0,
+	},
 	&"boss_die": {
 		"stream": preload("res://assets/audio/sfx/boss_die.wav"), "volume_db": -2.0,
 	},

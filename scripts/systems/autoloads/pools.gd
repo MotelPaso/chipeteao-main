@@ -25,6 +25,9 @@ const TELEGRAPH_DISC_SCENE: PackedScene = preload("res://scenes/fx/TelegraphDisc
 const SLASH_ARC_SCENE: PackedScene = preload("res://scenes/fx/SlashArc.tscn")
 const MUZZLE_FLASH_SCENE: PackedScene = preload("res://scenes/fx/MuzzleFlash.tscn")
 const WHIP_CRACK_SCENE: PackedScene = preload("res://scenes/fx/WhipCrack.tscn")
+const SHOCK_RING_SCENE: PackedScene = preload("res://scenes/fx/ShockRing.tscn")
+const TELEGRAPH_LANE_SCENE: PackedScene = preload("res://scenes/fx/TelegraphLane.tscn")
+const SPLASH_BURST_SCENE: PackedScene = preload("res://scenes/fx/SplashBurst.tscn")
 const EMBER_BURST_SCENE: PackedScene = preload("res://scenes/fx/EmberBurst.tscn")
 const BLOOD_POOL_SCENE: PackedScene = preload("res://scenes/fx/BloodPool.tscn")
 const ACID_POOL_SCENE: PackedScene = preload("res://scenes/fx/AcidPool.tscn")
@@ -55,6 +58,9 @@ const POOLS: Array[Dictionary] = [
 	{"name": "slash_arc", "scene": SLASH_ARC_SCENE, "warm": 8, "cap": 32},
 	{"name": "muzzle_flash", "scene": MUZZLE_FLASH_SCENE, "warm": 6, "cap": 24},
 	{"name": "whip_crack", "scene": WHIP_CRACK_SCENE, "warm": 4, "cap": 16},
+	{"name": "shock_ring", "scene": SHOCK_RING_SCENE, "warm": 2, "cap": 6},
+	{"name": "telegraph_lane", "scene": TELEGRAPH_LANE_SCENE, "warm": 1, "cap": 4},
+	{"name": "splash_burst", "scene": SPLASH_BURST_SCENE, "warm": 3, "cap": 10},
 	{"name": "ember_burst", "scene": EMBER_BURST_SCENE, "warm": 4, "cap": 16},
 	{"name": "blood_pool", "scene": BLOOD_POOL_SCENE, "warm": 4, "cap": 16},
 	{"name": "acid_pool", "scene": ACID_POOL_SCENE, "warm": 8, "cap": 48},

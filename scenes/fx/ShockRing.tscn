@@ -1,0 +1,28 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scripts/fx/shock_ring.gd" id="1_script"]
+[ext_resource type="Shader" path="res://assets/shaders/shock_ring.gdshader" id="2_crest"]
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_crest"]
+render_priority = 0
+shader = ExtResource("2_crest")
+shader_parameter/crest_color = null
+shader_parameter/body_color = null
+shader_parameter/strength = null
+shader_parameter/streak_scale = null
+shader_parameter/rise_speed = null
+
+[sub_resource type="QuadMesh" id="QuadMesh_segment"]
+material = SubResource("ShaderMaterial_crest")
+
+[sub_resource type="MultiMesh" id="MultiMesh_crest"]
+transform_format = 1
+mesh = SubResource("QuadMesh_segment")
+
+[node name="ShockRing" type="Node3D" unique_id=1090698841]
+script = ExtResource("1_script")
+
+[node name="Crest" type="MultiMeshInstance3D" parent="." unique_id=903802349]
+visible = false
+cast_shadow = 0
+multimesh = SubResource("MultiMesh_crest")

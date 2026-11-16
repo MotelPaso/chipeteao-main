@@ -50,6 +50,9 @@ instance uniform float tone = 0.0;
 instance uniform float pale = 0.0;
 // 0-1: cuánto se enciende ahora (lo escribe el rig en todas las piezas).
 instance uniform float anger = 0.0;
+// 1 = se deshace cerca de la cámara; 0 = se ve entera aunque la cámara se le
+// pegue (lo apaga la entrada, que la filma de cerca).
+instance uniform float near_fade = 1.0;
 
 varying vec3 local_pos;
 
@@ -79,7 +82,7 @@ void vertex() {
 void fragment() {
 	// Cerca de la cámara la pieza se deshace en puntos (VERTEX es la posición
 	// del píxel vista desde la cámara).
-	float seen = smoothstep(fade_near, fade_far, length(VERTEX));
+	float seen = mix(1.0, smoothstep(fade_near, fade_far, length(VERTEX)), near_fade);
 	if (seen < 1.0) {
 		int cell = int(mod(FRAGCOORD.x, 4.0)) + int(mod(FRAGCOORD.y, 4.0)) * 4;
 		if (seen < (DITHER[cell] + 0.5) / 16.0) {

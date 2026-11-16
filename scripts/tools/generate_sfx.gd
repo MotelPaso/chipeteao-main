@@ -49,6 +49,17 @@ func _init() -> void:
 	_save_wav(SFX_DIR, "chest_open", _gen_chest_open())
 	_save_wav(SFX_DIR, "boss_roar", _gen_boss_roar())
 	_save_wav(SFX_DIR, "boss_roar_2", _gen_boss_roar_2())
+	_save_wav(SFX_DIR, "lobster_roar", _gen_lobster_roar())
+	_save_wav(SFX_DIR, "lobster_chitter", _gen_lobster_chitter())
+	_save_wav(SFX_DIR, "lobster_snap", _gen_lobster_snap())
+	_save_wav(SFX_DIR, "lobster_hiss", _gen_lobster_hiss())
+	_save_wav(SFX_DIR, "lobster_slam", _gen_lobster_slam())
+	_save_wav(SFX_DIR, "lobster_dig", _gen_lobster_dig())
+	_save_wav(SFX_DIR, "lobster_rumble", _gen_lobster_rumble())
+	_save_wav(SFX_DIR, "lobster_whoosh", _gen_lobster_whoosh())
+	_save_wav(SFX_DIR, "lobster_lock", _gen_lobster_lock())
+	_save_wav(SFX_DIR, "lobster_death", _gen_lobster_death())
+	_save_wav(SFX_DIR, "lobster_scare", _gen_lobster_scare())
 	_save_wav(SFX_DIR, "boss_die", _gen_boss_die())
 	_save_wav(SFX_DIR, "streak", _gen_streak())
 	_save_wav(SFX_DIR, "laser_hum", _gen_laser_hum())
@@ -271,6 +282,154 @@ func _gen_boss_roar_2() -> PackedFloat32Array:
 	out = _lowpass(out, 1400.0, 1400.0)
 	_tremolo(out, 9.0, 0.45)
 	_adsr(out, 0.15, 0.35, 0.8, 0.5)
+	_normalize(out, 0.95)
+	return out
+
+
+## Un chasquido de pinza: un clic seco de ruido sobre un golpe hueco que cae
+## de tono. Es la base de los sonidos de la Langosta Azul.
+func _claw_click(pitch: float, seed_value: int) -> PackedFloat32Array:
+	var out := _tone(0.07, pitch, pitch * 0.35, Wave.TRIANGLE, 0.5)
+	_mix_at(out, _lowpass(_noise(0.02, _rng(seed_value)), 9000.0, 5000.0), 0.0, 0.9)
+	_exp_decay(out, 0.012)
+	_fade_in(out, 0.0008)
+	_fade_out(out, 0.01)
+	return out
+
+
+## Rugido con que la Langosta Azul empieza la pelea: un gruñido grave y
+## áspero que traquetea, con un siseo y un tableteo de pinzas encima.
+func _gen_lobster_roar() -> PackedFloat32Array:
+	var out := _tone3(1.5, 85.0, 130.0, 60.0, Wave.SAW)
+	_mix_at(out, _tone3(1.5, 86.6, 132.5, 61.2, Wave.SAW), 0.0, 0.7)
+	_mix_at(out, _tone3(1.5, 42.5, 65.0, 30.0, Wave.SQUARE), 0.0, 0.35)
+	_mix_at(out, _lowpass(_noise(1.5, _rng(520)), 5200.0, 1800.0), 0.0, 0.5)
+	out = _lowpass(out, 2600.0, 1500.0)
+	_tremolo(out, 26.0, 0.6)
+	_adsr(out, 0.06, 0.25, 0.85, 0.4)
+	for i in 6:
+		_mix_at(out, _claw_click(1600.0, 521 + i), 0.12 + 0.11 * float(i), 0.35)
+	_normalize(out, 0.95)
+	return out
+
+
+## Llamado suelto de la Langosta Azul: un tableteo de clics que se acelera.
+func _gen_lobster_chitter() -> PackedFloat32Array:
+	var out := _silence(0.6)
+	var at := 0.0
+	var gap := 0.085
+	for i in 9:
+		_mix_at(out, _claw_click(1900.0 - 90.0 * float(i), 510 + i), at, 0.55 + 0.05 * float(i))
+		at += gap
+		gap *= 0.86
+	_normalize(out, 0.7)
+	return out
+
+
+## Pinzazo: dos clics pegados (abre y cierra) y un golpe grave.
+func _gen_lobster_snap() -> PackedFloat32Array:
+	var out := _silence(0.22)
+	_mix_at(out, _claw_click(1500.0, 501), 0.0, 0.7)
+	_mix_at(out, _claw_click(900.0, 502), 0.045, 1.0)
+	var thud := _tone(0.16, 190.0, 70.0, Wave.SINE, 0.6)
+	_exp_decay(thud, 0.04)
+	_mix_at(out, thud, 0.045, 0.8)
+	_normalize(out, 0.9)
+	return out
+
+
+## Siseo cuando un golpe le duele: ruido que se aclara y se corta.
+func _gen_lobster_hiss() -> PackedFloat32Array:
+	var out := _lowpass(_noise(0.38, _rng(530)), 2500.0, 7500.0)
+	_mix_at(out, _tone(0.38, 700.0, 380.0, Wave.SAW, 0.6), 0.0, 0.18)
+	_tremolo(out, 55.0, 0.35)
+	_adsr(out, 0.02, 0.1, 0.6, 0.18)
+	_normalize(out, 0.7)
+	return out
+
+
+## Golpe del Salto y de la Emboscada: un bombazo grave, tierra que cae y el
+## crujido del caparazón.
+func _gen_lobster_slam() -> PackedFloat32Array:
+	var out := _tone(0.9, 120.0, 34.0, Wave.SINE, 0.5)
+	_mix_at(out, _tone(0.9, 62.0, 22.0, Wave.SQUARE, 0.5), 0.0, 0.2)
+	_mix_at(out, _lowpass(_noise(0.9, _rng(540)), 4200.0, 220.0), 0.0, 0.8)
+	_exp_decay(out, 0.2)
+	_mix_at(out, _claw_click(700.0, 541), 0.0, 0.8)
+	_fade_in(out, 0.002)
+	_fade_out(out, 0.1)
+	_normalize(out, 0.95)
+	return out
+
+
+## Se entierra: grava que raspa, cada vez más apagada.
+func _gen_lobster_dig() -> PackedFloat32Array:
+	var out := _lowpass(_noise(0.8, _rng(550)), 3200.0, 500.0)
+	_tremolo(out, 17.0, 0.7)
+	_mix_at(out, _tone(0.8, 90.0, 48.0, Wave.SINE), 0.0, 0.35)
+	_adsr(out, 0.03, 0.2, 0.7, 0.3)
+	_normalize(out, 0.75)
+	return out
+
+
+## Aviso de que va a salir de la tierra: un temblor grave que crece.
+func _gen_lobster_rumble() -> PackedFloat32Array:
+	var out := _tone(0.6, 38.0, 64.0, Wave.SINE)
+	_mix_at(out, _tone(0.6, 57.0, 96.0, Wave.TRIANGLE), 0.0, 0.5)
+	_mix_at(out, _lowpass(_noise(0.6, _rng(560)), 300.0, 900.0), 0.0, 0.7)
+	_tremolo(out, 22.0, 0.55)
+	_fade_in(out, 0.4)
+	_fade_out(out, 0.05)
+	_normalize(out, 0.85)
+	return out
+
+
+## Embestida y Coletazo: un barrido de aire corto y grave.
+func _gen_lobster_whoosh() -> PackedFloat32Array:
+	var out := _lowpass(_noise(0.42, _rng(570)), 400.0, 3600.0)
+	out = _lowpass(out, 3600.0, 700.0)
+	_mix_at(out, _tone(0.42, 150.0, 60.0, Wave.SINE, 0.7), 0.0, 0.3)
+	_adsr(out, 0.08, 0.1, 0.8, 0.2)
+	_normalize(out, 0.75)
+	return out
+
+
+## Un aviso se clava: dos clics agudos y secos.
+func _gen_lobster_lock() -> PackedFloat32Array:
+	var out := _silence(0.2)
+	_mix_at(out, _claw_click(2600.0, 580), 0.0, 0.9)
+	_mix_at(out, _claw_click(3100.0, 581), 0.075, 1.0)
+	_normalize(out, 0.7)
+	return out
+
+
+## Muerte de la Langosta Azul: el gruñido se desinfla con un gorgoteo y el
+## caparazón cruje cada vez más grave.
+func _gen_lobster_death() -> PackedFloat32Array:
+	var out := _tone(1.7, 140.0, 30.0, Wave.SAW, 0.6)
+	_mix_at(out, _tone(1.7, 71.0, 15.5, Wave.SQUARE, 0.6), 0.0, 0.3)
+	_mix_at(out, _lowpass(_noise(1.7, _rng(590)), 3000.0, 200.0), 0.0, 0.5)
+	out = _lowpass(out, 2400.0, 500.0)
+	_tremolo(out, 14.0, 0.65)
+	_exp_decay(out, 0.55)
+	for i in 5:
+		_mix_at(out, _claw_click(1100.0 - 150.0 * float(i), 591 + i), 0.25 + 0.22 * float(i), 0.5)
+	_fade_in(out, 0.004)
+	_fade_out(out, 0.15)
+	_normalize(out, 0.95)
+	return out
+
+
+## El susto del corte de su entrada cuando no hay canción: un chillido
+## disonante que arranca de golpe sobre un golpe grave.
+func _gen_lobster_scare() -> PackedFloat32Array:
+	var out := _tone3(1.0, 1900.0, 2300.0, 700.0, Wave.SAW)
+	_mix_at(out, _tone3(1.0, 2011.0, 2437.0, 742.0, Wave.SAW), 0.0, 0.8)
+	_mix_at(out, _tone3(1.0, 950.0, 1150.0, 350.0, Wave.SQUARE), 0.0, 0.4)
+	_mix_at(out, _lowpass(_noise(1.0, _rng(600)), 8000.0, 1500.0), 0.0, 0.6)
+	_mix_at(out, _tone(1.0, 95.0, 40.0, Wave.SINE, 0.5), 0.0, 0.8)
+	_tremolo(out, 31.0, 0.45)
+	_adsr(out, 0.003, 0.25, 0.55, 0.5)
 	_normalize(out, 0.95)
 	return out
 
