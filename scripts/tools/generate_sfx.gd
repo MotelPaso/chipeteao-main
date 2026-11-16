@@ -61,6 +61,7 @@ func _init() -> void:
 	_save_wav(SFX_DIR, "phoenix_screech", _gen_phoenix_screech())
 	_save_wav(SFX_DIR, "phoenix_caw", _gen_phoenix_caw())
 	_save_wav(SFX_DIR, "phoenix_dive", _gen_phoenix_dive())
+	_save_wav(SFX_DIR, "phoenix_breath", _gen_phoenix_breath())
 	_save_wav(SFX_DIR, "phoenix_flap", _gen_phoenix_flap())
 	_save_wav(SFX_DIR, "phoenix_hurt", _gen_phoenix_hurt())
 	_save_wav(SFX_DIR, "phoenix_death", _gen_phoenix_death())
@@ -448,6 +449,18 @@ func _gen_phoenix_dive() -> PackedFloat32Array:
 	var out := _bird_voice(0.85, 2600.0, 1900.0, 800.0, 36.0, 0.4)
 	_mix_at(out, _lowpass(_noise(0.85, _rng(371)), 900.0, 5000.0), 0.0, 0.35)
 	_adsr(out, 0.04, 0.2, 0.8, 0.25)
+	_normalize(out, 0.85)
+	return out
+
+
+## Aliento de fuego: un chorro que ruge un par de segundos, grave y lleno,
+## con un temblor rápido y un bramido de fondo que baja.
+func _gen_phoenix_breath() -> PackedFloat32Array:
+	var out := _lowpass(_noise(2.1, _rng(977)), 500.0, 4200.0)
+	out = _lowpass(out, 4200.0, 900.0)
+	_mix_at(out, _tone(2.1, 95.0, 52.0, Wave.SAW, 1.3), 0.0, 0.4)
+	_tremolo(out, 17.0, 0.35)
+	_adsr(out, 0.08, 0.2, 0.85, 0.5)
 	_normalize(out, 0.85)
 	return out
 

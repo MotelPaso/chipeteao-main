@@ -21,10 +21,6 @@ enum Step { CHARGE, REST }
 @export var damage: float = 75.0
 ## Segundos quieto después del estallido.
 @export var recover: float = 1.4
-## Fuerza del temblor de cámara del estallido.
-@export var shake_strength: float = 0.6
-## Segundos que dura ese temblor.
-@export var shake_seconds: float = 0.8
 ## Aviso en el HUD al empezar a cargar.
 @export var announce_text: String = "¡Amanecer! Corre a un círculo a salvo"
 ## Sonido al empezar a cargar (fila de Sfx.SOUND_LIBRARY).
@@ -91,7 +87,9 @@ func tick(delta: float) -> bool:
 	_timer -= delta
 	if _step == Step.REST:
 		return _timer <= 0.0
-	boss.rig.set_nova(1.0 - clampf(_timer / maxf(_charge_total, 0.01), 0.0, 1.0))
+	var charge := 1.0 - clampf(_timer / maxf(_charge_total, 0.01), 0.0, 1.0)
+	boss.rig.set_nova(charge)
+	boss.feel.dread(charge)
 	_tick_harass(delta)
 	if _timer <= 0.0:
 		_detonate()
@@ -180,8 +178,7 @@ func _detonate() -> void:
 	print("%s dawn blast: hit=%d circles=%d" % [boss.boss_title, hit, _circles.size()])
 	boss.rig.set_nova(-1.0)
 	boss.rig.gesture(&"slam")
-	boss.screen_flash()
-	Juice.shake(shake_strength, shake_seconds)
+	boss.feel.shock(MythosFeel.Shock.CATACLYSM, origin)
 	Sfx.play(blast_sfx)
 	get_tree().call_group(SafeCircle.GROUP, "dismiss")
 	boss.rig.set_pose(boss.rest_pose())

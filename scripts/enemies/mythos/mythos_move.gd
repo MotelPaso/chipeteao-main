@@ -8,6 +8,8 @@ extends Node
 ## esperas y suma proyectiles o zonas: cada ataque dice cuánto.
 ## Cada ataque dice además desde dónde se usa (stance): en vuelo o posado
 ## en tierra. La Picada lo posa (Mythos.land) y el Aletazo lo hace despegar.
+## Con flight_factor Mythos sigue volando alrededor del raider mientras lo
+## hace, y con chain_to otro ataque sale pegado a este, sin pausa (un combo).
 
 ## Desde dónde puede usar Mythos un ataque.
 enum Stance { AIR, GROUND, ANY }
@@ -31,6 +33,16 @@ enum Stance { AIR, GROUND, ANY }
 @export var max_range: float = 40.0
 ## Grito de Mythos al empezar este ataque (fila de Sfx.SOUND_LIBRARY; vacío = ninguno).
 @export var call_sfx: StringName = &""
+## Fracción de su vuelo que mantiene mientras hace este ataque (0 = se queda quieto en el aire, 1 = sigue girando igual de rápido).
+@export_range(0.0, 1.0) var flight_factor: float = 0.0
+
+@export_group("Combo")
+## Ataque (nombre de un nodo hermano) que sale pegado a este, sin pausa entre los dos (vacío = ninguno).
+@export var chain_to: StringName = &""
+## Vida (1 = la primera) desde la que encadena ese ataque.
+@export var chain_from_life: int = 1
+## Probabilidad (0-1) de encadenarlo cada vez que termina.
+@export_range(0.0, 1.0) var chain_chance: float = 1.0
 
 ## El jefe que lleva este ataque (lo pone Mythos en su _ready).
 var boss: Mythos = null
@@ -56,12 +68,18 @@ func tick_cooldown(delta: float) -> void:
 ## True si Mythos puede usarlo ahora: en su vida `life`, a `distance` metros
 ## del raider y volando o posado (`grounded`).
 func is_ready(life: int, distance: float, grounded: bool) -> bool:
+	return fits(life, grounded) and _cooldown_left <= 0.0 \
+			and distance >= min_range and distance <= max_range
+
+
+## True si este ataque es de la vida `life` y de la postura de ahora, sin
+## mirar su espera ni la distancia (lo que alcanza para salir encadenado).
+func fits(life: int, grounded: bool) -> bool:
 	if stance != Stance.ANY and (stance == Stance.GROUND) != grounded:
 		return false
 	if retire_life > 0 and life >= retire_life:
 		return false
-	return life >= unlock_life and _cooldown_left <= 0.0 \
-			and distance >= min_range and distance <= max_range
+	return life >= unlock_life
 
 
 ## Arranca la espera hasta el próximo uso, acortada por la agresividad.

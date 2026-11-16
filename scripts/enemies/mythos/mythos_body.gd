@@ -18,6 +18,37 @@ var _face_along: Vector3 = Vector3.ZERO
 @onready var _alive_layer: int = collision_layer
 @onready var _zones: MythosZones = $Zones
 @onready var _flight: MythosFlight = $Flight
+## Lo que se siente de sus golpes (nodo Feel): los ataques le dicen qué tan
+## fuerte fue cada uno y cuánto falta para los más grandes.
+@onready var feel: MythosFeel = $Feel
+
+
+## True mientras pelea. Mythos lo redefine con sus fases.
+func is_fighting() -> bool:
+	return true
+
+
+## Fracción de su vuelo que mantiene ahora (0 = quieto). Mythos lo redefine:
+## entera entre ataques y, en medio de uno, la que ese ataque le deje.
+func _flight_share() -> float:
+	return 1.0
+
+
+func _pick_target() -> Node3D:
+	return _flight.pick_target(get_tree())
+
+
+func _movement_intent(seek: Vector3, distance: float) -> Vector3:
+	var share := _flight_share()
+	return _flight.intent(seek, distance) * share if share > 0.0 else Vector3.ZERO
+
+
+func _facing_direction(steer: Vector3, seek: Vector3) -> Vector3:
+	if not is_fighting():
+		return Vector3.ZERO
+	if _face_along.length_squared() > 0.0001:
+		return _face_along
+	return seek if seek.length_squared() > 0.0001 else steer
 
 
 ## Lo saca de la pelea como si hubiera muerto: las armas dejan de apuntarle,

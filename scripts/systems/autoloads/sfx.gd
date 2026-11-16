@@ -140,6 +140,9 @@ const SOUND_LIBRARY: Dictionary[StringName, Dictionary] = {
 		"stream": preload("res://assets/audio/sfx/phoenix_dive.wav"), "volume_db": -5.0,
 		"rate_limit": 2,
 	},
+	&"phoenix_breath": {
+		"stream": preload("res://assets/audio/sfx/phoenix_breath.wav"), "volume_db": -4.0,
+	},
 	&"phoenix_flap": {
 		"stream": preload("res://assets/audio/sfx/phoenix_flap.wav"), "volume_db": -6.0,
 		"rate_limit": 4, "jitter": true,

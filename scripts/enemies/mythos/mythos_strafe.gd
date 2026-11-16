@@ -20,7 +20,7 @@ enum Step { APPROACH, RUN, REST }
 @export var run_speed: float = 30.0
 ## Segundos que se adelanta al raider para trazar la línea.
 @export var lead_seconds: float = 0.4
-## Tope de ese adelanto, en metros.
+## Tope de ese adelanto, en metros, para un raider a velocidad base (crece si corre más rápido).
 @export var max_lead: float = 4.0
 ## Grados que la línea se desvía, al azar, de la recta entre Mythos y el raider.
 @export var angle_jitter_degrees: float = 35.0
@@ -92,6 +92,8 @@ func tick(delta: float) -> bool:
 			boss.glide_to(_from.lerp(_start, t * t * (3.0 - 2.0 * t)))
 			if _timer <= 0.0:
 				_step = Step.RUN
+				boss.rig.set_trail(true)
+				boss.feel.shock(MythosFeel.Shock.LIGHT, boss.global_position)
 				Sfx.play(pass_sfx)
 		Step.RUN:
 			_travelled = minf(_travelled + run_speed * delta, _run_length)
@@ -108,6 +110,7 @@ func tick(delta: float) -> bool:
 
 
 func cancel() -> void:
+	boss.rig.set_trail(false)
 	boss.rig.set_pose(boss.rest_pose())
 
 
@@ -145,6 +148,7 @@ func _plan_pass(heading: Vector3, warn: float) -> void:
 
 
 func _after_pass() -> void:
+	boss.rig.set_trail(false)
 	if _passes_left > 0 and is_instance_valid(_target) and _target.is_inside_tree():
 		var turn := deg_to_rad(second_pass_degrees) * (1.0 if randf() < 0.5 else -1.0)
 		_plan_pass(_direction.rotated(Vector3.UP, turn),

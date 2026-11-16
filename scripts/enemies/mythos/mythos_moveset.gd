@@ -55,6 +55,21 @@ func takeoff() -> MythosMove:
 	return _takeoff
 
 
+## El ataque que `move` encadena en la vida `life` (MythosMove.chain_to), o
+## null si no encadena, no le tocó o no sirve para la postura de ahora. No
+## mira la espera del encadenado: un combo sale entero.
+func follow_up(move: MythosMove, life: int, grounded: bool) -> MythosMove:
+	if move == null or move.chain_to == &"" or life < move.chain_from_life \
+			or randf() > move.chain_chance:
+		return null
+	var next := get_node_or_null(NodePath(String(move.chain_to))) as MythosMove
+	if next == null or not next.fits(life, grounded):
+		return null
+	_uses += 1
+	_used_at[next] = _uses
+	return next
+
+
 ## El próximo ataque: de los que están listos, el que hace más que no se
 ## usa (a igualdad, el primero de la lista). Null si ninguno lo está.
 func next_ready(life: int, distance: float, grounded: bool) -> MythosMove:

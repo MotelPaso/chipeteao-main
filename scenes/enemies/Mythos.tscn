@@ -1,4 +1,4 @@
-[gd_scene load_steps=76 format=3]
+[gd_scene load_steps=80 format=3]
 
 [ext_resource type="Script" path="res://scripts/enemies/mythos.gd" id="1_mythos"]
 [ext_resource type="Script" path="res://scripts/enemies/boss/guarded_health.gd" id="2_health"]
@@ -33,6 +33,9 @@
 [ext_resource type="Script" path="res://scripts/enemies/mythos/mythos_storm.gd" id="31_storm"]
 [ext_resource type="Script" path="res://scripts/enemies/mythos/mythos_mill.gd" id="32_mill"]
 [ext_resource type="Script" path="res://scripts/enemies/mythos/mythos_halo.gd" id="33_halo"]
+[ext_resource type="Script" path="res://scripts/enemies/mythos/mythos_feel.gd" id="34_feel"]
+[ext_resource type="Shader" path="res://assets/shaders/dread_vignette.gdshader" id="35_dread"]
+[ext_resource type="Script" path="res://scripts/enemies/mythos/mythos_breath.gd" id="36_breath"]
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_flight"]
 shader = ExtResource("13_plumage")
@@ -346,6 +349,10 @@ gravity = Vector3(0, 1.6, 0)
 scale_min = 0.6
 scale_max = 1.4
 scale_curve = SubResource("CurveTexture_shrink")
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_dread"]
+resource_local_to_scene = true
+shader = ExtResource("35_dread")
 
 [sub_resource type="CapsuleShape3D" id="CapsuleShape3D_boss"]
 radius = 1.3
@@ -1692,6 +1699,20 @@ script = ExtResource("22_burnout")
 [node name="Voice" type="Node" parent="."]
 script = ExtResource("26_voice")
 
+[node name="Feel" type="CanvasLayer" parent="."]
+layer = 4
+script = ExtResource("34_feel")
+
+[node name="Vignette" type="ColorRect" parent="Feel"]
+visible = false
+material = SubResource("ShaderMaterial_dread")
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
 [node name="Moves" type="Node" parent="."]
 script = ExtResource("25_moveset")
 
@@ -1704,6 +1725,7 @@ first_use_fraction = 0.15
 min_range = 3.5
 max_range = 34.0
 call_sfx = &"phoenix_screech"
+flight_factor = 0.85
 
 [node name="Fireballs" type="Node" parent="Moves"]
 script = ExtResource("9_fireballs")
@@ -1711,6 +1733,7 @@ retire_life = 2
 cooldown = 9.0
 first_use_fraction = 0.35
 call_sfx = &"phoenix_screech"
+flight_factor = 0.6
 
 [node name="Dive" type="Node" parent="Moves"]
 script = ExtResource("7_dive")
@@ -1721,11 +1744,33 @@ first_use_fraction = 0.5
 max_range = 36.0
 call_sfx = &"phoenix_dive"
 
+[node name="Charge" type="Node" parent="Moves"]
+script = ExtResource("15_strafe")
+retire_life = 2
+cooldown = 14.0
+first_use_fraction = 0.6
+call_sfx = &"phoenix_dive"
+burn_seconds = 2.5
+second_pass_aggression = 1.0
+
 [node name="Tornados" type="Node" parent="Moves"]
 script = ExtResource("23_tornados")
 cooldown = 16.0
 first_use_fraction = 0.55
 call_sfx = &"phoenix_screech"
+flight_factor = 0.5
+chain_to = &"Fireballs"
+chain_chance = 0.5
+
+[node name="Breath" type="Node" parent="Moves"]
+script = ExtResource("36_breath")
+retire_life = 2
+cooldown = 18.0
+first_use_fraction = 0.65
+max_range = 30.0
+call_sfx = &"phoenix_call"
+chain_to = &"Dive"
+chain_chance = 0.5
 
 [node name="Waves" type="Node" parent="Moves"]
 script = ExtResource("24_waves")
@@ -1734,6 +1779,7 @@ cooldown = 13.0
 first_use_fraction = 0.7
 max_range = 30.0
 call_sfx = &"phoenix_caw"
+flight_factor = 0.3
 
 [node name="Ring" type="Node" parent="Moves"]
 script = ExtResource("8_ring")
@@ -1741,6 +1787,7 @@ cooldown = 18.0
 first_use_fraction = 0.8
 max_range = 30.0
 call_sfx = &"phoenix_call"
+flight_factor = 0.5
 
 [node name="Strafe" type="Node" parent="Moves"]
 script = ExtResource("15_strafe")
@@ -1748,6 +1795,21 @@ unlock_life = 2
 cooldown = 15.0
 first_use_fraction = 0.3
 call_sfx = &"phoenix_dive"
+chain_to = &"Deluge"
+chain_from_life = 2
+chain_chance = 0.5
+
+[node name="Scorch" type="Node" parent="Moves"]
+script = ExtResource("36_breath")
+unlock_life = 2
+cooldown = 19.0
+first_use_fraction = 0.35
+max_range = 30.0
+call_sfx = &"phoenix_call"
+windup = 1.3
+sweep_degrees = 150.0
+sweep_seconds = 2.0
+passes = 2
 
 [node name="Deluge" type="Node" parent="Moves"]
 script = ExtResource("9_fireballs")
@@ -1755,6 +1817,7 @@ unlock_life = 2
 cooldown = 20.0
 first_use_fraction = 0.5
 call_sfx = &"phoenix_screech"
+flight_factor = 0.7
 windup = 1.0
 count = 10
 extra_at_full_aggression = 6
@@ -1782,6 +1845,7 @@ cooldown = 10.0
 first_use_fraction = 0.1
 max_range = 34.0
 call_sfx = &"phoenix_screech"
+flight_factor = 0.3
 
 [node name="DiveChain" type="Node" parent="Moves"]
 script = ExtResource("7_dive")
@@ -1791,7 +1855,7 @@ cooldown_at_full_aggression = 0.7
 first_use_fraction = 0.6
 max_range = 36.0
 call_sfx = &"phoenix_dive"
-windup = 0.9
+windup = 1.15
 chain = 3
 
 [node name="Tide" type="Node" parent="Moves"]
@@ -1801,6 +1865,7 @@ cooldown = 14.0
 first_use_fraction = 0.75
 max_range = 30.0
 call_sfx = &"phoenix_caw"
+flight_factor = 0.3
 waves = 3
 extra_at_full_aggression = 1
 speed = 14.0
@@ -1826,3 +1891,4 @@ script = ExtResource("11_takeoff")
 stance = 1
 cooldown = 0.0
 call_sfx = &"phoenix_caw"
+chain_to = &"FeatherVolley"

@@ -32,7 +32,7 @@ extends MythosMove
 @export var height_window: float = 2.6
 ## Cuánto se adelanta al raider (0 = le apunta donde está, 1 = donde va a estar cuando caiga).
 @export_range(0.0, 1.0) var lead: float = 0.9
-## Tope de ese adelanto, en metros.
+## Tope de ese adelanto, en metros, para un raider a velocidad base (crece si corre más rápido).
 @export var max_lead: float = 8.0
 ## Metros al azar que se corre cada bola alrededor de ese punto.
 @export var scatter: float = 1.6

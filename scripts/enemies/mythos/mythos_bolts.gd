@@ -5,6 +5,11 @@ extends RefCounted
 ## La velocidad y el alcance de cada pluma son los de su escena
 ## (FireFeather.tscn).
 
+# --- Edita aquí ---------------------------------------------------------------
+## Cuántas veces puede crecer, como mucho, el tope del adelanto (max_lead de
+## cada ataque) cuando el raider corre más rápido que su velocidad base.
+const LEAD_GROWTH_MAX: float = 2.5
+
 
 ## Abanico de `count` plumas desde `origin` hacia `target`, abierto `spread`
 ## radianes en el plano. Apunta adonde el raider va a estar cuando lleguen:
@@ -47,14 +52,26 @@ static func shot(boss: Mythos, scene: PackedScene, origin: Vector3, direction: V
 
 
 ## Dónde va a estar `target` dentro de `seconds` si sigue como va, nunca a
-## más de `max_lead` metros de donde está ahora. Siempre a ras de sus pies.
+## más de `max_lead` metros de donde está ahora. Ese tope es para un raider a
+## su velocidad base y crece en proporción si corre más rápido (speed_ratio):
+## una build de velocidad no deja atrás la puntería. Siempre a ras de sus pies.
 static func predicted(target: Node3D, seconds: float, max_lead: float) -> Vector3:
 	var body := target as CharacterBody3D
 	if body == null or seconds <= 0.0 or max_lead <= 0.0:
 		return target.global_position
 	var ahead := body.velocity * seconds
 	ahead.y = 0.0
-	return target.global_position + ahead.limit_length(max_lead)
+	return target.global_position + ahead.limit_length(max_lead * speed_ratio(body))
+
+
+## Cuántas veces más rápido que su velocidad base se mueve `body` ahora: 1
+## como mínimo y LEAD_GROWTH_MAX como mucho. Lo que no es un raider vale 1.
+static func speed_ratio(body: CharacterBody3D) -> float:
+	var raider := body as Player
+	if raider == null or raider.move_speed <= 0.0:
+		return 1.0
+	var speed := Vector2(body.velocity.x, body.velocity.z).length()
+	return clampf(speed / raider.move_speed, 1.0, LEAD_GROWTH_MAX)
 
 
 static func _launch(bolt: EnemyBolt, boss: Mythos, origin: Vector3, direction: Vector3,

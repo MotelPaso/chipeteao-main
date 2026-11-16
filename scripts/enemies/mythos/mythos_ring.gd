@@ -35,6 +35,12 @@ extends MythosMove
 @export var recover: float = 0.5
 ## Sonido del estallido (fila de Sfx.SOUND_LIBRARY).
 @export var blast_sfx: StringName = &"fire_whoosh"
+## Escena de la columna de fuego del estallido (FireBurst, sale de Pools). Vacío = sin columna.
+@export var burst_scene: PackedScene = preload("res://scenes/fx/FireBurst.tscn")
+## Alto de esa columna, en metros.
+@export var burst_height: float = 10.0
+## Radio de la columna, en veces el radio del estallido.
+@export var burst_radius_factor: float = 0.6
 
 var _center: Vector3 = Vector3.ZERO
 var _timer: float = 0.0
@@ -71,6 +77,8 @@ func tick(delta: float) -> bool:
 		return true
 	_blasted = true
 	boss.strike_ground([_center], blast_radius, blast_height_window, blast_damage)
+	FireBurst.spawn(burst_scene, _center, blast_radius * burst_radius_factor, burst_height)
+	boss.feel.shock(MythosFeel.Shock.HEAVY, _center)
 	Sfx.play(blast_sfx)
 	boss.rig.gesture(&"slam")
 	boss.rig.set_pose(boss.rest_pose())

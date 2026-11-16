@@ -77,6 +77,7 @@ func tick(delta: float) -> bool:
 				height_window, band, boss)
 		_left -= 1
 	boss.rig.gesture(&"slam")
+	boss.feel.shock(MythosFeel.Shock.LIGHT, boss.global_position)
 	Sfx.play(wave_sfx)
 	if _left > 0 or (returning and _returning_left > 0):
 		_timer = interval * aggression_lerp(1.0, interval_at_full_aggression)

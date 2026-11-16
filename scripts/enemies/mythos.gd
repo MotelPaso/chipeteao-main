@@ -11,16 +11,16 @@ extends MythosBody
 ##
 ## Vuela bajo: el CUERPO va por el suelo como el de todo enemigo (las armas
 ## le pegan igual que a cualquiera) y lo que flota es el rig (MythosRig, el
-## nodo Visual). Alterna dos posturas (nodo Flight): EN VUELO gira alrededor
-## del raider y EN TIERRA, tras una Picada, lo persigue a pie hasta despegar.
-## Sus ataques cuelgan del nodo Moves (MythosMoveset), cada uno con sus
-## valores, y sus gritos los lleva el nodo Voice.
-##
+## nodo Visual). Alterna dos posturas (nodo Flight): EN VUELO gira rápido
+## alrededor del raider, también mientras ataca, y EN TIERRA, tras una
+## Picada, lo persigue a pie hasta despegar. Sus ataques cuelgan del nodo
+## Moves (MythosMoveset), cada uno con sus valores; algunos salen
+## encadenados, sin pausa. Sus gritos los lleva el nodo Voice y lo que se
+## siente de sus golpes (temblor, viñeta de peligro), el nodo Feel.
 ## La vida de cada fase, la agresividad y el daño extra salen del nodo
 ## Scaling (StageBossScaling); la vida de Health en Mythos.tscn es el PISO.
-## Las zonas de fuego las saca el nodo Zones (MythosBody), la llegada
-## (cinemática y mapa en llamas) el nodo Arrival, y si una fase se alarga
-## demasiado se consume solo (nodo Burnout).
+## Las zonas de fuego las saca el nodo Zones (MythosBody), la llegada el
+## nodo Arrival, y una fase que se alarga demasiado se consume sola (Burnout).
 ## Nada en la primera fase avisa que tiene otra: al agotarla parece morir
 ## (su barra se va, la música se apaga, nadie le apunta) y recién después
 ## renace.
@@ -42,7 +42,7 @@ const GAZE_HEIGHT: float = 1.2
 
 @export_group("Ritmo de ataques")
 ## Segundos de pausa entre un ataque y el siguiente, con agresividad 0.
-@export var attack_pause: float = 1.5
+@export var attack_pause: float = 1.2
 ## Multiplicador de esa pausa con agresividad 1.
 @export var attack_pause_at_full_aggression: float = 0.35
 ## Multiplicador de la pausa mientras está posado en tierra (de cerca ataca más seguido).
@@ -51,9 +51,8 @@ const GAZE_HEIGHT: float = 1.2
 var _phase: Phase = Phase.ARRIVAL
 var _guard: GuardedHealth = null
 var _lives_total: int = 1
-## Vida actual, desde 1.
+## Vida actual (desde 1) y sus segundos vulnerables y daño recibido.
 var _life: int = 1
-## Segundos vulnerables y daño recibido en la vida actual.
 var _life_clock: float = 0.0
 var _life_damage: float = 0.0
 ## Segundos de pelea desde que terminó la calma, renaceres incluidos.
@@ -64,7 +63,9 @@ var _fakeout_left: float = 0.0
 ## True si el renacer lo lleva la cinemática (ella avisa con finish_rebirth).
 var _ashes_staged: bool = false
 var _pause_left: float = 0.0
+## El ataque en curso, y si salió encadenado a otro (entonces no encadena más).
 var _move: MythosMove = null
+var _in_combo: bool = false
 ## Factor de daño por poder ya aplicado a los ataques (ver _apply_plan).
 var _power_damage_applied: float = 1.0
 
@@ -199,7 +200,7 @@ func _behavior_tick(delta: float) -> void:
 	if not is_fighting():
 		# El desgaste acaba de agotar esta vida.
 		return
-	_flight.tick(delta)
+	_flight.tick(delta, _phase == Phase.MOVE)
 	if _voice.tick(delta):
 		rig.gesture(&"screech")
 	_moveset.tick(delta, _life)
@@ -209,22 +210,11 @@ func _behavior_tick(delta: float) -> void:
 		_end_move()
 
 
-func _pick_target() -> Node3D:
-	return _flight.pick_target(get_tree())
-
-
-func _movement_intent(seek: Vector3, distance: float) -> Vector3:
-	if _phase != Phase.FLIGHT:
-		return Vector3.ZERO
-	return _flight.intent(seek, distance)
-
-
-func _facing_direction(steer: Vector3, seek: Vector3) -> Vector3:
-	if not is_fighting():
-		return Vector3.ZERO
-	if _face_along.length_squared() > 0.0001:
-		return _face_along
-	return seek if seek.length_squared() > 0.0001 else steer
+func _flight_share() -> float:
+	if _phase == Phase.FLIGHT:
+		return 1.0
+	# En medio de un ataque sigue volando lo que ese ataque le deje.
+	return _move.flight_factor if _phase == Phase.MOVE and _move != null else 0.0
 
 
 func _combat_tick(player: Node3D, distance: float) -> void:
@@ -232,7 +222,7 @@ func _combat_tick(player: Node3D, distance: float) -> void:
 		return
 	# No le saca los ojos de encima al raider que tiene de blanco.
 	rig.gaze_at(player.global_position + Vector3.UP * GAZE_HEIGHT)
-	if _phase != Phase.FLIGHT or _pause_left > 0.0:
+	if _phase != Phase.FLIGHT or _pause_left > 0.0 or _flight.is_crossing():
 		return
 	if _flight.wants_takeoff():
 		if _moveset.takeoff() != null:
@@ -322,6 +312,7 @@ func _rebirth() -> void:
 	_life_damage = 0.0
 	_apply_plan(plan)
 	rig.ascend(_is_ascended())
+	_flight.reborn = _is_ascended()
 	rig.set_nova(-1.0)
 	rig.set_pose(MythosRig.Pose.FLY)
 	if _is_ascended():
@@ -380,20 +371,31 @@ func _start_move(move: MythosMove, target: Node3D) -> void:
 
 
 func _end_move() -> void:
-	if _move != null:
-		_move.start_cooldown()
+	var done := _move
+	if done != null:
+		done.start_cooldown()
 	_move = null
 	_face_along = Vector3.ZERO
+	rig.lift = 0.0
 	_phase = Phase.FLIGHT
 	_pause_left = attack_pause * lerpf(1.0, attack_pause_at_full_aggression, aggression) \
 			* (ground_pause_factor if _flight.is_grounded() else 1.0)
+	# Combo: el ataque que este encadena sale ya, sin pausa. Uno solo por vez.
+	var next: MythosMove = null if _in_combo \
+			else _moveset.follow_up(done, _life, _flight.is_grounded())
+	var target: Node3D = _pick_target() if next != null else null
+	_in_combo = target != null
+	if _in_combo:
+		_start_move(next, target)
 
 
 func _cancel_move() -> void:
 	if _move != null:
 		_move.cancel()
 	_move = null
+	_in_combo = false
 	_face_along = Vector3.ZERO
+	rig.lift = 0.0
 	rig.set_trail(false)
 	rig.set_nova(-1.0)
 

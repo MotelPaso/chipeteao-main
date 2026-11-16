@@ -19,6 +19,14 @@ extends MythosMove
 ## Sonido del golpe (fila de Sfx.SOUND_LIBRARY).
 @export var blast_sfx: StringName = &"fire_whoosh"
 
+@export_group("Columna de fuego")
+## Escena de la columna que levanta el golpe (FireBurst, sale de Pools). Vacío = sin columna.
+@export var burst_scene: PackedScene = preload("res://scenes/fx/FireBurst.tscn")
+## Alto de la columna, en metros.
+@export var burst_height: float = 9.0
+## Radio de la columna, en veces el radio del golpe.
+@export var burst_radius_factor: float = 0.6
+
 @export_group("Onda de fuego")
 ## Escena de la onda que sale del golpe (FireWave, sale de Pools). Vacío = sin onda.
 @export var wave_scene: PackedScene = preload("res://scenes/fx/FireWave.tscn")
@@ -61,6 +69,8 @@ func tick(delta: float) -> bool:
 	if wave_scene != null:
 		FireWave.spawn(wave_scene, at, radius, wave_radius, wave_speed, wave_damage,
 				wave_height_window, wave_band, boss)
+	FireBurst.spawn(burst_scene, at, radius * burst_radius_factor, burst_height)
+	boss.feel.shock(MythosFeel.Shock.HEAVY, at)
 	boss.rig.gesture(&"flap")
 	boss.rig.burst()
 	Sfx.play(blast_sfx)

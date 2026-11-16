@@ -34,6 +34,7 @@ const SAFE_CIRCLE_SCENE: PackedScene = preload("res://scenes/fx/SafeCircle.tscn"
 const FIREBALL_SCENE: PackedScene = preload("res://scenes/fx/Fireball.tscn")
 const FIRE_TORNADO_SCENE: PackedScene = preload("res://scenes/fx/FireTornado.tscn")
 const FIRE_WAVE_SCENE: PackedScene = preload("res://scenes/fx/FireWave.tscn")
+const FIRE_BURST_SCENE: PackedScene = preload("res://scenes/fx/FireBurst.tscn")
 
 ## La lista de pools: name, scene, `warm` (instancias creadas al arrancar
 ## para que los primeros spawns no tironeen) y `cap` (máximo guardado, que
@@ -60,6 +61,7 @@ const POOLS: Array[Dictionary] = [
 	{"name": "fireball", "scene": FIREBALL_SCENE, "warm": 4, "cap": 24},
 	{"name": "fire_tornado", "scene": FIRE_TORNADO_SCENE, "warm": 10, "cap": 30},
 	{"name": "fire_wave", "scene": FIRE_WAVE_SCENE, "warm": 2, "cap": 8},
+	{"name": "fire_burst", "scene": FIRE_BURST_SCENE, "warm": 2, "cap": 8},
 ]
 
 var _pools_by_path: Dictionary[String, NodePool] = {}

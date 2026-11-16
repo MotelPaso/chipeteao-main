@@ -99,6 +99,7 @@ func _rear() -> void:
 func _strike() -> void:
 	boss.glide_to(_to)
 	boss.strike_ground([_mark], radius, height_window, damage)
+	boss.feel.shock(MythosFeel.Shock.LIGHT, _mark)
 	# Un zarpazo con cada ala, alternando.
 	boss.rig.gesture(&"swipe_left" if _swipes_left % 2 == 0 else &"swipe_right")
 	Sfx.play(swipe_sfx)

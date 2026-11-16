@@ -166,4 +166,5 @@ func _raise_cage(center: Vector3, amount: int, turn: float) -> void:
 func _blast(center: Vector3, reach: float) -> void:
 	FireWave.spawn(blast_scene, boss.floor_point(center), 0.5, reach, blast_speed,
 			blast_damage, blast_height_window, blast_band, boss)
+	boss.feel.shock(MythosFeel.Shock.HEAVY, center)
 	Sfx.play(blast_sfx)

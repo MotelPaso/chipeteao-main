@@ -202,6 +202,12 @@ Lo que NO se traduce nunca: los `id` de catálogo, los `node_name`, los nombres 
 | Claws (ataque de Mythos en tierra) | Garras |
 | Wing blast (el despegue de Mythos) | Aletazo |
 | Fire pass (ataque de Mythos) | Pasada de fuego |
+| Charge (ataque de Mythos, primera fase: una sola pasada rasante) | Embestida |
+| Fire breath (ataque de Mythos: un chorro de fuego que barre la arena) | Aliento de fuego |
+| Scorching breath (ataque de Mythos, segunda fase: el Aliento que barre y vuelve) | Aliento abrasador |
+| Fire column (lo que levanta un golpe grande de Mythos) | Columna de fuego |
+| Blink (Mythos renacido cruza la arena de un tirón) | Fogonazo |
+| Dread vignette (los bordes de la pantalla se oscurecen mientras Mythos carga un ataque grande) | Viñeta de peligro |
 | Dawn (el golpe más fuerte de Mythos) | Amanecer |
 | Safe circle | Círculo a salvo |
 | Fire zone | Zona de fuego |

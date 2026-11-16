@@ -27,7 +27,7 @@ extends MythosMove
 @export var wave_delay: float = 0.38
 ## Cuánto se adelanta al raider (0 = le apunta donde está, 1 = donde va a estar cuando llegue la pluma).
 @export_range(0.0, 1.0) var lead: float = 0.85
-## Tope de ese adelanto, en metros.
+## Tope de ese adelanto, en metros, para un raider a velocidad base (crece si corre más rápido).
 @export var max_lead: float = 7.0
 ## Segundos quieto después de la última tanda.
 @export var recover: float = 0.4

@@ -129,6 +129,11 @@ const ASCEND_SHADERS: Array[String] = ["phoenix_plumage.gdshader", "phoenix_body
 ## Parte de la inclinación que el cuello y la cabeza deshacen mientras lo lleva la cinemática (bajo = la cabeza apunta adonde vuela).
 @export_range(0.0, 1.0) var directed_head_level: float = 0.25
 
+## Metros que se suman a la altura de la pose: flight_lift lo lleva el vuelo
+## (sube y baja mientras gira) y lift el ataque en curso (la Picada).
+var flight_lift: float = 0.0
+var lift: float = 0.0
+
 var _pose: Pose = Pose.FLY
 ## Lo que pide la pose actual; _apply lo rearma en cada frame.
 var _want: MythosPoseTarget = MythosPoseTarget.new()
@@ -333,7 +338,7 @@ func _place_body() -> void:
 	else:
 		# El cuerpo sube cuando las alas bajan, y en tierra avanza a saltitos.
 		height += -sin(_flap_phase) * bob_amplitude * (_flap / maxf(flap_degrees, 0.01)) \
-				+ _motion.hop
+				+ _motion.hop + flight_lift + lift
 	_hover.position = Vector3(0.0, height, 0.0)
 	_hover.scale = Vector3.ONE * size
 	_hover.rotation.y = _gestures.yaw
