@@ -32,6 +32,9 @@ const HAZARD_GROUPS: Array[StringName] = [&"shock_rings", &"telegraph_lanes", &"
 ## Frames tras el evento antes de imprimir "Probe mini stage:", para que el
 ## desmontaje de la entrada ya haya corrido.
 const STAGE_REPORT_FRAMES: int = 2
+## Frames desde que llega hasta la línea que muestra la pantalla en plena entrada.
+const ENTRANCE_REPORT_FRAMES: int = 120
+
 ## Segundos tras su muerte hasta contar lo que dejó vivo.
 const AFTERMATH_DELAY: float = 5.0
 ## Una foto pedida en un frame de física sale del frame SIGUIENTE: la cámara
@@ -170,6 +173,7 @@ func _on_state_changed(from: StringName, to: StringName, boss: Node3D) -> void:
 		_shots_done.clear()
 		_calm_health = _health_snapshot(boss)
 		_calm_counts = _live_counts()
+		_stage_reports.append({"left": ENTRANCE_REPORT_FRAMES, "reason": "entrance"})
 	elif from == &"arrival" and to == &"":
 		print("Probe mini calm: aborted after %d frames (mini boss gone)" % (
 				_frames - _arrival_from_frame))
@@ -273,6 +277,10 @@ func _tick_stage_reports() -> void:
 
 ## Cómo quedó la pantalla: lo que la entrada toca y tiene que devolver.
 func _print_stage(reason: String) -> void:
+	# La foto de "en plena entrada" solo vale si hay una entrada en curso (la
+	# llegada simple ya terminó para entonces).
+	if reason == "entrance" and _cinematic() == null:
+		return
 	var hud := "n/a"
 	for node: Node in _tree.get_nodes_in_group(&"hud"):
 		hud = str(bool(node.get("visible")))
