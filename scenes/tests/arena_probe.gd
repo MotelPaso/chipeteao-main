@@ -737,6 +737,9 @@ func _on_stage_changed(stage_index: int, map_id: String) -> void:
 	_exit_rush = false
 	_boss_probe.on_stage_changed()
 	print("ArenaProbe: stage %d is %s" % [stage_index + 1, map_id])
+	# El mundo ya está construido y vestido: RunRoot emite stage_changed
+	# después del add_child de la arena y de colocar al equipo.
+	WorldDigest.report(get_tree(), RunRoot.stage_parent(get_tree()) as Node3D)
 	_request_settled_shot(SHOT_SETTLE, "stage%d" % (stage_index + 1))
 
 
