@@ -151,6 +151,7 @@ perimeter_rock_every = 5
 mesa_count = 6
 mesa_platform_scene = ExtResource("14_platform")
 mesa_ramp_scene = ExtResource("13_ramp")
+mesa_ramp_attached = true
 mesa_chest_scene = ExtResource("21_chest")
 mesa_chest_count = 3
 formation_style = ExtResource("91_rockstyle")

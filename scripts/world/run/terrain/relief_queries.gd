@@ -10,8 +10,10 @@ extends RefCounted
 ## Edita aquí (no hay Inspector).
 ##
 ## Metros alrededor de cada corte, rampa y puente donde la máscara de la
-## arena nunca pone roca: una formación llega hasta 2 m más allá de sus celdas.
-const MASK_MARGIN: float = 7.5
+## arena nunca pone roca. Una formación llega hasta 2 m más allá de sus
+## celdas y su celda más cercana queda a media diagonal (3.5 m) de su
+## centro: con 9 m, la roca queda a más de 3 m del borde y del pie de un corte.
+const MASK_MARGIN: float = 9.0
 ## Paso en metros con que se camina de una celda de la máscara a su vecina
 ## buscando un corte, y desnivel entre dos pasos que ya no se camina ni se salta.
 const BARRIER_STEP: float = 0.5

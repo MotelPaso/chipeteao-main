@@ -108,6 +108,11 @@ extends Node3D
 ## escala 1 (se multiplica por la escala de la meseta). 4.95 deja la rampa
 ## pegada a una cara de la plataforma de 6 m.
 @export var mesa_ramp_offset: float = 4.95
+## Encendido, la rampa queda pegada a su plataforma a cualquier escala.
+## Apagado, mesa_ramp_offset se multiplica dos veces por la escala: una
+## meseta más grande que el modelo queda con la rampa separada unos metros y
+## a su plataforma se llega saltando (el reparto de Dunas y Ciénaga).
+@export var mesa_ramp_attached: bool = false
 ## Distancia mínima en metros entre centros de meseta, y al spawn y a los
 ## keepouts.
 @export var mesa_min_spacing: float = 42.0
@@ -485,7 +490,9 @@ func _build_mesas() -> void:
 				Vector3(0.0, 0.0, -mesa_ramp_offset)
 			]
 			var local_rot_y: Array[float] = [PI, PI * 0.5, 0.0, -PI * 0.5]
-			var world_pos: Vector3 = plat.transform * (local_offsets[side_idx] * mesa_scale)
+			# plat.transform ya lleva la escala de la meseta.
+			var reach := 1.0 if mesa_ramp_attached else mesa_scale
+			var world_pos: Vector3 = plat.transform * (local_offsets[side_idx] * reach)
 			ramp.position = Vector3(world_pos.x, ground_height(world_pos.x, world_pos.z), world_pos.z)
 			ramp.rotation.y = plat_angle + local_rot_y[side_idx]
 			ramp.scale = Vector3.ONE * mesa_scale

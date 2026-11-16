@@ -40,6 +40,9 @@
 #   - el soak del JEFE DE ETAPA no ve llegar a Mythos, la calma no congela
 #     el mundo, no renace, su muerte no sale exactamente una vez, o no abre
 #     la puerta, el portal y el cruce de etapa.
+#   - una etapa con RELIEVE POR ZONAS (el Bosque Hueco) no imprime sus
+#     barridos, alguno no da cero, la pendiente pasa de su cota, o el bot
+#     del soak del bosque no pisa una zona elevada ni cruza un puente.
 set -uo pipefail
 cd "$(dirname "$0")/.."
 
@@ -90,6 +93,77 @@ chequear_tope_cofres() {
 		FALLOS=$((FALLOS + 1))
 	elif [ "${tope% *}" -gt "${tope#* }" ]; then
 		echo "  FALLO: max=${tope% *} cap=${tope#* } — más cofres de élite sin abrir que el tope"
+		FALLOS=$((FALLOS + 1))
+	fi
+}
+
+# --- Relieve por zonas ------------------------------------------------------
+# Toda etapa en una arena con relieve por zonas (hoy, el Bosque Hueco)
+# imprime los barridos `Relief sweep:` de relief_sweeps.gd. Falla si falta
+# alguno, si un conteo no da cero en CUALQUIERA de sus líneas (el soak de
+# etapa vuelve al bosque con otro trazado), si la pendiente p95 del suelo
+# abierto pasa de su cota o si queda una malla que el infierno no quemaría.
+# Con "paseo" exige además la colocación a los 120 s y que el bot haya
+# pisado una zona elevada y cruzado un puente.
+#
+# La cota de pendiente es la p95 del suelo de antes del relieve (12.76
+# grados, semilla 4242) más 5. No se sube para hacer pasar un cambio.
+RELIEVE_PENDIENTE_MAX="17.76"
+RELIEVE_BARRIDOS=("gap faces=" "raider open=" "horde open=" "placement at=start"
+	"slope p95=" "hell skipped=")
+chequear_relieve() {
+	local log="$1"
+	local paseo="${2:-}"
+	local mal=0
+	local clave
+	for clave in "${RELIEVE_BARRIDOS[@]}"; do
+		if ! grep -q "^Relief sweep: $clave" "$log"; then
+			echo "  FALLO (relieve): falta el barrido '$clave'"
+			mal=1
+		fi
+	done
+	if grep '^Relief sweep: gap ' "$log" | grep -qv ' faces=0 '; then
+		echo "  FALLO (relieve): hay caras tocables entre 45 y 60 grados"
+		grep -n '^Relief sweep\( detail\)\{0,1\}: gap ' "$log" | head -6
+		mal=1
+	fi
+	if grep '^Relief sweep: \(raider\|horde\) ' "$log" | grep -qv ' unreachable=0 no_return=0$'; then
+		echo "  FALLO (relieve): hay suelo abierto que el raider o la horda no alcanzan"
+		grep -n '^Relief sweep\( detail\)\{0,1\}: \(raider\|horde\) ' "$log" | head -8
+		mal=1
+	fi
+	if grep '^Relief sweep: placement ' "$log" \
+		| grep -qv ' on_relief=0 misplaced=0 raider_unreachable=0 horde_unreachable=0 crowding=0$'; then
+		echo "  FALLO (relieve): algo quedó mal colocado"
+		grep -n '^Relief sweep\( detail\)\{0,1\}: placement ' "$log" | head -10
+		mal=1
+	fi
+	if grep '^Relief sweep: hell ' "$log" | grep -qv ' unburnt=0$'; then
+		echo "  FALLO (relieve): hay mallas que el infierno de Mythos no quemaría"
+		grep -n '^Relief sweep\( detail\)\{0,1\}: hell ' "$log" | head -6
+		mal=1
+	fi
+	if ! grep '^Relief sweep: slope ' "$log" | sed -n 's/.* p95=\([0-9.]*\) .*/\1/p' \
+		| awk -v max="$RELIEVE_PENDIENTE_MAX" '$1 + 0 > max + 0 { bad = 1 } END { exit bad }'; then
+		echo "  FALLO (relieve): la pendiente p95 del suelo abierto pasa de $RELIEVE_PENDIENTE_MAX grados"
+		grep -n '^Relief sweep: slope ' "$log" | head -3
+		mal=1
+	fi
+	if [ -n "$paseo" ]; then
+		if ! grep -q '^Relief sweep: placement at=120 ' "$log"; then
+			echo "  FALLO (relieve): falta el barrido de colocación de los 120 s"
+			mal=1
+		fi
+		if ! grep -q '^Probe relief: stood on raised zone ' "$log"; then
+			echo "  FALLO (relieve): el bot nunca pisó una zona elevada"
+			mal=1
+		fi
+		if ! grep -q '^Probe relief: crossed bridge ' "$log"; then
+			echo "  FALLO (relieve): el bot nunca cruzó un puente"
+			mal=1
+		fi
+	fi
+	if [ "$mal" -ne 0 ]; then
 		FALLOS=$((FALLOS + 1))
 	fi
 }
@@ -268,6 +342,9 @@ for ARENA in HollowWoods AshDunes Gloomfen; do
 	fase_fin
 
 	chequear_tope_cofres "$LOG"
+	if [ "$ARENA" = "HollowWoods" ]; then
+		chequear_relieve "$LOG" paseo
+	fi
 
 	# Cobertura: un soak que no sube de nivel ni toca un interactuable no
 	# probó gran cosa, aunque no haya reventado.
@@ -348,6 +425,7 @@ else
 	# El director sobrevive al cambio de mapa: si no volviera a cachear
 	# el Sol de la arena nueva, este evento de cielo no saldría.
 	chequear_tope_cofres "$STAGE_LOG"
+	chequear_relieve "$STAGE_LOG"
 	if [ "$CIELO_TRAS_AVANCE" -eq 0 ]; then
 		echo "  FALLO: ningún evento de cielo tras el cambio de etapa"
 		FALLOS=$((FALLOS + 1))
@@ -416,6 +494,7 @@ else
 		FALLOS=$((FALLOS + 1))
 	fi
 	chequear_tope_cofres "$COOP_LOG"
+	chequear_relieve "$COOP_LOG"
 	# El preset Media aplicado a un sol real con las dos vistas ya armadas.
 	if ! grep -q '^Graphics: quality=1 scale=0.75 suns=1 views=2$' "$COOP_LOG"; then
 		echo "  FALLO: el preset gráfico no llegó al sol y a las dos vistas"
@@ -521,6 +600,7 @@ else
 		FALLOS=$((FALLOS + 1))
 	fi
 	chequear_tope_cofres "$MYTHOS_LOG"
+	chequear_relieve "$MYTHOS_LOG"
 fi
 
 # La cobertura de interactuables se mide SUMANDO las tres arenas, no por
