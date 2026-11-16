@@ -4,7 +4,10 @@ extends AudioStreamPlayer
 ## una por fase). La cinemática le dice cuándo arrancar y qué reloj seguir;
 ## este nodo sabe sonar por el bus de música, volver al final de la calma
 ## cuando la canción se acaba, quedarse pegado al reloj del juego y apagarse
-## de a poco.
+## de a poco. Con lead_seconds la canción va ADELANTADA a su acto: lo fuerte
+## de la canción llega esos segundos antes de que el acto termine. Si el acto
+## se anuncia con tiempo (cue: el renacer, mientras Mythos parece muerto)
+## arranca sola esos segundos antes; si no, empieza ya avanzada.
 ##
 ## EL RELOJ lo lleva la cinemática, en tiempo de juego. Con un driver de audio
 ## real la canción se reacomoda si se desfasa de ese reloj; con el driver
@@ -30,6 +33,8 @@ const SILENT_DB: float = -60.0
 @export var fade_seconds: float = 5.0
 ## Segundos que tarda en apagarse cuando la reemplaza la canción de otra fase.
 @export var handover_seconds: float = 1.2
+## Segundos que la canción va adelantada a su acto: arranca así de antes y su parte fuerte cae esos segundos antes de que el acto termine (0 = cae justo al terminar).
+@export var lead_seconds: float = 0.0
 
 var _dummy_audio: bool = false
 ## True desde start() hasta que la canción se corta o termina de apagarse.
@@ -37,12 +42,32 @@ var _live: bool = false
 var _resync_left: float = 0.0
 var _resyncs: int = 0
 var _fade_tween: Tween = null
+## Aviso pendiente (cue): segundos que faltan para arrancar sola, desde qué
+## segundo de la canción y adónde vuelve cuando se acaba.
+var _cue_left: float = 0.0
+var _cue_from: float = 0.0
+var _cue_loop_from: float = 0.0
+## True si arrancó sola, antes que su acto, y el acto todavía no empezó.
+var _early: bool = false
 
 
 func _ready() -> void:
 	add_to_group(GROUP)
 	bus = Sfx.MUSIC_BUS_NAME
 	_dummy_audio = AudioServer.get_driver_name() == "Dummy"
+	set_process(false)
+
+
+## Corre solo mientras hay un aviso pendiente: cuenta, en tiempo de juego,
+## lo que falta para arrancar antes que su acto.
+func _process(delta: float) -> void:
+	_cue_left -= delta
+	if _cue_left > 0.0:
+		return
+	set_process(false)
+	_early = true
+	_begin(_cue_loop_from, _cue_from)
+	print("Boss music: started ahead of its act lead=%.2fs" % lead_seconds)
 
 
 ## True si hay una canción puesta.
@@ -56,30 +81,44 @@ func is_live() -> bool:
 	return _live
 
 
-## Arranca la canción desde el principio. Cuando se acaba vuelve a
-## `loop_from` segundos (el final de la calma), no al principio.
+## Avisa que el acto de esta canción empieza en `wait` segundos. Si va
+## adelantada (lead_seconds) arranca sola esos segundos antes, o ya mismo y
+## avanzada si el aviso llegó con menos tiempo. Devuelve los segundos que
+## faltan para que suene (INF si no va a sonar antes que su acto).
+func cue(wait: float, loop_from: float) -> float:
+	if song == null or lead_seconds <= 0.0 or _live:
+		return INF
+	_cue_left = maxf(wait - lead_seconds, 0.0)
+	_cue_from = maxf(lead_seconds - wait, 0.0)
+	_cue_loop_from = loop_from
+	set_process(true)
+	return _cue_left
+
+
+## Arranca la canción con su acto. Cuando se acaba vuelve a `loop_from`
+## segundos (el final de la calma), no al principio. Si ya venía sonando
+## adelantada (cue) no se corta; si va adelantada y nadie la avisó, empieza
+## avanzada lead_seconds.
 func start(loop_from: float) -> void:
 	if song == null:
 		return
-	_kill_fade()
-	stream = _looped_copy(song, loop_from)
-	volume_db = song_volume_db
-	play(0.0)
-	_live = true
-	_resyncs = 0
-	_resync_left = RESYNC_COOLDOWN
+	set_process(false)
+	if _early and _live:
+		_early = false
+		return
+	_begin(loop_from, lead_seconds)
 
 
 ## Mantiene la canción pegada a `clock` (los segundos de juego que lleva la
-## calma). Se llama cada frame mientras la calma corre.
+## calma), con su adelanto. Se llama cada frame mientras la calma corre.
 func follow(clock: float, delta: float) -> void:
 	_resync_left = maxf(_resync_left - delta, 0.0)
 	if song == null or _dummy_audio or not playing or _resync_left > 0.0:
 		return
 	var heard := get_playback_position() + AudioServer.get_time_since_last_mix() \
 			- AudioServer.get_output_latency()
-	if absf(heard - clock) > resync_threshold:
-		seek(clock)
+	if absf(heard - clock - lead_seconds) > resync_threshold:
+		seek(clock + lead_seconds)
 		_resync_left = RESYNC_COOLDOWN
 		_resyncs += 1
 
@@ -91,10 +130,11 @@ func set_pausable(on: bool) -> void:
 	process_mode = Node.PROCESS_MODE_INHERIT if on else Node.PROCESS_MODE_ALWAYS
 
 
-## Lleva la canción a `seconds` (alguien saltó la cinemática).
+## Lleva la canción adonde estaría a los `seconds` de su acto (alguien saltó
+## la cinemática).
 func jump_to(seconds: float) -> void:
 	if song != null and playing:
-		seek(seconds)
+		seek(seconds + lead_seconds)
 
 
 ## Posición de la canción para el log: "n/a" sin canción o sin driver real.
@@ -109,9 +149,11 @@ func resyncs() -> int:
 	return _resyncs
 
 
-## El jefe murió: la canción se apaga de a poco y después se detiene.
-func fade_out() -> void:
-	_fade(fade_seconds)
+## El jefe murió: la canción se apaga de a poco y después se detiene. Con
+## `within` no tarda más que esos segundos (ni menos que handover_seconds):
+## otra canción está por entrar.
+func fade_out(within: float = INF) -> void:
+	_fade(minf(fade_seconds, maxf(within, handover_seconds)))
 
 
 ## Le deja el lugar a la canción de otra fase: se apaga rápido.
@@ -122,8 +164,22 @@ func hand_over() -> void:
 ## Corta la canción ya (la arena se va o la partida terminó).
 func halt() -> void:
 	_kill_fade()
+	set_process(false)
+	_early = false
 	_live = false
 	stop()
+
+
+## Pone a sonar la canción desde el segundo `from`; al acabarse vuelve a
+## `loop_from`.
+func _begin(loop_from: float, from: float) -> void:
+	_kill_fade()
+	stream = _looped_copy(song, loop_from)
+	volume_db = song_volume_db
+	play(from)
+	_live = true
+	_resyncs = 0
+	_resync_left = RESYNC_COOLDOWN
 
 
 ## Una copia de la canción que, al terminar, vuelve a `loop_from` y no al

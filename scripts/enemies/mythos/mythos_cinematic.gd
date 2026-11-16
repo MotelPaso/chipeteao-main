@@ -169,10 +169,11 @@ func skip_action() -> StringName:
 	return skip_action_name
 
 
-## El jefe murió: la canción que esté sonando se apaga de a poco.
-func fade_out_song() -> void:
-	_music.fade_out()
+## El jefe murió: la canción que esté sonando se apaga de a poco. Si en
+## `rebirth_in` segundos va a renacer, la de la segunda fase queda avisada.
+func fade_out_song(rebirth_in: float = -1.0) -> void:
 	_music_reborn.fade_out()
+	_music.fade_out(_music_reborn.cue(rebirth_in, rebirth_seconds) if rebirth_in >= 0.0 else INF)
 
 
 ## Destello a pantalla completa: el del golpe con que termina un acto.
@@ -266,7 +267,7 @@ func _finish(skipped: bool) -> void:
 	_active = false
 	set_process(false)
 	_stop_act()
-	var song_target := _elapsed
+	var song_target := _elapsed + _song.lead_seconds
 	if skipped:
 		if _transformation != null and is_instance_valid(_transformation):
 			_transformation.finish_now()
@@ -274,7 +275,7 @@ func _finish(skipped: bool) -> void:
 				# Si el fuego de la segunda fase todavía no había salido, sale ya.
 				_transformation.ascend(_boss.global_position, 0.0)
 			_transformation.ascend_now()
-		song_target = _act_seconds
+		song_target = _act_seconds + _song.lead_seconds
 		_song.jump_to(_act_seconds)
 	_release()
 	# Desde aquí la canción ya no sigue a la cinemática: no se corta con las

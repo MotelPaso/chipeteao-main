@@ -86,12 +86,13 @@ func _descend(progress: float) -> void:
 
 
 ## Mythos parece haber muerto: la canción se apaga y las llamas del mapa
-## bajan durante `seconds`, como si la pelea hubiera terminado.
+## bajan durante `seconds`, como si la pelea hubiera terminado. La canción
+## de la segunda fase queda avisada de que el renacer empieza al cabo.
 func feign_death(seconds: float) -> void:
 	if _transformation != null and is_instance_valid(_transformation):
 		_transformation.falter(seconds)
 	if _cinematic != null and is_instance_valid(_cinematic):
-		_cinematic.fade_out_song()
+		_cinematic.fade_out_song(seconds)
 
 
 ## True si el renacer lo va a llevar una cinemática, con el mundo congelado.
