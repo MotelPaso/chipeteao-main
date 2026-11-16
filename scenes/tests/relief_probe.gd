@@ -38,6 +38,10 @@ const HOLD_ARRIVE_RANGE: float = 3.0
 const HOLD_ARRIVE_LEVEL: float = 1.5
 const HOLD_WINDOW: float = 20.0
 const HOLD_WINDOWS_FROM: float = 30.0
+## Radio y ventana de altura con que se busca la celda abierta del punto
+## alto, en metros.
+const HIGH_SNAP: float = 7.0
+const HIGH_LEVEL: float = 2.0
 ## Metros que el raider retenido puede correrse antes de volver a su punto.
 const HOLD_DRIFT: float = 1.0
 ## El paseo: a cuántos metros cuenta que llegó a un punto y cuántos segundos
@@ -65,8 +69,9 @@ var _tour_index: int = 0
 var _tour_leg_time: float = 0.0
 var _stood: bool = false
 var _crossed: bool = false
-## Por qué cabecera entró el raider al puente: +1, -1 o 0 si no está encima.
-var _deck_side: int = 0
+## Por qué cabecera entró el raider a cada puente (una entrada por cruce):
+## +1, -1 o 0 si no está encima.
+var _deck_sides := PackedInt32Array()
 var _hold_point: Vector3 = Vector3.INF
 var _holding: bool = false
 ## Enemigos ya vistos: true si aparecieron a otro nivel (candidatos a llegada).
@@ -97,7 +102,7 @@ func on_stage_changed(frames: int) -> void:
 	_tour_index = 0
 	_holding = false
 	_hold_point = Vector3.INF
-	_deck_side = 0
+	_deck_sides.clear()
 	nav.reset()
 
 
@@ -225,9 +230,14 @@ func _high_point() -> Vector3:
 			if best.upper[index] - best.lower[index] > best.height - 0.05:
 				full.append(index)
 		var middle := full[full.size() / 2]
-		var inward := best.points[middle] - best.normals[middle] * HOLD_INSET
-		if sweeps.raider_reaches(sweeps.graph.nearest_open(inward, 3.0)):
-			flat = inward
+		flat = best.points[middle] - best.normals[middle] * HOLD_INSET
+	# La celda abierta más cercana que el raider alcanza: el punto pedido
+	# puede caer dentro del hito de la cumbre.
+	var cell := sweeps.graph.nearest_open(flat, HIGH_SNAP,
+			_layout.zones[top].floor + _layout.zones[top].height
+			+ _terrain.base_height_at(flat.x, flat.y), HIGH_LEVEL)
+	if sweeps.raider_reaches(cell):
+		return sweeps.graph.stand(cell)
 	return Vector3(flat.x, _terrain.height_at(flat.x, flat.y), flat.y)
 
 
@@ -285,23 +295,25 @@ func _watch_feats(lead: CharacterBody3D) -> void:
 						index + 1, at.x, at.y, at.z, _clock])
 	if _crossed:
 		return
-	for crossing: ReliefLayout.Crossing in _layout.crossings:
+	_deck_sides.resize(_layout.crossings.size())
+	for index in _layout.crossings.size():
+		var crossing := _layout.crossings[index]
 		var local := flat - crossing.center
 		var along := local.dot(crossing.axis)
 		var across := absf(local.dot(Vector2(-crossing.axis.y, crossing.axis.x)))
 		var half_span := crossing.span * 0.5
 		if across > crossing.width * 0.5 + 0.5 or absf(along) > half_span + 2.0 \
 				or absf(at.y - crossing.level) > DECK_LEVEL:
-			_deck_side = 0
+			_deck_sides[index] = 0
 			continue
 		if absf(along) < half_span - 1.5:
 			continue
 		var side := 1 if along > 0.0 else -1
-		if _deck_side == -side:
+		if _deck_sides[index] == -side:
 			_crossed = true
 			print("Probe relief: crossed bridge span=%.1f t=%.1fs" % [crossing.span, _clock])
 			return
-		_deck_side = side
+		_deck_sides[index] = side
 
 
 # --- sonda de llegada --------------------------------------------------------------
@@ -330,20 +342,32 @@ func _start_hold(lead: CharacterBody3D) -> void:
 			_hold_at, _hold_point.x, _hold_point.y, _hold_point.z])
 
 
-## El medio del tramo de fondo más largo del barranco (un puente lo parte).
+## El medio del tramo de fondo más largo del cañón. Lo parten los puentes y
+## los collados: se recorre el eje metro a metro y se queda con la racha más
+## larga a fondo completo que no cae bajo un tablero.
 func _ravine_point() -> Vector3:
 	var ravine := _layout.ravine
 	if ravine == null:
 		return Vector3.INF
-	var from := ravine.ramp
-	var to := ravine.length - ravine.ramp
-	for crossing: ReliefLayout.Crossing in _layout.crossings:
-		var half_width := crossing.width * 0.5
-		if crossing.s - half_width - from >= to - crossing.s - half_width:
-			to = crossing.s - half_width
-		else:
-			from = crossing.s + half_width
-	var flat := _layout.ravine_frame((from + to) * 0.5)[0]
+	var best := Vector2.ZERO
+	var run_from := -1.0
+	var along := 0.0
+	while along <= ravine.length + 1.0:
+		var deep := along <= ravine.length \
+				and _layout.ravine_drop(along) >= ravine.depth - 0.01
+		for crossing: ReliefLayout.Crossing in _layout.crossings:
+			if absf(along - crossing.s) <= crossing.width * 0.5:
+				deep = false
+		if deep and run_from < 0.0:
+			run_from = along
+		elif not deep and run_from >= 0.0:
+			if along - run_from > best.y - best.x:
+				best = Vector2(run_from, along)
+			run_from = -1.0
+		along += 1.0
+	if best.y <= best.x:
+		return Vector3.INF
+	var flat := _layout.ravine_frame((best.x + best.y) * 0.5)[0]
 	return Vector3(flat.x, _terrain.height_at(flat.x, flat.y), flat.y)
 
 

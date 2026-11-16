@@ -23,6 +23,14 @@ const SWELL_SHELF: float = 3.0
 ## completo, y metros que tarda la ondulación del suelo en volver a su fuerza.
 const VALLEY_SHELF: float = 4.0
 const DETAIL_BLEND: float = 6.0
+## Junto al contorno de una zona y sobre sus rampas la ondulación del suelo
+## se amansa a esta fracción: la cornisa de roca de un corte se apoya en ese
+## suelo, y sobre una loma fuerte quedaría con caras de 45 grados; una rampa
+## inclinada de más deja de caminarse. A EDGE_FLAT metros del corte sigue
+## amansada del todo y recupera su fuerza a EDGE_REACH metros.
+const EDGE_DETAIL: float = 0.35
+const EDGE_FLAT: float = 5.0
+const EDGE_REACH: float = 13.0
 ## Paso del barrido que marca la vaguada sobre la retícula gruesa, en metros
 ## (a lo largo y a lo ancho del eje). Más fino que la retícula: sin huecos.
 const VALLEY_STEP_ALONG: float = 1.0
@@ -108,7 +116,9 @@ func _build_base(terrain: Terrain, noise_seed: int) -> void:
 		var z := -_half + float(lz) * step
 		for lx in lattice:
 			var index := lz * lattice + lx
-			var detail := noise.get_noise_2d(-_half + float(lx) * step, z) * terrain.amplitude
+			var x := -_half + float(lx) * step
+			var detail := noise.get_noise_2d(x, z) * terrain.amplitude \
+					* _edge_detail(Vector2(x, z))
 			var across := side[index]
 			if across == INF:
 				coarse[index] = detail + lift[index]
@@ -123,11 +133,23 @@ func _build_base(terrain: Terrain, noise_seed: int) -> void:
 	_upsample(coarse, lattice, step)
 
 
+## Fracción de la ondulación del suelo que queda en `point`: EDGE_DETAIL
+## junto al contorno de una zona y sobre sus rampas, 1 lejos de todas.
+func _edge_detail(point: Vector2) -> float:
+	var nearest := EDGE_REACH
+	for zone: ReliefLayout.Zone in _layout.zones:
+		nearest = minf(nearest, ReliefQueries.zone_distance(_layout, zone, point, EDGE_REACH))
+	return lerpf(EDGE_DETAIL, 1.0, smoothstep(EDGE_FLAT, EDGE_REACH, nearest))
+
+
 ## La loma de cada zona elevada y las lomas sueltas: en cada punto gana la
 ## más alta (no se suman, así la cima del mapa la fija una sola zona).
 func _stamp_swells(lift: PackedFloat32Array, lattice: int, step: float) -> void:
 	var reach := _layout.settings.swell_reach
 	for zone: ReliefLayout.Zone in _layout.zones:
+		# Una zona apilada no tiene loma propia: la lleva la de su base.
+		if zone.parent >= 0:
+			continue
 		_stamp_dome(lift, lattice, step, zone.center, zone.r_max + SWELL_SHELF,
 				zone.r_max + SWELL_SHELF + reach, zone.swell)
 	for hill: ReliefLayout.Hill in _layout.hills:
@@ -273,7 +295,9 @@ func _flatten_pad(center: Vector2, radius: float, blend: float, level: float) ->
 
 # --- zonas -----------------------------------------------------------------------
 
-## Sube la meseta de `zone` y sus rampas sobre el suelo base.
+## Sube la meseta de `zone` y sus rampas sobre el suelo donde se apoya. Las
+## zonas llegan con el padre antes que la hija, así la hija pisa lo que dejó
+## el padre.
 func _raise_zone(zone: ReliefLayout.Zone) -> void:
 	var reach := zone.r_max + FINE_REACH
 	var from_x := clampi(floori(zone.center.x - reach + _half), 0, _samples - 1)
@@ -281,6 +305,7 @@ func _raise_zone(zone: ReliefLayout.Zone) -> void:
 	var from_z := clampi(floori(zone.center.y - reach + _half), 0, _samples - 1)
 	var to_z := clampi(ceili(zone.center.y + reach + _half), 0, _samples - 1)
 	var inset := ReliefLayout.LEDGE_INSET
+	var top := zone.floor + zone.height
 	for iz in range(from_z, to_z + 1):
 		for ix in range(from_x, to_x + 1):
 			var rel := Vector2(float(ix) - _half, float(iz) - _half) - zone.center
@@ -294,9 +319,9 @@ func _raise_zone(zone: ReliefLayout.Zone) -> void:
 			if rho > rim:
 				continue
 			var index := iz * _samples + ix
-			surface[index] = base[index] + zone.height
+			surface[index] = base[index] + top
 			if rho <= rim - inset * _layout.polar(zone.oblique, angle):
-				heights[index] = base[index] + zone.height
+				heights[index] = base[index] + top
 	for ramp: ReliefLayout.Ramp in zone.ramps:
 		_raise_ramp(zone, ramp)
 
@@ -327,7 +352,8 @@ func _raise_ramp(zone: ReliefLayout.Zone, ramp: ReliefLayout.Ramp) -> void:
 			if v > ramp.half_width:
 				continue
 			var index := iz * _samples + ix
-			var lifted := base[index] + zone.height * clampf(1.0 - u / ramp.length, 0.0, 1.0)
+			var lifted := base[index] + zone.floor \
+					+ zone.height * clampf(1.0 - u / ramp.length, 0.0, 1.0)
 			surface[index] = maxf(surface[index], lifted)
 			if v <= core:
 				heights[index] = maxf(heights[index], lifted)

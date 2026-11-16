@@ -12,6 +12,10 @@ extends Node3D
 ## - Dos anillos de colinas de silueta (esferas aplastadas) fuera del
 ##   perímetro, más oscuras con la distancia, para que el horizonte tenga
 ##   forma y no una costura recta.
+## - Opcional (peak_count): una cordillera de picos facetados más lejos y
+##   mucho más altos que las colinas, que asoma sobre los árboles. Es una
+##   sola malla con color de vértice y su propio RNG (la semilla del
+##   scatter): no saca nada del RNG de la partida.
 ##
 ## Todo se construye en código en _ready (sin colisión, un material por
 ## anillo), con colores por export para que cada bioma tiña su mundo.
@@ -74,6 +78,29 @@ extends Node3D
 ## Metros extra que una colina guarda entre su borde y el muro de la arena.
 @export var wall_clearance: float = 4.0
 
+@export_group("Cordillera")
+## Picos de la cordillera del horizonte (0 = sin cordillera). Cada arena pone
+## el suyo en su escena.
+@export var peak_count: int = 0
+## Color de la falda de los picos.
+@export var peak_base_color: Color = Color(0.15, 0.23, 0.22)
+## Color de las cumbres (la niebla las aclara todavía más).
+@export var peak_top_color: Color = Color(0.56, 0.63, 0.64)
+## Borde interior del anillo de picos, en mitades del lado de la arena.
+@export var peak_ring_min_factor: float = 2.1
+## Borde exterior del anillo de picos, en mitades del lado de la arena.
+@export var peak_ring_max_factor: float = 3.0
+## Altura mínima de un pico, en metros.
+@export var peak_height_min: float = 55.0
+## Altura máxima de un pico, en metros.
+@export var peak_height_max: float = 130.0
+## Media anchura mínima de la falda de un pico, en metros.
+@export var peak_width_min: float = 45.0
+## Media anchura máxima de la falda de un pico, en metros.
+@export var peak_width_max: float = 85.0
+## Lados de la falda de cada pico: pocos = picos más angulosos.
+@export_range(4, 10) var peak_sides: int = 6
+
 ## Mitad del lado de la arena; 80 solo si no hay scatter.
 var _half_extent: float = 80.0
 
@@ -91,6 +118,8 @@ func _ready() -> void:
 			_hill_material(hill_color))
 	_build_hill_ring(far_hill_count, far_ring_min_factor, far_ring_max_factor,
 			_hill_material(far_hill_color), far_hill_scale_boost)
+	if peak_count > 0:
+		_build_peaks()
 
 
 ## Mitad del lado de la arena desde el nodo "arena_bounds" (el scatter),
@@ -204,6 +233,85 @@ func _clear_distance(angle: float, width: float, depth: float) -> float:
 	var by_x := (limit + width) / cos_a if cos_a > 0.001 else INF
 	var by_z := (limit + depth) / sin_a if sin_a > 0.001 else INF
 	return minf(by_x, by_z)
+
+
+## La cordillera: peak_count picos en un anillo lejano, cada uno una pirámide
+## irregular con un hombro al lado, todos en UNA malla. Blanco por color de
+## vértice: HellSky tiñe el horizonte cambiando el albedo del material.
+func _build_peaks() -> void:
+	var rng := RandomNumberGenerator.new()
+	var bounds := get_tree().get_first_node_in_group("arena_bounds")
+	rng.seed = (int(bounds.call("run_seed")) if bounds != null and bounds.has_method("run_seed")
+			else 0) ^ 0x5045414B
+	var vertices := PackedVector3Array()
+	var normals := PackedVector3Array()
+	var colors := PackedColorArray()
+	for index in peak_count:
+		var angle := TAU * (float(index) + rng.randf_range(-0.35, 0.35)) / float(peak_count)
+		var distance := rng.randf_range(peak_ring_min_factor, peak_ring_max_factor) * _half_extent
+		var center := Vector3(cos(angle) * distance, 0.0, sin(angle) * distance)
+		var width := rng.randf_range(peak_width_min, peak_width_max)
+		var height := rng.randf_range(peak_height_min, peak_height_max)
+		_add_peak(rng, center, width, height, vertices, normals, colors)
+		# El hombro: un pico más bajo pegado a un costado, para que la
+		# silueta no sea una fila de conos.
+		var side := angle + PI * 0.5 * (1.0 if rng.randf() < 0.5 else -1.0)
+		_add_peak(rng, center + Vector3(cos(side), 0.0, sin(side)) * width * 0.75,
+				width * rng.randf_range(0.55, 0.8), height * rng.randf_range(0.5, 0.75),
+				vertices, normals, colors)
+	var arrays := []
+	arrays.resize(Mesh.ARRAY_MAX)
+	arrays[Mesh.ARRAY_VERTEX] = vertices
+	arrays[Mesh.ARRAY_NORMAL] = normals
+	arrays[Mesh.ARRAY_COLOR] = colors
+	var mesh := ArrayMesh.new()
+	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
+	var material := StandardMaterial3D.new()
+	material.vertex_color_use_as_albedo = true
+	material.vertex_color_is_srgb = true
+	material.roughness = 1.0
+	var range_view := MeshInstance3D.new()
+	range_view.name = "Peaks"
+	range_view.mesh = mesh
+	range_view.material_override = material
+	range_view.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(range_view)
+
+
+## Un pico: una pirámide de peak_sides lados con la falda irregular y la
+## cumbre corrida del centro. Caras planas, horarias vistas desde fuera.
+func _add_peak(rng: RandomNumberGenerator, center: Vector3, width: float, height: float,
+		vertices: PackedVector3Array, normals: PackedVector3Array, colors: PackedColorArray) -> void:
+	var apex := center + Vector3(rng.randf_range(-0.2, 0.2) * width, height,
+			rng.randf_range(-0.2, 0.2) * width)
+	var turn := rng.randf() * TAU
+	var rim := PackedVector3Array()
+	for side in peak_sides:
+		var angle := turn + TAU * float(side) / float(peak_sides)
+		var reach := width * rng.randf_range(0.75, 1.25)
+		# La falda baja unos metros del suelo lejano: nunca asoma su borde.
+		rim.append(center + Vector3(cos(angle) * reach, -4.0, sin(angle) * reach))
+	for side in peak_sides:
+		var a := rim[side]
+		var b := rim[(side + 1) % peak_sides]
+		var outward := ((a + b) * 0.5 - center)
+		outward.y = 0.0
+		var normal := (b - apex).cross(a - apex).normalized()
+		var first := b
+		var second := a
+		if normal.dot(outward) < 0.0:
+			normal = -normal
+			first = a
+			second = b
+		# Horario visto desde fuera: cross(v1 - v0, v2 - v0) mira hacia dentro.
+		for vertex: Vector3 in [apex, second, first]:
+			vertices.append(vertex)
+			normals.append(normal)
+		# Cada cara con un brillo algo distinto, para que se lean las aristas.
+		var shade := rng.randf_range(0.86, 1.1)
+		colors.append(peak_top_color * shade)
+		colors.append(peak_base_color * shade)
+		colors.append(peak_base_color * shade)
 
 
 func _hill_material(color: Color) -> StandardMaterial3D:

@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/world/props/standing_stones.gd" id="1_stones"]
+
+[node name="StandingStones" type="StaticBody3D"]
+script = ExtResource("1_stones")

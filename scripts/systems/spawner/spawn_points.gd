@@ -106,9 +106,11 @@ func register_clearance_skip() -> void:
 ## candidatos fuera de la placa se REINTENTAN, no se recortan: recortar X y Z
 ## por separado juntaría todos los ángulos en la misma esquina junto a un
 ## borde. El último intento se usa aunque esté bloqueado (los trepadores
-## salen), así que un spawn nunca se pierde en silencio.
+## salen), así que un spawn nunca se pierde en silencio; con relieve por
+## zonas se corre antes al punto libre más cercano (ver _off_relief).
 func band_position(center: Vector3, min_r: float, max_r: float, angle: float) -> Vector3:
 	var pos := center
+	var found := false
 	for attempt in RING_ATTEMPTS:
 		var heading := angle + TAU * float(attempt) / float(RING_ATTEMPTS)
 		pos = center + Vector3(cos(heading), 0.0, sin(heading)) * randf_range(min_r, max_r)
@@ -117,10 +119,11 @@ func band_position(center: Vector3, min_r: float, max_r: float, angle: float) ->
 		# El espacio libre es parte de "¿sirve este punto?": girar por la
 		# banda es justo como se resuelve un hueco bloqueado.
 		if _walkable(pos) and has_player_clearance(pos):
+			found = true
 			break
 	pos.x = clampf(pos.x, -_arena_half_extent, _arena_half_extent)
 	pos.z = clampf(pos.z, -_arena_half_extent, _arena_half_extent)
-	return pos
+	return pos if found else _off_relief(pos)
 
 
 ## Baja el punto de spawn hasta la geometría del mundo (capa 1) que haya
@@ -168,6 +171,21 @@ func _walkable(pos: Vector3) -> bool:
 	if not _bounds.has_method("is_walkable"):
 		return true
 	return bool(_bounds.call("is_walkable", Vector2(pos.x, pos.z)))
+
+
+## `pos` corrido al punto más cercano donde un cuerpo puede aparecer
+## (arena_bounds.nearest_place), para el spawn que no encontró lugar en su
+## banda: junto a muchos cortes, los ocho intentos pueden caer todos sobre
+## una cornisa o una rampa. Solo con relieve por zonas; en las demás arenas
+## devuelve `pos` tal cual. No saca números de ningún RNG.
+func _off_relief(pos: Vector3) -> Vector3:
+	if _bounds == null or not _bounds.has_method("nearest_place"):
+		return pos
+	var terrain := Terrain.find(_spawner.get_tree())
+	if terrain == null or not terrain.has_relief():
+		return pos
+	var spot: Vector2 = _bounds.call("nearest_place", Vector2(pos.x, pos.z), RELIEF_MARGIN)
+	return Vector3(spot.x, pos.y, spot.y)
 
 
 ## True si lo que hay bajo `pos` es suelo y no la punta de un prop. Solo se

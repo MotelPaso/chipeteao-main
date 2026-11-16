@@ -38,7 +38,7 @@ const SITE_GRID: float = 12.0
 static func distance(layout: ReliefLayout, point: Vector2, limit: float) -> float:
 	var nearest := INF
 	for zone: ReliefLayout.Zone in layout.zones:
-		nearest = minf(nearest, _zone_distance(layout, zone, point, limit))
+		nearest = minf(nearest, zone_distance(layout, zone, point, limit))
 	if layout.ravine != null:
 		nearest = minf(nearest, _ravine_distance(layout, point, limit))
 	for crossing: ReliefLayout.Crossing in layout.crossings:
@@ -85,10 +85,13 @@ static func mask_barriers(layout: ReliefLayout, cell_size: float) -> Dictionary[
 
 ## La línea de log del trazado.
 static func summary(layout: ReliefLayout, map_id: String) -> String:
-	return ("Relief layout: %s zones=%d raised=%d ravines=%d cuts=%d tallest=%.1f"
+	var peak := 0.0
+	for zone: ReliefLayout.Zone in layout.zones:
+		peak = maxf(peak, zone.floor + zone.height)
+	return ("Relief layout: %s zones=%d raised=%d ravines=%d cuts=%d tallest=%.1f peak=%.1f"
 			+ " bridges=%d ramps=%d fallback=%s digest=%s") % [map_id,
 			layout.zones.size() + (1 if layout.ravine != null else 0), layout.zones.size(),
-			1 if layout.ravine != null else 0, layout.cuts.size(), layout.tallest_cut(),
+			1 if layout.ravine != null else 0, layout.cuts.size(), layout.tallest_cut(), peak,
 			layout.crossings.size(), layout.ramp_count(), layout.fallback, layout.digest()]
 
 
@@ -100,7 +103,9 @@ static func summary(layout: ReliefLayout, map_id: String) -> String:
 ##              bajo), zone}] un tramo por punto de cada línea de corte (pie
 ##              y borde uno frente al otro; zone -1 = pared del barranco)
 ##   floors:    [{kind: "ravine" | "raised", center: Vector3, extent: Vector2
-##              (largo y ancho, en metros), zone}]
+##              (largo y ancho, en metros), zone, tier ("massif", "tier",
+##              "summit" o "butte"; "" en el cañón), parent (zona sobre la
+##              que está apilada, o -1)}]
 ##   ramps:     [{top, foot: Vector3, width, zone}] (zone -1 = del barranco)
 ##   sites:     [{center: Vector3, radius}] claros donde cabe una estructura de
 ##              SITE_RADIUS metros lejos de todo corte y casi planos
@@ -116,12 +121,14 @@ static func features(layout: ReliefLayout, terrain: Terrain) -> Dictionary:
 
 # --- distancias ------------------------------------------------------------------
 
-static func _zone_distance(layout: ReliefLayout, zone: ReliefLayout.Zone, point: Vector2,
+## Distancia de `point` al contorno de `zone` o a una de sus rampas (0 sobre
+## la rampa y su descanso). Lo que quede más lejos que `limit` puede salir INF.
+static func zone_distance(layout: ReliefLayout, zone: ReliefLayout.Zone, point: Vector2,
 		limit: float) -> float:
 	var rel := point - zone.center
 	var rho := rel.length()
 	var nearest := INF
-	if rho <= zone.r_max + limit:
+	if rho <= zone.r_max + limit and rho >= zone.r_min - limit:
 		var angle := rel.angle()
 		nearest = absf(rho - layout.polar(zone.radii, angle)) / layout.polar(zone.oblique, angle)
 	for ramp: ReliefLayout.Ramp in zone.ramps:
@@ -146,7 +153,8 @@ static func _ravine_distance(layout: ReliefLayout, point: Vector2, limit: float)
 		return gap if gap <= limit + ReliefLayout.RAMP_LANDING else INF
 	if coords.y > ravine.half_width:
 		return coords.y - ravine.half_width
-	if coords.x < ravine.ramp or coords.x > ravine.length - ravine.ramp:
+	# Sobre una rampa (las de los extremos y las de un collado) o un collado.
+	if layout.ravine_drop(coords.x) < ravine.depth - 0.01:
 		return 0.0
 	return ravine.half_width - coords.y
 
@@ -222,11 +230,13 @@ static func _floors(layout: ReliefLayout, terrain: Terrain) -> Array[Dictionary]
 		var ravine := layout.ravine
 		var middle := layout.ravine_frame(ravine.length * 0.5)[0]
 		out.append({"kind": "ravine", "center": _at(terrain, middle), "zone": -1,
-				"extent": Vector2(ravine.length - ravine.ramp * 2.0, ravine.half_width * 2.0)})
+				"extent": Vector2(ravine.length - ravine.ramp * 2.0, ravine.half_width * 2.0),
+				"tier": "", "parent": -1})
 	for index in layout.zones.size():
 		var zone := layout.zones[index]
 		out.append({"kind": "raised", "center": _at(terrain, zone.center), "zone": index,
-				"extent": Vector2(zone.r_max * 2.0, zone.r_min * 2.0)})
+				"extent": Vector2(zone.r_max * 2.0, zone.r_min * 2.0),
+				"tier": String(zone.kind), "parent": zone.parent})
 	return out
 
 
@@ -239,10 +249,16 @@ static func _ramps(layout: ReliefLayout, terrain: Terrain) -> Array[Dictionary]:
 					"width": ramp.half_width * 2.0, "zone": index})
 	if layout.ravine != null:
 		var ravine := layout.ravine
-		for ends: Vector2 in [Vector2(0.0, ravine.ramp), Vector2(ravine.length,
-				ravine.length - ravine.ramp)]:
-			out.append({"top": _at(terrain, layout.ravine_frame(ends.x)[0]),
-					"foot": _at(terrain, layout.ravine_frame(ends.y)[0]),
+		# (s de arriba, s del pie) de cada rampa del cañón.
+		var ends: Array[Vector2] = [Vector2(0.0, ravine.ramp),
+				Vector2(ravine.length, ravine.length - ravine.ramp)]
+		for saddle: float in ravine.saddles:
+			for side: float in [-1.0, 1.0]:
+				ends.append(Vector2(saddle + ravine.saddle_half * side,
+						saddle + (ravine.saddle_half + ravine.ramp) * side))
+		for pair: Vector2 in ends:
+			out.append({"top": _at(terrain, layout.ravine_frame(pair.x)[0]),
+					"foot": _at(terrain, layout.ravine_frame(pair.y)[0]),
 					"width": ravine.half_width * 2.0, "zone": -1})
 	return out
 

@@ -87,7 +87,11 @@ func _check_props(bad: Dictionary, notes: Array[String]) -> int:
 	var count := 0
 	for node: Node in _bounds.get_children():
 		var prop := node as Node3D
-		if prop == null or prop is CliffWall or prop is Bridge or prop is RockFormation:
+		# La roca de un corte, un puente, una formación y las estructuras del
+		# relieve (portales, hito, agua) son el relieve mismo, no algo puesto
+		# encima: que no tapen un paso lo comprueban los barridos de alcance.
+		if prop == null or prop is CliffWall or prop is Bridge or prop is RockFormation \
+				or prop.is_in_group(ReliefStructures.GROUP):
 			continue
 		count += 1
 		var xz := Vector2(prop.global_position.x, prop.global_position.z)

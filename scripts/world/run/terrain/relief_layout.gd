@@ -1,9 +1,14 @@
 class_name ReliefLayout
 extends RefCounted
 ## El trazado del relieve por zonas de UNA etapa: dónde están las zonas
-## elevadas, sus rampas, el barranco, el puente y las lomas, y las preguntas
-## de geometría que todo lo demás le hace (¿este punto está sobre una zona?,
+## elevadas (el macizo, los niveles que lleva encima y los cerros sueltos),
+## sus rampas, el cañón, los puentes y las lomas, y las preguntas de
+## geometría que todo lo demás le hace (¿este punto está sobre una zona?,
 ## ¿cuánto sube o baja ahí?, ¿por dónde pasan los cortes?).
+##
+## Las zonas se APILAN: una zona puede estar entera sobre la meseta de otra
+## (su `parent`), y así tres cortes de 6 m hacen una montaña de 18. En
+## `zones` un padre va siempre antes que sus hijas.
 ##
 ## Es solo geometría en planta: no conoce el ruido ni las alturas finales.
 ## Lo sortea ReliefPlanner con los valores de ReliefSettings, lo convierte en
@@ -42,7 +47,7 @@ const CHORD_SLACK: float = 0.08
 const OUTSIDE := Vector2(-1.0, INF)
 
 
-## Una rampa de tierra que baja de una zona elevada al nivel del bosque.
+## Una rampa de tierra que baja de una zona elevada al suelo que la rodea.
 class Ramp extends RefCounted:
 	## Punto del eje donde la rampa empieza a bajar (u = 0).
 	var origin: Vector2
@@ -64,6 +69,16 @@ class Ramp extends RefCounted:
 
 ## Una zona elevada: un contorno polar alrededor de su centro.
 class Zone extends RefCounted:
+	## Qué es: &"massif" (el nivel ancho donde aparece el equipo), &"tier"
+	## (el segundo nivel), &"summit" (la cumbre) o &"butte" (un cerro suelto).
+	var kind: StringName = &"butte"
+	## Índice de la zona sobre cuya meseta está, o -1 si está sobre el llano.
+	var parent: int = -1
+	## Cuánto sube ya el suelo donde se apoya: la suma de las alturas de
+	## sus ancestros (0 sobre el llano).
+	var floor: float = 0.0
+	## Pendiente de sus rampas, en grados.
+	var ramp_slope: float = 22.0
 	var center: Vector2
 	## Radio del contorno por ángulo (TABLE muestras).
 	var radii: PackedFloat32Array = PackedFloat32Array()
@@ -74,15 +89,18 @@ class Zone extends RefCounted:
 	var r_max: float
 	## Altura de su acantilado sobre el suelo de alrededor, en metros.
 	var height: float
-	## Altura de la loma ancha sobre la que se apoya.
+	## Altura de la loma ancha sobre la que se apoya (0 si está sobre otra zona).
 	var swell: float
-	## True en LA zona alta de la etapa.
+	## True en LA zona más alta de la etapa (la cumbre).
 	var top: bool
 	var ramps: Array[Ramp] = []
 
 
-## El barranco: un pasillo hundido a lo largo de un eje de tramos rectos,
-## con una rampa en cada extremo.
+## El cañón: un pasillo hundido a lo largo de un eje de tramos rectos, con
+## una rampa en cada extremo. Un COLLADO lo interrumpe: el fondo sube por una
+## rampa hasta el borde, sigue plano unos metros y vuelve a bajar. Entre dos
+## puentes siempre hay uno, o ese tramo de fondo sería un pozo sin salida
+## (un puente es una calzada maciza de pared a pared).
 class Ravine extends RefCounted:
 	var points: PackedVector2Array = PackedVector2Array()
 	## Distancia acumulada a lo largo del eje hasta cada punto.
@@ -90,8 +108,12 @@ class Ravine extends RefCounted:
 	var length: float
 	var half_width: float
 	var depth: float
-	## Largo de la rampa de cada extremo, en metros.
+	## Largo de la rampa de cada extremo (y de cada lado de un collado), en metros.
 	var ramp: float
+	## Posición a lo largo del eje del centro de cada collado.
+	var saddles: PackedFloat32Array = PackedFloat32Array()
+	## Mitad del tramo plano de un collado, en metros.
+	var saddle_half: float = 0.0
 	## Caja del eje, para descartar rápido los puntos lejanos.
 	var bounds: Rect2
 
@@ -161,9 +183,17 @@ func zone_radius(zone: Zone, angle: float) -> float:
 	return polar(zone.radii, angle)
 
 
+## True si `point` cae en la meseta de `zone` a `margin` metros o más de su
+## contorno. Con `margin` negativo, también hasta esa distancia por fuera.
+func on_plateau(zone: Zone, point: Vector2, margin: float = 0.0) -> bool:
+	var rel := point - zone.center
+	var angle := rel.angle()
+	return rel.length() <= polar(zone.radii, angle) - margin * polar(zone.oblique, angle)
+
+
 ## Cuánto sube el suelo en `point` por estar sobre `zone` (su meseta o una de
-## sus rampas), o -1 si queda fuera. `inset` achica la zona esos metros desde
-## sus cortes (ver la cabecera).
+## sus rampas) respecto del suelo donde `zone` se apoya, o -1 si queda fuera.
+## `inset` achica la zona esos metros desde sus cortes (ver la cabecera).
 func raised_offset(zone: Zone, point: Vector2, inset: float = 0.0) -> float:
 	var rel := point - zone.center
 	var rho := rel.length()
@@ -204,12 +234,15 @@ func ravine_coords(point: Vector2) -> Vector2:
 	return best
 
 
-## Metros que baja el fondo del barranco a `s` metros de su inicio: 0 en los
-## dos extremos, la profundidad completa pasadas las rampas.
+## Metros que baja el fondo del cañón a `s` metros de su inicio: 0 en los
+## dos extremos y sobre cada collado, la profundidad completa pasadas las rampas.
 func ravine_drop(s: float) -> float:
 	if ravine == null:
 		return 0.0
-	return ravine.depth * clampf(minf(s, ravine.length - s) / ravine.ramp, 0.0, 1.0)
+	var run := minf(s, ravine.length - s)
+	for saddle: float in ravine.saddles:
+		run = minf(run, absf(s - saddle) - ravine.saddle_half)
+	return ravine.depth * clampf(run / ravine.ramp, 0.0, 1.0)
 
 
 ## [punto, tangente unitaria] del eje del barranco a `s` metros de su inicio.
@@ -225,41 +258,50 @@ func ravine_frame(s: float) -> PackedVector2Array:
 	return PackedVector2Array([from + chord * t, chord / span])
 
 
-## Cuánto sube (zona elevada, rampa) o baja (barranco) el suelo en `point`
-## respecto del suelo base; 0 en el nivel del bosque. `inset`: ver la cabecera.
+## Cuánto sube (zona elevada, rampa) o baja (cañón) el suelo en `point`
+## respecto del suelo base; 0 en el llano. Sobre zonas apiladas gana la más
+## alta. `inset`: ver la cabecera.
 func offset_at(point: Vector2, inset: float = 0.0) -> float:
+	var highest := 0.0
 	for zone: Zone in zones:
 		if absf(point.x - zone.center.x) > zone.r_max + 40.0 \
 				or absf(point.y - zone.center.y) > zone.r_max + 40.0:
 			continue
 		var lift := raised_offset(zone, point, inset)
 		if lift >= 0.0:
-			return lift
+			highest = maxf(highest, zone.floor + lift)
+	if highest > 0.0:
+		return highest
 	var coords := ravine_coords(point)
 	if coords.x >= 0.0 and coords.y <= ravine.half_width + inset:
 		return -ravine_drop(coords.x)
 	return 0.0
 
 
-## En qué nivel cae `point` (línea nominal): 0 = el bosque, i + 1 = la zona
-## elevada i (rampas incluidas), -1 = el barranco.
+## En qué nivel cae `point` (línea nominal): 0 = el llano, i + 1 = la zona
+## elevada i (rampas incluidas; de dos apiladas, la de arriba), -1 = el cañón.
 func level_at(point: Vector2) -> int:
+	var level := 0
 	for index in zones.size():
 		if raised_offset(zones[index], point) >= 0.0:
-			return index + 1
+			level = index + 1
+	if level != 0:
+		return level
 	var coords := ravine_coords(point)
 	if coords.x >= 0.0 and coords.y <= ravine.half_width:
 		return -1
 	return 0
 
 
-## Rampas de entrada de toda la etapa: las de las zonas más las dos de los
-## extremos del barranco.
+## Rampas de entrada de toda la etapa: las de las zonas más las del cañón
+## (dos en los extremos y dos por collado).
 func ramp_count() -> int:
 	var count := 0
 	for zone: Zone in zones:
 		count += zone.ramps.size()
-	return count + (2 if ravine != null else 0)
+	if ravine != null:
+		count += 2 + ravine.saddles.size() * 2
+	return count
 
 
 ## Altura del corte más alto, en metros.
@@ -274,15 +316,17 @@ func tallest_cut() -> float:
 func digest() -> String:
 	var parts := PackedStringArray()
 	for zone: Zone in zones:
-		parts.append("z %d %d %d %d" % [roundi(zone.center.x * 100.0),
-				roundi(zone.center.y * 100.0), roundi(zone.height * 100.0),
-				roundi(zone.swell * 100.0)])
+		parts.append("z %s %d %d %d %d %d" % [zone.kind, zone.parent,
+				roundi(zone.center.x * 100.0), roundi(zone.center.y * 100.0),
+				roundi(zone.height * 100.0), roundi(zone.swell * 100.0)])
 		for index in range(0, TABLE, 12):
 			parts.append(str(roundi(zone.radii[index] * 100.0)))
 		for ramp: Ramp in zone.ramps:
 			parts.append("r %d %d" % [roundi(ramp.angle * 1000.0), roundi(ramp.length * 100.0)])
 	if ravine != null:
 		parts.append("v %d %d" % [roundi(ravine.half_width * 100.0), roundi(ravine.depth * 100.0)])
+		for saddle: float in ravine.saddles:
+			parts.append("s %d" % roundi(saddle * 100.0))
 		for point: Vector2 in ravine.points:
 			parts.append("%d %d" % [roundi(point.x * 100.0), roundi(point.y * 100.0)])
 	for crossing: Crossing in crossings:

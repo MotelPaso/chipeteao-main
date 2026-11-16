@@ -6,9 +6,10 @@ extends RefCounted
 ##
 ## Una zona elevada con N rampas da N líneas: cada una sube por el costado
 ## de una rampa (de 0 a la altura de la zona), sigue el contorno hasta la
-## rampa siguiente y baja por su costado. El barranco da sus dos paredes,
-## partidas donde las cruza un puente; cada pared nace y muere en 0 en las
-## rampas de los extremos.
+## rampa siguiente y baja por su costado. Los dos lados de una zona apilada
+## llevan además `zone.floor`, lo que ya sube el suelo donde se apoya. El
+## cañón da sus dos paredes, partidas donde las cruza un puente y donde un
+## collado las interrumpe; cada pared nace y muere en 0 en una rampa.
 ##
 ## Sentido: al recorrer una línea, el lado alto queda a la izquierda y el
 ## bajo a la derecha. Todas las normales apuntan al lado bajo.
@@ -66,8 +67,8 @@ static func _ramp_side(layout: ReliefLayout, zone: ReliefLayout.Zone, ramp: Reli
 		var k := pieces - step if side > 0.0 else step
 		var u := lerpf(from_u, ramp.length, float(k) / float(pieces))
 		path.points.append(ramp.origin + ramp.dir * u + ramp.perp * (ramp.half_width * side))
-		path.upper.append(zone.height * clampf(1.0 - u / ramp.length, 0.0, 1.0))
-		path.lower.append(0.0)
+		path.upper.append(zone.floor + zone.height * clampf(1.0 - u / ramp.length, 0.0, 1.0))
+		path.lower.append(zone.floor)
 
 
 ## El contorno de `zone` entre dos esquinas de rampa, con las dos esquinas.
@@ -87,25 +88,30 @@ static func _arc(layout: ReliefLayout, zone: ReliefLayout.Zone, from_angle: floa
 	for angle: float in angles:
 		path.points.append(zone.center + Vector2.from_angle(angle)
 				* layout.zone_radius(zone, angle))
-		path.upper.append(zone.height)
-		path.lower.append(0.0)
+		path.upper.append(zone.floor + zone.height)
+		path.lower.append(zone.floor)
 
 
 # --- barranco ------------------------------------------------------------------
 
-## Las dos paredes del barranco, partidas en cada cruce. La izquierda se
-## recorre hacia delante y la derecha hacia atrás: así el fondo queda a la
-## derecha de las dos.
+## Las dos paredes del cañón, partidas en cada cruce y en cada collado. La
+## izquierda se recorre hacia delante y la derecha hacia atrás: así el fondo
+## queda a la derecha de las dos.
 static func _ravine_cuts(layout: ReliefLayout) -> void:
 	var ravine := layout.ravine
-	var stops := PackedFloat32Array([0.0])
-	var sorted := layout.crossings.duplicate()
-	sorted.sort_custom(func(a: ReliefLayout.Crossing, b: ReliefLayout.Crossing) -> bool:
-		return a.s < b.s)
-	for crossing: ReliefLayout.Crossing in sorted:
+	# Tramos del eje sin pared: (desde, hasta).
+	var gaps: Array[Vector2] = []
+	for crossing: ReliefLayout.Crossing in layout.crossings:
 		var gap := crossing.width * 0.5 - BRIDGE_EMBED
-		stops.append(crossing.s - gap)
-		stops.append(crossing.s + gap)
+		gaps.append(Vector2(crossing.s - gap, crossing.s + gap))
+	for saddle: float in ravine.saddles:
+		gaps.append(Vector2(saddle - ravine.saddle_half, saddle + ravine.saddle_half))
+	gaps.sort_custom(func(a: Vector2, b: Vector2) -> bool:
+		return a.x < b.x)
+	var stops := PackedFloat32Array([0.0])
+	for gap: Vector2 in gaps:
+		stops.append(gap.x)
+		stops.append(gap.y)
 	stops.append(ravine.length)
 	for index in range(0, stops.size(), 2):
 		var from_s := stops[index]

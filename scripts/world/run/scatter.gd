@@ -33,6 +33,8 @@ extends Node3D
 @export var rock_scene: PackedScene
 ## Tercer prop interior.
 @export var stump_scene: PackedScene
+## Árbol antiguo: mucho más alto que los demás, pocos por etapa. Vacío, no hay.
+@export var ancient_tree_scene: PackedScene
 
 @export_group("Reparto interior")
 ## Cantidad de props de tree_scene. Cada arena pone la suya en su escena; el
@@ -42,6 +44,12 @@ extends Node3D
 @export var rock_count: int = 54
 ## Cantidad de props de stump_scene (por defecto, la del bosque).
 @export var stump_count: int = 34
+## Cantidad de árboles antiguos (ancient_tree_scene).
+@export var ancient_tree_count: int = 0
+## Escala uniforme mínima de cada árbol antiguo (1 = tamaño de la escena).
+@export var ancient_tree_scale_min: float = 0.85
+## Escala uniforme máxima de cada árbol antiguo (1 = tamaño de la escena).
+@export var ancient_tree_scale_max: float = 1.2
 ## Escala uniforme mínima de cada prop de tree_scene (1 = tamaño del modelo).
 @export var tree_scale_min: float = 0.85
 ## Escala uniforme máxima de cada prop de tree_scene (1 = tamaño del modelo).
@@ -91,6 +99,10 @@ extends Node3D
 @export var perimeter_accent_scale_min: float = 1.2
 ## Escala uniforme máxima de los acentos del borde (1 = tamaño del modelo).
 @export var perimeter_accent_scale_max: float = 1.7
+## Metros desde cada esquina de la arena donde el borde no planta nada (0 =
+## planta hasta la esquina). Los props de dos lados pueden encerrar la celda
+## de la esquina: un rincón de suelo abierto al que nadie llega.
+@export var perimeter_corner_gap: float = 0.0
 
 @export_group("Mesetas")
 ## Mesetas (plataforma + rampa) por etapa; el Terrain aplana un claro bajo
@@ -192,6 +204,10 @@ extends Node3D
 ## con menos formaciones.
 @export var mask_min_open_fraction: float = 0.84
 
+## Metros que el faldón de roca de una formación asoma de sus celdas más el
+## medio tronco de un prop del borde (ver _in_formation_skirt).
+const EDGE_SKIRT: float = 3.0
+
 ## RNG del reparto. La máscara saca números de este mismo objeto.
 var _rng := RandomNumberGenerator.new()
 ## Máscara de celdas caminables (arena_mask.gd); se arma en _enter_tree.
@@ -200,6 +216,8 @@ var _mask: ArenaMask = null
 var _run_seed: int = 0
 ## Centros planos de las mesetas de esta etapa (ver mesa_sites).
 var _mesa_sites: PackedVector2Array = PackedVector2Array()
+## Claros que ocupan las estructuras del relieve, como (x, radio, z).
+var _structure_sites: PackedVector3Array = PackedVector3Array()
 ## El Terrain de esta arena (ver _arena_terrain); se busca una sola vez.
 var _terrain: Terrain = null
 var _terrain_sought: bool = false
@@ -273,6 +291,13 @@ func place_props() -> void:
 		if not owner_arena_contains(spot):
 			continue
 		_keepouts_xz.append(Vector2(spot.global_position.x, spot.global_position.z))
+	# Las estructuras del relieve van después de los POIs y las mesetas (los
+	# esquivan) y antes de los props (que las esquivan a ellas).
+	var taken := _keepouts_xz.duplicate()
+	taken.append_array(_mesa_sites)
+	_structure_sites = ReliefStructures.raise(self, _arena_terrain(), _run_seed, taken)
+	_place_many(ancient_tree_scene, ancient_tree_count, ancient_tree_scale_min,
+			ancient_tree_scale_max)
 	_place_many(tree_scene, tree_count, tree_scale_min, tree_scale_max)
 	_place_many(rock_scene, rock_count, rock_scale_min, rock_scale_max)
 	_place_many(stump_scene, stump_count, stump_scale_min, stump_scale_max)
@@ -322,8 +347,8 @@ func can_place(xz: Vector2, margin: float = 0.0) -> bool:
 	if terrain == null or not terrain.has_relief():
 		return true
 	# Con relieve por zonas, además fuera del faldón de roca que cada
-	# formación asoma más allá de sus celdas.
-	return _mask.clear_of(xz, formation_clearance) \
+	# formación asoma más allá de sus celdas y de las estructuras del relieve.
+	return _mask.clear_of(xz, formation_clearance) and _structures_clear(xz) \
 			and ReliefDressing.clear(terrain, xz, margin, _mesa_sites, relief_mesa_keepout)
 
 
@@ -576,7 +601,7 @@ func _is_clear(pos: Vector3) -> bool:
 		return false
 	if not _mask.clear_of(flat, formation_clearance):
 		return false
-	if not _relief_clear(flat, relief_prop_clearance):
+	if not _relief_clear(flat, relief_prop_clearance) or not _structures_clear(flat):
 		return false
 	for keepout in _keepouts_xz:
 		if keepout.distance_to(flat) < keepout_radius:
@@ -591,6 +616,14 @@ func _is_clear(pos: Vector3) -> bool:
 ## del relieve por zonas (siempre, en una arena sin él).
 func _relief_clear(xz: Vector2, margin: float) -> bool:
 	return ReliefDressing.clear(_arena_terrain(), xz, margin)
+
+
+## True si `xz` queda fuera del claro de toda estructura del relieve.
+func _structures_clear(xz: Vector2) -> bool:
+	for site: Vector3 in _structure_sites:
+		if Vector2(site.x, site.z).distance_to(xz) < site.y:
+			return false
+	return true
 
 
 ## Recorre los cuatro lados del suelo plantando props grandes (y algún
@@ -623,11 +656,34 @@ func _band_depth() -> float:
 
 
 func _plant_edge_prop(pos: Vector3, slot: int) -> void:
+	var corner := arena_half_extent - perimeter_corner_gap
+	if perimeter_corner_gap > 0.0 and absf(pos.x) > corner and absf(pos.z) > corner:
+		return
+	# Con relieve por zonas un prop del borde tampoco va en el faldón de una
+	# formación: quedaría asomando de la roca.
+	var terrain := _arena_terrain()
+	if terrain != null and terrain.has_relief() and _in_formation_skirt(Vector2(pos.x, pos.z)):
+		return
 	var accent := _perimeter_accent()
 	if accent != null and perimeter_rock_every > 0 and slot % perimeter_rock_every == 0:
 		_spawn_prop(accent, pos, _rng.randf_range(perimeter_accent_scale_min, perimeter_accent_scale_max))
 	else:
 		_spawn_prop(_perimeter_main(), pos, _rng.randf_range(perimeter_scale_min, perimeter_scale_max))
+
+
+## True si `xz` cae en una formación o en el faldón que asoma de sus celdas
+## (EDGE_SKIRT metros). Los puntos de prueba se recortan a la arena: junto al
+## muro, "fuera del mapa" no es roca.
+func _in_formation_skirt(xz: Vector2) -> bool:
+	var limit := arena_half_extent - 0.1
+	for index in 9:
+		var probe := xz
+		if index > 0:
+			probe += Vector2.from_angle(float(index) * TAU / 8.0) * EDGE_SKIRT
+		probe = probe.clamp(Vector2(-limit, -limit), Vector2(limit, limit))
+		if not _mask.is_walkable(probe):
+			return true
+	return false
 
 
 func _perimeter_main() -> PackedScene:
