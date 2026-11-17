@@ -712,10 +712,12 @@ else
 			grep -n '^Probe mini stage: ' "$LOBSTER_LOG" | head -3
 			FALLOS=$((FALLOS + 1))
 		fi
+		# Baja con el reloj del juego (una pausa por subir de nivel la detiene):
+		# se mira al final del soak, no unos segundos después de la muerte.
 		if ! grep -q '^Lobster tide: gone at ' "$LOBSTER_LOG" \
-				|| ! grep -qE '^Probe mini stage: reason=aftermath .* tide=none$' "$LOBSTER_LOG"; then
+				|| ! grep -q '^Probe mini tide: left=none$' "$LOBSTER_LOG"; then
 			echo "  FALLO: la marea de la langosta no se fue después de su muerte"
-			grep -n '^Lobster tide: \|^Probe mini stage: reason=aftermath' "$LOBSTER_LOG" | head -6
+			grep -n '^Lobster tide: \|^Probe mini tide: ' "$LOBSTER_LOG" | head -6
 			FALLOS=$((FALLOS + 1))
 		fi
 	else

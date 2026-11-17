@@ -20,6 +20,8 @@ extends RefCounted
 ##   Probe mini states:  al salir, segundos en cada estado
 ##   Probe mini damage:  al salir, daño de cada arma por estado
 ##   Probe mini hits on raiders: al salir, golpes del minijefe por slot
+##   Probe mini tide:    al salir, en qué quedó la marea del minijefe (none =
+##                       no hay o ya se fue)
 ##   Probe mini hazards: lo que dejó vivo AFTERMATH_DELAY segundos después de
 ##                       morir, y cuántas veces su Health emitió `died`
 ## Con BONK_SHOT_DIR pide además las fotos de la entrada: el último frame de
@@ -125,7 +127,8 @@ func on_stage_changed() -> void:
 	_shots_done.clear()
 
 
-## Resumen al salir: segundos por estado, daño por arma y golpes por slot.
+## Resumen al salir: segundos por estado, daño por arma, golpes por slot y en
+## qué quedó la marea.
 func summary() -> void:
 	if _state_seconds.is_empty():
 		return
@@ -143,6 +146,9 @@ func summary() -> void:
 	for slot: int in _raider_hits:
 		hits += " p%d=%d" % [slot, _raider_hits[slot]]
 	print(hits)
+	# La marea baja con el reloj del juego (una pausa la detiene): que se fue
+	# se mira aquí, al salir, y no unos segundos después de la muerte.
+	print("Probe mini tide: left=%s" % _tide_state())
 
 
 # --- observación ---------------------------------------------------------------
@@ -274,17 +280,21 @@ func _print_stage(reason: String) -> void:
 		var camera := node as Camera3D
 		if camera != null and camera.current:
 			cinematic_camera = true
-	# La marea del minijefe: en qué anda, o "none" si ya no hay.
+	print(("Probe mini stage: reason=%s hud_visible=%s split_visible=%s cinematic_camera=%s"
+			+ " song_playing=%s world_frozen=%s clock_running=%s tide=%s") % [
+			reason, hud, split, cinematic_camera, _song_playing(), _world_frozen(),
+			RunState.is_physics_processing(), _tide_state()])
+	if reason == "aftermath":
+		_print_hazards()
+
+
+## La marea del minijefe: en qué anda, o "none" si no hay (o ya se fue).
+func _tide_state() -> String:
 	var tide := "none"
 	for node: Node in _tree.get_nodes_in_group(&"lobster_tide"):
 		if node.has_method(&"state_name") and not node.is_queued_for_deletion():
 			tide = String(node.call(&"state_name"))
-	print(("Probe mini stage: reason=%s hud_visible=%s split_visible=%s cinematic_camera=%s"
-			+ " song_playing=%s world_frozen=%s clock_running=%s tide=%s") % [
-			reason, hud, split, cinematic_camera, _song_playing(), _world_frozen(),
-			RunState.is_physics_processing(), tide])
-	if reason == "aftermath":
-		_print_hazards()
+	return tide
 
 
 func _song_playing() -> bool:
