@@ -15,6 +15,8 @@ extends Node3D
 ##
 ## EL RELOJ es tiempo de juego: la entrada dura intro_seconds en toda partida,
 ## con canción o sin ella, y la canción sigue ese reloj (BossSong.follow).
+## Reloj y canción arrancan juntos unos frames después de congelar el mundo
+## (warmup_frames), cuando lo que llegó con la langosta ya se dibujó una vez.
 ## Este nodo es PAUSABLE: el menú de pausa detiene la entrada y la canción.
 ##
 ## SALTAR. Cualquier raider mantiene su acción de saltar (skip_action_name):
@@ -38,6 +40,8 @@ const SPLIT_SCREEN_GROUP := &"split_screen"
 @export var title_shot: int = 7
 ## Sonido del susto en el corte cuando NO hay canción puesta (fila de Sfx.SOUND_LIBRARY; vacío = ninguno).
 @export var scare_sfx: StringName = &"lobster_scare"
+## Frames con el mundo ya congelado antes de que arranquen la canción y el reloj de la entrada. Lo que se dibuja por primera vez en ese instante (la marea) cuesta un tirón: con la canción ya sonando, los cortes quedarían atrasados respecto de sus golpes.
+@export var warmup_frames: int = 4
 
 @export_group("Saltar")
 ## Acción que cada raider mantiene para saltar la entrada.
@@ -53,6 +57,8 @@ var _active: bool = false
 ## True desde que play() arrancó la entrada.
 var _played: bool = false
 var _elapsed: float = 0.0
+## Frames que faltan para que arranquen la canción y el reloj.
+var _warmup_left: int = 0
 ## El plano en curso (-1 = todavía no cortó).
 var _shot_index: int = -1
 ## True mientras este nodo tiene tomados el HUD y la cámara.
@@ -82,6 +88,11 @@ func _process(delta: float) -> void:
 		return
 	if not is_instance_valid(_boss) or not _boss.is_inside_tree():
 		_teardown("boss_gone")
+		return
+	if _warmup_left > 0:
+		_warmup_left -= 1
+		if _warmup_left == 0:
+			_music.start(intro_seconds)
 		return
 	_elapsed += delta
 	var index := _camera.shot_at(_elapsed)
@@ -126,7 +137,9 @@ func play(boss: BlueLobster) -> void:
 	# Los números de daño que estaban en el aire quedarían ahí toda la entrada.
 	Pools.release_live_of(Pools.DAMAGE_POPUP_SCENE)
 	_music.set_pausable(true)
-	_music.start(intro_seconds)
+	_warmup_left = maxi(warmup_frames, 0)
+	if _warmup_left == 0:
+		_music.start(intro_seconds)
 	var manager := get_tree().get_first_node_in_group("run_manager")
 	if manager != null and manager.has_signal("run_ended") \
 			and not manager.is_connected("run_ended", _on_run_ended):
