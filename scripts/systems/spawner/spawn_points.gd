@@ -184,7 +184,10 @@ func _off_relief(pos: Vector3) -> Vector3:
 	var terrain := Terrain.find(_spawner.get_tree())
 	if terrain == null or not terrain.has_relief():
 		return pos
-	var spot: Vector2 = _bounds.call("nearest_place", Vector2(pos.x, pos.z), RELIEF_MARGIN)
+	# El punto libre más cercano que además tenga suelo debajo: la pregunta
+	# de colocar no ve lo que se puso después (un farol, un cofre).
+	var spot: Vector2 = _bounds.call("nearest_place", Vector2(pos.x, pos.z), RELIEF_MARGIN,
+			func(at: Vector2) -> bool: return _lands_on_ground(Vector3(at.x, pos.y, at.y)))
 	return Vector3(spot.x, pos.y, spot.y)
 
 

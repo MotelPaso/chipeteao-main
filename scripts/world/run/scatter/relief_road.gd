@@ -33,6 +33,8 @@ const LAMP_EVERY: float = 15.0
 const LAMP_ASIDE: float = 2.7
 const LAMP_HEIGHT: float = 3.1
 const LAMP_FROM_HEAD: float = 9.0
+## Radio del claro que reserva cada farol: nada se coloca encima de su poste.
+const LAMP_KEEPOUT: float = 1.2
 ## Radio del claro que el camino reserva (ni props ni pasto encima) y cada
 ## cuántos metros anota uno.
 const KEEPOUT: float = 2.9
@@ -156,6 +158,7 @@ static func _pave(scatter: Node3D, terrain: Terrain, layout: ReliefLayout,
 				if heads > LAMP_FROM_HEAD and layout.level_at(post) == layout.level_at(center) \
 						and terrain.relief_distance(post, 4.0) >= 4.0:
 					lamps.append(Vector3(post.x, terrain.height_at(post.x, post.y), post.y))
+					claimed.append(Vector3(post.x, LAMP_KEEPOUT, post.y))
 
 
 ## Una fila del camino: dos losas con la junta corrida, cada una apoyada en

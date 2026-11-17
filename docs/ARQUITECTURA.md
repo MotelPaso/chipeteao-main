@@ -653,7 +653,10 @@ entera sobre la meseta de otra, y así tres cortes de 6 m hacen una montaña de
   `BossBase._safe_arena_point` (su export `relief_margin`, 5 m; además sube el
   punto al suelo si quedó bajo una zona elevada). Un spawn que no encuentra
   lugar en los ocho intentos de su banda se corre al punto libre más cercano
-  (`SpawnPoints._off_relief`) en vez de nacer sobre una cornisa. Lo que cae
+  (`SpawnPoints._off_relief`) en vez de nacer sobre una cornisa.
+  `nearest_place` busca en anillos hasta 76 m: con el raider parado sobre
+  una formación de roca grande, el punto libre más cercano queda a más de
+  20 m, y sin eso el enemigo nacía sobre la roca. Lo que cae
   donde murió alguien pasa por `EnemyLoot.drop_point` →
   `arena_bounds.nearest_place` y se apoya **siempre** en el suelo: un cofre
   soltado en mitad de una rampa aparece al costado, y el de quien murió

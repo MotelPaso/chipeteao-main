@@ -399,8 +399,13 @@ func horde_lanes() -> ReliefLanes:
 
 ## El punto donde se puede colocar algo más cercano a `xz` (ver can_place):
 ## el mismo `xz` si sirve. Para lo que cae donde murió alguien. Sin RNG.
-func nearest_place(xz: Vector2, margin: float = 0.0) -> Vector2:
-	return ReliefDressing.nearest(xz, margin, can_place)
+## Con `also`, el punto además tiene que pasar esa pregunta (recibe el XZ):
+## un spawn pide que debajo haya suelo y no la punta de algo.
+func nearest_place(xz: Vector2, margin: float = 0.0, also: Callable = Callable()) -> Vector2:
+	if not also.is_valid():
+		return ReliefDressing.nearest(xz, margin, can_place)
+	return ReliefDressing.nearest(xz, margin, func(at: Vector2, gap: float) -> bool:
+		return can_place(at, gap) and bool(also.call(at)))
 
 
 func blocked_cell_count() -> int:
