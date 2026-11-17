@@ -162,11 +162,10 @@ func _pier(index: int, spring: float, half_width: float) -> void:
 		var face := turn * half_width
 		_wall(Vector3(x - half, 0.0, face), Vector3.RIGHT, b.pier_thickness, spring,
 				-b.deck_thickness, Vector3(0.0, 0.0, turn), b.stone_low_color, b.stone_color)
-		var tip := Vector3(x, spring, face + turn * b.cutwater)
-		var peak := Vector3(x, minf(spring + 1.7, -b.deck_thickness), face)
+		var cap := b.cutwater_cap(index, turn)
 		var inside := Vector3(x, spring - 1.0, face)
-		_mesh.triangle(Vector3(x - half, spring, face), tip, peak, b.moss_color, inside)
-		_mesh.triangle(tip, Vector3(x + half, spring, face), peak, b.moss_color, inside)
+		_mesh.triangle(cap[0], cap[2], cap[3], b.moss_color, inside)
+		_mesh.triangle(cap[2], cap[1], cap[3], b.moss_color, inside)
 
 
 ## El estribo de la orilla `side` (-1, +1): su frente bajo el primer arco y

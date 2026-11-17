@@ -42,6 +42,10 @@ extends StaticBody3D
 @export var pier_thickness: float = 1.9
 ## Largo del tajamar, la punta de cada pila, en metros.
 @export var cutwater: float = 1.6
+## Alto de la tapa en punta de cada tajamar sobre el arranque de los arcos,
+## en metros. Bajo 1.5 sus caras quedarían entre 45 y 60 grados: ni se
+## caminan ni se trepan.
+@export var cutwater_rise: float = 2.8
 ## Metros de piedra entre la clave de cada arco y el tablero.
 @export var crown_cover: float = 0.5
 ## Metros de pila que quedan a la vista bajo el arranque de los arcos, como mínimo.
@@ -170,6 +174,11 @@ func spring_y() -> float:
 	return maxf(crown_y() - arch_span() * 0.5, -drop + pier_stand)
 
 
+## Altura de la punta de las tapas de los tajamares: nunca pasa del tablero.
+func cutwater_peak() -> float:
+	return minf(spring_y() + cutwater_rise, -deck_thickness)
+
+
 ## Lo que la cara de afuera de cada escalera se abre por metro que baja.
 func stair_batter() -> float:
 	return (stair_out - nose) / maxf(drop, 0.1)
@@ -196,6 +205,17 @@ func pier_hull(index: int, low: float, high: float) -> PackedVector3Array:
 		points.append(Vector3(x, y, reach + cutwater))
 		points.append(Vector3(x - half, y, reach))
 	return points
+
+
+## Los cuatro puntos de la tapa en punta del tajamar de la pila `index` del
+## lado `turn` (-1, +1): sus dos esquinas, su punta y su cima contra el frente.
+func cutwater_cap(index: int, turn: float) -> PackedVector3Array:
+	var x := pier_x(index)
+	var half := pier_thickness * 0.5
+	var face := turn * deck_width() * 0.5
+	var spring := spring_y()
+	return PackedVector3Array([Vector3(x - half, spring, face), Vector3(x + half, spring, face),
+			Vector3(x, spring, face + turn * cutwater), Vector3(x, cutwater_peak(), face)])
 
 
 ## El macizo de la escalera de la orilla `side` que baja hacia `turn`: el
@@ -231,23 +251,32 @@ func _build_collision() -> void:
 		_add_box(Vector3(side * (span * 0.5 + (overlap - nose) * 0.5),
 				-deck_thickness - (deep - deck_thickness) * 0.5, 0.0),
 				Vector3(nose + overlap, deep - deck_thickness, width))
-		_add_box(Vector3(0.0, parapet_height * 0.5,
-				side * (deck_width() - parapet_thickness) * 0.5),
-				Vector3(span + 1.0, parapet_height, parapet_thickness))
 		for turn: float in [-1.0, 1.0]:
 			_add_hull(stair_hull(side, turn))
 	for index in pier_count:
 		_add_hull(pier_hull(index, -deep, spring_y()))
-	_build_towers()
+		# La tapa en punta también frena: sin ella, arriba de cada tajamar
+		# quedaría una repisa plana a la que nadie llega.
+		for turn: float in [-1.0, 1.0]:
+			_add_hull(cutwater_cap(index, turn))
+	_build_barriers()
 
 
-## Las torres van en un cuerpo aparte: son un obstáculo que se rodea, no un
-## piso del puente (el arnés lee como suelo todo lo que choca del Bridge).
-func _build_towers() -> void:
-	var towers := StaticBody3D.new()
-	towers.name = "Towers"
-	add_child(towers)
+## Las torres y las barandas van en un cuerpo aparte: son obstáculos (unas
+## se rodean, las otras se saltan), no pisos del puente. El arnés lee como
+## suelo todo lo que choca del Bridge, y por una baranda nadie camina.
+func _build_barriers() -> void:
+	var barriers := StaticBody3D.new()
+	barriers.name = "Barriers"
+	add_child(barriers)
 	for side: float in [-1.0, 1.0]:
+		var rail := BoxShape3D.new()
+		rail.size = Vector3(span - tower_inset * 2.0, parapet_height, parapet_thickness)
+		var rail_holder := CollisionShape3D.new()
+		rail_holder.shape = rail
+		rail_holder.position = Vector3(0.0, parapet_height * 0.5,
+				side * (deck_width() - parapet_thickness) * 0.5)
+		barriers.add_child(rail_holder)
 		for turn: float in [-1.0, 1.0]:
 			var shape := CylinderShape3D.new()
 			shape.radius = tower_radius
@@ -255,7 +284,7 @@ func _build_towers() -> void:
 			var holder := CollisionShape3D.new()
 			holder.shape = shape
 			holder.position = tower_spot(side, turn) + Vector3.UP * tower_height * 0.5
-			towers.add_child(holder)
+			barriers.add_child(holder)
 
 
 func _add_box(center: Vector3, size: Vector3) -> void:

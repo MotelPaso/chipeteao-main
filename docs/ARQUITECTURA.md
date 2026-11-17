@@ -474,9 +474,9 @@ Desde la iteración 51 el suelo de una arena **no es una placa plana**: es
   amplitud baja (dunas 3.0, ciénaga 1.5) con mesetas encima.
 - **Con `relief`** (Bosque Hueco): **relieve por zonas**. Sobre un suelo
   ondulado (amplitud 2.4) va una montaña escalonada de tres niveles —el
-  macizo donde aparece el equipo, un segundo nivel y la cumbre—, un cañón a
-  su pie con dos puentes, cerros sueltos y las rampas que entran a cada
-  zona. Ver «Relieve por zonas» abajo.
+  macizo donde aparece el equipo, un segundo nivel y la cumbre—, un cañón
+  con río a su pie que cruza el Gran Puente, cerros sueltos y las rampas
+  que entran a cada zona. Ver «Relieve por zonas» abajo.
 
 **La regla que manda sobre todo relieve.** Esto es un bullet-heaven: la horda no
 tiene navmesh, persigue en línea recta, camina hasta 45 grados y trepa lo que
@@ -486,8 +486,9 @@ Por eso el suelo base es suave, y por eso el relieve por zonas pone su altura
 en **cortes que la horda cruza**: ninguno mide más de 8 m (la montaña es alta
 porque **apila** cortes de 6 m, no porque alguno sea más alto), toda cara es
 claramente caminable o claramente pared (nunca entre 45 y 60 grados), a toda
-zona se entra caminando por alguna rampa y un puente es una calzada maciza
-que se trepa desde el fondo. Dentro de cada zona el suelo sigue igual de
+zona se entra caminando por alguna rampa, y bajo un puente de arcos abiertos
+la horda no se queda esperando: entra por sus cabeceras (`ReliefLanes`).
+Dentro de cada zona el suelo sigue igual de
 suave que antes: los barridos de las armas y los golpes de jefe leen la
 altura con ventanas de 1.6 a 2.2 m.
 
@@ -563,7 +564,7 @@ montaña vista desde el punto de aparición:
 | **Macizo** | Un nivel ancho (radio 52-56 m, 6 m sobre el llano), alargado hacia la montaña. **Contiene el punto de aparición.** 3-6 rampas al llano. |
 | **Segundo nivel** | Una zona apilada sobre el macizo, pegada a su borde lejano (+6 m). 2-3 rampas; la primera mira hacia el spawn. |
 | **Cumbre** | Una zona apilada sobre el segundo nivel (+5.5 m), con 1-2 rampas y el Árbol Hueco. Queda a unos 18 m sobre el llano. |
-| **Cañón** | Un pasillo hundido (5.2-5.5 m, 118-150 m de largo) al pie del macizo por el lado contrario a la montaña, con una rampa en cada punta, **dos puentes** y un **collado** entre ellos. |
+| **Cañón** | Un pasillo hundido con río (5.8-6 m de hondo, 24-27 m de ancho, 140-170 m de largo) al pie del macizo por el lado contrario a la montaña, con una rampa en cada punta y el **Gran Puente** más o menos al medio, con cuatro escaleras que bajan al agua. |
 | **Cerros** | 2-3 mesetas chicas sueltas en el llano, con 1-2 rampas. |
 | **Lomas** | 5 lomas anchas del llano, más la que sostiene a la montaña y la de cada cerro. |
 
@@ -582,9 +583,16 @@ entera sobre la meseta de otra, y así tres cortes de 6 m hacen una montaña de
 | `relief_mesh.gd` (`ReliefMesh`) | La malla: 2 m, con **parches de 1 m** en los bloques que tocan un corte. |
 | `relief_queries.gd` (`ReliefQueries`) | Distancia a cortes/rampas/puentes, celdas y barreras para la máscara, la línea `Relief layout:` y la consulta de la etapa. |
 | `scripts/world/cliff_wall.gd` (`CliffWall`) | La **roca** de un corte: una cinta facetada sobre su línea, con una cornisa caminable del lado alto y una cara empinada del lado bajo. La colisión es la malla (prismas convexos, como `RockFormation`). |
-| `scripts/world/props/bridge.gd` + `scenes/world/props/Bridge.tscn` (`Bridge`) | El puente: un tablero sobre una **calzada maciza** hasta el fondo. |
+| `scripts/world/props/bridge.gd` + `scenes/world/props/Bridge.tscn` (`Bridge`) | El Gran Puente, armado en código: tablero entre barandas, **arcos abiertos** sobre pilas con tajamar, estribos macizos, cuatro torres con brasero unidas por un dintel con estandartes, y cuatro escaleras macizas hasta el fondo. Sus medidas y colores son exports de la escena. |
+| `scripts/world/props/bridge/bridge_masonry.gd` (`BridgeMasonry`) | La cantería del puente: su malla, un tono por sillar (`LowPolyMesh.plate`/`block`). Sin colisión: las formas las pone `Bridge`. |
+| `relief_lanes.gd` (`ReliefLanes`) | Los puentes como los ve la horda: hacia dónde camina un enemigo cuando su objetivo está sobre un tablero o él quedó debajo. Lo lee `EnemyBase`. |
 | `scripts/world/run/scatter/relief_dressing.gd` (`ReliefDressing`) | Lo que hace el scatter con el relieve: levanta las `CliffWall` y los puentes **como hijos suyos** (así arden con el bosque en el infierno de Mythos) y responde `can_place` / `nearest_place`. |
 | `scripts/world/run/scatter/relief_structures.gd` (`ReliefStructures`) | Las estructuras que visten el relieve (ver «Estructuras y vegetación» abajo). |
+| `scripts/world/run/scatter/relief_road.gd` (`ReliefRoad`) | El camino antiguo: losas del punto de aparición al puente y un trecho más allá, con faroles de piedra. |
+| `scripts/world/run/scatter/relief_waters.gd` (`ReliefWaters`), `scripts/world/props/cascade_flow.gd` (`CascadeFlow`) | El agua: el río del cañón, sus nenúfares y juncos, y la cascada que lo alimenta, con la espuma que baja por cada caída. |
+| `scripts/world/run/backdrop/giant_trees.gd` (`GiantTrees`) | Los árboles colosales del horizonte, una malla hija del `Backdrop`. |
+| `scripts/world/props/giant_mushroom.gd` + `scenes/world/props/GiantMushroom.tscn` (`GiantMushroom`) | El hongo gigante que reparte el scatter (`mushroom_scene`). |
+| `scripts/fx/falling_leaves.gd` (`FallingLeaves`) | Las hojas que caen alrededor de la cámara; es un nodo hijo de la arena. |
 | `scripts/world/run/scatter/mesa_builder.gd` (`MesaBuilder`), `scripts/world/run/scatter/perimeter_ring.gd` (`PerimeterRing`) | Las mesetas (sorteo de sitios, plataforma y rampa) y la franja de props del borde, fuera de `scatter.gd` (`ArenaScatter`) para que ese archivo no crezca. Sus valores siguen siendo los exports del scatter (grupos «Mesetas» y «Borde»); sacan los números del mismo RNG y en el mismo orden, así el mundo de cada semilla no cambia. |
 | `scripts/world/run/scatter/prop_footprints.gd` (`PropFootprints`) | La huella en planta de cada prop con colisión que planta el scatter (troncos, rocas, tocones): una grilla de 1 m que `can_place` lee, para que nada se coloque encima de un tronco. Solo se enciende con relieve por zonas. |
 
@@ -606,15 +614,22 @@ entera sobre la meseta de otra, y así tres cortes de 6 m hacen una montaña de
   con caras de 45 grados, y una rampa inclinada de más deja de caminarse.
 - **Alturas.** El llano queda en 0, el macizo en +6, el segundo nivel en +12 y
   la cumbre en unos +17.5, todo sobre una loma de 2-3 m; el fondo del cañón,
-  en −5.5. Medido en doce semillas: `min` entre −6.0 y −6.6 (no baja de −7:
-  el rescate del vacío del raider está en −10), `max` entre 19.3 y 20.5, o
+  en −6. Medido en doce semillas: `min` entre −6.4 y −6.6 (no baja de −7:
+  el rescate del vacío del raider está en −10), `max` entre 19.3 y 20.9, o
   sea 26-27 m de cima a fondo.
-- **El collado.** Un puente es una calzada maciza de pared a pared: entre dos
-  puentes el fondo del cañón sería un pozo del que un raider no sale (salta
-  1.5 m). Por eso entre dos puentes el fondo **sube por una rampa hasta el
-  borde, sigue plano 10 m y vuelve a bajar** (`Ravine.saddles`,
-  `ReliefRavine.SADDLE_HALF`). El cañón queda en tantos tramos como puentes,
-  cada uno con salida por una rampa.
+- **Un puente, y si son más, un collado entre cada dos.** El Bosque Hueco
+  lleva un solo puente (`bridge_count_min/max` = 1) y su río corre de punta
+  a punta. Con más de uno, entre cada dos el fondo **sube por una rampa
+  hasta el borde, sigue plano 10 m y vuelve a bajar** (`Ravine.saddles`,
+  `ReliefRavine.SADDLE_HALF`), así cada tramo tiene su salida.
+- **Las salidas del río.** Un raider salta 1.5 m y las paredes miden 6: del
+  fondo se sale por las rampas de las dos puntas o por las **cuatro
+  escaleras del puente**, dos por orilla, una hacia cada lado. Cada escalera
+  es un macizo con la cara de afuera en talud (más de 60 grados: la horda
+  la trepa); su colisión es una rampa lisa de unos 35 grados y los peldaños
+  son dibujo. `bridge_stair_reach` es lo que ocupa cada una a lo largo del
+  cañón: de ahí sale su pendiente. El trazado de reserva acorta su cañón
+  hasta que cabe (`ReliefRavine.CALM_SHRINK`).
 - **El orden.** El scatter llama a `Terrain.plan_relief(run_seed, medio_lado)`
   en su `_enter_tree`, **antes** de armar su máscara y elegir sus mesetas (el
   `Terrain` todavía no entró al árbol: es puro cálculo). La máscara recibe del
@@ -646,9 +661,24 @@ entera sobre la meseta de otra, y así tres cortes de 6 m hacen una montaña de
   (`PowerUpPickup`) rebota al pie de un corte como contra una roca
   (`roam_max_rise`: el suelo no puede subir más de 2 m en lo que mira
   adelante) y sube por las rampas; bajar, baja por donde sea.
-- **El puente no es un refugio.** Quien cae al cañón termina bajo el tablero;
-  contra el costado de la calzada trepa como contra cualquier pared. El
-  tablero queda 3 cm bajo el claro de sus cabeceras: se entra sin escalón.
+- **El puente no es un refugio: `ReliefLanes`.** Bajo los arcos se pasa
+  caminando, así que ahí no hay pared que trepar: un enemigo que persigue
+  en línea recta a quien está parado en el tablero se quedaría debajo para
+  siempre. `ReliefLanes` le cambia el rumbo en tres casos: si su objetivo
+  está **sobre el tablero** y él en una orilla, va a la boca de su
+  cabecera y de ahí derecho por el tablero; si él está **en el cañón**, va
+  a un punto de la orilla al costado de la obra (trepa la pared o la
+  escalera que encuentre) y de ahí a la cabecera; y si quedó **bajo el
+  tablero** persiguiendo a alguien de arriba, sale por el costado en vez
+  de quedarse contra el estribo. En todo lo demás devuelve la línea recta
+  de siempre. `ReliefDressing.raise` lo arma con los puentes ya colocados,
+  el scatter lo publica (`arena_bounds.horde_lanes()`) y `EnemyBase` lo pide
+  una vez al nacer y llama a `seek()` en cada tick; mientras ningún raider
+  anda por un puente cuesta una comparación por enemigo. Las torres y las
+  barandas van en un cuerpo aparte (`Bridge/Barriers`): son obstáculos, no
+  pisos (el arnés lee como suelo todo lo que choca del `Bridge`, y por una
+  baranda nadie camina). El tablero queda 3 cm bajo el claro de sus
+  cabeceras: se entra sin escalón.
 - **El Backdrop** de una arena con relieve por zonas arma el suelo lejano como
   un **marco** de cuatro `PlaneMesh` alrededor de la arena, al nivel de su
   borde (`rim_drop`). Un plano entero bajo el fondo del cañón dejaría un
@@ -698,10 +728,39 @@ números del RNG de la partida.
   las piedras caídas, no. Nada pasa de 10 m: la horda trepa 10 de una vez, y
   lo que no cruza lo rodea.
 - **`GroundCover`** parte el mapa en trozos de 20 m y arma una malla por
-  trozo, unos pocos por frame desde que empieza la etapa (137 trozos, unas
-  35 000 caras, 70 ms en total). No tiene colisión. No planta sobre roca,
-  cortes, rampas, puentes, el fondo del cañón ni el claro de una estructura
+  trozo, unos pocos por frame desde que empieza la etapa (unos 135 trozos,
+  unas 40 000 caras, 90 ms en total): arbustos, pasto, flores, hongos,
+  piedras y helechos. No tiene colisión. No planta sobre roca, cortes,
+  rampas, puentes, el fondo del cañón ni el claro de una estructura
   (`arena_bounds.can_grow`).
+- **El camino antiguo (`ReliefRoad`)** sale del punto de aparición, baja por
+  la rampa del macizo que queda más cerca del puente, llega a su cabecera
+  por el llano (nunca sobre un corte) y sigue 28 m por la otra orilla
+  hasta perderse. Las losas se apoyan en el suelo por sus cuatro esquinas
+  y no tienen colisión; cada 15 m va un farol de piedra (un solo cuerpo,
+  `RoadLamps`, con un poste por farol). Devuelve su franja como claros, así
+  ni un prop ni el pasto ni un círculo de piedras caen encima.
+- **El agua (`ReliefWaters`)**: el río es una cinta a nivel por tramo hondo
+  del cañón, con nenúfares y juncos lejos del puente. La **cascada** nace en
+  un manantial sobre el macizo, cae por su acantilado a una poza, cruza el
+  llano y vuelve a caer al cañón; se busca a unos 40 m del puente, donde
+  el macizo queda cerca y no hay una rampa, y si no cabe en ningún lado no
+  se pone. El agua que cae deja la cornisa antes de caer (la roca del corte
+  asoma) y `CascadeFlow` hace bajar unos copos de espuma para que se vea
+  correr. Se apaga con `ReliefSettings.cascade`.
+- **Los árboles colosales (`GiantTrees`)** son del `Backdrop` (grupo
+  «Árboles colosales», `giant_count`): troncos de 125 a 190 m alrededor de
+  la arena, con la copa sobre la niebla. Una malla, sin colisión.
+- **`GiantMushroom`** es un prop del scatter (`mushroom_scene`,
+  `mushroom_count`): solo frena su pie; el sombrero y los hongos chicos se
+  atraviesan. Su forma se siembra con su posición. Ni los hongos ni los
+  árboles ni los tocones crecen dentro del cañón; las rocas sí.
+- **`FallingLeaves`** es un `GPUParticles3D` hijo de la arena que sigue a la
+  cámara y deja de soltar hojas cuando empieza una transformación de etapa.
+  Ojo con las semillas: el motor saca un número del RNG global al instanciar
+  un nodo de partículas, así que agregar o quitar uno de una arena cambia el
+  mundo que arma un mismo `BONK_GAME_SEED` (la Cacería diaria siembra el
+  scatter directo y no se mueve).
 - Las estructuras entran al grupo `relief_structures` (`ReliefStructures.GROUP`)
   y devuelven su claro al scatter: `can_place` y el reparto de props lo
   esquivan. Se colocan **después** de los POIs y las mesetas (los esquivan) y
@@ -719,9 +778,10 @@ por zonas. Posiciones en el mundo, con su altura real:
 | `ramps` | `top`, `foot`, `width`, `zone` (−1 = del cañón: las de las dos puntas y las de cada collado) |
 | `sites` | `center`, `radius`: claros casi planos donde cabe una estructura de 10 m lejos de todo corte (no mira rocas ni props: eso se le pregunta a `can_place`) |
 
-Los puentes son escenas sueltas (`Bridge.tscn`, con `span`, `width`, `drop` y
-`deck_ends()`), hijas del scatter: una mecánica que los rompa los encuentra
-ahí.
+Los puentes son escenas sueltas (`Bridge.tscn`, con `span`, `width`, `drop`,
+`overlap`, `stair_reach` y `deck_ends()`), hijas del scatter: una mecánica
+que los rompa los encuentra ahí. Si un puente deja de servir, hay que
+sacarlo también de `ReliefLanes`, o la horda seguirá yendo a su cabecera.
 
 ### La regla de apoyado
 
@@ -1962,16 +2022,17 @@ En una arena con relieve por zonas trabaja además `ReliefProbe`
   hacerlos pasar**: cede el relieve o quien coloca.
 - **El paseo**: antes del recorrido de siempre, el bot va a la cumbre y de
   una cabecera del puente más largo a la otra (`Probe relief: stood on raised
-  zone …`, `Probe relief: crossed bridge …`); la carrera a la salida y un
-  rescate pasan por delante.
+  zone …`, `Probe relief: crossed bridge …`; un salto sobre el tablero sigue
+  contando como estar en el puente, caer bajo él no); la carrera a la salida
+  y un rescate pasan por delante.
 - **`BONK_HOLD_AT=high|ravine|bridge`**: pone al raider en su punto y lo deja
   quieto; una **llegada** es un enemigo que apareció 3 m o más arriba o abajo
   de ese nivel y se le acercó a 3 m (y a no más de 1.5 m de altura). `Probe
   hold: at=… window=A-Bs arrivals=N` por ventana de 20 s desde el segundo 10
   y `Probe hold summary: … empty_after_30=N reached=N` al salir (`reached`:
-  todos los enemigos que lo alcanzaron, hayan aparecido en su nivel o no;
-  sobre un puente casi nadie aparece en otro nivel, así que ahí las ventanas
-  vacías dicen poco y `reached` dice si la horda llega). Es un soak aparte, no
+  todos los enemigos que lo alcanzaron, hayan aparecido en su nivel o no).
+  En `bridge` es la prueba de `ReliefLanes`: casi toda la horda nace en el
+  cañón, 6 m más abajo, y tiene que subir y entrar por una cabecera. Es un soak aparte, no
   del gate; con el raider quieto, el aviso de niebla poco explorada sale y
   es esperado.
 

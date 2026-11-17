@@ -5,9 +5,11 @@ extends RefCounted
 ## se lea como paisaje y no como vacío. Los valores son exports del scatter
 ## (grupo «Borde»): se cambian en la arena, no aquí.
 
-## Metros que el faldón de roca de una formación asoma de sus celdas más el
-## medio tronco de un prop del borde (ver _in_formation_skirt).
-const EDGE_SKIRT: float = 3.0
+## Metros que un prop del borde guarda con las celdas de una formación: lo
+## que asoma su faldón de roca, el ancho de la roca más grande del borde y
+## un paso de sobra. Más cerca, entre los dos queda un hueco de una celda
+## al que nadie entra (ver _in_formation_skirt).
+const EDGE_SKIRT: float = 5.5
 
 var _scatter: ArenaScatter = null
 var _rng: RandomNumberGenerator = null
@@ -70,15 +72,16 @@ func _plant_prop(pos: Vector3, slot: int) -> void:
 				_scatter.perimeter_scale_max))
 
 
-## True si `xz` cae en una formación o en el faldón que asoma de sus celdas
-## (EDGE_SKIRT metros). Los puntos de prueba se recortan a la arena: junto al
-## muro, "fuera del mapa" no es roca.
+## True si `xz` cae en una formación o a EDGE_SKIRT metros o menos de una:
+## prueba el punto y dos anillos a su alrededor. Los puntos de prueba se
+## recortan a la arena: junto al muro, "fuera del mapa" no es roca.
 func _in_formation_skirt(xz: Vector2) -> bool:
 	var limit := _scatter.arena_half_extent - 0.1
-	for index in 9:
+	for index in 17:
 		var probe := xz
 		if index > 0:
-			probe += Vector2.from_angle(float(index) * TAU / 8.0) * EDGE_SKIRT
+			var reach := EDGE_SKIRT if index <= 8 else EDGE_SKIRT * 0.5
+			probe += Vector2.from_angle(float(index) * TAU / 8.0) * reach
 		probe = probe.clamp(Vector2(-limit, -limit), Vector2(limit, limit))
 		if not _mask.is_walkable(probe):
 			return true
