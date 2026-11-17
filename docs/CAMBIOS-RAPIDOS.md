@@ -340,7 +340,7 @@ La lógica vive en ayudantes de `scripts/systems/spawner/` (`SpawnScaling`, `Spa
 | Portales, ruletas, cofres y cajas al inicio de cada etapa | RunSystems.tscn > WorldDirector > StageFixtures | `portal_count`, `roulette_count`, `extra_start_chests_min/max`, `start_pet_box_chance` |
 | Colores, recarga y avisos de los pares de portales | `scenes/world/director/PortalShrine.tscn` > PortalShrine | `pair_colors`, `cooldown`, `prompt_text`, `recharging_prompt` |
 | Color y tamaño del portal de salida | `scenes/world/director/ExitPortal.tscn` > ExitPortal | `portal_color`, `ring_radius` |
-| Aspecto de los portales (anillo, pilar, latido, luz) | `scenes/world/director/ExitPortal.tscn` > Visual; los pares de portales usan los valores de `scripts/world/run/director/portal_visual.gd` (`PortalShrine.tscn` > Visual no guarda ninguno) | `ring_*`, `pillar_*`, `idle_pulse_*`, `recharge_min_width` (solo pares), `light_*`; el color es `portal_color` / `pair_colors` |
+| Aspecto de los portales (anillo, pilar, latido, luz y círculo de piedras: grupo «Marco de piedra», `frame_stones`, `frame_gap`, `frame_height_min/max`, `frame_width`, `frame_lintels`, colores) | `scenes/world/director/ExitPortal.tscn` > Visual; los pares de portales usan los valores de `scripts/world/run/director/portal_visual.gd` (`PortalShrine.tscn` > Visual no guarda ninguno) | `ring_*`, `pillar_*`, `idle_pulse_*`, `recharge_min_width` (solo pares), `light_*`; el color es `portal_color` / `pair_colors` |
 
 ## Altares, cofres y secretos del mapa
 
@@ -354,6 +354,7 @@ lo que cambies ahí vale para todos los que no tengan su propio valor en la esce
 | Cuánto tarda en hundirse algo gastado | la escena del interactuable > raíz (grupo «Gastado») | `sink_duration`, `sink_depth`, `spent_color` |
 | Brillo de los cofres según la rareza | `scenes/world/chests/Chest.tscn` > Chest (grupo «Brillo por rareza») | `glow_energy_by_rarity`, `free_glow_energy`, `free_tint` |
 | Salto de apertura y textos del cofre | `Chest.tscn` > Chest (grupos «Apertura», «Textos») | `open_duration`, `open_hop_height`, `paid_prompt`, `opened_announce` |
+| Aspecto de los altares (zócalo, columna, cristal, obelisco, garras, monedas, rueda, fuente, círculo de piedras) | `scenes/world/shrines/<Altar>.tscn` > Visual > Look (grupos de cada uno: «Zócalo y columna», «Cristal», «Círculo de piedras», «Obelisco», «Medidas», «Colores») | medidas y colores de cada pieza; la colisión es el nodo `Body` de la escena (cambiarla si cambia el ancho de la base) |
 | Color del anillo de un altar de carga o del altar demoníaco | `scenes/world/shrines/ChargeShrine.tscn` / `CurseShrine.tscn` > raíz (grupo «Anillo») | `accent_color`; el color de su baliza es aparte: `beacon_color` de la fila `charge_altar` / `demonic_altar` en `EVENT_LIBRARY` (`world_director.gd`) |
 | Tiempo de carga y tamaño del don | `ChargeShrine.tscn` / `CurseShrine.tscn` > raíz (grupo «Carga») | `channel_time`, `boon_scale` |
 | Costo de dificultad de los pactos | `CurseShrine.tscn` > CurseShrine (grupo «Pactos») | `difficulty_scale` (1 = lo que dice `PACT_LIBRARY` en `curse_shrine.gd`) |
@@ -372,12 +373,13 @@ de reparto se llama `ForestScatter`, `DuneScatter` o `MarshScatter`.
 
 | Qué quieres cambiar | Dónde | Qué propiedad |
 | --- | --- | --- |
-| Tamaño de la arena | la arena > *Scatter (grupo «Arena») | `arena_half_extent` (y mover a mano los muros de `Perimeter` a ±(ese valor + 0.5)) |
+| Tamaño de la arena | la arena > *Scatter (grupo «Arena») | `arena_half_extent` (y mover a mano los muros de `Perimeter` a ±(ese valor + 0.5)); el Bosque Hueco mide 320 m (`arena_half_extent = 160`), las otras dos, 240 |
 | Cuántos árboles, rocas o tocones hay y su tamaño | la arena > *Scatter (grupo «Reparto interior») | `tree_count`, `rock_count`, `stump_count`, `*_scale_min/max` |
 | Ancho de los pasillos y zona libre del inicio | la arena > *Scatter («Reparto interior») | `min_prop_spacing`, `spawn_clear_radius`, `keepout_radius` |
 | Línea de props del borde | la arena > *Scatter (grupo «Borde») | `perimeter_step`, `perimeter_rock_every`, `perimeter_jitter` |
 | Mesetas | la arena > *Scatter (grupo «Mesetas») | `mesa_count`, `mesa_scale_min/max`, `mesa_ramp_offset`, `mesa_ramp_attached` (encendido pega la rampa a la plataforma a cualquier escala; solo el Bosque Hueco lo enciende) |
-| Cofres sobre las mesetas | la arena > *Scatter (grupo «Mesetas») | `mesa_chest_scene`, `mesa_chest_count`, `mesa_deck_height` (en el Bosque Hueco, 3 mesetas llevan cofre) |
+| Cofres sobre las mesetas | la arena > *Scatter (grupo «Mesetas») | `mesa_chest_scene`, `mesa_chest_count`, `mesa_deck_height` (en el Bosque Hueco, 4 de sus 5 mesetas llevan cofre) |
+| Meseta del Bosque Hueco (el estrado de piedra y su escalera): medidas, adornos y colores | `scenes/world/props/RuinDais.tscn` > RuinDais («Medidas», «Adornos», «Colores») y `RuinStairs.tscn` > RuinStairs | `post_height`, `ivy_per_side`, `runes_per_side`, `rubble`, `banners`, `banner_width/length`, `light_energy`, colores; en la escalera `steps`, `cheek_width`, `post_height`, colores (las medidas de la caja y la cuña tienen que seguir iguales a su colisión) |
 | Formaciones de roca (cuántas y qué tan grandes) | la arena > *Scatter (grupo «Máscara de la arena») | `mask_blobs_min/max`, `mask_blob_cells_min/max`, `mask_min_open_fraction` |
 | Color y forma de la roca de un bioma | `assets/world/rock_style_<mapa>.tres` | `rock_color`, `cap_color`, `cliff_height`, `peak_height`, `max_height` (bajar `margin_min` o `cliff_height` puede abrir huecos en el sello del mapa) |
 | Tamaño de las ondulaciones, grietas y cumbres de la roca (todas las arenas) | `scripts/world/rock_formation.gd` (bloque «edita aquí») | `LIFT_WAVELENGTH`, `CRAG_WAVELENGTH`, `EDGE_WAVELENGTH`, `SPIRE_WAVELENGTH` (metros; más grande = rasgos más anchos), `SPIRE_FADE_FROM`/`SPIRE_FADE_TO` (desde qué profundidad asoman las cumbres) |
@@ -538,4 +540,4 @@ de reparto se llama `ForestScatter`, `DuneScatter` o `MarshScatter`.
 | Cartas y textos de la tienda | `scenes/ui/modal/VendorPanel.tscn` > raíz | `card_size`, `card_title_font_size`, `sold_template` |
 | Margen y separación del contenido de las cartas de la tienda | `scripts/ui/card_factory.gd` (bloque «Edita aquí») | `CARD_BOX_MARGIN`, `CARD_BOX_SEPARATION` |
 | Precios y oferta del vendedor | `scenes/world/Vendor.tscn` > Vendor | `pet_price`, `powerup_price_growth`, `pet_offers`, `item_offers` (precio inicial del power-up: `POWERUP_VENDOR_BASE_PRICE` en `run_state.gd`) |
-| Aspecto del puesto del vendedor | `Vendor.tscn` > Stall, Figure, Sign, Light | malla y material; el color de Figure, Sign y la luz sale del campo `color` de su fila en `VENDOR_LIBRARY` (`scripts/world/interactables/vendor.gd`), no de la escena |
+| Aspecto del puesto del vendedor (mostrador, postes, toldo, repisa, sacos, farol, alfombra, sombrero) | `Vendor.tscn` > Look («Medidas», «Colores»); la figura, el toldo (nodo Sign) y la luz son nodos de Vendor.tscn | `counter_size`, `canopy_width`, `canopy_back_height`, `canopy_front_height`, `scallops`, colores; el color de la figura, el toldo y la luz sale del campo `color` de su fila en `VENDOR_LIBRARY` (`scripts/world/interactables/vendor.gd`) |

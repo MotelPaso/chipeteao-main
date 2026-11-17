@@ -517,7 +517,8 @@ altura con ventanas de 1.6 a 2.2 m.
   del scatter, leído al construir (la fuente única del tamaño de arena).
 - **Técnica**: el ruido se muestrea en una retícula de `noise_step` 2 m y se
   interpola a la rejilla de 1 m del `HeightMapShape3D` (que es **fija** en una
-  unidad por muestra: 241×241 y el nodo sin escalar). La malla se arma con
+  unidad por muestra: 321×321 en el Bosque Hueco, de 320 m, y 241×241 en las
+  otras dos arenas, de 240; el nodo sin escalar). La malla se arma con
   `add_surface_from_arrays` sobre arrays empaquetados, no con `SurfaceTool`:
   un vértice por llamada sobre 241×241 son cientos de miles de llamadas de
   GDScript y tarda segundos. Presupuesto: **400 ms**; medido 97-134 ms sin
@@ -656,7 +657,11 @@ entera sobre la meseta de otra, y así tres cortes de 6 m hacen una montaña de
   (`SpawnPoints._off_relief`) en vez de nacer sobre una cornisa.
   `nearest_place` busca en anillos hasta 76 m: con el raider parado sobre
   una formación de roca grande, el punto libre más cercano queda a más de
-  20 m, y sin eso el enemigo nacía sobre la roca. Lo que cae
+  20 m, y sin eso el enemigo nacía sobre la roca. `can_build` es
+  `can_place` fuera del cañón: el cauce mide 24-27 m, así que su medio queda
+  lejos de las paredes y pasa la pregunta de colocar, pero un santuario no
+  se levanta en el río. La usa `StageLayout.walkable_xz` (todo lo que pone
+  el director); lo que cae al morir y los spawns siguen con `can_place`. Lo que cae
   donde murió alguien pasa por `EnemyLoot.drop_point` →
   `arena_bounds.nearest_place` y se apoya **siempre** en el suelo: un cofre
   soltado en mitad de una rampa aparece al costado, y el de quien murió
@@ -715,7 +720,7 @@ números del RNG de la partida.
 | **Ruinas** | Hasta `ruin_count` columnatas rotas en claros del llano. | `layout = RUIN` |
 | **Monolitos** | Hasta `monolith_count` piedras de 6.5-9.5 m, sueltas por el mapa. | `layout = MENHIR`, con otras medidas |
 | **Agua** | Una cinta a nivel en cada tramo de fondo del cañón. | `water_material` |
-| **Árboles antiguos** | 22 por etapa, 2.5 veces más altos que los demás; los planta el scatter (`ancient_tree_scene`, `ancient_tree_count`). | `scenes/world/props/AncientTree.tscn` |
+| **Árboles antiguos** | 38 por etapa, 2.5 veces más altos que los demás; los planta el scatter (`ancient_tree_scene`, `ancient_tree_count`). | `scenes/world/props/AncientTree.tscn` |
 | **Vegetación del suelo** | Arbustos, matas, flores, hongos y piedras chicas en todo el mapa. | `scenes/world/props/GroundCover.tscn` (`ground_cover.gd`), hija del scatter en la escena de la arena |
 
 - **`LowPolyMesh`** (`scripts/world/props/low_poly_mesh.gd`) arma mallas
@@ -822,7 +827,7 @@ y muros siguen contando); el vigilante de celda bloqueada compara
 
 ## Arena irregular
 
-- Qué es: cada partida el cuadrado de **240x240** recibe una **máscara de celdas**. Vive en `scripts/world/run/scatter/arena_mask.gd` (`ArenaMask`, `RefCounted`, sin Inspector): el scatter (`scatter.gd`, grupo `arena_bounds`) la crea en su `_enter_tree`, con **su** RNG, y le copia sus exports `mask_*` del grupo «Máscara de la arena» antes de `build()`; ahí viven la acreción, `_fill_notches`, el flood fill y los pasillos. `mask_cell_size` (**5 m**, o sea 48x48 celdas), y entre `mask_blobs_min` y `mask_blobs_max` (**5-8**) formaciones crecen por **acreción** desde una semilla hasta `mask_blob_cells_min..max` (20-50) celdas: cada paso añade una celda de la frontera, con peso hacia el eje propio de la formación (crestas, `mask_ridge_bias`) y hacia celdas ya rodeadas por dos o más lados (masas compactas). Las semillas guardan `mask_blob_spacing` (10 celdas) entre sí, dos formaciones distintas dejan siempre `mask_formation_gap` (2) celdas abiertas entre ellas, el anillo exterior de `mask_border_cells` (2) celdas nunca lleva roca y nada crece a menos de `mask_protect_radius` (15 m, medido al cuadrado de la celda) del spawn ni de los spots de verticalidad. Una celda abierta rodeada por tres lados se rellena (`_fill_notches`) y un flood fill 4-vecinos desde el spawn **sella** cualquier bolsa no alcanzable. Si queda menos de `mask_min_open_fraction` (0.84) abierto se reintenta con menos formaciones. Los enemigos trepadores cruzan la roca; el jugador solo si sube encima (la cresta se camina).
+- Qué es: cada partida el cuadrado de la arena (**240x240**; **320x320** en el Bosque Hueco) recibe una **máscara de celdas**. Vive en `scripts/world/run/scatter/arena_mask.gd` (`ArenaMask`, `RefCounted`, sin Inspector): el scatter (`scatter.gd`, grupo `arena_bounds`) la crea en su `_enter_tree`, con **su** RNG, y le copia sus exports `mask_*` del grupo «Máscara de la arena» antes de `build()`; ahí viven la acreción, `_fill_notches`, el flood fill y los pasillos. `mask_cell_size` (**5 m**, o sea 48x48 celdas), y entre `mask_blobs_min` y `mask_blobs_max` (**5-8**) formaciones crecen por **acreción** desde una semilla hasta `mask_blob_cells_min..max` (20-50) celdas: cada paso añade una celda de la frontera, con peso hacia el eje propio de la formación (crestas, `mask_ridge_bias`) y hacia celdas ya rodeadas por dos o más lados (masas compactas). Las semillas guardan `mask_blob_spacing` (10 celdas) entre sí, dos formaciones distintas dejan siempre `mask_formation_gap` (2) celdas abiertas entre ellas, el anillo exterior de `mask_border_cells` (2) celdas nunca lleva roca y nada crece a menos de `mask_protect_radius` (15 m, medido al cuadrado de la celda) del spawn ni de los spots de verticalidad. Una celda abierta rodeada por tres lados se rellena (`_fill_notches`) y un flood fill 4-vecinos desde el spawn **sella** cualquier bolsa no alcanzable. Si queda menos de `mask_min_open_fraction` (0.84) abierto se reintenta con menos formaciones. Los enemigos trepadores cruzan la roca; el jugador solo si sube encima (la cresta se camina).
   - **Cuánto tapa.** Medido en 34 arranques (3 biomas × semillas 1-8 más las arenas de un `verificar.sh`): **7.3-15.5%** de las celdas, 5-8 formaciones por etapa; el techo es 16% por `mask_min_open_fraction`.
   - **Una formación por región** (`scripts/world/rock_formation.gd`, `class_name RockFormation`). `_raise_formations()` parte las celdas bloqueadas en regiones 4-conexas y levanta **un** `StaticBody3D` por región: una malla facetada (sombreado plano, un color por faceta) con un acantilado que empieza `margin_min..margin_max` (1-2 m, campos del `RockFormationStyle`) **fuera** de las celdas y una cresta cuya altura sigue la distancia al contorno —una cresta larga se lee como cresta, una masa compacta tiene cumbre—, picos de ruido _ridged_ y un techo suave en `max_height` 8 m (también del estilo), por debajo de los 10 m que un trepador escala de una vez (`EnemyBase.max_climb_height`). Log `Rock formations: %d regions, %d faces, %d shapes, tallest=%.1f in %d ms`.
   - **La colisión ES la malla.** Cada cuadrilátero visible es también un prisma convexo (sus 4 esquinas más las mismas hundidas bajo el terreno), partido por la diagonal **más alta**, que es justo la envolvente superior de las 4 esquinas: el techo del prisma son los dos triángulos que se ven. Nada invisible contra lo que chocar, nada visible que se atraviese. Convexo y no trimesh a propósito: un trimesh no tiene interior, y el barrido de máscara del harness para una cápsula **dentro** de la roca en cada frontera.
@@ -1379,6 +1384,28 @@ apertura, nombrando lo que de verdad se pagó.
 ## Santuarios, cofres y secretos
 
 - Qué es: interactuables de mundo con prompt flotante y acción `interact`.
+- **Cómo se ven.** Cada santuario, el puesto del vendedor y los portales se
+  arman en código con `ShrineKit` (`scripts/world/props/kit/shrine_kit.gd`:
+  zócalos escalonados, columnas, braseros, piedras con runa, velas,
+  cristales, monedas, calaveras, musgo, puntales) sobre `LowPolyMesh`. Lo
+  hace un nodo `Look` con su propio script (`scripts/world/interactables/
+  looks/<santuario>_look.gd`; en los portales, `PortalVisual`), que tiene
+  las medidas y los colores como exports: hijo de `Visual` en
+  `ChargeShrine`, `CurseShrine`, `EventAltar`, `GreedShrine`,
+  `RouletteShrine` y `SpringShrine`, y de la raíz en `Vendor`. Las piezas
+  que el script de lógica anima siguen en la escena con su nombre (el
+  cristal, el anillo y el disco de progreso del altar de carga, el orbe del
+  altar de eventos, la rueda de la ruleta, el agua del manantial, la
+  figura, el cartel y la luz del vendedor): el `Look` les cambia la forma
+  en su `_ready`, que corre antes del `_ready` del interactuable, y arma lo
+  demás un frame después (`call_deferred`), cuando el director ya lo puso
+  en su lugar: los círculos de piedras se apoyan cada una en el suelo de su
+  punto. El cartel del vendedor es el toldo del puesto (lo tiñe el color de
+  su fila de `VENDOR_LIBRARY`). La colisión de cada santuario es su
+  `Body` (un cilindro o una caja del tamaño de la base); las piedras de los
+  portales chocan (cuerpo `FrameStones`) y, en un portal de pareja, quedan
+  más afuera que el punto donde aparece quien llega teletransportado; lo
+  demás no tiene colisión. Todo se apaga a gris con `dim_visuals()`.
 - Archivos: base `scripts/world/interactables/interactable.gd` (`Interactable extends Area3D`); `chest.gd`, `charge_shrine.gd`, `curse_shrine.gd` (extiende `ChargeShrine`), `greed_shrine.gd`, `spring_shrine.gd`, `roulette_shrine.gd` + `scripts/ui/game/roulette_ui.gd`, `portal_shrine.gd`; secretos: `secret_trigger.gd`, `odd_stump.gd`, `humming_skull.gd`, `scripts/enemies/secret_boss_base.gd`.
 - Contrato `Interactable`: sobreescribir `_interact(player)` (y opcionalmente `_on_range_entered()` / `_on_range_exited()`); llamar `consume()` al gastarse (bumpea `meta_stat_id` y apaga el prompt); `dim_visuals()` para el gris de «usado» (`spent_color`); `sink_away(keep_alive)` para hundirse y liberarse (exports `sink_duration`, `sink_depth`, `sink_end_scale`, que cada escena ajusta); `_emit_completed()` da destello + sonido (`complete_sound`).
 - **Quién está en el anillo**: `_players_in_range` es la lista real; `player_in_range` es solo «alguno». Un raider **derribado sigue en la lista** (su cuerpo nunca sale del árbol, así que `body_exited` no dispara): para saber quién puede sostener un ritual, usar **`live_players_in_range()`** y `nearest_live_player()`. `best_kind_count_in_range(kind)` da el mejor conteo de copias de un `kind` de objeto entre los presentes.
