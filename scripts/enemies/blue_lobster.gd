@@ -87,6 +87,14 @@ func _physics_process(delta: float) -> void:
 	_watch_stuck(before, delta)
 
 
+func _notification(what: int) -> void:
+	# La detuvieron a mitad de un ataque (un «tiempo detenido», la cinemática
+	# de otro jefe): el ataque se corta. Sus avisos y sus ondas corren con su
+	# propio reloj y se cumplirían sin ella.
+	if what == NOTIFICATION_DISABLED and is_node_ready() and _phase == Phase.MOVE:
+		_interrupt_move()
+
+
 # --- contratos por nombre ---------------------------------------------------------
 
 ## En qué anda: "arrival", "stalk", "move" o "dead" (lo lee el harness).
@@ -194,8 +202,7 @@ func _scale_attack_damage(multiplier: float) -> void:
 func _death_tween() -> void:
 	_cancel_move()
 	# Lo que dejó en el suelo se va con ella: nadie recibe un golpe de un jefe muerto.
-	get_tree().call_group(ShockRing.GROUP, &"dissipate")
-	get_tree().call_group(TelegraphLane.GROUP, &"dismiss")
+	_clear_ground()
 	feel.clear()
 	_voice.died()
 	rig.set_pose(LobsterRig.Pose.DEAD)
@@ -252,13 +259,31 @@ func _end_move() -> void:
 	_stalk.flip()
 
 
-## Corta el ataque en curso sin terminarlo (la langosta muere).
+## Corta el ataque en curso sin terminarlo (la langosta muere o la detienen).
 func _cancel_move() -> void:
 	if _move == null:
 		return
 	_move.cancel()
 	_move = null
 	set_pace(1.0)
+
+
+## La detuvieron a mitad de un ataque: lo suelta, apaga lo que dejó en el
+## suelo y, cuando vuelva a moverse, ronda su pausa y elige otro.
+func _interrupt_move() -> void:
+	_cancel_move()
+	_clear_ground()
+	feel.clear()
+	_phase = Phase.STALK
+	_pause_left = attack_pause * lerpf(1.0, attack_pause_at_full_aggression, aggression)
+	face_along(Vector3.ZERO)
+	rig.set_pose(LobsterRig.Pose.STALK)
+
+
+## Apaga las ondas de choque y los carriles de aviso que dejó en el suelo.
+func _clear_ground() -> void:
+	get_tree().call_group(ShockRing.GROUP, &"dissipate")
+	get_tree().call_group(TelegraphLane.GROUP, &"dismiss")
 
 
 ## Lleva la cuenta del daño (nodo Life) y acusa los golpes fuertes.
