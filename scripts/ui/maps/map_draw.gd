@@ -200,7 +200,9 @@ func composite() -> void:
 				if fog_image.get_pixel(fx, fy).r < 0.5:
 					tint = tint.darkened(FOG_ALPHA)
 			_composite.set_pixel(px, py, tint)
-	if texture == null:
+	# Una arena de otro tamaño (el Bosque Hueco mide 320 m y las otras 240)
+	# pide una textura nueva: update() solo acepta una imagen del mismo tamaño.
+	if texture == null or Vector2i(texture.get_size()) != _composite.get_size():
 		texture = ImageTexture.create_from_image(_composite)
 	else:
 		texture.update(_composite)
