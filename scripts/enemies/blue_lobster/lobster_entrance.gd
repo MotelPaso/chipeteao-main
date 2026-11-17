@@ -47,10 +47,6 @@ const SPLIT_SCREEN_GROUP := &"split_screen"
 ## Texto de la indicación de saltar.
 @export var skip_hint_text: String = "Mantén para saltar"
 
-@export_group("Cartel")
-## Texto bajo el nombre del jefe.
-@export var subtitle_text: String = "Una entre dos millones"
-
 var _boss: BlueLobster = null
 var _freeze: WorldFreeze = WorldFreeze.new()
 var _active: bool = false
@@ -223,7 +219,7 @@ func _cut_in() -> void:
 	_camera.make_current()
 	_boss.rig.visible = true
 	_boss.rig.set_near_fade(false)
-	_overlay.open(_boss.boss_title, subtitle_text)
+	_overlay.open(_boss.boss_title)
 	if not _music.has_song() and not scare_sfx.is_empty():
 		Sfx.play(scare_sfx)
 	_taken_over = true

@@ -23,8 +23,6 @@ extends CanvasLayer
 @export var card_pop_seconds: float = 0.28
 ## Escala desde la que entra (1 = sin crecer).
 @export var card_pop_from: float = 0.55
-## Color del texto del subtítulo (va en una chapa oscura).
-@export var subtitle_color: Color = UiTheme.ACCENT
 
 @export_group("Saltar")
 ## Segundos desde el corte hasta que aparece la indicación de saltar: el susto va primero.
@@ -54,7 +52,6 @@ var _card_tween: Tween = null
 @onready var _card: Control = %Card
 @onready var _card_frame: Panel = %CardFrame
 @onready var _title: Label = %Title
-@onready var _subtitle: Label = %Subtitle
 @onready var _skip_hint: BoxContainer = %SkipHint
 @onready var _skip_bar: ProgressBar = %SkipBar
 @onready var _flash: ColorRect = %Flash
@@ -69,7 +66,6 @@ func _ready() -> void:
 	_card_frame.add_theme_stylebox_override("panel", style)
 	_title.add_theme_font_override("font", UiTheme.display_font())
 	_title.add_theme_color_override("font_color", UiTheme.INK)
-	UiTheme.style_badge(_subtitle, subtitle_color)
 	_card.visible = false
 	_card.resized.connect(_center_pivots)
 	_center_pivots()
@@ -84,9 +80,8 @@ func set_skip_hint(action: String, text: String) -> void:
 
 ## El corte: desde aquí hay entrada en pantalla. Deja listos el cartel (aún
 ## sin mostrar) y la indicación de saltar, y da el destello del susto.
-func open(title: String, subtitle: String) -> void:
+func open(title: String) -> void:
 	_title.text = title
-	_subtitle.text = subtitle
 	_card.visible = false
 	_card_shown = false
 	_staged = true
