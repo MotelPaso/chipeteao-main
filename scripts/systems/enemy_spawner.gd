@@ -207,6 +207,8 @@ const ELITE_CHANCE_CAP: float = 0.6
 @export var mini_boss_scene: PackedScene
 ## Minuto de etapa en que llega el minijefe.
 @export var mini_boss_spawn_minute: float = 5.0
+## Si el minijefe pelea SOLO: desde que llega no aparece ningún enemigo normal (ni flujo, ni hordas, ni jaurías, ni lluvia de enemigos) y el respiro tras su muerte es total. La horda que ya estaba en la arena se la lleva él al empezar la pelea.
+@export var mini_boss_fights_alone: bool = true
 ## Minuto de etapa en que llega su revancha Ancestral (el jefe de etapa).
 @export var elder_spawn_minute: float = 11.0
 ## Multiplicador de stats del Ancestral (y base de los jefes recurrentes).

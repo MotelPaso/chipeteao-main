@@ -1,8 +1,9 @@
 class_name BlueLobster
 extends LobsterBody
 ## Langosta Azul: el minijefe del Bosque Hueco. Llega en el hueco del
-## minijefe (EnemySpawner.mini_boss_scene) y pelea en medio de la horda, en
-## una sola fase: ronda al raider y cada tanto le suelta uno de sus cinco
+## minijefe (EnemySpawner.mini_boss_scene) y pelea SOLA, en una sola fase: al
+## empezar se lleva de una vez a la horda (nodo Purge) y mientras vive no
+## aparece nadie más. Ronda al raider y cada tanto le suelta uno de sus cinco
 ## ataques (los hijos del nodo Moves; cada uno con sus propios valores).
 ## Su vida no es un número fijo: el nodo Life la calcula con el daño real de
 ## la party (nodo Scaling) para que la pelea dure lo mismo con cualquier
@@ -58,6 +59,7 @@ var _pause_left: float = 0.0
 var _escape_turn: int = 0
 
 @onready var _life: LobsterLife = $Life
+@onready var _purge: LobsterPurge = $Purge
 @onready var _arrival: LobsterArrival = $Arrival
 @onready var _moveset: LobsterMoveset = $Moves
 @onready var _voice: LobsterVoice = $Voice
@@ -136,6 +138,8 @@ func finish_entrance(elapsed: float, skipped: bool) -> void:
 	_phase = Phase.STALK
 	_pause_left = first_attack_delay
 	show_presence()
+	# Pelea sola: se lleva ya a la horda que quedaba en la arena.
+	_purge.begin(self)
 	_voice.fight_started()
 	rig.gesture(&"roar")
 	# Línea de log para los soaks: la pelea se mide desde aquí.

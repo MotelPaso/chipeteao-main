@@ -614,9 +614,11 @@ fi
 # Azul), que llega en el minuto 5: BONK_MINI_BOSS_AT lo trae a los 60 s. Mide
 # su entrada (el mundo congelado, la pantalla tomada y devuelta), la pelea de
 # punta a punta, que su muerte salga exactamente una vez y que 5 s después no
-# quede nada suyo (ni efectos, ni cuerpo, ni canción). Fuera de la cuenta de
-# interactuables, como el del jefe de etapa. Pasa igual con la canción puesta
-# o con su hueco vacío.
+# quede nada suyo (ni efectos, ni cuerpo, ni canción). Si pelea sola
+# (EnemySpawner.mini_boss_fights_alone), que se lleve a la horda y no haya
+# ningún otro enemigo durante la pelea. Fuera de la cuenta de interactuables,
+# como el del jefe de etapa. Pasa igual con la canción puesta o con su hueco
+# vacío.
 LOBSTER_SECS=270
 LOBSTER_FRAMES=$(( LOBSTER_SECS * 60 ))
 echo "== soak minijefe (HollowWoods, Langosta Azul, ${LOBSTER_SECS}s de partida) =="
@@ -682,6 +684,24 @@ else
 	if [ "$LOBSTER_ATAQUES" -lt 3 ]; then
 		echo "  FALLO: la langosta usó $LOBSTER_ATAQUES ataque(s) distinto(s) (se esperan al menos 3)"
 		FALLOS=$((FALLOS + 1))
+	fi
+	# Si pelea sola: se llevó a la horda al empezar y no hubo nadie más.
+	if grep -q '^Spawns held: mini boss fights alone at ' "$LOBSTER_LOG"; then
+		if ! grep -qE '^Langosta Azul purge: swept=[0-9]+ bosses=[0-9]+ at ' "$LOBSTER_LOG"; then
+			echo "  FALLO: la langosta pelea sola pero no barrió a la horda al empezar"
+			FALLOS=$((FALLOS + 1))
+		fi
+		if ! grep -q '^Probe mini alone: held=true others_max_after_purge=0$' "$LOBSTER_LOG"; then
+			echo "  FALLO: hubo otros enemigos durante la pelea de la langosta, o los spawns no estaban cortados"
+			grep -n '^Probe mini alone: ' "$LOBSTER_LOG" | head -3
+			FALLOS=$((FALLOS + 1))
+		fi
+		if ! grep -q '^Spawns resumed at ' "$LOBSTER_LOG"; then
+			echo "  FALLO: los spawns no volvieron después de la muerte de la langosta"
+			FALLOS=$((FALLOS + 1))
+		fi
+	else
+		echo "  nota: la langosta pelea en medio de la horda (mini_boss_fights_alone apagado)"
 	fi
 	# Cinco segundos después de morir no queda nada suyo.
 	if ! grep -qE '^Probe mini hazards: .* total=0 body=false song_playing=false died_signals=1$' "$LOBSTER_LOG"; then

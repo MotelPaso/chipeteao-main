@@ -18,7 +18,8 @@ extends RefCounted
 ## normal hasta que muere y pasa el respiro (spawns_held).
 ## Una arena puede traer además un MINIJEFE (mini_boss_scene): llega en
 ## mini_boss_spawn_minute, sin aviso, y el jefe del bioma espera a que muera
-## y pase su respiro.
+## y pase su respiro. Si pelea solo (mini_boss_fights_alone), mientras vive
+## tampoco sale ningún enemigo normal, igual que con el jefe de etapa.
 
 ## Interruptor del harness: BONK_STAGE_BOSS_AT=<segundos> trae al jefe de
 ## etapa en ese segundo de la etapa y no en elder_spawn_minute. Solo
@@ -55,6 +56,8 @@ var _alone_breather_left: float = 0.0
 var _mini_boss_spawned: bool = false
 var _mini_boss: BossBase = null
 var _mini_boss_at: float = -1.0
+## True mientras vive un minijefe que pelea solo (mini_boss_fights_alone).
+var _mini_boss_alone: bool = false
 
 
 func _init(spawner: EnemySpawner) -> void:
@@ -82,19 +85,21 @@ func interval_factor() -> float:
 ## Descuenta el reloj del respiro.
 func tick_relief(delta: float) -> void:
 	_relief_timer = maxf(_relief_timer - delta, 0.0)
-	if _alone_breather_left > 0.0:
+	# El respiro sin spawns corre recién cuando ya no queda ningún jefe
+	# peleando solo (el minijefe puede morir con el jefe de etapa en la arena).
+	if _alone_breather_left > 0.0 and not _alone_boss_alive():
 		_alone_breather_left -= delta
 		if _alone_breather_left <= 0.0:
 			# Log de una línea para los soaks: la horda vuelve desde aquí.
 			print("Spawns resumed at %.1fs" % RunState.stage_time)
 
 
-## True mientras el jefe de etapa propio pelea solo
-## (EnemySpawner.stage_boss_fights_alone) y durante el respiro tras su
-## muerte: el spawner no saca nada.
+## True mientras un jefe pelea solo (el jefe de etapa propio con
+## EnemySpawner.stage_boss_fights_alone, o el minijefe con
+## mini_boss_fights_alone) y durante el respiro tras su muerte: el spawner
+## no saca nada.
 func spawns_held() -> bool:
-	return _spawner.stage_boss_fights_alone \
-			and (_own_stage_boss_alive or _alone_breather_left > 0.0)
+	return _alone_boss_alive() or _alone_breather_left > 0.0
 
 
 ## Dispara cada entrada del horario que ya venció. Cada una se dispara una
@@ -103,6 +108,10 @@ func spawns_held() -> bool:
 ## hueco marcado como gastado perdería ese jefe para siempre.
 func tick() -> void:
 	var spawner := _spawner
+	# Un minijefe que se fue sin morir (algo lo liberó) no deja la arena sin
+	# enemigos para siempre.
+	if _mini_boss_alone and not _mini_boss_alive():
+		_on_mini_boss_died()
 	_tick_mini_boss()
 	if spawner.boss_scene == null:
 		return
@@ -204,6 +213,13 @@ func _tick_mini_boss() -> void:
 	_mini_boss_spawned = true
 	_mini_boss = boss
 	boss.add_to_group(MINI_BOSS_GROUP)
+	if spawner.mini_boss_fights_alone:
+		_mini_boss_alone = true
+		# Log de una línea para los soaks: desde aquí no aparece nadie más.
+		print("Spawns held: mini boss fights alone at %.1fs" % RunState.stage_time)
+		var health := Health.find_in(boss)
+		if health != null:
+			health.died.connect(_on_mini_boss_died, CONNECT_ONE_SHOT)
 
 
 ## Segundo de etapa en que llega el minijefe.
@@ -219,6 +235,19 @@ func _mini_boss_holds_boss() -> bool:
 	if not _mini_boss_spawned:
 		return RunState.stage_time >= _mini_boss_due()
 	return _mini_boss_alive() or _relief_timer > 0.0
+
+
+## True mientras hay un jefe peleando solo en la arena.
+func _alone_boss_alive() -> bool:
+	return (_spawner.stage_boss_fights_alone and _own_stage_boss_alive) or _mini_boss_alone
+
+
+## El minijefe que peleaba solo murió: empieza el respiro sin spawns.
+func _on_mini_boss_died() -> void:
+	if not _mini_boss_alone:
+		return
+	_mini_boss_alone = false
+	_alone_breather_left = _spawner.boss_relief_duration
 
 
 func _mini_boss_alive() -> bool:

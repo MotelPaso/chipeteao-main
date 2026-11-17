@@ -9,13 +9,14 @@ extends RefCounted
 ## etapa) actúan igual sobre la entrada de un minijefe, porque buscan el grupo
 ## "boss_cinematic".
 ## Imprime:
-##   Probe mini calm:    vidas y cuerpos al empezar y al terminar la entrada:
-##                       con el mundo congelado nada cambia ni aparece. La
-##                       vida del propio minijefe no cuenta (su plan de vida
-##                       se aplica justo al empezar la pelea)
+##   Probe mini calm:    vidas y cuerpos en el primer y en el último frame de
+##                       la entrada: con el mundo congelado nada cambia ni
+##                       aparece (lo mide MiniBossCalm)
 ##   Probe mini stage:   HUD, pantalla dividida, cámara, canción y mundo, dos
 ##                       frames después de la entrada y un rato después de morir
 ##   Probe mini fight:   al morir, cuánto duró la pelea según el reloj del probe
+##   Probe mini alone:   al morir, si los spawns estaban cortados y cuántos
+##                       enemigos más hubo como mucho durante la pelea
 ##   Probe mini states:  al salir, segundos en cada estado
 ##   Probe mini damage:  al salir, daño de cada arma por estado
 ##   Probe mini hits on raiders: al salir, golpes del minijefe por slot
@@ -34,7 +35,9 @@ const HAZARD_GROUPS: Array[StringName] = [&"shock_rings", &"telegraph_lanes", &"
 const STAGE_REPORT_FRAMES: int = 2
 ## Frames desde que llega hasta la línea que muestra la pantalla en plena entrada.
 const ENTRANCE_REPORT_FRAMES: int = 120
-
+## Segundos de pelea desde los que se cuentan otros enemigos: el minijefe que
+## pelea solo se lleva a la horda en el instante en que empieza.
+const ALONE_AFTER: float = 0.5
 ## Segundos tras su muerte hasta contar lo que dejó vivo.
 const AFTERMATH_DELAY: float = 5.0
 ## Una foto pedida en un frame de física sale del frame SIGUIENTE: la cámara
@@ -55,8 +58,7 @@ var _frames: int = 0
 var _arrival_from_frame: int = 0
 var _fight_from: float = -1.0
 var _stage_reports: Array[Dictionary] = []
-var _calm_health: Dictionary[int, float] = {}
-var _calm_counts: Array[int] = []
+var _calm: MiniBossCalm = null
 ## Segundos del probe en cada estado y daño de cada arma por estado.
 var _state_seconds: Dictionary[String, float] = {}
 var _weapon_damage: Dictionary[String, Dictionary] = {}
@@ -69,11 +71,16 @@ var _last_fight_detail: String = ""
 ## Veces que su Health emitió `died` (tiene que ser una) y a quién se le cuenta.
 var _died_signals: int = 0
 var _watched_health: Health = null
+## Si el spawner estaba detenido al empezar la pelea, y el máximo de OTROS
+## enemigos vivos a la vez desde ALONE_AFTER segundos de pelea.
+var _alone_held: bool = false
+var _others_max: int = 0
 
 
 func _init(host: Node, camera: ShotCamera) -> void:
 	_tree = host.get_tree()
 	_camera = camera
+	_calm = MiniBossCalm.new(_tree)
 
 
 ## Un frame de física del probe. `frames` son los que lleva el probe.
@@ -92,10 +99,23 @@ func tick(delta: float, frames: int) -> void:
 		if state != &"dead" and state != &"arrival":
 			_last_fight_detail = key
 	if state == &"arrival":
+		_calm.sample()
 		_tick_entrance_shots()
 	elif _fight_from >= 0.0:
 		_tick_fight_shots()
+		_tick_alone(boss)
 	_tick_stage_reports()
+
+
+## Cuenta a los otros enemigos vivos mientras el minijefe pelea.
+func _tick_alone(boss: Node3D) -> void:
+	if boss == null or _now - _fight_from < ALONE_AFTER:
+		return
+	var others := 0
+	for node: Node in _tree.get_nodes_in_group(&"enemies"):
+		if node != boss:
+			others += 1
+	_others_max = maxi(_others_max, others)
 
 
 ## Cambio de etapa: el minijefe y su entrada se fueron con la arena.
@@ -171,18 +191,21 @@ func _on_state_changed(from: StringName, to: StringName, boss: Node3D) -> void:
 	if to == &"arrival":
 		_arrival_from_frame = _frames
 		_shots_done.clear()
-		_calm_health = _health_snapshot(boss)
-		_calm_counts = _live_counts()
+		_calm.begin(boss)
 		_stage_reports.append({"left": ENTRANCE_REPORT_FRAMES, "reason": "entrance"})
 	elif from == &"arrival" and to == &"":
 		print("Probe mini calm: aborted after %d frames (mini boss gone)" % (
 				_frames - _arrival_from_frame))
 	elif from == &"arrival":
-		_report_calm(_frames - _arrival_from_frame, boss)
+		_calm.report(_frames - _arrival_from_frame)
 		_fight_from = _now
+		_alone_held = EnemySpawner.is_holding(_tree)
+		_others_max = 0
 		_stage_reports.append({"left": STAGE_REPORT_FRAMES, "reason": "entrance_end"})
 	if to == &"dead" and _fight_from >= 0.0:
 		print("Probe mini fight: took=%.1fs at %.1fs" % [_now - _fight_from, _now])
+		# El minijefe pelea solo: durante la pelea no hubo ningún otro enemigo.
+		print("Probe mini alone: held=%s others_max_after_purge=%d" % [_alone_held, _others_max])
 		_stage_reports.append({"left": int(AFTERMATH_DELAY * 60.0), "reason": "aftermath"})
 		_camera.request_in(1.0, "mini_death_%.0fs" % _now)
 	if to == &"dead" or to == &"":
@@ -221,47 +244,6 @@ func _watch_death(boss: Node3D) -> void:
 func _on_raider_hit(attacker: Node3D, slot: int) -> void:
 	if attacker != null and is_instance_valid(attacker) and attacker.is_in_group(GROUP):
 		_raider_hits[slot] = int(_raider_hits.get(slot, 0)) + 1
-
-
-# --- la entrada: nada cambia con el mundo congelado ------------------------------
-
-## Vida de cada cuerpo con Health de la partida, por id de instancia, menos la
-## del propio minijefe.
-func _health_snapshot(boss: Node3D) -> Dictionary[int, float]:
-	var out: Dictionary[int, float] = {}
-	for group: StringName in [&"player", &"downed_players", &"enemies", &"boss", &"possessed"]:
-		for node: Node in _tree.get_nodes_in_group(group):
-			if node == boss:
-				continue
-			var health := Health.find_in(node)
-			if health != null:
-				out[health.get_instance_id()] = health.current_hp
-	return out
-
-
-## Cuerpos y proyectiles vivos: enemigos, saetas enemigas y disparos.
-func _live_counts() -> Array[int]:
-	return [_tree.get_node_count_in_group(&"enemies"),
-			_tree.get_node_count_in_group(&"enemy_projectiles"),
-			_tree.get_node_count_in_group(&"player_shots")]
-
-
-func _report_calm(frames: int, boss: Node3D) -> void:
-	var after := _health_snapshot(boss)
-	var changed := 0
-	for id: int in _calm_health:
-		if not after.has(id) or not is_equal_approx(after[id], _calm_health[id]):
-			changed += 1
-	var born := 0
-	for id: int in after:
-		if not _calm_health.has(id):
-			born += 1
-	var counts := _live_counts()
-	print(("Probe mini calm: frames=%d seconds=%.2f healths=%d changed=%d born=%d"
-			+ " enemies=%d->%d bolts=%d->%d shots=%d->%d") % [
-			frames, float(frames) / 60.0, _calm_health.size(), changed, born,
-			_calm_counts[0], counts[0], _calm_counts[1], counts[1],
-			_calm_counts[2], counts[2]])
 
 
 # --- reportes --------------------------------------------------------------------
