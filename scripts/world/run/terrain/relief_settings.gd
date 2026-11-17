@@ -96,9 +96,9 @@ extends Resource
 
 @export_group("Cerros")
 ## Cerros sueltos del llano (mesetas chicas con su acantilado), como mínimo.
-@export var butte_count_min: int = 2
+@export var butte_count_min: int = 3
 ## Cerros sueltos del llano, como máximo.
-@export var butte_count_max: int = 3
+@export var butte_count_max: int = 5
 ## Radio medio mínimo de un cerro, en metros.
 @export var butte_radius_min: float = 11.0
 ## Radio medio máximo de un cerro, en metros.
@@ -134,9 +134,9 @@ extends Resource
 
 @export_group("Cañón")
 ## Largo mínimo del cañón, en metros (rampas de los extremos incluidas).
-@export var ravine_length_min: float = 140.0
+@export var ravine_length_min: float = 170.0
 ## Largo máximo del cañón, en metros.
-@export var ravine_length_max: float = 170.0
+@export var ravine_length_max: float = 205.0
 ## Ancho mínimo del cañón de borde a borde, en metros.
 @export var ravine_width_min: float = 24.0
 ## Ancho máximo del cañón de borde a borde, en metros.
@@ -188,9 +188,9 @@ extends Resource
 ## las rampas del llano, el círculo de piedras y las ruinas. Vacío, no hay piedras.
 @export var stones_scene: PackedScene
 ## Ruinas en claros del llano, como máximo (las que quepan).
-@export var ruin_count: int = 3
+@export var ruin_count: int = 5
 ## Monolitos sueltos (piedras paradas de varios metros), como máximo.
-@export var monolith_count: int = 9
+@export var monolith_count: int = 14
 ## Altura mínima de un monolito, en metros.
 @export var monolith_height_min: float = 6.5
 ## Altura máxima de un monolito, en metros (bajo 10: la horda trepa 10 de una vez).
@@ -203,7 +203,7 @@ extends Resource
 
 @export_group("Lomas sueltas")
 ## Lomas anchas del llano, además de las que sostienen la montaña y los cerros.
-@export var hill_count: int = 5
+@export var hill_count: int = 9
 ## Altura mínima de una loma suelta, en metros.
 @export var hill_height_min: float = 1.8
 ## Altura máxima de una loma suelta, en metros.

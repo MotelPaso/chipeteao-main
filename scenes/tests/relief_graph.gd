@@ -56,9 +56,16 @@ const WORLD_LAYER: int = 1
 ## Rayos por celda como máximo: cada obstáculo atravesado gasta uno.
 const MAX_RAY_PASSES: int = 5
 ## Escenas de prop que son un tablero donde pararse, además de los tipos
-## Terrain, CliffWall y Bridge.
+## Terrain, CliffWall y Bridge: las plataformas de meseta y sus rampas.
+const PLATFORM_SCENES: Array[String] = [
+	"res://scenes/world/props/Platform.tscn", "res://scenes/world/props/RuinDais.tscn",
+]
+const RAMP_SCENES: Array[String] = [
+	"res://scenes/world/props/Ramp.tscn", "res://scenes/world/props/RuinStairs.tscn",
+]
 const DECK_SCENES: Array[String] = [
 	"res://scenes/world/props/Platform.tscn", "res://scenes/world/props/Ramp.tscn",
+	"res://scenes/world/props/RuinDais.tscn", "res://scenes/world/props/RuinStairs.tscn",
 ]
 ## Estado de una celda (ver la cabecera). Hasta TIGHT se camina.
 const OPEN: int = 0

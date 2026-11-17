@@ -377,6 +377,14 @@ func can_place(xz: Vector2, margin: float = 0.0) -> bool:
 	return can_grow(xz, margin) and _footprints.is_clear(xz)
 
 
+## True si en `xz` se puede levantar una ESTRUCTURA del director (un POI, un
+## portal, un evento): lo mismo que can_place y, con relieve por zonas, fuera
+## del cañón, que es río. Lo que cae donde murió alguien y los spawns siguen
+## con can_place: pueden quedar en el cañón.
+func can_build(xz: Vector2, margin: float = 0.0) -> bool:
+	return can_place(xz, margin) and not _in_canyon(xz)
+
+
 ## True si en `xz` puede crecer la vegetación del suelo: lo mismo que
 ## can_place, salvo que el pasto sí llega hasta el pie de un tronco.
 func can_grow(xz: Vector2, margin: float = 0.0) -> bool:

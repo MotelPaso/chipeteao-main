@@ -22,7 +22,7 @@ const GROUP: StringName = &"ground_cover"
 ## Lado de cada trozo, en metros: una malla por trozo.
 @export var chunk_size: float = 20.0
 ## Trozos que se arman por frame.
-@export_range(1, 64) var chunks_per_frame: int = 10
+@export_range(1, 64) var chunks_per_frame: int = 6
 ## Metros que la vegetación guarda con un corte, una rampa o un puente.
 @export var relief_clearance: float = 2.0
 ## Metros libres de vegetación alrededor del punto de aparición.

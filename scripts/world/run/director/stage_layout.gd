@@ -108,11 +108,13 @@ func spawn_at(scene: PackedScene, at: Vector3) -> Node3D:
 ## --- máscara y suelo --------------------------------------------------------
 
 ## True si en `xz` se puede poner algo: celda abierta de la máscara y, con
-## relieve por zonas, lejos de cortes, rampas, puentes y mesetas
-## (arena_bounds.can_place). Todo muestreo de este archivo pasa por aquí.
+## relieve por zonas, lejos de cortes, rampas, puentes y mesetas y fuera del
+## cañón (arena_bounds.can_build). Todo muestreo de este archivo pasa por aquí.
 func walkable_xz(xz: Vector2) -> bool:
 	if _bounds == null:
 		return true
+	if _bounds.has_method("can_build"):
+		return bool(_bounds.call("can_build", xz, RELIEF_MARGIN))
 	if _bounds.has_method("can_place"):
 		return bool(_bounds.call("can_place", xz, RELIEF_MARGIN))
 	if not _bounds.has_method("is_walkable"):

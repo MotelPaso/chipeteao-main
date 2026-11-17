@@ -110,9 +110,9 @@ func _check_props(bad: Dictionary, notes: Array[String]) -> int:
 		if not _settled(prop):
 			_flag(bad, "misplaced", notes, what, prop.global_position)
 		var reach := 0.0
-		if prop.scene_file_path == ReliefGraph.DECK_SCENES[0]:
+		if ReliefGraph.PLATFORM_SCENES.has(prop.scene_file_path):
 			reach = PLATFORM_REACH * prop.scale.x
-		elif prop.scene_file_path == ReliefGraph.DECK_SCENES[1]:
+		elif ReliefGraph.RAMP_SCENES.has(prop.scene_file_path):
 			reach = RAMP_REACH * prop.scale.x
 		if reach > 0.0 and near - reach < CROWDING:
 			_flag(bad, "crowding", notes, what, prop.global_position)

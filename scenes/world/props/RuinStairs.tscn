@@ -1,0 +1,13 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/world/props/ruin_stairs.gd" id="1_stairs"]
+
+[sub_resource type="ConvexPolygonShape3D" id="ConvexPolygonShape3D_wedge"]
+points = PackedVector3Array(-2, -1, -1.5, -2, -1, 1.5, 2, -1, -1.5, 2, -1, 1.5, 2, 1, -1.5, 2, 1, 1.5)
+
+[node name="RuinStairs" type="StaticBody3D"]
+script = ExtResource("1_stairs")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0)
+shape = SubResource("ConvexPolygonShape3D_wedge")
