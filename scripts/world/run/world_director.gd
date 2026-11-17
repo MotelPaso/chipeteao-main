@@ -350,6 +350,13 @@ func rebase_sky(sun_color: Color, sun_energy: float, ambient_color: Color,
 	return _weather.rebase_sky(sun_color, sun_energy, ambient_color, ambient_energy)
 
 
+## El cielo «original» de la arena ahora, sin el tinte del clima en curso
+## (sun_color, sun_energy, ambient_color, ambient_energy): lo pide quien va
+## a cambiar el cielo por un rato y devolverlo con rebase_sky().
+func sky_base() -> Dictionary:
+	return _weather.sky_base()
+
+
 ## Un StageLayout para `arena` (null = vacío) con las distancias del reparto.
 func _new_layout(arena: Node3D) -> StageLayout:
 	var layout := StageLayout.new(self, arena)

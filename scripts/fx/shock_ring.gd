@@ -4,7 +4,8 @@ extends Node3D
 ## ras de suelo desde un punto, siguiendo el relieve. Daña UNA vez a cada
 ## raider en pie que el anillo alcance por debajo de su altura: se esquiva
 ## SALTANDO justo cuando pasa. Con daño 0 es solo un efecto (el barrido del
-## Coletazo de la Langosta Azul).
+## Coletazo de la Langosta Azul) y se pinta de agua; la que daña, de un color
+## cálido (danger_color del sombreador).
 ## El anillo son tramos (el cuadro de 1 x 1 del nodo Crest de ShockRing.tscn)
 ## en un MultiMesh propio de cada instancia.
 ## Grupo "shock_rings": quien las lanza las apaga todas al morir (dissipate).
@@ -88,6 +89,8 @@ func open(center: Vector3, start_radius: float, end_radius: float, speed: float,
 	_live = true
 	add_to_group(GROUP)
 	global_transform = Transform3D(Basis.IDENTITY, center)
+	# La que daña se pinta cálida (hay que saltarla); la que es solo un efecto, de agua.
+	_crest.set_instance_shader_parameter(&"danger", 1.0 if damage > 0.0 else 0.0)
 	_set_fade(1.0)
 	_place_segments()
 	_crest.visible = true

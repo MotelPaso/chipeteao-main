@@ -10,6 +10,9 @@ group_uniforms Color;
 // Color de la espuma de arriba y del cuerpo de la onda.
 uniform vec3 crest_color : source_color = vec3(0.92, 0.98, 1.0);
 uniform vec3 body_color : source_color = vec3(0.16, 0.62, 1.0);
+// Color del cuerpo de una onda que DAÑA (ShockRing la marca con `danger`):
+// cálido, para que se lea sobre cualquier suelo, también el azul de la marea.
+uniform vec3 danger_color : source_color = vec3(1.0, 0.26, 0.16);
 // Brillo de la onda.
 uniform float strength : hint_range(0.0, 4.0) = 1.5;
 
@@ -20,6 +23,8 @@ uniform float rise_speed = 2.6;
 
 // 0-1: opacidad de toda la onda (la baja al apagarse).
 instance uniform float fade = 1.0;
+// 1 si la onda daña (hay que saltarla), 0 si es solo un efecto.
+instance uniform float danger = 0.0;
 
 varying vec3 world_pos;
 
@@ -53,6 +58,6 @@ void fragment() {
 	float top = 0.35 + 0.6 * n;
 	float body = 1.0 - smoothstep(top - 0.25, top, h);
 	float foam = smoothstep(top - 0.24, top - 0.05, h) * body;
-	ALBEDO = mix(body_color, crest_color, foam) * strength;
+	ALBEDO = mix(mix(body_color, danger_color, danger), crest_color, foam) * strength;
 	ALPHA = body * (0.3 + 0.7 * foam + 0.25 * (1.0 - h)) * fade;
 }

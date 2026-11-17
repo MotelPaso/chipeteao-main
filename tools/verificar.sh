@@ -616,9 +616,10 @@ fi
 # punta a punta, que su muerte salga exactamente una vez y que 5 s después no
 # quede nada suyo (ni efectos, ni cuerpo, ni canción). Si pelea sola
 # (EnemySpawner.mini_boss_fights_alone), que se lleve a la horda y no haya
-# ningún otro enemigo durante la pelea. Fuera de la cuenta de interactuables,
-# como el del jefe de etapa. Pasa igual con la canción puesta o con su hueco
-# vacío.
+# ningún otro enemigo durante la pelea; si trae su marea
+# (LobsterArrival.tide_scene), que esté alta al terminar la entrada y se haya
+# ido tras su muerte. Fuera de la cuenta de interactuables, como el del jefe
+# de etapa. Pasa igual con la canción puesta o con su hueco vacío.
 LOBSTER_SECS=270
 LOBSTER_FRAMES=$(( LOBSTER_SECS * 60 ))
 echo "== soak minijefe (HollowWoods, Langosta Azul, ${LOBSTER_SECS}s de partida) =="
@@ -663,12 +664,12 @@ else
 		FALLOS=$((FALLOS + 1))
 	fi
 	# En plena entrada la pantalla es de la langosta; al terminar vuelve entera.
-	if ! grep -qE '^Probe mini stage: reason=entrance hud_visible=false .*cinematic_camera=true .*world_frozen=true clock_running=false$' "$LOBSTER_LOG"; then
+	if ! grep -qE '^Probe mini stage: reason=entrance hud_visible=false .*cinematic_camera=true .*world_frozen=true clock_running=false tide=[a-z]+$' "$LOBSTER_LOG"; then
 		echo "  FALLO: en plena entrada el HUD, la cámara o el mundo no estaban tomados"
 		grep -n '^Probe mini stage: ' "$LOBSTER_LOG" | head -3
 		FALLOS=$((FALLOS + 1))
 	fi
-	if ! grep -qE '^Probe mini stage: reason=entrance_end hud_visible=true .*cinematic_camera=false .*world_frozen=false clock_running=true$' "$LOBSTER_LOG"; then
+	if ! grep -qE '^Probe mini stage: reason=entrance_end hud_visible=true .*cinematic_camera=false .*world_frozen=false clock_running=true tide=[a-z]+$' "$LOBSTER_LOG"; then
 		echo "  FALLO: la entrada no devolvió el HUD, la cámara, el mundo o el reloj"
 		grep -n '^Probe mini stage: ' "$LOBSTER_LOG" | head -3
 		FALLOS=$((FALLOS + 1))
@@ -702,6 +703,23 @@ else
 		fi
 	else
 		echo "  nota: la langosta pelea en medio de la horda (mini_boss_fights_alone apagado)"
+	fi
+	# Si trae su marea: alta cuando la entrada devuelve la pantalla, y nada
+	# de ella (ni el cielo azul) tras su muerte.
+	if grep -q '^Lobster tide: rising over ' "$LOBSTER_LOG"; then
+		if ! grep -qE '^Probe mini stage: reason=entrance_end .* tide=high$' "$LOBSTER_LOG"; then
+			echo "  FALLO: la marea no estaba alta al terminar la entrada de la langosta"
+			grep -n '^Probe mini stage: ' "$LOBSTER_LOG" | head -3
+			FALLOS=$((FALLOS + 1))
+		fi
+		if ! grep -q '^Lobster tide: gone at ' "$LOBSTER_LOG" \
+				|| ! grep -qE '^Probe mini stage: reason=aftermath .* tide=none$' "$LOBSTER_LOG"; then
+			echo "  FALLO: la marea de la langosta no se fue después de su muerte"
+			grep -n '^Lobster tide: \|^Probe mini stage: reason=aftermath' "$LOBSTER_LOG" | head -6
+			FALLOS=$((FALLOS + 1))
+		fi
+	else
+		echo "  nota: la langosta llega sin marea (tide_scene vacío)"
 	fi
 	# Cinco segundos después de morir no queda nada suyo.
 	if ! grep -qE '^Probe mini hazards: .* total=0 body=false song_playing=false died_signals=1$' "$LOBSTER_LOG"; then

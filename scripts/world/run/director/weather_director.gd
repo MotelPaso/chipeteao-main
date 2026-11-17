@@ -291,6 +291,13 @@ func rebase_sky(sun_color: Color, sun_energy: float, ambient_color: Color,
 	return _sky.environment()
 
 
+## El cielo «original» de la arena ahora, sin el tinte del clima que esté en
+## curso (ver SkyTint.base()): lo pide quien va a cambiarlo por un rato.
+func sky_base() -> Dictionary:
+	_sky.cache(layout)
+	return _sky.base()
+
+
 ## Verdadero mientras `id` sea el clima activo.
 func is_weather_active(id: String) -> bool:
 	return not active_weather.is_empty() and String(active_weather.id) == id

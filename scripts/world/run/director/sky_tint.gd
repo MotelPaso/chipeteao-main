@@ -91,6 +91,16 @@ func environment() -> Environment:
 	return _environment
 
 
+## El cielo «original» de ahora, el que devuelve restore(): quien cambia el
+## cielo de la arena por un rato lo guarda para devolverlo con rebase().
+## Claves: sun_color, sun_energy, ambient_color y ambient_energy.
+func base() -> Dictionary:
+	return {
+		"sun_color": _sun_color, "sun_energy": _sun_energy,
+		"ambient_color": _ambient_color, "ambient_energy": _ambient_energy,
+	}
+
+
 ## Lleva el sol y el ambiente a un tinte en TINT_SECONDS. `sun_energy`
 ## multiplica la energía original del sol.
 func tint(sun_color: Color, sun_energy: float, ambient: Color) -> void:

@@ -274,10 +274,15 @@ func _print_stage(reason: String) -> void:
 		var camera := node as Camera3D
 		if camera != null and camera.current:
 			cinematic_camera = true
+	# La marea del minijefe: en qué anda, o "none" si ya no hay.
+	var tide := "none"
+	for node: Node in _tree.get_nodes_in_group(&"lobster_tide"):
+		if node.has_method(&"state_name") and not node.is_queued_for_deletion():
+			tide = String(node.call(&"state_name"))
 	print(("Probe mini stage: reason=%s hud_visible=%s split_visible=%s cinematic_camera=%s"
-			+ " song_playing=%s world_frozen=%s clock_running=%s") % [
+			+ " song_playing=%s world_frozen=%s clock_running=%s tide=%s") % [
 			reason, hud, split, cinematic_camera, _song_playing(), _world_frozen(),
-			RunState.is_physics_processing()])
+			RunState.is_physics_processing(), tide])
 	if reason == "aftermath":
 		_print_hazards()
 

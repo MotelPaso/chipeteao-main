@@ -33,9 +33,10 @@ uniform float rim_strength : hint_range(0.0, 4.0) = 1.0;
 uniform float rim_power : hint_range(0.5, 8.0) = 2.4;
 
 group_uniforms Furia;
-// Color que toma el brillo mientras carga un ataque y cuánto se enciende.
-uniform vec3 anger_color : source_color = vec3(0.55, 0.95, 1.0);
-uniform float anger_glow : hint_range(0.0, 6.0) = 1.6;
+// Color que toma el brillo mientras carga un ataque (cálido: se despega del
+// azul de su marea) y cuánto se enciende.
+uniform vec3 anger_color : source_color = vec3(1.0, 0.4, 0.26);
+uniform float anger_glow : hint_range(0.0, 6.0) = 1.25;
 
 group_uniforms Camara;
 // Metros a la cámara por debajo de los cuales la pieza desaparece y por
