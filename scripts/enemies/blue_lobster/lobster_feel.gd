@@ -8,23 +8,33 @@ extends CanvasLayer
 ## ve vive aquí y en el material del nodo Vignette.
 
 ## Tamaño de un golpe.
-enum Shock { LIGHT, HEAVY }
+enum Shock { LIGHT, HEAVY, CRUSHING }
 
 @export_group("Golpe liviano")
-## Temblor de cámara (0-1) de un golpe liviano: un pinzazo, el Coletazo.
-@export var light_shake: float = 0.18
+## Temblor de cámara (0-1) de un golpe liviano: un pinzazo o un Coletazo que no le dio a nadie.
+@export var light_shake: float = 0.2
 ## Segundos que dura ese temblor.
 @export var light_shake_seconds: float = 0.25
 
 @export_group("Golpe fuerte")
-## Temblor de cámara (0-1) de un golpe fuerte: la caída del Salto, la salida de la Emboscada.
-@export var heavy_shake: float = 0.5
+## Temblor de cámara (0-1) de un golpe fuerte: un golpe que le dio a alguien, cada salida de la Emboscada, la réplica del Salto.
+@export var heavy_shake: float = 0.55
 ## Segundos que dura ese temblor.
 @export var heavy_shake_seconds: float = 0.55
 ## Escala de tiempo (0-1) de la pausa de impacto de un golpe fuerte.
 @export_range(0.05, 1.0) var heavy_stop_scale: float = 0.18
 ## Segundos reales que dura esa pausa (0 = sin pausa).
 @export var heavy_stop_seconds: float = 0.06
+
+@export_group("Golpe demoledor")
+## Temblor de cámara (0-1) del golpe más grande: la caída del Salto, el remate de las Tenazas, la última salida de la Emboscada.
+@export var crushing_shake: float = 0.9
+## Segundos que dura ese temblor.
+@export var crushing_shake_seconds: float = 0.85
+## Escala de tiempo (0-1) de su pausa de impacto.
+@export_range(0.05, 1.0) var crushing_stop_scale: float = 0.1
+## Segundos reales que dura esa pausa (0 = sin pausa).
+@export var crushing_stop_seconds: float = 0.1
 
 @export_group("Distancia")
 ## Metros al raider más cercano hasta los que el golpe se siente entero.
@@ -79,8 +89,8 @@ func _process(delta: float) -> void:
 
 
 ## Un golpe de tamaño `size` en `at` (un punto del mundo): tiembla la cámara,
-## más cuanto más cerca cae de un raider, y los golpes fuertes además frenan
-## el juego un instante.
+## más cuanto más cerca cae de un raider, y los fuertes y los demoledores
+## además frenan el juego un instante.
 func shock(size: Shock, at: Vector3) -> void:
 	var share := _share_at(at)
 	match size:
@@ -89,6 +99,9 @@ func shock(size: Shock, at: Vector3) -> void:
 		Shock.HEAVY:
 			Juice.shake(heavy_shake * share, heavy_shake_seconds)
 			Juice.hit_stop(heavy_stop_scale, heavy_stop_seconds)
+		Shock.CRUSHING:
+			Juice.shake(crushing_shake * share, crushing_shake_seconds)
+			Juice.hit_stop(crushing_stop_scale, crushing_stop_seconds)
 
 
 ## Pide la viñeta de peligro a `amount` (0-1) durante este frame. El ataque

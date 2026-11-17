@@ -4,45 +4,50 @@ extends LobsterMove
 ## que solo asoman los ojos y las antenas. Un disco de aviso PERSIGUE al
 ## raider; cuando el montículo lo alcanza (o se le acaba el túnel) el disco se
 ## clava, el suelo tiembla y la langosta sale de golpe hacia arriba con las
-## pinzas por delante. Se esquiva cambiando de rumbo cuando el disco se clava.
-## Bajo tierra sigue siendo un blanco: las armas le pegan al montículo. Con
-## agresividad vuelve a enterrarse y sale una segunda vez.
+## pinzas por delante, vuelve a enterrarse en el acto y sale OTRA VEZ: una
+## cadena de salidas cada vez más encima. La última es la más grande. Se
+## esquiva cambiando de rumbo cuando el disco se clava (correr derecho no
+## alcanza), derrapando o saltando. Bajo tierra pasa por debajo de los raiders
+## (no choca con ellos) y sigue siendo un blanco: las armas le pegan al
+## montículo.
 
 enum Step { DIG, TUNNEL, LOCKED, POP, REST }
 
 @export_group("Emboscada")
 ## Salidas seguidas con agresividad 0.
-@export var eruptions: int = 1
+@export var eruptions: int = 3
 ## Salidas extra con agresividad 1.
 @export var extra_eruptions_at_full_aggression: int = 1
-## Segundos que tarda en enterrarse.
-@export var dig_seconds: float = 0.6
+## Segundos que tarda en enterrarse la primera vez.
+@export var dig_seconds: float = 0.45
+## Segundos que tarda en volver a enterrarse entre una salida y la siguiente.
+@export var redig_seconds: float = 0.25
 ## Metros por segundo a los que avanza bajo tierra.
-@export var tunnel_speed: float = 12.0
+@export var tunnel_speed: float = 17.0
 ## Segundos que como mucho pasa bajo tierra antes de clavar el disco.
-@export var max_tunnel_seconds: float = 2.4
+@export var max_tunnel_seconds: float = 1.8
 ## Metros al disco a los que ya lo da por alcanzado y lo clava.
 @export var catch_distance: float = 1.2
 ## Segundos entre que el disco se clava y la salida, con agresividad 0: la ventana para salir.
-@export var lock_seconds: float = 0.55
+@export var lock_seconds: float = 0.5
 ## Multiplicador de esa ventana con agresividad 1 (nunca menos que esto).
-@export var lock_at_full_aggression: float = 0.8
-## Radio de la salida y de su disco de aviso, en metros.
-@export var radius: float = 3.2
-## Daño de la salida a cada raider dentro del disco (valor base).
-@export var damage: float = 9.0
-## Metros sobre el suelo por encima de los cuales la salida no alcanza.
-@export var height_window: float = 1.6
+@export var lock_at_full_aggression: float = 0.85
+## Radio de cada salida y de su disco de aviso, en metros.
+@export var radius: float = 3.6
+## Daño de cada salida a cada raider dentro del disco (valor base).
+@export var damage: float = 6.0
+## Metros sobre el suelo por encima de los cuales la salida no alcanza (se esquiva saltando en cuanto el disco se clava).
+@export var height_window: float = 1.3
 ## Segundos que se adelanta al raider para ubicar el disco.
-@export var lead_seconds: float = 0.3
+@export var lead_seconds: float = 0.4
 ## Tope de ese adelanto, en metros, para un raider a velocidad base.
-@export var max_lead: float = 3.5
+@export var max_lead: float = 4.0
 ## Metros que se hunde el modelo bajo tierra.
 @export var depth: float = 1.9
 ## Metros que salta al salir.
-@export var pop_height: float = 2.8
+@export var pop_height: float = 3.2
 ## Segundos que dura ese salto.
-@export var pop_seconds: float = 0.55
+@export var pop_seconds: float = 0.42
 ## Metros antes del raider por donde sale: no le sale justo debajo, lo alcanza con las pinzas. El disco de aviso marca por dónde sale.
 @export var stand_off: float = 2.0
 ## Segundos quieta después de la última salida: una ventana para pegarle.
@@ -58,9 +63,28 @@ enum Step { DIG, TUNNEL, LOCKED, POP, REST }
 ## Escena del salpicón de tierra (SplashBurst, sale de Pools). Vacío = sin salpicón.
 @export var burst_scene: PackedScene = preload("res://scenes/fx/SplashBurst.tscn")
 
+@export_group("Última salida")
+## Radio de la última salida de la cadena y de su disco de aviso, en metros.
+@export var final_radius: float = 5.0
+## Daño de la última salida a cada raider dentro del disco (valor base).
+@export var final_damage: float = 10.0
+## Segundos entre que su disco se clava y la salida: la ventana para salir.
+@export var final_lock_seconds: float = 0.58
+## Metros que salta al salir la última vez.
+@export var final_pop_height: float = 5.2
+## Segundos que dura ese salto.
+@export var final_pop_seconds: float = 0.6
+## Tamaño de su salpicón de tierra (1 = el de siempre).
+@export var final_burst_size: float = 3.2
+
 var _step: Step = Step.DIG
 var _timer: float = 0.0
 var _eruptions_left: int = 0
+## True desde la segunda vez que se entierra en esta cadena.
+var _redigging: bool = false
+## Lo que mide el salto de la salida en curso.
+var _pop_height: float = 0.0
+var _pop_seconds: float = 0.5
 var _target: Node3D = null
 var _mark: Vector3 = Vector3.ZERO
 ## Dónde se enterró esta vez: desde ahí se mide por dónde sale.
@@ -73,11 +97,13 @@ var _disc: TelegraphDisc = null
 
 func scale_damage(multiplier: float) -> void:
 	damage *= multiplier
+	final_damage *= multiplier
 
 
 func begin(target: Node3D) -> void:
 	_target = target
 	_eruptions_left = maxi(aggression_count(eruptions, extra_eruptions_at_full_aggression), 1)
+	_redigging = false
 	_aim_height = boss.aim_height
 	_mark = boss.global_position
 	_dig()
@@ -87,7 +113,7 @@ func tick(delta: float) -> bool:
 	_timer -= delta
 	match _step:
 		Step.DIG:
-			var t := 1.0 - clampf(_timer / maxf(dig_seconds, 0.01), 0.0, 1.0)
+			var t := 1.0 - clampf(_timer / maxf(_dig_time(), 0.01), 0.0, 1.0)
 			boss.rig.sink = depth * t
 			if _timer <= 0.0:
 				_tunnel()
@@ -99,8 +125,8 @@ func tick(delta: float) -> bool:
 			if _timer <= 0.0:
 				_erupt()
 		Step.POP:
-			var t := 1.0 - clampf(_timer / maxf(pop_seconds, 0.01), 0.0, 1.0)
-			boss.rig.lift = pop_height * sin(t * PI)
+			var t := 1.0 - clampf(_timer / maxf(_pop_seconds, 0.01), 0.0, 1.0)
+			boss.rig.lift = _pop_height * sin(t * PI)
 			if _timer <= 0.0:
 				_after_pop()
 		Step.REST:
@@ -111,6 +137,7 @@ func tick(delta: float) -> bool:
 func cancel() -> void:
 	release_disc(_disc)
 	_disc = null
+	boss.pass_under_raiders(false)
 	boss.aim_height = _aim_height
 	boss.rig.sink = 0.0
 	boss.rig.lift = 0.0
@@ -125,7 +152,7 @@ func cancel() -> void:
 
 func _dig() -> void:
 	_step = Step.DIG
-	_timer = dig_seconds
+	_timer = _dig_time()
 	_dug_at = boss.global_position
 	boss.rig.set_pose(LobsterRig.Pose.DIG)
 	boss.rig.set_dust(true)
@@ -140,8 +167,10 @@ func _tunnel() -> void:
 	boss.rig.sink = depth
 	boss.rig.set_pose(LobsterRig.Pose.TUNNEL)
 	boss.aim_height = buried_aim_height
+	boss.pass_under_raiders(true)
 	_mark = _aim_point()
-	_disc = Telegraph.spawn_moving_disc(_mark, radius, max_tunnel_seconds, boss.telegraph_color)
+	_disc = Telegraph.spawn_moving_disc(_mark, _radius_now(), max_tunnel_seconds,
+			boss.telegraph_color)
 
 
 func _tick_tunnel(delta: float) -> void:
@@ -170,26 +199,31 @@ func _creep(delta: float) -> void:
 ## El disco se clava: un segundo aviso marca por dónde sale, y el suelo tiembla.
 func _lock() -> void:
 	_step = Step.LOCKED
-	_timer = lock_seconds * aggression_lerp(1.0, lock_at_full_aggression)
+	_timer = final_lock_seconds if _is_last() \
+			else lock_seconds * aggression_lerp(1.0, lock_at_full_aggression)
 	release_disc(_disc)
 	_disc = null
-	Telegraph.spawn_disc(boss, _mark, radius, _timer, boss.impact_color)
+	Telegraph.spawn_disc(boss, _mark, _radius_now(), _timer, boss.impact_color)
 	Sfx.play(lock_sfx)
 	boss.rig.set_anger(1.0)
 
 
 func _erupt() -> void:
+	var last := _is_last()
 	_step = Step.POP
-	_timer = pop_seconds
+	_pop_height = final_pop_height if last else pop_height
+	_pop_seconds = final_pop_seconds if last else pop_seconds
+	_timer = _pop_seconds
 	boss.glide_to(_mark)
+	boss.pass_under_raiders(false)
 	boss.aim_height = _aim_height
 	boss.rig.sink = 0.0
 	boss.rig.set_mound(0.0)
 	boss.rig.set_pose(LobsterRig.Pose.ERUPT)
 	boss.rig.snap_to_pose()
-	boss.strike_ground([_mark], radius, height_window, damage)
-	SplashBurst.spawn(burst_scene, _mark, 2.0)
-	boss.feel.shock(LobsterFeel.Shock.HEAVY, _mark)
+	boss.strike_ground([_mark], _radius_now(), height_window, final_damage if last else damage)
+	SplashBurst.spawn(burst_scene, _mark, final_burst_size if last else 2.0)
+	boss.feel.shock(LobsterFeel.Shock.CRUSHING if last else LobsterFeel.Shock.HEAVY, _mark)
 	Sfx.play(erupt_sfx)
 	boss.rig.set_anger(0.0)
 	_eruptions_left -= 1
@@ -198,6 +232,7 @@ func _erupt() -> void:
 func _after_pop() -> void:
 	boss.rig.lift = 0.0
 	if _eruptions_left > 0:
+		_redigging = true
 		_dig()
 		return
 	_step = Step.REST
@@ -206,6 +241,20 @@ func _after_pop() -> void:
 	boss.face_along(Vector3.ZERO)
 	boss.rig.set_pose(LobsterRig.Pose.STALK)
 	boss.rig.gesture(&"shake")
+
+
+## True si la salida que viene es la última de la cadena (la grande). Una
+## cadena de una sola salida no tiene última grande.
+func _is_last() -> bool:
+	return _eruptions_left == 1 and _redigging
+
+
+func _radius_now() -> float:
+	return final_radius if _is_last() else radius
+
+
+func _dig_time() -> float:
+	return redig_seconds if _redigging else dig_seconds
 
 
 ## Adónde va el raider, llevado a un lugar donde la langosta cabe. Sin raider

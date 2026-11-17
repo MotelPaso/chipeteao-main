@@ -3,8 +3,9 @@ extends LobsterBody
 ## Langosta Azul: el minijefe del Bosque Hueco. Llega en el hueco del
 ## minijefe (EnemySpawner.mini_boss_scene) y pelea SOLA, en una sola fase: al
 ## empezar se lleva de una vez a la horda (nodo Purge) y mientras vive no
-## aparece nadie más. Ronda al raider y cada tanto le suelta uno de sus cinco
-## ataques (los hijos del nodo Moves; cada uno con sus propios valores).
+## aparece nadie más, y el mapa queda bajo su marea azul (la trae el nodo
+## Arrival). Ronda al raider y cada tanto le suelta uno de sus cinco ataques
+## en cadena (los hijos del nodo Moves; cada uno con sus propios valores).
 ## Su vida no es un número fijo: el nodo Life la calcula con el daño real de
 ## la party (nodo Scaling) para que la pelea dure lo mismo con cualquier
 ## build, y la vida de Health en BlueLobster.tscn es el PISO. Si la pelea se
@@ -32,11 +33,11 @@ const GAZE_HEIGHT: float = 1.2
 
 @export_group("Ritmo de la pelea")
 ## Segundos que ronda antes del primer ataque.
-@export var first_attack_delay: float = 1.4
-## Segundos que ronda entre un ataque y el siguiente, con agresividad 0.
-@export var attack_pause: float = 4.6
-## Multiplicador de esa pausa con agresividad 1 (0.5 = la mitad de pausa).
-@export var attack_pause_at_full_aggression: float = 0.5
+@export var first_attack_delay: float = 0.9
+## Segundos que ronda entre un ataque y el siguiente, con agresividad 0: el respiro del raider.
+@export var attack_pause: float = 2.2
+## Multiplicador de esa pausa con agresividad 1 (0.6 = 40 % menos de pausa).
+@export var attack_pause_at_full_aggression: float = 0.6
 
 @export_group("Atasco")
 ## Segundos trabada contra algo (sin poder avanzar mientras ronda) tras los que sale del paso con un ataque que la saca de ahí.
@@ -246,6 +247,8 @@ func _end_move() -> void:
 	_pause_left = attack_pause * lerpf(1.0, attack_pause_at_full_aggression, aggression)
 	set_pace(1.0)
 	face_along(Vector3.ZERO)
+	# Un ataque puede terminar con su última pose puesta (aplastada, clavada).
+	rig.set_pose(LobsterRig.Pose.STALK)
 	_stalk.flip()
 
 

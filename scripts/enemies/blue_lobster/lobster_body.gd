@@ -52,6 +52,8 @@ var _move_steer: Vector3 = Vector3.ZERO
 ## segundos que lleva sin lograrlo (trabada contra algo).
 var _wanted_speed: float = 0.0
 var _stuck_time: float = 0.0
+## Raiders con los que dejó de chocar mientras va bajo tierra.
+var _passed_raiders: Array[PhysicsBody3D] = []
 
 @onready var _stalk: LobsterStalk = $Stalk
 ## Su velocidad de siempre: los ataques la cambian con set_pace().
@@ -187,6 +189,26 @@ func floor_point(point: Vector3) -> Vector3:
 func glide_to(point: Vector3) -> void:
 	global_position = Vector3(point.x, ground_height(point), point.z)
 	velocity = Vector3.ZERO
+
+
+## Bajo tierra pasa por DEBAJO de los raiders: mientras `on`, ni ella choca con
+## ellos ni ellos con ella (pueden pisar el montículo). Con `on` en false
+## vuelve a chocar con todos.
+func pass_under_raiders(on: bool) -> void:
+	for body: PhysicsBody3D in _passed_raiders:
+		if is_instance_valid(body):
+			remove_collision_exception_with(body)
+			body.remove_collision_exception_with(self)
+	_passed_raiders.clear()
+	if not on:
+		return
+	for group: StringName in [&"player", &"downed_players"]:
+		for node: Node in get_tree().get_nodes_in_group(group):
+			var body := node as PhysicsBody3D
+			if body != null:
+				add_collision_exception_with(body)
+				body.add_collision_exception_with(self)
+				_passed_raiders.append(body)
 
 
 ## Metros que el cuerpo puede recorrer desde `from` hacia `direction` antes de

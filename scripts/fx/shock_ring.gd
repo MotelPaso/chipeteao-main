@@ -97,6 +97,13 @@ func open(center: Vector3, start_radius: float, end_radius: float, speed: float,
 	set_physics_process(true)
 
 
+## Esta onda no toca a `raiders`: ya recibieron el golpe del que nace.
+func spare(raiders: Array[Node3D]) -> void:
+	for raider: Node3D in raiders:
+		if is_instance_valid(raider):
+			_hit[raider.get_instance_id()] = true
+
+
 ## Se apaga ya (murió quien la lanzó). Una que ya se está apagando no cambia.
 func dissipate() -> void:
 	if not _live:

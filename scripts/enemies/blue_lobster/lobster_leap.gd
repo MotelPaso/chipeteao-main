@@ -4,9 +4,11 @@ extends LobsterMove
 ## alto. El disco de aviso PERSIGUE al raider mientras está en el aire; poco
 ## antes de caer se clava (un segundo aviso lo marca) y la langosta cae en su
 ## centro con las pinzas por delante: golpe, salpicón y una onda de choque que
-## se abre a ras de suelo y hay que SALTAR. El disco queda un poco antes del
-## raider (stand_off), así el cuerpo no le cae encima. Después queda un rato
-## aplastada contra el suelo: la ventana más segura para pegarle.
+## se abre a ras de suelo y hay que SALTAR. Aplastada contra el suelo da un
+## coletazo y manda una RÉPLICA: otra onda, con el tiempo justo para caer del
+## primer salto y volver a saltar; la anuncia levantando la cola. El disco
+## queda un poco antes del raider (stand_off), así el cuerpo no le cae encima.
+## Mientras está aplastada es la ventana para pegarle, saltando la réplica.
 
 enum Step { CROUCH, AIRBORNE, REST }
 
@@ -14,31 +16,31 @@ enum Step { CROUCH, AIRBORNE, REST }
 ## Segundos agazapada antes de saltar.
 @export var crouch_seconds: float = 0.5
 ## Segundos en el aire, con agresividad 0.
-@export var air_seconds: float = 1.2
+@export var air_seconds: float = 1.0
 ## Multiplicador del tiempo en el aire con agresividad 1 (nunca menos que esto).
-@export var air_at_full_aggression: float = 0.82
+@export var air_at_full_aggression: float = 0.85
 ## Segundos antes de caer en los que el disco deja de perseguir al raider: la ventana para salir.
-@export var lock_seconds: float = 0.55
+@export var lock_seconds: float = 0.5
 ## Metros que sube en lo más alto del salto.
-@export var leap_height: float = 7.5
+@export var leap_height: float = 9.0
 ## Metros que puede cruzar de un salto, como mucho.
 @export var max_distance: float = 30.0
 ## Radio del golpe y de su disco de aviso, en metros.
-@export var radius: float = 4.4
+@export var radius: float = 5.0
 ## Daño del golpe a cada raider dentro del disco (valor base).
 @export var damage: float = 11.0
-## Metros sobre el suelo por encima de los cuales el golpe no alcanza.
-@export var height_window: float = 1.6
+## Metros sobre el suelo por encima de los cuales el golpe no alcanza (se esquiva saltando cuando el disco se clava).
+@export var height_window: float = 1.4
 ## Segundos que se adelanta al raider para ubicar el disco.
-@export var lead_seconds: float = 0.35
+@export var lead_seconds: float = 0.45
 ## Tope de ese adelanto, en metros, para un raider a velocidad base.
-@export var max_lead: float = 4.0
+@export var max_lead: float = 4.5
 ## Metros antes del raider donde cae el cuerpo: no le cae encima, lo alcanza con las pinzas. El disco de aviso marca dónde cae.
 @export var stand_off: float = 2.4
 ## Segundos aplastada después de caer, con agresividad 0: la ventana para pegarle.
-@export var recover: float = 1.8
+@export var recover: float = 1.6
 ## Multiplicador de ese descanso con agresividad 1.
-@export var recover_at_full_aggression: float = 0.7
+@export var recover_at_full_aggression: float = 0.8
 ## Sonido al saltar (fila de Sfx.SOUND_LIBRARY).
 @export var jump_sfx: StringName = &"lobster_whoosh"
 ## Sonido cuando el disco se clava (fila de Sfx.SOUND_LIBRARY).
@@ -51,16 +53,28 @@ enum Step { CROUCH, AIRBORNE, REST }
 @export_group("Onda de choque")
 ## Escena de la onda que sale del golpe (ShockRing, sale de Pools). Vacío = sin onda.
 @export var ring_scene: PackedScene = preload("res://scenes/fx/ShockRing.tscn")
-## Radio en metros hasta el que llega la onda.
-@export var ring_radius: float = 13.0
+## Ondas seguidas que salen del golpe: la primera al caer y las demás como réplicas.
+@export var rings: int = 2
+## Segundos entre una onda y la siguiente: lo justo para caer de un salto y volver a saltar.
+@export var ring_gap_seconds: float = 1.1
+## Radio en metros con que nace cada onda, bajo su cuerpo. A quien el golpe ya le dio, la primera no lo toca.
+@export var ring_start_radius: float = 1.5
+## Radio en metros hasta el que llega cada onda.
+@export var ring_radius: float = 17.0
 ## Metros por segundo a los que se abre.
-@export var ring_speed: float = 12.0
+@export var ring_speed: float = 15.0
 ## Daño de la onda a cada raider que alcance en el suelo (valor base).
 @export var ring_damage: float = 4.0
 ## Metros sobre el suelo desde los que un raider ya no es alcanzado (se esquiva saltando).
 @export var ring_height_window: float = 0.9
 ## Ancho del anillo que golpea, en metros.
 @export var ring_band: float = 1.3
+## Tamaño del salpicón de cada réplica (1 = el de siempre).
+@export var aftershock_burst_size: float = 1.2
+## Segundos antes de cada réplica en los que la anuncia: levanta la cola y suena.
+@export var aftershock_cue_seconds: float = 0.45
+## Sonido de ese anuncio (fila de Sfx.SOUND_LIBRARY).
+@export var aftershock_cue_sfx: StringName = &"lobster_hiss"
 
 var _step: Step = Step.CROUCH
 var _timer: float = 0.0
@@ -69,6 +83,10 @@ var _target: Node3D = null
 var _from: Vector3 = Vector3.ZERO
 var _mark: Vector3 = Vector3.ZERO
 var _locked: bool = false
+## Réplicas que faltan, segundos hasta la próxima y si ya la anunció.
+var _rings_left: int = 0
+var _ring_timer: float = 0.0
+var _ring_cued: bool = false
 ## El disco que persigue al raider; se suelta en cuanto se clava.
 var _disc: TelegraphDisc = null
 
@@ -95,6 +113,7 @@ func begin(target: Node3D) -> void:
 func tick(delta: float) -> bool:
 	_timer -= delta
 	if _step == Step.REST:
+		_tick_aftershocks(delta)
 		return _timer <= 0.0
 	if not _locked:
 		if _timer > lock_seconds:
@@ -164,17 +183,52 @@ func _fly() -> void:
 func _impact() -> void:
 	boss.glide_to(_mark)
 	boss.rig.lift = 0.0
-	boss.strike_ground([_mark], radius, height_window, damage)
-	# La onda nace justo por fuera del golpe (a quien ya golpeó no lo vuelve a
-	# tocar): quien salió del disco todavía tiene que saltarla.
-	if ring_scene != null:
-		ShockRing.spawn(ring_scene, _mark, radius + ring_band * 0.5, ring_radius, ring_speed,
-				ring_damage, ring_height_window, ring_band, boss)
-	SplashBurst.spawn(burst_scene, _mark, 2.2)
-	boss.feel.shock(LobsterFeel.Shock.HEAVY, _mark)
+	_send_ring(boss.strike_ground([_mark], radius, height_window, damage))
+	SplashBurst.spawn(burst_scene, _mark, 2.6)
+	boss.feel.shock(LobsterFeel.Shock.CRUSHING, _mark)
 	Sfx.play(impact_sfx)
 	boss.rig.set_anger(0.0)
 	boss.rig.set_pose(LobsterRig.Pose.SLAM)
 	boss.face_along(Vector3.ZERO)
 	_step = Step.REST
-	_timer = recover * aggression_lerp(1.0, recover_at_full_aggression)
+	_rings_left = maxi(rings - 1, 0)
+	_ring_timer = ring_gap_seconds
+	_ring_cued = false
+	# El descanso alcanza siempre para todas las réplicas.
+	_timer = maxf(recover * aggression_lerp(1.0, recover_at_full_aggression),
+			ring_gap_seconds * float(_rings_left) + 0.2)
+
+
+## Una onda de choque desde donde cayó. Nace bajo su cuerpo y se abre: quien
+## salió del disco tiene un instante para saltarla. A los `spared` (los que el
+## golpe ya alcanzó) no los toca.
+func _send_ring(spared: Array[Node3D] = []) -> void:
+	if ring_scene == null:
+		return
+	var ring := ShockRing.spawn(ring_scene, _mark, ring_start_radius, ring_radius, ring_speed,
+			ring_damage, ring_height_window, ring_band, boss)
+	if ring != null:
+		ring.spare(spared)
+
+
+## Aplastada contra el suelo: cada tanto levanta la cola (el anuncio) y un
+## coletazo manda otra onda.
+func _tick_aftershocks(delta: float) -> void:
+	if _rings_left <= 0:
+		return
+	_ring_timer -= delta
+	if not _ring_cued and _ring_timer <= aftershock_cue_seconds:
+		_ring_cued = true
+		boss.rig.gesture(&"tail_slap")
+		boss.rig.set_anger(1.0)
+		Sfx.play(aftershock_cue_sfx)
+	if _ring_timer > 0.0:
+		return
+	_rings_left -= 1
+	_ring_timer = ring_gap_seconds
+	_ring_cued = false
+	_send_ring()
+	boss.rig.set_anger(0.0)
+	SplashBurst.spawn(burst_scene, _mark, aftershock_burst_size)
+	boss.feel.shock(LobsterFeel.Shock.HEAVY, _mark)
+	Sfx.play(impact_sfx)
