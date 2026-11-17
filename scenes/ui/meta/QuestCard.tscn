@@ -1,0 +1,145 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scripts/ui/meta/quest_log/quest_card.gd" id="1_card"]
+
+[node name="QuestCard" type="PanelContainer"]
+size_flags_horizontal = 3
+script = ExtResource("1_card")
+
+[node name="Columns" type="HBoxContainer" parent="."]
+layout_mode = 2
+theme_override_constants/separation = 14
+
+[node name="TypeChip" type="PanelContainer" parent="Columns"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(56, 56)
+layout_mode = 2
+size_flags_vertical = 4
+mouse_filter = 2
+
+[node name="TypeIcon" type="TextureRect" parent="Columns/TypeChip"]
+unique_name_in_owner = true
+texture_filter = 4
+editor_description = "El dibujo del tipo de misión; lo pone quest_card.gd (QuestTypes). Texture Filter con mipmaps para que el SVG se vea limpio en chico."
+layout_mode = 2
+mouse_filter = 2
+expand_mode = 1
+stretch_mode = 5
+
+[node name="Info" type="VBoxContainer" parent="Columns"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 2
+
+[node name="Name" type="Label" parent="Columns/Info"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.957, 0.863, 1)
+theme_override_font_sizes/font_size = 19
+text = "Cien caídos"
+
+[node name="Description" type="Label" parent="Columns/Info"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.765, 0.839, 0.816, 1)
+theme_override_font_sizes/font_size = 13
+text = "Derrota a 100 enemigos."
+
+[node name="Progress" type="HBoxContainer" parent="Columns/Info"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="Bar" type="ProgressBar" parent="Columns/Info/Progress"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 24)
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 4
+mouse_filter = 2
+value = 40.0
+show_percentage = false
+
+[node name="Count" type="Label" parent="Columns/Info/Progress/Bar"]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_colors/font_color = Color(1, 0.957, 0.863, 1)
+theme_override_colors/font_outline_color = Color(0.082, 0.075, 0.102, 1)
+theme_override_constants/outline_size = 5
+theme_override_font_sizes/font_size = 14
+text = "40 / 100"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="Remaining" type="Label" parent="Columns/Info/Progress"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(84, 0)
+layout_mode = 2
+theme_override_colors/font_color = Color(0.765, 0.839, 0.816, 1)
+theme_override_font_sizes/font_size = 13
+text = "Faltan 60"
+
+[node name="Side" type="VBoxContainer" parent="Columns"]
+custom_minimum_size = Vector2(118, 0)
+layout_mode = 2
+theme_override_constants/separation = 6
+alignment = 1
+
+[node name="ReadyStamp" type="Label" parent="Columns/Side"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+size_flags_horizontal = 4
+theme_override_colors/font_color = Color(0.082, 0.075, 0.102, 1)
+theme_override_font_sizes/font_size = 16
+text = "¡Lista!"
+horizontal_alignment = 1
+
+[node name="RewardChip" type="PanelContainer" parent="Columns/Side"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 4
+mouse_filter = 1
+
+[node name="Row" type="HBoxContainer" parent="Columns/Side/RewardChip"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/separation = 4
+
+[node name="RewardIcon" type="TextureRect" parent="Columns/Side/RewardChip/Row"]
+unique_name_in_owner = true
+texture_filter = 4
+custom_minimum_size = Vector2(20, 20)
+layout_mode = 2
+size_flags_vertical = 4
+mouse_filter = 2
+expand_mode = 1
+stretch_mode = 5
+
+[node name="Reward" type="Label" parent="Columns/Side/RewardChip/Row"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.082, 0.075, 0.102, 1)
+theme_override_font_sizes/font_size = 17
+text = "+40"
+
+[node name="ClaimButton" type="Button" parent="Columns/Side"]
+unique_name_in_owner = true
+visible = false
+custom_minimum_size = Vector2(112, 34)
+layout_mode = 2
+size_flags_horizontal = 4
+text = "Reclamar"
+
+[node name="ClaimedStamp" type="Label" parent="Columns/Side"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+theme_override_colors/font_color = Color(0.576, 0.69, 0.671, 1)
+theme_override_font_sizes/font_size = 12
+text = "RECLAMADA"
+horizontal_alignment = 1

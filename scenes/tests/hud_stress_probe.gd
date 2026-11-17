@@ -43,9 +43,6 @@ const PARTS: Array[String] = ["RunInfo", "KillsLabel", "MatePanel", "LoadoutDock
 	"PowerUpRow", "LootToast", "LevelLabel", "HpBar", "PointsLabel", "XpBar"]
 ## Elementos que pueden estar vacíos: la columna de compañeros en solitario.
 const EMPTY_OK: Array[String] = ["MatePanel"]
-## Elementos que llegan al borde de la ventana y lo pasan: no se les exige
-## quedar dentro de la pantalla.
-const BLEEDS: Array[String] = ["XpBar"]
 
 
 ## Jugador de mentira: lo justo para que el HUD lo una (ranura, billetera y un
@@ -219,7 +216,7 @@ func _check(where: String, screen: Rect2) -> void:
 		if not rect.has_area():
 			if not EMPTY_OK.has(names[i]):
 				_fail(where, "%s is not on screen" % names[i])
-		elif not BLEEDS.has(names[i]) and not bounds.encloses(rect):
+		elif not bounds.encloses(rect):
 			_fail(where, "%s leaves the screen: %s" % [names[i], rect])
 		for j in range(i + 1, names.size()):
 			if _touch(rect, rects[names[j]]):

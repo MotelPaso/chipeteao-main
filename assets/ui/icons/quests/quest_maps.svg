@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
+  <!-- Mapas: un mapa plegado con una equis. Dibujo propio. -->
+  <g stroke="#15131a" stroke-width="8" stroke-linejoin="round" stroke-linecap="round">
+<path d="M12 30 L44 18 L84 30 L116 18 L116 98 L84 110 L44 98 L12 110 Z" fill="#fff4dc"/>
+<path d="M44 18 L44 98 M84 30 L84 110" fill="none" stroke-width="5"/>
+<path d="M22 84 C30 70 34 78 40 66" fill="none" stroke="#5bd6a0" stroke-width="6" stroke-dasharray="2 12"/>
+<path d="M56 52 L72 68 M72 52 L56 68" fill="none" stroke="#f2542d" stroke-width="9"/>
+<path d="M94 46 L106 42 M94 62 L106 58" fill="none" stroke-width="5"/>
+  </g>
+</svg>

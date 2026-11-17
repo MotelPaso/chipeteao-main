@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
+  <!-- Altares: una llama sobre un pedestal de piedra. Dibujo propio. -->
+  <g stroke="#15131a" stroke-width="8" stroke-linejoin="round" stroke-linecap="round">
+<path d="M26 112 L102 112 L94 92 L34 92 Z" fill="#c3d6d0"/>
+<path d="M40 92 L88 92 L88 76 L40 76 Z" fill="#93b0ab"/>
+<path d="M64 12 C84 34 92 44 92 58 C92 70 80 78 64 78 C48 78 36 70 36 58 C36 46 46 40 50 28 C56 34 58 38 60 44 C62 32 62 22 64 12 Z" fill="#f2542d"/>
+<path d="M64 46 C72 54 76 58 76 64 C76 70 70 74 64 74 C58 74 52 70 52 64 C52 58 60 54 64 46 Z" fill="#ffd23f" stroke-width="5"/>
+  </g>
+</svg>

@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
+  <!-- Incursiones: un banderín en su asta. Dibujo propio. -->
+  <g stroke="#15131a" stroke-width="8" stroke-linejoin="round" stroke-linecap="round">
+<path d="M30 116 L30 14" fill="none" stroke-width="12"/>
+<path d="M30 20 L110 20 L90 46 L110 72 L30 72 Z" fill="#f2542d"/>
+<path d="M46 46 L74 46" fill="none" stroke="#fff4dc" stroke-width="8"/>
+<circle cx="30" cy="12" r="7" fill="#ffd23f"/>
+  </g>
+</svg>

@@ -650,6 +650,11 @@ evolución.
 | `QUEST LOG` | REGISTRO DE MISIONES |
 | `Claim` | Reclamar |
 | `CLAIMED` | RECLAMADA |
+| `Ready!` (sello de misión completa) | ¡Lista! |
+| `To claim` | Para reclamar |
+| `Claimed` (título de grupo) | Reclamadas |
+| `%d left` | Faltan %d / Falta 1 |
+| Grupos de misiones | Bajas, Jefes, Altares, Cofres, Personajes, Mapas, Vueltas, Evoluciones, Incursiones |
 | `+%d Shards` | +%d esquirlas |
 | `%d/%d` | %d/%d |
 | `ARMORY` | ARMERÍA |
