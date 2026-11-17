@@ -16,10 +16,12 @@ extends RefCounted
 ##      Probe relief: crossed bridge …
 ## 4. RETIENE, solo con BONK_HOLD_AT=high|ravine|bridge: deja al raider
 ##    quieto a 8 m del corte más alto de la zona más alta, en el medio del
-##    fondo del barranco o en el medio del puente más largo, y cuenta las
+##    fondo del cañón o en el medio del puente más largo, y cuenta las
 ##    LLEGADAS: enemigos que aparecieron 3 m o más arriba o abajo de su nivel
 ##    y se le acercaron a 3 m (y a no más de 1.5 m de altura). Imprime una
-##    línea `Probe hold:` por ventana de 20 s y un resumen al salir.
+##    línea `Probe hold:` por ventana de 20 s y un resumen al salir; el
+##    resumen dice además cuántos enemigos lo alcanzaron en total
+##    (`reached`), hayan aparecido en su nivel o en otro.
 
 const HOLD_ENV := "BONK_HOLD_AT"
 const HOLD_PLACES: Array[String] = ["high", "ravine", "bridge"]
@@ -77,6 +79,8 @@ var _holding: bool = false
 ## Enemigos ya vistos: true si aparecieron a otro nivel (candidatos a llegada).
 var _candidates: Dictionary[int, bool] = {}
 var _arrived: Dictionary[int, bool] = {}
+## Enemigos que se le acercaron al retenido, hayan aparecido donde sea.
+var _reached: Dictionary[int, bool] = {}
 var _window: int = 0
 var _window_arrivals: int = 0
 var _arrivals: int = 0
@@ -179,9 +183,9 @@ func report() -> void:
 	if _hold_at.is_empty():
 		return
 	_close_window(true)
-	print("Probe hold summary: at=%s arrivals=%d candidates=%d empty_after_%d=%d" % [
+	print("Probe hold summary: at=%s arrivals=%d candidates=%d empty_after_%d=%d reached=%d" % [
 			_hold_at, _arrivals, _candidates.values().count(true),
-			int(HOLD_WINDOWS_FROM), _empty_windows])
+			int(HOLD_WINDOWS_FROM), _empty_windows, _reached.size()])
 
 
 # --- arranque ----------------------------------------------------------------------
@@ -334,6 +338,7 @@ func _start_hold(lead: CharacterBody3D) -> void:
 	_holding = true
 	_candidates.clear()
 	_arrived.clear()
+	_reached.clear()
 	_window = 0
 	_window_arrivals = 0
 	lead.global_position = _hold_point + Vector3.UP * 0.2
@@ -381,10 +386,13 @@ func _watch_hold(lead: CharacterBody3D) -> void:
 		var where := body.global_position
 		if not _candidates.has(id):
 			_candidates[id] = absf(where.y - _hold_point.y) >= HOLD_SPAWN_GAP
+		var close := Vector2(where.x - at.x, where.z - at.z).length() <= HOLD_ARRIVE_RANGE \
+				and absf(where.y - at.y) <= HOLD_ARRIVE_LEVEL
+		if close:
+			_reached[id] = true
 		if not _candidates[id] or _arrived.has(id):
 			continue
-		if Vector2(where.x - at.x, where.z - at.z).length() <= HOLD_ARRIVE_RANGE \
-				and absf(where.y - at.y) <= HOLD_ARRIVE_LEVEL:
+		if close:
 			_arrived[id] = true
 			_arrivals += 1
 			_window_arrivals += 1

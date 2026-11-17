@@ -30,6 +30,10 @@ const RELIEF_MARGIN: float = 5.0
 ## Veces que se le pide a la máscara otro punto al azar cuando el que dio
 ## cae sobre el relieve.
 const FALLBACK_ATTEMPTS: int = 8
+## Con relieve por zonas, metros sobre el suelo a partir de los cuales lo
+## que hay bajo un punto es la punta de algo (otro POI, un prop) y no un
+## lugar donde poner la salida o un evento: un raider salta 1.5 m.
+const TOP_LIMIT: float = 1.2
 
 ## Distancias del reparto (metros). Sin valor propio: el director les copia
 ## sus exports del grupo "Reparto de POI" al crear el layout; edítalas ahí.
@@ -166,6 +170,16 @@ func ground_height(pos: Vector3) -> float:
 	return hit_position.y
 
 
+## True si lo que hay bajo `pos` es suelo y no la punta de otro POI o de un
+## prop. Solo se pregunta con relieve por zonas; en las demás arenas lo que
+## aparece durante la etapa se apoya en lo que toque el rayo, como siempre.
+func lands_on_ground(pos: Vector3) -> bool:
+	var terrain := Terrain.find(_tree())
+	if terrain == null or not terrain.has_relief():
+		return true
+	return ground_height(pos) - terrain.height_at(pos.x, pos.z) <= TOP_LIMIT
+
+
 ## Altura del terreno en un punto, o 0 sin terreno. Para apoyar algo en el
 ## suelo sin el rayo, que también vería los props de encima.
 func terrain_height(xz: Vector2) -> float:
@@ -243,7 +257,7 @@ func ring_sample(origin: Vector3, angle: float, min_distance: float,
 func ring_point(origin: Vector3, min_distance: float, max_distance: float) -> Vector3:
 	for attempt in RING_POINT_ATTEMPTS:
 		var pos := ring_sample(origin, randf() * TAU, min_distance, max_distance)
-		if walkable(pos):
+		if walkable(pos) and lands_on_ground(pos):
 			return pos
 	return Vector3.INF
 
@@ -279,7 +293,7 @@ func exit_portal_point(min_distance: float) -> Vector3:
 	var best_distance := -1.0
 	for attempt in CLEAR_POINT_ATTEMPTS:
 		var candidate := Vector3(randf_range(-limit, limit), 0.0, randf_range(-limit, limit))
-		if not walkable(candidate):
+		if not walkable(candidate) or not lands_on_ground(candidate):
 			continue
 		var nearest := distance_to_nearest_player(candidate)
 		if nearest > best_distance:

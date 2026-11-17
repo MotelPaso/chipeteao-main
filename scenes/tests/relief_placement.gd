@@ -6,7 +6,9 @@ extends RefCounted
 ##
 ##   on_relief           algo sobre un corte, una rampa o un puente
 ##   misplaced           algo enterrado o flotando
-##   raider_unreachable  un POI al que un raider no llega (o del que no vuelve)
+##   raider_unreachable  un POI, o un lugar que el director elegiría para la
+##                       salida o un evento, al que un raider no llega (o
+##                       del que no vuelve)
 ##   horde_unreachable   un spawn desde el que la horda no llega
 ##   crowding            una meseta, una plataforma o una formación pegada
 ##                       al borde o al pie de un corte
@@ -31,6 +33,10 @@ const SPAWN_REACH: float = 2.0
 const LEVEL_WINDOW: float = 1.5
 ## Spawns muestreados de cada tipo (anillo y banda): 200 en total.
 const SPAWN_SAMPLES: int = 100
+## Lugares muestreados de cada tipo que el director elige durante la etapa
+## (la salida y los eventos): 2000 en total. Son muchos porque lo que se
+## busca, un punto encima de un tronco, sale en menos de uno de cada cien.
+const PLACE_SAMPLES: int = 1000
 ## Medio lado de una plataforma y media rampa de meseta a escala 1, en metros.
 const PLATFORM_REACH: float = 4.3
 const RAMP_REACH: float = 2.5
@@ -72,11 +78,12 @@ func run(tag: String) -> void:
 	var props := _check_props(bad, notes)
 	var pois := _check_pois(bad, notes)
 	var spawns := _check_spawns(bad, notes)
+	var places := _check_places(bad, notes)
 	_check_formations(bad, notes)
-	print(("Relief sweep: placement at=%s props=%d pois=%d spawns=%d on_relief=%d misplaced=%d"
-			+ " raider_unreachable=%d horde_unreachable=%d crowding=%d") % [tag, props, pois,
-			spawns, bad["on_relief"], bad["misplaced"], bad["raider_unreachable"],
-			bad["horde_unreachable"], bad["crowding"]])
+	print(("Relief sweep: placement at=%s props=%d pois=%d spawns=%d places=%d on_relief=%d"
+			+ " misplaced=%d raider_unreachable=%d horde_unreachable=%d crowding=%d") % [tag,
+			props, pois, spawns, places, bad["on_relief"], bad["misplaced"],
+			bad["raider_unreachable"], bad["horde_unreachable"], bad["crowding"]])
 	for note: String in notes:
 		print("Relief sweep detail: placement at=%s %s" % [tag, note])
 
@@ -164,6 +171,44 @@ func _check_spawns(bad: Dictionary, notes: Array[String]) -> int:
 		var cell := _graph.nearest_open(xz, SPAWN_REACH, at.y, LEVEL_WINDOW)
 		if cell == ReliefGraph.NONE or _horde_ok[cell] == 0:
 			_flag(bad, "horde_unreachable", notes, what, at)
+	return count
+
+
+## Lugares que el director elige durante la etapa, muestreados con sus
+## propias funciones (la salida, lejos de todos, y el anillo de los eventos
+## alrededor del raider líder): fuera del relieve, apoyados, y donde un
+## raider llega y vuelve. Encima de un tronco nadie alcanza un portal.
+func _check_places(bad: Dictionary, notes: Array[String]) -> int:
+	var director := _tree.get_first_node_in_group(&"world_director")
+	var lead := Coop.nearest_player(_tree, Vector3.ZERO)
+	if director == null or lead == null:
+		return 0
+	var layout := director.get("_layout") as StageLayout
+	if layout == null:
+		return 0
+	var exit_gap := float(director.get("exit_portal_min_distance"))
+	var event_min := float(director.get("event_min_distance"))
+	var event_max := float(director.get("event_max_distance"))
+	var count := 0
+	for sample in PLACE_SAMPLES * 2:
+		var what := "exit point"
+		var at := Vector3.INF
+		if sample < PLACE_SAMPLES:
+			at = layout.exit_portal_point(exit_gap)
+		else:
+			what = "event point"
+			at = layout.rain_point(lead.global_position, event_min, event_max)
+		if at == Vector3.INF:
+			continue
+		count += 1
+		var xz := Vector2(at.x, at.z)
+		if _terrain.relief_distance(xz, ON_RELIEF_PROP) < ON_RELIEF_PROP:
+			_flag(bad, "on_relief", notes, what, at)
+		if _buried(at, []) or at.y - _floor_under(at, []) > SETTLE:
+			_flag(bad, "misplaced", notes, what, at)
+		var cell := _graph.nearest_open(xz, POI_REACH, at.y, LEVEL_WINDOW)
+		if cell == ReliefGraph.NONE or _raider_ok[cell] == 0:
+			_flag(bad, "raider_unreachable", notes, what, at)
 	return count
 
 

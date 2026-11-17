@@ -91,7 +91,7 @@ func _ready() -> void:
 func _begin() -> void:
 	_terrain = Terrain.find(get_tree())
 	_bounds = get_parent()
-	if _terrain == null or _bounds == null or not _bounds.has_method(&"can_place"):
+	if _terrain == null or _bounds == null or not _bounds.has_method(&"can_grow"):
 		return
 	_half = _terrain.size * 0.5
 	_per_side = ceili(_terrain.size / chunk_size)
@@ -152,7 +152,7 @@ func _build_chunk(cx: int, cz: int) -> void:
 ## puente, el fondo del cañón, una estructura o el claro del spawn.
 func _spot(rng: RandomNumberGenerator, corner: Vector2) -> Vector3:
 	var xz := corner + Vector2(rng.randf(), rng.randf()) * chunk_size
-	if xz.length() < spawn_clearance or not bool(_bounds.call(&"can_place", xz, relief_clearance)):
+	if xz.length() < spawn_clearance or not bool(_bounds.call(&"can_grow", xz, relief_clearance)):
 		return Vector3.INF
 	if _terrain.relief_layout() != null and _terrain.relief_layout().level_at(xz) < 0:
 		return Vector3.INF

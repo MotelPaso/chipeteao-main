@@ -1,3 +1,4 @@
+class_name ArenaScatter
 extends Node3D
 ## Reparto determinista de la arena: props interiores (árboles, rocas y
 ## tocones o sus equivalentes del bioma), una franja más densa en el borde
@@ -204,10 +205,6 @@ extends Node3D
 ## con menos formaciones.
 @export var mask_min_open_fraction: float = 0.84
 
-## Metros que el faldón de roca de una formación asoma de sus celdas más el
-## medio tronco de un prop del borde (ver _in_formation_skirt).
-const EDGE_SKIRT: float = 3.0
-
 ## RNG del reparto. La máscara saca números de este mismo objeto.
 var _rng := RandomNumberGenerator.new()
 ## Máscara de celdas caminables (arena_mask.gd); se arma en _enter_tree.
@@ -218,6 +215,8 @@ var _run_seed: int = 0
 var _mesa_sites: PackedVector2Array = PackedVector2Array()
 ## Claros que ocupan las estructuras del relieve, como (x, radio, z).
 var _structure_sites: PackedVector3Array = PackedVector3Array()
+## Huella de los props con colisión; solo se enciende con relieve por zonas.
+var _footprints := PropFootprints.new()
 ## El Terrain de esta arena (ver _arena_terrain); se busca una sola vez.
 var _terrain: Terrain = null
 var _terrain_sought: bool = false
@@ -258,7 +257,7 @@ func _enter_tree() -> void:
 		_mask.build(_protected_seeds())
 	# Sitios de meseta justo después de la máscara: el Terrain los lee como
 	# claros planos en su _ready, y place_props() construye cada meseta.
-	_pick_mesa_sites()
+	_mesa_sites = MesaBuilder.pick_sites(self, _rng, _mask, terrain)
 
 
 ## Semilla de esta partida, válida desde _enter_tree. El Terrain la lee por
@@ -281,7 +280,9 @@ func place_props() -> void:
 	if mask_enabled:
 		_raise_formations()
 	ReliefDressing.raise(self, _arena_terrain(), formation_style, _run_seed)
-	_build_mesas()
+	# Cada meseta cuenta como keepout del reparto interior, para que no
+	# crezcan árboles a través de su plataforma.
+	_keepouts_xz.append_array(MesaBuilder.build(self, _rng, _mesa_sites))
 	for node: Node in get_tree().get_nodes_in_group("scatter_keepout"):
 		var spot := node as Node3D
 		if spot == null or not is_inside_tree() or not spot.is_inside_tree():
@@ -296,12 +297,15 @@ func place_props() -> void:
 	var taken := _keepouts_xz.duplicate()
 	taken.append_array(_mesa_sites)
 	_structure_sites = ReliefStructures.raise(self, _arena_terrain(), _run_seed, taken)
+	var relief := _arena_terrain() != null and _arena_terrain().has_relief()
+	if relief:
+		_footprints.setup(arena_half_extent)
 	_place_many(ancient_tree_scene, ancient_tree_count, ancient_tree_scale_min,
 			ancient_tree_scale_max)
 	_place_many(tree_scene, tree_count, tree_scale_min, tree_scale_max)
 	_place_many(rock_scene, rock_count, rock_scale_min, rock_scale_max)
 	_place_many(stump_scene, stump_count, stump_scale_min, stump_scale_max)
-	_ring_perimeter()
+	PerimeterRing.new(self, _rng, _mask, relief).plant()
 
 
 ## True si `node` pertenece a la misma escena de arena que este scatter (la
@@ -326,6 +330,22 @@ func ground_height(x: float, z: float) -> float:
 	return terrain.height_at(x, z)
 
 
+## Planta un prop de `scene` en `pos`, girado al azar. Solo escala
+## uniforme: Godot no soporta escalar formas de colisión de forma no
+## uniforme. `pos.y` se IGNORA y se usa la altura del terreno en ese XZ: un
+## prop a y = 0 flotaría sobre una loma o se hundiría en una hondonada.
+## Pública para la franja del borde (PerimeterRing).
+func spawn_prop(scene: PackedScene, pos: Vector3, uniform_scale: float) -> void:
+	var prop := scene.instantiate() as Node3D
+	if prop == null:
+		return
+	add_child(prop)
+	prop.position = Vector3(pos.x, ground_height(pos.x, pos.z), pos.z)
+	prop.rotate_y(_rng.randf_range(0.0, TAU))
+	prop.scale = Vector3.ONE * uniform_scale
+	_footprints.add(prop)
+
+
 # --- Fachada de la máscara: otros nodos llaman estos métodos por el grupo
 # "arena_bounds" (spawner, director, jefes, jugador, mapa, harness).
 # Conservar nombres y firmas.
@@ -338,9 +358,16 @@ func is_walkable(xz: Vector2) -> bool:
 
 ## True si en `xz` se puede COLOCAR algo (un POI, un spawn, un cofre, un
 ## jefe): celda abierta de la máscara y, con relieve por zonas, a `margin`
-## metros o más de todo corte, rampa y puente y fuera de las mesetas. Es la
-## pregunta de quien pone cosas; is_walkable sigue siendo solo la máscara.
+## metros o más de todo corte, rampa y puente, fuera de las mesetas y de las
+## estructuras, y nunca encima de un prop con colisión. Es la pregunta de
+## quien pone cosas; is_walkable sigue siendo solo la máscara.
 func can_place(xz: Vector2, margin: float = 0.0) -> bool:
+	return can_grow(xz, margin) and _footprints.is_clear(xz)
+
+
+## True si en `xz` puede crecer la vegetación del suelo: lo mismo que
+## can_place, salvo que el pasto sí llega hasta el pie de un tronco.
+func can_grow(xz: Vector2, margin: float = 0.0) -> bool:
 	if not _mask.is_walkable(xz):
 		return false
 	var terrain := _arena_terrain()
@@ -441,99 +468,6 @@ func _protected_seeds() -> Array[Vector2]:
 	return seeds
 
 
-## Elige los centros de meseta de la etapa: dentro del cuadrado de muestreo,
-## en suelo caminable, lejos del spawn, de los keepouts de autor y entre sí.
-## Corre en _enter_tree para que el Terrain aplane un claro bajo cada una
-## antes de colocar nada.
-func _pick_mesa_sites() -> void:
-	_mesa_sites = PackedVector2Array()
-	if mesa_count <= 0 or mesa_platform_scene == null:
-		return
-	var authored: Array[Vector2] = []
-	for node: Node in get_tree().get_nodes_in_group("scatter_keepout"):
-		var spot := node as Node3D
-		if spot != null and not (spot is Interactable) and owner_arena_contains(spot):
-			authored.append(Vector2(spot.position.x, spot.position.z))
-	var half := _mesa_half_extent()
-	for attempt in mesa_count * 40:
-		if _mesa_sites.size() >= mesa_count:
-			break
-		var candidate := Vector2(_rng.randf_range(-half, half), _rng.randf_range(-half, half))
-		if candidate.length() < mesa_min_spacing:
-			continue
-		if mask_enabled and not (_mask.clear_of(candidate, mesa_clearance)
-				and _mask.clear_of(candidate, mesa_clearance * 0.5)):
-			continue
-		if not _relief_clear(candidate, relief_mesa_clearance):
-			continue
-		var clear := true
-		for other: Vector2 in authored:
-			if other.distance_to(candidate) < mesa_min_spacing:
-				clear = false
-				break
-		if clear:
-			for other: Vector2 in _mesa_sites:
-				if other.distance_to(candidate) < mesa_min_spacing:
-					clear = false
-					break
-		if clear:
-			_mesa_sites.append(candidate)
-
-
-## Mitad del cuadrado donde se sortean los centros de meseta, en metros.
-func _mesa_half_extent() -> float:
-	return arena_half_extent - mesa_edge_margin
-
-
-## Construye plataforma + rampa en cada sitio. El claro ya es plano (el
-## Terrain leyó mesa_sites()), así la rampa toca suelo parejo en sus dos
-## extremos en vez de flotar en uno.
-func _build_mesas() -> void:
-	if mesa_platform_scene == null:
-		return
-	var chests_left := mesa_chest_count
-	for site: Vector2 in _mesa_sites:
-		var mesa_scale := _rng.randf_range(mesa_scale_min, mesa_scale_max)
-		var plat := mesa_platform_scene.instantiate() as Node3D
-		if plat == null:
-			continue
-		add_child(plat)
-		var plat_angle := _rng.randf_range(0.0, TAU)
-		plat.position = Vector3(site.x, ground_height(site.x, site.y), site.y)
-		plat.rotation.y = plat_angle
-		plat.scale = Vector3.ONE * mesa_scale
-		if chests_left > 0 and ReliefDressing.place_chest(self, mesa_chest_scene, plat,
-				mesa_deck_height * mesa_scale):
-			chests_left -= 1
-
-		if mesa_ramp_scene == null:
-			_keepouts_xz.append(site)
-			continue
-
-		var ramp := mesa_ramp_scene.instantiate() as Node3D
-		if ramp != null:
-			add_child(ramp)
-			# Alinea la rampa con una de las 4 caras planas de la plataforma.
-			var side_idx := _rng.randi_range(0, 3)
-			var local_offsets: Array[Vector3] = [
-				Vector3(mesa_ramp_offset, 0.0, 0.0),
-				Vector3(0.0, 0.0, mesa_ramp_offset),
-				Vector3(-mesa_ramp_offset, 0.0, 0.0),
-				Vector3(0.0, 0.0, -mesa_ramp_offset)
-			]
-			var local_rot_y: Array[float] = [PI, PI * 0.5, 0.0, -PI * 0.5]
-			# plat.transform ya lleva la escala de la meseta.
-			var reach := 1.0 if mesa_ramp_attached else mesa_scale
-			var world_pos: Vector3 = plat.transform * (local_offsets[side_idx] * reach)
-			ramp.position = Vector3(world_pos.x, ground_height(world_pos.x, world_pos.z), world_pos.z)
-			ramp.rotation.y = plat_angle + local_rot_y[side_idx]
-			ramp.scale = Vector3.ONE * mesa_scale
-
-		# La meseta cuenta como keepout del reparto interior, para que no
-		# crezcan árboles a través de su plataforma.
-		_keepouts_xz.append(site)
-
-
 ## Cada región conexa de celdas bloqueadas se vuelve UNA RockFormation que
 ## cubre toda la región, borde incluido, con roca sólida (rock_formation.gd
 ## explica por qué el sello es estructural y no probable). El interior
@@ -585,7 +519,7 @@ func _place_many(scene: PackedScene, count: int, min_scale: float, max_scale: fl
 		var pos := Vector3(_rng.randf_range(-half, half), 0.0, _rng.randf_range(-half, half))
 		if not _is_clear(pos):
 			continue
-		_spawn_prop(scene, pos, _rng.randf_range(min_scale, max_scale))
+		spawn_prop(scene, pos, _rng.randf_range(min_scale, max_scale))
 		_placed_xz.append(Vector2(pos.x, pos.z))
 		placed += 1
 
@@ -624,85 +558,3 @@ func _structures_clear(xz: Vector2) -> bool:
 		if Vector2(site.x, site.z).distance_to(xz) < site.y:
 			return false
 	return true
-
-
-## Recorre los cuatro lados del suelo plantando props grandes (y algún
-## acento) en una franja con jitter. La franja queda fuera del cuadrado
-## interior, así que no revisa distancias.
-func _ring_perimeter() -> void:
-	if _perimeter_main() == null:
-		return
-	var slot := 0
-	var outer := arena_half_extent - perimeter_edge_margin_min
-	var t := -outer + 1.0
-	while t <= outer - 1.0:
-		_plant_edge_prop(Vector3(t + _jitter(), 0.0, -_band_depth()), slot)
-		_plant_edge_prop(Vector3(t + _jitter(), 0.0, _band_depth()), slot + 1)
-		_plant_edge_prop(Vector3(-_band_depth(), 0.0, t + _jitter()), slot + 2)
-		_plant_edge_prop(Vector3(_band_depth(), 0.0, t + _jitter()), slot + 3)
-		slot += 4
-		t += perimeter_step
-
-
-## Desvío al azar de un prop del borde a lo largo de su lado.
-func _jitter() -> float:
-	return _rng.randf_range(-perimeter_jitter, perimeter_jitter)
-
-
-## Distancia al centro, en metros, de un prop del borde (dentro de la franja).
-func _band_depth() -> float:
-	return _rng.randf_range(arena_half_extent - perimeter_edge_margin_max,
-			arena_half_extent - perimeter_edge_margin_min)
-
-
-func _plant_edge_prop(pos: Vector3, slot: int) -> void:
-	var corner := arena_half_extent - perimeter_corner_gap
-	if perimeter_corner_gap > 0.0 and absf(pos.x) > corner and absf(pos.z) > corner:
-		return
-	# Con relieve por zonas un prop del borde tampoco va en el faldón de una
-	# formación: quedaría asomando de la roca.
-	var terrain := _arena_terrain()
-	if terrain != null and terrain.has_relief() and _in_formation_skirt(Vector2(pos.x, pos.z)):
-		return
-	var accent := _perimeter_accent()
-	if accent != null and perimeter_rock_every > 0 and slot % perimeter_rock_every == 0:
-		_spawn_prop(accent, pos, _rng.randf_range(perimeter_accent_scale_min, perimeter_accent_scale_max))
-	else:
-		_spawn_prop(_perimeter_main(), pos, _rng.randf_range(perimeter_scale_min, perimeter_scale_max))
-
-
-## True si `xz` cae en una formación o en el faldón que asoma de sus celdas
-## (EDGE_SKIRT metros). Los puntos de prueba se recortan a la arena: junto al
-## muro, "fuera del mapa" no es roca.
-func _in_formation_skirt(xz: Vector2) -> bool:
-	var limit := arena_half_extent - 0.1
-	for index in 9:
-		var probe := xz
-		if index > 0:
-			probe += Vector2.from_angle(float(index) * TAU / 8.0) * EDGE_SKIRT
-		probe = probe.clamp(Vector2(-limit, -limit), Vector2(limit, limit))
-		if not _mask.is_walkable(probe):
-			return true
-	return false
-
-
-func _perimeter_main() -> PackedScene:
-	return perimeter_scene if perimeter_scene != null else tree_scene
-
-
-func _perimeter_accent() -> PackedScene:
-	return perimeter_accent_scene if perimeter_accent_scene != null else rock_scene
-
-
-## Solo escala uniforme: Godot no soporta escalar formas de colisión de
-## forma no uniforme. `pos.y` se IGNORA y se usa la altura del terreno en
-## ese XZ: un prop a y = 0 flotaría sobre una loma o se hundiría en una
-## hondonada.
-func _spawn_prop(scene: PackedScene, pos: Vector3, uniform_scale: float) -> void:
-	var prop := scene.instantiate() as Node3D
-	if prop == null:
-		return
-	add_child(prop)
-	prop.position = Vector3(pos.x, ground_height(pos.x, pos.z), pos.z)
-	prop.rotate_y(_rng.randf_range(0.0, TAU))
-	prop.scale = Vector3.ONE * uniform_scale
