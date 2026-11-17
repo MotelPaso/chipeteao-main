@@ -50,6 +50,10 @@ var _cells_per_side: int = 0
 ## Aristas entre celdas vecinas que no se cruzan a pie: las separa un corte
 ## del relieve por zonas (ver ReliefQueries.mask_barriers). Vacío sin relieve.
 var _barriers: Dictionary[Vector3i, bool] = {}
+## Encendido (lo enciende build() cuando recibe `keep_open`, o sea con
+## relieve por zonas), los pasillos de una sola celda entre dos brazos de
+## roca también se rellenan (ver _fill_slots).
+var _seal_slots: bool = false
 
 
 func _init(rng: RandomNumberGenerator) -> void:
@@ -65,6 +69,7 @@ func build(protected_seeds: Array[Vector2], keep_open: Dictionary[Vector2i, bool
 		barriers: Dictionary[Vector3i, bool] = {}) -> void:
 	_cells_per_side = maxi(ceili(half_extent * 2.0 / cell_size), 3)
 	_barriers = barriers
+	_seal_slots = not keep_open.is_empty()
 	var protected := _protected_cells(protected_seeds)
 	protected.merge(keep_open)
 	var formations := _rng.randi_range(blobs_min, blobs_max)
@@ -83,7 +88,11 @@ func build(protected_seeds: Array[Vector2], keep_open: Dictionary[Vector2i, bool
 					_rng.randi_range(blob_cells_min, blob_cells_max),
 					protected, owners, seeds.size())
 		_fill_notches(protected)
+		if _seal_slots:
+			_fill_slots(protected)
 		_seal_unreachable(protected)
+		if _seal_slots:
+			_free_squeezed(protected)
 		if float(open_cell_count()) / float(_cells_per_side * _cells_per_side) \
 				>= min_open_fraction:
 			break
@@ -331,6 +340,46 @@ func _fill_notches(protected: Dictionary[Vector2i, bool]) -> void:
 			return
 		for cell: Vector2i in notches:
 			_blocked[cell] = true
+
+
+## Las celdas abiertas con roca a los dos lados opuestos se vuelven roca:
+## un pasillo de UNA celda entre dos brazos de roca. El faldón que cada
+## formación asoma de sus celdas lo deja en una rendija por donde nadie
+## pasa, y lo que quede abierto al fondo es un rincón sin entrada (adonde
+## sí se llega volando). Solo con relieve por zonas: en las demás arenas la
+## máscara queda como siempre.
+func _fill_slots(protected: Dictionary[Vector2i, bool]) -> void:
+	for sweep in 4:
+		var slots: Array[Vector2i] = []
+		for x in _cells_per_side:
+			for y in _cells_per_side:
+				var cell := Vector2i(x, y)
+				if _blocked.has(cell) or not _rock_may_grow(cell, protected):
+					continue
+				if (_blocked.has(cell + Vector2i.LEFT) and _blocked.has(cell + Vector2i.RIGHT)) \
+						or (_blocked.has(cell + Vector2i.UP) and _blocked.has(cell + Vector2i.DOWN)):
+					slots.append(cell)
+		if slots.is_empty():
+			return
+		for cell: Vector2i in slots:
+			_blocked[cell] = true
+
+
+## Una celda PROTEGIDA con roca a los dos lados opuestos no se puede
+## rellenar (ver _fill_slots), así que se abre la roca: las dos celdas que
+## la aprietan pasan a ser suelo. Va al final, después de todo lo que
+## bloquea: abrir una celda nunca aprieta a otra ni deja nada sin alcanzar.
+func _free_squeezed(protected: Dictionary[Vector2i, bool]) -> void:
+	var opened: Array[Vector2i] = []
+	for cell: Vector2i in protected:
+		if not _in_grid(cell) or _blocked.has(cell):
+			continue
+		for axis: Vector2i in [Vector2i.RIGHT, Vector2i.DOWN]:
+			if _blocked.has(cell + axis) and _blocked.has(cell - axis):
+				opened.append(cell + axis)
+				opened.append(cell - axis)
+	for cell: Vector2i in opened:
+		_blocked.erase(cell)
 
 
 ## Flood fill desde la celda del spawn; las celdas abiertas que no alcanza

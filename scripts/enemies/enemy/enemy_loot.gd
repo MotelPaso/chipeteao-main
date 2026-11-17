@@ -109,19 +109,18 @@ static func spawn_chest(body: Node, at: Vector3, luck_bonus: float,
 
 ## Dónde queda algo que se suelta en `at`. En una arena con relieve por zonas
 ## lo corre al punto más cercano donde se puede dejar (fuera de cortes,
-## rampas, puentes y mesetas: quien muere trepando un acantilado no deja su
-## cofre colgado de la roca) y lo apoya en el suelo; en las demás, y si `at`
-## ya sirve, devuelve `at` tal cual. No saca números de ningún RNG.
+## rampas, puentes, mesetas y estructuras: quien muere trepando un
+## acantilado no deja su cofre colgado de la roca) y lo apoya SIEMPRE en el
+## suelo: quien muere encima de una piedra o de un tronco tampoco lo deja
+## flotando. En las demás arenas devuelve `at` tal cual. No saca números de
+## ningún RNG.
 static func drop_point(tree: SceneTree, at: Vector3) -> Vector3:
 	var terrain := Terrain.find(tree)
 	var bounds := tree.get_first_node_in_group("arena_bounds")
 	if terrain == null or bounds == null or not terrain.has_relief() \
 			or not bounds.has_method("nearest_place"):
 		return at
-	var flat := Vector2(at.x, at.z)
-	var spot: Vector2 = bounds.call("nearest_place", flat, DROP_RELIEF_MARGIN)
-	if spot.is_equal_approx(flat):
-		return at
+	var spot: Vector2 = bounds.call("nearest_place", Vector2(at.x, at.z), DROP_RELIEF_MARGIN)
 	return Vector3(spot.x, terrain.height_at(spot.x, spot.y), spot.y)
 
 

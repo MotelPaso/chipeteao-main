@@ -183,6 +183,12 @@ extends Resource
 @export var stones_scene: PackedScene
 ## Ruinas en claros del llano, como máximo (las que quepan).
 @export var ruin_count: int = 3
+## Monolitos sueltos (piedras paradas de varios metros), como máximo.
+@export var monolith_count: int = 9
+## Altura mínima de un monolito, en metros.
+@export var monolith_height_min: float = 6.5
+## Altura máxima de un monolito, en metros (bajo 10: la horda trepa 10 de una vez).
+@export var monolith_height_max: float = 9.5
 ## Material del agua que corre por el fondo del cañón. Vacío, el cañón queda seco.
 @export var water_material: Material
 

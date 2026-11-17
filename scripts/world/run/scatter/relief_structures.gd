@@ -7,6 +7,7 @@ extends RefCounted
 ##   - una pareja de MENHIRES al pie de cada rampa que baja al llano;
 ##   - un CÍRCULO de piedras en un claro del macizo;
 ##   - RUINAS en claros del llano;
+##   - MONOLITOS sueltos, altos, repartidos por todo el mapa;
 ##   - el AGUA del cañón, en cada tramo de fondo.
 ##
 ## Las escenas vienen del ReliefSettings de la arena (grupo «Estructuras»);
@@ -45,6 +46,15 @@ const RUIN_KEEPOUT: float = 9.0
 const SITE_SPACING: float = 48.0
 ## Metros que un claro guarda con un POI ya puesto o con una meseta.
 const SITE_CLEAR: float = 14.0
+## Un monolito: radio de su base, metros que guarda con el relieve y con el
+## punto de aparición, separación entre dos y claro que ocupa.
+const MONOLITH_RADIUS: float = 1.35
+const MONOLITH_RELIEF_GAP: float = 7.0
+const MONOLITH_SPAWN_GAP: float = 24.0
+const MONOLITH_SPACING: float = 32.0
+const MONOLITH_KEEPOUT: float = 3.5
+## Intentos por monolito.
+const MONOLITH_TRIES: int = 30
 ## El agua: metros que se mete bajo las paredes del cañón, metros sobre el
 ## punto más alto del fondo y metros que se acorta en cada punta.
 const WATER_MARGIN: float = 0.6
@@ -75,6 +85,7 @@ static func raise(scatter: Node3D, terrain: Terrain, run_seed: int,
 			else:
 				_place_menhirs(scatter, terrain, ramp, run_seed + order * 131)
 	_place_sites(scatter, terrain, layout, run_seed, taken, claimed)
+	_place_monoliths(scatter, terrain, layout, run_seed, taken, claimed)
 	if settings.water_material != null and layout.ravine != null:
 		_place_water(scatter, terrain, layout)
 	return claimed
@@ -82,9 +93,10 @@ static func raise(scatter: Node3D, terrain: Terrain, run_seed: int,
 
 ## Una estructura de `scene` colgada de `scatter` en `at`, girada `yaw`.
 ## Si es un StandingStones, `layout_kind` y `span` la configuran antes de
-## entrar al árbol.
+## entrar al árbol, y `tweaks` (nombre de export -> valor) le cambia medidas.
 static func _spawn(scatter: Node3D, scene: PackedScene, at: Vector3, yaw: float,
-		seed_value: int, layout_kind: int = -1, span: float = 0.0) -> Node3D:
+		seed_value: int, layout_kind: int = -1, span: float = 0.0,
+		tweaks: Dictionary = {}) -> Node3D:
 	var node := scene.instantiate() as Node3D
 	if node == null:
 		return null
@@ -92,6 +104,8 @@ static func _spawn(scatter: Node3D, scene: PackedScene, at: Vector3, yaw: float,
 	if layout_kind >= 0:
 		node.set(&"layout", layout_kind)
 		node.set(&"span", span)
+	for key: StringName in tweaks:
+		node.set(key, tweaks[key])
 	node.add_to_group(GROUP)
 	scatter.add_child(node)
 	node.position = at
@@ -200,6 +214,51 @@ static func _place_sites(scatter: Node3D, terrain: Terrain, layout: ReliefLayout
 		claimed.append(Vector3(xz.x, RUIN_KEEPOUT, xz.y))
 		used.append(xz)
 		ruins += 1
+
+
+## Los monolitos: piedras paradas de varios metros en puntos al azar donde
+## se puede poner algo, lejos del relieve, del punto de aparición, de los
+## POIs y entre sí. Tienen su propio RNG (la semilla de partida).
+static func _place_monoliths(scatter: Node3D, terrain: Terrain, layout: ReliefLayout,
+		run_seed: int, taken: PackedVector2Array, claimed: PackedVector3Array) -> void:
+	var settings := layout.settings
+	if settings.stones_scene == null or not scatter.has_method(&"can_place"):
+		return
+	var rng := RandomNumberGenerator.new()
+	rng.seed = run_seed ^ 0x4D4F4E4F
+	var limit := layout.half - settings.edge_margin
+	var placed := PackedVector2Array()
+	for index in settings.monolith_count:
+		for attempt in MONOLITH_TRIES:
+			var xz := Vector2(rng.randf_range(-limit, limit), rng.randf_range(-limit, limit))
+			if xz.length() < MONOLITH_SPAWN_GAP or layout.level_at(xz) < 0:
+				continue
+			if not bool(scatter.call(&"can_place", xz, MONOLITH_RELIEF_GAP)):
+				continue
+			if not _site_free(xz, taken, PackedVector2Array()) or not _apart(xz, placed, claimed):
+				continue
+			var node := _spawn(scatter, settings.stones_scene, _ground(terrain, xz), 0.0,
+					run_seed + 2111 + index * 37, StandingStones.Layout.MENHIR, 0.0,
+					{&"stone_height_min": settings.monolith_height_min,
+					&"stone_height_max": settings.monolith_height_max,
+					&"stone_radius": MONOLITH_RADIUS})
+			if node != null:
+				node.name = "Monolith"
+			placed.append(xz)
+			claimed.append(Vector3(xz.x, MONOLITH_KEEPOUT, xz.y))
+			break
+
+
+## True si `xz` queda a MONOLITH_SPACING de los monolitos ya puestos y fuera
+## del claro de toda estructura ya puesta.
+static func _apart(xz: Vector2, placed: PackedVector2Array, claimed: PackedVector3Array) -> bool:
+	for other: Vector2 in placed:
+		if xz.distance_to(other) < MONOLITH_SPACING:
+			return false
+	for site: Vector3 in claimed:
+		if Vector2(site.x, site.z).distance_to(xz) < site.y + MONOLITH_KEEPOUT:
+			return false
+	return true
 
 
 ## True si en `xz` no hay un POI ni una meseta cerca (`taken`) ni otra

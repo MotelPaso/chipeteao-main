@@ -1,4 +1,4 @@
-[gd_scene load_steps=32 format=3 uid="uid://dqv5m2x8rk1fj"]
+[gd_scene load_steps=33 format=3 uid="uid://dqv5m2x8rk1fj"]
 
 [ext_resource type="Script" path="res://scripts/world/run/arena.gd" id="1_arena"]
 [ext_resource type="Script" path="res://scripts/world/run/backdrop.gd" id="90_backdrop"]
@@ -26,6 +26,7 @@
 [ext_resource type="Shader" path="res://assets/shaders/forest_ground.gdshader" id="93_ground"]
 [ext_resource type="Resource" path="res://assets/world/relief_hollow_woods.tres" id="94_relief"]
 [ext_resource type="PackedScene" path="res://scenes/world/props/AncientTree.tscn" id="95_ancient"]
+[ext_resource type="PackedScene" path="res://scenes/world/props/GroundCover.tscn" id="96_cover"]
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_grass"]
 shader = ExtResource("93_ground")
@@ -143,7 +144,7 @@ tree_scene = ExtResource("10_tree")
 rock_scene = ExtResource("11_rock")
 stump_scene = ExtResource("12_stump")
 ancient_tree_scene = ExtResource("95_ancient")
-ancient_tree_count = 16
+ancient_tree_count = 22
 tree_count = 128
 rock_count = 54
 stump_count = 34
@@ -161,6 +162,8 @@ mesa_chest_scene = ExtResource("21_chest")
 mesa_chest_count = 3
 formation_clearance = 4.5
 formation_style = ExtResource("91_rockstyle")
+
+[node name="GroundCover" parent="ForestScatter" instance=ExtResource("96_cover")]
 
 [node name="Terrain" type="StaticBody3D" parent="."]
 script = ExtResource("90_terrain")

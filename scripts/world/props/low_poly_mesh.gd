@@ -141,6 +141,11 @@ func is_empty() -> bool:
 	return _vertices.is_empty()
 
 
+## Caras (triángulos) agregadas hasta ahora.
+func face_count() -> int:
+	return _vertices.size() / 3
+
+
 ## La malla con todo lo agregado hasta ahora.
 func commit() -> ArrayMesh:
 	var arrays := []

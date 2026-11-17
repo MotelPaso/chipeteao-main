@@ -90,8 +90,9 @@ func _check_props(bad: Dictionary, notes: Array[String]) -> int:
 		# La roca de un corte, un puente, una formación y las estructuras del
 		# relieve (portales, hito, agua) son el relieve mismo, no algo puesto
 		# encima: que no tapen un paso lo comprueban los barridos de alcance.
+		# La vegetación del suelo no tiene colisión.
 		if prop == null or prop is CliffWall or prop is Bridge or prop is RockFormation \
-				or prop.is_in_group(ReliefStructures.GROUP):
+				or prop.is_in_group(ReliefStructures.GROUP) or prop is GroundCover:
 			continue
 		count += 1
 		var xz := Vector2(prop.global_position.x, prop.global_position.z)
