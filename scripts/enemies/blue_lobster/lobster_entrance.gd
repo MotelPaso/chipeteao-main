@@ -206,8 +206,9 @@ func _enter_shot(index: int) -> void:
 		_boss.rig.gesture(shot.gesture)
 	if not shot.sfx.is_empty():
 		Sfx.play(shot.sfx)
-	print("Boss cinematic: shot=%d at=%.2fs song=%s isolated=%s" % [
-			index + 1, _elapsed, _music.position_text(), shot.isolated])
+	print("Boss cinematic: shot=%d at=%.2fs song=%s isolated=%s hidden=%d" % [
+			index + 1, _elapsed, _music.position_text(), shot.isolated,
+			_camera.hidden_count()])
 
 
 ## El corte: toma el HUD, la pantalla dividida y la cámara. Lo que se toma
