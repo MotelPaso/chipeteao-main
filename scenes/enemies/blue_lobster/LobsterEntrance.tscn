@@ -9,14 +9,7 @@
 [ext_resource type="Script" path="res://scripts/enemies/blue_lobster/lobster_entrance_overlay.gd" id="7_lobster_entrance_overlay"]
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_backdrop"]
-render_priority = 0
 shader = ExtResource("1_lobster_backdrop")
-shader_parameter/core_color = null
-shader_parameter/edge_color = null
-shader_parameter/core_size = null
-shader_parameter/ray_count = null
-shader_parameter/ray_strength = null
-shader_parameter/ray_speed = null
 
 [sub_resource type="SphereMesh" id="SphereMesh_backdrop"]
 material = SubResource("ShaderMaterial_backdrop")

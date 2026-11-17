@@ -4,12 +4,7 @@
 [ext_resource type="Shader" path="res://assets/shaders/telegraph_lane.gdshader" id="2_lane"]
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_lane"]
-render_priority = 0
 shader = ExtResource("2_lane")
-shader_parameter/chevrons = null
-shader_parameter/flow_speed = null
-shader_parameter/sweep = null
-shader_parameter/edge = null
 
 [sub_resource type="PlaneMesh" id="PlaneMesh_segment"]
 material = SubResource("ShaderMaterial_lane")
