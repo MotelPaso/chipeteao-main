@@ -1,10 +1,10 @@
 class_name Bridge
 extends StaticBody3D
-## Puente fijo sobre un barranco: un tablero de madera sobre una CALZADA
+## Puente fijo sobre un cañón: un tablero de madera sobre una CALZADA
 ## MACIZA de piedra que baja hasta el fondo. Escena:
 ## scenes/world/props/Bridge.tscn.
 ##
-## Por qué maciza: un enemigo que cae al barranco persigue en línea recta y
+## Por qué maciza: un enemigo que cae al cañón persigue en línea recta y
 ## termina bajo el tablero. Sin nada contra qué empujar no trepa, y el
 ## puente sería un refugio. Contra el costado de la calzada sí trepa, como
 ## contra cualquier pared, y sale al tablero.
@@ -24,7 +24,7 @@ extends StaticBody3D
 ## Ancho del tablero y de la calzada, en metros.
 @export var width: float = 5.0
 ## Metros que la calzada baja desde la cara de arriba del tablero. Tiene que
-## pasar el fondo del barranco.
+## pasar el fondo del cañón.
 @export var drop: float = 8.0
 ## Grosor del tablero de madera, en metros.
 @export var deck_thickness: float = 0.3

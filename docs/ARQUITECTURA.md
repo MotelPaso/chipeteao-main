@@ -400,7 +400,7 @@ La vida de cada vida es el daño por segundo que la party le hace a **un solo cu
 - Qué es: una fila de catálogo + una escena de arena. **El orden de `MAP_LIBRARY` es el orden de la partida**: una fila nueva insertada en medio cambia la progresión de todos inmediatamente. No hay desbloqueos de mapa ni grados; a un bioma se llega jugando.
 - Archivos: `scripts/systems/catalogs/map_catalog.gd` (`MAP_LIBRARY`), `scripts/world/run/run_root.gd`, `scripts/world/run/arena.gd`, `scripts/world/run/scatter.gd`, arenas existentes como plantilla.
 - Fila: `id`, `display_name` (topónimo, mayúscula en las dos partes), `blurb`, `scene_path`, `palette`. Nada más.
-- Escena de arena (copiar `AshDunes.tscn`): raíz `Node3D` **con `scripts/world/run/arena.gd` y su `map_id`**, `WorldEnvironment` + luz (`Sun`), `Perimeter` (muros, capa 1), `Backdrop` (`scripts/world/run/backdrop.gd`, sus anillos de colinas se derivan de `arena_half_extent`), spots de verticalidad y props a mano (en grupo `scatter_keepout`), nodo de scatter con `scatter.gd` (seed determinista; su `arena_half_extent` es la **fuente única del tamaño de arena** — 120.0 = 240x240 — publicada por el grupo `arena_bounds`: la leen `BossBase` y `EnemySpawner` restando su margen, el `Terrain` (su lado es `2 × arena_half_extent`, leído al construirse) y el propio scatter, que deriva de ahí las zonas de mesetas, interior y perímetro con los márgenes `mesa_edge_margin`, `interior_edge_margin` y `perimeter_edge_margin_min/max`; el scatter además necesita su `formation_style`, un `RockFormationStyle` en `assets/world/rock_style_<mapa>.tres`), `Interactables`, `EnemySpawner` (con `phase_preset` y sus escenas/horario), `AmbientBed`, un nodo **`Terrain`** con `scripts/world/run/terrain.gd`, su `amplitude` del bioma, el `ShaderMaterial` del suelo en `surface_material`, un `backdrop_path` válido (por defecto `../Backdrop`, de donde saca el tinte del minimapa) y, si el mapa lleva acantilados, barranco y puente, un `relief` (un `ReliefSettings` en `assets/world/relief_<mapa>.tres`; ver «Terreno → Relieve por zonas»: con él no se ponen spots de verticalidad a mano, que clavarían el trazado en el mismo sitio en todas las semillas) (colocado **después** del scatter en orden de árbol), y un `Marker3D` llamado `SpawnPoint` (dónde aterriza el equipo). Los muros del `Perimeter` se escriben **estáticos** en la escena: formas `(1, 17, 242)` / `(242, 17, 1)` centradas en ±120.5 y y = 3.5. Unos **13 POI barajables** bajo `Interactables`. **NO** instancia `RunSystems.tscn`: eso vive una sola vez en `Run.tscn`.
+- Escena de arena (copiar `AshDunes.tscn`): raíz `Node3D` **con `scripts/world/run/arena.gd` y su `map_id`**, `WorldEnvironment` + luz (`Sun`), `Perimeter` (muros, capa 1), `Backdrop` (`scripts/world/run/backdrop.gd`, sus anillos de colinas se derivan de `arena_half_extent`), spots de verticalidad y props a mano (en grupo `scatter_keepout`), nodo de scatter con `scatter.gd` (seed determinista; su `arena_half_extent` es la **fuente única del tamaño de arena** — 120.0 = 240x240 — publicada por el grupo `arena_bounds`: la leen `BossBase` y `EnemySpawner` restando su margen, el `Terrain` (su lado es `2 × arena_half_extent`, leído al construirse) y el propio scatter, que deriva de ahí las zonas de mesetas, interior y perímetro con los márgenes `mesa_edge_margin`, `interior_edge_margin` y `perimeter_edge_margin_min/max`; el scatter además necesita su `formation_style`, un `RockFormationStyle` en `assets/world/rock_style_<mapa>.tres`), `Interactables`, `EnemySpawner` (con `phase_preset` y sus escenas/horario), `AmbientBed`, un nodo **`Terrain`** con `scripts/world/run/terrain.gd`, su `amplitude` del bioma, el `ShaderMaterial` del suelo en `surface_material`, un `backdrop_path` válido (por defecto `../Backdrop`, de donde saca el tinte del minimapa) y, si el mapa lleva montaña, cañón y puentes, un `relief` (un `ReliefSettings` en `assets/world/relief_<mapa>.tres`; ver «Terreno → Relieve por zonas»: con él no se ponen spots de verticalidad a mano, que clavarían el trazado en el mismo sitio en todas las semillas; ahí mismo se eligen sus estructuras, y la vegetación del suelo es una `GroundCover.tscn` hija del scatter) (colocado **después** del scatter en orden de árbol), y un `Marker3D` llamado `SpawnPoint` (dónde aterriza el equipo). Los muros del `Perimeter` se escriben **estáticos** en la escena: formas `(1, 17, 242)` / `(242, 17, 1)` centradas en ±120.5 y y = 3.5. Unos **13 POI barajables** bajo `Interactables`. **NO** instancia `RunSystems.tscn`: eso vive una sola vez en `Run.tscn`.
 - Las tres arenas guardan en su `.tscn` algunos `@export` del `EnemySpawner` (las escenas de enemigos, `phase_preset`, `boss_scene`, `elder_title` y `boss_warning_text`), y cualquiera puede guardar otro: si un export se muda a un colaborador, el valor que una escena guarda con ese nombre se pierde sin aviso. Por eso `SpawnScaling`, `SpawnPoints`, `HordeSchedule`, `BossSchedule`, `PowerUpDrops` y `EnemyFreeze` (`scripts/systems/spawner/`) tienen la lógica pero leen los exports del spawner. Son `RefCounted` sin proceso propio: el `_physics_process` del spawner los avanza, así que parar el spawner los para a todos.
 
 ## Partida por etapas
@@ -472,16 +472,19 @@ Desde la iteración 51 el suelo de una arena **no es una placa plana**: es
 
 - **Sin `relief`** (Dunas de Ceniza, Ciénaga Lóbrega): un heightmap suave de
   amplitud baja (dunas 3.0, ciénaga 1.5) con mesetas encima.
-- **Con `relief`** (Bosque Hueco): **relieve por zonas**. Sobre ese mismo suelo
-  suave (amplitud 1.6) van zonas elevadas con acantilado, un barranco, las
-  rampas que entran a cada una y un puente. Ver «Relieve por zonas» abajo.
+- **Con `relief`** (Bosque Hueco): **relieve por zonas**. Sobre un suelo
+  ondulado (amplitud 2.4) va una montaña escalonada de tres niveles —el
+  macizo donde aparece el equipo, un segundo nivel y la cumbre—, un cañón a
+  su pie con dos puentes, cerros sueltos y las rampas que entran a cada
+  zona. Ver «Relieve por zonas» abajo.
 
 **La regla que manda sobre todo relieve.** Esto es un bullet-heaven: la horda no
 tiene navmesh, persigue en línea recta, camina hasta 45 grados y trepa lo que
 la bloquea desde 60 grados hacia arriba, hasta 10 m de una vez. Un terreno
 capaz de esconder a un raider o de cortar una persecución rompería el juego.
 Por eso el suelo base es suave, y por eso el relieve por zonas pone su altura
-en **cortes que la horda cruza**: ninguno mide más de 8 m, toda cara es
+en **cortes que la horda cruza**: ninguno mide más de 8 m (la montaña es alta
+porque **apila** cortes de 6 m, no porque alguno sea más alto), toda cara es
 claramente caminable o claramente pared (nunca entre 45 y 60 grados), a toda
 zona se entra caminando por alguna rampa y un puente es una calzada maciza
 que se trepa desde el fondo. Dentro de cada zona el suelo sigue igual de
@@ -517,8 +520,7 @@ altura con ventanas de 1.6 a 2.2 m.
   `add_surface_from_arrays` sobre arrays empaquetados, no con `SurfaceTool`:
   un vértice por llamada sobre 241×241 son cientos de miles de llamadas de
   GDScript y tarda segundos. Presupuesto: **400 ms**; medido 97-134 ms sin
-  relieve por zonas y 30-38 ms con él (sus rejillas se llenan por zonas, no
-  muestra por muestra). La malla clásica vive en
+  relieve por zonas y 87-104 ms con él. La malla clásica vive en
   `scripts/world/run/terrain/terrain_mesh.gd` (`TerrainMesh`).
 - **El sentido de los triángulos (iteración 60).** Godot considera **frontal
   la cara horaria vista desde delante**, así que un suelo que se pisa se
@@ -553,17 +555,38 @@ Opt-in por arena: el nodo `Terrain` lleva en `relief` un `ReliefSettings`
 de `scripts/world/run/terrain/relief_settings.gd`). Una arena sin él no
 ejecuta nada de esto y no saca ni una tirada distinta del RNG.
 
+**Qué arma.** Todo gira alrededor de un rumbo al azar, hacia donde queda la
+montaña vista desde el punto de aparición:
+
+| Pieza | Qué es |
+| --- | --- |
+| **Macizo** | Un nivel ancho (radio 52-56 m, 6 m sobre el llano), alargado hacia la montaña. **Contiene el punto de aparición.** 3-6 rampas al llano. |
+| **Segundo nivel** | Una zona apilada sobre el macizo, pegada a su borde lejano (+6 m). 2-3 rampas; la primera mira hacia el spawn. |
+| **Cumbre** | Una zona apilada sobre el segundo nivel (+5.5 m), con 1-2 rampas y el Árbol Hueco. Queda a unos 18 m sobre el llano. |
+| **Cañón** | Un pasillo hundido (5.2-5.5 m, 118-150 m de largo) al pie del macizo por el lado contrario a la montaña, con una rampa en cada punta, **dos puentes** y un **collado** entre ellos. |
+| **Cerros** | 2-3 mesetas chicas sueltas en el llano, con 1-2 rampas. |
+| **Lomas** | 5 lomas anchas del llano, más la que sostiene a la montaña y la de cada cerro. |
+
+Las zonas se **apilan** (`Zone.parent`, `Zone.floor`): una zona puede estar
+entera sobre la meseta de otra, y así tres cortes de 6 m hacen una montaña de
+18 sin que ninguno pase de lo que la horda trepa.
+
 | Archivo (`scripts/world/run/terrain/` salvo que diga otra cosa) | Qué hace |
 | --- | --- |
-| `relief_planner.gd` (`ReliefPlanner`) | Sortea el trazado con un **RNG propio** sembrado con `run_seed` (no toca el flujo de la partida): un barranco curvo con una rampa en cada extremo y un cruce, 2-3 zonas elevadas (contorno polar: óvalo con lóbulos) con 2-4 rampas cada una, y lomas sueltas. Cada pieza se sortea por rechazo: lejos del spawn, del borde y de las demás. La primera zona queda a la vista del spawn. Si en 40 intentos no cabe, usa un trazado fijo de reserva (`fallback=true` en el log). |
-| `relief_layout.gd` (`ReliefLayout`) | El trazado y sus preguntas de geometría en planta: `offset_at`, `level_at`, `raised_offset`, `ravine_coords`, `ravine_drop`, `digest`. |
-| `relief_cuts.gd` (`ReliefCuts`) | Las **líneas de corte** (`CutPath`): por dónde pasa cada acantilado y cuánto mide en cada punto. Una zona con N rampas da N líneas (sube por el costado de una rampa, sigue el contorno, baja por el de la siguiente); el barranco, sus dos paredes, partidas en el puente. El lado alto queda a la izquierda al recorrerlas. |
-| `relief_field.gd` (`ReliefField`) | Las alturas: suelo base (ruido + la loma ancha de cada zona + la vaguada del barranco), borde plano, claros y, encima, las zonas. |
+| `relief_planner.gd` (`ReliefPlanner`) | Sortea el trazado con un **RNG propio** sembrado con `run_seed` (no toca el flujo de la partida): macizo, segundo nivel, cumbre, cañón, rampas del macizo, cerros y lomas, en ese orden. Cada pieza se sortea por rechazo; si una obligatoria no cabe, se tira el trazado y se sortea otro (hasta 60; medido: 9 como mucho en 300 semillas). Si ninguno cabe usa el de reserva (`fallback=true` en el log): la montaña mira a una esquina y cada medida toma el medio de su rango. |
+| `relief_ramps.gd` (`ReliefRamps`) | Las rampas de una zona: dónde caben alrededor de su contorno (dentro de la arena, fuera del claro del spawn, sobre la meseta del padre si la zona está apilada, lejos de otras zonas, de sus rampas y del cañón, y con meseta libre detrás de la boca). |
+| `relief_ravine.gd` (`ReliefRavine`) | El cañón: su eje (una Bézier que abraza al macizo), en cuántos tramos se parte su fondo, los collados y los puentes. |
+| `relief_layout.gd` (`ReliefLayout`) | El trazado y sus preguntas de geometría en planta: `offset_at`, `level_at`, `on_plateau`, `raised_offset`, `ravine_coords`, `ravine_drop`, `digest`. |
+| `relief_cuts.gd` (`ReliefCuts`) | Las **líneas de corte** (`CutPath`): por dónde pasa cada acantilado y cuánto mide en cada punto. Una zona con N rampas da N líneas; el cañón, sus dos paredes, partidas en cada puente y en cada collado. El lado alto queda a la izquierda al recorrerlas. |
+| `relief_field.gd` (`ReliefField`) | Las alturas: suelo base (ruido + lomas + la vaguada del cañón), borde plano, claros y, encima, las zonas (el padre antes que la hija). |
 | `relief_mesh.gd` (`ReliefMesh`) | La malla: 2 m, con **parches de 1 m** en los bloques que tocan un corte. |
 | `relief_queries.gd` (`ReliefQueries`) | Distancia a cortes/rampas/puentes, celdas y barreras para la máscara, la línea `Relief layout:` y la consulta de la etapa. |
 | `scripts/world/cliff_wall.gd` (`CliffWall`) | La **roca** de un corte: una cinta facetada sobre su línea, con una cornisa caminable del lado alto y una cara empinada del lado bajo. La colisión es la malla (prismas convexos, como `RockFormation`). |
 | `scripts/world/props/bridge.gd` + `scenes/world/props/Bridge.tscn` (`Bridge`) | El puente: un tablero sobre una **calzada maciza** hasta el fondo. |
 | `scripts/world/run/scatter/relief_dressing.gd` (`ReliefDressing`) | Lo que hace el scatter con el relieve: levanta las `CliffWall` y los puentes **como hijos suyos** (así arden con el bosque en el infierno de Mythos) y responde `can_place` / `nearest_place`. |
+| `scripts/world/run/scatter/relief_structures.gd` (`ReliefStructures`) | Las estructuras que visten el relieve (ver «Estructuras y vegetación» abajo). |
+| `scripts/world/run/scatter/mesa_builder.gd` (`MesaBuilder`), `scripts/world/run/scatter/perimeter_ring.gd` (`PerimeterRing`) | Las mesetas (sorteo de sitios, plataforma y rampa) y la franja de props del borde, fuera de `scatter.gd` (`ArenaScatter`) para que ese archivo no crezca. Sus valores siguen siendo los exports del scatter (grupos «Mesetas» y «Borde»); sacan los números del mismo RNG y en el mismo orden, así el mundo de cada semilla no cambia. |
+| `scripts/world/run/scatter/prop_footprints.gd` (`PropFootprints`) | La huella en planta de cada prop con colisión que planta el scatter (troncos, rocas, tocones): una grilla de 1 m que `can_place` lee, para que nada se coloque encima de un tronco. Solo se enciende con relieve por zonas. |
 
 - **Dos superficies por corte.** Un heightmap de 1 m por muestra no puede
   dibujar una pared limpia: un escalón entre dos muestras vecinas da una cara
@@ -576,16 +599,26 @@ ejecuta nada de esto y no saca ni una tirada distinta del RNG.
   fracción fija de lo que baja (`CliffWall.FACE_RUN`, 76 grados) a cualquier
   altura, así que donde el corte se acaba (el pie de una rampa) la roca baja
   a cero sin pasar por la franja prohibida.
-- **Alturas acotadas por construcción.** La cima del mapa es
-  `zone_top_height + zone_top_swell + amplitude` y el fondo
-  `ravine_valley + ravine_depth + ravine_floor_detail × amplitude`: con los
-  valores del bosque, `max − min` cae entre 12 y 17 m y `min` no baja de
-  −6.7 m (el rescate del vacío del raider está en −10). Medido en 29
-  semillas: 15.7-16.0 m.
+- **El suelo se amansa junto a un corte.** La ondulación del suelo queda al
+  35% a menos de 5 m del contorno de una zona y sobre sus rampas, y recupera
+  su fuerza a 13 m (`ReliefField.EDGE_DETAIL`, `EDGE_FLAT`, `EDGE_REACH`). La
+  cornisa de un corte se apoya en ese suelo: sobre una loma fuerte quedaría
+  con caras de 45 grados, y una rampa inclinada de más deja de caminarse.
+- **Alturas.** El llano queda en 0, el macizo en +6, el segundo nivel en +12 y
+  la cumbre en unos +17.5, todo sobre una loma de 2-3 m; el fondo del cañón,
+  en −5.5. Medido en doce semillas: `min` entre −6.0 y −6.6 (no baja de −7:
+  el rescate del vacío del raider está en −10), `max` entre 19.3 y 20.5, o
+  sea 26-27 m de cima a fondo.
+- **El collado.** Un puente es una calzada maciza de pared a pared: entre dos
+  puentes el fondo del cañón sería un pozo del que un raider no sale (salta
+  1.5 m). Por eso entre dos puentes el fondo **sube por una rampa hasta el
+  borde, sigue plano 10 m y vuelve a bajar** (`Ravine.saddles`,
+  `ReliefRavine.SADDLE_HALF`). El cañón queda en tantos tramos como puentes,
+  cada uno con salida por una rampa.
 - **El orden.** El scatter llama a `Terrain.plan_relief(run_seed, medio_lado)`
   en su `_enter_tree`, **antes** de armar su máscara y elegir sus mesetas (el
   `Terrain` todavía no entró al árbol: es puro cálculo). La máscara recibe del
-  relieve `keep_open` (celdas sobre zonas, barranco y a 9 m de un corte, rampa
+  relieve `keep_open` (celdas sobre zonas, cañón y a 9 m de un corte, rampa
   o puente: ahí nunca hay roca) y `barriers` (aristas entre celdas que un
   corte separa): su flood fill ya no cruza un acantilado, así que «alcanzable
   desde el spawn» significa lo mismo para ella que para un raider. Las
@@ -593,30 +626,86 @@ ejecuta nada de esto y no saca ni una tirada distinta del RNG.
   `relief_prop_clearance` (5 m).
 - **Colocar sobre el relieve.** Nadie pone nada sobre un corte, una rampa o un
   puente. La pregunta es `arena_bounds.can_place(xz, margen)` (máscara +
-  lejos del relieve + fuera del faldón de las formaciones y de las mesetas);
-  `is_walkable` sigue siendo **solo** la máscara, porque los vigilantes del
-  harness la leen así. La hacen `StageLayout.walkable_xz` (POIs, eventos,
-  lluvias, portal de salida; 5 m), `SpawnPoints` (4 m, y un spawn tampoco cae
-  sobre la punta de un árbol) y `BossBase._safe_arena_point` (su export `relief_margin`, 5 m; además
-  sube el punto al suelo si quedó bajo una zona elevada). Lo que cae donde murió
-  alguien pasa por `EnemyLoot.drop_point` → `arena_bounds.nearest_place`: un
-  cofre soltado en mitad de una rampa aparece al costado. La estrella que
-  ronda (`PowerUpPickup`) rebota al pie de un corte como contra una roca
+  lejos del relieve + fuera del faldón de las formaciones, de las mesetas y
+  del claro de cada estructura, y nunca sobre la huella de un prop con
+  colisión, `PropFootprints`: un portal de salida encima de un tronco de
+  8 m no lo alcanza nadie); `is_walkable` sigue siendo **solo** la máscara,
+  porque los vigilantes del harness la leen así. `can_grow` es la misma
+  pregunta sin la huella de los props, para la vegetación del suelo, que sí
+  llega hasta el pie de un tronco. La hacen
+  `StageLayout.walkable_xz` (POIs, eventos, lluvias, portal de salida; 5 m),
+  `SpawnPoints` (4 m, y un spawn tampoco cae sobre la punta de un árbol) y
+  `BossBase._safe_arena_point` (su export `relief_margin`, 5 m; además sube el
+  punto al suelo si quedó bajo una zona elevada). Un spawn que no encuentra
+  lugar en los ocho intentos de su banda se corre al punto libre más cercano
+  (`SpawnPoints._off_relief`) en vez de nacer sobre una cornisa. Lo que cae
+  donde murió alguien pasa por `EnemyLoot.drop_point` →
+  `arena_bounds.nearest_place` y se apoya **siempre** en el suelo: un cofre
+  soltado en mitad de una rampa aparece al costado, y el de quien murió
+  encima de una piedra no queda flotando. La estrella que ronda
+  (`PowerUpPickup`) rebota al pie de un corte como contra una roca
   (`roam_max_rise`: el suelo no puede subir más de 2 m en lo que mira
   adelante) y sube por las rampas; bajar, baja por donde sea.
-- **El puente no es un refugio.** Quien cae al barranco termina bajo el
-  tablero; contra el costado de la calzada trepa como contra cualquier pared.
-  El tablero queda 3 cm bajo el claro de sus cabeceras: se entra sin escalón.
+- **El puente no es un refugio.** Quien cae al cañón termina bajo el tablero;
+  contra el costado de la calzada trepa como contra cualquier pared. El
+  tablero queda 3 cm bajo el claro de sus cabeceras: se entra sin escalón.
 - **El Backdrop** de una arena con relieve por zonas arma el suelo lejano como
   un **marco** de cuatro `PlaneMesh` alrededor de la arena, al nivel de su
-  borde (`rim_drop`). Un plano entero bajo el fondo del barranco dejaría un
-  escalón de 6 m en el borde, y al nivel del borde taparía el barranco.
+  borde (`rim_drop`). Un plano entero bajo el fondo del cañón dejaría un
+  escalón de 6 m en el borde, y al nivel del borde taparía el cañón.
   `PlaneMesh` a propósito: `HellSky` reconoce el suelo lejano por ese tipo.
+  Con `peak_count` mayor que cero levanta además una **cordillera**: picos
+  facetados de 55-130 m en un anillo lejano (2.1-3 veces la mitad de la
+  arena), en una sola malla con color de vértice y su propio RNG. Es lo que
+  le da horizonte al mapa desde cualquier punto.
 - **Logs.** `Relief layout: <mapa> zones=N raised=N ravines=N cuts=N tallest=M
-  bridges=N ramps=N fallback=B digest=H` (junto a `Terrain built:`; el digest
-  se repite con la misma semilla y cambia con otra) y `Relief dressing: N
+  peak=M bridges=N ramps=N fallback=B digest=H` (junto a `Terrain built:`;
+  `tallest` es el corte más alto, `peak` la cumbre sobre el llano; el digest
+  se repite con la misma semilla y cambia con otra), `Relief dressing: N
   cuts, N faces, N shapes, tallest=M, N bridges in N ms` (un `WARNING` si
-  alguna cara de roca queda entre 45 y 60 grados).
+  alguna cara de roca queda entre 45 y 60 grados) y `Ground cover: N chunks,
+  N faces in N ms`.
+
+#### Estructuras y vegetación
+
+Lo que le da altura y carácter al relieve. Las escenas salen del
+`ReliefSettings` de la arena (grupo «Estructuras»): una escena vacía apaga
+esa pieza. Todo cuelga del scatter, así arde con el bosque, y nada saca
+números del RNG de la partida.
+
+| Pieza | Dónde va | Con qué |
+| --- | --- | --- |
+| **Árbol Hueco** | Al borde de la cumbre que queda más lejos de su rampa, con la boca del hueco hacia el centro. 30 m: se ve desde todo el mapa. | `scenes/world/props/HollowTree.tscn` (`hollow_tree.gd`) |
+| **Portales** | En la boca de cada rampa de los niveles altos: un pilar detrás de cada esquina de la rampa y el dintel encima. | `StandingStones.tscn`, `layout = GATE` |
+| **Menhires** | Una pareja al pie de cada rampa que baja al llano. | `layout = MENHIR` |
+| **Círculo de piedras** | En un claro del macizo, a unos 36 m del spawn. | `layout = CIRCLE` |
+| **Ruinas** | Hasta `ruin_count` columnatas rotas en claros del llano. | `layout = RUIN` |
+| **Monolitos** | Hasta `monolith_count` piedras de 6.5-9.5 m, sueltas por el mapa. | `layout = MENHIR`, con otras medidas |
+| **Agua** | Una cinta a nivel en cada tramo de fondo del cañón. | `water_material` |
+| **Árboles antiguos** | 22 por etapa, 2.5 veces más altos que los demás; los planta el scatter (`ancient_tree_scene`, `ancient_tree_count`). | `scenes/world/props/AncientTree.tscn` |
+| **Vegetación del suelo** | Arbustos, matas, flores, hongos y piedras chicas en todo el mapa. | `scenes/world/props/GroundCover.tscn` (`ground_cover.gd`), hija del scatter en la escena de la arena |
+
+- **`LowPolyMesh`** (`scripts/world/props/low_poly_mesh.gd`) arma mallas
+  facetadas con color de vértice a partir de piezas simples (caras, prismas
+  entre dos anillos, cajas, copas). El material es
+  `assets/materials/vertex_paint.tres`: blanco por color de vértice, que es
+  lo que `HellDressing` sabe quemar. **No uses `MultiMesh` para nada que
+  cuelgue del scatter**: el infierno solo viste `MeshInstance3D`, y lo demás
+  quedaría verde en un bosque en llamas.
+- **`StandingStones`** hace las cuatro formas de piedra con una sola escena;
+  quien la coloca fija `layout`, `span` y `shape_seed` antes de que entre al
+  árbol. Cada piedra parada lleva su cilindro de colisión; los dinteles y
+  las piedras caídas, no. Nada pasa de 10 m: la horda trepa 10 de una vez, y
+  lo que no cruza lo rodea.
+- **`GroundCover`** parte el mapa en trozos de 20 m y arma una malla por
+  trozo, unos pocos por frame desde que empieza la etapa (137 trozos, unas
+  35 000 caras, 70 ms en total). No tiene colisión. No planta sobre roca,
+  cortes, rampas, puentes, el fondo del cañón ni el claro de una estructura
+  (`arena_bounds.can_grow`).
+- Las estructuras entran al grupo `relief_structures` (`ReliefStructures.GROUP`)
+  y devuelven su claro al scatter: `can_place` y el reparto de props lo
+  esquivan. Se colocan **después** de los POIs y las mesetas (los esquivan) y
+  **antes** de los props.
 
 **La consulta de la etapa: `Terrain.relief_features()`.** Solo lectura, para
 quien construya encima (mecánicas de mapa, estructuras). Vacía sin relieve
@@ -625,9 +714,9 @@ por zonas. Posiciones en el mundo, con su altura real:
 | Llave | Cada fila |
 | --- | --- |
 | `crossings` | `a`, `b` (los dos extremos del tablero), `span`, `width` |
-| `cuts` | `foot`, `rim`, `height`, `normal` (hacia el lado bajo), `zone` (−1 = pared del barranco): un tramo por punto de cada línea de corte |
-| `floors` | `kind` (`"ravine"` o `"raised"`), `center`, `extent` (largo y ancho), `zone` |
-| `ramps` | `top`, `foot`, `width`, `zone` |
+| `cuts` | `foot`, `rim`, `height`, `normal` (hacia el lado bajo), `zone` (−1 = pared del cañón): un tramo por punto de cada línea de corte |
+| `floors` | `kind` (`"ravine"` o `"raised"`), `center`, `extent` (largo y ancho), `zone`, `tier` (`"massif"`, `"tier"`, `"summit"` o `"butte"`) y `parent` (la zona sobre la que está apilada, o −1) |
+| `ramps` | `top`, `foot`, `width`, `zone` (−1 = del cañón: las de las dos puntas y las de cada collado) |
 | `sites` | `center`, `radius`: claros casi planos donde cabe una estructura de 10 m lejos de todo corte (no mira rocas ni props: eso se le pregunta a `can_place`) |
 
 Los puentes son escenas sueltas (`Bridge.tscn`, con `span`, `width`, `drop` y
@@ -642,8 +731,8 @@ incluidas):
 
 | Dónde                                                              | Cómo                                                                                                                       |
 | ------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------- |
-| Props del scatter                                                  | `_spawn_prop` **ignora** el `pos.y` que le pasan y usa `ground_height()`                                                   |
-| Línea de perímetro, mesetas                                        | por el mismo `_spawn_prop`                                                                                                 |
+| Props del scatter                                                  | `spawn_prop` **ignora** el `pos.y` que le pasan y usa `ground_height()`                                                    |
+| Línea de perímetro, mesetas                                        | por el mismo `spawn_prop` (el borde, `PerimeterRing`) y por `ground_height()` (las mesetas, `MesaBuilder`)                                                                                               |
 | Formaciones rocosas de la máscara                                  | `RockFormation.build` levanta cada vértice sobre `height_at` de su propio XZ                                               |
 | Puntos del director                                                | `StageLayout.claim_clear_point()` → `terrain_height()`                                                                     |
 | Eventos, portales, ruletas, altares, manantiales, cofres de evento | `StageLayout.event_point()` / `claim_clear_point()`                                                                        |
@@ -679,9 +768,9 @@ y muros siguen contando); el vigilante de celda bloqueada compara
   - **Paleta por bioma** en el `formation_style` de cada scatter (un `RockFormationStyle`, `scripts/world/run/scatter/rock_formation_style.gd`): `assets/world/rock_style_hollow_woods.tres` (granito con musgo), `assets/world/rock_style_ash_dunes.tres` (arenisca roja con estratos y escalones: `strata_strength`, `terrace_strength`, `terrace_step`) y `assets/world/rock_style_gloomfen.tres` (pizarra oscura musgosa). Para cambiar cómo se ve la roca de un mapa se edita su `.tres` en el Inspector. El color va **horneado en vértices** sobre `assets/materials/rock_formation.tres` (blanco × color de vértice, sRGB), incluido el sombreado por pendiente: con el ambiente y la niebla de las arenas el sol solo no separaba un acantilado de una cresta y la primera versión se leía como una maqueta de papel.
   - Los árboles (`scenes/world/props/Tree.tscn`, script `scripts/world/props/tree_prop.gd`) cambian su `TreeModel` de vista previa por uno de dos modelos al azar con una escala al azar al entrar al juego: los modelos, la probabilidad y los rangos de escala son exports de la escena (tres tiradas del RNG de la partida, siempre en el mismo orden).
   - Los props interiores (`_is_clear`) guardan `formation_clearance` (2.5 m) a cualquier celda bloqueada y las mesetas `mesa_clearance` (12 m), para que ni un árbol ni una rampa salgan de un acantilado.
-  - Las rocas sueltas (`Rock.tscn`, `DuneRock.tscn`) siguen llevando **un `ConvexPolygonShape3D` por blob visible**, con los puntos horneados en la transformación del blob para que `_spawn_prop` pueda escalar **uniformemente** (Godot no soporta escalar una forma de colisión de forma no uniforme). `DuneRock.tscn` se pinta con `assets/shaders/faceted_rock.gdshader` (`boulder_red.tres`): normal de cara por derivadas, para que no parezca un canto rodado junto a las formaciones. `Rock.tscn` es el modelo `rock-a.glb`, con el color de su textura `colormap.png`; `boulder.tres` no lo usa ninguna escena. `rock.tres` y `red_rock.tres` siguen en plataformas y santuarios, sin cambios.
+  - Las rocas sueltas (`Rock.tscn`, `DuneRock.tscn`) siguen llevando **un `ConvexPolygonShape3D` por blob visible**, con los puntos horneados en la transformación del blob para que `spawn_prop` pueda escalar **uniformemente** (Godot no soporta escalar una forma de colisión de forma no uniforme). `DuneRock.tscn` se pinta con `assets/shaders/faceted_rock.gdshader` (`boulder_red.tres`): normal de cara por derivadas, para que no parezca un canto rodado junto a las formaciones. `Rock.tscn` es el modelo `rock-a.glb`, con el color de su textura `colormap.png`; `boulder.tres` no lo usa ninguna escena. `rock.tres` y `red_rock.tres` siguen en plataformas y santuarios, sin cambios.
 - API: `is_walkable(Vector2)`, `random_walkable_point()`, `blocked_cell_count()`, `open_cell_count()`, `blocked_cells()`, `cell_center(Vector2i)`, `cell_of(Vector2)` (las tres últimas las usa el barrido de máscara del harness), más `can_place(Vector2, margen)` y `nearest_place(Vector2, margen)`. Son métodos de `scatter.gd` que reenvían a su `ArenaMask` (y, las dos últimas, a `ReliefDressing`). **Dos preguntas distintas:** `is_walkable` es solo la máscara (lo que la roca bloquea; la leen los vigilantes del harness); `can_place` es la de quien **coloca** algo, y en una arena con relieve por zonas suma «lejos de cortes, rampas, puentes, faldones de formación y mesetas» (en las demás es idéntica a `is_walkable`). Consumidores de `can_place`: `SpawnPoints.ring_position` / `band_position` (`scripts/systems/spawner/spawn_points.gd`, detrás de `EnemySpawner.ring_position` y `spawn_pressure_burst`) (reintentan hasta hallar un punto que sirva, no clampean), el `StageLayout` del director (un **único** camino, `walkable_xz`, para portales, ruleta, altares, cofres de evento, lluvias y el portal de salida) y `BossBase._safe_arena_point`; `nearest_place` lo usa `EnemyLoot.drop_point`. `scatter._is_clear` y los sitios de meseta preguntan lo mismo con sus propios márgenes.
-- Con relieve por zonas la máscara recibe dos cosas más en `ArenaMask.build(protected_seeds, keep_open, barriers)`: las celdas que el relieve necesita sin roca y las aristas entre celdas que un corte separa. El flood fill desde el spawn no cruza esas aristas, así que sella (o abre un pasillo hasta) cualquier bolsa que quedara encerrada entre una formación y un acantilado. La máscara se construye en `_enter_tree` (antes del barajado del director) con el mismo RNG. Log `Arena mask:`, que **imprime la fracción abierta** (la puerta que persigue el bucle de reconstrucción).
+- Con relieve por zonas la máscara recibe dos cosas más en `ArenaMask.build(protected_seeds, keep_open, barriers)`: las celdas que el relieve necesita sin roca y las aristas entre celdas que un corte separa. El flood fill desde el spawn no cruza esas aristas, así que sella (o abre un pasillo hasta) cualquier bolsa que quedara encerrada entre una formación y un acantilado. Y **no deja pasillos de una celda**: una celda abierta con roca a los dos lados opuestos se rellena (`_fill_slots`), y si es una de las que el relieve mantiene abiertas, se abre la roca que la aprieta (`_free_squeezed`). El faldón de dos brazos de roca cierra la boca de un pasillo así y deja adentro un rincón al que no se entra caminando pero donde sí aterriza un raider que vuela. En el Bosque Hueco, además, los props guardan `formation_clearance` 4.5 m con la roca (entre un tronco y un faldón siempre cabe un cuerpo), el borde no planta en las esquinas (`perimeter_corner_gap`) ni sobre el faldón de una formación. La máscara se construye en `_enter_tree` (antes del barajado del director) con el mismo RNG. Log `Arena mask:`, que **imprime la fracción abierta** (la puerta que persigue el bucle de reconstrucción).
 - Inicio irregular: `StageFixtures._randomize_starting_pois` (`scripts/world/run/director/stage_fixtures.gd`) elimina cofres/altares colocados con `poi_skip_chance` (conserva al menos el primer cofre) y añade `extra_start_chests_min..max` cofres en puntos libres. Log `Start layout:`.
 
 ## Minimapa y mapa (Tab)
@@ -1850,10 +1939,16 @@ En una arena con relieve por zonas trabaja además `ReliefProbe`
   que asoma sobre el suelo), `raider open=N unreachable=N no_return=N` y
   `horde …` (celdas abiertas que el spawn no alcanza, o que no vuelven a él),
   `placement at=start|120 … on_relief=N misplaced=N raider_unreachable=N
-  horde_unreachable=N crowding=N` (props, POIs y 200 spawns muestreados del
-  anillo y de la banda de oleadas: sobre un corte, rampa o puente; enterrado
-  o flotando; un POI que el raider no alcanza; un spawn que la horda no
-  alcanza; una meseta o formación a menos de 3 m de un corte), `slope p95=G`
+  horde_unreachable=N crowding=N` (props, POIs, 200 spawns muestreados del
+  anillo y de la banda de oleadas y 2000 lugares que el director elegiría
+  durante la etapa, `places=N`, muestreados con `StageLayout.exit_portal_point`
+  y con el anillo de los eventos: sobre un corte, rampa o puente; enterrado
+  o flotando; un POI o un lugar que el raider no alcanza; un spawn que la
+  horda no alcanza; una meseta o formación a menos de 3 m de un corte; lo arma
+  `ReliefPlacement`, y no cuenta como prop lo que ES el relieve: la roca de
+  un corte, un puente, una formación, las estructuras del grupo
+  `relief_structures` ni la vegetación del suelo, que no tiene colisión: que
+  ninguna tape un paso lo dicen los barridos de alcance), `slope p95=G`
   (la medida congelada de `WorldDigest`, lejos de cortes y rampas) y
   `hell skipped=N interactable=N backdrop=N bodies=N pooled=N unburnt=N`
   (las mallas que el infierno no quemaría, por tipo: bajo un interactuable,
@@ -1865,15 +1960,18 @@ En una arena con relieve por zonas trabaja además `ReliefProbe`
   tiene el mundo congelado (`WorldFreeze` saca la arena de la física) la
   colocación espera a que vuelva. **Jamás se afloja una tolerancia para
   hacerlos pasar**: cede el relieve o quien coloca.
-- **El paseo**: antes del recorrido de siempre, el bot va a la zona más alta
-  y de una cabecera del puente a la otra (`Probe relief: stood on raised
+- **El paseo**: antes del recorrido de siempre, el bot va a la cumbre y de
+  una cabecera del puente más largo a la otra (`Probe relief: stood on raised
   zone …`, `Probe relief: crossed bridge …`); la carrera a la salida y un
   rescate pasan por delante.
 - **`BONK_HOLD_AT=high|ravine|bridge`**: pone al raider en su punto y lo deja
   quieto; una **llegada** es un enemigo que apareció 3 m o más arriba o abajo
   de ese nivel y se le acercó a 3 m (y a no más de 1.5 m de altura). `Probe
   hold: at=… window=A-Bs arrivals=N` por ventana de 20 s desde el segundo 10
-  y `Probe hold summary: … empty_after_30=N` al salir. Es un soak aparte, no
+  y `Probe hold summary: … empty_after_30=N reached=N` al salir (`reached`:
+  todos los enemigos que lo alcanzaron, hayan aparecido en su nivel o no;
+  sobre un puente casi nadie aparece en otro nivel, así que ahí las ventanas
+  vacías dicen poco y `reached` dice si la horda llega). Es un soak aparte, no
   del gate; con el raider quieto, el aviso de niebla poco explorada sale y
   es esperado.
 
@@ -1892,5 +1990,5 @@ En una arena con relieve por zonas trabaja además `ReliefProbe`
 - **Una sola fuente de verdad por valor.** Un script usado por una sola escena no lleva overrides en esa escena: el valor vive en el default del script, así editar el script siempre funciona. Los valores por instancia (la vida de cada enemigo, el scatter de cada mapa, el horario de jefes por arena, las escenas del spawner) viven en cada escena. **Nunca dejes que `_ready` pise un valor del Inspector**: si el código lo sobreescribe, editarlo en la escena no hace nada. Antes de mover un `@export` de sitio, comprueba qué `.tscn` lo overridea: las tres arenas overridean el `EnemySpawner`.
 - **Cada catálogo dice en su cabecera qué campos son llaves** («NUNCA las cambies») y cuáles se pueden cambiar libremente. Los ids de personaje son `snake_case` (el lint `id_format` lo exige en todo catálogo); renombrar uno exige una fila en `SaveData.ID_ALIASES` para que los guardados viejos no lo pierdan.
 - **Nada de números sueltos.** Un `0.5` repetido en dos archivos es la forma en que dos copias del mismo cálculo se separan: si es diseño, es un `@export` (regla de arriba); si no, una `const` con nombre.
-- **Logs de una línea** en eventos clave — son la interfaz de verificación de los soaks headless, van **en inglés** y se conservan. Inventario actual: `Run ended:`, `Meta saved:`, `Save recovered from backup:`, `Boss spawned:`, `Boss chests dropped:`, `Elite chest dropped:`, `Horde:`, `Sky event:`, `Chest opened:`, `Altar charged:`, `Altar left:`, `Altar placed:`, `Demonic altar used:`, `Demonic pact:`, `Spawn skipped:`, `Stage advanced:`, `Stage sweep:`, `Stage carry:`, `Stage gate:`, `Stage boss slain:`, `Exit portal opened`, `Portal used: exit`, `Pseudo-infinite:`, `Run stages:`, `Terrain built:`, `Probe legs:`, `Greed shrine:`, `Roulette spun:`, `Spring used:`, `Portal used:`, `Portals placed:`, `Weapon evolved:`, `Weapon ascended:`, `Pet joined:`, `Secret miniboss awakened:`, `Secret boss slain:`, `Arena mask:`, `Rock formations:`, `Start layout:`, `Daily run scored:`, `Void rescue:`, `Power-up picked:`, `Power-up dropped:`, `Star roam:`, `Flight landing:`, `Pet box opened:`, `Vendor arrived:`, `Vendor sold:`, `Time stop:`, `Immortal blocked:`, `Weather started:`, `Weather ended:`, `Disaster:`, `Event altar used:`, `Possessed spawned:`, `Possessed expired:`, `Belt bolt:`, `Saiyan aura:`, `Zenkai triggered:`, `Lucky block:`, `Relief layout:`, `Relief dressing:`, `Save path overridden:`, `Save migrated:`, `Player revived:`, `Vendor buyer:`, `Elite chest capped:`, `Graphics:`, `Skirmisher degenerate aim:`. Al crear un evento mayor, añade el tuyo con el mismo formato. Las líneas de los harness van aparte y también se conservan (`tools/verificar.sh` greppea `Probe fog:`, `Probe bounty chests:`, `Catalog lint:` y `UiProbe:`; las otras se leen a mano al revisar un soak): `Probe legs:`, `Probe fog:` (incluida su forma `Probe fog: skipped`), `Probe: run ended`, `Mask sweep:`, `Map overlay:`, `Time stop:`, `Immortal blocked:`, `HUD offset:`, `Party:`, `Party pets:`, `Points sources:`, `Catalog lint:`, `UiProbe:`, `Swap menu:`, `Saiyan boons:`, `Time stop worms:`, `Probe bounty chests:`, `Perf` (y `Perf summary:`, del `PerfMeter`), `World digest:`, `Hell skip:`, `Ground slope:`, `Relief graph:`, `Relief sweep:` (y `Relief sweep detail:`), `Probe relief:`, `Probe hold:`. `tools/verificar.sh` también greppea `Relief sweep:` y `Probe relief:`.
+- **Logs de una línea** en eventos clave — son la interfaz de verificación de los soaks headless, van **en inglés** y se conservan. Inventario actual: `Run ended:`, `Meta saved:`, `Save recovered from backup:`, `Boss spawned:`, `Boss chests dropped:`, `Elite chest dropped:`, `Horde:`, `Sky event:`, `Chest opened:`, `Altar charged:`, `Altar left:`, `Altar placed:`, `Demonic altar used:`, `Demonic pact:`, `Spawn skipped:`, `Stage advanced:`, `Stage sweep:`, `Stage carry:`, `Stage gate:`, `Stage boss slain:`, `Exit portal opened`, `Portal used: exit`, `Pseudo-infinite:`, `Run stages:`, `Terrain built:`, `Probe legs:`, `Greed shrine:`, `Roulette spun:`, `Spring used:`, `Portal used:`, `Portals placed:`, `Weapon evolved:`, `Weapon ascended:`, `Pet joined:`, `Secret miniboss awakened:`, `Secret boss slain:`, `Arena mask:`, `Rock formations:`, `Ground cover:`, `Start layout:`, `Daily run scored:`, `Void rescue:`, `Power-up picked:`, `Power-up dropped:`, `Star roam:`, `Flight landing:`, `Pet box opened:`, `Vendor arrived:`, `Vendor sold:`, `Time stop:`, `Immortal blocked:`, `Weather started:`, `Weather ended:`, `Disaster:`, `Event altar used:`, `Possessed spawned:`, `Possessed expired:`, `Belt bolt:`, `Saiyan aura:`, `Zenkai triggered:`, `Lucky block:`, `Relief layout:`, `Relief dressing:`, `Save path overridden:`, `Save migrated:`, `Player revived:`, `Vendor buyer:`, `Elite chest capped:`, `Graphics:`, `Skirmisher degenerate aim:`. Al crear un evento mayor, añade el tuyo con el mismo formato. Las líneas de los harness van aparte y también se conservan (`tools/verificar.sh` greppea `Probe fog:`, `Probe bounty chests:`, `Catalog lint:` y `UiProbe:`; las otras se leen a mano al revisar un soak): `Probe legs:`, `Probe fog:` (incluida su forma `Probe fog: skipped`), `Probe: run ended`, `Mask sweep:`, `Map overlay:`, `Time stop:`, `Immortal blocked:`, `HUD offset:`, `Party:`, `Party pets:`, `Points sources:`, `Catalog lint:`, `UiProbe:`, `Swap menu:`, `Saiyan boons:`, `Time stop worms:`, `Probe bounty chests:`, `Perf` (y `Perf summary:`, del `PerfMeter`), `World digest:`, `Hell skip:`, `Ground slope:`, `Relief graph:`, `Relief sweep:` (y `Relief sweep detail:`), `Probe relief:`, `Probe hold:`. `tools/verificar.sh` también greppea `Relief sweep:` y `Probe relief:`.
 - **Verificar antes de dar por hecho un cambio**: `tools/verificar.sh`. Un cambio que no pasa el import o ensucia el log de un soak no está terminado.

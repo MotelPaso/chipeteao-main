@@ -16,7 +16,7 @@ extends RefCounted
 
 ## Edita aquí (no hay Inspector).
 ##
-## Metros que el final de una pared del barranco se mete dentro del puente,
+## Metros que el final de una pared del cañón se mete dentro del puente,
 ## para que la roca no deje ver su corte.
 const BRIDGE_EMBED: float = 0.4
 ## Tope del factor de esquina (ver CutPath.miter): una esquina más cerrada
@@ -24,7 +24,7 @@ const BRIDGE_EMBED: float = 0.4
 const MITER_MAX: float = 1.6
 
 
-## Llena layout.cuts desde las zonas, las rampas, el barranco y los cruces.
+## Llena layout.cuts desde las zonas, las rampas, el cañón y los cruces.
 static func build(layout: ReliefLayout) -> void:
 	layout.cuts.clear()
 	for index in layout.zones.size():
@@ -92,7 +92,7 @@ static func _arc(layout: ReliefLayout, zone: ReliefLayout.Zone, from_angle: floa
 		path.lower.append(zone.floor)
 
 
-# --- barranco ------------------------------------------------------------------
+# --- cañón ------------------------------------------------------------------
 
 ## Las dos paredes del cañón, partidas en cada cruce y en cada collado. La
 ## izquierda se recorre hacia delante y la derecha hacia atrás: así el fondo

@@ -5,7 +5,7 @@ extends RefCounted
 ##
 ## Tres rejillas de una muestra por metro, las tres del tamaño del colisionador:
 ## - `base`: el suelo sin zonas (lomas anchas + ondulación + claros planos).
-## - `heights`: lo que va al colisionador y a la malla. Zonas y barranco van
+## - `heights`: lo que va al colisionador y a la malla. Zonas y cañón van
 ##   como un escalón duro, corrido LEDGE_INSET hacia el lado alto de cada
 ##   corte: queda escondido bajo la cornisa de roca (CliffWall).
 ## - `surface`: lo que se pisa, con el escalón en la línea nominal del corte.
@@ -19,7 +19,7 @@ extends RefCounted
 ##
 ## Metros desde el contorno de una zona en que su loma sigue a altura completa.
 const SWELL_SHELF: float = 3.0
-## Metros desde el borde del barranco en que la vaguada sigue a fondo
+## Metros desde el borde del cañón en que la vaguada sigue a fondo
 ## completo, y metros que tarda la ondulación del suelo en volver a su fuerza.
 const VALLEY_SHELF: float = 4.0
 const DETAIL_BLEND: float = 6.0
@@ -123,7 +123,7 @@ func _build_base(terrain: Terrain, noise_seed: int) -> void:
 			if across == INF:
 				coarse[index] = detail + lift[index]
 				continue
-			# Junto al barranco: la vaguada tira del suelo hacia abajo y la
+			# Junto al cañón: la vaguada tira del suelo hacia abajo y la
 			# ondulación se amansa sobre el fondo.
 			var valley := 1.0 - smoothstep(edge + VALLEY_SHELF,
 					edge + VALLEY_SHELF + settings.swell_reach, across)
@@ -174,7 +174,7 @@ func _stamp_dome(lift: PackedFloat32Array, lattice: int, step: float, center: Ve
 			lift[index] = maxf(lift[index], height * (1.0 - smoothstep(shelf, rim, distance)))
 
 
-## Anota en `side` la distancia al eje del barranco de cada punto de la
+## Anota en `side` la distancia al eje del cañón de cada punto de la
 ## retícula que cae en su vaguada: barre cada tramo del eje a lo ancho y
 ## redondea los dos extremos.
 func _stamp_valley(side: PackedFloat32Array, lattice: int, step: float) -> void:
@@ -359,7 +359,7 @@ func _raise_ramp(zone: ReliefLayout.Zone, ramp: ReliefLayout.Ramp) -> void:
 				heights[index] = maxf(heights[index], lifted)
 
 
-## Hunde el pasillo del barranco, tramo por tramo de su eje.
+## Hunde el pasillo del cañón, tramo por tramo de su eje.
 func _sink_ravine() -> void:
 	var ravine := _layout.ravine
 	var grown := ravine.half_width + ReliefLayout.LEDGE_INSET

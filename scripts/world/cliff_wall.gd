@@ -1,14 +1,14 @@
 class_name CliffWall
 extends StaticBody3D
 ## La roca de UN corte del relieve por zonas (un acantilado, el costado de
-## una rampa, una pared del barranco): una cinta facetada a lo largo de la
+## una rampa, una pared del cañón): una cinta facetada a lo largo de la
 ## línea de corte (ReliefLayout.CutPath).
 ##
 ## QUÉ ES. En cada punto de la línea, un perfil de siete filas: del lado
 ## alto, una CORNISA que sale enterrada del suelo, sube un labio y llega al
 ## borde; del lado bajo, una CARA empinada que baja del borde hasta
 ## enterrarse al pie. Donde el corte se acaba (el pie de una rampa, un
-## extremo del barranco) el perfil entero se hunde y la roca desaparece.
+## extremo del cañón) el perfil entero se hunde y la roca desaparece.
 ##
 ## POR QUÉ LA CORNISA ES ANCHA. El colisionador del terreno lleva el escalón
 ## del corte corrido ReliefLayout.LEDGE_INSET metros hacia el lado alto. La

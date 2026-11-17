@@ -34,7 +34,7 @@ const PATH_STEP: float = 1.6
 ## Ningún punto de una línea de corte queda a menos de esto de una esquina:
 ## más cerca, las filas de la cara de roca se pisarían entre sí.
 const CORNER_CLEAR: float = 2.6
-## Largo de cada tramo recto del eje del barranco, en metros.
+## Largo de cada tramo recto del eje del cañón, en metros.
 const CENTER_STEP: float = 5.0
 ## Metros de suelo libre que se reservan al pie de cada rampa.
 const RAMP_LANDING: float = 5.0
@@ -43,7 +43,7 @@ const HEAD_SETBACK: float = 3.0
 ## Tolerancia al proyectar sobre un tramo del eje (fracción del tramo): tapa
 ## las cuñas que quedan entre dos tramos en una curva.
 const CHORD_SLACK: float = 0.08
-## "Fuera del barranco" para ravine_coords().
+## "Fuera del cañón" para ravine_coords().
 const OUTSIDE := Vector2(-1.0, INF)
 
 
@@ -118,14 +118,14 @@ class Ravine extends RefCounted:
 	var bounds: Rect2
 
 
-## Un cruce del barranco: dónde va un puente.
+## Un cruce del cañón: dónde va un puente.
 class Crossing extends RefCounted:
-	## Posición a lo largo del eje del barranco.
+	## Posición a lo largo del eje del cañón.
 	var s: float
 	var center: Vector2
 	## Dirección del tablero, de un borde al otro.
 	var axis: Vector2
-	## Distancia entre los dos bordes del barranco, en metros.
+	## Distancia entre los dos bordes del cañón, en metros.
 	var span: float
 	var width: float
 	## Centros de los claros planos de las dos cabeceras.
@@ -154,7 +154,7 @@ class CutPath extends RefCounted:
 	## Factor >= 1 del desplazamiento lateral en cada punto: en una esquina
 	## las filas van sobre la bisectriz y más lejos.
 	var miter: PackedFloat32Array = PackedFloat32Array()
-	## Índice de la zona elevada que bordea, o -1 si es una pared del barranco.
+	## Índice de la zona elevada que bordea, o -1 si es una pared del cañón.
 	var zone: int = -1
 	## Mayor altura visible del corte, en metros.
 	var height: float = 0.0
@@ -164,7 +164,7 @@ var settings: ReliefSettings
 ## Mitad del lado de la arena, en metros.
 var half: float
 var zones: Array[Zone] = []
-## null si la etapa no tiene barranco.
+## null si la etapa no tiene cañón.
 var ravine: Ravine = null
 var crossings: Array[Crossing] = []
 var hills: Array[Hill] = []
@@ -212,8 +212,8 @@ func raised_offset(zone: Zone, point: Vector2, inset: float = 0.0) -> float:
 	return -1.0
 
 
-## (s, v) de `point` respecto del eje del barranco: s = metros a lo largo
-## del eje, v = distancia al eje. OUTSIDE si no hay barranco, si el punto
+## (s, v) de `point` respecto del eje del cañón: s = metros a lo largo
+## del eje, v = distancia al eje. OUTSIDE si no hay cañón, si el punto
 ## queda antes o después de sus extremos o lejos de su caja.
 func ravine_coords(point: Vector2) -> Vector2:
 	if ravine == null or not ravine.bounds.has_point(point):
@@ -245,7 +245,7 @@ func ravine_drop(s: float) -> float:
 	return ravine.depth * clampf(run / ravine.ramp, 0.0, 1.0)
 
 
-## [punto, tangente unitaria] del eje del barranco a `s` metros de su inicio.
+## [punto, tangente unitaria] del eje del cañón a `s` metros de su inicio.
 func ravine_frame(s: float) -> PackedVector2Array:
 	var last := ravine.points.size() - 2
 	var index := 0

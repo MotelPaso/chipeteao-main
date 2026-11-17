@@ -12,9 +12,9 @@ extends RefCounted
 ## y en ReliefSettings.
 ##
 ## Metros que el puente se mete en cada orilla, pasado el borde del
-## barranco: tiene que tapar el escalón que el terreno esconde ahí.
+## cañón: tiene que tapar el escalón que el terreno esconde ahí.
 const BRIDGE_OVERLAP: float = 3.5
-## Metros que la calzada del puente baja pasado el fondo del barranco.
+## Metros que la calzada del puente baja pasado el fondo del cañón.
 const BRIDGE_FOOTING: float = 2.5
 ## Metros que el tablero queda bajo el claro de sus cabeceras: el suelo lo
 ## tapa en las orillas y se entra al puente sin escalón.

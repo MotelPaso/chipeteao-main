@@ -47,7 +47,7 @@ static func distance(layout: ReliefLayout, point: Vector2, limit: float) -> floa
 
 
 ## Celdas de la máscara de la arena que el relieve necesita abiertas: las
-## que caen sobre una zona elevada o el barranco y las que quedan a
+## que caen sobre una zona elevada o el cañón y las que quedan a
 ## MASK_MARGIN de un corte, una rampa o un puente.
 static func mask_cells(layout: ReliefLayout, cell_size: float) -> Dictionary[Vector2i, bool]:
 	var cells: Dictionary[Vector2i, bool] = {}
@@ -101,12 +101,12 @@ static func summary(layout: ReliefLayout, map_id: String) -> String:
 ##   crossings: [{a, b: Vector3 (los dos extremos del tablero), span, width}]
 ##   cuts:      [{foot, rim: Vector3, height, normal: Vector3 (hacia el lado
 ##              bajo), zone}] un tramo por punto de cada línea de corte (pie
-##              y borde uno frente al otro; zone -1 = pared del barranco)
+##              y borde uno frente al otro; zone -1 = pared del cañón)
 ##   floors:    [{kind: "ravine" | "raised", center: Vector3, extent: Vector2
 ##              (largo y ancho, en metros), zone, tier ("massif", "tier",
 ##              "summit" o "butte"; "" en el cañón), parent (zona sobre la
 ##              que está apilada, o -1)}]
-##   ramps:     [{top, foot: Vector3, width, zone}] (zone -1 = del barranco)
+##   ramps:     [{top, foot: Vector3, width, zone}] (zone -1 = del cañón)
 ##   sites:     [{center: Vector3, radius}] claros donde cabe una estructura de
 ##              SITE_RADIUS metros lejos de todo corte y casi planos
 static func features(layout: ReliefLayout, terrain: Terrain) -> Dictionary:

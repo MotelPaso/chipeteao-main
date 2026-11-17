@@ -7,8 +7,8 @@ extends Node3D
 ##   con el tinte del bioma: más allá de los muros "la tierra sigue". En una
 ##   arena con relieve por zonas (Terrain.has_relief) el disco pasa a ser un
 ##   MARCO alrededor de la arena, al nivel de su borde: un plano entero bajo
-##   el fondo del barranco dejaría un escalón de metros en el borde, y a
-##   nivel del borde taparía el barranco.
+##   el fondo del cañón dejaría un escalón de metros en el borde, y a
+##   nivel del borde taparía el cañón.
 ## - Dos anillos de colinas de silueta (esferas aplastadas) fuera del
 ##   perímetro, más oscuras con la distancia, para que el horizonte tenga
 ##   forma y no una costura recta.

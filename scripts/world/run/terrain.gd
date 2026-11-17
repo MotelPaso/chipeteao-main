@@ -7,8 +7,9 @@ extends StaticBody3D
 ##   los claros planos donde se apoyan los grupos de verticalidad de autor y
 ##   las mesetas. La amplitud es de 1.5-3.0 m según el bioma.
 ## - Con `relief` (Bosque Hueco): RELIEVE POR ZONAS. Sobre ese mismo suelo
-##   suave van zonas elevadas con acantilado, un barranco, las rampas que
-##   entran a cada una y un puente. La altura va en los cortes y en las
+##   suave va una montaña escalonada (un macizo, un segundo nivel y una
+##   cumbre, apilados), un cañón con sus puentes, cerros sueltos y las
+##   rampas que entran a cada zona. La altura va en los cortes y en las
 ##   pendientes largas; dentro de cada zona el suelo sigue igual de suave.
 ##
 ## La regla que el relieve por zonas no puede romper: la horda no tiene
@@ -62,7 +63,7 @@ const FALLBACK_MAP_TINT := Color(0.25, 0.27, 0.3)
 ## con FastNoiseLite desde GDScript es el costo dominante del nodo; a 2 m
 ## cuesta un cuarto y a esta amplitud no se nota la diferencia.
 @export var noise_step: float = 2.0
-## Relieve por zonas de esta arena: zonas elevadas, barranco, rampas y puente
+## Relieve por zonas de esta arena: zonas apiladas, cañón, rampas y puentes
 ## (un .tres de assets/world/, ver ReliefSettings). Vacío = el suelo suave de
 ## siempre. Con él, `amplitude` es la ondulación DENTRO de cada zona, y la
 ## malla va a 2 m con parches de 1 m junto a los cortes (mesh_step no se usa).
@@ -205,7 +206,7 @@ func relief_features() -> Dictionary:
 
 
 ## Altura del suelo SIN zonas en un XZ: lo que habría bajo una zona elevada
-## o sobre el barranco. La usa la roca de los cortes para apoyar cada lado.
+## o sobre el cañón. La usa la roca de los cortes para apoyar cada lado.
 func base_height_at(x: float, z: float) -> float:
 	return _field.base_at(x, z) if _field != null else height_at(x, z)
 
