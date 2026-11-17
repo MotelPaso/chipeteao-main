@@ -258,9 +258,11 @@ func _live_beacons() -> int:
 
 ## Libera de inmediato cada cuerpo enemigo. free() y no queue_free() para
 ## que el barrido cuente lo que de verdad se fue: un free en cola cae al
-## final del cuadro, después del conteo.
+## final del cuadro, después del conteo. El grupo de los enterrados va
+## también: un Duneburrower bajo tierra sale de "enemies" a propósito, y
+## sin él sobreviviría al barrido y podría erupcionar antes del conteo.
 func _free_enemies() -> void:
-	for group: StringName in [&"enemies", &"boss"]:
+	for group: StringName in [&"enemies", &"boss", Duneburrower.BURROWED_GROUP]:
 		for node: Node in get_tree().get_nodes_in_group(group):
 			if is_instance_valid(node) and not node.is_queued_for_deletion():
 				node.get_parent().remove_child(node)
