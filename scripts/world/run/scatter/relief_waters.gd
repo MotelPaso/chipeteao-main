@@ -36,6 +36,18 @@ const FALL_LIP: float = 2.3
 const FALL_REACH: float = 5.8
 ## Metros que el agua se levanta del suelo, para que no parpadee contra él.
 const LIFT: float = 0.1
+## Nenúfares: uno cada tantos metros de río, y su radio (mínimo y máximo).
+const PAD_EVERY: float = 4.5
+const PAD_RADIUS := Vector2(0.45, 0.95)
+## Juncos: una mata cada tantos metros de cada orilla, y su alto (mínimo y máximo).
+const REEDS_EVERY: float = 7.0
+const REED_HEIGHT := Vector2(1.2, 2.3)
+## Metros que nenúfares y juncos guardan con el puente.
+const LIFE_FROM_BRIDGE: float = 16.0
+## Colores: la hoja del nenúfar, su flor y el junco.
+const PAD := Color(0.3, 0.6, 0.36)
+const PAD_FLOWER := Color(0.97, 0.76, 0.84)
+const REED := Color(0.42, 0.58, 0.3)
 ## Color del agua que cae, color de la espuma y copos de espuma por caída.
 const RAPIDS := Color(0.74, 0.9, 0.96)
 const FOAM := Color(0.97, 0.99, 1.0)
@@ -43,13 +55,18 @@ const FLAKES: int = 7
 # -----------------------------------------------------------------------------
 
 
-## Levanta el agua de `terrain` como hija de `scatter`.
-static func raise(scatter: Node3D, terrain: Terrain, layout: ReliefLayout) -> void:
+## Levanta el agua de `terrain` como hija de `scatter`. `run_seed` siembra
+## dónde crecen los nenúfares y los juncos.
+static func raise(scatter: Node3D, terrain: Terrain, layout: ReliefLayout,
+		run_seed: int) -> void:
 	var material := layout.settings.water_material
 	if material == null or layout.ravine == null:
 		return
 	var level := _place_river(scatter, terrain, layout, material)
-	if level == -INF or not layout.settings.cascade:
+	if level == -INF:
+		return
+	_place_life(scatter, terrain, layout, level, run_seed)
+	if not layout.settings.cascade:
 		return
 	var spot := _cascade_spot(layout)
 	if not spot.is_empty():
@@ -109,6 +126,64 @@ static func _place_river(scatter: Node3D, terrain: Terrain, layout: ReliefLayout
 			longest = run.y - run.x
 			answer = level
 	return answer
+
+
+## La vida del río: nenúfares sobre el agua y matas de juncos al pie de las
+## dos paredes, lejos del puente. Una sola malla, sin colisión.
+static func _place_life(scatter: Node3D, terrain: Terrain, layout: ReliefLayout, level: float,
+		run_seed: int) -> void:
+	var ravine := layout.ravine
+	var rng := RandomNumberGenerator.new()
+	rng.seed = run_seed ^ 0x52495645
+	var life := LowPolyMesh.new(run_seed + 11)
+	var from := ravine.ramp + 4.0
+	var to := ravine.length - ravine.ramp - 4.0
+	var along := from
+	while along < to:
+		var frame := layout.ravine_frame(along)
+		var side := Vector2(-frame[1].y, frame[1].x)
+		var clear := true
+		for crossing: ReliefLayout.Crossing in layout.crossings:
+			if absf(along - crossing.s) < crossing.width * 0.5 + LIFE_FROM_BRIDGE:
+				clear = false
+		if clear and rng.randf() < 1.0 / PAD_EVERY:
+			var at := frame[0] + side * rng.randf_range(-1.0, 1.0) * (ravine.half_width - 4.0)
+			_pad(life, rng, Vector3(at.x, level + 0.03, at.y))
+		if clear and rng.randf() < 2.0 / REEDS_EVERY:
+			var bank := 1.0 if rng.randf() < 0.5 else -1.0
+			var at := frame[0] + side * bank * (ravine.half_width - rng.randf_range(3.6, 5.2))
+			# Solo donde el agua tapa el suelo: un junco no crece en seco.
+			if terrain.height_at(at.x, at.y) < level:
+				_reeds(life, rng, Vector3(at.x, level - 0.1, at.y))
+		along += 1.0
+	if life.is_empty():
+		return
+	var view := life.instance("RiverLife")
+	view.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	view.add_to_group(ReliefStructures.GROUP)
+	scatter.add_child(view)
+
+
+## Un nenúfar: una hoja redonda con una muesca y, a veces, su flor.
+static func _pad(life: LowPolyMesh, rng: RandomNumberGenerator, center: Vector3) -> void:
+	var radius := rng.randf_range(PAD_RADIUS.x, PAD_RADIUS.y)
+	var rim := life.ring(center, radius, 8, rng.randf() * TAU)
+	for index in rim.size() - 1:
+		life.triangle(center, rim[index], rim[index + 1], PAD, center + Vector3.DOWN)
+	if rng.randf() < 0.3:
+		life.blob(center + Vector3.UP * 0.12, Vector3(0.2, 0.16, 0.2), PAD_FLOWER, 5, 3, 0.1)
+
+
+## Una mata de juncos: varias hojas finas y altas que salen del agua.
+static func _reeds(life: LowPolyMesh, rng: RandomNumberGenerator, center: Vector3) -> void:
+	for blade in rng.randi_range(5, 8):
+		var foot := center + Vector3(rng.randf_range(-0.6, 0.6), 0.0, rng.randf_range(-0.6, 0.6))
+		var height := rng.randf_range(REED_HEIGHT.x, REED_HEIGHT.y)
+		var angle := rng.randf() * TAU
+		var side := Vector3(cos(angle), 0.0, sin(angle)) * 0.07
+		var tip := foot + Vector3(rng.randf_range(-0.25, 0.25), height, rng.randf_range(-0.25, 0.25))
+		life.triangle(foot + side, foot - side, tip, REED, foot + Vector3(-side.z, 0.0, side.x) * 9.0)
+		life.triangle(foot - side, foot + side, tip, REED, foot - Vector3(-side.z, 0.0, side.x) * 9.0)
 
 
 # --- la cascada --------------------------------------------------------------------

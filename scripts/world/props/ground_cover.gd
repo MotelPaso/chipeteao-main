@@ -1,7 +1,8 @@
 class_name GroundCover
 extends Node3D
 ## La vegetación baja del suelo de una arena: arbustos, matas de pasto,
-## flores, hongos y piedras chicas, para que el suelo no sea un césped liso.
+## flores, hongos, piedras chicas y helechos, para que el suelo no sea un
+## césped liso.
 ## No tiene colisión: nadie tropieza con una flor.
 ##
 ## Va como hija del scatter de la arena (así arde con el bosque en el
@@ -38,6 +39,8 @@ const GROUP: StringName = &"ground_cover"
 @export var mushroom_groups: int = 1
 ## Grupos de piedras chicas por trozo.
 @export var pebble_groups: int = 2
+## Helechos por trozo.
+@export var ferns: int = 6
 
 @export_group("Tamaños")
 ## Radio mínimo de un arbusto, en metros.
@@ -52,6 +55,10 @@ const GROUP: StringName = &"ground_cover"
 @export var flower_height: float = 0.42
 ## Alto máximo del sombrero de un hongo sobre el suelo, en metros.
 @export var mushroom_height: float = 0.7
+## Largo mínimo de una hoja de helecho, en metros.
+@export var fern_reach_min: float = 0.8
+## Largo máximo de una hoja de helecho, en metros.
+@export var fern_reach_max: float = 1.5
 
 @export_group("Colores")
 ## Verde oscuro de los arbustos.
@@ -69,6 +76,8 @@ const GROUP: StringName = &"ground_cover"
 @export var mushroom_stem: Color = Color(0.9, 0.87, 0.78)
 ## Color de las piedras chicas.
 @export var pebble_color: Color = Color(0.5, 0.52, 0.54)
+## Verde de los helechos.
+@export var fern_color: Color = Color(0.2, 0.52, 0.3)
 
 var _terrain: Terrain = null
 var _bounds: Node = null
@@ -139,6 +148,10 @@ func _build_chunk(cx: int, cz: int) -> void:
 		var at := _spot(rng, corner)
 		if at != Vector3.INF:
 			_add_pebbles(mesh, rng, at)
+	for index in ferns:
+		var at := _spot(rng, corner)
+		if at != Vector3.INF:
+			_add_fern(mesh, rng, at)
 	if mesh.is_empty():
 		return
 	_faces += mesh.face_count()
@@ -227,3 +240,21 @@ func _add_pebbles(mesh: LowPolyMesh, rng: RandomNumberGenerator, at: Vector3) ->
 		var center := _near(rng, at, 0.8) + Vector3.UP * radius * 0.2
 		mesh.blob(center, Vector3(radius, radius * 0.6, radius * rng.randf_range(0.7, 1.0)),
 				pebble_color, 4, 3, 0.2)
+
+
+## Un helecho: un abanico de hojas que suben, se abren y caen en la punta.
+func _add_fern(mesh: LowPolyMesh, rng: RandomNumberGenerator, at: Vector3) -> void:
+	var fronds := rng.randi_range(5, 7)
+	var turn := rng.randf() * TAU
+	var tone := fern_color.lerp(bush_bright, rng.randf_range(0.0, 0.45))
+	for frond in fronds:
+		var angle := turn + TAU * (float(frond) + rng.randf_range(-0.2, 0.2)) / float(fronds)
+		var reach := rng.randf_range(fern_reach_min, fern_reach_max)
+		var out := Vector3(cos(angle), 0.0, sin(angle))
+		var side := Vector3(-out.z, 0.0, out.x)
+		var bend := at + out * reach * 0.5 + Vector3.UP * reach * 0.55
+		var tip := at + out * reach + Vector3.UP * reach * 0.22
+		var below := bend + Vector3.DOWN
+		mesh.quad(at + side * 0.05, at - side * 0.05, bend - side * reach * 0.2,
+				bend + side * reach * 0.2, tone, below)
+		mesh.triangle(bend + side * reach * 0.2, bend - side * reach * 0.2, tip, tone, below)

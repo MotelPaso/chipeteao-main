@@ -88,7 +88,7 @@ static func raise(scatter: Node3D, terrain: Terrain, run_seed: int,
 		busy.append(Vector2(site.x, site.z))
 	_place_sites(scatter, terrain, layout, run_seed, busy, claimed)
 	_place_monoliths(scatter, terrain, layout, run_seed, taken, claimed)
-	ReliefWaters.raise(scatter, terrain, layout)
+	ReliefWaters.raise(scatter, terrain, layout, run_seed)
 	return claimed
 
 

@@ -36,6 +36,8 @@ extends Node3D
 @export var stump_scene: PackedScene
 ## Árbol antiguo: mucho más alto que los demás, pocos por etapa. Vacío, no hay.
 @export var ancient_tree_scene: PackedScene
+## Hongo gigante (scenes/world/props/GiantMushroom.tscn). Vacío, no hay.
+@export var mushroom_scene: PackedScene
 
 @export_group("Reparto interior")
 ## Cantidad de props de tree_scene. Cada arena pone la suya en su escena; el
@@ -47,6 +49,12 @@ extends Node3D
 @export var stump_count: int = 34
 ## Cantidad de árboles antiguos (ancient_tree_scene).
 @export var ancient_tree_count: int = 0
+## Cantidad de hongos gigantes (mushroom_scene).
+@export var mushroom_count: int = 0
+## Escala uniforme mínima de un hongo gigante.
+@export var mushroom_scale_min: float = 0.8
+## Escala uniforme máxima de un hongo gigante.
+@export var mushroom_scale_max: float = 1.45
 ## Escala uniforme mínima de cada árbol antiguo (1 = tamaño de la escena).
 @export var ancient_tree_scale_min: float = 0.85
 ## Escala uniforme máxima de cada árbol antiguo (1 = tamaño de la escena).
@@ -305,6 +313,7 @@ func place_props() -> void:
 	# Los árboles y los tocones no crecen en el agua del cañón; las rocas sí.
 	_place_many(ancient_tree_scene, ancient_tree_count, ancient_tree_scale_min,
 			ancient_tree_scale_max, true)
+	_place_many(mushroom_scene, mushroom_count, mushroom_scale_min, mushroom_scale_max, true)
 	_place_many(tree_scene, tree_count, tree_scale_min, tree_scale_max, true)
 	_place_many(rock_scene, rock_count, rock_scale_min, rock_scale_max)
 	_place_many(stump_scene, stump_count, stump_scale_min, stump_scale_max, true)
