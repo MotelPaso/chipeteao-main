@@ -7,6 +7,7 @@
 [ext_resource type="Script" path="res://scripts/enemies/mythos/boss_song.gd" id="5_boss_song"]
 [ext_resource type="Script" path="res://scripts/enemies/blue_lobster/lobster_song_yield.gd" id="6_lobster_song_yield"]
 [ext_resource type="Script" path="res://scripts/enemies/blue_lobster/lobster_entrance_overlay.gd" id="7_lobster_entrance_overlay"]
+[ext_resource type="AudioStream" path="res://assets/audio/music/infestation.mp3" id="8_infestation"]
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_backdrop"]
 shader = ExtResource("1_lobster_backdrop")
@@ -147,6 +148,7 @@ sfx = &"lobster_hiss"
 
 [node name="Music" type="AudioStreamPlayer" parent="." unique_id=1998361302]
 script = ExtResource("5_boss_song")
+song = ExtResource("8_infestation")
 fade_seconds = 4.0
 
 [node name="Yield" type="Node" parent="Music" unique_id=1456871739]
