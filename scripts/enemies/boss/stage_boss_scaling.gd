@@ -18,6 +18,9 @@ extends Node
 ## Vidas siguientes: el daño que el jefe recibió de verdad (el de la última
 ## vida mezclado con el de toda la pelea, para que una vida muy corta no
 ## engañe), y el tiempo que queda del objetivo.
+## Un jefe de una sola vida que se recalcula seguido (la Langosta Azul) pide
+## en cambio plan_rest(): la vida de lo que le queda de barra, para que dure
+## lo que falta del objetivo con el daño que él mismo midió.
 ##
 ## Piso: la vida que trae la escena del jefe, ya multiplicada por vuelta,
 ## dificultad y tamaño de party (BossSchedule.spawn_boss), repartida entre
@@ -167,6 +170,45 @@ func plan_next_life(life: int, damage_taken: float, life_seconds: float,
 	return plan
 
 
+## Plan de lo que le queda a un jefe de una sola vida que se recalcula a
+## mitad de pelea: `dps_estimate` es el daño por segundo que se espera de la
+## party desde ahora, `fight_elapsed` los segundos de pelea que pasaron y
+## `bar_left` la parte de la barra (0-1) que le queda. El plan trae en `hp` la
+## vida de esa parte de la barra, para que dure lo que falta del objetivo; el
+## piso y el techo se reparten igual que la barra. `step` numera el plan en
+## el log.
+func plan_rest(step: int, dps_estimate: float, fight_elapsed: float,
+		bar_left: float) -> LifePlan:
+	var power := PartyPower.find(get_tree())
+	var score := power.score() if power != null else 0.0
+	var players := maxi(Coop.player_count, 1)
+	var plan := LifePlan.new()
+	plan.life = step
+	plan.players = players
+	plan.dps = dps_estimate
+	plan.power = score
+	plan.source = "boss"
+	plan.expected = _expected_dps(score, players)
+	var floor_rest := _floor_hp * clampf(bar_left, 0.0, 1.0)
+	var time_left := maxf(target_fight_seconds - fight_elapsed, 0.0)
+	plan.hp = _absorbed_dps(dps_estimate) * time_left
+	# Con su daño real, la pelea entera no baja del mínimo.
+	var min_hp := dps_estimate * maxf(min_fight_seconds - fight_elapsed, 0.0)
+	if plan.hp < min_hp:
+		plan.hp = min_hp
+		plan.clamp = "min"
+	if plan.hp < floor_rest:
+		plan.hp = floor_rest
+		plan.clamp = "floor"
+	elif plan.hp > floor_rest * max_hp_over_floor:
+		plan.hp = floor_rest * max_hp_over_floor
+		plan.clamp = "ceiling"
+	plan.budget = plan.hp / maxf(dps_estimate, 0.01)
+	plan.aggression = _aggression(players, score, 1)
+	plan.damage_bonus = _damage_bonus(score)
+	return plan
+
+
 ## Línea de log de un plan; `title` es el nombre del jefe.
 func log_line(title: String, plan: LifePlan) -> String:
 	return ("%s scaling: life=%d players=%d dps=%.1f power=%.1f hp=%.0f budget=%.1fs"
@@ -220,13 +262,7 @@ func _plan(life: int, dps_estimate: float, score: float, players: int, source: S
 	var seconds := maxf(time_left * own_share / share_left, min_life_seconds)
 	var floor_life := _floor_hp * own_share / total_share
 	var ceiling_life := floor_life * max_hp_over_floor
-	# Daño de referencia: el que deja la pelea justo en el objetivo con la
-	# vida del piso. De la ventaja sobre él, el jefe solo absorbe una parte.
-	var reference := _floor_hp / maxf(target_fight_seconds, 1.0)
-	var effective := dps_estimate
-	if dps_estimate > reference:
-		effective = reference + (dps_estimate - reference) * advantage_absorbed
-	plan.hp = effective * seconds
+	plan.hp = _absorbed_dps(dps_estimate) * seconds
 	# Nunca en segundos: con su daño real la vida dura su parte del mínimo.
 	var min_hp := dps_estimate * seconds \
 			* min_fight_seconds / maxf(target_fight_seconds, 1.0)
@@ -243,8 +279,26 @@ func _plan(life: int, dps_estimate: float, score: float, players: int, source: S
 	if burnout_after > 0.0:
 		plan.burnout_after = seconds * burnout_after
 		plan.burnout_drain = plan.hp / maxf(burnout_seconds, 0.1)
-	plan.aggression = clampf(aggression_per_extra_player * float(players - 1)
+	plan.aggression = _aggression(players, score, life)
+	plan.damage_bonus = _damage_bonus(score)
+	return plan
+
+
+## El daño contra el que se calcula la vida. Daño de referencia: el que deja
+## la pelea justo en el objetivo con la vida del piso. De la ventaja sobre
+## él, el jefe solo absorbe una parte (advantage_absorbed).
+func _absorbed_dps(dps_estimate: float) -> float:
+	var reference := _floor_hp / maxf(target_fight_seconds, 1.0)
+	if dps_estimate <= reference:
+		return dps_estimate
+	return reference + (dps_estimate - reference) * advantage_absorbed
+
+
+func _aggression(players: int, score: float, life: int) -> float:
+	return clampf(aggression_per_extra_player * float(players - 1)
 			+ aggression_per_power * score + aggression_per_life * float(life - 1),
 			0.0, aggression_cap)
-	plan.damage_bonus = clampf(damage_per_power * score, 0.0, damage_power_cap)
-	return plan
+
+
+func _damage_bonus(score: float) -> float:
+	return clampf(damage_per_power * score, 0.0, damage_power_cap)
