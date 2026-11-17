@@ -125,6 +125,7 @@ func _tick_coil() -> void:
 		_timer = spin_seconds
 		_struck = false
 		boss.rig.set_pose(LobsterRig.Pose.SWEEP)
+		boss.fx.sweep(boss.core_point(), radius, boss.rig.side > 0.0, spin_seconds)
 		Sfx.play(spin_sfx)
 		if sweep_scene != null:
 			ShockRing.spawn(sweep_scene, boss.core_point(), 1.0, radius,
@@ -138,6 +139,7 @@ func _tick_spin() -> void:
 		_struck = true
 		var at := boss.core_point()
 		var hit := boss.strike_ground([at], radius, height_window, damage)
+		boss.fx.sweep_hit(at, radius)
 		# La ola nace justo por fuera del barrido: a quien ya golpeó la cola no
 		# lo vuelve a tocar.
 		if wave_scene != null:

@@ -47,8 +47,6 @@ enum Step { CROUCH, AIRBORNE, REST }
 @export var lock_sfx: StringName = &"lobster_lock"
 ## Sonido del golpe (fila de Sfx.SOUND_LIBRARY).
 @export var impact_sfx: StringName = &"lobster_slam"
-## Escena del salpicón del golpe (SplashBurst, sale de Pools). Vacío = sin salpicón.
-@export var burst_scene: PackedScene = preload("res://scenes/fx/SplashBurst.tscn")
 
 @export_group("Onda de choque")
 ## Escena de la onda que sale del golpe (ShockRing, sale de Pools). Vacío = sin onda.
@@ -69,8 +67,6 @@ enum Step { CROUCH, AIRBORNE, REST }
 @export var ring_height_window: float = 0.9
 ## Ancho del anillo que golpea, en metros.
 @export var ring_band: float = 1.3
-## Tamaño del salpicón de cada réplica (1 = el de siempre).
-@export var aftershock_burst_size: float = 1.2
 ## Segundos antes de cada réplica en los que la anuncia: levanta la cola y suena.
 @export var aftershock_cue_seconds: float = 0.45
 ## Sonido de ese anuncio (fila de Sfx.SOUND_LIBRARY).
@@ -130,6 +126,7 @@ func tick(delta: float) -> bool:
 		boss.rig.set_pose(LobsterRig.Pose.LEAP)
 		boss.rig.gesture(&"tail_slap")
 		boss.rig.set_dust(true)
+		boss.fx.takeoff(boss.core_point())
 		Sfx.play(jump_sfx)
 	if _step == Step.AIRBORNE:
 		_fly()
@@ -184,7 +181,7 @@ func _impact() -> void:
 	boss.glide_to(_mark)
 	boss.rig.lift = 0.0
 	_send_ring(boss.strike_ground([_mark], radius, height_window, damage))
-	SplashBurst.spawn(burst_scene, _mark, 2.6)
+	boss.fx.landing(_mark, radius)
 	boss.feel.shock(LobsterFeel.Shock.CRUSHING, _mark)
 	Sfx.play(impact_sfx)
 	boss.rig.set_anger(0.0)
@@ -229,6 +226,6 @@ func _tick_aftershocks(delta: float) -> void:
 	_ring_cued = false
 	_send_ring()
 	boss.rig.set_anger(0.0)
-	SplashBurst.spawn(burst_scene, _mark, aftershock_burst_size)
+	boss.fx.aftershock(_mark, radius)
 	boss.feel.shock(LobsterFeel.Shock.HEAVY, _mark)
 	Sfx.play(impact_sfx)

@@ -35,12 +35,12 @@ initial_velocity_max = 11.0
 scale_amount_min = 0.8
 scale_amount_max = 2.2
 scale_amount_curve = SubResource("Curve_shrink")
-color = Color(0.26, 0.19, 0.12, 1)
+color = Color(0.74, 0.7, 0.56, 1)
 
 [node name="Spray" type="CPUParticles3D" parent="." unique_id=1632372915]
 cast_shadow = 0
 emitting = false
-amount = 22
+amount = 34
 lifetime = 0.8
 one_shot = true
 explosiveness = 0.92
@@ -52,7 +52,7 @@ spread = 75.0
 gravity = Vector3(0, -16, 0)
 initial_velocity_min = 4.0
 initial_velocity_max = 9.0
-scale_amount_min = 0.4
-scale_amount_max = 1.1
+scale_amount_min = 0.5
+scale_amount_max = 1.5
 scale_amount_curve = SubResource("Curve_shrink")
-color = Color(0.6, 0.88, 1, 1)
+color = Color(0.82, 0.96, 1, 1)

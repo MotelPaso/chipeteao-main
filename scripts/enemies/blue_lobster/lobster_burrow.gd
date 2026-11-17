@@ -60,8 +60,6 @@ enum Step { DIG, TUNNEL, LOCKED, POP, REST }
 @export var lock_sfx: StringName = &"lobster_rumble"
 ## Sonido de la salida (fila de Sfx.SOUND_LIBRARY).
 @export var erupt_sfx: StringName = &"lobster_slam"
-## Escena del salpicón de tierra (SplashBurst, sale de Pools). Vacío = sin salpicón.
-@export var burst_scene: PackedScene = preload("res://scenes/fx/SplashBurst.tscn")
 
 @export_group("Última salida")
 ## Radio de la última salida de la cadena y de su disco de aviso, en metros.
@@ -74,8 +72,6 @@ enum Step { DIG, TUNNEL, LOCKED, POP, REST }
 @export var final_pop_height: float = 5.2
 ## Segundos que dura ese salto.
 @export var final_pop_seconds: float = 0.6
-## Tamaño de su salpicón de tierra (1 = el de siempre).
-@export var final_burst_size: float = 3.2
 
 var _step: Step = Step.DIG
 var _timer: float = 0.0
@@ -157,6 +153,7 @@ func _dig() -> void:
 	boss.rig.set_pose(LobsterRig.Pose.DIG)
 	boss.rig.set_dust(true)
 	boss.rig.set_mound(1.0)
+	boss.fx.dig(boss.core_point())
 	Sfx.play(dig_sfx)
 
 
@@ -192,7 +189,9 @@ func _creep(delta: float) -> void:
 	if distance < 0.05:
 		return
 	var direction := to_mark / distance
-	boss.glide_to(boss.global_position + direction * minf(tunnel_speed * delta, distance))
+	var before := boss.global_position
+	boss.glide_to(before + direction * minf(tunnel_speed * delta, distance))
+	boss.fx.tunnel_trail(before, boss.global_position)
 	boss.face_along(direction)
 
 
@@ -222,7 +221,7 @@ func _erupt() -> void:
 	boss.rig.set_pose(LobsterRig.Pose.ERUPT)
 	boss.rig.snap_to_pose()
 	boss.strike_ground([_mark], _radius_now(), height_window, final_damage if last else damage)
-	SplashBurst.spawn(burst_scene, _mark, final_burst_size if last else 2.0)
+	boss.fx.eruption(_mark, _radius_now(), last)
 	boss.feel.shock(LobsterFeel.Shock.CRUSHING if last else LobsterFeel.Shock.HEAVY, _mark)
 	Sfx.play(erupt_sfx)
 	boss.rig.set_anger(0.0)

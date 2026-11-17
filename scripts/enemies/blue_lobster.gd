@@ -274,6 +274,7 @@ func _interrupt_move() -> void:
 	_cancel_move()
 	_clear_ground()
 	feel.clear()
+	fx.clear()
 	_phase = Phase.STALK
 	_pause_left = attack_pause * lerpf(1.0, attack_pause_at_full_aggression, aggression)
 	face_along(Vector3.ZERO)

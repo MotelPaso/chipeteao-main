@@ -24,6 +24,7 @@
 [ext_resource type="Script" path="res://scripts/enemies/blue_lobster/lobster_tail_spin.gd" id="22_lobster_tail_spin"]
 [ext_resource type="Script" path="res://scripts/enemies/blue_lobster/lobster_burrow.gd" id="23_lobster_burrow"]
 [ext_resource type="Script" path="res://scripts/enemies/blue_lobster/lobster_purge.gd" id="24_lobster_purge"]
+[ext_resource type="Script" path="res://scripts/enemies/blue_lobster/lobster_fx.gd" id="25_lobster_fx"]
 
 [sub_resource type="CapsuleShape3D" id="CapsuleShape3D_body"]
 radius = 1.1
@@ -1058,6 +1059,19 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
+
+[node name="Flash" type="ColorRect" parent="Feel" unique_id=640318827]
+visible = false
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+color = Color(0.84, 0.96, 1, 0)
+
+[node name="Fx" type="Node" parent="." unique_id=771204583]
+script = ExtResource("25_lobster_fx")
 
 [node name="Moves" type="Node" parent="." unique_id=1674137332]
 script = ExtResource("18_lobster_moveset")

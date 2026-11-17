@@ -1,10 +1,10 @@
 class_name SplashBurst
 extends Node3D
-## Salpicón del pool: terrones y gotas que saltan de un golpe de la Langosta
+## Salpicón del pool: arena y gotas que saltan de un golpe de la Langosta
 ## Azul (un pinzazo, la caída del Salto, la salida de la Emboscada). No daña a
 ## nadie. `size` agranda todo el estallido (1 = el de la escena). Vuelve solo
 ## al pool cuando terminó.
-## Los dos emisores son los nodos Clods (tierra) y Spray (agua) de
+## Los dos emisores son los nodos Clods (arena) y Spray (agua) de
 ## SplashBurst.tscn: cantidad, colores y velocidades se ajustan ahí.
 ## Grupo "splash_bursts".
 

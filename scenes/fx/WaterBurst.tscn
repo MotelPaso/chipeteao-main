@@ -1,0 +1,60 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scripts/fx/water_burst.gd" id="1_script"]
+[ext_resource type="Shader" path="res://assets/shaders/water_column.gdshader" id="2_column"]
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_column"]
+shader = ExtResource("2_column")
+
+[sub_resource type="QuadMesh" id="QuadMesh_segment"]
+material = SubResource("ShaderMaterial_column")
+
+[sub_resource type="MultiMesh" id="MultiMesh_column"]
+transform_format = 1
+mesh = SubResource("QuadMesh_segment")
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_drop"]
+shading_mode = 0
+albedo_color = Color(0.86, 0.97, 1, 1)
+
+[sub_resource type="SphereMesh" id="SphereMesh_drop"]
+material = SubResource("StandardMaterial3D_drop")
+radius = 0.09
+height = 0.18
+radial_segments = 6
+rings = 3
+
+[sub_resource type="Curve" id="Curve_shrink"]
+_data = [Vector2(0, 1), 0.0, 0.0, 0, 0, Vector2(0.6, 0.9), 0.0, 0.0, 0, 0, Vector2(1, 0), 0.0, 0.0, 0, 0]
+point_count = 3
+
+[node name="WaterBurst" type="Node3D" unique_id=1995291384]
+script = ExtResource("1_script")
+
+[node name="Column" type="MultiMeshInstance3D" parent="." unique_id=251608180]
+visible = false
+cast_shadow = 0
+multimesh = SubResource("MultiMesh_column")
+
+[node name="Light" type="OmniLight3D" parent="." unique_id=810782958]
+visible = false
+omni_attenuation = 1.4
+
+[node name="Drops" type="CPUParticles3D" parent="." unique_id=583984508]
+cast_shadow = 0
+emitting = false
+amount = 30
+lifetime = 1.1
+one_shot = true
+explosiveness = 0.92
+mesh = SubResource("SphereMesh_drop")
+emission_shape = 1
+emission_sphere_radius = 0.6
+direction = Vector3(0, 1, 0)
+spread = 28.0
+gravity = Vector3(0, -22, 0)
+initial_velocity_min = 6.0
+initial_velocity_max = 12.0
+scale_amount_min = 0.6
+scale_amount_max = 1.8
+scale_amount_curve = SubResource("Curve_shrink")

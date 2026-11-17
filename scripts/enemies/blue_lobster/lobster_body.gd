@@ -38,10 +38,11 @@ const STUCK_VERTICAL_SPEED: float = 0.5
 ## Agresividad actual (0-1); la leen los ataques.
 var aggression: float = 0.0
 
-## El rig (nodo Visual) y lo que se siente de sus golpes (nodo Feel): los
-## mueven sus ataques.
+## El rig (nodo Visual), lo que se siente de sus golpes (nodo Feel) y lo que
+## se ve de ellos (nodo Fx): los mueven sus ataques.
 @onready var rig: LobsterRig = $Visual
 @onready var feel: LobsterFeel = $Feel
+@onready var fx: LobsterFx = $Fx
 
 ## Hacia dónde mira mientras un ataque la lleva (ZERO = mira al raider).
 var _face_along: Vector3 = Vector3.ZERO

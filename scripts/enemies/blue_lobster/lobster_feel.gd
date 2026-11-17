@@ -2,10 +2,11 @@ class_name LobsterFeel
 extends CanvasLayer
 ## Lo que se SIENTE de los golpes de la Langosta Azul (nodo Feel de
 ## BlueLobster.tscn): la sacudida de cámara y la pausa de impacto de cada
-## golpe según su tamaño, y la VIÑETA DE PELIGRO que oscurece los bordes de la
-## pantalla mientras carga un golpe grande. Los ataques dicen qué pasó (shock
-## con un tamaño y un lugar, dread con cuánto falta); cuánto tiembla y cómo se
-## ve vive aquí y en el material del nodo Vignette.
+## golpe según su tamaño, el fogonazo de los más grandes (nodo Flash) y la
+## VIÑETA DE PELIGRO que oscurece los bordes de la pantalla mientras carga un
+## golpe grande. Los ataques dicen qué pasó (shock con un tamaño y un lugar,
+## dread con cuánto falta); cuánto tiembla y cómo se ve vive aquí y en el
+## material del nodo Vignette.
 
 ## Tamaño de un golpe.
 enum Shock { LIGHT, HEAVY, CRUSHING }
@@ -35,6 +36,12 @@ enum Shock { LIGHT, HEAVY, CRUSHING }
 @export_range(0.05, 1.0) var crushing_stop_scale: float = 0.1
 ## Segundos reales que dura esa pausa (0 = sin pausa).
 @export var crushing_stop_seconds: float = 0.1
+## Opacidad (0-1) del fogonazo a pantalla completa de un golpe demoledor (0 = sin fogonazo).
+@export_range(0.0, 1.0) var crushing_flash: float = 0.2
+## Segundos que tarda ese fogonazo en apagarse.
+@export var crushing_flash_seconds: float = 0.22
+## Color del fogonazo.
+@export var flash_color: Color = Color(0.84, 0.96, 1.0)
 
 @export_group("Distancia")
 ## Metros al raider más cercano hasta los que el golpe se siente entero.
@@ -58,12 +65,15 @@ enum Shock { LIGHT, HEAVY, CRUSHING }
 var _wanted: float = 0.0
 var _level: float = 0.0
 var _clock: float = 0.0
+var _flash_tween: Tween = null
 
 @onready var _vignette: ColorRect = $Vignette
+@onready var _flash: ColorRect = $Flash
 
 
 func _ready() -> void:
 	_vignette.visible = false
+	_flash.visible = false
 
 
 func _notification(what: int) -> void:
@@ -102,6 +112,7 @@ func shock(size: Shock, at: Vector3) -> void:
 		Shock.CRUSHING:
 			Juice.shake(crushing_shake * share, crushing_shake_seconds)
 			Juice.hit_stop(crushing_stop_scale, crushing_stop_seconds)
+			_flash_screen(crushing_flash * share)
 
 
 ## Pide la viñeta de peligro a `amount` (0-1) durante este frame. El ataque
@@ -110,11 +121,27 @@ func dread(amount: float) -> void:
 	_wanted = maxf(_wanted, clampf(amount, 0.0, 1.0))
 
 
-## Apaga la viñeta ya (la langosta murió).
+## Apaga la viñeta y el fogonazo ya (la langosta murió).
 func clear() -> void:
 	_wanted = 0.0
 	_level = 0.0
 	_vignette.visible = false
+	if _flash_tween != null and _flash_tween.is_valid():
+		_flash_tween.kill()
+	_flash.visible = false
+
+
+## Un fogonazo a pantalla completa de opacidad `alpha` que se apaga solo.
+func _flash_screen(alpha: float) -> void:
+	if alpha <= 0.01:
+		return
+	if _flash_tween != null and _flash_tween.is_valid():
+		_flash_tween.kill()
+	_flash.color = Color(flash_color, alpha)
+	_flash.visible = true
+	_flash_tween = create_tween()
+	_flash_tween.tween_property(_flash, "color:a", 0.0, crushing_flash_seconds)
+	_flash_tween.tween_callback(_flash.hide)
 
 
 ## Qué parte del temblor llega desde `at` al raider más cercano (faint_share-1).

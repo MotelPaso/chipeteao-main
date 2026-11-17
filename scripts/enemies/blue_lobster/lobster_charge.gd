@@ -194,6 +194,7 @@ func _dash() -> void:
 	_passes_left -= 1
 	boss.rig.set_pose(LobsterRig.Pose.DASH)
 	boss.rig.set_dust(true)
+	boss.fx.charge_started()
 	Sfx.play(dash_sfx)
 
 
@@ -202,11 +203,14 @@ func _tick_dash(delta: float) -> void:
 	_travelled = minf(_travelled + run_speed * delta, _run)
 	boss.glide_to(_from + _direction * _travelled)
 	var now := boss.global_position
+	boss.fx.charge_trail(before, now)
 	if boss.strike_along(before, now, width * 0.5, height_window, damage, _hit) > 0:
 		boss.feel.shock(LobsterFeel.Shock.HEAVY, now)
+		boss.fx.charge_hit(now)
 	if _travelled >= _run:
 		_step = Step.SKID
 		_timer = skid_seconds
+		boss.fx.skid(now)
 		boss.rig.set_pose(LobsterRig.Pose.SIDE)
 		boss.rig.set_anger(0.0)
 		_drop_lane()

@@ -51,8 +51,6 @@ enum Step { REAR, LUNGE, GAP, REST }
 @export var snap_sfx: StringName = &"lobster_snap"
 ## Sonido cuando el disco se clava (fila de Sfx.SOUND_LIBRARY).
 @export var lock_sfx: StringName = &"lobster_lock"
-## Escena del salpicón del golpe (SplashBurst, sale de Pools). Vacío = sin salpicón.
-@export var burst_scene: PackedScene = preload("res://scenes/fx/SplashBurst.tscn")
 
 @export_group("Remate")
 ## Si la ráfaga termina con el remate de las dos pinzas.
@@ -67,8 +65,6 @@ enum Step { REAR, LUNGE, GAP, REST }
 @export var slam_spread: float = 2.4
 ## Daño del remate a cada raider dentro de sus discos (valor base).
 @export var slam_damage: float = 8.0
-## Tamaño del salpicón de cada pinza en el remate (1 = el de siempre).
-@export var slam_burst_size: float = 1.6
 ## Sonido del remate (fila de Sfx.SOUND_LIBRARY).
 @export var slam_sfx: StringName = &"lobster_slam"
 
@@ -244,7 +240,8 @@ func _strike() -> void:
 		return
 	boss.feel.shock(LobsterFeel.Shock.HEAVY if not hit.is_empty() else LobsterFeel.Shock.LIGHT,
 			_mark)
-	SplashBurst.spawn(burst_scene, _mark, 0.8)
+	boss.fx.snap(_mark, radius, LobsterAim.flat_direction(_from, _mark,
+			-boss.global_transform.basis.z))
 	Sfx.play(snap_sfx)
 	_snaps_left -= 1
 	_step = Step.GAP
@@ -261,8 +258,7 @@ func _strike() -> void:
 ## pinzas clavadas en el suelo (la langosta vuelve a su pose al terminar).
 func _finish_strike() -> void:
 	boss.feel.shock(LobsterFeel.Shock.CRUSHING, _mark)
-	for spot: Vector3 in _spots:
-		SplashBurst.spawn(burst_scene, spot, slam_burst_size)
+	boss.fx.slam(_spots, slam_radius)
 	Sfx.play(slam_sfx)
 	_finishing = false
 	_step = Step.REST
