@@ -23,6 +23,11 @@ const CUT_SEED_STEP: int = 7919
 const NEAREST_RINGS: int = 14
 const NEAREST_TURNS: int = 12
 const NEAREST_STEP: float = 1.5
+## Si en esos anillos no hay dónde (el punto cayó en medio de una formación
+## de roca grande), sigue con anillos más ralos hasta salir de ella.
+const FAR_RINGS: int = 11
+const FAR_TURNS: int = 16
+const FAR_STEP: float = 5.0
 
 
 ## Levanta la roca de cada corte y los puentes de `terrain` como hijos de
@@ -90,6 +95,13 @@ static func nearest(xz: Vector2, margin: float, can_place: Callable) -> Vector2:
 		for turn in NEAREST_TURNS:
 			var candidate := xz + Vector2.from_angle(TAU * float(turn) / float(NEAREST_TURNS)) \
 					* (float(ring) * NEAREST_STEP)
+			if bool(can_place.call(candidate, margin)):
+				return candidate
+	var reach := float(NEAREST_RINGS) * NEAREST_STEP
+	for ring in range(1, FAR_RINGS + 1):
+		for turn in FAR_TURNS:
+			var candidate := xz + Vector2.from_angle(TAU * (float(turn) + 0.5) / float(FAR_TURNS)) \
+					* (reach + float(ring) * FAR_STEP)
 			if bool(can_place.call(candidate, margin)):
 				return candidate
 	return xz
