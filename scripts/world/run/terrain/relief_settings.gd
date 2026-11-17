@@ -134,19 +134,19 @@ extends Resource
 
 @export_group("Cañón")
 ## Largo mínimo del cañón, en metros (rampas de los extremos incluidas).
-@export var ravine_length_min: float = 118.0
+@export var ravine_length_min: float = 140.0
 ## Largo máximo del cañón, en metros.
-@export var ravine_length_max: float = 150.0
+@export var ravine_length_max: float = 170.0
 ## Ancho mínimo del cañón de borde a borde, en metros.
-@export var ravine_width_min: float = 15.0
+@export var ravine_width_min: float = 24.0
 ## Ancho máximo del cañón de borde a borde, en metros.
-@export var ravine_width_max: float = 17.0
+@export var ravine_width_max: float = 27.0
 ## Profundidad mínima del cañón bajo su borde, en metros.
-@export var ravine_depth_min: float = 5.2
+@export var ravine_depth_min: float = 5.8
 ## Profundidad máxima del cañón bajo su borde, en metros.
-@export var ravine_depth_max: float = 5.5
+@export var ravine_depth_max: float = 6.0
 ## Metros que baja la vaguada ancha por la que corre el cañón.
-@export var ravine_valley: float = 0.6
+@export var ravine_valley: float = 0.4
 ## Metros de llano entre el pie del macizo y el borde del cañón, donde más se acercan.
 @export var ravine_gap: float = 14.0
 ## Cuánto abraza el cañón a la montaña: metros que sus extremos se acercan
@@ -157,22 +157,28 @@ extends Resource
 ## Pendiente de las rampas de los dos extremos del cañón, en grados.
 @export_range(10.0, 30.0) var ravine_ramp_slope_degrees: float = 20.0
 ## Fracción de la ondulación del suelo que conserva el fondo del cañón (0-1).
-@export_range(0.0, 1.0) var ravine_floor_detail: float = 0.25
+@export_range(0.0, 1.0) var ravine_floor_detail: float = 0.15
 
 @export_group("Puentes")
 ## Escena del puente que cruza el cañón (scenes/world/props/Bridge.tscn).
 ## Vacío, el cañón se queda sin puentes.
 @export var bridge_scene: PackedScene
 ## Puentes sobre el cañón, como mínimo. Entre dos puentes el cañón lleva un
-## collado (el fondo sube hasta el borde): sin él, ese tramo sería un pozo.
-@export var bridge_count_min: int = 2
+## collado (el fondo sube hasta el borde).
+@export var bridge_count_min: int = 1
 ## Puentes sobre el cañón, como máximo. Si el cañón sale corto para tantos
 ## tramos, lleva menos.
-@export var bridge_count_max: int = 2
-## Ancho del tablero de cada puente, en metros.
-@export var bridge_width: float = 5.0
-## Radio del claro plano en cada cabecera de puente, en metros.
-@export var bridgehead_radius: float = 6.0
+@export var bridge_count_max: int = 1
+## Ancho de la obra de cada puente en sus estribos, en metros (el tablero
+## mide algo más de un metro menos: ver Bridge.tscn).
+@export var bridge_width: float = 9.0
+## Metros a lo largo del cañón que ocupa cada escalera del puente desde el
+## costado de su estribo. De aquí sale su pendiente: con el cañón a 6 m,
+## bajo 8.5 m quedaría sobre 45 grados y no se caminaría.
+@export var bridge_stair_reach: float = 12.5
+## Radio del claro plano en cada cabecera de puente, en metros: cubre el
+## tablero y los descansos de las dos escaleras.
+@export var bridgehead_radius: float = 10.5
 
 @export_group("Estructuras")
 ## Hito de la cumbre (scenes/world/props/HollowTree.tscn). Vacío, la cumbre queda pelada.

@@ -116,6 +116,10 @@ var _xp_multiplier: int = 1
 var _tier_xp_multiplier: float = 1.0
 ## Límite de la arena para los trepadores (del nodo "arena_bounds"; INF = sin límite).
 var _arena_limit: float = INF
+## Los puentes de la arena bajo los que se pasa caminando (del nodo
+## "arena_bounds"), o null si no tiene: quien persigue a alguien parado
+## sobre uno entra por una cabecera en vez de quedarse debajo.
+var _lanes: ReliefLanes = null
 ## Último empuje de separación calculado, reusado en los ticks alternos.
 var _separation_cache: Vector3 = Vector3.ZERO
 ## Altura donde empezó la trepada actual y si hay una en curso; juntas
@@ -145,6 +149,8 @@ func _ready() -> void:
 		var extent: Variant = bounds.get("arena_half_extent")
 		if extent is float or extent is int:
 			_arena_limit = float(extent) - ARENA_CLAMP_MARGIN
+		if bounds.has_method("horde_lanes"):
+			_lanes = bounds.call("horde_lanes") as ReliefLanes
 
 
 ## El bucle más caliente del juego (corre por cada enemigo en cada tick de
@@ -184,6 +190,8 @@ func _physics_process(delta: float) -> void:
 		var distance := to_player.length()
 		if distance > 0.001:
 			seek = to_player / distance
+			if _lanes != null:
+				seek = _lanes.seek(global_position, player.global_position, seek)
 		steer = _movement_intent(seek, distance)
 		_combat_tick(player, distance)
 

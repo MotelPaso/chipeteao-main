@@ -29,30 +29,41 @@ func _init(seed_value: int = 0) -> void:
 ## Una cara triangular que mira hacia fuera del sólido cuyo interior
 ## contiene a `inside`.
 func triangle(a: Vector3, b: Vector3, c: Vector3, color: Color, inside: Vector3) -> void:
-	var normal := (b - a).cross(c - a)
-	if normal.length_squared() < 0.0000001:
+	if (b - a).cross(c - a).length_squared() < 0.0000001:
 		return
-	normal = normal.normalized()
-	# Godot dibuja la cara horaria: vista desde fuera, cross(b - a, c - a)
-	# tiene que mirar hacia dentro.
-	if normal.dot((a + b + c) / 3.0 - inside) > 0.0:
-		var swap := b
-		b = c
-		c = swap
-	else:
-		normal = -normal
-	var shaded := color * (1.0 + _rng.randf_range(-FACE_SHADE, FACE_SHADE))
-	shaded.a = 1.0
-	for vertex: Vector3 in [a, b, c]:
-		_vertices.append(vertex)
-		_normals.append(normal)
-		_colors.append(shaded)
+	_face(a, b, c, _shade(color), inside)
 
 
 ## Una cara de cuatro lados (a-b-c-d en orden alrededor de la cara).
 func quad(a: Vector3, b: Vector3, c: Vector3, d: Vector3, color: Color, inside: Vector3) -> void:
 	triangle(a, b, c, color, inside)
 	triangle(a, c, d, color, inside)
+
+
+## Una losa: una cara de cuatro lados con un solo tono (un sillar, una losa
+## del piso). quad() le daría un tono a cada mitad y se vería la diagonal.
+func plate(a: Vector3, b: Vector3, c: Vector3, d: Vector3, color: Color, inside: Vector3) -> void:
+	var shaded := _shade(color)
+	_face(a, b, c, shaded, inside)
+	_face(a, c, d, shaded, inside)
+
+
+## Un sillar: una caja de tamaño `size` centrada en el origen de `frame`,
+## con las seis caras del mismo tono.
+func block(frame: Transform3D, size: Vector3, color: Color) -> void:
+	var half := size * 0.5
+	var shaded := _shade(color)
+	var corners := PackedVector3Array()
+	for y: float in [-half.y, half.y]:
+		for turn: Vector2 in [Vector2(-1, -1), Vector2(1, -1), Vector2(1, 1), Vector2(-1, 1)]:
+			corners.append(frame * Vector3(turn.x * half.x, y, turn.y * half.z))
+	for side in 4:
+		var next := (side + 1) % 4
+		_face(corners[side], corners[next], corners[next + 4], shaded, frame.origin)
+		_face(corners[side], corners[next + 4], corners[side + 4], shaded, frame.origin)
+	for base: int in [0, 4]:
+		_face(corners[base], corners[base + 1], corners[base + 2], shaded, frame.origin)
+		_face(corners[base], corners[base + 2], corners[base + 3], shaded, frame.origin)
 
 
 ## Las caras laterales entre dos anillos con la misma cantidad de puntos
@@ -134,6 +145,34 @@ func blob(center: Vector3, radii: Vector3, color: Color, segments: int = 7, ring
 			var next := (index + 1) % segments
 			quad(rows[row][index], rows[row][next], rows[row + 1][next], rows[row + 1][index],
 					color, center)
+
+
+## `color` con el brillo al azar de una cara.
+func _shade(color: Color) -> Color:
+	var shaded := color * (1.0 + _rng.randf_range(-FACE_SHADE, FACE_SHADE))
+	shaded.a = 1.0
+	return shaded
+
+
+## Agrega el triángulo a-b-c con el color ya elegido, mirando hacia fuera
+## del sólido cuyo interior contiene a `inside`.
+func _face(a: Vector3, b: Vector3, c: Vector3, shaded: Color, inside: Vector3) -> void:
+	var normal := (b - a).cross(c - a)
+	if normal.length_squared() < 0.0000001:
+		return
+	normal = normal.normalized()
+	# Godot dibuja la cara horaria: vista desde fuera, cross(b - a, c - a)
+	# tiene que mirar hacia dentro.
+	if normal.dot((a + b + c) / 3.0 - inside) > 0.0:
+		var swap := b
+		b = c
+		c = swap
+	else:
+		normal = -normal
+	for vertex: Vector3 in [a, b, c]:
+		_vertices.append(vertex)
+		_normals.append(normal)
+		_colors.append(shaded)
 
 
 ## True si todavía no se le agregó ninguna cara.

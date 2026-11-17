@@ -1,34 +1,6 @@
-[gd_scene load_steps=7 format=3]
+[gd_scene load_steps=2 format=3]
 
 [ext_resource type="Script" path="res://scripts/world/props/bridge.gd" id="1_bridge"]
-[ext_resource type="Material" uid="uid://dwood2hw7zb9e" path="res://assets/materials/wood_cut.tres" id="2_wood"]
-[ext_resource type="Material" uid="uid://crockm6hw5fy4" path="res://assets/materials/rock.tres" id="3_rock"]
-
-[sub_resource type="BoxMesh" id="BoxMesh_deck"]
-resource_local_to_scene = true
-material = ExtResource("2_wood")
-size = Vector3(23, 0.3, 5)
-
-[sub_resource type="BoxMesh" id="BoxMesh_body"]
-resource_local_to_scene = true
-material = ExtResource("3_rock")
-size = Vector3(23, 7.7, 5)
-
-[sub_resource type="BoxShape3D" id="BoxShape3D_bridge"]
-resource_local_to_scene = true
-size = Vector3(23, 8, 5)
 
 [node name="Bridge" type="StaticBody3D"]
 script = ExtResource("1_bridge")
-
-[node name="Deck" type="MeshInstance3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.15, 0)
-mesh = SubResource("BoxMesh_deck")
-
-[node name="Body" type="MeshInstance3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -4.15, 0)
-mesh = SubResource("BoxMesh_body")
-
-[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -4, 0)
-shape = SubResource("BoxShape3D_bridge")

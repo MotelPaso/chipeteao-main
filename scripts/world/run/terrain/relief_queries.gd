@@ -164,8 +164,9 @@ static func _crossing_distance(layout: ReliefLayout, crossing: ReliefLayout.Cros
 	var local := point - crossing.center
 	var along := maxf(absf(local.dot(crossing.axis)) - crossing.span * 0.5
 			- ReliefLayout.HEAD_SETBACK, 0.0)
+	# A lo ancho, la obra entera: el tablero y las escaleras de cada costado.
 	var across := maxf(absf(local.dot(Vector2(-crossing.axis.y, crossing.axis.x)))
-			- crossing.width * 0.5, 0.0)
+			- crossing.width * 0.5 - layout.settings.bridge_stair_reach, 0.0)
 	var deck := sqrt(along * along + across * across)
 	var radius := layout.settings.bridgehead_radius
 	var heads := minf(point.distance_to(crossing.head_a), point.distance_to(crossing.head_b))

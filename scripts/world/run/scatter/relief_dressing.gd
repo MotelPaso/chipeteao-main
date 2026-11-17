@@ -14,8 +14,6 @@ extends RefCounted
 ## Metros que el puente se mete en cada orilla, pasado el borde del
 ## cañón: tiene que tapar el escalón que el terreno esconde ahí.
 const BRIDGE_OVERLAP: float = 3.5
-## Metros que la calzada del puente baja pasado el fondo del cañón.
-const BRIDGE_FOOTING: float = 2.5
 ## Metros que el tablero queda bajo el claro de sus cabeceras: el suelo lo
 ## tapa en las orillas y se entra al puente sin escalón.
 const DECK_SINK: float = 0.03
@@ -28,11 +26,12 @@ const NEAREST_STEP: float = 1.5
 
 
 ## Levanta la roca de cada corte y los puentes de `terrain` como hijos de
-## `scatter`, e imprime `Relief dressing:`.
+## `scatter`, e imprime `Relief dressing:`. Devuelve los puentes como los ve
+## la horda (ReliefLanes), o null si la arena no tiene ninguno.
 static func raise(scatter: Node3D, terrain: Terrain, style: RockFormationStyle,
-		run_seed: int) -> void:
+		run_seed: int) -> ReliefLanes:
 	if terrain == null or not terrain.has_relief():
-		return
+		return null
 	var started := Time.get_ticks_msec()
 	terrain.ensure_built()
 	var layout := terrain.relief_layout()
@@ -51,14 +50,18 @@ static func raise(scatter: Node3D, terrain: Terrain, style: RockFormationStyle,
 		gaps += wall.gap_faces
 		tallest = maxf(tallest, wall.tallest)
 	var bridges := 0
+	var lanes := ReliefLanes.new(scatter.get_tree())
 	for crossing: ReliefLayout.Crossing in layout.crossings:
-		if _place_bridge(scatter, layout, crossing):
+		var bridge := _place_bridge(scatter, terrain, crossing, run_seed)
+		if bridge != null:
+			lanes.add(bridge)
 			bridges += 1
 	print("Relief dressing: %d cuts, %d faces, %d shapes, tallest=%.1f, %d bridges in %d ms" % [
 			layout.cuts.size(), faces, shapes, tallest, bridges,
 			Time.get_ticks_msec() - started])
 	if gaps > 0:
 		push_warning("Relief dressing: %d rock faces slope between 45 and 60 degrees" % gaps)
+	return null if lanes.is_empty() else lanes
 
 
 ## True si `xz` queda a `margin` metros o más de todo corte, rampa y puente
@@ -111,17 +114,30 @@ static func place_chest(scatter: Node3D, scene: PackedScene, plat: Node3D, heigh
 	return true
 
 
-static func _place_bridge(scatter: Node3D, layout: ReliefLayout,
-		crossing: ReliefLayout.Crossing) -> bool:
-	var scene := layout.settings.bridge_scene
+static func _place_bridge(scatter: Node3D, terrain: Terrain,
+		crossing: ReliefLayout.Crossing, run_seed: int) -> Bridge:
+	var settings := terrain.relief_layout().settings
+	var scene := settings.bridge_scene
 	var bridge := scene.instantiate() as Bridge if scene != null else null
 	if bridge == null:
-		return false
-	bridge.span = crossing.span + BRIDGE_OVERLAP * 2.0
+		return null
+	bridge.span = crossing.span
 	bridge.width = crossing.width
-	bridge.drop = layout.ravine.depth + BRIDGE_FOOTING
+	bridge.overlap = BRIDGE_OVERLAP
+	bridge.stair_reach = settings.bridge_stair_reach
+	bridge.shape_seed = run_seed
+	# El fondo del cañón ondula: la obra baja hasta su punto más hondo bajo
+	# el puente y al pie de las escaleras, así ninguna queda colgando.
+	var side := Vector2(-crossing.axis.y, crossing.axis.x)
+	var floor := INF
+	for across: float in [-1.0, 0.0, 1.0]:
+		for along: float in [-0.25, 0.0, 0.25]:
+			var probe := crossing.center + crossing.axis * (crossing.span * along) \
+					+ side * (across * (crossing.width * 0.5 + settings.bridge_stair_reach))
+			floor = minf(floor, terrain.height_at(probe.x, probe.y))
+	bridge.drop = crossing.level - DECK_SINK - floor
 	scatter.add_child(bridge)
 	bridge.position = Vector3(crossing.center.x, crossing.level - DECK_SINK, crossing.center.y)
 	# El tablero corre por +X local: se gira hasta el eje del cruce.
 	bridge.rotation.y = -crossing.axis.angle()
-	return true
+	return bridge

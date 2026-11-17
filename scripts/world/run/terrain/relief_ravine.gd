@@ -18,6 +18,9 @@ const SEGMENT_MIN: float = 22.0
 const SADDLE_HALF: float = 5.0
 ## Cuánto se corre cada puente del medio de su tramo, en fracción del tramo.
 const CROSSING_JITTER: float = 0.15
+## El trazado de reserva no sortea nada: parte del largo mínimo y lo acorta
+## a esta fracción en cada intento, hasta que el cañón cabe.
+const CALM_SHRINK: float = 0.93
 
 
 ## El cañón: pasa al pie del macizo por el lado contrario a la montaña, a
@@ -30,6 +33,8 @@ static func place(layout: ReliefLayout, rng: RandomNumberGenerator, bearing: flo
 		var half_width := ReliefPlanner.roll(rng, s.ravine_width_min, s.ravine_width_max, calm) * 0.5
 		var depth := ReliefPlanner.roll(rng, s.ravine_depth_min, s.ravine_depth_max, calm)
 		var length := ReliefPlanner.roll(rng, s.ravine_length_min, s.ravine_length_max, calm)
+		if calm:
+			length = s.ravine_length_min * pow(CALM_SHRINK, float(attempt))
 		var bend := ReliefPlanner.roll(rng, s.ravine_bend_min, s.ravine_bend_max, calm)
 		var facing := bearing + PI + (0.0 if calm else rng.randf_range(-RAVINE_SWAY, RAVINE_SWAY))
 		var out := Vector2.from_angle(facing)

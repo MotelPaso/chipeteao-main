@@ -50,8 +50,10 @@ const HOLD_DRIFT: float = 1.0
 ## le da a cada tramo antes de pasar al siguiente.
 const TOUR_REACHED: float = 2.5
 const TOUR_LEG_TIMEOUT: float = 70.0
-## Ventana de altura alrededor del tablero que cuenta como "sobre el puente".
+## Ventana de altura que cuenta como "sobre el puente": metros bajo el
+## tablero (más abajo es haberse caído) y metros sobre él (un salto).
 const DECK_LEVEL: float = 1.2
+const DECK_JUMP: float = 2.6
 
 var nav := ReliefNav.new()
 var sweeps := ReliefSweeps.new()
@@ -306,8 +308,11 @@ func _watch_feats(lead: CharacterBody3D) -> void:
 		var along := local.dot(crossing.axis)
 		var across := absf(local.dot(Vector2(-crossing.axis.y, crossing.axis.x)))
 		var half_span := crossing.span * 0.5
+		# Un salto sobre el tablero sigue siendo estar en el puente; caer
+		# bajo él, no.
+		var above := at.y - crossing.level
 		if across > crossing.width * 0.5 + 0.5 or absf(along) > half_span + 2.0 \
-				or absf(at.y - crossing.level) > DECK_LEVEL:
+				or above < -DECK_LEVEL or above > DECK_JUMP:
 			_deck_sides[index] = 0
 			continue
 		if absf(along) < half_span - 1.5:

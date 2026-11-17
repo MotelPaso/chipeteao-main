@@ -217,6 +217,8 @@ var _mesa_sites: PackedVector2Array = PackedVector2Array()
 var _structure_sites: PackedVector3Array = PackedVector3Array()
 ## Huella de los props con colisión; solo se enciende con relieve por zonas.
 var _footprints := PropFootprints.new()
+## Los puentes de arcos abiertos de la arena como los ve la horda, o null.
+var _lanes: ReliefLanes = null
 ## El Terrain de esta arena (ver _arena_terrain); se busca una sola vez.
 var _terrain: Terrain = null
 var _terrain_sought: bool = false
@@ -279,7 +281,7 @@ func mesa_sites() -> PackedVector2Array:
 func place_props() -> void:
 	if mask_enabled:
 		_raise_formations()
-	ReliefDressing.raise(self, _arena_terrain(), formation_style, _run_seed)
+	_lanes = ReliefDressing.raise(self, _arena_terrain(), formation_style, _run_seed)
 	# Cada meseta cuenta como keepout del reparto interior, para que no
 	# crezcan árboles a través de su plataforma.
 	_keepouts_xz.append_array(MesaBuilder.build(self, _rng, _mesa_sites))
@@ -300,11 +302,12 @@ func place_props() -> void:
 	var relief := _arena_terrain() != null and _arena_terrain().has_relief()
 	if relief:
 		_footprints.setup(arena_half_extent)
+	# Los árboles y los tocones no crecen en el agua del cañón; las rocas sí.
 	_place_many(ancient_tree_scene, ancient_tree_count, ancient_tree_scale_min,
-			ancient_tree_scale_max)
-	_place_many(tree_scene, tree_count, tree_scale_min, tree_scale_max)
+			ancient_tree_scale_max, true)
+	_place_many(tree_scene, tree_count, tree_scale_min, tree_scale_max, true)
 	_place_many(rock_scene, rock_count, rock_scale_min, rock_scale_max)
-	_place_many(stump_scene, stump_count, stump_scale_min, stump_scale_max)
+	_place_many(stump_scene, stump_count, stump_scale_min, stump_scale_max, true)
 	PerimeterRing.new(self, _rng, _mask, relief).plant()
 
 
@@ -377,6 +380,12 @@ func can_grow(xz: Vector2, margin: float = 0.0) -> bool:
 	# formación asoma más allá de sus celdas y de las estructuras del relieve.
 	return _mask.clear_of(xz, formation_clearance) and _structures_clear(xz) \
 			and ReliefDressing.clear(terrain, xz, margin, _mesa_sites, relief_mesa_keepout)
+
+
+## Los puentes de esta arena bajo los que se pasa caminando, como los ve la
+## horda (ReliefLanes), o null si no tiene. EnemyBase lo pide al nacer.
+func horde_lanes() -> ReliefLanes:
+	return _lanes
 
 
 ## El punto donde se puede colocar algo más cercano a `xz` (ver can_place):
@@ -508,7 +517,10 @@ func _raise_formations() -> void:
 ## Muestreo por rechazo de `count` posiciones en el cuadrado interior, lejos
 ## del spawn, de los keepouts y de los props ya puestos. El tope de intentos
 ## evita un bucle infinito si la configuración no cabe.
-func _place_many(scene: PackedScene, count: int, min_scale: float, max_scale: float) -> void:
+## Reparte `count` props de `scene` por el interior. Con `dry`, ninguno cae
+## dentro del cañón del relieve por zonas.
+func _place_many(scene: PackedScene, count: int, min_scale: float, max_scale: float,
+		dry: bool = false) -> void:
 	if scene == null:
 		return
 	var half := _interior_half_extent()
@@ -517,7 +529,7 @@ func _place_many(scene: PackedScene, count: int, min_scale: float, max_scale: fl
 	while placed < count and attempts < count * 24:
 		attempts += 1
 		var pos := Vector3(_rng.randf_range(-half, half), 0.0, _rng.randf_range(-half, half))
-		if not _is_clear(pos):
+		if not _is_clear(pos) or (dry and _in_canyon(Vector2(pos.x, pos.z))):
 			continue
 		spawn_prop(scene, pos, _rng.randf_range(min_scale, max_scale))
 		_placed_xz.append(Vector2(pos.x, pos.z))
@@ -544,6 +556,13 @@ func _is_clear(pos: Vector3) -> bool:
 		if other.distance_to(flat) < min_prop_spacing:
 			return false
 	return true
+
+
+## True si `xz` cae dentro del cañón del relieve por zonas, rampas incluidas.
+func _in_canyon(xz: Vector2) -> bool:
+	var terrain := _arena_terrain()
+	return terrain != null and terrain.has_relief() \
+			and terrain.relief_layout().level_at(xz) == -1
 
 
 ## True si `xz` queda a `margin` metros o más de todo corte, rampa y puente
