@@ -6,10 +6,10 @@ extends LobsterMove
 ## clava, el suelo tiembla y la langosta sale de golpe hacia arriba con las
 ## pinzas por delante, vuelve a enterrarse en el acto y sale OTRA VEZ: una
 ## cadena de salidas cada vez más encima. La última es la más grande. Se
-## esquiva cambiando de rumbo cuando el disco se clava (correr derecho no
-## alcanza), derrapando o saltando. Bajo tierra pasa por debajo de los raiders
-## (no choca con ellos) y sigue siendo un blanco: las armas le pegan al
-## montículo.
+## esquiva derrapando o saltando en cuanto el disco se clava, o alejándose
+## del montículo mientras persigue; correr derecho no alcanza, y dar media
+## vuelta al clavarse tampoco. Bajo tierra pasa por debajo de los raiders (no
+## choca con ellos) y sigue siendo un blanco: las armas le pegan al montículo.
 
 enum Step { DIG, TUNNEL, LOCKED, POP, REST }
 
