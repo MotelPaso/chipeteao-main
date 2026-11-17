@@ -197,6 +197,9 @@ extends Resource
 @export var monolith_height_max: float = 9.5
 ## Material del agua que corre por el fondo del cañón. Vacío, el cañón queda seco.
 @export var water_material: Material
+## La cascada: un manantial sobre el macizo que cae por su acantilado, cruza
+## el llano y vuelve a caer al cañón. Apagada, el río queda sin fuente.
+@export var cascade: bool = true
 
 @export_group("Lomas sueltas")
 ## Lomas anchas del llano, además de las que sostienen la montaña y los cerros.

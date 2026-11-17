@@ -72,6 +72,7 @@ hill_color = Color(0.16, 0.26, 0.17, 1)
 far_hill_color = Color(0.13, 0.21, 0.15, 1)
 hill_height_max = 20.0
 peak_count = 22
+giant_count = 8
 
 [node name="Sun" type="DirectionalLight3D" parent="."]
 transform = Transform3D(0.866025, 0.383022, -0.321394, 0, 0.642788, 0.766044, 0.5, -0.663414, 0.55667, 0, 12, 0)

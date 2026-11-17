@@ -8,7 +8,8 @@ extends RefCounted
 ##   - un CÍRCULO de piedras en un claro del macizo;
 ##   - RUINAS en claros del llano;
 ##   - MONOLITOS sueltos, altos, repartidos por todo el mapa;
-##   - el AGUA del cañón, en cada tramo de fondo.
+##   - el CAMINO antiguo, del punto de aparición al puente (ReliefRoad);
+##   - el AGUA: el río del cañón y la cascada que lo alimenta (ReliefWaters).
 ##
 ## Las escenas vienen del ReliefSettings de la arena (grupo «Estructuras»);
 ## una escena vacía apaga esa pieza. Todo cuelga del scatter, así arde con
@@ -55,11 +56,6 @@ const MONOLITH_SPACING: float = 32.0
 const MONOLITH_KEEPOUT: float = 3.5
 ## Intentos por monolito.
 const MONOLITH_TRIES: int = 30
-## El agua: metros que se mete bajo las paredes del cañón, metros sobre el
-## punto más alto del fondo y metros que se acorta en cada punta.
-const WATER_MARGIN: float = 0.6
-const WATER_DEPTH: float = 0.16
-const WATER_TRIM: float = 2.5
 
 
 ## Levanta las estructuras de la etapa como hijas de `scatter`. `taken` son
@@ -84,10 +80,15 @@ static func raise(scatter: Node3D, terrain: Terrain, run_seed: int,
 				_place_gate(scatter, terrain, layout, zone, ramp, run_seed + order * 131)
 			else:
 				_place_menhirs(scatter, terrain, ramp, run_seed + order * 131)
-	_place_sites(scatter, terrain, layout, run_seed, taken, claimed)
+	# El camino va antes que los claros y los monolitos: lo esquivan.
+	var road := ReliefRoad.raise(scatter, terrain, run_seed)
+	claimed.append_array(road)
+	var busy := taken.duplicate()
+	for site: Vector3 in road:
+		busy.append(Vector2(site.x, site.z))
+	_place_sites(scatter, terrain, layout, run_seed, busy, claimed)
 	_place_monoliths(scatter, terrain, layout, run_seed, taken, claimed)
-	if settings.water_material != null and layout.ravine != null:
-		_place_water(scatter, terrain, layout)
+	ReliefWaters.raise(scatter, terrain, layout)
 	return claimed
 
 
@@ -271,73 +272,3 @@ static func _site_free(xz: Vector2, taken: PackedVector2Array, used: PackedVecto
 		if xz.distance_to(other) < SITE_SPACING:
 			return false
 	return true
-
-
-## El agua del cañón: una cinta por tramo de fondo, a nivel, apenas sobre el
-## punto más alto de ese tramo.
-static func _place_water(scatter: Node3D, terrain: Terrain, layout: ReliefLayout) -> void:
-	var ravine := layout.ravine
-	var half := ravine.half_width + WATER_MARGIN
-	var runs: Array[Vector2] = []
-	var run_from := -1.0
-	var along := 0.0
-	while along <= ravine.length + 1.0:
-		var deep := along <= ravine.length \
-				and layout.ravine_drop(along) >= ravine.depth - 0.01
-		if deep and run_from < 0.0:
-			run_from = along
-		elif not deep and run_from >= 0.0:
-			runs.append(Vector2(run_from + WATER_TRIM, along - 1.0 - WATER_TRIM))
-			run_from = -1.0
-		along += 1.0
-	for index in runs.size():
-		var run := runs[index]
-		if run.y - run.x < 4.0:
-			continue
-		var rows: Array[PackedVector3Array] = []
-		var level := -INF
-		var s := run.x
-		while s <= run.y + 0.01:
-			var frame := layout.ravine_frame(s)
-			var side := Vector2(-frame[1].y, frame[1].x)
-			level = maxf(level, terrain.height_at(frame[0].x, frame[0].y))
-			var left := frame[0] + side * half
-			var right := frame[0] - side * half
-			rows.append(PackedVector3Array([Vector3(left.x, 0.0, left.y),
-					Vector3(right.x, 0.0, right.y)]))
-			s += 2.0
-		_add_water(scatter, rows, level + WATER_DEPTH, layout.settings.water_material, index)
-
-
-## Una cinta de agua a la altura `level` entre las filas (izquierda, derecha).
-static func _add_water(scatter: Node3D, rows: Array[PackedVector3Array], level: float,
-		material: Material, index: int) -> void:
-	var vertices := PackedVector3Array()
-	var normals := PackedVector3Array()
-	for row in rows.size() - 1:
-		var a := rows[row][0]
-		var b := rows[row][1]
-		var c := rows[row + 1][1]
-		var d := rows[row + 1][0]
-		for corner: Vector3 in [a, b, c, a, c, d]:
-			vertices.append(Vector3(corner.x, level, corner.z))
-			normals.append(Vector3.UP)
-	# Horario visto desde arriba: si la primera cara mira hacia abajo, se da vuelta.
-	if (vertices[1] - vertices[0]).cross(vertices[2] - vertices[0]).y > 0.0:
-		for start in range(0, vertices.size(), 3):
-			var swap := vertices[start + 1]
-			vertices[start + 1] = vertices[start + 2]
-			vertices[start + 2] = swap
-	var arrays := []
-	arrays.resize(Mesh.ARRAY_MAX)
-	arrays[Mesh.ARRAY_VERTEX] = vertices
-	arrays[Mesh.ARRAY_NORMAL] = normals
-	var mesh := ArrayMesh.new()
-	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
-	var view := MeshInstance3D.new()
-	view.name = "Water%d" % (index + 1)
-	view.mesh = mesh
-	view.material_override = material
-	view.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	view.add_to_group(GROUP)
-	scatter.add_child(view)

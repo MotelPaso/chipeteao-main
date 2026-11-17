@@ -101,6 +101,29 @@ extends Node3D
 ## Lados de la falda de cada pico: pocos = picos más angulosos.
 @export_range(4, 10) var peak_sides: int = 6
 
+@export_group("Árboles colosales")
+## Árboles colosales del horizonte, de más de cien metros (0 = ninguno).
+## Cada arena pone el suyo en su escena.
+@export var giant_count: int = 0
+## Borde interior del anillo donde se paran, en mitades del lado de la arena.
+@export var giant_ring_min_factor: float = 1.4
+## Borde exterior del anillo donde se paran, en mitades del lado de la arena.
+@export var giant_ring_max_factor: float = 2.0
+## Altura mínima de un árbol colosal, en metros.
+@export var giant_height_min: float = 125.0
+## Altura máxima de un árbol colosal, en metros.
+@export var giant_height_max: float = 190.0
+## Radio del tronco en su base, en metros.
+@export var giant_trunk_radius: float = 8.5
+## Radio de la copa, en metros.
+@export var giant_crown_radius: float = 46.0
+## Color de la corteza (la niebla la aclara).
+@export var giant_bark_color: Color = Color(0.3, 0.25, 0.23)
+## Verde más oscuro de la copa.
+@export var giant_leaf_dark_color: Color = Color(0.14, 0.34, 0.24)
+## Verde más claro de la copa.
+@export var giant_leaf_bright_color: Color = Color(0.22, 0.46, 0.3)
+
 ## Mitad del lado de la arena; 80 solo si no hay scatter.
 var _half_extent: float = 80.0
 
@@ -120,6 +143,8 @@ func _ready() -> void:
 			_hill_material(far_hill_color), far_hill_scale_boost)
 	if peak_count > 0:
 		_build_peaks()
+	if giant_count > 0:
+		_build_giants()
 
 
 ## Mitad del lado de la arena desde el nodo "arena_bounds" (el scatter),
@@ -276,6 +301,20 @@ func _build_peaks() -> void:
 	range_view.material_override = material
 	range_view.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(range_view)
+
+
+## Los árboles colosales del horizonte (GiantTrees), con su propio RNG
+## sembrado con la semilla de la partida.
+func _build_giants() -> void:
+	var rng := RandomNumberGenerator.new()
+	var bounds := get_tree().get_first_node_in_group("arena_bounds")
+	rng.seed = (int(bounds.call("run_seed")) if bounds != null and bounds.has_method("run_seed")
+			else 0) ^ 0x4749414E
+	add_child(GiantTrees.build(rng, giant_count,
+			Vector2(giant_ring_min_factor, giant_ring_max_factor) * _half_extent,
+			Vector2(giant_height_min, giant_height_max), giant_trunk_radius,
+			giant_crown_radius, giant_bark_color, giant_leaf_dark_color,
+			giant_leaf_bright_color))
 
 
 ## Un pico: una pirámide de peak_sides lados con la falda irregular y la
