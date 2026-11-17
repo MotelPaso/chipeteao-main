@@ -17,6 +17,8 @@ extends Node3D
 ## con canción o sin ella, y la canción sigue ese reloj (BossSong.follow).
 ## Reloj y canción arrancan juntos unos frames después de congelar el mundo
 ## (warmup_frames), cuando lo que llegó con la langosta ya se dibujó una vez.
+## Si un frame tarda de más y la canción queda adelante, es la entrada la que
+## salta a alcanzarla (catch_up_after): la música no retrocede.
 ## Este nodo es PAUSABLE: el menú de pausa detiene la entrada y la canción.
 ##
 ## SALTAR. Cualquier raider mantiene su acción de saltar (skip_action_name):
@@ -42,6 +44,8 @@ const SPLIT_SCREEN_GROUP := &"split_screen"
 @export var scare_sfx: StringName = &"lobster_scare"
 ## Frames con el mundo ya congelado antes de que arranquen la canción y el reloj de la entrada. Lo que se dibuja por primera vez en ese instante (la marea) cuesta un tirón: con la canción ya sonando, los cortes quedarían atrasados respecto de sus golpes.
 @export var warmup_frames: int = 4
+## Segundos que la canción puede adelantarse al reloj de la entrada antes de que la entrada salte a alcanzarla. Un frame que tarda de más le quita tiempo al reloj del juego y no a la canción: así los cortes siguen con sus golpes y la música no retrocede. 0 = no la alcanza (la canción se reacomoda sola).
+@export var catch_up_after: float = 0.06
 
 @export_group("Saltar")
 ## Acción que cada raider mantiene para saltar la entrada.
@@ -95,6 +99,7 @@ func _process(delta: float) -> void:
 			_music.start(intro_seconds)
 		return
 	_elapsed += delta
+	_catch_up_with_song()
 	var index := _camera.shot_at(_elapsed)
 	if index != _shot_index:
 		_enter_shot(index)
@@ -197,6 +202,20 @@ func is_spent() -> bool:
 
 
 # --- la entrada -------------------------------------------------------------------
+
+## Si la canción quedó adelante del reloj de la entrada (un frame tardó de
+## más: el motor le cuenta al juego solo una parte de ese tiempo, y la canción
+## lo suena entero), la entrada salta hasta donde va la canción. Sin driver de
+## audio real la canción no avanza: ahí manda solo el reloj del juego.
+func _catch_up_with_song() -> void:
+	if catch_up_after <= 0.0 or not _music.playing \
+			or AudioServer.get_driver_name() == "Dummy":
+		return
+	var heard := _music.get_playback_position() + AudioServer.get_time_since_last_mix() \
+			- AudioServer.get_output_latency()
+	if heard - _elapsed > catch_up_after and heard < intro_seconds:
+		_elapsed = heard
+
 
 ## Entra el plano `index`. El primero es EL CORTE: recién ahí se toma la
 ## pantalla y la langosta se deja ver.
