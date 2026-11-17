@@ -163,7 +163,7 @@ func _tick_rear() -> void:
 			-boss.global_transform.basis.z)
 	boss.face_along(toward)
 	# Mientras avisa se le viene encima, hasta quedar a un paso del disco.
-	if boss.global_position.distance_to(_mark) > reach:
+	if boss.global_position.distance_to(_mark) > scaled(reach):
 		boss.walk(toward * advance_factor)
 	if _timer <= 0.0:
 		_launch(toward)
@@ -174,7 +174,7 @@ func _launch(toward: Vector3) -> void:
 	if not _locked:
 		_lock()
 	_from = boss.global_position
-	var travel := clampf(_from.distance_to(_mark) - reach, 0.0, lunge)
+	var travel := clampf(_from.distance_to(_mark) - scaled(reach), 0.0, scaled(lunge))
 	_to = boss.safe_point(_from + toward * travel)
 	_step = Step.LUNGE
 	_timer = lunge_time
@@ -202,7 +202,8 @@ func _aim_point() -> Vector3:
 	if not has_target(_target):
 		return _mark
 	var wanted := LobsterAim.predicted(_target, lead_seconds, max_lead)
-	return boss.floor_point(LobsterAim.within(boss.global_position, wanted, reach + lunge))
+	return boss.floor_point(LobsterAim.within(boss.global_position, wanted,
+			scaled(reach + lunge)))
 
 
 ## Dónde caería el golpe que se está avisando: la marca, o en el remate un
@@ -212,12 +213,12 @@ func _spots_now() -> Array[Vector3]:
 		return [_mark]
 	var toward := LobsterAim.flat_direction(boss.global_position, _mark,
 			-boss.global_transform.basis.z)
-	var side := Vector3(-toward.z, 0.0, toward.x) * slam_spread
+	var side := Vector3(-toward.z, 0.0, toward.x) * scaled(slam_spread)
 	return [boss.floor_point(_mark + side), boss.floor_point(_mark - side)]
 
 
 func _radius_now() -> float:
-	return slam_radius if _finishing else radius
+	return scaled(slam_radius if _finishing else radius)
 
 
 func _lock_window() -> float:
@@ -240,7 +241,7 @@ func _strike() -> void:
 		return
 	boss.feel.shock(LobsterFeel.Shock.HEAVY if not hit.is_empty() else LobsterFeel.Shock.LIGHT,
 			_mark)
-	boss.fx.snap(_mark, radius, LobsterAim.flat_direction(_from, _mark,
+	boss.fx.snap(_mark, scaled(radius), LobsterAim.flat_direction(_from, _mark,
 			-boss.global_transform.basis.z))
 	Sfx.play(snap_sfx)
 	_snaps_left -= 1
@@ -258,7 +259,7 @@ func _strike() -> void:
 ## pinzas clavadas en el suelo (la langosta vuelve a su pose al terminar).
 func _finish_strike() -> void:
 	boss.feel.shock(LobsterFeel.Shock.CRUSHING, _mark)
-	boss.fx.slam(_spots, slam_radius)
+	boss.fx.slam(_spots, scaled(slam_radius))
 	Sfx.play(slam_sfx)
 	_finishing = false
 	_step = Step.REST

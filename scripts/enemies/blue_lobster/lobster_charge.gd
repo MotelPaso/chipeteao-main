@@ -132,7 +132,7 @@ func _aim_pass(seconds: float, step_back: float) -> void:
 	_hit.clear()
 	_measure_run()
 	_drop_lane()
-	_lane = TelegraphLane.spawn(lane_scene, _from, _lane_end(), width, _timer,
+	_lane = TelegraphLane.spawn(lane_scene, _from, _lane_end(), scaled(width), _timer,
 			boss.telegraph_color)
 	# El flanco que queda adelante se alterna de una pasada a la otra.
 	boss.rig.side = -boss.rig.side
@@ -153,7 +153,8 @@ func _aim_point() -> Vector3:
 func _measure_run() -> void:
 	var to_target := _aim_point() - _from
 	to_target.y = 0.0
-	var wanted := clampf(to_target.dot(_direction) + overshoot, overshoot, length)
+	var wanted := clampf(to_target.dot(_direction) + scaled(overshoot), scaled(overshoot),
+			scaled(length))
 	_run = maxf(boss.clear_run(_from, _direction, wanted), 2.0)
 
 
@@ -165,7 +166,7 @@ func _lane_end() -> Vector3:
 func _turn_lane(delta: float) -> void:
 	var wanted := LobsterAim.flat_direction(_from, _aim_point(), _direction)
 	var angle := _direction.signed_angle_to(wanted, Vector3.UP)
-	var step := deg_to_rad(turn_degrees_per_second) * delta
+	var step := deg_to_rad(scaled(turn_degrees_per_second)) * delta
 	_direction = _direction.rotated(Vector3.UP, clampf(angle, -step, step)).normalized()
 	_measure_run()
 	boss.face_along(_direction)
@@ -200,11 +201,11 @@ func _dash() -> void:
 
 func _tick_dash(delta: float) -> void:
 	var before := boss.global_position
-	_travelled = minf(_travelled + run_speed * delta, _run)
+	_travelled = minf(_travelled + scaled(run_speed) * delta, _run)
 	boss.glide_to(_from + _direction * _travelled)
 	var now := boss.global_position
 	boss.fx.charge_trail(before, now)
-	if boss.strike_along(before, now, width * 0.5, height_window, damage, _hit) > 0:
+	if boss.strike_along(before, now, scaled(width) * 0.5, height_window, damage, _hit) > 0:
 		boss.feel.shock(LobsterFeel.Shock.HEAVY, now)
 		boss.fx.charge_hit(now)
 	if _travelled >= _run:

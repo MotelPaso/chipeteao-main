@@ -9,8 +9,10 @@ extends LobsterBody
 ## Su vida no es un número fijo: el nodo Life la calcula con el daño real de
 ## la party (nodo Scaling) para que la pelea dure lo mismo con cualquier
 ## build, y la vida de Health en BlueLobster.tscn es el PISO. Si la pelea se
-## alarga, se desgasta sola (nodo Burnout). Cómo ronda lo lleva el nodo Stalk,
-## la llegada el nodo Arrival, su voz el nodo Voice y su modelo el rig (Visual).
+## alarga, se desgasta sola (nodo Burnout). Sus ataques crecen con la
+## movilidad del raider al que apuntan (nodo Reach). Cómo ronda lo lleva el
+## nodo Stalk, la llegada el nodo Arrival, su voz el nodo Voice y su modelo el
+## rig (Visual).
 ## El nombre de este archivo es su id de bestiario (kills_blue_lobster): no se
 ## renombra.
 ## Contratos por nombre: bar_title / bar_color (BossBar), fight_state y
@@ -61,6 +63,7 @@ var _escape_turn: int = 0
 
 @onready var _life: LobsterLife = $Life
 @onready var _purge: LobsterPurge = $Purge
+@onready var _reach: LobsterReach = $Reach
 @onready var _arrival: LobsterArrival = $Arrival
 @onready var _moveset: LobsterMoveset = $Moves
 @onready var _voice: LobsterVoice = $Voice
@@ -241,8 +244,11 @@ func _start_move(move: LobsterMove, target: Node3D) -> void:
 	clear_stuck()
 	set_pace(1.0)
 	_voice.move_started(move)
-	# Línea de log para los soaks: qué ataque y cuándo.
-	print("%s move: %s at %.1fs" % [boss_title, move.state_name(), RunState.stage_time])
+	# A la medida del raider al que apunta (nodo Reach).
+	move.mobility = _reach.mobility_of(target)
+	# Línea de log para los soaks: qué ataque, cuándo y a qué medida.
+	print("%s move: %s at %.1fs reach=x%.2f" % [boss_title, move.state_name(),
+			RunState.stage_time, move.mobility])
 	move.begin(target)
 
 

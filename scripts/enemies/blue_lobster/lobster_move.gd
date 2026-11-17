@@ -8,6 +8,10 @@ extends Node
 ## esperas y los avisos y suma golpes: cada ataque dice cuánto.
 ## El cuerpo viaja en todos los ataques: lo llevan con boss.walk() (camina) o
 ## con boss.glide_to() (un salto, un túnel, una embestida).
+## Las distancias y velocidades de cada ataque son las de un raider SIN
+## mejoras de velocidad: en cada uso pasan por scaled(), que las lleva a la
+## medida del raider al que apunta (lo mide el nodo Reach de la langosta
+## antes de begin()).
 
 @export_group("Ritmo")
 ## Segundos de espera entre un uso y el siguiente, con agresividad 0.
@@ -25,6 +29,9 @@ extends Node
 
 ## La langosta que lleva este ataque (la pone ella en su _ready).
 var boss: BlueLobster = null
+## A la medida del raider de este uso (la langosta la pone antes de begin()):
+## veces que crecen las distancias y velocidades del ataque.
+var mobility: float = 1.0
 
 var _cooldown_left: float = 0.0
 
@@ -57,6 +64,12 @@ func aggression_lerp(calm: float, fierce: float) -> float:
 ## `base` más la parte de `extra_at_full` que toca a la agresividad actual.
 func aggression_count(base: int, extra_at_full: int) -> int:
 	return base + roundi(float(extra_at_full) * (boss.aggression if boss != null else 0.0))
+
+
+## `value` (una distancia o una velocidad del ataque, pensada para un raider
+## sin mejoras) a la medida del raider de este uso.
+func scaled(value: float) -> float:
+	return value * mobility
 
 
 ## Nombre del ataque para el harness: el del nodo, en minúsculas.

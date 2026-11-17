@@ -190,7 +190,7 @@ func _creep(delta: float) -> void:
 		return
 	var direction := to_mark / distance
 	var before := boss.global_position
-	boss.glide_to(before + direction * minf(tunnel_speed * delta, distance))
+	boss.glide_to(before + direction * minf(scaled(tunnel_speed) * delta, distance))
 	boss.fx.tunnel_trail(before, boss.global_position)
 	boss.face_along(direction)
 
@@ -249,7 +249,7 @@ func _is_last() -> bool:
 
 
 func _radius_now() -> float:
-	return final_radius if _is_last() else radius
+	return scaled(final_radius if _is_last() else radius)
 
 
 func _dig_time() -> float:

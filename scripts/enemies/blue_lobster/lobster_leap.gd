@@ -101,7 +101,7 @@ func begin(target: Node3D) -> void:
 	_from = boss.global_position
 	_mark = _from
 	_mark = _aim_point()
-	_disc = Telegraph.spawn_moving_disc(_mark, radius, _timer, boss.telegraph_color)
+	_disc = Telegraph.spawn_moving_disc(_mark, scaled(radius), _timer, boss.telegraph_color)
 	boss.rig.set_pose(LobsterRig.Pose.CROUCH)
 	boss.rig.set_anger(0.5)
 
@@ -154,14 +154,14 @@ func _aim_point() -> Vector3:
 		return _mark
 	var wanted := LobsterAim.short_of(_from,
 			LobsterAim.predicted(_target, lead_seconds, max_lead), stand_off)
-	return boss.safe_point(LobsterAim.within(_from, wanted, max_distance))
+	return boss.safe_point(LobsterAim.within(_from, wanted, scaled(max_distance)))
 
 
 ## El disco se clava: ya no persigue, y un segundo aviso marca dónde cae.
 func _lock() -> void:
 	_locked = true
 	_disc = null
-	Telegraph.spawn_disc(boss, _mark, radius, maxf(_timer, 0.05), boss.impact_color)
+	Telegraph.spawn_disc(boss, _mark, scaled(radius), maxf(_timer, 0.05), boss.impact_color)
 	Sfx.play(lock_sfx)
 	boss.rig.set_anger(1.0)
 
@@ -180,8 +180,8 @@ func _fly() -> void:
 func _impact() -> void:
 	boss.glide_to(_mark)
 	boss.rig.lift = 0.0
-	_send_ring(boss.strike_ground([_mark], radius, height_window, damage))
-	boss.fx.landing(_mark, radius)
+	_send_ring(boss.strike_ground([_mark], scaled(radius), height_window, damage))
+	boss.fx.landing(_mark, scaled(radius))
 	boss.feel.shock(LobsterFeel.Shock.CRUSHING, _mark)
 	Sfx.play(impact_sfx)
 	boss.rig.set_anger(0.0)
@@ -202,8 +202,8 @@ func _impact() -> void:
 func _send_ring(spared: Array[Node3D] = []) -> void:
 	if ring_scene == null:
 		return
-	var ring := ShockRing.spawn(ring_scene, _mark, ring_start_radius, ring_radius, ring_speed,
-			ring_damage, ring_height_window, ring_band, boss)
+	var ring := ShockRing.spawn(ring_scene, _mark, ring_start_radius, scaled(ring_radius),
+			scaled(ring_speed), ring_damage, ring_height_window, scaled(ring_band), boss)
 	if ring != null:
 		ring.spare(spared)
 
@@ -226,6 +226,6 @@ func _tick_aftershocks(delta: float) -> void:
 	_ring_cued = false
 	_send_ring()
 	boss.rig.set_anger(0.0)
-	boss.fx.aftershock(_mark, radius)
+	boss.fx.aftershock(_mark, scaled(radius))
 	boss.feel.shock(LobsterFeel.Shock.HEAVY, _mark)
 	Sfx.play(impact_sfx)

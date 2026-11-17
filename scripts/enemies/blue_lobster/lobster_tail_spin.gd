@@ -105,7 +105,7 @@ func _coil(seconds: float) -> void:
 	boss.rig.side = -boss.rig.side
 	boss.rig.set_pose(LobsterRig.Pose.COIL)
 	boss.rig.set_anger(0.7)
-	_disc = Telegraph.spawn_moving_disc(boss.core_point(), radius, seconds,
+	_disc = Telegraph.spawn_moving_disc(boss.core_point(), scaled(radius), seconds,
 			boss.telegraph_color)
 
 
@@ -125,11 +125,11 @@ func _tick_coil() -> void:
 		_timer = spin_seconds
 		_struck = false
 		boss.rig.set_pose(LobsterRig.Pose.SWEEP)
-		boss.fx.sweep(boss.core_point(), radius, boss.rig.side > 0.0, spin_seconds)
+		boss.fx.sweep(boss.core_point(), scaled(radius), boss.rig.side > 0.0, spin_seconds)
 		Sfx.play(spin_sfx)
 		if sweep_scene != null:
-			ShockRing.spawn(sweep_scene, boss.core_point(), 1.0, radius,
-					radius / maxf(spin_seconds * hit_fraction, 0.05), 0.0, 0.0, 0.0, boss)
+			ShockRing.spawn(sweep_scene, boss.core_point(), 1.0, scaled(radius),
+					scaled(radius) / maxf(spin_seconds * hit_fraction, 0.05), 0.0, 0.0, 0.0, boss)
 
 
 func _tick_spin() -> void:
@@ -138,13 +138,13 @@ func _tick_spin() -> void:
 	if not _struck and t >= hit_fraction:
 		_struck = true
 		var at := boss.core_point()
-		var hit := boss.strike_ground([at], radius, height_window, damage)
-		boss.fx.sweep_hit(at, radius)
+		var hit := boss.strike_ground([at], scaled(radius), height_window, damage)
+		boss.fx.sweep_hit(at, scaled(radius))
 		# La ola nace justo por fuera del barrido: a quien ya golpeó la cola no
 		# lo vuelve a tocar.
 		if wave_scene != null:
-			ShockRing.spawn(wave_scene, at, radius + wave_band * 0.5, wave_radius, wave_speed,
-					wave_damage, wave_height_window, wave_band, boss)
+			ShockRing.spawn(wave_scene, at, scaled(radius + wave_band * 0.5), scaled(wave_radius),
+					scaled(wave_speed), wave_damage, wave_height_window, scaled(wave_band), boss)
 		boss.feel.shock(
 				LobsterFeel.Shock.HEAVY if not hit.is_empty() else LobsterFeel.Shock.LIGHT, at)
 	if _timer > 0.0:

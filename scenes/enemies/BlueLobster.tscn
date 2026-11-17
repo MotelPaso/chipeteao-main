@@ -25,6 +25,7 @@
 [ext_resource type="Script" path="res://scripts/enemies/blue_lobster/lobster_burrow.gd" id="23_lobster_burrow"]
 [ext_resource type="Script" path="res://scripts/enemies/blue_lobster/lobster_purge.gd" id="24_lobster_purge"]
 [ext_resource type="Script" path="res://scripts/enemies/blue_lobster/lobster_fx.gd" id="25_lobster_fx"]
+[ext_resource type="Script" path="res://scripts/enemies/blue_lobster/lobster_reach.gd" id="26_lobster_reach"]
 
 [sub_resource type="CapsuleShape3D" id="CapsuleShape3D_body"]
 radius = 1.1
@@ -1041,6 +1042,9 @@ script = ExtResource("14_lobster_arrival")
 
 [node name="Purge" type="Node" parent="." unique_id=1620457731]
 script = ExtResource("24_lobster_purge")
+
+[node name="Reach" type="Node" parent="." unique_id=1438807219]
+script = ExtResource("26_lobster_reach")
 
 [node name="Voice" type="Node" parent="." unique_id=1286840023]
 script = ExtResource("15_lobster_voice")
