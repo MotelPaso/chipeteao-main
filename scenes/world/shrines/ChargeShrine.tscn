@@ -1,7 +1,7 @@
-[gd_scene load_steps=13 format=3 uid="uid://cshrn1chrg4ka"]
+[gd_scene load_steps=11 format=3 uid="uid://cshrn1chrg4ka"]
 
 [ext_resource type="Script" path="res://scripts/world/interactables/charge_shrine.gd" id="1_charge"]
-[ext_resource type="Material" uid="uid://crockm6hw5fy4" path="res://assets/materials/rock.tres" id="2_rock"]
+[ext_resource type="Script" path="res://scripts/world/interactables/looks/charge_shrine_look.gd" id="look_1"]
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_crystal"]
 albedo_color = Color(0.45, 0.85, 1, 1)
@@ -26,18 +26,6 @@ albedo_color = Color(0.4, 0.8, 1, 0.26)
 emission_enabled = true
 emission = Color(0.4, 0.8, 1, 1)
 emission_energy_multiplier = 1.1
-
-[sub_resource type="CylinderMesh" id="CylinderMesh_pillar"]
-material = ExtResource("2_rock")
-top_radius = 0.5
-bottom_radius = 0.72
-height = 2.2
-radial_segments = 16
-rings = 1
-
-[sub_resource type="BoxMesh" id="BoxMesh_capital"]
-material = ExtResource("2_rock")
-size = Vector3(1.25, 0.28, 1.25)
 
 [sub_resource type="SphereMesh" id="SphereMesh_crystal"]
 material = SubResource("StandardMaterial3D_crystal")
@@ -66,8 +54,8 @@ radius = 9.3
 height = 3.0
 
 [sub_resource type="CylinderShape3D" id="CylinderShape3D_body"]
-radius = 0.74
-height = 2.3
+radius = 1.5
+height = 3.0
 
 [node name="ChargeShrine" type="Area3D"]
 collision_layer = 0
@@ -88,14 +76,6 @@ shape = SubResource("CylinderShape3D_zone")
 
 [node name="Visual" type="Node3D" parent="."]
 
-[node name="Pillar" type="MeshInstance3D" parent="Visual"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.1, 0)
-mesh = SubResource("CylinderMesh_pillar")
-
-[node name="Capital" type="MeshInstance3D" parent="Visual"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.34, 0)
-mesh = SubResource("BoxMesh_capital")
-
 [node name="Crystal" type="MeshInstance3D" parent="Visual"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 3.25, 0)
 mesh = SubResource("SphereMesh_crystal")
@@ -111,8 +91,11 @@ transform = Transform3D(0.001, 0, 0, 0, 1, 0, 0, 0, 0.001, 0, 0.06, 0)
 editor_description = "El color, la opacidad y la energía de emisión los pinta charge_shrine.gd al iniciar (accent_color, disc_alpha, ring_energy_*); cambiarlos aquí no tiene efecto."
 mesh = SubResource("CylinderMesh_progress")
 
+[node name="Look" type="Node3D" parent="Visual"]
+script = ExtResource("look_1")
+
 [node name="Body" type="StaticBody3D" parent="."]
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="Body"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.15, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.5, 0)
 shape = SubResource("CylinderShape3D_body")
