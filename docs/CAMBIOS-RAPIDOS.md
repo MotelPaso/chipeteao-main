@@ -251,42 +251,49 @@ otra cosa.
 
 La Langosta Azul llega en el minuto 5 del Bosque Hueco, **sin aviso**: la
 pantalla corta de golpe a un primer plano de su cara (la entrada), y cuando su
-canción entra de lleno empieza la pelea, en medio de la horda. Mientras viva,
-el Rey Pútrido espera. Su vida **no es un número fijo**: se calcula para que la
+canción entra de lleno empieza la pelea. **Pelea sola**: desde que llega no
+aparece ningún enemigo más y al empezar la pelea se lleva a la horda que
+quedaba; mientras vive, el mapa queda azul, como bajo el mar (la marea), y el
+Rey Pútrido espera. Su vida **no es un número fijo**: se calcula para que la
 pelea dure lo mismo con una party débil o fuerte (nodo `Scaling`), y se
 recalcula dos veces durante la pelea con el daño que le hicieron de verdad, sin
-que la barra se mueva. Tiene una sola fase y cinco ataques, todos avisados.
+que la barra se mueva. Tiene una sola fase y cinco ataques, todos avisados y
+todos en cadena: sus avisos se adelantan a quien corre, así que se esquivan
+reaccionando cuando el aviso se clava (salto, derrape o cambio de rumbo).
 El cuerpo físico (lo que choca y a lo que le apuntan las armas) va en su
 **cabeza**, no en la mitad del lomo.
 
 | Qué quieres cambiar | Dónde | Qué propiedad |
 | --- | --- | --- |
 | En qué minuto llega, o sacarla de la arena | `scenes/world/HollowWoods.tscn` > EnemySpawner (grupo «Jefes») | `mini_boss_spawn_minute`, `mini_boss_scene` (vacío = sin minijefe); el Rey Pútrido llega en `boss_spawn_minute` |
+| Que pelee sola o en medio de la horda | `scenes/world/HollowWoods.tscn` > EnemySpawner (grupo «Jefes») | `mini_boss_fights_alone` (apagado = la horda sigue llegando y nadie la barre); el respiro tras su muerte es `boss_relief_duration` |
+| El barrido de la horda al empezar la pelea: salpicones, anillo y sonido | `scripts/enemies/blue_lobster/lobster_purge.gd` | `max_bursts`, `burst_color`, `burst_amount`, `ring_radius`, `ring_speed`, `wave_sfx` |
 | Su nombre, colores de sus avisos y de su barra | `scenes/enemies/BlueLobster.tscn` > raíz («Jefe», «Telegrafía») y `scripts/enemies/blue_lobster.gd` («Aspecto») | `boss_title`, `telegraph_color`, `impact_color`; `bar_fill_color`, `burst_color` |
 | Su nombre en la Colección | `scripts/ui/meta/collection.gd` > tabla `BESTIARY`, fila `blue_lobster` | `display_name` (igual a `boss_title`), `flavor` |
 | Cuánto dura la pelea y en cuántos tramos se recalcula la vida | `BlueLobster.tscn` > nodo `Scaling` | `target_fight_seconds`, `min_fight_seconds`, `life_shares` (partes de la barra; con una sola nunca se recalcula), `focus_on_boss`, `advantage_absorbed` |
 | Su vida mínima (el PISO del cálculo) | `BlueLobster.tscn` > nodo `Health` | `max_hp` |
 | Cuándo empieza a desgastarse sola si la pelea se alarga, y su aviso | `BlueLobster.tscn` > nodos `Scaling` y `Burnout` | `burnout_after`, `burnout_seconds`; `announce_text` |
 | Daño extra y agresividad por poder de la party y por jugador | `BlueLobster.tscn` > nodo `Scaling` («Agresividad», «Daño») | `aggression_per_extra_player`, `aggression_per_power`, `damage_per_power`, `damage_power_cap` |
-| Cada cuánto ataca | `scripts/enemies/blue_lobster.gd` (grupo «Ritmo de la pelea») | `first_attack_delay`, `attack_pause`, `attack_pause_at_full_aggression` |
+| Cada cuánto ataca (el respiro entre un ataque y otro) | `scripts/enemies/blue_lobster.gd` (grupo «Ritmo de la pelea») | `first_attack_delay`, `attack_pause`, `attack_pause_at_full_aggression` |
 | Espera de cada ataque, a qué distancia lo usa y su sonido de aviso | `BlueLobster.tscn` > `Moves` > cada ataque (grupo «Ritmo») | `cooldown`, `cooldown_at_full_aggression`, `first_use_fraction`, `min_range`, `max_range`, `call_sfx` |
-| Tenazas: daño, avisos, alcance y cuántos pinzazos | `scripts/enemies/blue_lobster/lobster_pincers.gd` | `damage`, `windup`, `lock_seconds`, `radius`, `reach`, `lunge`, `snaps`, `extra_snaps_at_full_aggression`, `gap`, `recover` |
-| Embestida: daño, aviso, carril y velocidad | `scripts/enemies/blue_lobster/lobster_charge.gd` | `damage`, `windup`, `lock_seconds`, `length`, `width`, `overshoot`, `backstep`, `run_speed`, `turn_degrees_per_second`, `recover` |
-| Salto aplastante: daño, tiempo en el aire, disco y su onda de choque | `scripts/enemies/blue_lobster/lobster_leap.gd` («Salto», «Onda de choque») | `damage`, `crouch_seconds`, `air_seconds`, `lock_seconds`, `leap_height`, `radius`, `stand_off`, `recover`; `ring_damage`, `ring_radius`, `ring_speed`, `ring_height_window` |
-| Coletazo: daño, aviso, radio y cuántos giros | `scripts/enemies/blue_lobster/lobster_tail_spin.gd` | `damage`, `windup`, `respin_windup`, `radius`, `spin_seconds`, `height_window` (más bajo = más fácil de saltar), `spins`, `recover` |
-| Emboscada: daño, velocidad bajo tierra, aviso y cuántas salidas | `scripts/enemies/blue_lobster/lobster_burrow.gd` | `damage`, `dig_seconds`, `tunnel_speed`, `max_tunnel_seconds`, `lock_seconds`, `radius`, `stand_off`, `eruptions`, `recover` |
-| Cuánto se adelanta cada ataque a un raider que corre | el script de cada ataque | `lead_seconds`, `max_lead` (0 = apunta a donde está) |
+| Tenazas: daño, avisos, alcance, cuántos pinzazos y el remate de las dos pinzas | `scripts/enemies/blue_lobster/lobster_pincers.gd` («Tenazas», «Remate») | `damage`, `windup`, `windup_jitter` (ritmo irregular), `lock_seconds`, `radius`, `reach`, `lunge`, `snaps`, `gap`, `height_window`, `recover`; `slam` (apagado = sin remate), `slam_damage`, `slam_windup`, `slam_lock_seconds`, `slam_radius`, `slam_spread` |
+| Embestida: daño, aviso, carril, velocidad y cuántas pasadas | `scripts/enemies/blue_lobster/lobster_charge.gd` | `damage`, `passes`, `windup`, `repass_windup`, `lock_seconds`, `length`, `width`, `overshoot`, `backstep`, `run_speed`, `turn_degrees_per_second`, `skid_seconds`, `recover` |
+| Salto aplastante: daño, tiempo en el aire, disco, sus ondas de choque y la réplica | `scripts/enemies/blue_lobster/lobster_leap.gd` («Salto», «Onda de choque») | `damage`, `crouch_seconds`, `air_seconds`, `lock_seconds`, `leap_height`, `radius`, `stand_off`, `recover`; `rings` (1 = sin réplica), `ring_gap_seconds`, `ring_damage`, `ring_radius`, `ring_speed`, `ring_height_window`, `aftershock_cue_seconds` |
+| Coletazo: daño, aviso, radio, cuántos giros y la ola que sale de cada uno | `scripts/enemies/blue_lobster/lobster_tail_spin.gd` («Coletazo», «Ola del coletazo») | `damage`, `windup`, `respin_windup`, `radius`, `spin_seconds`, `height_window` (más bajo = más fácil de saltar), `spins`, `recover`; `wave_damage`, `wave_radius`, `wave_speed`, `wave_scene` (vacío = sin ola) |
+| Emboscada: daño, velocidad bajo tierra, aviso, cuántas salidas y la última, más grande | `scripts/enemies/blue_lobster/lobster_burrow.gd` («Emboscada», «Última salida») | `damage`, `dig_seconds`, `redig_seconds`, `tunnel_speed`, `max_tunnel_seconds`, `lock_seconds`, `radius`, `stand_off`, `eruptions`, `recover`; `final_damage`, `final_radius`, `final_lock_seconds`, `final_pop_height` |
+| Que sus ataques sean más fáciles o más difíciles de esquivar | el script de cada ataque | `lock_seconds` (la ventana para salir desde que el aviso se clava: más = más fácil; por debajo de unos 0.3 s ya no se puede reaccionar), `lead_seconds` y `max_lead` (cuánto se adelanta a quien corre; 0 = apunta a donde está), `radius` / `width`, `height_window` |
 | A qué distancia ronda, cuándo corre a alcanzarte y cada cuánto cambia de raider en co-op | `scripts/enemies/blue_lobster/lobster_stalk.gd` («Ronda», «Persecución», «Objetivo») | `orbit_distance`, `orbit_band`, `orbit_speed_factor`; `chase_distance`, `chase_speed_factor`; `focus_seconds` |
 | Su velocidad al caminar y al girar | `BlueLobster.tscn` > raíz («Movimiento») | `move_speed`, `turn_speed` |
 | Qué hace cuando queda trabada contra una roca | `scripts/enemies/blue_lobster.gd` (grupo «Atasco») | `stuck_seconds`, `escape_moves` |
-| Temblor, pausa de impacto y viñeta de peligro de sus golpes | `scripts/enemies/blue_lobster/lobster_feel.gd` y el material de `BlueLobster.tscn` > `Feel/Vignette` | `light_shake`, `heavy_shake`, `heavy_stop_seconds`, `dread_opacity`; `tint`, `ripples` |
+| Temblor, pausa de impacto y viñeta de peligro de sus golpes | `scripts/enemies/blue_lobster/lobster_feel.gd` y el material de `BlueLobster.tscn` > `Feel/Vignette` | `light_shake`, `heavy_shake`, `heavy_stop_seconds`, `crushing_shake`, `crushing_stop_seconds` (el golpe más grande: caída del Salto, remate, última salida), `dread_opacity`; `tint`, `ripples` |
 | Sus sonidos (rugido, tableteo, siseo, muerte) | `scripts/enemies/blue_lobster/lobster_voice.gd`; las recetas en `scripts/tools/generate_sfx.gd` (`_gen_lobster_*`) | `roar_sfx`, `call_sfx`, `hurt_sfx`, `death_sfx`, `call_min_seconds`, `hurt_fraction` |
 | Su tamaño y cuánto va corrido el modelo detrás del cuerpo físico | `scripts/enemies/blue_lobster/lobster_rig.gd` (grupo «Tamaño») | `body_scale`, `body_setback` |
 | Sus poses (ronda, cada ataque, muerte) | `scripts/enemies/blue_lobster/lobster_poses.gd`, tabla `TABLE` | una fila por pose: `height`, `pitch`, `arms`, `tail_curl`, `fan`… (la cabecera explica cada campo) |
 | Gestos, cómo camina, respira y mueve ojos y antenas | `lobster_gestures.gd`, `lobster_gait.gd`, `lobster_motion.gd`, `lobster_head.gd` (en `scripts/enemies/blue_lobster/`) | los exports de cada uno, con su unidad en el tooltip |
-| Colores y brillo del caparazón, y a qué distancia se deshace frente a la cámara | `BlueLobster.tscn` > material del caparazón (Shader Parameters) | `deep_color`, `bright_color`, `pale_color`, `glow`, `rim_strength`, `anger_glow`, `fade_near`, `fade_far` |
+| Colores y brillo del caparazón, y a qué distancia se deshace frente a la cámara | `BlueLobster.tscn` > material del caparazón (Shader Parameters) | `deep_color`, `bright_color`, `pale_color`, `glow`, `rim_strength`, `fade_near`, `fade_far` |
+| El color con que se enciende mientras carga un ataque | el mismo material (grupo «Furia») | `anger_color` (cálido, para que se despegue del azul de la marea), `anger_glow` |
 | Cómo muere | `scripts/enemies/blue_lobster.gd` (grupo «Muerte») | `death_seconds`, `death_fade_seconds` |
-| Aspecto de la onda de choque, del carril de la Embestida y del salpicón | `scenes/fx/ShockRing.tscn`, `TelegraphLane.tscn`, `SplashBurst.tscn` y sus scripts en `scripts/fx/` | `crest_height`, `segments`; `segment_length`, `empty_alpha`, `full_alpha`; los valores de las partículas |
+| Aspecto de la onda de choque, del carril de la Embestida y del salpicón | `scenes/fx/ShockRing.tscn`, `TelegraphLane.tscn`, `SplashBurst.tscn` y sus scripts en `scripts/fx/` | `crest_height`, `segments`, `danger_color` (el color de la onda que daña; Shader Parameters del nodo `Crest`); `segment_length`, `empty_alpha`, `full_alpha`; los valores de las partículas |
 | **La canción** | `scenes/enemies/blue_lobster/LobsterEntrance.tscn` > nodo `Music` | `song` (vacío = entrada y pelea sin música), `song_volume_db`, `fade_seconds` |
 | Cuánto dura la entrada (lo que dura la introducción de la canción) | `scripts/enemies/blue_lobster/lobster_entrance.gd` (grupo «Entrada») | `intro_seconds` |
 | Los planos de la entrada: cuándo entra cada uno, desde dónde filma y qué hace la langosta | `LobsterEntrance.tscn` > `Camera` > `Shot1`…`Shot8` | `at_seconds` (un golpe de la canción), `focus`, `distance`, `around_degrees`, `height`, `fov`, `push_in`, `isolated`, `hit_shake`, `pose`, `gesture`, `sfx` |
@@ -296,6 +303,12 @@ El cuerpo físico (lo que choca y a lo que le apuntan las armas) va en su
 | El fondo oscuro y la luz de los primeros planos | `LobsterEntrance.tscn` > `Camera/Backdrop` (Shader Parameters) y `Camera/Light` | `core_color`, `edge_color`, `ray_strength`; `light_color`, `light_energy` |
 | El sonido del susto cuando no hay canción | `lobster_entrance.gd` (grupo «Entrada») | `scare_sfx` |
 | Quitar la entrada (llega como un jefe común) | `scripts/enemies/blue_lobster/lobster_arrival.gd` | `entrance_scene` (vacío = llegada simple: `plain_seconds`, `plain_ring_radius`, `plain_roar_sfx`) |
+| Qué tan lejos de la línea de vista se oculta la decoración que la taparía en la entrada | `scripts/enemies/blue_lobster/lobster_entrance_camera.gd` (grupo «Vista libre») | `sight_clearance`, `hide_radius_limit` |
+| **La marea**: quitarla, o cuánto tarda en subir y en bajar | `lobster_arrival.gd` («Marea») y `scripts/enemies/blue_lobster/lobster_tide.gd` («Ritmo») | `tide_scene` (vacío = el mapa no cambia); `rise_seconds`, `ebb_seconds` |
+| El tono azul del mapa durante la pelea | `lobster_tide.gd` (grupo «Cielo de la marea») | `sky_top`, `sky_horizon`, `sun_color`, `sun_energy`, `ambient_color`, `ambient_energy`, `fog_color`, `fog_density`, `backdrop_ground`, `backdrop_hills` |
+| Los corales que brotan: cuántos, dónde y de qué tamaño | `lobster_tide.gd` (grupo «Corales») | `coral_sites`, `coral_reach`, `coral_clearance`, `raider_clearance`, `branches_min`/`branches_max`, `branch_height_min`/`branch_height_max`, `bulb_radius_min`/`bulb_radius_max` |
+| Color y brillo de los corales, a qué distancia de la cámara se deshacen, y los reflejos de agua del suelo | `scenes/enemies/blue_lobster/LobsterTide.tscn` > materiales de `Branches` y de `Caustics` (Shader Parameters) | corales: `deep_color`, `bright_color`, `tip_color`, `glow`, `pulse`, `rim_strength`, `sway`, `fade_near`, `fade_far`; reflejos: `tint`, `strength`, `scale`, `speed`, `sharpness`, `fade_far` |
+| Las burbujas alrededor de cada raider | `LobsterTide.tscn` > nodo `Bubbles`; `lobster_tide.gd` («Burbujas») | `amount`, `lifetime`, el tamaño de la caja de emisión; `bubble_height` |
 
 ## Aparición de enemigos
 
