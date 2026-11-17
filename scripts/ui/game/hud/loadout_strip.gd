@@ -1,10 +1,19 @@
 class_name LoadoutStrip
-extends HBoxContainer
-## Franja de equipo del jugador 1, abajo en la pantalla. HUD.tscn tiene dos:
-## BuildStrip (abajo a la izquierda: armas con su nivel, tomos con sus pilas
-## y la mascota) y BagStrip (abajo a la derecha: objetos con sus copias). Se
-## consulta cada `refresh_seconds` y se reconstruye solo cuando cambia su firma.
+extends Container
+## Franja de equipo del jugador 1. HUD.tscn tiene dos, apiladas en LoadoutDock
+## (abajo a la izquierda, crece hacia arriba y nunca llega a la barra de vida):
+##   - BuildStrip, la fila de abajo: armas con su nivel, tomos con sus pilas y
+##     la mascota, con una línea de tinta entre grupo y grupo;
+##   - BagStrip, encima: los objetos con sus copias en casillas chicas, en una
+##     cuadrícula (sus columnas son `columns` del nodo). Si no caben en
+##     `max_tiles`, la última casilla pasa a ser "+N".
+## Se consulta cada `refresh_seconds` y solo toca las casillas cuando cambia
+## su firma: si son las mismas, las actualiza en su lugar; si no, las rehace.
+## La casilla nueva o que subió recibe un golpe de escala.
 ## El HUD le pasa el jugador con set_player al unir el grupo.
+##
+## El script extiende Container para servir a los dos nodos: BuildStrip es un
+## HBoxContainer y BagStrip un GridContainer.
 
 ## Qué muestra una franja.
 enum Contents {
@@ -24,8 +33,17 @@ const TOME_NAME_PREFIXES: Array[String] = ["Tome of ", "Tomo del ", "Tomo de "]
 @export var contents: Contents = Contents.BUILD
 ## Segundos entre consultas del equipo del jugador.
 @export var refresh_seconds: float = 0.5
-## Espacio en blanco entre los grupos de casillas (armas, tomos, mascota), en píxeles.
-@export var group_gap: float = 8.0
+## Casillas chicas (LoadoutTile > grupo «Casilla chica»): las de la bolsa.
+@export var compact_tiles: bool = false
+## Tope de casillas de la franja (columnas x filas en la bolsa); 0 = sin tope.
+## Pasado el tope, la última casilla es "+N" con lo que no cupo.
+@export var max_tiles: int = 0
+@export_group("Separador de grupos")
+## Tamaño de la línea entre los grupos de casillas (armas, tomos, mascota), en
+## píxeles (ancho, alto).
+@export var divider_size: Vector2 = Vector2(3.0, 30.0)
+## Color de esa línea.
+@export var divider_color: Color = UiTheme.INK
 @export_group("Colores")
 ## Borde de las casillas de arma.
 @export var weapon_color: Color = UiTheme.ACCENT_MINT
@@ -40,9 +58,28 @@ const TOME_NAME_PREFIXES: Array[String] = ["Tome of ", "Tomo del ", "Tomo de "]
 @export var copies_format: String = "x%d"
 ## Tooltip de la mascota: su nombre y la estadística que da.
 @export var pet_tip_format: String = "%s — %s"
+## Casilla "+N": cuántos objetos no cupieron en la franja.
+@export var overflow_format: String = "+%d"
+## Tooltip de la casilla "+N".
+@export var overflow_tip_format: String = "%d objetos más"
+@export_group("Casilla +N")
+## Color de la casilla "+N".
+@export var overflow_color: Color = UiTheme.PAPER
+@export_group("Animación")
+## Escala máxima del golpe de una casilla nueva o que subió de nivel.
+@export var gain_pop_scale: float = 1.2
+## Duración de ese golpe, en segundos.
+@export var gain_pop_time: float = 0.2
 
 var _player: Node = null
 var _signature: String = ""
+## Casillas en pantalla por clave ("biblioteca/id"), y lo que mostraba cada
+## una ("esquina|tooltip") para saber cuál subió.
+var _tiles: Dictionary[String, LoadoutTile] = {}
+var _shown: Dictionary[String, String] = {}
+## Falso hasta la primera consulta: el equipo con que empieza la partida no
+## es una ganancia y no recibe golpe.
+var _primed: bool = false
 var _refresh_left: float = 0.0
 
 
@@ -68,10 +105,10 @@ func refresh() -> void:
 	var signature := ""
 	for entry: Dictionary in entries:
 		signature += "%s|%s|%s;" % [entry.tip, entry.corner, entry.icon]
-	if signature == _signature:
-		return
-	_signature = signature
-	show_entries(entries)
+	if signature != _signature:
+		_signature = signature
+		show_entries(entries)
+	_primed = true
 
 
 ## Armas (nivel, o rango con ★ desde el primer hito), tomos (pilas) y
@@ -113,7 +150,7 @@ func gather_build() -> Array[Dictionary]:
 				"entry_id": tome_id,
 				"color": tome_color,
 				"corner": Tome.stack_label(stats.stack_count(tome_id)),
-				"tip": title, "icon": String(tome.get("icon", "")),
+				"tip": title, "icon": String(tome.get("icon", "")), "row": tome,
 			})
 	# La mascota cierra la franja de armas y tomos: es un arma fuera del tope
 	# de cinco más una estadística, así que va junto a ellos y no entre los objetos.
@@ -150,32 +187,102 @@ func gather_bag() -> Array[Dictionary]:
 			"color": ItemCatalog.rarity_color(String(row.get("rarity", "Common"))),
 			"corner": copies_format % copies if copies > 1 else "",
 			"tip": String(row.get("display_name", item_id)), "icon": String(row.get("icon", "")),
+			"row": row,
 		})
 	return items
 
 
-## Reemplaza las casillas de la franja por `entries`, con un espacio en blanco
-## cada vez que cambia la biblioteca (armas, tomos, mascota).
+## Muestra `entries` en la franja. Si son las mismas casillas en el mismo
+## orden las actualiza en su lugar; si no, las rehace con una línea cada vez
+## que cambia la biblioteca (armas, tomos, mascota). Con más entradas que
+## `max_tiles`, la última casilla es "+N". La casilla nueva o cuya esquina
+## cambió recibe un golpe de escala (salvo en la primera consulta).
 func show_entries(entries: Array[Dictionary]) -> void:
+	var fitted := _fit(entries)
+	var keys: Array[String] = []
+	for entry: Dictionary in fitted:
+		keys.append(_key(entry))
+	if keys != _tiles.keys():
+		_rebuild(fitted, keys)
+		return
+	for i in fitted.size():
+		var shown := _shown_text(fitted[i])
+		if shown == _shown[keys[i]]:
+			continue
+		_shown[keys[i]] = shown
+		_tiles[keys[i]].show_entry(fitted[i])
+		_pop(_tiles[keys[i]])
+
+
+## `entries` recortado a `max_tiles`: las que caben y, al final, la casilla
+## "+N" con las que no.
+func _fit(entries: Array[Dictionary]) -> Array[Dictionary]:
+	if max_tiles <= 0 or entries.size() <= max_tiles:
+		return entries
+	var fitted := entries.slice(0, max_tiles - 1)
+	var hidden := entries.size() - fitted.size()
+	fitted.append({
+		# Misma biblioteca que lo que resume, así no abre un grupo aparte.
+		"glyph": overflow_format % hidden, "entry_id": "overflow",
+		"library": String(entries[-1].get("library", "")),
+		"color": overflow_color, "corner": "", "icon": "",
+		"tip": overflow_tip_format % hidden,
+	})
+	return fitted
+
+
+func _rebuild(entries: Array[Dictionary], keys: Array[String]) -> void:
+	var old_keys := _tiles.keys()
 	for child: Node in get_children():
 		# Primero fuera del contenedor: queue_free() recién actúa al final del
 		# cuadro, y las casillas viejas se acomodarían junto a las nuevas por un
 		# cuadro, haciendo saltar la franja cada vez que cambia el equipo.
 		remove_child(child)
 		child.queue_free()
+	_tiles.clear()
+	_shown.clear()
 	var last_library := ""
-	for entry: Dictionary in entries:
-		# El espacio se decide por la biblioteca que declara cada entrada y no
+	for i in entries.size():
+		var entry := entries[i]
+		# La línea se decide por la biblioteca que declara cada entrada y no
 		# por su color (un arma evolucionada es ámbar).
 		var library := String(entry.get("library", ""))
 		if not last_library.is_empty() and library != last_library:
-			var spacer := Control.new()
-			spacer.custom_minimum_size = Vector2(group_gap, 0.0)
-			add_child(spacer)
+			add_child(_divider())
 		last_library = library
 		var tile: LoadoutTile = TILE_SCENE.instantiate()
 		add_child(tile)
+		tile.set_compact(compact_tiles)
 		tile.show_entry(entry)
+		_tiles[keys[i]] = tile
+		_shown[keys[i]] = _shown_text(entry)
+		if not old_keys.has(keys[i]):
+			_pop(tile)
+
+
+## Golpe de escala de una casilla que el jugador acaba de ganar o subir.
+## Diferido: una casilla recién agregada todavía no tiene tamaño y el golpe
+## saldría desde su esquina.
+func _pop(tile: LoadoutTile) -> void:
+	if _primed:
+		UiTheme.pop.call_deferred(tile, gain_pop_scale, gain_pop_time)
+
+
+func _divider() -> ColorRect:
+	var line := ColorRect.new()
+	line.color = divider_color
+	line.custom_minimum_size = divider_size
+	line.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	line.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	return line
+
+
+static func _key(entry: Dictionary) -> String:
+	return "%s/%s" % [entry.get("library", ""), entry.get("entry_id", "")]
+
+
+static func _shown_text(entry: Dictionary) -> String:
+	return "%s|%s" % [entry.get("corner", ""), entry.get("tip", "")]
 
 
 ## La parte que distingue un nombre de tomo ("Tomo de Furia" -> "Furia"), para

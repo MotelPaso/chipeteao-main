@@ -264,21 +264,29 @@ de reparto se llama `ForestScatter`, `DuneScatter` o `MarshScatter`.
 
 | Qué quieres cambiar | Dónde | Qué propiedad |
 | --- | --- | --- |
-| Posición o tamaño de cualquier elemento del HUD | `scenes/ui/HUD.tscn` > el nodo (TimerLabel, KillsLabel, BuildStrip, BagStrip, FpsBadge, PowerUpRow, MatePanel…) | Layout (anclas y márgenes) |
+| Posición o tamaño de cualquier elemento del HUD | `scenes/ui/HUD.tscn` > el nodo (RunInfo, KillsLabel, LoadoutDock, FpsBadge, PowerUpRow, MatePanel…) | Layout (anclas y márgenes) |
+| Fila de arriba a la izquierda (reloj, etapa y dificultad) | HUD.tscn > RunInfo | Layout; Theme Overrides > Constants > `separation` (espacio entre fichas) |
+| Ficha de dificultad (texto, colores, golpe al subir) | `scenes/ui/hud/DifficultyChip.tscn` > raíz (icono y tamaño de letra: sus hijos Icon y Label) | `text_format`, `tip_format`, `body_color`, `border_color`, `text_color`, `pop_scale`, `pop_time` |
+| Dónde va el equipo (armas, tomos, mascota y objetos) | HUD.tscn > LoadoutDock (abajo a la izquierda; crece hacia arriba) | Layout |
+| Cuántos objetos caben antes de la ficha «+N» | HUD.tscn > LoadoutDock/BagStrip | `columns` (fichas por fila) y `max_tiles` (columnas x filas) |
+| Línea entre armas, tomos y mascota | HUD.tscn > LoadoutDock/BuildStrip | `divider_size`, `divider_color` |
+| Golpe de una ficha al ganarla o subirla | HUD.tscn > LoadoutDock/BuildStrip y BagStrip | `gain_pop_scale`, `gain_pop_time` |
+| Tamaño de las fichas chicas de objetos | `scenes/ui/hud/LoadoutTile.tscn` > raíz (grupo «Casilla chica») | `compact_size`, `compact_glyph_font_size`, `compact_corner_font_size` |
+| Icono de un tomo o un objeto en su ficha | el mismo de la Colección: `scripts/ui/stat_icons.gd` (`ICON_FILES`) y `scripts/ui/item_icons.gd` (`KIND_FILES`); para un dibujo propio, un PNG en `assets/icons/<tomes o items>/<id>.png` | la fila del stat o del `kind` |
 | Tamaño y margen del minimapa | HUD.tscn > ViewWidgets/MinimapSlot (solo cuentan su tamaño y sus márgenes, medidos desde la esquina superior derecha de cada celda; no muevas sus anclas); en las celdas de abajo, ViewWidgets | Layout > márgenes; `lower_cell_top_margin` |
-| Color o tamaño de Nivel, Reloj, Bajas y Puntos | HUD.tscn > LevelLabel, TimerLabel, KillsLabel, PointsLabel | Theme Overrides > Colors / Font Sizes |
+| Color o tamaño de Nivel, Reloj, Etapa, Bajas y Puntos | HUD.tscn > LevelLabel, RunInfo/TimerLabel, RunInfo/StageLabel, KillsLabel, PointsLabel | Theme Overrides > Colors / Font Sizes |
 | Colores de la barra de vida y el latido de vida baja | HUD.tscn > HUD | `hp_full_color`, `hp_low_color`, grupo «Latido de vida baja» |
 | Color y forma de la barra de XP | HUD.tscn > HUD | `xp_color`, `xp_trough_color`, `xp_line_color`, `xp_corner_radius`, `xp_line_width` |
-| Textos de bajas, puntos, dificultad, etapa y reloj | HUD.tscn > HUD (grupo «Textos») | `kills_format`, `points_format`, `difficulty_format`, `stage_format`, `timer_format` |
+| Textos de bajas, puntos, etapa y reloj | HUD.tscn > HUD (grupo «Textos») | `kills_format`, `points_format`, `stage_format`, `stage_lap_format`, `timer_format` |
 | Palabras, colores y umbrales de las rachas («¡TRITURANDO!») | HUD.tscn > StreakLabel | `tier_kills`, `tier_words`, `tier_colors`, `window_seconds` |
 | Duración y color de los avisos en pantalla | HUD.tscn > AnnounceLabel | `fade_in_time`, `hold_time`, `fade_out_time`, `normal_color`, `major_*` |
 | Barra del jefe (y color de su flecha) | HUD.tscn > BossBar | `fill_color`, `glow_size`, `glow_alpha` |
-| Colores de las fichas de armas, evoluciones y tomos | HUD.tscn > BuildStrip | `weapon_color`, `evolved_weapon_color`, `tome_color` |
+| Colores de las fichas de armas, evoluciones y tomos | HUD.tscn > LoadoutDock/BuildStrip | `weapon_color`, `evolved_weapon_color`, `tome_color` |
 | Contorno, sombra y glifo de cada ficha (su color es el de su tipo o rareza) | `scenes/ui/hud/LoadoutTile.tscn` > raíz | `border_width`, `corner_radius`, `shadow_offset`, `show_placeholder_art`, `glyph_font_size` |
 | Tarjeta de botín | `scenes/ui/hud/LootToast.tscn` > raíz | `hold_time`, `fade_time`, `background_color` |
 | Filas de compañeros en co-op | `scenes/ui/hud/MateRow.tscn` > raíz | `knocked_out_format`, `knocked_out_tint`, `points_format` |
 | Panel de relleno del cuarto vacío con 3 jugadores (fondo, texto, color, tamaño) | `scripts/systems/split_screen.gd` (bloque «Edita aquí») | `FILLER_BG`, `FILLER_TEXT`, `FILLER_TEXT_COLOR`, `FILLER_FONT_SIZE` |
-| Color del chip de clima bajo el reloj | HUD.tscn > TimerLabel/WeatherBadge | `group_colors`, `text_format` (el nombre sale de `display_name` en `weather_catalog.gd`) |
+| Color del chip de clima bajo el reloj | HUD.tscn > RunInfo/TimerLabel/WeatherBadge | `group_colors`, `text_format` (el nombre sale de `display_name` en `weather_catalog.gd`) |
 | Insignia de FPS | HUD.tscn > FpsBadge | `text_format`, `background_color`, `refresh_seconds` |
 | Marco y refresco del minimapa | `scripts/ui/maps/minimap.gd` (bloque «Edita aquí») | `FRAME_PAD`, `MARKER_SCALE`, `BACKGROUND_COLOR`, `BORDER_WIDTH`, `BORDER_DARKEN`, `REFRESH` |
 | Colores, formas y leyenda de los marcadores del mapa | `scripts/ui/maps/map_draw.gd` | `MARKER_STYLES`, `MARKER_LABELS` |
