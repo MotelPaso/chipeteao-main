@@ -10,11 +10,11 @@ render_mode unshaded, blend_mix, cull_disabled, depth_draw_never, shadows_disabl
 
 group_uniforms Color;
 // Color en la base, en el medio y en lo alto del embudo.
-uniform vec3 base_color : source_color = vec3(1.0, 0.85, 0.4);
-uniform vec3 mid_color : source_color = vec3(1.0, 0.42, 0.05);
+uniform vec3 base_color : source_color = vec3(1.0, 0.66, 0.2);
+uniform vec3 mid_color : source_color = vec3(1.0, 0.36, 0.04);
 uniform vec3 top_color : source_color = vec3(0.7, 0.1, 0.02);
 // Brillo de las vetas de fuego.
-uniform float strength : hint_range(0.0, 6.0) = 1.3;
+uniform float strength : hint_range(0.0, 6.0) = 1.05;
 // Color y opacidad del humo entre las vetas.
 uniform vec3 smoke_color : source_color = vec3(0.17, 0.045, 0.02);
 uniform float smoke_alpha : hint_range(0.0, 1.0) = 0.6;
@@ -39,6 +39,12 @@ uniform float rise_speed = 1.1;
 // Cuánto se bambolea la punta (en radios) y con qué rapidez.
 uniform float wobble_amount = 0.22;
 uniform float wobble_speed = 2.4;
+// Cuánto del dibujo es grano fino (0 = solo vetas anchas; más alto = lenguas chicas que rompen las vetas).
+uniform float detail : hint_range(0.0, 0.8) = 0.35;
+// Qué tan ancho es el borde que se deshace en la silueta del embudo (0 = borde duro).
+uniform float soft_edge : hint_range(0.0, 1.0) = 0.32;
+// Cuánto más brilla donde el tornado toca el suelo.
+uniform float base_heat : hint_range(0.0, 2.0) = 0.3;
 
 // 0-1: cuánto está formado (0 = invisible).
 instance uniform float form = 1.0;
@@ -80,17 +86,25 @@ void fragment() {
 	float around = UV.x * count + height * twist * count
 			- TIME * spin_speed * count * (1.0 + 0.6 * core);
 	float n = wrap_noise(vec2(around, height * 7.0 - TIME * rise_speed * 3.0), count);
+	// Un grano más fino y más rápido rompe las vetas en lenguas de fuego.
+	float fine = wrap_noise(vec2(around * 4.0 + 7.0, height * 9.0 - TIME * rise_speed * 5.0),
+			count * 4.0);
+	n = mix(n, fine, detail);
 	// Vetas de fuego angostas sobre un cuerpo de humo más ancho.
-	float fire = smoothstep(0.4, 0.72, n);
-	float body = smoothstep(0.1, 0.42, n);
+	float fire = smoothstep(0.42, 0.68, n);
+	float body = smoothstep(0.14, 0.42, n);
 	vec3 base = mix(base_color, ascended_base_color, fire_ascend);
 	vec3 flame = mix(base, mix(mid_color, ascended_mid_color, fire_ascend),
 			smoothstep(0.0, 0.45, height));
 	flame = mix(flame, mix(top_color, ascended_top_color, fire_ascend),
 			smoothstep(0.45, 1.0, height));
 	flame = mix(flame, base, core * 0.6) * strength * (0.7 + 0.8 * n);
+	flame += base * base_heat * (1.0 - smoothstep(0.0, 0.28, height));
 	ALBEDO = mix(mix(smoke_color, ascended_smoke_color, fire_ascend), flame, fire);
 	// Se deshace en la base y en la punta.
 	float ends = smoothstep(0.0, 0.06, height) * (1.0 - smoothstep(0.7, 1.0, height));
-	ALPHA = clamp(max(fire, body * smoke_alpha) * ends * form * (0.85 + 0.3 * core), 0.0, 1.0);
+	// Y en la silueta, para que el embudo no termine en un borde duro.
+	float rim = smoothstep(0.0, max(soft_edge, 0.001), abs(dot(NORMAL, VIEW)));
+	ALPHA = clamp(max(fire, body * smoke_alpha) * ends * rim * form * (0.85 + 0.3 * core),
+			0.0, 1.0);
 }

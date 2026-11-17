@@ -25,8 +25,10 @@ enum Step { CHARGE, REST }
 @export var recover: float = 1.4
 ## Aviso en el HUD al empezar a cargar.
 @export var announce_text: String = "¡Amanecer! Corre a un círculo a salvo"
-## Sonido al empezar a cargar (fila de Sfx.SOUND_LIBRARY).
+## Grito al empezar a cargar (fila de Sfx.SOUND_LIBRARY).
 @export var charge_sfx: StringName = &"phoenix_cry"
+## Sonido de la carga, que crece hasta el estallido (fila de Sfx.SOUND_LIBRARY).
+@export var riser_sfx: StringName = &"dawn_riser"
 ## Sonido del estallido (fila de Sfx.SOUND_LIBRARY).
 @export var blast_sfx: StringName = &"phoenix_nova"
 
@@ -79,6 +81,7 @@ func begin(_target: Node3D) -> void:
 	boss.rig.gesture(&"screech")
 	boss.rig.set_nova(0.0)
 	Sfx.play(charge_sfx)
+	Sfx.play(riser_sfx)
 	get_tree().call_group("boss_ui", "announce", announce_text)
 	# Línea de log para los soaks.
 	print("%s dawn: circles=%d charge=%.2fs" % [

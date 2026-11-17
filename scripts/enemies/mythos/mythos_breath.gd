@@ -43,6 +43,8 @@ enum Step { INHALE, SWEEP, TURN, REST }
 @export var recover: float = 0.9
 ## Metros que baja de su altura de vuelo mientras sopla, para que el chorro le salga del pico a ras de suelo.
 @export var stoop: float = 2.2
+## Sonido mientras toma aire, durante el aviso (fila de Sfx.SOUND_LIBRARY).
+@export var inhale_sfx: StringName = &"breath_inhale"
 ## Sonido del chorro en cada pasada (fila de Sfx.SOUND_LIBRARY).
 @export var breath_sfx: StringName = &"phoenix_breath"
 
@@ -80,6 +82,7 @@ func begin(target: Node3D) -> void:
 	_total = windup * aggression_lerp(1.0, windup_at_full_aggression)
 	_timer = _total
 	boss.rig.set_pose(MythosRig.Pose.WINDUP)
+	Sfx.play(inhale_sfx)
 	_face(_from_angle)
 
 

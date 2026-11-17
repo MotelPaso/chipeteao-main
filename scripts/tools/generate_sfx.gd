@@ -1,11 +1,12 @@
 extends SceneTree
 ## Sintetizador de efectos fuera de línea: genera cada sonido del juego como
 ## wav original PCM de 16 bits, mono, 44.1 kHz, desde cero, con bloques de
-## DSP básicos (osciladores, ruido blanco, pasa-bajos de un polo,
-## envolventes, barridos de tono). No se samplea audio externo. Determinista:
-## cada capa de ruido usa su propia semilla fija, así volver a correrlo
-## escribe bytes idénticos. Córrelo desde la raíz del proyecto cada vez que
-## cambies una receta:
+## DSP básicos (osciladores, ruido blanco, filtros, envolventes, barridos de
+## tono). No se samplea audio externo. Determinista: cada capa de ruido usa
+## su propia semilla fija, así volver a correrlo escribe bytes idénticos. Los
+## bloques viven en SfxDsp y las recetas de los ataques de Mythos en SfxMythos
+## (los dos en scripts/tools/generate_sfx/); las demás recetas están aquí.
+## Córrelo desde la raíz del proyecto cada vez que cambies una receta:
 ##
 ##     godot --headless --path . -s res://scripts/tools/generate_sfx.gd
 ##
@@ -17,11 +18,12 @@ extends SceneTree
 ## Pendiente: los wav del repo no son los que escribe esta versión;
 ## regenerarlos cambia como mucho 1 LSB por muestra.
 
-const RATE := 44100.0
+const RATE := SfxDsp.RATE
 const SFX_DIR := "res://assets/audio/sfx"
 const AMBIENT_DIR := "res://assets/audio/ambient"
 
-enum Wave { SINE, SQUARE, SAW, TRIANGLE }
+## Las formas de onda de SfxDsp, con el nombre corto que usan las recetas.
+const Wave := SfxDsp.Wave
 
 var _failed := false
 
@@ -55,21 +57,34 @@ func _init() -> void:
 	_save_wav(SFX_DIR, "phoenix_cry", _gen_phoenix_cry())
 	_save_wav(SFX_DIR, "phoenix_rebirth", _gen_phoenix_rebirth())
 	_save_wav(SFX_DIR, "fire_whoosh", _gen_fire_whoosh())
-	_save_wav(SFX_DIR, "fire_feathers", _gen_fire_feathers())
-	_save_wav(SFX_DIR, "phoenix_nova", _gen_phoenix_nova())
+	_save_wav(SFX_DIR, "fire_feathers", SfxMythos.fire_feathers())
+	_save_wav(SFX_DIR, "phoenix_nova", SfxMythos.phoenix_nova())
 	_save_wav(SFX_DIR, "phoenix_call", _gen_phoenix_call())
 	_save_wav(SFX_DIR, "phoenix_screech", _gen_phoenix_screech())
 	_save_wav(SFX_DIR, "phoenix_caw", _gen_phoenix_caw())
 	_save_wav(SFX_DIR, "phoenix_dive", _gen_phoenix_dive())
-	_save_wav(SFX_DIR, "phoenix_breath", _gen_phoenix_breath())
+	_save_wav(SFX_DIR, "phoenix_breath", SfxMythos.phoenix_breath())
 	_save_wav(SFX_DIR, "phoenix_flap", _gen_phoenix_flap())
 	_save_wav(SFX_DIR, "phoenix_step", _gen_phoenix_step())
 	_save_wav(SFX_DIR, "phoenix_hurt", _gen_phoenix_hurt())
 	_save_wav(SFX_DIR, "phoenix_death", _gen_phoenix_death())
 	_save_wav(SFX_DIR, "phoenix_ascend", _gen_phoenix_ascend())
-	_save_wav(SFX_DIR, "fireball_cast", _gen_fireball_cast())
-	_save_wav(SFX_DIR, "fireball_blast", _gen_fireball_blast())
-	_save_wav(SFX_DIR, "fire_tornado", _gen_fire_tornado())
+	_save_wav(SFX_DIR, "fireball_cast", SfxMythos.fireball_cast())
+	_save_wav(SFX_DIR, "fireball_blast", SfxMythos.fireball_blast())
+	_save_wav(SFX_DIR, "fire_tornado", SfxMythos.fire_tornado())
+	_save_wav(SFX_DIR, "claw_swipe", SfxMythos.claw_swipe())
+	_save_wav(SFX_DIR, "dive_impact", SfxMythos.dive_impact())
+	_save_wav(SFX_DIR, "dive_fall", SfxMythos.dive_fall())
+	_save_wav(SFX_DIR, "wing_blast", SfxMythos.wing_blast())
+	_save_wav(SFX_DIR, "strafe_pass", SfxMythos.strafe_pass())
+	_save_wav(SFX_DIR, "fire_blink", SfxMythos.fire_blink())
+	_save_wav(SFX_DIR, "fireball_fall", SfxMythos.fireball_fall())
+	_save_wav(SFX_DIR, "zone_ignite", SfxMythos.zone_ignite())
+	_save_wav(SFX_DIR, "fire_wave", SfxMythos.fire_wave())
+	_save_wav(SFX_DIR, "ring_blast", SfxMythos.ring_blast())
+	_save_wav(SFX_DIR, "tornado_burst", SfxMythos.tornado_burst())
+	_save_wav(SFX_DIR, "breath_inhale", SfxMythos.breath_inhale())
+	_save_wav(SFX_DIR, "dawn_riser", SfxMythos.dawn_riser())
 	_save_wav(AMBIENT_DIR, "forest_wind", _gen_forest_wind())
 	_save_wav(AMBIENT_DIR, "desert_wind", _gen_desert_wind())
 	_save_wav(AMBIENT_DIR, "hell_fire", _gen_hell_fire())
@@ -360,41 +375,14 @@ func _gen_phoenix_rebirth() -> PackedFloat32Array:
 	return out
 
 
-## Llamarada: ruido que se abre y se cierra sobre un golpe grave. Suena al
-## encenderse una zona de fuego y en el golpe de la picada.
+## Llamarada: ruido que se abre y se cierra sobre un golpe grave. Suena
+## cuando la ola de fuego barre a la horda al empezar la pelea de Mythos.
 func _gen_fire_whoosh() -> PackedFloat32Array:
 	var out := _lowpass(_noise(0.55, _rng(311)), 350.0, 2600.0)
 	out = _lowpass(out, 2600.0, 500.0)
 	_mix_at(out, _tone(0.3, 110.0, 48.0, Wave.SINE), 0.0, 0.7)
 	_adsr(out, 0.03, 0.12, 0.7, 0.3)
 	_normalize(out, 0.7)
-	return out
-
-
-## Plumas ardientes: tres soplos cortos y seguidos (el abanico al salir) con
-## un silbido que sube.
-func _gen_fire_feathers() -> PackedFloat32Array:
-	var out := _silence(0.4)
-	for i in 3:
-		var puff := _lowpass(_noise(0.12, _rng(321 + i)), 3800.0, 900.0)
-		_exp_decay(puff, 0.03)
-		_mix_at(out, puff, 0.07 * float(i), 0.8)
-	_mix_at(out, _tone(0.3, 700.0, 1900.0, Wave.TRIANGLE, 0.6), 0.02, 0.25)
-	_fade_in(out, 0.004)
-	_fade_out(out, 0.08)
-	_normalize(out, 0.6)
-	return out
-
-
-## Amanecer de Mythos: un estallido de ruido brillante que se cierra
-## despacio sobre un trueno grave que cae de tono, con una campana encima.
-func _gen_phoenix_nova() -> PackedFloat32Array:
-	var out := _lowpass(_noise(1.6, _rng(341)), 6000.0, 300.0)
-	_mix_at(out, _tone(1.1, 150.0, 34.0, Wave.SINE), 0.0, 1.0)
-	_mix_at(out, _tone(0.6, 300.0, 60.0, Wave.TRIANGLE), 0.0, 0.5)
-	_mix_at(out, _chime(0.9, 1174.7, 0.2), 0.02, 0.35)
-	_adsr(out, 0.005, 0.3, 0.6, 1.0)
-	_normalize(out, 0.95)
 	return out
 
 
@@ -454,18 +442,6 @@ func _gen_phoenix_dive() -> PackedFloat32Array:
 	return out
 
 
-## Aliento de fuego: un chorro que ruge un par de segundos, grave y lleno,
-## con un temblor rápido y un bramido de fondo que baja.
-func _gen_phoenix_breath() -> PackedFloat32Array:
-	var out := _lowpass(_noise(2.1, _rng(977)), 500.0, 4200.0)
-	out = _lowpass(out, 4200.0, 900.0)
-	_mix_at(out, _tone(2.1, 95.0, 52.0, Wave.SAW, 1.3), 0.0, 0.4)
-	_tremolo(out, 17.0, 0.35)
-	_adsr(out, 0.08, 0.2, 0.85, 0.5)
-	_normalize(out, 0.85)
-	return out
-
-
 ## Aletazo: un golpe de aire grave que se abre y se cierra rápido.
 func _gen_phoenix_flap() -> PackedFloat32Array:
 	var out := _lowpass(_noise(0.5, _rng(381)), 250.0, 2200.0)
@@ -518,35 +494,6 @@ func _gen_phoenix_ascend() -> PackedFloat32Array:
 	return out
 
 
-## Lanzamiento de una bola de fuego: un soplo grave que sale de golpe.
-func _gen_fireball_cast() -> PackedFloat32Array:
-	var out := _lowpass(_noise(0.45, _rng(411)), 3200.0, 500.0)
-	_mix_at(out, _tone(0.35, 220.0, 70.0, Wave.SINE), 0.0, 0.9)
-	_adsr(out, 0.01, 0.1, 0.5, 0.25)
-	_normalize(out, 0.75)
-	return out
-
-
-## Estallido de una bola de fuego: un trueno seco con chisporroteo.
-func _gen_fireball_blast() -> PackedFloat32Array:
-	var out := _lowpass(_noise(0.9, _rng(421)), 5500.0, 250.0)
-	_mix_at(out, _tone(0.7, 130.0, 36.0, Wave.SINE), 0.0, 1.0)
-	_mix_at(out, _tone(0.3, 260.0, 80.0, Wave.TRIANGLE), 0.0, 0.4)
-	_adsr(out, 0.004, 0.2, 0.45, 0.55)
-	_normalize(out, 0.9)
-	return out
-
-
-## Tornado de fuego al formarse: un remolino de ruido que sube y late.
-func _gen_fire_tornado() -> PackedFloat32Array:
-	var out := _lowpass(_noise(1.6, _rng(431)), 400.0, 3600.0)
-	_mix_at(out, _tone(1.6, 70.0, 150.0, Wave.SAW, 1.3), 0.0, 0.35)
-	_tremolo(out, 9.0, 0.5)
-	_adsr(out, 0.35, 0.2, 0.8, 0.6)
-	_normalize(out, 0.8)
-	return out
-
-
 ## Fondo de viento de bosque muy suave, bucle de 4 s. Se genera 0.35 s más
 ## largo y la cola sobrante se funde con el inicio (_loop_blend) para
 ## esconder el salto del filtro en el empalme. Los dos LFO completan ciclos
@@ -590,199 +537,82 @@ func _gen_hell_fire() -> PackedFloat32Array:
 
 
 # --- Bloques de DSP -----------------------------------------------------------
+# Viven en SfxDsp (scripts/tools/generate_sfx/sfx_dsp.gd), que los explica uno
+# por uno; estos son los nombres cortos con que los llaman las recetas de
+# este archivo.
 
 func _rng(seed_value: int) -> RandomNumberGenerator:
-	var rng := RandomNumberGenerator.new()
-	rng.seed = seed_value
-	return rng
+	return SfxDsp.rng(seed_value)
 
 
 func _silence(duration: float) -> PackedFloat32Array:
-	var out := PackedFloat32Array()
-	out.resize(int(duration * RATE))
-	return out
+	return SfxDsp.silence(duration)
 
 
-func _osc(wave: Wave, phase: float) -> float:
-	match wave:
-		Wave.SINE:
-			return sin(phase * TAU)
-		Wave.SQUARE:
-			return 1.0 if phase < 0.5 else -1.0
-		Wave.SAW:
-			return 2.0 * phase - 1.0
-		Wave.TRIANGLE:
-			return 1.0 - 4.0 * absf(phase - 0.5)
-	return 0.0
+func _osc(wave: SfxDsp.Wave, phase: float) -> float:
+	return SfxDsp.osc(wave, phase)
 
 
-## Oscilador con barrido de tono f0 -> f1. `curve` da forma al barrido
-## (t^curve): <1 se mueve temprano, >1 tarde. Acumula fase, así ningún
-## barrido hace clic.
-func _tone(duration: float, f0: float, f1: float, wave: Wave,
+func _tone(duration: float, f0: float, f1: float, wave: SfxDsp.Wave,
 		curve: float = 1.0) -> PackedFloat32Array:
-	var n := int(duration * RATE)
-	var out := PackedFloat32Array()
-	out.resize(n)
-	var phase := 0.0
-	for i in n:
-		var t := float(i) / float(n)
-		var freq := lerpf(f0, f1, pow(t, curve))
-		out[i] = _osc(wave, phase)
-		phase = fmod(phase + freq / RATE, 1.0)
-	return out
+	return SfxDsp.tone(duration, f0, f1, wave, curve)
 
 
-## Curva de tono de tres puntos: f0 al inicio, f_mid a la mitad y f1 al
-## final, lineal entre ellos (el gruñido que sube y baja del jefe).
 func _tone3(duration: float, f0: float, f_mid: float, f1: float,
-		wave: Wave) -> PackedFloat32Array:
-	var n := int(duration * RATE)
-	var out := PackedFloat32Array()
-	out.resize(n)
-	var phase := 0.0
-	for i in n:
-		var t := float(i) / float(n)
-		var freq := lerpf(f0, f_mid, t * 2.0) if t < 0.5 \
-				else lerpf(f_mid, f1, t * 2.0 - 1.0)
-		out[i] = _osc(wave, phase)
-		phase = fmod(phase + freq / RATE, 1.0)
-	return out
+		wave: SfxDsp.Wave) -> PackedFloat32Array:
+	return SfxDsp.tone3(duration, f0, f_mid, f1, wave)
 
 
 func _noise(duration: float, rng: RandomNumberGenerator) -> PackedFloat32Array:
-	var n := int(duration * RATE)
-	var out := PackedFloat32Array()
-	out.resize(n)
-	for i in n:
-		out[i] = rng.randf_range(-1.0, 1.0)
-	return out
+	return SfxDsp.noise(duration, rng)
 
 
-## Seno que decae con un armónico de octava: la voz de campana compartida.
 func _chime(duration: float, freq: float, half_life: float) -> PackedFloat32Array:
-	var out := _tone(duration, freq, freq, Wave.SINE)
-	_mix_at(out, _tone(duration, freq * 2.0, freq * 2.0, Wave.SINE), 0.0, 0.22)
-	_exp_decay(out, half_life)
-	_fade_in(out, 0.002)
-	_fade_out(out, 0.02)
-	return out
+	return SfxDsp.chime(duration, freq, half_life)
 
 
-## Pasa-bajos de un polo con el corte barriendo de start a end en el buffer.
 func _lowpass(samples: PackedFloat32Array, cutoff_start: float,
 		cutoff_end: float) -> PackedFloat32Array:
-	var out := PackedFloat32Array()
-	out.resize(samples.size())
-	var y := 0.0
-	var last := float(maxi(samples.size() - 1, 1))
-	for i in samples.size():
-		var cutoff := lerpf(cutoff_start, cutoff_end, float(i) / last)
-		# Coeficiente de un polo: alpha = 1 - e^(-2*pi*fc/fs).
-		var alpha := 1.0 - exp(-TAU * cutoff / RATE)
-		y += alpha * (samples[i] - y)
-		out[i] = y
-	return out
+	return SfxDsp.lowpass(samples, cutoff_start, cutoff_end)
 
 
-## Pasa-bajos de un polo cuyo corte respira en seno alrededor de `base`.
 func _lowpass_lfo(samples: PackedFloat32Array, base: float, depth: float,
 		lfo_hz: float) -> PackedFloat32Array:
-	var out := PackedFloat32Array()
-	out.resize(samples.size())
-	var y := 0.0
-	for i in samples.size():
-		var t := float(i) / RATE
-		var cutoff := maxf(base + sin(TAU * lfo_hz * t) * depth, 30.0)
-		var alpha := 1.0 - exp(-TAU * cutoff / RATE)
-		y += alpha * (samples[i] - y)
-		out[i] = y
-	return out
+	return SfxDsp.lowpass_lfo(samples, base, depth, lfo_hz)
 
 
-## LFO de amplitud en el lugar; la ganancia baja a (1 - depth) en el valle.
 func _tremolo(samples: PackedFloat32Array, hz: float, depth: float) -> void:
-	for i in samples.size():
-		var t := float(i) / RATE
-		samples[i] *= 1.0 - depth * (0.5 + 0.5 * sin(TAU * hz * t))
+	SfxDsp.tremolo(samples, hz, depth)
 
 
-## Decaimiento exponencial en el lugar desde t=0: la ganancia se reduce a
-## la mitad cada half_life segundos.
 func _exp_decay(samples: PackedFloat32Array, half_life: float) -> void:
-	for i in samples.size():
-		samples[i] *= pow(0.5, (float(i) / RATE) / half_life)
+	SfxDsp.exp_decay(samples, half_life)
 
 
-## ADSR lineal en el lugar: ataque y caída desde el inicio, sostén en el
-## medio y los últimos `release` segundos bajan a silencio.
 func _adsr(samples: PackedFloat32Array, attack: float, decay: float,
 		sustain: float, release: float) -> void:
-	var n := samples.size()
-	var a := int(attack * RATE)
-	var d := int(decay * RATE)
-	var r := int(release * RATE)
-	for i in n:
-		var gain := sustain
-		if i < a:
-			gain = float(i) / float(maxi(a, 1))
-		elif i < a + d:
-			gain = lerpf(1.0, sustain, float(i - a) / float(maxi(d, 1)))
-		if i >= n - r:
-			gain = minf(gain, sustain * float(n - i) / float(maxi(r, 1)))
-		samples[i] *= gain
+	SfxDsp.adsr(samples, attack, decay, sustain, release)
 
 
 func _fade_in(samples: PackedFloat32Array, seconds: float) -> void:
-	var n := mini(int(seconds * RATE), samples.size())
-	for i in n:
-		samples[i] *= float(i) / float(n)
+	SfxDsp.fade_in(samples, seconds)
 
 
 func _fade_out(samples: PackedFloat32Array, seconds: float) -> void:
-	var n := mini(int(seconds * RATE), samples.size())
-	var total := samples.size()
-	for i in n:
-		samples[total - 1 - i] *= float(i) / float(n)
+	SfxDsp.fade_out(samples, seconds)
 
 
-## Suma `src * gain` en `dst` desde `at_seconds` (recortado a dst).
 func _mix_at(dst: PackedFloat32Array, src: PackedFloat32Array,
 		at_seconds: float, gain: float) -> void:
-	var start := int(at_seconds * RATE)
-	for i in src.size():
-		var j := start + i
-		if j >= dst.size():
-			break
-		dst[j] += src[i] * gain
+	SfxDsp.mix_at(dst, src, at_seconds, gain)
 
 
-## Normalización de pico en el lugar a `peak` (también evita la saturación).
 func _normalize(samples: PackedFloat32Array, peak: float) -> void:
-	var max_abs := 0.0
-	for i in samples.size():
-		max_abs = maxf(max_abs, absf(samples[i]))
-	if max_abs < 0.0001:
-		return
-	var factor := peak / max_abs
-	for i in samples.size():
-		samples[i] *= factor
+	SfxDsp.normalize(samples, peak)
 
 
-## Convierte un buffer generado de más en un bucle sin costura: la cola
-## sobrante (blend_seconds) se funde con el inicio, así la muestra 0 sigue
-## exactamente a la última y la señal directa manda al terminar la mezcla.
 func _loop_blend(samples: PackedFloat32Array, blend_seconds: float) -> PackedFloat32Array:
-	var b := int(blend_seconds * RATE)
-	var length := samples.size() - b
-	var out := PackedFloat32Array()
-	out.resize(length)
-	for i in length:
-		out[i] = samples[i]
-	for i in b:
-		var w := float(i) / float(maxi(b, 1))
-		out[i] = lerpf(samples[length + i], samples[i], w)
-	return out
+	return SfxDsp.loop_blend(samples, blend_seconds)
 
 
 # --- Salida -------------------------------------------------------------------

@@ -20,6 +20,10 @@ const GROUP := &"fire_waves"
 @export var segment_overlap: float = 1.2
 ## Segundos que tarda en apagarse al llegar a su radio máximo.
 @export var fade_time: float = 0.3
+## Metros detrás del anillo a los que lo sigue una estela de llamas bajas (0 = sin estela).
+@export var wake_distance: float = 1.3
+## Alto de esa estela, en veces el de las llamas del anillo.
+@export var wake_height: float = 0.5
 
 var _radius: float = 0.0
 var _end_radius: float = 0.0
@@ -41,7 +45,8 @@ func _ready() -> void:
 	# Cada onda del pool mueve sus propios tramos: copia el MultiMesh de la
 	# escena (que trae la malla del tramo) en vez de compartirlo.
 	var multimesh := _wall.multimesh.duplicate() as MultiMesh
-	multimesh.instance_count = maxi(segments, 3)
+	# La mitad de los tramos es el anillo y la otra mitad, su estela.
+	multimesh.instance_count = maxi(segments, 3) * 2
 	# El anillo llega lejos de su centro: una caja fija evita que se recorte.
 	multimesh.custom_aabb = AABB(Vector3(-80.0, -12.0, -80.0), Vector3(160.0, 30.0, 160.0))
 	_wall.multimesh = multimesh
@@ -116,23 +121,34 @@ func _physics_process(delta: float) -> void:
 		dissipate()
 
 
-## Reparte los tramos en el anillo, cada uno a la altura del suelo en su punto.
+## Reparte los tramos: el anillo y, detrás de él según hacia dónde avanza,
+## su estela de llamas bajas.
 func _place_segments() -> void:
+	var count := maxi(segments, 3)
+	_place_ring(0, count, _radius, wall_height)
+	var behind := -wake_distance if _end_radius >= _radius else wake_distance
+	var wake_radius := _radius + behind
+	_place_ring(count, count, wake_radius,
+			wall_height * wake_height if wake_distance > 0.0 and wake_radius > 0.3 else 0.0)
+
+
+## Un anillo de `count` tramos de `height` metros de alto y `radius` de
+## radio, desde el tramo `first`, cada uno a la altura del suelo en su punto.
+func _place_ring(first: int, count: int, radius: float, height: float) -> void:
 	var multimesh := _wall.multimesh
-	var count := multimesh.instance_count
-	var width := TAU * _radius / float(count) * segment_overlap
+	var width := TAU * radius / float(count) * segment_overlap
 	var center := global_position
 	for index: int in count:
 		var angle := TAU * float(index) / float(count)
 		var outward := Vector3(cos(angle), 0.0, sin(angle))
-		var at := outward * _radius
+		var at := outward * radius
 		var ground := center.y
 		if _terrain != null:
 			ground = _terrain.height_at(center.x + at.x, center.z + at.z)
-		at.y = ground - center.y + wall_height * 0.5
+		at.y = ground - center.y + height * 0.5
 		var tangent := Vector3(-outward.z, 0.0, outward.x)
-		multimesh.set_instance_transform(index, Transform3D(
-				Basis(tangent * width, Vector3.UP * wall_height, outward), at))
+		multimesh.set_instance_transform(first + index, Transform3D(
+				Basis(tangent * width, Vector3.UP * height, outward), at))
 
 
 ## Golpea una vez a cada raider en pie que el anillo alcanza sin saltar.

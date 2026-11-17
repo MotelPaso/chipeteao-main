@@ -1,0 +1,17 @@
+[gd_scene load_steps=5 format=3]
+
+[ext_resource type="Script" path="res://scripts/fx/claw_scar.gd" id="1_script"]
+[ext_resource type="Shader" path="res://assets/shaders/claw_scar.gdshader" id="2_scar"]
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_scar"]
+shader = ExtResource("2_scar")
+
+[sub_resource type="PlaneMesh" id="PlaneMesh_scar"]
+material = SubResource("ShaderMaterial_scar")
+size = Vector2(1, 1)
+
+[node name="ClawScar" type="MeshInstance3D"]
+visible = false
+cast_shadow = 0
+mesh = SubResource("PlaneMesh_scar")
+script = ExtResource("1_script")

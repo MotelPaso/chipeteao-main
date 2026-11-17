@@ -22,6 +22,10 @@ const GROUP := &"fireballs"
 @export var spin_turns: float = 1.2
 ## Tamaño del resplandor alrededor de la bola, en veces su radio.
 @export var glow_scale: float = 1.7
+## Largo de la cola de llama que deja atrás, en veces su radio.
+@export var tail_length: float = 5.0
+## Ancho de esa cola donde nace, en veces su radio.
+@export var tail_width: float = 2.2
 
 @export_group("Estallido")
 ## Temblor de cámara del estallido.
@@ -46,6 +50,8 @@ var _flying: bool = false
 @onready var _ball: MeshInstance3D = $Ball
 @onready var _glow: MeshInstance3D = $Glow
 @onready var _trail: GPUParticles3D = $Trail
+@onready var _tail: Node3D = $Tail
+@onready var _smoke: CPUParticles3D = $Smoke
 
 
 func _ready() -> void:
@@ -82,8 +88,11 @@ func launch(from: Vector3, to: Vector3, radius: float, seconds: float, damage: f
 	_ball.scale = Vector3.ONE * ball_radius
 	_glow.scale = Vector3.ONE * ball_radius * glow_scale
 	_glow.set_instance_shader_parameter(&"charge", 1.0)
+	_point_tail(0.0)
 	_trail.restart()
 	_trail.emitting = true
+	_smoke.restart()
+	_smoke.emitting = true
 	set_physics_process(true)
 
 
@@ -100,8 +109,21 @@ func _physics_process(delta: float) -> void:
 	var t := clampf(_elapsed / _seconds, 0.0, 1.0)
 	global_position = _from.lerp(_to, t) + Vector3.UP * _arc * 4.0 * t * (1.0 - t)
 	_ball.rotate_x(spin_turns * TAU * delta)
+	_point_tail(t)
 	if t >= 1.0:
 		_explode()
+
+
+## Deja la cola de llama detrás de la bola: apunta contra el rumbo que lleva
+## en el punto `t` (0-1) de su arco.
+func _point_tail(t: float) -> void:
+	var heading := (_to - _from) + Vector3.UP * _arc * 4.0 * (1.0 - 2.0 * t)
+	if heading.length_squared() < 0.0001:
+		return
+	heading = heading.normalized()
+	var look := Basis.looking_at(heading, Vector3.RIGHT if absf(heading.y) > 0.99 else Vector3.UP)
+	var width := tail_width * ball_radius
+	_tail.basis = Basis(look.x * width, look.y * width, look.z * tail_length * ball_radius)
 
 
 func _explode() -> void:
@@ -119,6 +141,7 @@ func _explode() -> void:
 func _finish() -> void:
 	_flying = false
 	_trail.emitting = false
+	_smoke.emitting = false
 	remove_from_group(GROUP)
 	set_physics_process(false)
 	Pools.release(self)

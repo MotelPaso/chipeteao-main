@@ -34,7 +34,7 @@ extends MythosMove
 ## Segundos quieto después del estallido.
 @export var recover: float = 0.5
 ## Sonido del estallido (fila de Sfx.SOUND_LIBRARY).
-@export var blast_sfx: StringName = &"fire_whoosh"
+@export var blast_sfx: StringName = &"ring_blast"
 ## Escena de la columna de fuego del estallido (FireBurst, sale de Pools). Vacío = sin columna.
 @export var burst_scene: PackedScene = preload("res://scenes/fx/FireBurst.tscn")
 ## Alto de esa columna, en metros.

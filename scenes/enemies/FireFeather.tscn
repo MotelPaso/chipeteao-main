@@ -1,34 +1,65 @@
-[gd_scene load_steps=8 format=3]
+[gd_scene load_steps=16 format=3]
 
 [ext_resource type="Script" path="res://scripts/enemies/enemy_bolt.gd" id="1_bolt"]
 [ext_resource type="Shader" path="res://assets/shaders/fire_spark.gdshader" id="2_spark"]
+[ext_resource type="Shader" path="res://assets/shaders/fire_tail.gdshader" id="3_tail"]
+[ext_resource type="Shader" path="res://assets/shaders/phoenix_nova.gdshader" id="4_glow"]
+[ext_resource type="Script" path="res://scripts/fx/pooled_trail.gd" id="5_trail"]
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_core"]
 shader = ExtResource("2_spark")
-shader_parameter/color = Color(1, 0.82, 0.3, 1)
-shader_parameter/glow = 2.4
-shader_parameter/ascended_color = Color(0.75, 0.95, 1, 1)
+shader_parameter/color = Color(1, 0.86, 0.4, 1)
+shader_parameter/glow = 2.6
+shader_parameter/ascended_color = Color(0.8, 0.96, 1, 1)
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_plume"]
+shader = ExtResource("3_tail")
+shader_parameter/strength = 2.0
+shader_parameter/flow_speed = 6.0
+shader_parameter/wobble_amount = 0.22
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_glow"]
+shader = ExtResource("4_glow")
+shader_parameter/strength = 0.55
+shader_parameter/softness = 2.0
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_ember"]
 shader = ExtResource("2_spark")
-shader_parameter/color = Color(1, 0.38, 0.06, 1)
+shader_parameter/color = Color(1, 0.6, 0.18, 1)
 shader_parameter/glow = 1.6
-shader_parameter/ascended_color = Color(0.08, 0.42, 1, 1)
+shader_parameter/ascended_color = Color(0.4, 0.8, 1, 1)
 
 [sub_resource type="SphereMesh" id="SphereMesh_core"]
 material = SubResource("ShaderMaterial_core")
-radius = 0.17
-height = 0.34
+radius = 0.2
+height = 0.4
 radial_segments = 12
 rings = 6
 
 [sub_resource type="CylinderMesh" id="CylinderMesh_plume"]
 material = SubResource("ShaderMaterial_plume")
 top_radius = 0.0
-bottom_radius = 0.16
-height = 0.9
-radial_segments = 8
-rings = 0
+bottom_radius = 0.5
+height = 1.0
+radial_segments = 10
+rings = 6
+cap_top = false
+cap_bottom = false
+
+[sub_resource type="SphereMesh" id="SphereMesh_glow"]
+material = SubResource("ShaderMaterial_glow")
+radius = 1.0
+height = 2.0
+radial_segments = 12
+rings = 6
+
+[sub_resource type="BoxMesh" id="BoxMesh_ember"]
+material = SubResource("ShaderMaterial_ember")
+size = Vector3(0.09, 0.09, 0.09)
+
+[sub_resource type="Curve" id="Curve_shrink"]
+_data = [Vector2(0, 1), 0.0, 0.0, 0, 0, Vector2(1, 0), 0.0, 0.0, 0, 0]
+point_count = 2
 
 [sub_resource type="SphereShape3D" id="SphereShape3D_hit"]
 radius = 0.24
@@ -46,9 +77,33 @@ cast_shadow = 0
 mesh = SubResource("SphereMesh_core")
 
 [node name="Plume" type="MeshInstance3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 0, -1, 0, 1, 0, 0, 0, 0.5)
+transform = Transform3D(0.55, 0, 0, 0, 0, -0.55, 0, 2.4, 0, 0, 0, 1.1)
 cast_shadow = 0
 mesh = SubResource("CylinderMesh_plume")
+
+[node name="Glow" type="MeshInstance3D" parent="."]
+transform = Transform3D(0.6, 0, 0, 0, 0.6, 0, 0, 0, 0.6, 0, 0, 0)
+cast_shadow = 0
+instance_shader_parameters/charge = 1.0
+mesh = SubResource("SphereMesh_glow")
+
+[node name="Trail" type="CPUParticles3D" parent="."]
+cast_shadow = 0
+mesh = SubResource("BoxMesh_ember")
+scale_amount_curve = SubResource("Curve_shrink")
+amount = 8
+lifetime = 0.4
+local_coords = false
+emission_shape = 1
+emission_sphere_radius = 0.12
+direction = Vector3(0, 0, 1)
+spread = 25.0
+gravity = Vector3(0, 1, 0)
+initial_velocity_min = 1.0
+initial_velocity_max = 3.0
+scale_amount_min = 0.8
+scale_amount_max = 1.6
+script = ExtResource("5_trail")
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="."]
 shape = SubResource("SphereShape3D_hit")

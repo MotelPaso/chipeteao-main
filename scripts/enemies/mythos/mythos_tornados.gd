@@ -56,7 +56,7 @@ extends MythosMove
 ## Ancho del anillo que golpea, en metros.
 @export var blast_band: float = 1.6
 ## Sonido del estallido (fila de Sfx.SOUND_LIBRARY).
-@export var blast_sfx: StringName = &"fireball_blast"
+@export var blast_sfx: StringName = &"tornado_burst"
 
 var _timer: float = 0.0
 var _cast: bool = false

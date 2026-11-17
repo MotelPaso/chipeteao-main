@@ -32,7 +32,15 @@ enum Step { REAR, LUNGE, GAP, REST }
 ## Segundos quieto después del último zarpazo: otra ventana para pegarle.
 @export var recover: float = 1.8
 ## Sonido de cada zarpazo (fila de Sfx.SOUND_LIBRARY).
-@export var swipe_sfx: StringName = &"fire_whoosh"
+@export var swipe_sfx: StringName = &"claw_swipe"
+
+@export_group("Marca en el suelo")
+## Escena de la marca que deja cada zarpazo (ClawScar, sale de Pools).
+@export var scar_scene: PackedScene = preload("res://scenes/fx/ClawScar.tscn")
+## Largo de la marca, en veces el radio del zarpazo.
+@export var scar_length: float = 1.8
+## Grados que la marca queda cruzada hacia el lado del ala que golpeó.
+@export var scar_degrees: float = 24.0
 
 var _step: Step = Step.REAR
 var _timer: float = 0.0
@@ -101,8 +109,13 @@ func _strike() -> void:
 	boss.strike_ground([_mark], radius, height_window, damage)
 	boss.blast(_mark, radius * 0.7)
 	boss.feel.shock(MythosFeel.Shock.LIGHT, _mark)
-	# Un zarpazo con cada ala, alternando.
-	boss.rig.gesture(&"swipe_left" if _swipes_left % 2 == 0 else &"swipe_right")
+	# Un zarpazo con cada ala, alternando; la marca queda cruzada hacia el
+	# lado del ala que golpeó.
+	var left_wing := _swipes_left % 2 == 0
+	boss.rig.gesture(&"swipe_left" if left_wing else &"swipe_right")
+	var slant := deg_to_rad(scar_degrees) * (1.0 if left_wing else -1.0)
+	ClawScar.spawn(scar_scene, _mark, (_mark - _from).rotated(Vector3.UP, slant),
+			radius * scar_length)
 	Sfx.play(swipe_sfx)
 	_swipes_left -= 1
 	if _swipes_left > 0:

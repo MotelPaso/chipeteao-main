@@ -17,7 +17,7 @@ extends MythosMove
 ## Segundos quieto en el aire después de despegar.
 @export var recover: float = 0.5
 ## Sonido del golpe (fila de Sfx.SOUND_LIBRARY).
-@export var blast_sfx: StringName = &"fire_whoosh"
+@export var blast_sfx: StringName = &"wing_blast"
 
 @export_group("Columna de fuego")
 ## Escena de la columna que levanta el golpe (FireBurst, sale de Pools). Vacío = sin columna.

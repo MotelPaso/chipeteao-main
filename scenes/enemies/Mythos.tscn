@@ -2058,6 +2058,7 @@ passes = 2
 
 [node name="Deluge" type="Node" parent="Moves"]
 script = ExtResource("9_fireballs")
+launch_sfx = &"fireball_fall"
 unlock_life = 2
 cooldown = 20.0
 first_use_fraction = 0.5

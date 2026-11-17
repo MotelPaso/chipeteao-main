@@ -74,7 +74,7 @@ extends Node
 ## Radio del estallido de luz con que reaparece, en unidades del modelo.
 @export var blink_flash_radius: float = 4.0
 ## Sonido del fogonazo (fila de Sfx.SOUND_LIBRARY).
-@export var blink_sfx: StringName = &"fire_whoosh"
+@export var blink_sfx: StringName = &"fire_blink"
 
 @export_group("En tierra")
 ## Distancia al raider, en metros, a la que se detiene cuando camina hacia él (las armas cortas llegan).

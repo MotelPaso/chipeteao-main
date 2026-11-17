@@ -38,8 +38,10 @@ enum Step { TRACK, LOCKED, PERCHED }
 @export var recover_at_full_aggression: float = 0.7
 ## Sonido cuando el disco se clava (fila de Sfx.SOUND_LIBRARY).
 @export var lock_sfx: StringName = &"phoenix_screech"
+## Sonido de la caída, desde que el disco se clava hasta el golpe (fila de Sfx.SOUND_LIBRARY).
+@export var fall_sfx: StringName = &"dive_fall"
 ## Sonido del golpe (fila de Sfx.SOUND_LIBRARY).
-@export var impact_sfx: StringName = &"fireball_blast"
+@export var impact_sfx: StringName = &"dive_impact"
 ## Picadas seguidas antes de quedarse posado (1 = una sola).
 @export var chain: int = 1
 ## Segundos de aviso de cada picada después de la primera.
@@ -164,6 +166,7 @@ func _lock() -> void:
 	boss.warn_disc(_mark, radius, _timer, true)
 	boss.rig.gesture(&"screech")
 	Sfx.play(lock_sfx)
+	Sfx.play(fall_sfx)
 
 
 ## Mientras avisa vuela alto, un poco detrás de la marca, mirándola.

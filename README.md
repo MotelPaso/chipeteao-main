@@ -171,7 +171,8 @@ scenes/
                          #   TerrainShots; ver Verificación)
 scripts/                 # espejo de scenes/: systems/ (autoloads, catálogos y
                          #   spawner/), player/, weapons/, enemies/, world/, ui/,
-                         #   fx/, tools/generate_sfx.gd (generador de audio).
+                         #   fx/, tools/generate_sfx.gd (generador de audio; sus
+                         #   bloques y las recetas de Mythos, en tools/generate_sfx/).
                          #   Los componentes de un dueño grande viven junto a él,
                          #   en scripts/<área>/<dueño>/: player/components/,
                          #   enemies/enemy/, world/run/director/,

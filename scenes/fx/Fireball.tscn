@@ -1,9 +1,11 @@
-[gd_scene load_steps=13 format=3]
+[gd_scene load_steps=21 format=3]
 
 [ext_resource type="Script" path="res://scripts/fx/fireball.gd" id="1_script"]
 [ext_resource type="Shader" path="res://assets/shaders/fireball.gdshader" id="2_ball"]
 [ext_resource type="Shader" path="res://assets/shaders/phoenix_nova.gdshader" id="3_glow"]
 [ext_resource type="Shader" path="res://assets/shaders/fire_spark.gdshader" id="4_spark"]
+[ext_resource type="Shader" path="res://assets/shaders/fire_tail.gdshader" id="5_tail"]
+[ext_resource type="Shader" path="res://assets/shaders/smoke_puff.gdshader" id="6_smoke"]
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_ball"]
 shader = ExtResource("2_ball")
@@ -47,6 +49,42 @@ scale_min = 0.6
 scale_max = 1.6
 scale_curve = SubResource("CurveTexture_shrink")
 
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_tail"]
+shader = ExtResource("5_tail")
+shader_parameter/strength = 2.8
+shader_parameter/tongue_scale = 2.2
+shader_parameter/flow_speed = 4.5
+shader_parameter/tip_fade = 0.75
+shader_parameter/wobble_amount = 0.2
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_tail"]
+top_radius = 0.0
+bottom_radius = 0.5
+height = 1.0
+radial_segments = 12
+rings = 6
+cap_top = false
+cap_bottom = false
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_smoke"]
+shader = ExtResource("6_smoke")
+shader_parameter/opacity = 0.75
+
+[sub_resource type="SphereMesh" id="SphereMesh_smoke"]
+material = SubResource("ShaderMaterial_smoke")
+radius = 0.9
+height = 1.8
+radial_segments = 10
+rings = 5
+
+[sub_resource type="Curve" id="Curve_grow"]
+_data = [Vector2(0, 0.45), 0.0, 0.0, 0, 0, Vector2(1, 1), 0.0, 0.0, 0, 0]
+point_count = 2
+
+[sub_resource type="Gradient" id="Gradient_fade"]
+offsets = PackedFloat32Array(0, 0.25, 1)
+colors = PackedColorArray(1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 0)
+
 [node name="Fireball" type="Node3D"]
 script = ExtResource("1_script")
 
@@ -60,10 +98,37 @@ cast_shadow = 0
 mesh = SubResource("SphereMesh_ball")
 surface_material_override/0 = SubResource("ShaderMaterial_glow")
 
+[node name="Tail" type="Node3D" parent="."]
+
+[node name="Flame" type="MeshInstance3D" parent="Tail"]
+transform = Transform3D(1, 0, 0, 0, 0, -1, 0, 1, 0, 0, 0, 0.5)
+cast_shadow = 0
+mesh = SubResource("CylinderMesh_tail")
+surface_material_override/0 = SubResource("ShaderMaterial_tail")
+
+[node name="Smoke" type="CPUParticles3D" parent="."]
+cast_shadow = 0
+emitting = false
+mesh = SubResource("SphereMesh_smoke")
+scale_amount_curve = SubResource("Curve_grow")
+color_ramp = SubResource("Gradient_fade")
+amount = 20
+lifetime = 1.2
+local_coords = false
+emission_shape = 1
+emission_sphere_radius = 0.6
+direction = Vector3(0, 1, 0)
+spread = 180.0
+gravity = Vector3(0, 1.2, 0)
+initial_velocity_min = 0.2
+initial_velocity_max = 0.9
+scale_amount_min = 0.8
+scale_amount_max = 1.5
+
 [node name="Trail" type="GPUParticles3D" parent="."]
 cast_shadow = 0
 emitting = false
-amount = 40
-lifetime = 0.55
+amount = 60
+lifetime = 0.8
 process_material = SubResource("ParticleProcessMaterial_trail")
 draw_pass_1 = SubResource("BoxMesh_ember")

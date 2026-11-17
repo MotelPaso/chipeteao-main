@@ -36,7 +36,7 @@ const GROUP := &"fire_zones"
 
 @export_group("Sonido")
 ## Sonido al encenderse (fila de Sfx.SOUND_LIBRARY).
-@export var ignite_sfx: StringName = &"fire_whoosh"
+@export var ignite_sfx: StringName = &"zone_ignite"
 
 var _stage: Stage = Stage.IDLE
 var _radius: float = 0.0

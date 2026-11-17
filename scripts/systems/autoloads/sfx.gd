@@ -141,7 +141,7 @@ const SOUND_LIBRARY: Dictionary[StringName, Dictionary] = {
 		"rate_limit": 2,
 	},
 	&"phoenix_breath": {
-		"stream": preload("res://assets/audio/sfx/phoenix_breath.wav"), "volume_db": -4.0,
+		"stream": preload("res://assets/audio/sfx/phoenix_breath.wav"), "volume_db": -6.0,
 	},
 	&"phoenix_flap": {
 		"stream": preload("res://assets/audio/sfx/phoenix_flap.wav"), "volume_db": -6.0,
@@ -166,12 +166,60 @@ const SOUND_LIBRARY: Dictionary[StringName, Dictionary] = {
 		"rate_limit": 6, "jitter": true,
 	},
 	&"fireball_blast": {
-		"stream": preload("res://assets/audio/sfx/fireball_blast.wav"), "volume_db": -5.0,
-		"rate_limit": 6, "jitter": true,
+		"stream": preload("res://assets/audio/sfx/fireball_blast.wav"), "volume_db": -6.0,
+		"rate_limit": 5, "jitter": true,
+	},
+	&"fireball_fall": {
+		"stream": preload("res://assets/audio/sfx/fireball_fall.wav"), "volume_db": -10.0,
+		"rate_limit": 3, "jitter": true,
 	},
 	&"fire_tornado": {
 		"stream": preload("res://assets/audio/sfx/fire_tornado.wav"), "volume_db": -6.0,
 		"rate_limit": 3,
+	},
+	&"tornado_burst": {
+		"stream": preload("res://assets/audio/sfx/tornado_burst.wav"), "volume_db": -4.0,
+	},
+	&"claw_swipe": {
+		"stream": preload("res://assets/audio/sfx/claw_swipe.wav"), "volume_db": -5.0,
+		"rate_limit": 4, "jitter": true,
+	},
+	&"dive_fall": {
+		"stream": preload("res://assets/audio/sfx/dive_fall.wav"), "volume_db": -7.0,
+		"rate_limit": 2,
+	},
+	&"dive_impact": {
+		"stream": preload("res://assets/audio/sfx/dive_impact.wav"), "volume_db": -3.0,
+	},
+	&"wing_blast": {
+		"stream": preload("res://assets/audio/sfx/wing_blast.wav"), "volume_db": -4.0,
+		"rate_limit": 2,
+	},
+	&"strafe_pass": {
+		"stream": preload("res://assets/audio/sfx/strafe_pass.wav"), "volume_db": -5.0,
+		"rate_limit": 2,
+	},
+	&"fire_blink": {
+		"stream": preload("res://assets/audio/sfx/fire_blink.wav"), "volume_db": -6.0,
+		"rate_limit": 2,
+	},
+	&"zone_ignite": {
+		"stream": preload("res://assets/audio/sfx/zone_ignite.wav"), "volume_db": -9.0,
+		"rate_limit": 5, "jitter": true,
+	},
+	&"fire_wave": {
+		"stream": preload("res://assets/audio/sfx/fire_wave.wav"), "volume_db": -6.0,
+		"rate_limit": 3, "jitter": true,
+	},
+	&"ring_blast": {
+		"stream": preload("res://assets/audio/sfx/ring_blast.wav"), "volume_db": -4.0,
+		"rate_limit": 2,
+	},
+	&"breath_inhale": {
+		"stream": preload("res://assets/audio/sfx/breath_inhale.wav"), "volume_db": -6.0,
+	},
+	&"dawn_riser": {
+		"stream": preload("res://assets/audio/sfx/dawn_riser.wav"), "volume_db": -4.0,
 	},
 }
 

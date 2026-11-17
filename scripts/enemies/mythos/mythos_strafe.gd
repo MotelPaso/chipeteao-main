@@ -31,7 +31,7 @@ enum Step { APPROACH, RUN, REST }
 ## Segundos quieto después de la última pasada.
 @export var recover: float = 0.6
 ## Sonido al empezar cada pasada (fila de Sfx.SOUND_LIBRARY).
-@export var pass_sfx: StringName = &"fire_whoosh"
+@export var pass_sfx: StringName = &"strafe_pass"
 
 @export_group("Pared de fuego")
 ## Radio de cada zona de la línea, en metros.

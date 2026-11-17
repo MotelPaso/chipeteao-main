@@ -39,7 +39,7 @@ extends MythosMove
 ## Segundos quieto después de la última onda.
 @export var recover: float = 0.7
 ## Sonido de cada onda (fila de Sfx.SOUND_LIBRARY).
-@export var wave_sfx: StringName = &"phoenix_flap"
+@export var wave_sfx: StringName = &"fire_wave"
 
 var _timer: float = 0.0
 var _left: int = 0
