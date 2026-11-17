@@ -335,7 +335,9 @@ func _sweep_hell() -> void:
 			continue
 		skipped += 1
 		var kind := "other"
-		var up := child.get_parent()
+		# Desde la malla misma: un destello del pool ES un MeshInstance3D y
+		# lleva la marca del pool en él, no en un padre.
+		var up: Node = child
 		while up != null and up != _arena:
 			if up is Interactable:
 				kind = "interactable"
