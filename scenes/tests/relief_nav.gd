@@ -24,6 +24,11 @@ const JUMP_RISE: float = 0.55
 const JUMP_RANGE: float = 1.8
 ## Radio en metros donde se busca la celda abierta del bot y la del destino.
 const SNAP_REACH: float = 4.0
+## Radio en metros donde se busca la celda de un DESTINO que no tiene ninguna
+## a su altura cerca: está bajo un tablero (el grafo guarda un piso por
+## celda, y ahí ese piso es el tablero de arriba). Se llega a la celda de su
+## nivel más cercana y de ahí, derecho.
+const UNDER_REACH: float = 16.0
 ## Cuánto más alto o más bajo que un cuerpo puede estar el piso de "su"
 ## celda, en metros: por encima, un escalón; por debajo, lo que sube un salto.
 ## Sin esto, al pie de un corte la celda más cercana es una de arriba.
@@ -64,7 +69,7 @@ func steer(slot: int, from: Vector3, goal: Vector3, delta: float) -> Vector3:
 	if graph == null:
 		return goal
 	var here := _cell_at(from)
-	var there := _cell_at(goal)
+	var there := _goal_cell(goal)
 	if here == ReliefGraph.NONE or there == ReliefGraph.NONE or here == there:
 		return goal
 	var path := _plan(slot, here, there, from, delta)
@@ -133,6 +138,20 @@ func _cell_at(at: Vector3) -> int:
 	var flat := Vector2(at.x, at.z)
 	var cell := graph.nearest_open(flat, SNAP_REACH, at.y + (LEVEL_ABOVE - LEVEL_BELOW) * 0.5,
 			(LEVEL_ABOVE + LEVEL_BELOW) * 0.5)
+	return cell if cell != ReliefGraph.NONE else graph.nearest_open(flat, SNAP_REACH)
+
+
+## La celda abierta de un destino: como _cell_at, pero antes de conformarse
+## con una de otro nivel busca más lejos una del suyo. Un compañero caído
+## bajo el puente tiene encima las celdas del tablero: sin esto el bot se
+## pararía arriba de él sin poder alcanzarlo.
+func _goal_cell(goal: Vector3) -> int:
+	var flat := Vector2(goal.x, goal.z)
+	var level := goal.y + (LEVEL_ABOVE - LEVEL_BELOW) * 0.5
+	var window := (LEVEL_ABOVE + LEVEL_BELOW) * 0.5
+	var cell := graph.nearest_open(flat, SNAP_REACH, level, window)
+	if cell == ReliefGraph.NONE:
+		cell = graph.nearest_open(flat, UNDER_REACH, level, window)
 	return cell if cell != ReliefGraph.NONE else graph.nearest_open(flat, SNAP_REACH)
 
 
