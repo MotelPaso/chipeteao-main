@@ -213,7 +213,6 @@ Lo que NO se traduce nunca: los `id` de catálogo, los `node_name`, los nombres 
 | Fire zone | Zona de fuego |
 | Blue Lobster | Langosta Azul (nombre propio del minijefe del Bosque Hueco) |
 | Mini-boss | Minijefe (el que llega a mitad de la etapa, antes del jefe del bioma: la Langosta Azul en el Bosque Hueco; los ocultos son «minijefe secreto») |
-| One in two million (cartel de la entrada de la Langosta Azul) | Una entre dos millones |
 | Pincers (ataque de la Langosta Azul) | Tenazas |
 | Charge (ataque de la Langosta Azul: cruza un carril de un tirón) | Embestida |
 | Crushing leap (ataque de la Langosta Azul) | Salto aplastante |
