@@ -13,6 +13,7 @@
 [ext_resource type="PackedScene" path="res://scenes/ui/hud/LootToast.tscn" id="11_loot"]
 [ext_resource type="Script" uid="uid://ry5jc7hbci8u" path="res://scripts/ui/game/hud/powerup_row.gd" id="12_powerups"]
 [ext_resource type="Script" uid="uid://dbqt1k5sw738v" path="res://scripts/ui/game/hud/view_widgets.gd" id="13_views"]
+[ext_resource type="PackedScene" path="res://scenes/ui/hud/DifficultyChip.tscn" id="14_difficulty"]
 
 [node name="HUD" type="CanvasLayer" unique_id=214834967]
 layer = 5
@@ -20,15 +21,13 @@ script = ExtResource("1_hud")
 
 [node name="XpBar" type="ProgressBar" parent="." unique_id=1869279084]
 unique_name_in_owner = true
-anchors_preset = -1
-anchor_top = 0.98600006
+anchors_preset = 12
+anchor_top = 1.0
 anchor_right = 1.0
-anchor_bottom = 0.98600006
-offset_left = 6.0
-offset_top = 0.079956055
-offset_right = 6.0
-offset_bottom = 14.079956
+anchor_bottom = 1.0
+offset_top = -14.0
 grow_horizontal = 2
+grow_vertical = 0
 mouse_filter = 2
 max_value = 8.0
 show_percentage = false
@@ -48,19 +47,23 @@ theme_override_colors/font_color = Color(1, 0.957, 0.863, 1)
 theme_override_font_sizes/font_size = 20
 text = "Nv 1"
 
-[node name="TimerLabel" type="Label" parent="." unique_id=874018886]
+[node name="RunInfo" type="HBoxContainer" parent="."]
+editor_description = "Información de la partida, siempre arriba a la izquierda: reloj, etapa y dificultad (la ficha se oculta mientras la dificultad extra es cero)."
+offset_left = 16.0
+offset_top = 6.0
+offset_right = 16.0
+offset_bottom = 38.0
+mouse_filter = 2
+theme_override_constants/separation = 8
+
+[node name="TimerLabel" type="Label" parent="RunInfo" unique_id=874018886]
 unique_name_in_owner = true
-anchors_preset = -1
-offset_left = 19.0
-offset_top = 4.0
-offset_right = 81.0
-offset_bottom = 36.0
-grow_horizontal = 2
+layout_mode = 2
 theme_override_colors/font_color = Color(1, 0.957, 0.863, 1)
 theme_override_font_sizes/font_size = 20
 text = "00:00"
 
-[node name="WeatherBadge" type="Label" parent="TimerLabel" unique_id=1493541020]
+[node name="WeatherBadge" type="Label" parent="RunInfo/TimerLabel" unique_id=1493541020]
 unique_name_in_owner = true
 visible = false
 layout_mode = 1
@@ -75,41 +78,18 @@ text = "Luna de sangre 36s"
 horizontal_alignment = 1
 script = ExtResource("3_weather")
 
-[node name="StageLabel" type="Label" parent="." unique_id=1608730742]
+[node name="StageLabel" type="Label" parent="RunInfo" unique_id=1608730742]
 unique_name_in_owner = true
-anchors_preset = -1
-anchor_left = 1.0
-anchor_top = 1.0
-anchor_right = 1.0
-anchor_bottom = 1.0
-offset_left = -66.0
-offset_top = -118.0
-offset_right = -19.0
-offset_bottom = -98.0
-grow_horizontal = 2
+layout_mode = 2
 theme_override_colors/font_color = Color(1, 0.824, 0.247, 1)
-theme_override_colors/font_outline_color = Color(0.1, 0.07, 0.02, 0.9)
-theme_override_constants/outline_size = 4
-theme_override_font_sizes/font_size = 14
+theme_override_font_sizes/font_size = 20
 text = "E1"
 horizontal_alignment = 1
 vertical_alignment = 1
 
-[node name="CurseLabel" type="Label" parent="." unique_id=823731012]
+[node name="DifficultyChip" parent="RunInfo" instance=ExtResource("14_difficulty")]
 unique_name_in_owner = true
-visible = false
-anchors_preset = 5
-anchor_left = 0.5
-anchor_right = 0.5
-offset_left = 64.0
-offset_top = 30.0
-offset_right = 64.0
-offset_bottom = 30.0
-theme_override_colors/font_color = Color(0.949, 0.329, 0.176, 1)
-theme_override_colors/font_outline_color = Color(0.08, 0.03, 0.03, 0.9)
-theme_override_constants/outline_size = 4
-theme_override_font_sizes/font_size = 14
-text = "Dificultad +15%"
+layout_mode = 2
 
 [node name="KillsLabel" type="Label" parent="." unique_id=80650438]
 unique_name_in_owner = true
@@ -317,8 +297,8 @@ theme_override_font_sizes/font_size = 12
 horizontal_alignment = 2
 script = ExtResource("7_probe")
 
-[node name="BuildStrip" type="HBoxContainer" parent="." unique_id=685484247]
-unique_name_in_owner = true
+[node name="LoadoutDock" type="VBoxContainer" parent="."]
+editor_description = "Muelle de equipo del jugador 1: la bolsa arriba y armas, tomos y mascota abajo. Anclado abajo a la izquierda y crece hacia arriba; su ancho lo fijan las columnas de BagStrip, así nunca llega a la barra de vida."
 anchors_preset = 2
 anchor_top = 1.0
 anchor_bottom = 1.0
@@ -327,27 +307,30 @@ offset_top = -84.0
 offset_right = 16.0
 offset_bottom = -36.0
 grow_vertical = 0
-mouse_filter = 1
+mouse_filter = 2
 theme_override_constants/separation = 6
-script = ExtResource("8_strip")
+alignment = 2
 
-[node name="BagStrip" type="HBoxContainer" parent="." unique_id=2136025266]
+[node name="BagStrip" type="GridContainer" parent="LoadoutDock" unique_id=2136025266]
 unique_name_in_owner = true
-anchors_preset = 3
-anchor_left = 1.0
-anchor_top = 1.0
-anchor_right = 1.0
-anchor_bottom = 1.0
-offset_left = -16.0
-offset_top = -84.0
-offset_right = -16.0
-offset_bottom = -36.0
-grow_horizontal = 0
-grow_vertical = 0
-mouse_filter = 1
-theme_override_constants/separation = 6
+layout_mode = 2
+size_flags_horizontal = 0
+mouse_filter = 2
+theme_override_constants/h_separation = 4
+theme_override_constants/v_separation = 4
+columns = 10
 script = ExtResource("8_strip")
 contents = 1
+compact_tiles = true
+max_tiles = 20
+
+[node name="BuildStrip" type="HBoxContainer" parent="LoadoutDock" unique_id=685484247]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 0
+mouse_filter = 2
+theme_override_constants/separation = 6
+script = ExtResource("8_strip")
 
 [node name="MatePanel" type="VBoxContainer" parent="." unique_id=394820517]
 unique_name_in_owner = true
@@ -385,8 +368,8 @@ anchor_left = 0.5
 anchor_top = 1.0
 anchor_right = 0.5
 anchor_bottom = 1.0
-offset_top = -104.0
-offset_bottom = -104.0
+offset_top = -40.0
+offset_bottom = -40.0
 grow_horizontal = 2
 grow_vertical = 0
 mouse_filter = 1

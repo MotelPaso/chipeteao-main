@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
+  <!-- Jefes: una corona. Dibujo propio. -->
+  <g stroke="#15131a" stroke-width="8" stroke-linejoin="round" stroke-linecap="round">
+<path d="M16 100 L16 40 L42 64 L64 24 L86 64 L112 40 L112 100 Z" fill="#ffd23f"/>
+<path d="M16 100 L112 100 L112 84 L16 84 Z" fill="#ffa62b"/>
+<circle cx="64" cy="70" r="9" fill="#f2542d"/><circle cx="16" cy="38" r="7" fill="#fff4dc"/><circle cx="112" cy="38" r="7" fill="#fff4dc"/><circle cx="64" cy="22" r="7" fill="#fff4dc"/>
+  </g>
+</svg>

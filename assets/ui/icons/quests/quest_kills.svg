@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
+  <!-- Bajas: una espada en diagonal. Dibujo propio. -->
+  <g stroke="#15131a" stroke-width="9" stroke-linejoin="round" stroke-linecap="round">
+<path d="M112 12 L116 36 L62 90 L38 66 L92 12 Z" fill="#fff4dc"/>
+<path d="M26 54 L74 102" fill="none" stroke-width="24"/>
+<path d="M26 54 L74 102" fill="none" stroke="#ffa62b" stroke-width="10"/>
+<path d="M44 84 L22 106" fill="none" stroke-width="24"/>
+<path d="M44 84 L22 106" fill="none" stroke="#f2542d" stroke-width="10"/>
+  </g>
+</svg>

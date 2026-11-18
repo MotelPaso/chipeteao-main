@@ -24,6 +24,25 @@ mouse_filter = 2
 expand_mode = 1
 stretch_mode = 5
 
+[node name="StatIcon" type="TextureRect" parent="Inner"]
+unique_name_in_owner = true
+visible = false
+texture_filter = 4
+editor_description = "Icono de estadística de tomos y objetos; lo pone loadout_tile.gd. Los márgenes son el aire entre el icono y el contorno. Texture Filter con mipmaps para que el SVG se vea limpio en chico."
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 4.0
+offset_top = 4.0
+offset_right = -4.0
+offset_bottom = -4.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+expand_mode = 1
+stretch_mode = 5
+
 [node name="Glyph" type="Label" parent="Inner" unique_id=386867677]
 unique_name_in_owner = true
 visible = false

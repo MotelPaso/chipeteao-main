@@ -3,13 +3,18 @@ extends PanelContainer
 ## Una casilla de las franjas de equipo y de la fila de power-ups: un sticker
 ## del color de su tipo o rareza, con contorno de tinta y sombra dura, que
 ## lleva el ícono o, mientras no hay ícono, el glifo de dos letras del
-## catálogo en tinta, y una esquina con nivel, pilas, copias o segundos. Quien la usa solo le pasa una entrada (show_entry); el aspecto
-## vive aquí y en LoadoutTile.tscn.
+## catálogo en tinta, y una esquina con nivel, pilas, copias o segundos. Quien
+## la usa solo le pasa una entrada (show_entry) y, si la quiere chica,
+## set_compact; el aspecto vive aquí y en LoadoutTile.tscn.
 ##
-## Convención de íconos: una casilla dibuja res://assets/icons/<biblioteca>/<id>.png
-## si existe y, si no, su glifo sobre el color (o sobre la imagen de reemplazo
-## con show_placeholder_art); así se agregan sprites por id sin tocar código. El `icon` propio de una fila de
-## catálogo gana sobre ambos.
+## Qué dibuja una casilla, en este orden:
+##   1. el `icon` propio de la fila del catálogo;
+##   2. res://assets/icons/<biblioteca>/<id>.png (así se agregan sprites por id
+##      sin tocar código);
+##   3. en tomos y objetos, el icono de su estadística o de su efecto especial
+##      (ItemIcons / StatIcons, los mismos de la Colección);
+##   4. el glifo de dos letras sobre el color (o sobre la imagen de reemplazo
+##      con show_placeholder_art).
 
 ## Carpeta raíz de los íconos por id.
 const ICON_ROOT := "res://assets/icons/"
@@ -21,6 +26,8 @@ const ICON_LIBRARY_TOMES := "tomes"
 const ICON_LIBRARY_ITEMS := "items"
 const ICON_LIBRARY_POWERUPS := "powerups"
 const ICON_LIBRARY_PETS := "pets"
+## Bibliotecas cuyas filas de catálogo tienen icono de estadística (paso 3).
+const STAT_ICON_LIBRARIES: Array[String] = [ICON_LIBRARY_TOMES, ICON_LIBRARY_ITEMS]
 
 @export_group("Recuadro")
 ## Grosor del contorno de tinta, en píxeles. El cuerpo toma el color de la
@@ -43,8 +50,22 @@ const ICON_LIBRARY_PETS := "pets"
 @export var placeholder_glyph_outline: int = 4
 ## Espacio extra entre las letras del glifo, en píxeles.
 @export var glyph_letter_spacing: int = 1
+@export_group("Casilla chica")
+## Lado de la casilla chica (la de los objetos de la bolsa), en píxeles. El de
+## la casilla normal es Custom Minimum Size en LoadoutTile.tscn.
+@export var compact_size: Vector2 = Vector2(34.0, 34.0)
+## Tamaño de fuente del glifo en una casilla chica, en píxeles.
+@export var compact_glyph_font_size: int = 14
+## Tamaño de fuente de la esquina en una casilla chica, en píxeles. El de la
+## casilla normal es el de Corner en LoadoutTile.tscn.
+@export var compact_corner_font_size: int = 9
+
+var _compact: bool = false
+## Tamaño de la casilla normal (el de la escena), para volver de la chica.
+var _normal_size: Vector2 = Vector2.ZERO
 
 @onready var _icon: TextureRect = %Icon
+@onready var _stat_icon: TextureRect = %StatIcon
 @onready var _glyph: Label = %Glyph
 @onready var _corner: Label = %Corner
 
@@ -53,8 +74,24 @@ func _ready() -> void:
 	_glyph.add_theme_font_override("font", UiTheme.spaced_font(glyph_letter_spacing))
 
 
+## Achica la casilla (compact_size y sus fuentes). Llamar después de agregarla
+## al árbol y antes de show_entry.
+func set_compact(on: bool) -> void:
+	if on == _compact:
+		return
+	_compact = on
+	if on:
+		_normal_size = custom_minimum_size
+		custom_minimum_size = compact_size
+		_corner.add_theme_font_size_override("font_size", compact_corner_font_size)
+	else:
+		custom_minimum_size = _normal_size
+		_corner.remove_theme_font_size_override("font_size")
+
+
 ## Pinta la casilla para `entry` = {glyph, library, entry_id, color, corner,
-## tip, icon}. Llamar después de agregarla al árbol.
+## tip, icon, row}. `row` es la fila del catálogo (opcional): de ella sale el
+## icono de estadística de tomos y objetos. Llamar después de agregarla al árbol.
 func show_entry(entry: Dictionary) -> void:
 	var color: Color = entry.color
 	tooltip_text = String(entry.tip)
@@ -67,16 +104,25 @@ func show_entry(entry: Dictionary) -> void:
 	if icon_path == ICON_PLACEHOLDER and not show_placeholder_art:
 		icon_path = ""
 	var on_placeholder := icon_path == ICON_PLACEHOLDER
+	# Sin sprite propio, un tomo o un objeto dibuja el icono de su estadística.
+	var stat_icon: Texture2D = stat_icon_for(entry) \
+			if icon_path.is_empty() or on_placeholder else null
+	if stat_icon != null:
+		icon_path = ""
+		on_placeholder = false
+	_stat_icon.visible = stat_icon != null
+	_stat_icon.texture = stat_icon
 	_icon.visible = not icon_path.is_empty()
 	if _icon.visible:
 		_icon.texture = load(icon_path)
-	# El glifo es el arte mientras no hay sprite: solo sobre una casilla vacía,
+	# El glifo es el arte mientras no hay icono: solo sobre una casilla vacía,
 	# o sobre la imagen de reemplazo para que se siga leyendo.
-	_glyph.visible = icon_path.is_empty() or on_placeholder
+	_glyph.visible = stat_icon == null and (icon_path.is_empty() or on_placeholder)
 	if _glyph.visible:
 		_glyph.text = String(entry.glyph)
+		var free_size := compact_glyph_font_size if _compact else glyph_font_size
 		_glyph.add_theme_font_size_override("font_size",
-				placeholder_glyph_font_size if on_placeholder else glyph_font_size)
+				placeholder_glyph_font_size if on_placeholder else free_size)
 		_glyph.add_theme_color_override("font_color",
 				UiTheme.TEXT_BRIGHT if on_placeholder else UiTheme.INK)
 		_glyph.add_theme_constant_override("outline_size",
@@ -110,6 +156,20 @@ static func icon_path_for(entry: Dictionary) -> String:
 	if ResourceLoader.exists(ICON_PLACEHOLDER, "Texture2D"):
 		return ICON_PLACEHOLDER
 	return ""
+
+
+## El icono de estadística de una entrada de tomo u objeto (el mismo de la
+## Colección), sacado de su fila de catálogo `row`. null si la entrada no es
+## de esas bibliotecas, no trae fila o su fila no tiene icono propio: ahí la
+## casilla cae al glifo en vez de repetir el icono genérico en todas.
+static func stat_icon_for(entry: Dictionary) -> Texture2D:
+	if not STAT_ICON_LIBRARIES.has(String(entry.get("library", ""))):
+		return null
+	var row: Dictionary = entry.get("row", {})
+	if row.is_empty():
+		return null
+	var icon := ItemIcons.texture(row)
+	return null if icon == StatIcons.texture("") else icon
 
 
 ## Glifo de una casilla: el `glyph` de dos letras de la fila del catálogo si

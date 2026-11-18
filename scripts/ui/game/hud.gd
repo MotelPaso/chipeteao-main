@@ -3,8 +3,9 @@ extends CanvasLayer
 ## Este nodo raíz lleva la vida, la XP, el nivel, el reloj, las bajas, los
 ## puntos, la dificultad y la etapa. Lo demás son componentes en HUD.tscn,
 ## cada uno con su aspecto en sus propiedades: racha (%StreakLabel), anuncios
-## (%AnnounceLabel), jefe (%BossBar, %BossArrow), franjas de equipo
-## (%BuildStrip, %BagStrip), power-ups (%PowerUpRow), compañeros (%MatePanel),
+## (%AnnounceLabel), jefe (%BossBar, %BossArrow), ficha de dificultad
+## (%DifficultyChip), franjas de equipo (%BuildStrip, %BagStrip), power-ups
+## (%PowerUpRow), compañeros (%MatePanel),
 ## botín (%LootToast), FPS (%FpsBadge), clima (%WeatherBadge), sonda de
 ## depuración (%PerfProbe) y mapas (%ViewWidgets).
 ##
@@ -64,8 +65,6 @@ extends CanvasLayer
 @export var kills_format: String = "Bajas: %d"
 ## Puntos del jugador 1.
 @export var points_format: String = UiTheme.POINTS_AMOUNT
-## Dificultad de la partida en porcentaje (%% es el signo %).
-@export var difficulty_format: String = "Dificultad +%d%%"
 ## Etiqueta de etapa en la primera vuelta; empieza en E1.
 @export var stage_format: String = "E%d"
 ## Etiqueta de etapa desde la segunda vuelta: etapa y vuelta.
@@ -105,7 +104,7 @@ var _shown_second: int = -1
 @onready var _timer_label: Label = %TimerLabel
 @onready var _kills_label: Label = %KillsLabel
 @onready var _points_label: Label = %PointsLabel
-@onready var _curse_label: Label = %CurseLabel
+@onready var _difficulty: DifficultyChip = %DifficultyChip
 @onready var _stage_label: Label = %StageLabel
 @onready var _streak: StreakPopup = %StreakLabel
 @onready var _announce: AnnounceBanner = %AnnounceLabel
@@ -172,7 +171,7 @@ func track_objective(node: Node3D) -> void:
 	_boss_arrow.track_objective(node)
 
 
-## Etiqueta de etapa, sobre los puntos: "E%d" y, desde que el grupo dio la
+## Etiqueta de etapa, junto al reloj: "E%d" y, desde que el grupo dio la
 ## vuelta a la lista de mapas, "E%d · V%d". En pantalla ambos empiezan en 1;
 ## RunState los guarda desde 0. GLOSARIO regla 6: Nivel/Nv es el jugador,
 ## Etapa/E el mapa, Vuelta/V la vuelta y Rango una reliquia.
@@ -345,17 +344,16 @@ func _on_points_changed(total: int) -> void:
 	UiTheme.pop(_points_label, points_pop_scale, points_pop_time)
 
 
-## Dificultad de la partida, arriba al centro (altares demoníacos, Tomo del
-## Peligro, ruleta); oculta mientras es cero.
+## Dificultad de la partida (altares demoníacos, Tomo del Peligro, ruleta):
+## la ficha junto al reloj, oculta mientras es cero.
 func _on_difficulty_changed(bonus: float) -> void:
-	_curse_label.visible = bonus > 0.001
-	_curse_label.text = difficulty_format % roundi(bonus * 100.0)
+	_difficulty.show_bonus(bonus)
 
 
 # --- estilos ------------------------------------------------------------------
 
 ## Estilos de UiTheme: barras en capas (fondo, relleno, línea de brillo y
-## borde de avance) y pastillas para nivel, reloj, bajas y puntos. El color
+## borde de avance) y pastillas para nivel, reloj, etapa, bajas y puntos. El color
 ## del texto de cada pastilla es el de su nodo en HUD.tscn.
 func _apply_styles() -> void:
 	_hp_fill = UiTheme.style_bar(_hp_bar, hp_full_color, hp_corner_radius)
@@ -366,7 +364,8 @@ func _apply_styles() -> void:
 	xp_trough.border_color = xp_line_color
 	_xp_bar.add_theme_stylebox_override("background", xp_trough)
 	_xp_bar.add_theme_stylebox_override("fill", UiTheme.bar_fill(xp_color, xp_corner_radius))
-	for label: Label in [_level_label, _kills_label, _points_label, _timer_label]:
+	for label: Label in [_level_label, _kills_label, _points_label, _timer_label,
+			_stage_label]:
 		UiTheme.style_badge(label, label.get_theme_color(&"font_color"))
 	_timer_label.add_theme_font_override("font", UiTheme.spaced_font(timer_letter_spacing))
 	_hp_label.add_theme_font_override("font", UiTheme.display_font())

@@ -1,75 +1,67 @@
 extends MetaScreen
-## Registro de misiones (GDD 8), abierto desde el botón Misiones del
-## selector: cada desafío de QuestCatalog como una fila con nombre,
-## descripción, barra de progreso x/y y su recompensa en esquirlas. Las
-## misiones completas sin reclamar suben arriba con borde brillante y un
-## botón Reclamar: reclamar es el pago manual que acredita las esquirlas
-## (SaveData guarda al instante). Las reclamadas bajan al fondo, atenuadas.
+## Registro de misiones (GDD 8), abierto desde la tarjeta Misiones del menú:
+## cada desafío de QuestCatalog como una tarjeta (QuestCard.tscn), en grupos
+## con un título pequeño. Arriba van las completas sin reclamar («Para
+## reclamar»), después las que siguen en curso agrupadas por tipo (bajas,
+## jefes, altares… según QuestTypes) y al final las ya reclamadas, atenuadas.
+## Reclamar es el pago manual que acredita las esquirlas (SaveData guarda al
+## instante).
 ##
-## El cromo, la salida con Esc/Volver, la entrada escalonada y el pago (la
-## fila destella en oro y el saldo cuenta y salta) vienen de MetaScreen.
+## El aspecto de cada tarjeta vive en QuestCard.tscn. El cromo, la salida con
+## Esc/Volver y el pago (la tarjeta destella en oro y el saldo cuenta y salta)
+## vienen de MetaScreen. La entrada es propia: las tarjetas llegan una tras
+## otra en vez de deslizarse toda la pantalla.
 
-## Tres estados de fila que se excluyen entre sí.
-enum RowState { IN_PROGRESS, CLAIMABLE, CLAIMED }
+const CARD_SCENE: PackedScene = preload("res://scenes/ui/meta/QuestCard.tscn")
 
-@export_group("Filas")
-## Tamaño de fuente del nombre de la misión, en píxeles.
-@export var name_font_size: int = 16
-## Color del nombre de la misión.
-@export var name_color: Color = UiTheme.TEXT_BRIGHT
-## Tamaño de fuente de la descripción de la misión, en píxeles.
-@export var description_font_size: int = 12
-## Color de la descripción de la misión.
-@export var description_color: Color = UiTheme.TEXT_DIM
-## Tamaño de fuente de la recompensa "+N esquirlas" de la derecha, en píxeles.
-@export var reward_font_size: int = 14
-## Color de la recompensa "+N esquirlas" de la derecha.
-@export var reward_color: Color = UiTheme.SHARD_BLUE
-## Tamaño de fuente del contador "x/y" junto a la barra, en píxeles.
-@export var progress_font_size: int = 12
-## Color del contador "x/y" junto a la barra.
-@export var progress_color: Color = Color(0.72, 0.74, 0.78)
-## Tamaño de fuente del sello de misión reclamada, en píxeles.
-@export var claimed_font_size: int = 12
-## Color del sello de misión reclamada.
-@export var claimed_color: Color = UiTheme.TEXT_FAINT
-## Modulate de las filas ya reclamadas (atenuadas).
-@export var claimed_row_modulate: Color = Color(1.0, 1.0, 1.0, 0.45)
-## Tamaño mínimo del botón Reclamar, en píxeles (ancho, alto).
-@export var claim_button_size: Vector2 = Vector2(110.0, 34.0)
-## Tamaño mínimo de la barra de progreso, en píxeles (ancho, alto).
-@export var progress_bar_size: Vector2 = Vector2(260.0, 14.0)
-## Separación entre la columna de la misión y la de la recompensa, en píxeles.
-@export var columns_separation: int = 16
-## Separación vertical entre nombre, descripción y progreso, en píxeles.
-@export var info_separation: int = 3
-## Separación vertical entre la recompensa y el botón Reclamar o el sello, en píxeles.
-@export var side_separation: int = 4
-## Separación entre la barra de progreso y su contador, en píxeles.
-@export var progress_separation: int = 10
-## Radio de las esquinas de la barra de progreso, en píxeles.
-@export var progress_bar_radius: int = 5
-## Margen entre el canal de la barra de progreso y su relleno, en píxeles.
-@export var progress_bar_inset: int = 2
-## Cuánto se oscurece el azul de esquirla (UiTheme.SHARD_BLUE) en la barra de
-## una misión en curso (0-1); las terminadas usan UiTheme.ACCENT_AMBER.
-@export var progress_fill_darken: float = 0.15
-## Espacio extra entre las letras del sello RECLAMADA, en píxeles.
-@export var claimed_spacing: int = 1
+@export_group("Grupos")
+## Título del grupo de misiones completas sin reclamar.
+@export var claimable_title: String = "Para reclamar"
+## Título del grupo de misiones ya reclamadas.
+@export var claimed_title: String = "Reclamadas"
+## Título de cada grupo: su nombre y cuántas misiones tiene.
+@export var group_title_format: String = "%s · %d"
+## Tamaño de fuente del título de cada grupo, en píxeles.
+@export var group_title_font_size: int = 15
+## Color del título de cada grupo.
+@export var group_title_color: Color = UiTheme.ACCENT
+## Color del título del grupo de reclamadas.
+@export var claimed_title_color: Color = UiTheme.TEXT_FAINT
+## Espacio extra entre las letras del título de cada grupo, en píxeles.
+@export var group_title_spacing: int = 1
+## Aire sobre el título de un grupo, en píxeles (separa un grupo del anterior).
+@export var group_gap: float = 8.0
 
-@export_group("Textos")
-## Botón de una misión completa sin reclamar.
-@export var claim_text: String = "Reclamar"
-## Sello de una misión ya reclamada.
-@export var claimed_text: String = "RECLAMADA"
+@export_group("Entrada")
+## Espera entre la primera tarjeta y la segunda al abrir, en segundos.
+@export var card_stagger: float = 0.06
+## Cuánto se acorta cada espera respecto de la anterior (1 = todas iguales).
+@export_range(0.5, 1.0) var card_stagger_shrink: float = 0.8
+## Desde esta tarjeta todas llegan juntas: las de más abajo no se ven al abrir.
+@export var card_stagger_cap: int = 6
 
 
-## Primero las reclamables, luego las en curso en orden de catálogo y al
-## final las reclamadas, atenuadas.
+func _slides_in() -> bool:
+	return false
+
+
+## Entrada al abrir: las tarjetas llegan una tras otra con esperas que se
+## acortan, y desde card_stagger_cap todas juntas. Los títulos de grupo, el
+## título y Volver ya están ahí: una sola entrada por pantalla. Es decorativa:
+## el foco y los botones funcionan desde el primer frame.
+func play_entrance() -> void:
+	var index := 0
+	for child: Node in _list.get_children():
+		var card := child as QuestCard
+		if card != null:
+			card.play_entrance(_card_delay(index))
+			index += 1
+
+
 func _build_rows(list_node: VBoxContainer) -> void:
 	var claimable: Array[Dictionary] = []
-	var in_progress: Array[Dictionary] = []
 	var claimed: Array[Dictionary] = []
+	var by_type: Dictionary[String, Array] = {}
 	for quest: Dictionary in QuestCatalog.QUEST_LIBRARY:
 		var quest_id := String(quest.id)
 		if SaveData.is_quest_claimed(quest_id):
@@ -77,93 +69,61 @@ func _build_rows(list_node: VBoxContainer) -> void:
 		elif SaveData.is_quest_completed(quest_id):
 			claimable.append(quest)
 		else:
-			in_progress.append(quest)
-	for quest: Dictionary in claimable:
-		list_node.add_child(_build_row(quest, RowState.CLAIMABLE))
-	for quest: Dictionary in in_progress:
-		list_node.add_child(_build_row(quest, RowState.IN_PROGRESS))
-	for quest: Dictionary in claimed:
-		list_node.add_child(_build_row(quest, RowState.CLAIMED))
+			var type_id := QuestTypes.type_of(String(quest.stat))
+			if not by_type.has(type_id):
+				by_type[type_id] = []
+			by_type[type_id].append(quest)
+	_add_group(list_node, claimable_title, group_title_color, claimable,
+			QuestCard.State.CLAIMABLE)
+	for type_id: String in QuestTypes.ids():
+		var quests: Array[Dictionary] = []
+		quests.assign(by_type.get(type_id, []))
+		_add_group(list_node, QuestTypes.title(type_id), group_title_color, quests,
+				QuestCard.State.IN_PROGRESS)
+	_add_group(list_node, claimed_title, claimed_title_color, claimed,
+			QuestCard.State.CLAIMED)
+
+
+## Un grupo: su título y una tarjeta por misión. Un grupo vacío no se dibuja.
+func _add_group(list_node: VBoxContainer, title: String, title_color: Color,
+		quests: Array[Dictionary], state: QuestCard.State) -> void:
+	if quests.is_empty():
+		return
+	list_node.add_child(_group_title(group_title_format % [title, quests.size()],
+			title_color, list_node.get_child_count() > 0))
+	for quest: Dictionary in quests:
+		var card: QuestCard = CARD_SCENE.instantiate()
+		list_node.add_child(card)
+		card.show_quest(quest, state, SaveData.stat(String(quest.stat)))
+		card.claim_pressed.connect(_on_claim_pressed.bind(card))
+
+
+func _group_title(text: String, color: Color, spaced: bool) -> Control:
+	var title := MetaScreen.label(text, group_title_font_size, color)
+	title.add_theme_font_override("font", UiTheme.display_font(group_title_spacing))
+	if not spaced:
+		return title
+	var margin := MarginContainer.new()
+	margin.add_theme_constant_override("margin_top", int(group_gap))
+	margin.add_child(title)
+	return margin
 
 
 ## El pago: acredita las esquirlas y deja que MetaScreen haga destellar la
-## fila, cuente el saldo y reordene la lista.
-func _on_claim_pressed(quest_id: String, row: PanelContainer) -> void:
+## tarjeta, cuente el saldo y reordene la lista.
+func _on_claim_pressed(quest_id: String, card: QuestCard) -> void:
 	var before := SaveData.shards
 	if SaveData.claim_quest(quest_id) <= 0:
 		return
-	payoff(row, before, SaveData.shards, &"gem_pickup")
+	payoff(card, before, SaveData.shards, &"gem_pickup")
 
 
-func _build_row(quest: Dictionary, state: RowState) -> PanelContainer:
-	var row := PanelContainer.new()
-	var claimable := state == RowState.CLAIMABLE
-	row.add_theme_stylebox_override("panel", MetaScreen.card_style(
-			UiTheme.ACCENT_AMBER if claimable else UiTheme.BORDER_DIM, claimable))
-	if state == RowState.CLAIMED:
-		row.modulate = claimed_row_modulate
-	var columns := HBoxContainer.new()
-	columns.add_theme_constant_override("separation", columns_separation)
-	row.add_child(columns)
-	columns.add_child(_build_info(quest, state))
-	columns.add_child(_build_side(quest, state, row))
-	return row
-
-
-## Columna izquierda: nombre, descripción y la línea de progreso.
-func _build_info(quest: Dictionary, state: RowState) -> VBoxContainer:
-	var info := VBoxContainer.new()
-	info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	info.add_theme_constant_override("separation", info_separation)
-	info.add_child(MetaScreen.label(String(quest.display_name), name_font_size, name_color))
-	info.add_child(MetaScreen.label(String(quest.description), description_font_size,
-			description_color))
-	info.add_child(_progress_line(SaveData.stat(String(quest.stat)), int(quest.target),
-			state != RowState.IN_PROGRESS))
-	return info
-
-
-## Columna derecha: la recompensa y lo propio del estado (botón Reclamar,
-## sello RECLAMADA o nada mientras sigue en curso).
-func _build_side(quest: Dictionary, state: RowState,
-		row: PanelContainer) -> VBoxContainer:
-	var side := VBoxContainer.new()
-	side.alignment = BoxContainer.ALIGNMENT_CENTER
-	side.add_theme_constant_override("separation", side_separation)
-	var reward := MetaScreen.label(UiTheme.SHARDS_GAIN % int(quest.reward),
-			reward_font_size, reward_color)
-	reward.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	side.add_child(reward)
-	if state == RowState.CLAIMABLE:
-		var claim := Button.new()
-		claim.text = claim_text
-		claim.custom_minimum_size = claim_button_size
-		claim.pressed.connect(_on_claim_pressed.bind(String(quest.id), row))
-		UiTheme.style_button(claim, UiTheme.ACCENT_AMBER, true)
-		side.add_child(claim)
-	elif state == RowState.CLAIMED:
-		var done := MetaScreen.label(claimed_text, claimed_font_size, claimed_color)
-		done.add_theme_font_override("font", UiTheme.spaced_font(claimed_spacing))
-		done.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		side.add_child(done)
-	return side
-
-
-## Barra "x/y" con contador; la barra se acota, así pasarse se lee lleno.
-## Las misiones terminadas pintan el relleno de ámbar.
-func _progress_line(current: int, target: int, complete: bool) -> HBoxContainer:
-	var line := HBoxContainer.new()
-	line.add_theme_constant_override("separation", progress_separation)
-	var bar := ProgressBar.new()
-	bar.custom_minimum_size = progress_bar_size
-	bar.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	bar.max_value = float(target)
-	bar.value = float(mini(current, target))
-	bar.show_percentage = false
-	UiTheme.style_bar(bar,
-			UiTheme.ACCENT_AMBER if complete else UiTheme.SHARD_BLUE.darkened(progress_fill_darken),
-			progress_bar_radius, progress_bar_inset)
-	line.add_child(bar)
-	line.add_child(MetaScreen.label("%d/%d" % [mini(current, target), target],
-			progress_font_size, progress_color))
-	return line
+## Espera de la tarjeta número `index` (desde 0): cada paso es más corto que
+## el anterior (card_stagger_shrink) y se detiene en card_stagger_cap.
+func _card_delay(index: int) -> float:
+	var delay := 0.0
+	var step := card_stagger
+	for i in mini(index, card_stagger_cap):
+		delay += step
+		step *= card_stagger_shrink
+	return delay

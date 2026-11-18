@@ -14,7 +14,7 @@ extends Control
 ## principal. El título vive entero en la escena (texto, fuente, color), y el
 ## color de texto de %BadgeLabel en la escena también pinta su píldora.
 ##
-## Ganchos de las subclases: _tracks_shards() y _build_rows(list). Momentos
+## Ganchos de las subclases: _tracks_shards(), _slides_in() y _build_rows(list). Momentos
 ## compartidos que llama una subclase: payoff() (reclamar / comprar),
 ## reject() (no alcanza) y rebuild().
 
@@ -89,7 +89,7 @@ func _ready() -> void:
 	rebuild()
 	# Una sola entrada: si la pantalla llegó deslizándose desde el menú, sus
 	# filas ya vienen con ella y no se escalonan además.
-	if not MenuNav.arrive(_content):
+	if not MenuNav.arrive(_content, _slides_in()):
 		play_entrance()
 	_back_button.grab_focus()
 
@@ -317,6 +317,13 @@ static func label(label_text: String, font_size: int, color: Color) -> Label:
 ## False en una pantalla cuya insignia no es un saldo de esquirlas (escribe
 ## su propio texto al reconstruir).
 func _tracks_shards() -> bool:
+	return true
+
+
+## False en una pantalla que prefiere su propia entrada al deslizamiento
+## desde el menú: debe hacerla ella (sobrescribiendo _ready o play_entrance),
+## porque con el deslizamiento apagado nadie más la llama.
+func _slides_in() -> bool:
 	return true
 
 
