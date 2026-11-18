@@ -1,11 +1,10 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
-  <!-- Bajas: dos espadas cruzadas. Dibujo propio. -->
-  <g stroke="#15131a" stroke-width="8" stroke-linejoin="round" stroke-linecap="round">
-<path d="M22 18 L38 18 L92 72 L80 84 L26 30 Z" fill="#fff4dc"/>
-<path d="M106 18 L90 18 L36 72 L48 84 L102 30 Z" fill="#fff4dc"/>
-<path d="M70 94 L98 66" fill="none" stroke-width="12"/><path d="M58 94 L30 66" fill="none" stroke-width="12"/>
-<path d="M84 80 L104 100" fill="none" stroke="#15131a" stroke-width="16"/><path d="M84 80 L104 100" fill="none" stroke="#ffa62b" stroke-width="7"/>
-<path d="M44 80 L24 100" fill="none" stroke="#15131a" stroke-width="16"/><path d="M44 80 L24 100" fill="none" stroke="#ffa62b" stroke-width="7"/>
-<circle cx="107" cy="103" r="8" fill="#f2542d"/><circle cx="21" cy="103" r="8" fill="#f2542d"/>
+  <!-- Bajas: una espada en diagonal. Dibujo propio. -->
+  <g stroke="#15131a" stroke-width="9" stroke-linejoin="round" stroke-linecap="round">
+<path d="M112 12 L116 36 L62 90 L38 66 L92 12 Z" fill="#fff4dc"/>
+<path d="M26 54 L74 102" fill="none" stroke-width="24"/>
+<path d="M26 54 L74 102" fill="none" stroke="#ffa62b" stroke-width="10"/>
+<path d="M44 84 L22 106" fill="none" stroke-width="24"/>
+<path d="M44 84 L22 106" fill="none" stroke="#f2542d" stroke-width="10"/>
   </g>
 </svg>

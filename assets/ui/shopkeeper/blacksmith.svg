@@ -1,0 +1,69 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="80 20 490 615" width="490" height="615">
+  <!-- El herrero de la Armería: viejo, gruñón, delantal de cuero chamuscado y un martillo enorme al hombro. Personaje y dibujo propios. -->
+  <ellipse cx="256" cy="604" rx="176" ry="24" fill="#15131a"/>
+  <g stroke="#15131a" stroke-width="10" stroke-linejoin="round" stroke-linecap="round">
+    <!-- cabeza del martillo, detrás de todo -->
+    <g transform="rotate(-20 418 132)">
+      <rect x="318" y="72" width="200" height="120" rx="14" fill="#93b0ab"/>
+      <rect x="318" y="72" width="42" height="120" rx="10" fill="#c3d6d0"/>
+      <rect x="476" y="72" width="42" height="120" rx="10" fill="#c3d6d0"/>
+      <path d="M376 96 L460 96" fill="none" stroke="#fff4dc" stroke-width="8"/>
+    </g>
+    <!-- botas -->
+    <path d="M168 548 L246 548 L246 598 L150 598 C150 574 156 560 168 548 Z" fill="#12343b"/>
+    <path d="M266 548 L344 548 C356 560 362 574 362 598 L266 598 Z" fill="#12343b"/>
+    <!-- torso -->
+    <path d="M132 330 C132 286 180 268 256 268 C332 268 380 286 380 330 L366 556 L146 556 Z" fill="#246370"/>
+    <!-- delantal de cuero -->
+    <path d="M196 300 L176 356 L160 556 L352 556 L336 356 L316 300 Z" fill="#a2602f"/>
+    <path d="M196 300 L176 356 L336 356 L316 300" fill="none" stroke-width="8"/>
+    <rect x="226" y="440" width="60" height="50" rx="8" fill="#c98548" stroke-width="7" stroke-dasharray="10 9"/>
+    <g stroke="none" fill="#4a2a17">
+      <path d="M172 470 C186 456 204 462 206 480 C210 500 196 516 178 512 C168 510 164 484 172 470 Z"/>
+      <path d="M300 392 C314 384 330 392 328 408 C326 420 310 424 300 416 C294 410 294 398 300 392 Z"/>
+      <path d="M306 520 C320 510 340 518 342 536 L344 556 L300 556 C296 544 298 528 306 520 Z"/>
+      <circle cx="218" cy="402" r="9"/>
+    </g>
+    <circle cx="186" cy="488" r="5" fill="#ffa62b" stroke="none"/>
+    <circle cx="322" cy="538" r="5" fill="#f2542d" stroke="none"/>
+    <!-- brazo izquierdo, puño en la cadera -->
+    <path d="M140 314 C110 330 92 380 96 430 C98 452 112 462 130 458 C146 454 152 440 150 424 C148 396 158 370 172 350 Z" fill="#eeb083"/>
+    <path d="M100 428 C116 420 136 422 148 432" fill="none" stroke-width="7"/>
+    <!-- mango del martillo, sobre el hombro -->
+    <path d="M326 452 L428 150" fill="none" stroke-width="36"/>
+    <path d="M326 452 L428 150" fill="none" stroke="#c46a2a" stroke-width="18"/>
+    <!-- brazo derecho, agarrando el mango -->
+    <path d="M370 314 C404 330 416 372 404 410 C396 434 372 444 350 436 C336 430 330 414 336 400 C344 380 346 362 340 346 Z" fill="#eeb083"/>
+    <path d="M318 396 C318 376 336 366 352 372 C370 378 376 398 366 412 C356 426 334 426 324 414 C320 408 318 402 318 396 Z" fill="#eeb083"/>
+    <path d="M330 388 L360 400 M326 402 L354 414" fill="none" stroke-width="6"/>
+    <!-- cabeza -->
+    <ellipse cx="160" cy="214" rx="20" ry="26" fill="#e09a6c"/>
+    <ellipse cx="352" cy="214" rx="20" ry="26" fill="#e09a6c"/>
+    <path d="M164 206 C164 140 204 104 256 104 C308 104 348 140 348 206 C348 262 308 300 256 300 C204 300 164 262 164 206 Z" fill="#eeb083"/>
+    <!-- mechones a los lados -->
+    <path d="M172 178 L136 158 L156 190 L128 196 L160 214 Z" fill="#c3d6d0"/>
+    <path d="M340 178 L376 158 L356 190 L384 196 L352 214 Z" fill="#c3d6d0"/>
+    <!-- arrugas del ceño -->
+    <path d="M226 138 C244 132 268 132 286 138 M236 156 C248 152 264 152 276 156" fill="none" stroke-width="6"/>
+    <!-- barba grande con las puntas chamuscadas -->
+    <path d="M168 226 C176 246 196 254 216 250 L296 250 C316 254 336 246 344 226 C356 290 340 352 312 384 L296 362 L280 400 L256 372 L232 400 L216 362 L200 384 C172 352 156 290 168 226 Z" fill="#fff4dc"/>
+    <g stroke="none" fill="#4a2a17">
+      <path d="M270 384 L280 400 L290 376 Z"/>
+      <path d="M222 376 L232 400 L242 384 Z"/>
+      <path d="M306 372 L312 384 L322 368 Z"/>
+    </g>
+    <circle cx="281" cy="408" r="5" fill="#ffa62b" stroke="none"/>
+    <path d="M212 300 L220 330 M256 306 L256 340 M300 300 L292 330" fill="none" stroke-width="6"/>
+    <!-- boca torcida y bigote caído -->
+    <path d="M232 284 C246 274 266 274 280 284" fill="none" stroke-width="8"/>
+    <path d="M256 250 C236 246 212 252 196 276 C218 276 240 270 256 262 C272 270 294 276 316 276 C300 252 276 246 256 250 Z" fill="#c3d6d0"/>
+    <!-- nariz -->
+    <path d="M228 236 C228 214 242 204 256 204 C270 204 284 214 284 236 C284 254 272 262 256 262 C240 262 228 254 228 236 Z" fill="#e58a62"/>
+    <!-- ojos y cejas: una entera, la otra quemada -->
+    <circle cx="218" cy="208" r="7" fill="#15131a" stroke="none"/>
+    <circle cx="294" cy="208" r="7" fill="#15131a" stroke="none"/>
+    <path d="M178 172 L238 196 L234 208 L176 190 Z" fill="#c3d6d0" stroke-width="8"/>
+    <path d="M308 186 L276 198 L280 208 L312 198 Z" fill="#4a2a17" stroke-width="8"/>
+    <circle cx="326" cy="182" r="5" fill="#f2542d" stroke="none"/>
+  </g>
+</svg>

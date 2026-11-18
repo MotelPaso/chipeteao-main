@@ -1,8 +1,9 @@
-[gd_scene load_steps=5 format=3]
+[gd_scene load_steps=6 format=3]
 
 [ext_resource type="Script" path="res://scripts/ui/meta/relic_shop.gd" id="1_relicshop"]
 [ext_resource type="Material" path="res://assets/ui/menu_backdrop.tres" id="2_backdrop"]
 [ext_resource type="FontFile" path="res://assets/ui/fonts/LilitaOne-Regular.ttf" id="font_display"]
+[ext_resource type="PackedScene" path="res://scenes/ui/meta/Shopkeeper.tscn" id="3_keeper"]
 
 [sub_resource type="FontVariation" id="FontVariation_title"]
 base_font = ExtResource("font_display")
@@ -43,11 +44,18 @@ theme_override_font_sizes/font_size = 18
 horizontal_alignment = 1
 text = "Esquirlas: 0"
 
-[node name="Scroll" type="ScrollContainer" parent="Center/VBox"]
+[node name="Body" type="HBoxContainer" parent="Center/VBox"]
+theme_override_constants/separation = 18
+
+[node name="Shopkeeper" parent="Center/VBox/Body" instance=ExtResource("3_keeper")]
+unique_name_in_owner = true
+layout_mode = 2
+
+[node name="Scroll" type="ScrollContainer" parent="Center/VBox/Body"]
 custom_minimum_size = Vector2(700, 420)
 horizontal_scroll_mode = 0
 
-[node name="List" type="VBoxContainer" parent="Center/VBox/Scroll"]
+[node name="List" type="VBoxContainer" parent="Center/VBox/Body/Scroll"]
 unique_name_in_owner = true
 size_flags_horizontal = 3
 theme_override_constants/separation = 8
