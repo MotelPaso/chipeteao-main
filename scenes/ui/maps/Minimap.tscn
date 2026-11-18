@@ -1,0 +1,47 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scripts/ui/maps/minimap.gd" id="1_minimap"]
+[ext_resource type="PackedScene" path="res://scenes/ui/maps/MapView.tscn" id="2_view"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_north"]
+content_margin_left = 5.0
+content_margin_top = 0.0
+content_margin_right = 5.0
+content_margin_bottom = 1.0
+bg_color = Color(0.082, 0.075, 0.102, 1)
+corner_radius_top_left = 8
+corner_radius_top_right = 8
+corner_radius_bottom_right = 8
+corner_radius_bottom_left = 8
+
+[node name="Minimap" type="Control" unique_id=1284490517]
+layout_mode = 3
+anchors_preset = 0
+offset_right = 150.0
+offset_bottom = 150.0
+mouse_filter = 2
+script = ExtResource("1_minimap")
+
+[node name="View" parent="." unique_id=771360942 instance=ExtResource("2_view")]
+layout_mode = 1
+offset_left = 10.0
+offset_top = 10.0
+offset_right = -10.0
+offset_bottom = -10.0
+view_radius = 55.0
+round_view = true
+pin_offscreen = true
+marker_scale = 1.25
+rim_shade = 0.3
+
+[node name="North" type="Label" parent="." unique_id=1650932288]
+layout_mode = 0
+offset_right = 17.0
+offset_bottom = 16.0
+mouse_filter = 2
+theme_override_colors/font_color = Color(1, 0.957, 0.863, 1)
+theme_override_font_sizes/font_size = 11
+theme_override_styles/normal = SubResource("StyleBoxFlat_north")
+text = "N"
+horizontal_alignment = 1
+vertical_alignment = 1

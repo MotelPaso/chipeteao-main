@@ -1,32 +1,41 @@
 [gd_scene format=3]
 
 [ext_resource type="Script" path="res://scripts/ui/maps/map_section.gd" id="1_section"]
+[ext_resource type="FontFile" path="res://assets/ui/fonts/LilitaOne-Regular.ttf" id="2_display"]
 
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_section"]
-bg_color = Color(0.078, 0.235, 0.267, 0.97)
-corner_radius_top_left = 7
-corner_radius_top_right = 7
-corner_radius_bottom_right = 7
-corner_radius_bottom_left = 7
+[sub_resource type="StyleBoxEmpty" id="StyleBoxEmpty_none"]
 
 [node name="MapSection" type="PanelContainer" unique_id=2011593384]
 mouse_filter = 2
-theme_override_styles/panel = SubResource("StyleBoxFlat_section")
+theme_override_styles/panel = SubResource("StyleBoxEmpty_none")
 script = ExtResource("1_section")
 
-[node name="Box" type="VBoxContainer" parent="." unique_id=1559668210]
+[node name="Back" type="Control" parent="." unique_id=1273305918]
+editor_description = "No es un contenedor a propósito: así el marco puede girar sin que el layout lo enderece."
+layout_mode = 2
+mouse_filter = 2
+
+[node name="Frame" type="Panel" parent="Back" unique_id=448120637]
+editor_description = "El marco de color. Es lo único que gira; su StyleBox lo arma map_section.gd con el grupo Marco de la raíz."
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="Content" type="MarginContainer" parent="." unique_id=1818620394]
+editor_description = "El texto. No es hijo del marco, así que nunca gira. Sus márgenes los pone map_section.gd (grupo Contenido)."
+layout_mode = 2
+mouse_filter = 2
+
+[node name="Box" type="VBoxContainer" parent="Content" unique_id=1559668210]
 layout_mode = 2
 mouse_filter = 2
 theme_override_constants/separation = 4
 
-[node name="Title" type="Label" parent="Box" unique_id=105465912]
+[node name="Title" type="Label" parent="Content/Box" unique_id=105465912]
 layout_mode = 2
-theme_override_colors/font_color = Color(0.357, 0.839, 0.627, 1)
-theme_override_font_sizes/font_size = 15
-
-[node name="Body" type="Label" parent="Box" unique_id=620089133]
-layout_mode = 2
-theme_override_colors/font_color = Color(0.765, 0.839, 0.816, 1)
-theme_override_font_sizes/font_size = 13
-text = "—"
-autowrap_mode = 3
+theme_override_colors/font_color = Color(0.082, 0.075, 0.102, 1)
+theme_override_fonts/font = ExtResource("2_display")

@@ -1,19 +1,21 @@
 class_name MapDraw
 extends RefCounted
-## El mapa que dibujan el minimapa y el mapa de Tab. Un ayudante, dos
-## consumidores: la imagen, la niebla y los marcadores son idénticos para un
-## widget de 150 px en una esquina y un mapa de media pantalla, y escribirlos
-## dos veces es cómo se separarían.
+## El mapa que comparten TODAS las vistas del HUD: el minimapa y el mapa de Tab
+## de cada jugador dibujan el mismo estado. ViewWidgets crea uno solo y lo
+## refresca; las vistas (MapView) solo lo leen. Escrito una vez por vista, la
+## imagen, la niebla y los marcadores se separarían entre un widget y otro.
 ##
 ## Reparto del trabajo:
-##   - build_background(arena)  una vez por etapa: la imagen del terreno,
-##     oscurecida donde la máscara de la arena bloquea el suelo.
-##   - composite()              en el tick de la niebla: fondo por niebla en
-##     una textura RGBA8 que el consumidor solo copia.
-##   - collect_markers()        cada 0.1 s: quién está dónde, filtrado por lo
-##     que la niebla ya reveló.
-## Ninguno usa un Control, así que un soak headless ejercita todo aunque
-## _draw() nunca se despache con el renderizador falso.
+##   - build_background(arena)  una vez por etapa: la imagen del suelo que
+##     arma MapGround (relieve y formaciones de roca), subida a ground_texture.
+##   - refresh()                cada refresco de ViewWidgets: sube la niebla a
+##     fog_texture si cambió, junta los marcadores y avisa con `refreshed`.
+## Ninguno usa un Control, así que un soak headless ejercita todo aunque nada
+## se dibuje con el renderizador falso. La niebla se mezcla con el suelo en
+## assets/shaders/map_ground.gdshader, no aquí.
+
+## Hay marcadores y niebla nuevos: las vistas se vuelven a dibujar.
+signal refreshed
 
 ## LA tabla de marcadores. Un nodo aparece en el mapa si está en el grupo
 ## "map_markers" y su map_marker_kind() devuelve un tipo de esta tabla; un
@@ -21,14 +23,18 @@ extends RefCounted
 ## su marker_kind: los secretos siguen secretos).
 ##   color:          color del marcador.
 ##   shape:          "dot" | "square" | "triangle" | "diamond".
-##   size:           radio en píxeles del mapa, a la escala del mapa de Tab.
+##   size:           radio en píxeles, antes de la escala de cada vista
+##                   (MapView.marker_scale).
 ##   always_visible: se dibuja aunque la niebla no se haya explorado. Solo el
 ##                   grupo y la salida: lo demás hay que encontrarlo.
+##   pin:            (opcional) el minimapa lo ancla a su orilla cuando queda
+##                   fuera de la vista, para saber hacia dónde está.
+##   order:          (opcional, por defecto 0) los más altos se dibujan encima.
 const MARKER_STYLES: Dictionary[StringName, Dictionary] = {
 	&"player": {"color": Color(0.45, 0.95, 1.0), "shape": "triangle",
-		"size": 4.0, "always_visible": true},
+		"size": 4.5, "always_visible": true, "pin": true, "order": 3},
 	&"boss": {"color": Color(0.98, 0.35, 0.2), "shape": "diamond",
-		"size": 5.0, "always_visible": false},
+		"size": 5.0, "always_visible": false, "pin": true, "order": 2},
 	&"chest": {"color": Color(1.0, 0.82, 0.35), "shape": "square",
 		"size": 3.0, "always_visible": false},
 	&"chest_free": {"color": Color(1.0, 0.93, 0.72), "shape": "square",
@@ -46,7 +52,7 @@ const MARKER_STYLES: Dictionary[StringName, Dictionary] = {
 	&"portal": {"color": Color(0.6, 0.85, 1.0), "shape": "diamond",
 		"size": 3.0, "always_visible": false},
 	&"exit": {"color": Color(1.0, 0.82, 0.35), "shape": "diamond",
-		"size": 6.0, "always_visible": true},
+		"size": 6.0, "always_visible": true, "pin": true, "order": 1},
 	# Power-up en el suelo. Se dibuja con el color de su propia fila vía
 	# map_marker_color(), para distinguir una estrella de una Furia.
 	&"powerup": {"color": Color(0.95, 0.95, 0.4), "shape": "dot",
@@ -83,135 +89,106 @@ const MARKER_LABELS: Dictionary[StringName, String] = {
 }
 
 ## Tipos que a propósito NO tienen fila en la leyenda: cada uno es una
-## VARIANTE de un tipo que ya la tiene (un cofre gratis es un cofre; un altar
-## demoníaco o de codicia es un altar). Se nombran aquí para que el lint de
-## catálogos distinga una omisión a propósito de un olvido: cualquier otro
-## tipo sin fila en MARKER_LABELS es un error.
-const LEGEND_VARIANTS: Dictionary[StringName, bool] = {
-	&"chest_free": true,
-	&"altar_demonic": true,
-	&"altar_greed": true,
+## VARIANTE de un tipo que ya la tiene, y aquí dice de cuál (un cofre gratis
+## es un cofre; un altar demoníaco o de codicia es un altar). Se nombran aquí
+## para que el lint de catálogos distinga una omisión a propósito de un
+## olvido: cualquier otro tipo sin fila en MARKER_LABELS es un error.
+const LEGEND_VARIANTS: Dictionary[StringName, StringName] = {
+	&"chest_free": &"chest",
+	&"altar_demonic": &"altar",
+	&"altar_greed": &"altar",
 }
 
-## Cuánto se oscurece el suelo sin explorar en la composición (0-1). No es
-## opaco del todo: la forma del mapa es una pista, lo que hay ENCIMA es el premio.
-const FOG_ALPHA: float = 0.85
-## Píxeles del mapa por metro de arena. 0.5 da 120 px para una arena de
-## 240 m; el minimapa (150 px) y el mapa de Tab estiran esa imagen a su tamaño.
-const PIXELS_PER_METER: float = 0.5
-## Color liso del fondo del mapa cuando la arena no tiene Terrain y no hay
-## relieve que dibujar.
-const PLAIN_BACKGROUND: Color = Color(0.16, 0.17, 0.2)
-## Cuánto se oscurecen en el mapa las celdas que la máscara de la arena
-## bloquea (0-1).
-const BLOCKED_DARKEN: float = 0.55
+# --- Edita aquí: se crea con .new(), así que no tiene Inspector. -----------
+## Color de la flecha de cada jugador, por ranura (J1 a J4). También es el
+## color de su fila en el panel «Jugadores» del mapa de Tab.
+const PLAYER_COLORS: Array[Color] = [
+	Color(0.45, 0.95, 1.0), Color(1.0, 0.66, 0.3),
+	Color(0.96, 0.5, 0.9), Color(0.66, 0.95, 0.4),
+]
+## Contorno de todos los marcadores: color y grosor en píxeles.
+const OUTLINE_COLOR: Color = UiTheme.INK
+const OUTLINE_WIDTH: float = 1.6
+## Anillo alrededor de la flecha de un jugador caído: color, radio como
+## múltiplo del tamaño de la flecha y grosor en píxeles.
+const DOWNED_RING_COLOR: Color = UiTheme.ACCENT_RED
+const DOWNED_RING_RADIUS: float = 2.3
+const DOWNED_RING_WIDTH: float = 2.0
+## Lados del polígono con que se dibuja un marcador redondo.
+const DOT_SIDES: int = 14
 
 ## Media extensión, en metros, de la arena que cubre este mapa.
 var half_extent: float = 120.0
-## La imagen del suelo de la etapa, antes de la niebla.
+## La imagen del suelo de la etapa, sin niebla.
 var background: Image = null
-## Fondo por niebla, listo para dibujar.
-var texture: ImageTexture = null
-## Última instantánea de marcadores: {position: Vector2 (XZ del mundo),
-## kind, color, heading (radianes, solo jugadores)}.
+## La misma imagen como textura. El objeto no cambia entre etapas: las vistas
+## lo guardan una vez.
+var ground_texture: ImageTexture = ImageTexture.new()
+## La niebla de guerra como textura (blanco = explorado). Tampoco cambia de objeto.
+var fog_texture: ImageTexture = ImageTexture.new()
+## Última instantánea de marcadores, los de más abajo primero: {position
+## (Vector2, XZ del mundo), kind, color, heading (radianes, giro del cuerpo),
+## slot (jugadores; -1 en el resto), downed (jugador caído)}.
 var markers: Array[Dictionary] = []
 
-var _composite: Image = null
 var _tree: SceneTree = null
+## Niebla ya subida a fog_texture: [id del nodo, revisión]. Vacío = hay que subirla.
+var _fog_synced: Array = []
 
 
 func _init(tree: SceneTree) -> void:
 	_tree = tree
+	# Hasta que exista una niebla, todo cuenta como explorado.
+	fog_texture.set_image(_solid_image(Color.WHITE))
 
 
-## Construye la imagen del suelo de la etapa. Se llama una vez por etapa,
-## desde el gancho de etapa del consumidor. Un terreno nulo no es un error
-## (un HUD puede existir antes de la primera arena): queda una pizarra plana
-## sobre la que la composición igual funciona.
+## Color de la flecha del jugador de `slot`.
+static func player_color(slot: int) -> Color:
+	return PLAYER_COLORS[posmod(slot, PLAYER_COLORS.size())]
+
+
+## Rehace el suelo con la arena de la etapa. Se llama una vez por etapa, desde
+## el gancho de etapa de ViewWidgets. Una arena nula no es un error (un HUD
+## puede existir antes de la primera): queda una pizarra lisa.
 func build_background(_arena: Node3D = null) -> void:
-	var terrain := Terrain.find(_tree)
-	var bounds := _tree.get_first_node_in_group(&"arena_bounds")
-	if bounds != null:
-		var value: Variant = bounds.get("arena_half_extent")
-		if value != null:
-			half_extent = float(value)
-	if terrain != null:
-		terrain.ensure_built()
-		half_extent = terrain.size * 0.5
-		background = terrain.map_image(PIXELS_PER_METER)
-	else:
-		var pixels := maxi(int(round(half_extent * 2.0 * PIXELS_PER_METER)), 8)
-		background = Image.create_empty(pixels, pixels, false, Image.FORMAT_RGBA8)
-		background.fill(PLAIN_BACKGROUND)
-	_darken_blocked_cells(bounds)
-	composite()
+	half_extent = MapGround.arena_half_extent(_tree, half_extent)
+	background = MapGround.build(_tree, half_extent)
+	ground_texture.set_image(background)
+	# La etapa nueva trae su propia niebla: se sube sin mirar la revisión.
+	_fog_synced = []
+	refresh()
 
 
-## Oscurece las celdas bloqueadas de la máscara de la arena, para que el mapa
-## muestre la forma irregular de la etapa y no un cuadrado limpio. Se decide
-## por PÍXEL, según la celda donde cae su centro: una celda puede medir una
-## fracción de píxeles (5 m a 0.5 px/m son 2.5 px), y pintar cuadrados
-## redondeados por celda dejaría franjas más oscuras donde se solapan.
-func _darken_blocked_cells(bounds: Node) -> void:
-	if bounds == null or background == null or not bounds.has_method(&"blocked_cells"):
-		return
-	var cells: Variant = bounds.call(&"blocked_cells")
-	if cells is not Array:
-		return
-	var blocked: Dictionary[Vector2i, bool] = {}
-	for cell: Vector2i in cells:
-		blocked[cell] = true
-	if blocked.is_empty():
-		return
-	var cell_size := float(bounds.call(&"cell_size")) if bounds.has_method(&"cell_size") else 10.0
-	# El origen de la propia grilla, con la aritmética del scatter, para que
-	# los dos nunca discrepen sobre dónde empieza una celda.
-	var corner: Vector2 = bounds.call(&"cell_center", Vector2i.ZERO)
-	corner -= Vector2.ONE * cell_size * 0.5
-	var pixels := background.get_width()
-	var meters := half_extent * 2.0 / float(pixels)
-	for py in pixels:
-		var row := floori((-half_extent + (float(py) + 0.5) * meters - corner.y) / cell_size)
-		for px in pixels:
-			var column := floori((-half_extent + (float(px) + 0.5) * meters - corner.x) / cell_size)
-			if blocked.has(Vector2i(column, row)):
-				background.set_pixel(px, py, background.get_pixel(px, py).darkened(BLOCKED_DARKEN))
+## Pone al día la niebla y los marcadores y avisa a las vistas.
+func refresh() -> void:
+	sync_fog()
+	collect_markers()
+	refreshed.emit()
 
 
-## Fondo por niebla en la textura dibujable. El consumidor lo llama en el
-## tick de la niebla, nunca cada cuadro.
-func composite() -> void:
-	if background == null:
-		return
-	var pixels := background.get_width()
-	if _composite == null or _composite.get_width() != pixels:
-		_composite = Image.create_empty(pixels, pixels, false, Image.FORMAT_RGBA8)
+## Sube la niebla a fog_texture si cambió desde la última vez. FogOfWar sube
+## su `revision` cada vez que cambia su imagen, así que mismo nodo y misma
+## revisión son los mismos píxeles: la mayoría de los refrescos no sube nada.
+func sync_fog() -> void:
 	var fog := FogOfWar.find(_tree)
-	var fog_image: Image = fog.image if fog != null else null
-	var fog_pixels := fog.pixels() if fog != null else 0
-	for py in pixels:
-		for px in pixels:
-			var tint := background.get_pixel(px, py)
-			if fog_image != null and fog_pixels > 0:
-				# Píxel de niebla más cercano: la grilla de niebla es más gruesa
-				# que el mapa, e interpolar un estado binario solo emborrona su borde.
-				var fx := mini(px * fog_pixels / pixels, fog_pixels - 1)
-				var fy := mini(py * fog_pixels / pixels, fog_pixels - 1)
-				if fog_image.get_pixel(fx, fy).r < 0.5:
-					tint = tint.darkened(FOG_ALPHA)
-			_composite.set_pixel(px, py, tint)
-	# Una arena de otro tamaño (el Bosque Hueco mide 320 m y las otras 240)
-	# pide una textura nueva: update() solo acepta una imagen del mismo tamaño.
-	if texture == null or Vector2i(texture.get_size()) != _composite.get_size():
-		texture = ImageTexture.create_from_image(_composite)
+	var key: Array = [fog.get_instance_id(), fog.revision] if fog != null else [0, -1]
+	if key == _fog_synced:
+		return
+	_fog_synced = key
+	var image: Image = fog.image if fog != null else null
+	if image == null:
+		image = _solid_image(Color.WHITE)
+	if fog_texture.get_size() == Vector2(image.get_size()) \
+			and fog_texture.get_format() == image.get_format():
+		fog_texture.update(image)
 	else:
-		texture.update(_composite)
+		fog_texture.set_image(image)
 
 
 ## Instantánea de cada marcador vivo, filtrada por la niebla. Los jugadores
 ## y el portal de salida siempre están; lo demás hay que haberlo encontrado.
 func collect_markers() -> void:
-	markers = []
+	var found: Array[Dictionary] = []
 	var fog := FogOfWar.find(_tree)
 	for node: Node in _tree.get_nodes_in_group(&"map_markers"):
 		var body := node as Node3D
@@ -231,58 +208,111 @@ func collect_markers() -> void:
 		if not bool(style["always_visible"]) and fog != null and not fog.is_explored(at):
 			continue
 		var color: Color = style["color"]
-		if body.has_method(&"map_marker_color"):
+		var slot := -1
+		if kind == &"player":
+			slot = int(body.get("player_index"))
+			color = player_color(slot)
+		elif body.has_method(&"map_marker_color"):
 			color = body.call(&"map_marker_color")
-		markers.append({
+		found.append({
 			"position": at,
 			"kind": kind,
 			"color": color,
-			# Los jugadores se dibujan como una flecha hacia donde miran; los
-			# demás ignoran este campo.
+			# Giro del cuerpo: la flecha de un jugador apunta hacia donde mira.
 			"heading": body.global_rotation.y,
+			"slot": slot,
+			"downed": body.is_in_group(&"downed_players"),
 		})
+	found.sort_custom(_draws_below)
+	markers = found
 
 
 func marker_count() -> int:
 	return markers.size()
 
 
-## XZ del mundo -> un punto dentro de `rect`, con el norte arriba. LA
-## proyección que usan ambos consumidores, para que un marcador nunca caiga
-## donde no está el suelo.
-func to_screen(xz: Vector2, rect: Rect2) -> Vector2:
-	var span := maxf(half_extent * 2.0, 0.001)
-	return rect.position + Vector2(
-			(xz.x + half_extent) / span * rect.size.x,
-			(xz.y + half_extent) / span * rect.size.y)
-
-
-## Dibuja la composición y cada marcador dentro de `rect` de `canvas`. Ambos
-## consumidores lo llaman desde su propio _draw; todo lo que necesita ya lo
-## calcularon los métodos de arriba.
-func draw_into(canvas: CanvasItem, rect: Rect2, marker_scale: float = 1.0) -> void:
-	if texture != null:
-		canvas.draw_texture_rect(texture, rect, false)
+## Tipos con fila de leyenda que tienen algún marcador a la vista ahora, en el
+## orden de MARKER_LABELS. Una variante cuenta como su familia.
+func legend_kinds() -> Array[StringName]:
+	var present: Dictionary[StringName, bool] = {}
 	for marker: Dictionary in markers:
-		var at := to_screen(marker["position"], rect)
-		var style: Dictionary = MARKER_STYLES[marker["kind"] as StringName]
-		var size: float = float(style["size"]) * marker_scale
-		var color: Color = marker["color"]
-		match String(style["shape"]):
-			"square":
-				canvas.draw_rect(Rect2(at - Vector2(size, size), Vector2(size, size) * 2.0),
-						color, true)
-			"diamond":
-				canvas.draw_colored_polygon(PackedVector2Array([
-						at + Vector2(0.0, -size), at + Vector2(size, 0.0),
-						at + Vector2(0.0, size), at + Vector2(-size, 0.0)]), color)
-			"triangle":
-				var heading: float = marker["heading"]
-				# La flecha del jugador apunta hacia donde mira: en un mapa de
-				# 240 m, saber hacia dónde miras es casi todo el valor.
-				var tip := at + Vector2(sin(heading), -cos(heading)) * size * 1.6
-				var left := at + Vector2(sin(heading + 2.4), -cos(heading + 2.4)) * size
-				var right := at + Vector2(sin(heading - 2.4), -cos(heading - 2.4)) * size
-				canvas.draw_colored_polygon(PackedVector2Array([tip, left, right]), color)
-			_:
-				canvas.draw_circle(at, size, color)
+		var kind: StringName = marker["kind"]
+		present[LEGEND_VARIANTS.get(kind, kind)] = true
+	var kinds: Array[StringName] = []
+	for kind: StringName in MARKER_LABELS:
+		if present.has(kind):
+			kinds.append(kind)
+	return kinds
+
+
+## XZ del mundo -> UV de la imagen del suelo (0-1), con el norte arriba.
+func world_to_uv(xz: Vector2) -> Vector2:
+	var span := maxf(half_extent * 2.0, 0.001)
+	return (xz + Vector2(half_extent, half_extent)) / span
+
+
+## Hacia dónde apunta en un mapa con el norte arriba un cuerpo con giro `yaw`
+## (rotation.y): un cuerpo camina hacia su -Z local, que con giro 0 es el norte.
+static func facing_of(yaw: float) -> Vector2:
+	return Vector2(-sin(yaw), -cos(yaw))
+
+
+## Dibuja un marcador en `canvas`: la forma rellena y su contorno de tinta.
+## `radius` va en píxeles y `facing` es hacia dónde apunta en pantalla (solo
+## lo usa la flecha, "triangle").
+static func draw_glyph(canvas: CanvasItem, at: Vector2, shape: String, color: Color,
+		radius: float, facing: Vector2 = Vector2.UP) -> void:
+	var points := _glyph_points(at, shape, radius, facing)
+	canvas.draw_colored_polygon(points, color)
+	points.append(points[0])
+	canvas.draw_polyline(points, OUTLINE_COLOR, OUTLINE_WIDTH, true)
+
+
+## Anillo de "caído" alrededor de la flecha de un jugador.
+static func draw_downed_ring(canvas: CanvasItem, at: Vector2, radius: float) -> void:
+	canvas.draw_arc(at, radius * DOWNED_RING_RADIUS, 0.0, TAU, 24, DOWNED_RING_COLOR,
+			DOWNED_RING_WIDTH, true)
+
+
+static func _glyph_points(at: Vector2, shape: String, radius: float,
+		facing: Vector2) -> PackedVector2Array:
+	match shape:
+		"square":
+			return PackedVector2Array([
+					at + Vector2(-radius, -radius), at + Vector2(radius, -radius),
+					at + Vector2(radius, radius), at + Vector2(-radius, radius)])
+		"diamond":
+			var reach := radius * 1.25
+			return PackedVector2Array([
+					at + Vector2(0.0, -reach), at + Vector2(reach, 0.0),
+					at + Vector2(0.0, reach), at + Vector2(-reach, 0.0)])
+		"triangle":
+			# Punta de flecha con muesca atrás: se lee hacia dónde apunta aunque
+			# sea chica.
+			var side := Vector2(-facing.y, facing.x)
+			return PackedVector2Array([
+					at + facing * radius * 1.7,
+					at - facing * radius * 1.15 + side * radius * 1.2,
+					at - facing * radius * 0.45,
+					at - facing * radius * 1.15 - side * radius * 1.2])
+	var points := PackedVector2Array()
+	for step in DOT_SIDES:
+		points.append(at + Vector2.from_angle(TAU * float(step) / float(DOT_SIDES)) * radius)
+	return points
+
+
+## Orden de dibujo: primero los de `order` más bajo.
+static func _draws_below(a: Dictionary, b: Dictionary) -> bool:
+	return _order_of(a) < _order_of(b)
+
+
+static func _order_of(marker: Dictionary) -> int:
+	var style: Dictionary = MARKER_STYLES[marker["kind"] as StringName]
+	return int(style.get("order", 0))
+
+
+## Imagen de un solo píxel, para una textura sin contenido todavía.
+func _solid_image(color: Color) -> Image:
+	var image := Image.create_empty(1, 1, false, Image.FORMAT_L8)
+	image.fill(color)
+	return image

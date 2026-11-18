@@ -1,0 +1,29 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scripts/ui/maps/map_chip.gd" id="1_chip"]
+[ext_resource type="PackedScene" path="res://scenes/ui/hud/LoadoutTile.tscn" id="2_tile"]
+
+[node name="MapChip" type="HBoxContainer" unique_id=1375561201]
+mouse_filter = 2
+theme_override_constants/separation = 5
+script = ExtResource("1_chip")
+
+[node name="Tile" parent="." unique_id=418827654 instance=ExtResource("2_tile")]
+custom_minimum_size = Vector2(28, 24)
+layout_mode = 2
+size_flags_vertical = 4
+mouse_filter = 2
+border_width = 2
+corner_radius = 6
+shadow_offset = Vector2(0, 2)
+glyph_font_size = 12
+
+[node name="Name" type="Label" parent="." unique_id=2083317906]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.082, 0.075, 0.102, 1)
+theme_override_font_sizes/font_size = 14
+
+[node name="Tag" type="Label" parent="." unique_id=947720433]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.082, 0.075, 0.102, 1)
+theme_override_font_sizes/font_size = 14

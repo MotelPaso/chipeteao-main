@@ -75,10 +75,12 @@ func refresh() -> void:
 
 
 ## Armas (nivel, o rango con ★ desde el primer hito), tomos (pilas) y
-## mascota del jugador, en ese orden.
-func gather_build() -> Array[Dictionary]:
+## mascota, en ese orden: del jugador de la franja o, si se pasa uno, de
+## `body` (el mapa de Tab pide las de su propio jugador).
+func gather_build(body: Node = null) -> Array[Dictionary]:
+	var player := body if body != null else _player
 	var entries: Array[Dictionary] = []
-	var mount := _player.get_node_or_null("Weapons")
+	var mount := player.get_node_or_null("Weapons")
 	if mount != null:
 		for child: Node in mount.get_children():
 			var weapon := child as WeaponBase
@@ -102,7 +104,7 @@ func gather_build() -> Array[Dictionary]:
 						else (UiTheme.WEAPON_LEVEL_ABBREV % weapon.upgrade_level),
 				"tip": title, "icon": String(row.get("icon", "")),
 			})
-	var stats := PlayerStats.find_in(_player)
+	var stats := PlayerStats.find_in(player)
 	if stats != null:
 		for tome_id: String in stats.carried_tome_ids():
 			var tome := Tome.by_id(tome_id)
@@ -117,7 +119,7 @@ func gather_build() -> Array[Dictionary]:
 			})
 	# La mascota cierra la franja de armas y tomos: es un arma fuera del tope
 	# de cinco más una estadística, así que va junto a ellos y no entre los objetos.
-	var pet_id: Variant = _player.get("pet_id")
+	var pet_id: Variant = player.get("pet_id")
 	if pet_id != null and not String(pet_id).is_empty():
 		var pet := PetCatalog.by_id(String(pet_id))
 		if not pet.is_empty():
@@ -134,10 +136,12 @@ func gather_build() -> Array[Dictionary]:
 	return entries
 
 
-## Objetos de la bolsa del jugador, en el orden en que los recogió, con sus copias.
-func gather_bag() -> Array[Dictionary]:
+## Objetos de la bolsa, en el orden en que se recogieron y con sus copias:
+## del jugador de la franja o, si se pasa uno, de `body`.
+func gather_bag(body: Node = null) -> Array[Dictionary]:
+	var player := body if body != null else _player
 	var items: Array[Dictionary] = []
-	var bag := ItemBag.find_in(_player)
+	var bag := ItemBag.find_in(player)
 	if bag == null:
 		return items
 	for item_id: String in bag.carried_ids():

@@ -356,9 +356,11 @@ theme_override_constants/separation = 6
 alignment = 1
 script = ExtResource("12_powerups")
 
-[node name="ViewWidgets" type="Node" parent="." unique_id=386425940]
+[node name="ViewWidgets" type="Node" parent="." unique_id=386425940 node_paths=PackedStringArray("build_strip", "bag_strip")]
 unique_name_in_owner = true
 script = ExtResource("13_views")
+build_strip = NodePath("../BuildStrip")
+bag_strip = NodePath("../BagStrip")
 
 [node name="MinimapSlot" type="Control" parent="ViewWidgets" unique_id=827944634]
 anchors_preset = 1

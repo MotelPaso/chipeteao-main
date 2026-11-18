@@ -23,7 +23,7 @@ Lo que NO se traduce nunca: los `id` de catálogo, los `node_name`, los nombres 
 18. Compuestos: verbo + sustantivo en plural (Perforacorazones, Matarreyes, Cazacoronas, Levantatapas); mata- no elide nunca. Escupesol va en singular (quitasol, girasol).
 19. Los glifos de dos letras de item_catalog.gd se re-siglan al nombre español (tabla en «terminos»); un glifo «WS» sobre «Piedra de afilar» se lee como bug.
 20. Brevedad: la etiqueta española no debe crecer más de ~10% sobre la inglesa en HUD, insignias y botones. Si crece, se recorta el adjetivo, nunca el sentido.
-21. El mapa de Tab **no** es un menú y su título no lleva verbo: la cabecera es «Etapa N · Vuelta M — MM:SS» y los paneles son sustantivos sueltos — hoy cinco: «Power-ups», «Mascota», «Estadísticas», «Jugadores», «Objetos». La leyenda nombra **familias** en plural («Cofres», «Altares», «Portales») y en singular solo lo que es único en la etapa («Jefe», «Salida», «Manantial», «Ruleta»).
+21. El mapa de Tab **no** es un menú y su título no lleva verbo: la cabecera es «Etapa N · Vuelta M — MM:SS», con la chapa «Explorado N%» en la esquina del mapa, y los paneles son sustantivos sueltos — hoy cinco: «Estadísticas», «Jugadores» (solo en co-op: en solitario repetiría el HUD), «Power-ups», «Mascota», «Objetos». La leyenda nombra **familias** en plural («Cofres», «Altares», «Portales») y en singular solo lo que es único en la etapa («Jefe», «Salida», «Manantial», «Ruleta»), y lista solo los tipos que están a la vista. La chapa del minimapa es «N», de norte.
 
 ## Personajes (no se traducen)
 
@@ -457,7 +457,12 @@ Lo que NO se traduce nunca: los `id` de catálogo, los `node_name`, los nombres 
 | Roulette | Ruleta |
 | Portals | Portales |
 | Exit | Salida |
-| `J%d  %s  %s  %s  %d pts` | `J%d  %s  %s  %s  %d pts` |
+| `Explored %d%%` | `Explorado %d%%` |
+| `N` (north, la chapa del minimapa) | `N` |
+| `Close` (indicación del botón que cierra el mapa de Tab) | Cerrar |
+| `Attack speed` en las celdas chicas del mapa de Tab (co-op) | Vel. de ataque |
+| `J%d K.O.` | `J%d K.O.` |
+| `%d/%d` (vida) | `%d/%d` |
 
 Las filas del panel **Estadísticas** reusan tal cual los términos de la tabla
 «Estadísticas» de más abajo, incluida la **regla 7**: `cooldown_multiplier` se

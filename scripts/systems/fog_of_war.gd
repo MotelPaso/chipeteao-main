@@ -13,9 +13,9 @@ extends Node
 ## set_pixel cada quinto de segundo) y lo bastante preciso para que el mapa
 ## se lea como "por donde caminamos".
 ##
-## MapDraw lo compone en la imagen que dibujan el minimapa y el mapa de Tab;
-## nada fuera de este nodo escribe la imagen, y por eso `revision` puede
-## representar su contenido.
+## MapDraw la sube a la textura con que el minimapa y el mapa de Tab atenúan
+## el suelo sin explorar; nada fuera de este nodo escribe la imagen, y por eso
+## `revision` puede representar su contenido.
 
 @export_group("Niebla")
 ## Metros por píxel de niebla. 2 m da 120x120 en una arena de 240 m: lo
@@ -30,14 +30,14 @@ extends Node
 @export_group("")
 
 ## El estado de verdad. FORMAT_L8: un byte por píxel, sin alfa; MapDraw lo
-## convierte en algo dibujable.
+## sube tal cual a una textura.
 var image: Image = null
 
 ## Sube cada vez que cambia `image`: una imagen nueva en _rebuild o un
 ## reveal_at que cambió al menos un píxel. Nunca se reinicia ni sube por otra
 ## cosa, así "mismo nodo de niebla, misma revisión" significa "mismos
-## píxeles". El minimapa y el mapa de Tab cachean su MapDraw.composite() con
-## esto (Minimap.composite_key) en vez de rearmar la misma imagen.
+## píxeles". MapDraw.sync_fog() vuelve a subir la niebla a su textura solo
+## cuando esto cambió.
 var revision: int = 0
 
 var _pixels: int = 0
@@ -151,7 +151,7 @@ func explored_fraction() -> float:
 	return float(_explored_pixels) / float(_pixels * _pixels)
 
 
-## Tamaño de la imagen de niebla en píxeles (MapDraw escala su composición a él).
+## Lado de la imagen de niebla, en píxeles.
 func pixels() -> int:
 	return _pixels
 

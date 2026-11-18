@@ -932,46 +932,81 @@ Cada vista de jugador tiene **su propio** minimapa en la esquina y **su
 propio** mapa a pantalla completa con Tab. En 240×240 con relieve, «¿dónde
 estoy y dónde está lo que no he abierto?» no se responde mirando alrededor.
 
-### Las tres piezas
+### Las piezas
 
-| Pieza                    | Qué es                                                                  | Dónde vive                                                                                   |
-| ------------------------ | ----------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
-| `FogOfWar`               | lo que el equipo **ha visto** de la etapa                               | `scripts/systems/fog_of_war.gd`, nodo de `RunSystems.tscn`, grupo `fog`, `static find(tree)` |
-| `MapDraw`                | **el** dibujante: fondo, composición con niebla, marcadores, proyección | `scripts/ui/maps/map_draw.gd` (`RefCounted`, `MapDraw.new(get_tree())`)                      |
-| `Minimap` / `MapOverlay` | los dos consumidores                                                    | `scripts/ui/maps/minimap.gd`, `scripts/ui/maps/map_overlay.gd` (escena `scenes/ui/maps/MapOverlay.tscn`), ambos creados por `ViewWidgets` del HUD |
+| Pieza                    | Qué es                                                                              | Dónde vive                                                                                   |
+| ------------------------ | ----------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| `FogOfWar`               | lo que el equipo **ha visto** de la etapa                                           | `scripts/systems/fog_of_war.gd`, nodo de `RunSystems.tscn`, grupo `fog`, `static find(tree)` |
+| `MapDraw`                | **el** estado del mapa: texturas de suelo y niebla, marcadores y sus formas         | `scripts/ui/maps/map_draw.gd` (`RefCounted`; `ViewWidgets` crea **uno solo**)                |
+| `MapGround`              | la imagen del suelo de la etapa: relieve y formaciones de roca                      | `scripts/ui/maps/map_ground.gd` (funciones estáticas)                                        |
+| `MapView`                | **una vista** del mapa: el suelo con su niebla, los marcadores y la proyección      | `scripts/ui/maps/map_view.gd`, `scenes/ui/maps/MapView.tscn`, shader `assets/shaders/map_ground.gdshader` |
+| `Minimap` / `MapOverlay` | los dos widgets; cada uno lleva un `MapView`                                        | `scenes/ui/maps/Minimap.tscn` (`minimap.gd`) y `scenes/ui/maps/MapOverlay.tscn` (`map_overlay.gd`), ambos creados por `ViewWidgets` del HUD |
 
-**`MapDraw` es uno solo a propósito.** Un widget de 150 px y un overlay de
-media pantalla comparten el 100% de la lógica (la imagen del terreno, el
-oscurecido de celdas bloqueadas, la composición con la niebla, el filtrado de
-marcadores y la proyección mundo→pantalla). Escrita dos veces, la única
-pregunta interesante —«¿por qué el marcador cae en un sitio distinto en el
-minimapa?»— habría tenido respuesta.
+**`MapDraw` es uno solo a propósito, y una sola instancia**: `ViewWidgets`
+la crea en `build()` y se la pasa a cada minimapa y a cada mapa de Tab con
+`set_map()`. Todos los widgets de todos los jugadores muestran el mismo estado
+(la niebla es del equipo y el suelo es el mismo), así que se mira una vez por
+refresco y no una vez por widget, que en co-op de cuatro serían ocho. Y
+escrito dos veces, la única pregunta interesante —«¿por qué el marcador cae
+en un sitio distinto en el minimapa?»— tendría respuesta.
 
 Reparto de trabajo, y **cuándo** corre cada cosa:
 
-- `build_background(arena)` — **una vez por etapa**, desde el hook de etapa del
-  consumidor. Pide `Terrain.map_image(PIXELS_PER_METER)` (tinte del bioma
-  sombreado por altura; 0.5 px/m = 240 px para una arena de 240 m) y oscurece
-  las celdas que la máscara bloquea, para que el mapa tenga la **forma
-  irregular** de la etapa y no un cuadrado limpio.
-- `composite()` — en el tick de refresco (10 Hz), **pero solo si cambió algo
-  que lee**: el minimapa y el overlay comparan
-  `Minimap.composite_key()` —identidad de la `Image` de fondo, identidad del
-  nodo de niebla y `FogOfWar.revision`— y se la saltan si es la misma de la
-  última vez; `on_stage_started` borra la clave. Recomponer cuesta 1,5-2,8 ms,
-  demasiado para hacerlo cada 6 frames sin motivo. **Contrato**: si
-  `composite()` empieza a leer otra cosa, esa cosa entra en la clave; y quien
-  escriba `FogOfWar.image` fuera de `fog_of_war.gd` sube `revision`. Fondo × niebla en una única
-  `ImageTexture` que el consumidor solo blitea. Lo inexplorado se atenúa a
-  `FOG_ALPHA` 0.85, **no** se pinta opaco: la silueta del mapa es una pista, lo
-  que hay **encima** es la recompensa.
-- `collect_markers()` — 10 Hz. Quién está dónde, filtrado por la niebla.
-- `draw_into(canvas, rect, marker_scale)` — desde el `_draw` de cada consumidor.
+- `build_background(arena)` — **una vez por etapa**, desde
+  `ViewWidgets.on_stage_started`. Pide la imagen a `MapGround.build()`:
+  `Terrain.map_image(PIXELS_PER_METER)` (tinte del bioma sombreado por altura;
+  1.0 px/m = 240 px para una arena de 240 m) con las **formaciones de roca**
+  pintadas encima, para que el mapa tenga la **forma irregular** de la etapa.
+  Cada celda que la máscara bloquea toma el `rock_color` del
+  `formation_style` del scatter (la roca del mapa es la del mundo); el borde
+  sale de interpolar la máscara entre centros de celda, así que una formación
+  se ve como una mancha de borde redondo con contorno oscuro y no como una
+  escalera de cuadrados de 5 m. Cuesta unos 29 ms por etapa (medido sin
+  ventana en los tres biomas), una sola vez para todos los widgets.
+- `refresh()` — cada `ViewWidgets.refresh_seconds` (0.1 s). Hace las dos
+  cosas de abajo y emite `refreshed`, que es lo que hace redibujar a las vistas.
+  - `sync_fog()` sube la `Image` de la niebla a `fog_texture`, **pero solo si
+    cambió**: compara la identidad del nodo de niebla y `FogOfWar.revision`
+    con lo último que subió. **Contrato**: quien escriba `FogOfWar.image`
+    fuera de `fog_of_war.gd` sube `revision`.
+  - `collect_markers()` junta quién está dónde, filtrado por la niebla, con
+    los de `order` más alto al final (se dibujan encima).
 
-Las tres primeras son **métodos planos sin Control**: un soak headless las
-ejercita aunque `_draw()` no se despache jamás bajo el renderer dummy. Esa es
-la razón de que el minimapa y el overlay refresquen llamándolas en vez de
-dejarlo todo dentro de `_draw`.
+Son **métodos planos sin Control**: un soak headless los ejercita aunque nada
+se dibuje bajo el renderer dummy.
+
+**La niebla se mezcla en la GPU**, no en GDScript: el shader
+`map_ground.gdshader` lee el suelo y la niebla como dos texturas y las mezcla
+al dibujar. Componerlas en una imagen son 57 600 `get_pixel`/`set_pixel` cada
+vez que alguien pisa suelo nuevo; subir la niebla tal cual deja el refresco
+entero en centésimas de milisegundo. Del
+shader salen además el **borde suave** de la niebla (la imagen es de 2 m por
+píxel y sin suavizar se ve en escalones), el zoom, el giro y el recorte
+circular del minimapa. Lo inexplorado se va hacia `MapView.unexplored_color` con
+`unexplored_strength` 0.84, **no** se pinta opaco: la silueta del mapa es una
+pista, lo que hay **encima** es la recompensa. Los valores del shader los
+pone `map_view.gd` desde sus exports; el `.gdshader` no se edita para cambiar
+un color.
+
+### `MapView`: una vista
+
+`MapView.tscn` es un `Control` con dos hijos: `Ground` (un `TextureRect` con
+el shader) y `Markers` (un `Control` vacío donde `map_view.gd` dibuja los
+marcadores por su señal `draw`). Siempre usa el cuadrado más grande que cabe
+en su rectángulo.
+
+- `set_map(map)` le da el `MapDraw`; `look_at_world(centro_xz, giro)` mueve
+  y gira la vista. Con `view_radius` 0 muestra toda la arena.
+- `to_view(xz)` es **la** proyección mundo→vista (centro, zoom y giro), y el
+  shader usa la inversa con los mismos tres números: un marcador nunca cae
+  donde no está su suelo.
+- Las formas las dibuja `MapDraw.draw_glyph()` (estática, también la usa la
+  leyenda): el relleno y un **contorno de tinta** suavizado, para que un
+  marcador se lea sobre cualquier suelo. La flecha de un jugador apunta con
+  `MapDraw.facing_of(rotation.y)` — un cuerpo camina hacia su −Z local, que en
+  el mapa es `(-sin, -cos)`.
+- Cada jugador tiene su color (`MapDraw.PLAYER_COLORS`, J1 a J4); un caído
+  lleva además un anillo rojo.
 
 ### Niebla de guerra
 
@@ -999,8 +1034,9 @@ se une solo al grupo `map_markers` cuando ese export no está vacío, y expone
 `map_marker_kind()`. `Player` y `BossBase` hacen lo mismo por su cuenta.
 
 - La tabla es `MapDraw.MARKER_STYLES`: color, forma (`dot` / `square` /
-  `triangle` / `diamond`), tamaño y `always_visible`. **Un kind que no está en
-  la tabla no se dibuja.**
+  `triangle` / `diamond`), tamaño, `always_visible` y, opcionales, `pin` (el
+  minimapa lo ancla a su orilla) y `order` (los más altos se dibujan encima).
+  **Un kind que no está en la tabla no se dibuja.**
 - Solo los raiders y la **salida** son `always_visible`; todo lo demás hay que
   **encontrarlo** (la niebla filtra en `collect_markers`).
 - **Los enemigos normales no se dibujan nunca.** Un minimapa con cuarenta
@@ -1017,42 +1053,117 @@ se une solo al grupo `map_markers` cuando ese export no está vacío, y expone
 - Un nodo puede además implementar `map_marker_color()` para pintarse con su
   propio color (rareza de cofre, por ejemplo) sin tocar la tabla.
 
-### Los dos consumidores
+### Los dos widgets
 
-- **`Minimap`** (150 px): norte arriba, marcadores a 0.75 de escala, refresco
-  0.1 s. En solitario va arriba a la derecha, **bajo las bajas y la insignia
-  de FPS**; en co-op, uno por celda de pantalla dividida.
+- **`Minimap`** (`scenes/ui/maps/Minimap.tscn`): un disco con el aspecto de un
+  sticker del menú principal (contorno de tinta grueso, aro de papel y sombra
+  dura), **centrado en su jugador**. Muestra `view_radius` 55 m
+  alrededor del raider y no la arena entera: los 240 m en 150 px dejan cada
+  marcador de dos píxeles, y para eso está el mapa de Tab.
+  - **Gira con la cámara** (`rotate_with_view`): lo que el jugador tiene
+    delante queda arriba, y una chapa «N» en la orilla dice dónde quedó el
+    norte. El giro es el de la **cámara** (`Player.view_camera()`), no el del
+    cuerpo: en órbita libre no coinciden. Con el export apagado el norte queda
+    arriba y solo gira la flecha.
+  - Sigue a su jugador **cada cuadro** (`_process`), no en el refresco del
+    mapa: a diez pasos por segundo el giro se vería a saltos.
+  - **Lo que queda fuera de la vista y vale la pena perseguir se ancla a la
+    orilla**: los tipos con `pin` en `MARKER_STYLES` (jugadores, jefe y
+    salida). El resto se ve en el mapa de Tab.
+  - La flecha propia va al centro, más grande y encima de todo
+    (`MapView.own_arrow_scale`).
+  - El zoom, la escala de los marcadores y los colores del suelo son exports
+    del nodo `View` dentro de `Minimap.tscn`; el grosor total del aro es el
+    margen de ese nodo, y `outline_width` / `inner_outline_width` de la raíz
+    dicen cuánto de él es tinta.
+  - Con el mapa de Tab de su jugador abierto, el minimapa se transparenta
+    (`modulate`, no `visible`): quedaría justo bajo los paneles.
   - **Dónde va, exactamente.** El rectángulo del minimapa en las celdas que
     tocan el borde superior de la ventana es el nodo
     `HUD.tscn > ViewWidgets > MinimapSlot`: se mueve y se redimensiona en el
-    editor. Las celdas de abajo (co-op) usan el mismo ancho y alto con el
-    margen superior `lower_cell_top_margin` de
-    `scripts/ui/game/hud/view_widgets.gd`.
+    editor. Las celdas de abajo (co-op) usan el margen superior
+    `lower_cell_top_margin`, y en co-op todos miden `coop_size_scale` (0.8)
+    de ese tamaño; los dos son exports de `ViewWidgets`.
 - **`MapOverlay`** (`scenes/ui/maps/MapOverlay.tscn`): en su propia
   `CanvasLayer` de capa **8** (`UiLayers.MAP_OVERLAY` en `scripts/ui/ui_layers.gd`; bajo
   `UpgradeCardUI` 10 — una carta abierta tiene que verse por encima),
-  `PROCESS_MODE_ALWAYS`, grupo `map_overlay`. Cabecera «Etapa N · Vuelta M —
-  MM:SS», leyenda abajo a la izquierda y cinco paneles a la derecha, cada uno
-  una instancia de `scenes/ui/maps/MapSection.tscn` que solo pone su `title`:
-  **Power-ups**, **Mascota**, **Estadísticas** (la capa derivada, con
-  `cooldown_multiplier` mostrado como **velocidad de ataque en positivo**,
-  regla 7 del glosario; qué filas salen y en qué orden es `STAT_ROWS`, al
-  principio de `map_overlay.gd`), **Jugadores** (HP, nivel y puntos de los
-  cuatro slots, caídos incluidos) y **Objetos** (objetos con copias, armas
-  con nivel, tomos con su numeral).
+  `PROCESS_MODE_ALWAYS`, grupo `map_overlay`.
+  - **Usa el diseño de la primera pantalla del menú** (`MainMenu.tscn`), y solo
+    ese: el velo es el mismo oscurecido petróleo con viñeta
+    (`assets/ui/menu_backdrop.gdshader`, en un material propio con `reveal` en
+    1: el mundo sigue vivo detrás); la cabecera es un `TitleLabel` amarillo con
+    contorno de tinta; «Explorado N%» es un `BadgeLabel`; y cada panel es una
+    tarjeta como `MenuTile`.
+  - A la izquierda, la columna del mapa: cabecera «Etapa N · Vuelta M —
+    MM:SS», el mapa de toda la arena con el norte arriba dentro de un marco de
+    papel con contorno de tinta y sombra dura (`MapFrame`), con la chapa
+    «Explorado N%» en su esquina como el dato vivo de una tarjeta del menú, y
+    la leyenda.
+  - A la derecha, los paneles. Cada uno es una instancia de
+    `scenes/ui/maps/MapSection.tscn` (`map_section.gd`): un marco de **color
+    plano con contorno de tinta grueso y sombra dura, apenas girado**, con el
+    título y el contenido en tinta. Como en `MenuTile`, solo gira el nodo
+    `Frame`, que cuelga de un `Control` que no es contenedor (un contenedor
+    endereza a sus hijos en cada acomodo); el texto queda recto. Cada
+    instancia pone su `title`, su `tile_color` y su `tilt_degrees`, y su
+    contenido se agrega en `MapOverlay.tscn` bajo `Content/Box` («Hijos
+    editables»). Al abrir el mapa las tarjetas saltan una tras otra
+    (`MapSection.pop`).
+  - **Estadísticas** (`map_stats.gd`, tarjeta amarilla): una celda por fila de
+    `STAT_ROWS` (al principio de `map_overlay.gd`, que dice qué filas salen y
+    en qué orden). Un valor que subió o bajó va dentro de una **chapa oscura**
+    (verde o rojo), como el dato vivo de las tarjetas del menú; uno en cero
+    queda apagado. Dos claves opcionales por fila: `short`, el nombre para las
+    celdas chicas («Vel. de ataque»), y `base_property`, la propiedad de
+    `PlayerStats` con el valor de partida (el daño crítico parte en +100% y
+    hasta que no sube se ve apagado); el lint `stat_rows` revisa las dos
+    propiedades. `cooldown_multiplier` se muestra como **velocidad de ataque
+    en positivo** (regla 7 del glosario). Las columnas salen del ancho
+    disponible.
+  - **Jugadores** (`map_players.gd`, tarjeta de papel, solo en co-op): chapa
+    del color de su flecha, personaje, barra de vida (con la rampa de color
+    del HUD, pedida por el grupo `hud`) y puntos; los caídos quedan en la
+    lista, marcados.
+  - **Power-ups** (roja) y **Objetos** (celeste), con `map_chips.gd`: fichas
+    `MapChip.tscn`, la misma casilla de color del HUD (`LoadoutTile`) en chico
+    más el nombre completo y su etiqueta. Las entradas de armas, tomos y
+    objetos las arman **las franjas del HUD**
+    (`LoadoutStrip.gather_build(body)` / `gather_bag(body)`), así que glifos y
+    colores son los mismos y el mapa sirve para aprender qué es cada casilla.
+    `map_entries.gd` (`MapEntries`, estático) junta esas entradas, las de los
+    power-ups y el texto de la mascota.
+  - **Mascota** (verde): nombre, arma y la estadística que da.
+  - **Leyenda** (`map_legend.gd`): una fila por tipo de marcador **que está a
+    la vista ahora**, con su forma y su color reales.
+  - Al pie de los paneles, la indicación del botón que cierra el mapa
+    (`InputHints`, con la acción `map_overlay` de ese jugador), como las del
+    pie del menú.
+- **Se adapta a la celda** (`MapSection.Density`). Parte en `ROOMY` y baja un
+  escalón cada vez que los paneles no caben en su columna: `COMPACT` achica
+  la letra, afina y endereza las tarjetas, oculta las estadísticas en cero,
+  los nombres de las fichas y la indicación de cierre, y pasa la mascota a ser
+  una ficha más; `TIGHT` además quita los títulos y aprieta los márgenes. El lado del mapa es lo que deja el alto de la celda,
+  sin pasar de `map_share` del ancho, y en una celda ancha y baja (la de dos
+  jugadores) la leyenda baja al pie de los paneles. **Nada se sale de la
+  celda**: los paneles van dentro de un `ScrollContainer` sin barras, que
+  recorta, y la raíz tiene `clip_contents`. Con el equipo lleno, hoy cabe
+  todo en las tres formas de celda (1280×720 en solitario, 1280×360 con dos
+  jugadores y 640×360 con tres o cuatro).
 - **No pausa la partida.** Es un mapa, no un menú: el mundo sigue vivo detrás,
   y por eso el overlay tampoco entra en `ui_blocking`. Se oculta solo si la
   partida no está activa, si el árbol está pausado o si el slot no tiene raider.
 - **Todo Control de ambos widgets es `FOCUS_NONE` y `MOUSE_FILTER_IGNORE`**:
   **Tab es `ui_focus_next` de Godot**, así que un solo Control enfocable
   dentro del overlay se come la tecla y el mapa deja de cerrarse. Las filas
-  que se arman en código pasan por `_own()`; los nodos de `MapOverlay.tscn`
-  tienen foco None por defecto y `mouse_filter = 2` en la escena. **Un nodo
-  nuevo en esa escena tiene que quedar con foco None.**
+  que se arman en código pasan por `_own()`; los nodos de las escenas tienen
+  foco None por defecto y `mouse_filter = 2`. **Un nodo nuevo en esas escenas
+  tiene que quedar con foco None.**
 - Los construye `ViewWidgets` (`scripts/ui/game/hud/view_widgets.gd`, nodo
-  `HUD.tscn > ViewWidgets`): `build(player_count)` crea un par por jugador y
-  `_anchor_to_cell` ancla el overlay usando **`SplitScreenView.cell_rect(i, n)`**
-  (con un caso `1:` explícito que devuelve el rect entero).
+  `HUD.tscn > ViewWidgets`): `build(player_count)` crea el `MapDraw` y un par
+  de widgets por jugador, y `_anchor_to_cell` ancla el overlay usando
+  **`SplitScreenView.cell_rect(i, n)`** (con un caso `1:` explícito que
+  devuelve el rect entero). Sus exports `build_strip` y `bag_strip` apuntan a
+  las franjas del HUD que arman las fichas.
 
 ### Entrada
 
@@ -1537,7 +1648,7 @@ La existencia se comprueba con `ResourceLoader.exists(path, "Texture2D")`, **no*
   - `FpsBadge` → `fps_badge.gd`: el **badge de FPS** opcional (`SaveData.show_fps`, Ajustes → «Mostrar FPS»; se sondea, no se escucha, porque la opción se cambia con el HUD vivo o antes de que exista).
   - `TimerLabel/WeatherBadge` → `weather_badge.gd`: la chapa de clima.
   - `PerfProbe` → `perf_probe.gd`: el overlay de rendimiento, oculto salvo con su export `enabled` o `BONK_PERF=1`.
-  - `ViewWidgets` → `view_widgets.gd`: **construye y ancla** el minimapa y el mapa de Tab de cada jugador y les reenvía `on_stage_started(arena)` — ver «Minimapa y mapa (Tab)».
+  - `ViewWidgets` → `view_widgets.gd`: **construye y ancla** el minimapa y el mapa de Tab de cada jugador, y es dueño del `MapDraw` que todos muestran: lo refresca cada `refresh_seconds` y lo reconstruye en `on_stage_started(arena)` — ver «Minimapa y mapa (Tab)».
   - **Las posiciones son de la escena**: para mover algo del HUD se mueve su nodo en `HUD.tscn` (anclas y offsets), no se toca código. Lo que tiene que respetarse al moverlos:
   - **Arriba a la izquierda**: el cronómetro, y **debajo de su caja** —no encima— la chapa de clima, que es hija de `TimerLabel` y cuelga de su borde inferior: si el reloj cambia de alto, la chapa lo sigue sola.
   - **Arriba a la derecha**: las bajas, la insignia de FPS y el minimapa (`ViewWidgets/MinimapSlot`) debajo de las dos.
@@ -1766,7 +1877,7 @@ cada una que pasa y un `push_error` por cada fallo:
 | `text_values`               | las filas de objetos y power-ups que arman su texto con `RowText`: cada campo de `text_values` es un número (int o float) de la fila, la descripción tiene un `%d` por campo y, en esas filas, ningún `%` suelto (el signo de porcentaje se escribe `%%`); un campo que falta se dibujaría como 0 y un `%` suelto dejaría la plantilla cruda en pantalla |
 | `item_kinds_unique`         | cada `kind` de comportamiento aparece en una sola fila de `ITEM_LIBRARY`: `ItemCatalog.kind_row()` lee los números de la primera, así que una segunda fila mostraría sus números en el texto y jugaría con los de la otra |
 | `sfx_ids`                   | todo id de sonido escrito a mano existe como clave de `Sfx.SOUND_LIBRARY`: los `&"…"` de `Sfx.play(…)`, `acquire_loop(…)` y demás llamadas a `Sfx`, los de `MetaScreen.payoff(…)`, las constantes con `SOUND` o `SFX` en el nombre (`FANFARE_SFX`, `SOUND`), los defaults de los exports `*_sound`/`*_loop` y sus valores en escenas: un id mal escrito solo avisa en tiempo de ejecución y el sonido no suena |
-| `stat_rows`                 | toda fila de `MapOverlay.STAT_ROWS` (panel «Estadísticas» del mapa de Tab) nombra una propiedad que existe en `PlayerStats` y un `show` conocido: una propiedad renombrada se mostraría como `empty_text` sin avisar |
+| `stat_rows`                 | toda fila de `MapOverlay.STAT_ROWS` (panel «Estadísticas» del mapa de Tab) nombra una propiedad que existe en `PlayerStats` (y su `base_property`, si la trae) y un `show` conocido: una propiedad renombrada se mostraría como `empty_text` sin avisar |
 
 `rows` es lo que se inspeccionó **de verdad**, y **cero filas es un fallo**: una
 comprobación que recorre una lista vacía pasa por el motivo equivocado, que es
@@ -1932,9 +2043,9 @@ Desde la iteración 45 **el raider camina e interactúa por defecto**. Un raider
   `map_overlay`, lo mantiene `MAP_OVERLAY_HOLD` 2 s y suelta. Imprime
   `Map overlay: open markers=%d` y `Map overlay: closed`. El conteo se lee
   `MAP_OVERLAY_REPORT_DELAY` 0.5 s **después** de la pulsación, no en el mismo
-  frame: el overlay refresca en su propio `_process`, que cae en un frame de
-  idle **posterior** al de física que sintetizó la tecla, y leerlo antes
-  reportaba el mapa de antes de abrirse (`markers=0`).
+  frame: el overlay atiende su tecla en su propio `_process`, que cae en un
+  frame de idle **posterior** al de física que la sintetizó. El número es el
+  del `MapDraw` compartido (`MapOverlay.marker_count()` lo reenvía).
 - `_send_action(base, pressed)` es el sintetizador de teclas genérico (antes
   era solo `_send_interact`): misma regla de soltar en un frame posterior.
 - **Power-ups** (iteración 53): el recorrido se desvía a la gema más cercana dentro de `PICKUP_DETOUR` 20 m (caminar encima **es** la interacción: ni pulsación ni linger). Bajo `BONK_POWERUP_NOW=time_stop` muestrea hasta tres cuerpos congelados por frame y al descongelar imprime `Time stop: sampled=%d moved=%d damage_events=%d` — `moved` y `damage_events` son las dos formas en que un congelado puede ser mentira, y las dos tienen que salir en cero. Al terminar imprime `Immortal blocked:` con `Health.blocked_hits` (cacheado en vida, como la niebla). Bajo `BONK_POWERUP_NOW=flight` **mantiene el salto** 5 s cada 15 s, porque Vuelo solo hace algo mientras se mantiene; el resto de los soaks conservan el paseo de siempre.

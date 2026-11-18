@@ -147,7 +147,7 @@ scenes/
                          #   RunEndScreen, QuestLog, SettingsPanel,
                          #   Collection, RelicShop
   ui/hud/                # piezas del HUD: LoadoutTile, LootToast, MateRow
-  ui/maps/               # MapOverlay (mapa de Tab) y MapSection
+  ui/maps/               # Minimap, MapOverlay (mapa de Tab), MapView, MapSection y MapChip
   ui/modal/              # ModalPanel y sus herederas VendorPanel, RoulettePanel
   ui/upgrade_card_ui/    # UpgradeCard (una carta de mejora)
   ui/meta/character_select/  # CharacterCard, CoopLobby

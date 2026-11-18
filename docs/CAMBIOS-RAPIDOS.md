@@ -500,7 +500,7 @@ de reparto se llama `ForestScatter`, `DuneScatter` o `MarshScatter`.
 | Qué quieres cambiar | Dónde | Qué propiedad |
 | --- | --- | --- |
 | Posición o tamaño de cualquier elemento del HUD | `scenes/ui/HUD.tscn` > el nodo (TimerLabel, KillsLabel, BuildStrip, BagStrip, FpsBadge, PowerUpRow, MatePanel…) | Layout (anclas y márgenes) |
-| Tamaño y margen del minimapa | HUD.tscn > ViewWidgets/MinimapSlot (solo cuentan su tamaño y sus márgenes, medidos desde la esquina superior derecha de cada celda; no muevas sus anclas); en las celdas de abajo, ViewWidgets | Layout > márgenes; `lower_cell_top_margin` |
+| Tamaño y margen del minimapa | HUD.tscn > ViewWidgets/MinimapSlot (solo cuentan su tamaño y sus márgenes, medidos desde la esquina superior derecha de cada celda; no muevas sus anclas); en co-op y en las celdas de abajo, ViewWidgets | Layout > márgenes; `coop_size_scale`, `lower_cell_top_margin` |
 | Color o tamaño de Nivel, Reloj, Bajas y Puntos | HUD.tscn > LevelLabel, TimerLabel, KillsLabel, PointsLabel | Theme Overrides > Colors / Font Sizes |
 | Colores de la barra de vida y el latido de vida baja | HUD.tscn > HUD | `hp_full_color`, `hp_low_color`, grupo «Latido de vida baja» |
 | Color y forma de la barra de XP | HUD.tscn > HUD | `xp_color`, `xp_trough_color`, `xp_line_color`, `xp_corner_radius`, `xp_line_width` |
@@ -519,12 +519,23 @@ de reparto se llama `ForestScatter`, `DuneScatter` o `MarshScatter`.
 | Panel de relleno del cuarto vacío con 3 jugadores (fondo, texto, color, tamaño) | `scripts/systems/split_screen.gd` (bloque «Edita aquí») | `FILLER_BG`, `FILLER_TEXT`, `FILLER_TEXT_COLOR`, `FILLER_FONT_SIZE` |
 | Color del chip de clima bajo el reloj | HUD.tscn > TimerLabel/WeatherBadge | `group_colors`, `text_format` (el nombre sale de `display_name` en `weather_catalog.gd`) |
 | Insignia de FPS | HUD.tscn > FpsBadge | `text_format`, `background_color`, `refresh_seconds` |
-| Marco y refresco del minimapa | `scripts/ui/maps/minimap.gd` (bloque «Edita aquí») | `FRAME_PAD`, `MARKER_SCALE`, `BACKGROUND_COLOR`, `BORDER_WIDTH`, `BORDER_DARKEN`, `REFRESH` |
-| Colores, formas y leyenda de los marcadores del mapa | `scripts/ui/maps/map_draw.gd` | `MARKER_STYLES`, `MARKER_LABELS` |
-| Fondo liso del mapa cuando la arena no tiene Terrain y oscurecido de las celdas bloqueadas | `scripts/ui/maps/map_draw.gd` | `PLAIN_BACKGROUND`, `BLOCKED_DARKEN` (al comienzo) |
-| Mapa de Tab: fondo, paneles y textos | `scenes/ui/maps/MapOverlay.tscn` (paneles: `scenes/ui/maps/MapSection.tscn`) | Layout, `title`, grupo «Textos» |
-| Marco del mapa, leyenda y encabezado del mapa de Tab | `MapOverlay.tscn` > raíz (grupos «Mapa», «Leyenda», «Encabezado») | `frame_color`, `frame_margin`, `border_width`, `border_darken`; `swatch_size`, `legend_font_size`, `legend_text_color`, `legend_row_separation`; `header_letter_spacing` |
-| Filas de estadísticas del mapa de Tab | `scripts/ui/maps/map_overlay.gd` | `STAT_ROWS` (al comienzo) |
+| Minimapa: que gire con la cámara o deje el norte arriba; colores y grosor del aro, sombra | `scenes/ui/maps/Minimap.tscn` > raíz | `rotate_with_view`, `ring_color`, `band_color`, `outline_width`, `inner_outline_width`, `shadow_color`, `shadow_offset`, `north_inset` (la chapa «N» es el nodo North) |
+| Minimapa: cuánto terreno muestra, tamaño de los marcadores y grosor total del aro | `Minimap.tscn` > View | `view_radius` (metros), `marker_scale`, `own_arrow_scale`, `own_halo_alpha`, `pinned_scale`, `pin_margin`; el aro es el margen del nodo (Layout) |
+| Colores del suelo del mapa: lo sin explorar, fuera de la arena y la línea del borde | `Minimap.tscn` > View y `MapOverlay.tscn` > MapView (grupo «Suelo») | `unexplored_color`, `unexplored_strength`, `outside_color`, `border_color`, `border_meters`, `rim_shade` |
+| Cada cuánto se refrescan la niebla y los marcadores del mapa | HUD.tscn > ViewWidgets | `refresh_seconds` |
+| Colores, formas y leyenda de los marcadores del mapa; cuáles se anclan a la orilla del minimapa | `scripts/ui/maps/map_draw.gd` | `MARKER_STYLES` (`color`, `shape`, `size`, `pin`, `order`), `MARKER_LABELS` |
+| Color de la flecha de cada jugador (J1-J4), contorno de los marcadores y anillo de caído | `scripts/ui/maps/map_draw.gd` (bloque «Edita aquí») | `PLAYER_COLORS`, `OUTLINE_COLOR`, `OUTLINE_WIDTH`, `DOWNED_RING_*` |
+| Formaciones de roca en el mapa, nitidez de la imagen y fondo liso cuando la arena no tiene Terrain | `scripts/ui/maps/map_ground.gd` (bloque «Edita aquí») | `ROCK_BLEND`, `ROCK_OUTLINE_DARKEN`, `ROCK_EDGE`, `ROCK_FALLBACK_COLOR`, `PIXELS_PER_METER`, `PLAIN_BACKGROUND` (el color de la roca sale del `formation_style` de cada arena) |
+| Mapa de Tab: cuánto tapa el velo al mundo y su viñeta | `scenes/ui/maps/MapOverlay.tscn` > Dim > Material | `dim`, `vignette`, `tint_color`, `edge_color` |
+| Mapa de Tab: color, giro y título de cada tarjeta | `MapOverlay.tscn` > StatsPanel, PlayersPanel, PowerUpsPanel, PetPanel, ItemsPanel | `tile_color`, `tilt_degrees`, `title` |
+| Mapa de Tab: contorno, esquinas, sombra, márgenes y letra del título de las tarjetas | `scenes/ui/maps/MapSection.tscn` > raíz (grupos «Marco», «Contenido», «Panel») | `border_width`, `corner_radius`, `shadow_offset`, `padding`, `title_font_size` y sus pares `compact_*` para las celdas de co-op |
+| Mapa de Tab: marco del mapa, márgenes y orden de los paneles | `MapOverlay.tscn` (MapFrame, Layout y los paneles bajo Side/Panels) | Layout, Theme Overrides > Styles |
+| Mapa de Tab: cuánto ancho toma el mapa, separación de las tarjetas, aparición y textos | `MapOverlay.tscn` > raíz | `map_share`, `min_map_side`, `wide_cell_aspect`, `panel_gap`, `fade_seconds`, `pop_stagger`, `header_font_size`, grupo «Textos» (`close_hint` incluido) |
+| Estadísticas del mapa de Tab: colores de subida y baja, chapa del valor, letra y ancho de cada celda | `MapOverlay.tscn` > Stats | `raised_color`, `lowered_color`, `idle_color`, `chip_color`, `chip_radius`, `font_size`, `cell_min_width`, `max_columns` |
+| Filas de estadísticas del mapa de Tab (nombre, nombre corto para co-op, orden) | `scripts/ui/maps/map_overlay.gd` | `STAT_ROWS` (al comienzo) |
+| Filas de jugadores del mapa de Tab (co-op) | `MapOverlay.tscn` > Players | `bar_size`, `knocked_out_color`, `knocked_out_format`, `points_format`, `font_size` |
+| Fichas de equipo y de power-ups del mapa de Tab | `scenes/ui/maps/MapChip.tscn` (la casilla es Tile; el nombre, Name; la etiqueta, Tag) | Theme Overrides; en Tile, `glyph_font_size` y tamaño mínimo |
+| Leyenda del mapa de Tab | `MapOverlay.tscn` > Legend y SideLegend | `swatch_side`, `swatch_scale`, `font_size`, `text_color`, `outline_size` |
 
 ## Menús
 
