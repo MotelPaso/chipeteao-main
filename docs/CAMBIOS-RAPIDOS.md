@@ -245,7 +245,7 @@ otra cosa.
 | Cómo arden árboles, rocas, tocones y mesetas | `scenes/enemies/mythos/HellTransformation.tscn` > raíz > `prop_material` (Shader Parameters); el pasto de las mesetas, en la raíz | `char_color`, `ember_color`, `fire_color`, `fire_core`, `fire_glow`; `grass_flame_amount` |
 | Suelo quemado: tierra, grietas de lava y ceniza | `assets/shaders/forest_ground.gdshader` (uniforms «Quemado») | `scorch_dark`, `scorch_light`, `lava_color`, `lava_core`, `ash_color`, `crack_scale`, `crack_width`, `lava_glow` |
 | Sonido de fuego, brasas y humo | HellTransformation.tscn > raíz («Sonido», «Partículas»), sus nodos FireBed y Embers, y `HellSmoke.tscn` | `fire_volume_db`, `smolder_volume_db`, `charred_ember_ratio`; `amount`, `lifetime` y el material de cada nube |
-| Nombre de Mythos en la Colección | `scripts/ui/meta/collection.gd` > tabla `BESTIARY`, fila `mythos` | `display_name`, `flavor` |
+| Nombre de Mythos en la Colección | `scripts/ui/meta/collection/collection_entries.gd` > tabla `BESTIARY`, fila `mythos` | `display_name`, `flavor`, `tint` (color de su carta) |
 
 ### Langosta Azul, el minijefe del Bosque Hueco
 
@@ -269,7 +269,7 @@ El cuerpo físico (lo que choca y a lo que le apuntan las armas) va en su
 | Que pelee sola o en medio de la horda | `scenes/world/HollowWoods.tscn` > EnemySpawner (grupo «Jefes») | `mini_boss_fights_alone` (apagado = la horda sigue llegando y nadie la barre); el respiro tras su muerte es `boss_relief_duration` |
 | El barrido de la horda al empezar la pelea: salpicones, anillo y sonido | `scripts/enemies/blue_lobster/lobster_purge.gd` | `max_bursts`, `burst_color`, `burst_amount`, `ring_radius`, `ring_speed`, `wave_sfx` |
 | Su nombre, colores de sus avisos y de su barra | `scenes/enemies/BlueLobster.tscn` > raíz («Jefe», «Telegrafía») y `scripts/enemies/blue_lobster.gd` («Aspecto») | `boss_title`, `telegraph_color`, `impact_color`; `bar_fill_color`, `burst_color` |
-| Su nombre en la Colección | `scripts/ui/meta/collection.gd` > tabla `BESTIARY`, fila `blue_lobster` | `display_name` (igual a `boss_title`), `flavor` |
+| Su nombre en la Colección | `scripts/ui/meta/collection/collection_entries.gd` > tabla `BESTIARY`, fila `blue_lobster` | `display_name` (igual a `boss_title`), `flavor`, `tint` (color de su carta) |
 | Cuánto dura la pelea | `BlueLobster.tscn` > nodo `Scaling` | `target_fight_seconds` (su vida se recalcula para durar esto con el daño real de la party), `min_fight_seconds`, `focus_on_boss` (la estimación del principio), `advantage_absorbed` (parte de la ventaja de daño de la party que se vuelve vida: 1 = dura lo mismo con cualquier build; más bajo = una party fuerte la mata antes); `life_shares` queda en `[1.0]` |
 | Cada cuánto y con qué cuidado recalcula su vida con el daño real | `scripts/enemies/blue_lobster/lobster_life.gd` («Recálculo») | `replan_seconds`, `trust_seconds`, `recent_seconds`, `recent_weight`, `max_drop_per_replan`, `stop_with_seconds_left`, `stop_with_bar_left`, `log_change` |
 | Su vida mínima (el PISO del cálculo) | `BlueLobster.tscn` > nodo `Health` | `max_hp` |
