@@ -10,6 +10,8 @@ extends WeaponBase
 @export var travel_scale: float = 1.0
 ## Altura sobre este montaje desde la que se lanza la hoja, en metros.
 @export var throw_height: float = 0.0
+## Escala de la hoja, visual y área de corte (1 = tamaño de la escena). Las mejoras de arma la suben.
+@export var blade_scale: float = 1.0
 
 @export_group("Multitud")
 ## Segundos entre las hojas extra del Tomo de Multitud; lanzadas juntas volarían la misma línea y solo la primera tocaría algo.
@@ -36,5 +38,8 @@ func _throw_blade(throw_dir: Vector3) -> void:
 	var blade := Pools.acquire_scene(projectile_scene) as BoomerangProjectile
 	if blade == null:
 		return
+	# Se escribe en cada lanzamiento: la hoja viene del pool y conserva la
+	# escala de su uso anterior.
+	blade.scale = Vector3.ONE * blade_scale
 	blade.launch(self, global_position + Vector3.UP * throw_height, throw_dir,
 			attack_range * travel_scale * area_scale())

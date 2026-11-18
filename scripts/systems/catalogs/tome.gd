@@ -1,189 +1,205 @@
 class_name Tome
 extends RefCounted
-## Catálogo estático de Tomos: objetos pasivos acumulables cuyos efectos de
-## stats alimentan la capa PlayerStats del jugador. Un tomo nuevo es una fila
-## aquí, igual que un arma en WeaponCatalog.WEAPON_LIBRARY.
+## Catálogo de tomos. Cada tomo es un stat permanente que se acumula por
+## stacks (sin tope de stacks; solo hay tope de tomos DISTINTOS, ver
+## Player.max_tomes).
 ##
-## Edita aquí: una fila por tomo.
-## Se puede cambiar sin romper nada:
-##   display_name: texto para el jugador; el título de la carta le suma el
-##             numeral de la copia siguiente («Tomo de Furia II»). Las
-##             copias no tienen techo (sí lo tiene la cantidad de tomos
-##             DISTINTOS); ver stack_label().
-##   glyph:    2 letras de la casilla del HUD mientras no hay sprite. Se
-##             DECLARA, no sale de display_name: todos empiezan con
-##             «Tomo de» y el resto choca (Persistencia/Peligro darían «PE»).
-##             No debe repetirse entre armas, evoluciones, tomos, objetos,
-##             power-ups ni mascotas (el lint glyphs_unique lo revisa).
-##   description: texto de la carta; el "%d" se llena con el amount del
-##             PRIMER efecto, escalado por la rareza.
-##   effects:  lista de {stat, amount}. amount es por copia a potencia
-##             Común; la potencia de la rareza sacada lo escala al tomarlo.
-## Llave interna (la lee el código; cambiarla rompe algo):
-##   id:       identificador en inglés, nunca se muestra.
-##   effects[].stat: nombres de stat de PlayerStats (ver su _apply_effect).
-
-## Tabla de numerales romanos para stack_label(). Las copias no tienen techo,
-## así que el numeral se arma con estos pares en vez de salir de una lista
-## fija; se usa numeral y no «Nv %d», que el GLOSARIO (regla 6) reserva para
-## el nivel de la partida.
-const ROMAN_VALUES: Array[int] = [1000, 900, 500, 400, 100, 90, 50, 40, 10, 9, 5, 4, 1]
-const ROMAN_SYMBOLS: Array[String] = [
-	"M", "CM", "D", "CD", "C", "XC", "L", "XL", "X", "IX", "V", "IV", "I"]
+## Campos de un tomo:
+##   id: identificador (no lo cambies: lo usan guardados y PlayerStats).
+##   short: sigla de 2 letras para la franja del HUD.
+##   title: nombre base; display_title() le añade el numeral.
+##   description: texto de la carta, con un "%d" que se llena con la cantidad.
+##   effects: lista de {stat, amount, values?}.
+##       stat: id de stat de PlayerStats._apply_effect (damage, cooldown,
+##           area, move_speed, crit_chance, crit_damage, lifesteal, evasion,
+##           armor, luck, thorns, max_hp, projectiles, duration, xp_gain,
+##           difficulty, jumps, powerup_chance, pickup_radius, gambling).
+##       amount: cantidad base (respaldo si no hay `values`).
+##       values: OPCIONAL. Cantidad FIJA por rareza, en el orden de
+##           Rarity.TIERS: [Común, Raro, Épico, Legendario]. Si existe manda
+##           sobre amount x potencia. ESTAS LISTAS SE EDITAN PARA BALANCEAR.
+##   gamble: true en el Tomo del Azar (ver gamble_boon_count y GAMBLE_BOONS).
 
 const TOME_LIBRARY: Array[Dictionary] = [
 	{
-		"id": "tome_fury", "display_name": "Tomo de Furia", "glyph": "FU",
-		"description": "Daño de todas las armas +%d%%",
-		"effects": [{"stat": "damage", "amount": 15.0}],
+		"id": "tome_fury", "short": "FU", "title": "Tomo de Furia",
+		"description": "Daño +%d%%",
+		"effects": [{"stat": "damage", "amount": 15.0, "values": [15, 20, 25, 30]}],
 	},
 	{
-		"id": "tome_haste", "display_name": "Tomo de Celeridad", "glyph": "CE",
-		"description": "Velocidad de ataque de todas las armas +%d%%",
-		"effects": [{"stat": "cooldown", "amount": 8.0}],
+		"id": "tome_haste", "short": "CE", "title": "Tomo de Celeridad",
+		"description": "Vel. de ataque +%d%%",
+		# "cooldown" resta amount/100 al multiplicador de enfriamiento.
+		"effects": [{"stat": "cooldown", "amount": 8.0, "values": [8, 10, 13, 16]}],
 	},
 	{
-		"id": "tome_reach", "display_name": "Tomo de Alcance", "glyph": "AL",
-		"description": "Área de ataque +%d%%",
-		"effects": [{"stat": "area", "amount": 12.0}],
+		"id": "tome_reach", "short": "AL", "title": "Tomo de Alcance",
+		"description": "Área +%d%%",
+		"effects": [{"stat": "area", "amount": 12.0, "values": [12, 16, 20, 25]}],
 	},
 	{
-		"id": "tome_swiftness", "display_name": "Tomo de Ligereza", "glyph": "LI",
-		"description": "Velocidad de movimiento +%d%%",
-		"effects": [{"stat": "move_speed", "amount": 8.0}],
+		"id": "tome_swiftness", "short": "LI", "title": "Tomo de Ligereza",
+		"description": "Vel. de movimiento +%d%%",
+		"effects": [{"stat": "move_speed", "amount": 8.0, "values": [8, 10, 12, 15]}],
 	},
 	{
-		"id": "tome_precision", "display_name": "Tomo de Precisión", "glyph": "PR",
-		"description": "Prob. de crítico +%d%%",
-		"effects": [{"stat": "crit_chance", "amount": 6.0}],
+		"id": "tome_precision", "short": "PR", "title": "Tomo de Precisión",
+		"description": "Prob. crítico +%d%%",
+		"effects": [{"stat": "crit_chance", "amount": 6.0, "values": [6, 8, 10, 13]}],
 	},
 	{
-		"id": "tome_ruin", "display_name": "Tomo de Ruina", "glyph": "RU",
+		"id": "tome_ruin", "short": "RU", "title": "Tomo de Ruina",
 		"description": "Daño crítico +%d%%",
-		"effects": [{"stat": "crit_damage", "amount": 30.0}],
+		"effects": [{"stat": "crit_damage", "amount": 30.0, "values": [30, 40, 50, 65]}],
 	},
 	{
-		"id": "tome_thirst", "display_name": "Tomo de Sed", "glyph": "SE",
-		"description": "Robo de vida: te curas el %d%% del daño hecho",
-		"effects": [{"stat": "lifesteal", "amount": 3.0}],
+		"id": "tome_thirst", "short": "SE", "title": "Tomo de Sed",
+		"description": "Robo de vida +%d%%",
+		"effects": [{"stat": "lifesteal", "amount": 3.0, "values": [3, 4, 5, 7]}],
 	},
 	{
-		"id": "tome_stone", "display_name": "Tomo de Piedra", "glyph": "PI",
-		"description": "Armadura +%d (reducción fija de daño)",
-		"effects": [{"stat": "armor", "amount": 2.0}],
+		"id": "tome_stone", "short": "PI", "title": "Tomo de Piedra",
+		"description": "Armadura +%d",
+		"effects": [{"stat": "armor", "amount": 2.0, "values": [2, 3, 4, 6]}],
 	},
 	{
-		"id": "tome_mist", "display_name": "Tomo de Bruma", "glyph": "BR",
-		"description": "Evasión: %d%% de probabilidad de esquivar golpes",
-		"effects": [{"stat": "evasion", "amount": 4.0}],
-	},
-	# Capa de stats de suerte, proyectiles, duración, XP, azar y dificultad.
-	{
-		"id": "tome_fortune", "display_name": "Tomo de Fortuna", "glyph": "FO",
-		"description": "Suerte +%d (mejores rarezas de cartas y objetos)",
-		"effects": [{"stat": "luck", "amount": 10.0}],
+		"id": "tome_mist", "short": "BR", "title": "Tomo de Bruma",
+		"description": "Evasión +%d%%",
+		"effects": [{"stat": "evasion", "amount": 4.0, "values": [4, 5, 7, 9]}],
 	},
 	{
-		"id": "tome_multitude", "display_name": "Tomo de Multitud", "glyph": "MU",
-		"description": "+%d proyectil(es) en cada arma de andanada",
-		"effects": [{"stat": "projectiles", "amount": 1.0}],
+		"id": "tome_fortune", "short": "FO", "title": "Tomo de Fortuna",
+		"description": "Suerte +%d",
+		"effects": [{"stat": "luck", "amount": 7.0, "values": [7, 9, 12, 15]}],
 	},
 	{
-		"id": "tome_lingering", "display_name": "Tomo de Persistencia", "glyph": "PS",
-		"description": "Duración de efectos +%d%% (ralentizaciones, charcos, veneno)",
-		"effects": [{"stat": "duration", "amount": 20.0}],
+		"id": "tome_multitude", "short": "MU", "title": "Tomo de Multitud",
+		"description": "+%d proyectil en armas de andanada",
+		"effects": [{"stat": "projectiles", "amount": 1.0, "values": [1, 1, 2, 2]}],
 	},
 	{
-		"id": "tome_wisdom", "display_name": "Tomo de Sabiduría", "glyph": "SA",
-		"description": "XP ganada +%d%%",
-		"effects": [{"stat": "xp_gain", "amount": 10.0}],
+		"id": "tome_lingering", "short": "PS", "title": "Tomo de Persistencia",
+		"description": "Duración de efectos +%d%%",
+		"effects": [{"stat": "duration", "amount": 20.0, "values": [20, 25, 32, 40]}],
 	},
 	{
-		# Azar: cada copia saca boons de stats al azar — más y más grandes a
-		# mayor rareza (la tirada la hace PlayerStats.add_tome).
-		"id": "tome_chance", "display_name": "Tomo del Azar", "glyph": "AZ",
-		"description": "Apuesta: %d bonificación(es) de stat al azar, mayores a más rareza",
-		"effects": [{"stat": "gambling", "amount": 1.0}],
+		"id": "tome_wisdom", "short": "SA", "title": "Tomo de Sabiduría",
+		"description": "XP +%d%%",
+		"effects": [{"stat": "xp_gain", "amount": 10.0, "values": [10, 13, 16, 20]}],
+	},
+	{
+		"id": "tome_vitality", "short": "VI", "title": "Tomo de Vitalidad",
+		"description": "HP máx. +%d",
+		"effects": [{"stat": "max_hp", "amount": 20.0, "values": [20, 25, 32, 40]}],
+	},
+	{
+		"id": "tome_greed", "short": "CO", "title": "Tomo de Codicia",
+		"description": "Radio de recolección +%d%%",
+		"effects": [{"stat": "pickup_radius", "amount": 25.0, "values": [25, 30, 38, 50]}],
+	},
+	{
+		# Apuesta: sin values. La cantidad de boons sale de gamble_boon_count()
+		# y PlayerStats los sortea de GAMBLE_BOONS al tomarlo.
+		"id": "tome_chance", "short": "AZ", "title": "Tomo del Azar",
+		"description": "Apuesta: %d boons al azar",
 		"gamble": true,
+		"effects": [{"stat": "gambling", "amount": 1.0}],
 	},
 	{
-		# La dificultad es DE LA PARTIDA (compartida en co-op): enemigos más
-		# duros que pagan más XP; PlayerStats manda el total a RunState.
-		"id": "tome_peril", "display_name": "Tomo del Peligro", "glyph": "PG",
-		"description": "Dificultad +%d%%: enemigos más duros, más XP",
+		# Sin values: es un riesgo, no escala con la rareza.
+		"id": "tome_peril", "short": "PG", "title": "Tomo del Peligro",
+		"description": "Dificultad +%d%%",
 		"effects": [{"stat": "difficulty", "amount": 10.0}],
 	},
 ]
 
-## Stats en que puede caer un boon del Tomo del Azar: {stat, amount, label}
-## a potencia Común (la potencia de la rareza lo escala y suma más boons).
-## `label` lleva exactamente un "%d", que se llena con el amount sacado: el
-## aviso del HUD muestra lo que pagó la apuesta.
+## Boons posibles del Tomo del Azar: {stat, amount, label}. `amount` es la
+## cantidad a potencia Común (PlayerStats.roll_gamble_boons la escala).
+## SI TU Tome.gd ORIGINAL YA TENÍA ESTA LISTA, USA LA TUYA EN VEZ DE ESTA.
 const GAMBLE_BOONS: Array[Dictionary] = [
-	{"stat": "damage", "amount": 12.0, "label": "daño +%d%%"},
-	{"stat": "cooldown", "amount": 6.0, "label": "velocidad de ataque +%d%%"},
-	{"stat": "area", "amount": 10.0, "label": "área +%d%%"},
-	{"stat": "move_speed", "amount": 6.0, "label": "velocidad +%d%%"},
-	{"stat": "crit_chance", "amount": 5.0, "label": "prob. de crítico +%d%%"},
-	{"stat": "crit_damage", "amount": 25.0, "label": "daño crítico +%d%%"},
-	{"stat": "lifesteal", "amount": 2.0, "label": "robo de vida +%d%%"},
-	{"stat": "armor", "amount": 2.0, "label": "armadura +%d"},
-	{"stat": "evasion", "amount": 3.0, "label": "evasión +%d%%"},
-	{"stat": "luck", "amount": 8.0, "label": "suerte +%d"},
-	{"stat": "max_hp", "amount": 15.0, "label": "HP máx. +%d"},
-	{"stat": "xp_gain", "amount": 8.0, "label": "ganancia de XP +%d%%"},
-	{"stat": "duration", "amount": 15.0, "label": "duración de efectos +%d%%"},
+	{"stat": "damage", "amount": 10.0, "label": "Daño"},
+	{"stat": "cooldown", "amount": 6.0, "label": "Vel. de ataque"},
+	{"stat": "area", "amount": 8.0, "label": "Área"},
+	{"stat": "move_speed", "amount": 6.0, "label": "Vel. de movimiento"},
+	{"stat": "crit_chance", "amount": 5.0, "label": "Prob. crítico"},
+	{"stat": "lifesteal", "amount": 2.0, "label": "Robo de vida"},
+	{"stat": "armor", "amount": 2.0, "label": "Armadura"},
+	{"stat": "luck", "amount": 5.0, "label": "Suerte"},
+	{"stat": "xp_gain", "amount": 8.0, "label": "XP"},
 ]
 
-## Índice id -> fila, construido al primer uso (ver CatalogIndex):
-## PlayerStats.recompute() resuelve una fila por copia llevada en cada subida
-## de nivel y cada boon de altar.
-static var _by_id: Dictionary[String, Dictionary] = {}
+## Stats cuyo valor se muestra como porcentaje; el resto, como número plano.
+const PERCENT_STATS: Array[String] = [
+	"damage", "cooldown", "area", "move_speed", "crit_chance", "crit_damage",
+	"lifesteal", "evasion", "duration", "xp_gain", "difficulty", "pickup_radius",
+]
+
+## Nombre que ve el jugador por cada id de stat.
+const STAT_NAMES: Dictionary[String, String] = {
+	"damage": "Daño", "cooldown": "Vel. de ataque", "area": "Área",
+	"move_speed": "Vel. de movimiento", "crit_chance": "Prob. crítico",
+	"crit_damage": "Daño crítico", "lifesteal": "Robo de vida",
+	"evasion": "Evasión", "armor": "Armadura", "luck": "Suerte",
+	"thorns": "Espinas", "max_hp": "HP máx.", "projectiles": "Proyectiles",
+	"duration": "Duración de efectos", "xp_gain": "XP", "difficulty": "Dificultad",
+	"jumps": "Saltos", "powerup_chance": "Prob. de power-ups",
+	"pickup_radius": "Radio de recolección",
+}
+
+const _NUMERALS: PackedStringArray = [
+	"", "I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X",
+]
 
 
-static func by_id(tome_id: String) -> Dictionary:
-	if _by_id.is_empty():
-		_by_id = CatalogIndex.build(TOME_LIBRARY)
-	return _by_id.get(tome_id, {})
+## Cantidad de un efecto para la potencia de una rareza: el valor fijo de
+## `values` si existe; si no, la cantidad base por la potencia.
+static func effect_amount(effect: Dictionary, potency: float) -> float:
+	var values: Array = effect.get("values", [])
+	if not values.is_empty():
+		var rank := mini(Rarity.potency_rank(potency), values.size() - 1)
+		return float(values[rank])
+	return float(effect.amount) * potency
 
 
-## Cuántos boons da una copia del Tomo del Azar a la potencia dada: Común 1,
-## Raro 2, Épico 3, Legendario 4. LA única fuente de esa cuenta: PlayerStats
-## saca exactamente esta cantidad y UpgradePool imprime la misma, así la
-## carta nunca promete menos de lo que da.
+## Boons que sortea el Tomo del Azar: 1 (Común) a 4 (Legendario).
 static func gamble_boon_count(potency: float) -> int:
-	return 1 + clampi(UpgradePool.potency_rank(potency), 0, 3)
+	return Rarity.potency_rank(potency) + 1
 
 
-## Título de carta para ofrecer la copia dada (desde 1): el nombre solo para
-## la primera, «Nombre II», «Nombre VII», «Nombre XIV»... para las siguientes.
-static func display_title(tome: Dictionary, stack: int) -> String:
-	var title := String(tome.display_name)
-	if stack <= 1:
-		return title
-	return title + " " + stack_label(stack)
-
-
-## EL numeral de copias, para el título de la carta y la esquina de la
-## casilla del HUD. Cualquier cantidad desde 1 se lee como numeral.
+## Numeral de un stack: 1 -> "I", 2 -> "II"... y desde 11 el número normal.
 static func stack_label(stack: int) -> String:
-	var value := maxi(stack, 1)
+	if stack >= 1 and stack < _NUMERALS.size():
+		return _NUMERALS[stack]
+	return str(stack)
+
+
+## Título de la carta: «Tomo de Furia II».
+static func display_title(tome: Dictionary, stack: int) -> String:
+	return "%s %s" % [String(tome.title), stack_label(stack)]
+
+
+## Fila de un tomo por id, o {} si no existe.
+static func by_id(tome_id: String) -> Dictionary:
+	for tome: Dictionary in TOME_LIBRARY:
+		if String(tome.id) == tome_id:
+			return tome
+	return {}
+
+## Texto de un boon, p. ej. "+10% Daño" o "+5 Suerte". Acepta el diccionario
+## del boon {stat, amount, label} o (stat, amount) por separado.
+static func boon_text(boon_or_stat: Variant, amount: float = 0.0) -> String:
+	var stat := ""
+	var value := amount
 	var label := ""
-	for i: int in ROMAN_VALUES.size():
-		while value >= ROMAN_VALUES[i]:
-			value -= ROMAN_VALUES[i]
-			label += ROMAN_SYMBOLS[i]
-	return label
-
-
-## Lee una lista de boons sacados ({stat, amount, label}) como una línea,
-## para el aviso del HUD: "daño +18%, suerte +12". Las filas sin label usan
-## su id de stat, así una fila nueva de GAMBLE_BOONS nunca imprime vacío.
-static func boon_text(boons: Array[Dictionary]) -> String:
-	var parts: PackedStringArray = PackedStringArray()
-	for boon: Dictionary in boons:
-		var label := String(boon.get("label", ""))
-		var amount := roundi(float(boon.get("amount", 0.0)))
-		parts.append(label % amount if not label.is_empty()
-				else "%s +%d" % [String(boon.get("stat", "?")), amount])
-	return ", ".join(parts)
+	if boon_or_stat is Dictionary:
+		var boon: Dictionary = boon_or_stat
+		stat = String(boon.get("stat", ""))
+		value = float(boon.get("amount", 0.0))
+		label = String(boon.get("label", ""))
+	else:
+		stat = String(boon_or_stat)
+	if label.is_empty():
+		label = STAT_NAMES.get(stat, stat)
+	var prefix := "+" if value >= 0.0 else "-"
+	var suffix := "%" if PERCENT_STATS.has(stat) else ""
+	return "%s%d%s %s" % [prefix, absi(roundi(value)), suffix, label]

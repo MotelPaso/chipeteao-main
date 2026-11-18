@@ -13,6 +13,8 @@ extends WeaponBase
 ## una fila de evolución, que WeaponBase.evolve aplica por nombre),
 ## _tick_pools gastaría todo su presupuesto de pulsos en un frame.
 const MIN_TICK_INTERVAL: float = 0.01
+## Piso de projectile_speed: el tiempo de vuelo es lob_time / projectile_speed.
+const MIN_FLASK_SPEED: float = 0.1
 
 @export_group("Puntería")
 ## Radio del vecindario con que se puntúa la densidad alrededor de cada candidato, en metros.
@@ -27,7 +29,7 @@ const MIN_TICK_INTERVAL: float = 0.01
 @export var pool_ticks: int = 6
 ## Segundos entre pulsos de daño del charco.
 @export var tick_interval: float = 0.5
-## Fracción del daño del charco que vuelve al jugador como curación (0-1).
+## Fracción del daño del charco que vuelve al jugador como curación (0-1). Es el «robo de vida» propio del vial; las mejoras de arma lo suben.
 @export var heal_fraction: float = 0.15
 ## Altura máxima, en metros, por encima o por debajo del plano del charco a la que alcanza.
 @export var pool_height_window: float = 1.6
@@ -35,8 +37,10 @@ const MIN_TICK_INTERVAL: float = 0.01
 @export var pool_ground_offset: float = 0.03
 
 @export_group("Frasco")
-## Segundos de vuelo del frasco desde la mano hasta el impacto.
+## Segundos de vuelo del frasco desde la mano hasta el impacto (a velocidad 1).
 @export var lob_time: float = 0.435
+## Multiplicador de velocidad del frasco en vuelo (1 = normal, 1.5 = vuela en dos tercios del tiempo). Las mejoras de arma lo suben.
+@export var projectile_speed: float = 1.0
 ## Altura máxima del arco del frasco sobre la línea recta del lanzamiento, en metros.
 @export var arc_height: float = 4.145
 ## Altura sobre el montaje desde la que sale el frasco, en metros.
@@ -148,7 +152,8 @@ func _throw_from(offset: Vector3, origin: Vector3) -> void:
 
 
 ## Lanza el visual del frasco en un arco parabólico; el charco aparece donde
-## cae (la posición del blanco al lanzar), lob_time segundos después.
+## cae (la posición del blanco al lanzar), lob_time / projectile_speed
+## segundos después.
 func _lob_flask(impact: Vector3) -> void:
 	var flask := spawn_fx_mesh(flask_mesh)
 	var start := global_position + Vector3.UP * throw_height
@@ -164,7 +169,8 @@ func _lob_flask(impact: Vector3) -> void:
 	# argumento atado: la llamada falla ANTES de la guarda is_instance_valid()
 	# del método. Un int siempre pasa, y la búsqueda de abajo da null si murió.
 	var flask_id := flask.get_instance_id()
-	tween.tween_method(_arc_flask.bind(flask_id, start, impact), 0.0, 1.0, lob_time)
+	var flight_time := lob_time / maxf(projectile_speed, MIN_FLASK_SPEED)
+	tween.tween_method(_arc_flask.bind(flask_id, start, impact), 0.0, 1.0, flight_time)
 	tween.tween_callback(_shatter.bind(flask_id, impact))
 
 

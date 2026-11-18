@@ -15,6 +15,9 @@ const MIN_DAMAGE_MULTIPLIER: float = 0.1
 const MIN_MOVE_MULTIPLIER: float = 0.2
 const MIN_DURATION_MULTIPLIER: float = 0.1
 const MIN_XP_MULTIPLIER: float = 0.1
+## Piso del bono de radio de recolección (-0.9 = -90%): un debuff nunca deja
+## el radio en cero o negativo.
+const MIN_PICKUP_RADIUS_BONUS: float = -0.9
 ## Techo de saltos extra. No es gusto: el raider no tiene más control en el
 ## aire que air_acceleration, y pasado esto la verticalidad de una arena
 ## (mesetas, plataformas, el borde) deja de ser un obstáculo.
@@ -83,6 +86,9 @@ var extra_jumps: int = 0
 ## Bono, en %, a la probabilidad de drop de power-ups. Lo lee
 ## EnemySpawner.roll_powerup_drop y lo venden los altares («Fortuna menor»).
 var powerup_drop_chance: float = 0.0
+## Bono (fracción, 0.25 = +25%) al radio de recolección. Se empuja a
+## RunState.pickup_radius_multiplier como DELTA, igual que bonus_max_hp.
+var pickup_radius_bonus: float = 0.0
 
 ## id de tomo -> una potencia de rareza por copia recogida. recompute()
 ## deriva todo de aquí: es la única fuente de verdad.
@@ -133,6 +139,9 @@ var _passive_every: int = 0
 ## Parte de bonus_max_hp ya aplicada al Health, para que cada recompute
 ## ajuste por la diferencia en vez de volver a sumar todo el bono.
 var _applied_bonus_max_hp: float = 0.0
+## Parte de pickup_radius_bonus ya sumada a RunState.pickup_radius_multiplier,
+## con la misma idea de diferencia.
+var _applied_pickup_bonus: float = 0.0
 ## True mientras corre recompute() (ver is_recomputing).
 var _recomputing: bool = false
 
@@ -359,6 +368,7 @@ func _reset_derived() -> void:
 	gambling_stacks = 0
 	extra_jumps = 0
 	powerup_drop_chance = 0.0
+	pickup_radius_bonus = 0.0
 
 
 ## Todas las fuentes, en el ÚNICO orden que importa: la pasiva del personaje
@@ -405,7 +415,7 @@ func _apply_tomes() -> void:
 			for effect: Dictionary in effects:
 				# roundf coincide con el texto de la carta: lo mostrado es lo
 				# aplicado.
-				_apply_effect(String(effect.stat), roundf(float(effect.amount) * potency))
+				_apply_effect(String(effect.stat), roundf(Tome.effect_amount(effect, potency)))
 
 
 ## Una lista de boons {stat, amount} por el canal de efectos. Los boons de
@@ -427,13 +437,16 @@ func _clamp_derived() -> void:
 	duration_multiplier = maxf(duration_multiplier, MIN_DURATION_MULTIPLIER)
 	xp_multiplier = maxf(xp_multiplier, MIN_XP_MULTIPLIER)
 	projectile_bonus = maxi(projectile_bonus, 0)
+	pickup_radius_bonus = maxf(pickup_radius_bonus, MIN_PICKUP_RADIUS_BONUS)
 
 
 ## Empuja los totales a los consumidores que no pueden leerlos solos: el
-## Health hermano (armadura, HP máx. extra) y la dificultad de la partida.
+## Health hermano (armadura, HP máx. extra), el radio de recolección de la
+## partida y la dificultad.
 func _publish_derived() -> void:
 	_push_armor_to_health()
 	_push_bonus_max_hp_to_health()
+	_push_pickup_radius_to_run_state()
 	_publish_difficulty()
 
 
@@ -592,6 +605,8 @@ func _apply_effect(stat: String, amount: float) -> void:
 			extra_jumps = mini(extra_jumps + roundi(amount), MAX_EXTRA_JUMPS)
 		"powerup_chance":
 			powerup_drop_chance += amount
+		"pickup_radius":
+			pickup_radius_bonus += amount / 100.0
 		"gambling":
 			# Sin efecto a propósito: los boons se sacaron al tomar el tomo y
 			# se repiten desde _gamble_boons, y gambling_stacks cuenta COPIAS,
@@ -631,6 +646,16 @@ func _push_bonus_max_hp_to_health() -> void:
 	health.max_hp += delta
 	if delta > 0.0:
 		health.heal(delta)
+
+
+## RunState.pickup_radius_multiplier es compartido, así que el bono se aplica
+## como delta de lo ya empujado y no pisa otras fuentes ni a otro jugador.
+func _push_pickup_radius_to_run_state() -> void:
+	var delta := pickup_radius_bonus - _applied_pickup_bonus
+	if is_zero_approx(delta):
+		return
+	_applied_pickup_bonus = pickup_radius_bonus
+	RunState.pickup_radius_multiplier += delta
 
 
 ## Esquivar-ejecutar (tipo "evasion_execute"): un esquive exitoso mata al

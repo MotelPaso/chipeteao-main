@@ -1,12 +1,23 @@
 [gd_scene format=3 uid="uid://d1eush8kc0f3o"]
 
-[ext_resource type="Script" uid="uid://c04wf3navrij8" path="res://scripts/weapons/dart_pistol.gd" id="1_pistol"]
+[ext_resource type="Script" uid="uid://dbgcwwat42aet" path="res://scripts/weapons/dart_pistol.gd" id="1_pistol"]
 [ext_resource type="PackedScene" uid="uid://ckkwhp30gfho8" path="res://scenes/weapons/Projectile.tscn" id="2_projectile"]
+[ext_resource type="AudioStream" uid="uid://ru202p4vnmyn" path="res://scenes/weapons/pistol_hit.wav" id="3_gjwv6"]
 
 [node name="DartPistol" type="Node3D" unique_id=1100073359]
 script = ExtResource("1_pistol")
 projectile_scene = ExtResource("2_projectile")
+projectile_speed = 120.0
+homing_turn_speed = 0.0
+bounces = 0
+damage = 4.0
+cooldown = 1.5
 attack_range = 14.0
+projectile_count = 4
 
 [node name="Muzzle" type="Node3D" parent="." unique_id=1809399650]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.35, 0, -0.3)
+
+[node name="HitSound" type="AudioStreamPlayer" parent="." unique_id=972454858]
+stream = ExtResource("3_gjwv6")
+volume_db = -31.018

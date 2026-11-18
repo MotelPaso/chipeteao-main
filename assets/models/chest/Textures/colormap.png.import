@@ -2,7 +2,11 @@
 
 importer="texture"
 type="CompressedTexture2D"
+<<<<<<< HEAD
+uid="uid://bfmhwx8snjbmb"
+=======
 uid="uid://cuwqam6d5swrf"
+>>>>>>> origin/main
 path.s3tc="res://.godot/imported/colormap.png-33d4cab5b7660420665ad8d29406756a.s3tc.ctex"
 path.etc2="res://.godot/imported/colormap.png-33d4cab5b7660420665ad8d29406756a.etc2.ctex"
 metadata={

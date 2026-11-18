@@ -77,7 +77,7 @@ const ELITE_CHANCE_CAP: float = 0.6
 @export_group("Ritmo y dificultad")
 ## Multiplicador global de cantidad: escala los enemigos de cada tick del
 ## flujo Y el tamaño de cada horda. No toca el cupo (ver «Cupo de enemigos»).
-@export var spawn_count_multiplier: float = 6.0
+@export var spawn_count_multiplier: float = 4.0
 ## Segundos entre ticks del flujo al empezar la partida.
 @export var start_interval: float = 3.0
 ## Piso del intervalo entre ticks, en segundos (también de los factores de
@@ -87,9 +87,10 @@ const ELITE_CHANCE_CAP: float = 0.6
 @export var interval_shrink_per_minute: float = 0.32
 ## Enemigos por tick al empezar, antes de spawn_count_multiplier.
 @export var base_count_per_tick: int = 1
-## Enemigos por tick que se suman por minuto (se trunca a entero; con 0.45
-## los escalones caen en los minutos ~2.2 / 4.4 / 6.7).
-@export var extra_count_per_minute: float = 0.45
+## Cada cuántos segundos de partida sube la cantidad por tick.
+@export var count_step_seconds: float = 30.0
+## Cuánto sube la cantidad por tick en cada escalón (0.5 = medio enemigo más).
+@export var count_step_amount: float = 0.5
 
 @export_group("Cupo de enemigos")
 ## Máximo de enemigos vivos para el flujo normal: un tick crea a lo sumo
@@ -256,6 +257,7 @@ const ELITE_CHANCE_CAP: float = 0.6
 @export var temp_buff_text: String = "¡La horda crece con una fuerza antinatural!"
 
 var _spawn_timer: float = 0.0  # arranca vencido: la acción empieza de inmediato
+var _count_carry: float = 0.0  # resto fraccionario de enemigos por tick
 ## Solo lo activa el gancho del harness (force_elite_spawns).
 var _force_elite_spawns: bool = false
 # Ayudantes. HordeSchedule recibe _points, así que el orden de declaración
@@ -291,7 +293,12 @@ func _physics_process(delta: float) -> void:
 	# haría la cadencia real más lenta que la tabulada. Con piso en cero, un
 	# tirón de frames compra como mucho un tick de recuperación.
 	_spawn_timer = maxf(_spawn_timer + current_interval(), 0.0)
-	var budget := mini(current_count_per_tick(), max_active - live_enemy_count())
+	# Lo mismo con la cantidad: el resto fraccionario (p. ej. 1.5) se arrastra
+	# al tick siguiente, así que el flujo alterna 1 y 2 enemigos.
+	_count_carry += current_count_exact()
+	var wanted := floori(_count_carry)
+	_count_carry -= float(wanted)
+	var budget := mini(wanted, max_active - live_enemy_count())
 	for i in budget:
 		_spawn_one()
 
@@ -366,9 +373,16 @@ func current_interval() -> float:
 			* SpawnScaling.coop_extra_alive(get_tree()))
 
 
+## Cantidad por tick sin redondear: (base + escalones * paso) * multiplicador.
+func current_count_exact() -> float:
+	var steps := floorf(RunState.run_time / maxf(count_step_seconds, 0.001))
+	return (float(base_count_per_tick) + steps * count_step_amount) \
+			* spawn_count_multiplier
+
+
+## Versión entera para quien la llame desde fuera (mínimo 1).
 func current_count_per_tick() -> int:
-	var base := base_count_per_tick + int(run_minutes() * extra_count_per_minute)
-	return maxi(roundi(float(base) * spawn_count_multiplier), 1)
+	return maxi(floori(current_count_exact()), 1)
 
 
 ## Reloj de la partida en minutos. RunState es el dueño del reloj (timer del
