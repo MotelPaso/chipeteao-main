@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
+  <!-- Esquirla: un cristal azul facetado. Dibujo propio. -->
+  <g stroke="#15131a" stroke-width="8" stroke-linejoin="round" stroke-linecap="round">
+<path d="M64 8 L100 44 L80 118 L48 118 L28 44 Z" fill="#7fd4f0"/>
+<path d="M64 8 L64 48 L28 44 M64 48 L100 44 M64 48 L48 118 M64 48 L80 118" fill="none" stroke-width="5"/>
+<path d="M64 8 L64 48 L28 44 Z" fill="#fff4dc" stroke-width="5"/>
+  </g>
+</svg>

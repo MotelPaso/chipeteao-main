@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
+  <!-- Evoluciones: una flecha hacia arriba con una estrella. Dibujo propio. -->
+  <g stroke="#15131a" stroke-width="8" stroke-linejoin="round" stroke-linecap="round">
+<path d="M64 12 L108 60 L84 60 L84 112 L44 112 L44 60 L20 60 Z" fill="#5bd6a0"/>
+<path d="M64 48 L70 62 L86 63 L74 73 L78 88 L64 80 L50 88 L54 73 L42 63 L58 62 Z" fill="#ffd23f" stroke-width="5"/>
+  </g>
+</svg>

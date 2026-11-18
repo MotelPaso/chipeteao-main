@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
+  <!-- Cofres: un cofre con cerradura. Dibujo propio. -->
+  <g stroke="#15131a" stroke-width="8" stroke-linejoin="round" stroke-linecap="round">
+<path d="M16 58 C16 34 32 22 64 22 C96 22 112 34 112 58 Z" fill="#ffa62b"/>
+<path d="M16 58 L112 58 L112 106 L16 106 Z" fill="#c46a2a"/>
+<path d="M16 58 L112 58" fill="none"/>
+<rect x="52" y="48" width="24" height="26" rx="5" fill="#ffd23f"/>
+<circle cx="64" cy="60" r="3" fill="#15131a" stroke-width="4"/>
+  </g>
+</svg>

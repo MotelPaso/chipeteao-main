@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
+  <!-- Vueltas: dos flechas que giran en círculo. Dibujo propio. -->
+  <g stroke="#15131a" stroke-width="8" stroke-linejoin="round" stroke-linecap="round">
+<path d="M100 60 C98 38 84 24 64 24 C50 24 38 31 31 42" fill="none" stroke-width="22"/>
+<path d="M100 60 C98 38 84 24 64 24 C50 24 38 31 31 42" fill="none" stroke="#5bd6a0" stroke-width="12"/>
+<path d="M28 68 C30 90 44 104 64 104 C78 104 90 97 97 86" fill="none" stroke-width="22"/>
+<path d="M28 68 C30 90 44 104 64 104 C78 104 90 97 97 86" fill="none" stroke="#ffd23f" stroke-width="12"/>
+<path d="M14 30 L46 30 L34 58 Z" fill="#5bd6a0"/>
+<path d="M114 98 L82 98 L94 70 Z" fill="#ffd23f"/>
+  </g>
+</svg>

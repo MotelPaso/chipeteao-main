@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
+  <!-- Personajes: un busto con capucha. Dibujo propio. -->
+  <g stroke="#15131a" stroke-width="8" stroke-linejoin="round" stroke-linecap="round">
+<path d="M18 114 C18 86 38 74 64 74 C90 74 110 86 110 114 Z" fill="#7fd4f0"/>
+<path d="M36 50 C36 26 48 14 64 14 C80 14 92 26 92 50 C92 68 80 80 64 80 C48 80 36 68 36 50 Z" fill="#fff4dc"/>
+<path d="M36 46 C40 26 50 14 64 14 C78 14 88 26 92 46 C80 40 72 34 64 28 C56 34 48 40 36 46 Z" fill="#12343b"/>
+<circle cx="54" cy="56" r="3" fill="#15131a" stroke-width="4"/><circle cx="74" cy="56" r="3" fill="#15131a" stroke-width="4"/>
+  </g>
+</svg>

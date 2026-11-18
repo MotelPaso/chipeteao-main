@@ -695,6 +695,12 @@ evolución.
 | `QUEST LOG` | REGISTRO DE MISIONES |
 | `Claim` | Reclamar |
 | `CLAIMED` | RECLAMADA |
+| `Ready!` (sello de misión completa) | ¡Lista! |
+| `To claim` | Para reclamar |
+| `Claimed` (título de grupo) | Reclamadas |
+| `%d left` | Faltan %d / Falta 1 |
+| Frases del vendedor de la Armería | «¿Qué quieres, pequeño superviviente?», «Mira sin tocar. Tocar cuesta esquirlas.», «Trato hecho. No acepto devoluciones.», «Con eso no te vendo ni el polvo.», «Más de eso ya no cabe en ti.», «Me dejaste sin mercancía. Largo.» |
+| Grupos de misiones | Bajas, Jefes, Altares, Cofres, Personajes, Mapas, Vueltas, Evoluciones, Incursiones |
 | `+%d Shards` | +%d esquirlas |
 | `%d/%d` | %d/%d |
 | `ARMORY` | ARMERÍA |

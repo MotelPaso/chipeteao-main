@@ -7,6 +7,10 @@ extends MetaScreen
 ## tope. Comprar hace destellar la fila y descuenta el saldo
 ## (MetaScreen.payoff), igual que reclamar una misión; un rango que no
 ## alcanza recibe el vaivén de rechazo compartido.
+##
+## A la izquierda de la lista está el vendedor (%Shopkeeper, Shopkeeper.tscn).
+## Esta pantalla solo le avisa qué pasó (abrió, compró, no alcanza, llegó al
+## rango máximo, todo al máximo); él decide qué decir.
 
 ## Ficha con el icono del stat de cada reliquia.
 const STAT_CHIP_SCENE: PackedScene = preload("res://scenes/ui/meta/StatIconChip.tscn")
@@ -47,6 +51,13 @@ const STAT_CHIP_SCENE: PackedScene = preload("res://scenes/ui/meta/StatIconChip.
 ## Sello de una reliquia en su rango máximo.
 @export var maxed_text: String = "MÁX"
 
+@onready var _shopkeeper: Shopkeeper = %Shopkeeper
+
+
+func _ready() -> void:
+	super()
+	_shopkeeper.say(Shopkeeper.Line.SOLD_OUT if _all_maxed() else Shopkeeper.Line.OPEN)
+
 
 func _build_rows(list_node: VBoxContainer) -> void:
 	for relic: Dictionary in RelicCatalog.RELIC_LIBRARY:
@@ -57,8 +68,26 @@ func _on_buy_pressed(relic_id: String, row: PanelContainer) -> void:
 	var before := SaveData.shards
 	if not SaveData.purchase_relic(relic_id):
 		reject(row)
+		_shopkeeper.say(Shopkeeper.Line.CANT_AFFORD)
 		return
 	payoff(row, before, SaveData.shards, &"chest_open")
+	if _all_maxed():
+		_shopkeeper.say(Shopkeeper.Line.SOLD_OUT)
+	elif _is_maxed(RelicCatalog.by_id(relic_id)):
+		_shopkeeper.say(Shopkeeper.Line.MAXED)
+	else:
+		_shopkeeper.say(Shopkeeper.Line.BOUGHT)
+
+
+func _is_maxed(relic: Dictionary) -> bool:
+	return SaveData.relic_rank(String(relic.id)) >= int(relic.max_ranks)
+
+
+func _all_maxed() -> bool:
+	for relic: Dictionary in RelicCatalog.RELIC_LIBRARY:
+		if not _is_maxed(relic):
+			return false
+	return true
 
 
 func _build_row(relic: Dictionary) -> PanelContainer:

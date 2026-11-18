@@ -499,12 +499,20 @@ de reparto se llama `ForestScatter`, `DuneScatter` o `MarshScatter`.
 
 | Qué quieres cambiar | Dónde | Qué propiedad |
 | --- | --- | --- |
-| Posición o tamaño de cualquier elemento del HUD | `scenes/ui/HUD.tscn` > el nodo (TimerLabel, KillsLabel, BuildStrip, BagStrip, FpsBadge, PowerUpRow, MatePanel…) | Layout (anclas y márgenes) |
+| Posición o tamaño de cualquier elemento del HUD | `scenes/ui/HUD.tscn` > el nodo (RunInfo, KillsLabel, LoadoutDock, FpsBadge, PowerUpRow, MatePanel…) | Layout (anclas y márgenes) |
+| Fila de arriba a la izquierda (reloj, etapa y dificultad) | HUD.tscn > RunInfo | Layout; Theme Overrides > Constants > `separation` (espacio entre fichas) |
+| Ficha de dificultad (texto, colores, golpe al subir) | `scenes/ui/hud/DifficultyChip.tscn` > raíz (icono y tamaño de letra: sus hijos Icon y Label) | `text_format`, `tip_format`, `body_color`, `border_color`, `text_color`, `pop_scale`, `pop_time` |
+| Dónde va el equipo (armas, tomos, mascota y objetos) | HUD.tscn > LoadoutDock (abajo a la izquierda; crece hacia arriba) | Layout |
+| Cuántos objetos caben antes de la ficha «+N» | HUD.tscn > LoadoutDock/BagStrip | `columns` (fichas por fila) y `max_tiles` (columnas x filas) |
+| Línea entre armas, tomos y mascota | HUD.tscn > LoadoutDock/BuildStrip | `divider_size`, `divider_color` |
+| Golpe de una ficha al ganarla o subirla | HUD.tscn > LoadoutDock/BuildStrip y BagStrip | `gain_pop_scale`, `gain_pop_time` |
+| Tamaño de las fichas chicas de objetos | `scenes/ui/hud/LoadoutTile.tscn` > raíz (grupo «Casilla chica») | `compact_size`, `compact_glyph_font_size`, `compact_corner_font_size` |
+| Icono de un tomo o un objeto en su ficha | el mismo de la Colección: `scripts/ui/stat_icons.gd` (`ICON_FILES`) y `scripts/ui/item_icons.gd` (`KIND_FILES`); para un dibujo propio, un PNG en `assets/icons/<tomes o items>/<id>.png` | la fila del stat o del `kind` |
 | Tamaño y margen del minimapa | HUD.tscn > ViewWidgets/MinimapSlot (solo cuentan su tamaño y sus márgenes, medidos desde la esquina superior derecha de cada celda; no muevas sus anclas); en co-op y en las celdas de abajo, ViewWidgets | Layout > márgenes; `coop_size_scale`, `lower_cell_top_margin` |
-| Color o tamaño de Nivel, Reloj, Bajas y Puntos | HUD.tscn > LevelLabel, TimerLabel, KillsLabel, PointsLabel | Theme Overrides > Colors / Font Sizes |
+| Color o tamaño de Nivel, Reloj, Etapa, Bajas y Puntos | HUD.tscn > LevelLabel, RunInfo/TimerLabel, RunInfo/StageLabel, KillsLabel, PointsLabel | Theme Overrides > Colors / Font Sizes |
 | Colores de la barra de vida y el latido de vida baja | HUD.tscn > HUD | `hp_full_color`, `hp_low_color`, grupo «Latido de vida baja» |
 | Color y forma de la barra de XP | HUD.tscn > HUD | `xp_color`, `xp_trough_color`, `xp_line_color`, `xp_corner_radius`, `xp_line_width` |
-| Textos de bajas, puntos, dificultad, etapa y reloj | HUD.tscn > HUD (grupo «Textos») | `kills_format`, `points_format`, `difficulty_format`, `stage_format`, `timer_format` |
+| Textos de bajas, puntos, etapa y reloj | HUD.tscn > HUD (grupo «Textos») | `kills_format`, `points_format`, `stage_format`, `stage_lap_format`, `timer_format` |
 | Palabras, colores y umbrales de las rachas («¡TRITURANDO!») | HUD.tscn > StreakLabel | `tier_kills`, `tier_words`, `tier_colors`, `window_seconds` |
 | Duración y color de los avisos en pantalla | HUD.tscn > AnnounceLabel | `fade_in_time`, `hold_time`, `fade_out_time`, `normal_color`, `major_*` |
 | Barra de vida del jefe: colores (y color de la flecha que apunta al jefe) | `scripts/ui/game/hud/boss_bar.gd` («Colores») | `fill_color`, `trough_color`, `ghost_color`, `low_color`, `tick_color` |
@@ -512,12 +520,12 @@ de reparto se llama `ForestScatter`, `DuneScatter` o `MarshScatter`.
 | Barra de vida del jefe: rastro del daño, llenado, sacudida y latido con poca vida | `boss_bar.gd` («Animación») | `tween_time`, `ghost_delay`, `ghost_speed`, `fill_in_time`, `shake_pixels`, `shake_time`, `low_fraction`, `low_pulse_speed` |
 | Tamaño y lugar de la barra del jefe y de su nombre | `scenes/ui/HUD.tscn` > BossBar y BossBar/BossNameLabel | sus `offset_*`; en el nombre, `font_size` y `outline_size`; `name_letter_spacing` en `boss_bar.gd` |
 | Rombos de fase bajo la barra de un jefe con varias fases (Mythos) | `boss_bar.gd` («Fases») | `pip_size`, `pip_gap`, `pip_drop`, `pip_spent_color` |
-| Colores de las fichas de armas, evoluciones y tomos | HUD.tscn > BuildStrip | `weapon_color`, `evolved_weapon_color`, `tome_color` |
+| Colores de las fichas de armas, evoluciones y tomos | HUD.tscn > LoadoutDock/BuildStrip | `weapon_color`, `evolved_weapon_color`, `tome_color` |
 | Contorno, sombra y glifo de cada ficha (su color es el de su tipo o rareza) | `scenes/ui/hud/LoadoutTile.tscn` > raíz | `border_width`, `corner_radius`, `shadow_offset`, `show_placeholder_art`, `glyph_font_size` |
 | Tarjeta de botín | `scenes/ui/hud/LootToast.tscn` > raíz | `hold_time`, `fade_time`, `background_color` |
 | Filas de compañeros en co-op | `scenes/ui/hud/MateRow.tscn` > raíz | `knocked_out_format`, `knocked_out_tint`, `points_format` |
 | Panel de relleno del cuarto vacío con 3 jugadores (fondo, texto, color, tamaño) | `scripts/systems/split_screen.gd` (bloque «Edita aquí») | `FILLER_BG`, `FILLER_TEXT`, `FILLER_TEXT_COLOR`, `FILLER_FONT_SIZE` |
-| Color del chip de clima bajo el reloj | HUD.tscn > TimerLabel/WeatherBadge | `group_colors`, `text_format` (el nombre sale de `display_name` en `weather_catalog.gd`) |
+| Color del chip de clima bajo el reloj | HUD.tscn > RunInfo/TimerLabel/WeatherBadge | `group_colors`, `text_format` (el nombre sale de `display_name` en `weather_catalog.gd`) |
 | Insignia de FPS | HUD.tscn > FpsBadge | `text_format`, `background_color`, `refresh_seconds` |
 | Minimapa: que gire con la cámara o deje el norte arriba; colores y grosor del aro, sombra | `scenes/ui/maps/Minimap.tscn` > raíz | `rotate_with_view`, `ring_color`, `band_color`, `outline_width`, `inner_outline_width`, `shadow_color`, `shadow_offset`, `north_inset` (la chapa «N» es el nodo North) |
 | Minimapa: cuánto terreno muestra, tamaño de los marcadores y grosor total del aro | `Minimap.tscn` > View | `view_radius` (metros), `marker_scale`, `own_arrow_scale`, `own_halo_alpha`, `pinned_scale`, `pin_margin`; el aro es el margen del nodo (Layout) |
@@ -567,10 +575,17 @@ de reparto se llama `ForestScatter`, `DuneScatter` o `MarshScatter`.
 | Oscurecido sobre el mapa de fondo de los menús (cuánto tapa, viñeta, color de respaldo sin mapa) | `assets/ui/menu_backdrop.gdshader` (o el Inspector de `assets/ui/menu_backdrop.tres`) | `dim`, `vignette`, `tint_color`, `edge_color` |
 | Mapa de fondo de los menús (cámara: altura, giro, campo de visión; aparición; sombras) | `scripts/ui/menu/menu_backdrop.gd` (bloque de constantes al comienzo) | `CAMERA_HEIGHT`, `CAMERA_TURN_SPEED`, `CAMERA_FOV`, `CAMERA_PITCH`, `CAMERA_BOB_*`, `REVEAL_TIME`, `SHADOW_DISTANCE` |
 | Títulos de Misiones, Armería y Colección | `scenes/ui/QuestLog.tscn`, `RelicShop.tscn`, `Collection.tscn` > TitleLabel | Theme Overrides |
-| Filas de Misiones, Armería y Colección (letra, color, textos) | esas mismas escenas > raíz | grupos «Filas» y «Textos» |
+| Filas de Armería y Colección (letra, color, textos) | `RelicShop.tscn`, `Collection.tscn` > raíz | grupos «Filas» y «Textos» |
 | Colección: títulos de sección (RAIDERS, ARSENAL, BESTIARIO) y el «???» de lo no descubierto | `scenes/ui/Collection.tscn` > raíz | grupo «Textos» (`raiders_title`, `arsenal_title`, `bestiary_title`, `unknown_text`) |
-| Misiones: atenuado de las reclamadas, botón Reclamar, barra de progreso (tamaño, radio, margen y tono), sello RECLAMADA y separaciones de cada fila | `scenes/ui/QuestLog.tscn` > raíz | grupo «Filas» (`claimed_row_modulate`, `claim_button_size`, `progress_bar_size`, `progress_bar_radius`, `progress_bar_inset`, `progress_fill_darken`, `claimed_spacing`, `columns_separation`, `info_separation`, `side_separation`, `progress_separation`) |
+| Misiones: tarjeta (fondo, contorno, sombra, atenuado de las reclamadas), fichas de tipo y recompensa, colores de la barra, sello «¡Lista!» y todos sus textos (Reclamar, RECLAMADA, «Faltan %d») | `scenes/ui/meta/QuestCard.tscn` > raíz | grupos «Tarjeta», «Ficha de tipo», «Barra de progreso», «Recompensa», «Sello», «Animación» y «Textos» |
+| Misiones: tamaño y color de letra de nombre, descripción, avance y recompensa; alto de la barra; tamaño del botón Reclamar | `scenes/ui/meta/QuestCard.tscn` > Name, Description, Bar, Count, Remaining, Reward, ClaimButton | Theme Overrides; Layout > Custom Minimum Size |
+| Misiones: títulos de grupo («Para reclamar», «Reclamadas»), su letra y color, y el ritmo de la entrada de las tarjetas | `scenes/ui/QuestLog.tscn` > raíz | grupos «Grupos» y «Entrada» (`card_stagger`, `card_stagger_shrink`, `card_stagger_cap`) |
+| Misiones: tipos (título de grupo, icono, orden) y qué contador cae en cada tipo | `scripts/ui/meta/quest_log/quest_types.gd` | `TYPES`, `STATS`, `PREFIXES`; iconos en `assets/ui/icons/quests/` |
+| Icono de esquirla de la ficha de recompensa | `assets/ui/icons/shard.svg` | el dibujo |
 | Armería: tamaño del botón de compra, sello MÁX y separaciones de cada fila | `scenes/ui/RelicShop.tscn` > raíz | grupo «Filas» (`buy_button_size`, `maxed_spacing`, `columns_separation`, `info_separation`) |
+| Vendedor de la Armería: sus frases (abrir, comprar, no alcanza, rango máximo, todo al máximo) | `scenes/ui/meta/Shopkeeper.tscn` > raíz | grupo «Frases» (`open_lines`, `bought_line`, `cant_afford_line`, `maxed_line`, `sold_out_line`) |
+| Vendedor de la Armería: globo de diálogo (colores, contorno, sombra), su aparición y la respiración del herrero | `scenes/ui/meta/Shopkeeper.tscn` > raíz (letra del globo: su hijo Text; punta: Tail y TailOutline) | grupos «Globo» y «Animación» (`bubble_start_scale`, `bubble_time`, `breath_scale`, `breath_half_period`) |
+| Vendedor de la Armería: el dibujo del herrero y su tamaño | `assets/ui/shopkeeper/blacksmith.svg`; tamaño: `Shopkeeper.tscn` > Figure y la raíz | el dibujo; Layout > Custom Minimum Size |
 | Colección: separación entre el título y el detalle de cada fila y tono de las filas del bestiario | `scenes/ui/Collection.tscn` > raíz | grupo «Filas» (`row_separation`, `bestiary_row_lighten`) |
 | Colección, submenú: nombre, frase, color, giro y dibujo de cada tarjeta | `scenes/ui/Collection.tscn` > Layout/VBox/Tiles/* (los SVG están en `assets/ui/icons/collection/`) | grupos «Textos», «Marco» y «Dibujo» de cada tarjeta |
 | Colección, submenú: qué categoría abre cada tarjeta, textos del avance y entrada escalonada | `scripts/ui/meta/collection.gd` | `TILE_CATEGORIES` (al comienzo); grupos «Textos» (`badge_format`, `tile_progress_format`) y «Movimiento» (`tile_stagger`, `tile_stagger_shrink`) |
@@ -585,8 +600,8 @@ de reparto se llama `ForestScatter`, `DuneScatter` o `MarshScatter`.
 | Nombre de cada estadística en las líneas de Objetos y Tomos | `scripts/ui/stat_icons.gd` | `LABELS` |
 | Icono de cada estadística (daño, salud, armadura…) en la Armería y la Colección | `scripts/ui/stat_icons.gd` (bloque «Edita aquí»); los SVG están en `assets/ui/icons/stats/` | `ICON_FILES` (stat -> archivo), `FALLBACK_FILE` |
 | Ficha del icono de estadística: tamaño, color, contorno y sombra | `scenes/ui/meta/StatIconChip.tscn` > raíz (grupo «Ficha») | `chip_size`, `chip_color`, `border_color`, `border_width`, `corner_radius`, `icon_padding`, `shadow_offset` |
-| Tarjeta de las filas de Misiones y Armería (margen, borde y brillo) | `scripts/ui/meta/meta_screen.gd` | `CARD_MARGIN_H`, `CARD_MARGIN_V`, `CARD_BORDER_WIDTH`, `CARD_GLOW_SIZE`, `CARD_GLOW_ALPHA` (al comienzo) |
-| Entrada de filas, conteo del saldo y destello de pago de Misiones, Armería y Colección | esas mismas escenas > raíz (sección MetaScreen); las tres a la vez: valores por defecto en `scripts/ui/meta/meta_screen.gd` | grupos «Animación» y «Textos» |
+| Tarjeta de las filas de la Armería (margen, borde y brillo) | `scripts/ui/meta/meta_screen.gd` | `CARD_MARGIN_H`, `CARD_MARGIN_V`, `CARD_BORDER_WIDTH`, `CARD_GLOW_SIZE`, `CARD_GLOW_ALPHA` (al comienzo) |
+| Entrada de filas de la Armería, y conteo del saldo y destello de pago de Misiones y Armería | esas mismas escenas > raíz (sección MetaScreen); las tres a la vez: valores por defecto en `scripts/ui/meta/meta_screen.gd` | grupos «Animación» y «Textos» |
 | Ajustes: formato de los valores, indicaciones y entrada del panel | `SettingsPanel.tscn` > raíz | grupos «Textos» (`sensitivity_format`, `volume_format`) y «Entrada» |
 | Ajustes: sliders (canal, relleno y agarrador) y margen del panel | `scenes/ui/SettingsPanel.tscn` > raíz | grupos «Panel» (`panel_margin`) y «Sliders» (`slider_track_color`, `slider_track_border_color`, `slider_track_border_width`, `slider_track_margin`, `slider_corner_radius`, `slider_fill_darken`, `slider_fill_edge_width`, `slider_fill_edge_lighten`, `slider_grabber_hover_lighten`) |
 | Ajustes: color de los valores y encabezados | `scenes/ui/SettingsPanel.tscn` > los nodos *Value; encabezados en SoundHeader/Label, ControlsHeader/Label y ScreenHeader/Label (texto y letra) y */Rule (línea) | Theme Overrides, `text`; `color` de cada Rule |
