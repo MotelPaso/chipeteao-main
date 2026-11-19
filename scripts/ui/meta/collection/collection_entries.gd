@@ -280,9 +280,9 @@ static func _items() -> Array[Dictionary]:
 static func _tomes() -> Array[Dictionary]:
 	var out: Array[Dictionary] = []
 	for row: Dictionary in Tome.TOME_LIBRARY:
-		var entry := _entry(String(row.id), String(row.display_name), false, TOME_TINT, ART_ICON)
+		var entry := _entry(String(row.id), String(row.title), false, TOME_TINT, ART_ICON)
 		entry["icon"] = ItemIcons.texture(row)
-		entry["glyph"] = String(row.get("glyph", ""))
+		entry["glyph"] = String(row.get("short", ""))
 		entry.caption = TOME_CAPTION
 		entry.body = _tome_text(row)
 		_append_stat_lines(entry, row)

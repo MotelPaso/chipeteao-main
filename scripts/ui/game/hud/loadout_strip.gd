@@ -145,9 +145,9 @@ func gather_build(body: Node = null) -> Array[Dictionary]:
 	if stats != null:
 		for tome_id: String in stats.carried_tome_ids():
 			var tome := Tome.by_id(tome_id)
-			var title := String(tome.get("display_name", tome_id))
+			var title := String(tome.get("title", tome_id))
 			entries.append({
-				"glyph": LoadoutTile.catalog_glyph(tome, _tome_short_name(title)),
+				"glyph": _tome_glyph(tome, title),
 				"library": LoadoutTile.ICON_LIBRARY_TOMES,
 				"entry_id": tome_id,
 				"color": tome_color,
@@ -292,6 +292,13 @@ static func _shown_text(entry: Dictionary) -> String:
 ## La parte que distingue un nombre de tomo ("Tomo de Furia" -> "Furia"), para
 ## el glifo de respaldo: con el prefijo común todos los glifos serían iguales.
 ## Se quita un solo prefijo, del más largo al más corto (ver TOME_NAME_PREFIXES).
+## La sigla de un tomo en su casilla: la `short` de su fila del catálogo (FU,
+## CE…); sin ella, la que sale de su nombre.
+func _tome_glyph(tome: Dictionary, title: String) -> String:
+	var short := String(tome.get("short", ""))
+	return short if not short.is_empty() else LoadoutTile.catalog_glyph(tome, _tome_short_name(title))
+
+
 func _tome_short_name(display_name: String) -> String:
 	for prefix: String in TOME_NAME_PREFIXES:
 		if display_name.begins_with(prefix):
