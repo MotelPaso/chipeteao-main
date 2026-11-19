@@ -266,7 +266,7 @@ func _lay_caustics() -> void:
 
 
 ## Reparte los grupos de corales alrededor de `origin`, en lugares donde se
-## puede caminar, y arma las dos MultiMesh. Usa su propio azar: no toca el
+## puede poner algo (_fits_corals), y arma las dos MultiMesh. Usa su propio azar: no toca el
 ## RNG de la partida.
 func _plant_corals(origin: Vector3) -> void:
 	var rng := RandomNumberGenerator.new()
@@ -284,8 +284,7 @@ func _plant_corals(origin: Vector3) -> void:
 		var angle := rng.randf() * TAU
 		var reach := lerpf(coral_clearance, coral_reach, sqrt(rng.randf()))
 		var site := origin + Vector3(cos(angle), 0.0, sin(angle)) * reach
-		if bounds != null and bounds.has_method(&"is_walkable") \
-				and not bool(bounds.call(&"is_walkable", Vector2(site.x, site.z))):
+		if bounds != null and not _fits_corals(bounds, site):
 			continue
 		if _near_raider(site):
 			continue
@@ -320,6 +319,16 @@ func _fill(multimesh: MultiMesh, transforms: Array[Transform3D], data: Array[Col
 	for index: int in transforms.size():
 		multimesh.set_instance_transform(index, transforms[index])
 		multimesh.set_instance_custom_data(index, data[index])
+
+
+## True si en `site` cabe un grupo de corales: lejos de cortes, rampas,
+## puentes y props (arena_bounds.can_place con site_radius de margen), o al
+## menos sobre una celda caminable si el mapa no tiene esa pregunta.
+func _fits_corals(bounds: Node, site: Vector3) -> bool:
+	var xz := Vector2(site.x, site.z)
+	if bounds.has_method(&"can_place"):
+		return bool(bounds.call(&"can_place", xz, site_radius))
+	return not bounds.has_method(&"is_walkable") or bool(bounds.call(&"is_walkable", xz))
 
 
 func _near_raider(point: Vector3) -> bool:

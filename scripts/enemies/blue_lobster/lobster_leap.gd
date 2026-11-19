@@ -170,15 +170,18 @@ func _lock() -> void:
 ## en arco por encima. En la bajada apunta las pinzas al suelo.
 func _fly() -> void:
 	var t := 1.0 - clampf(_timer / maxf(_air, 0.01), 0.0, 1.0)
-	boss.glide_to(_from.lerp(_mark, smoothstep(0.0, 1.0, t)))
-	boss.rig.lift = leap_height * 4.0 * t * (1.0 - t)
+	var line := _from.lerp(_mark, smoothstep(0.0, 1.0, t))
+	boss.fly_to(line)
+	# El modelo sigue su arco sobre la recta del salto aunque el cuerpo haya
+	# tenido que subir al borde de un corte: así no da un tirón al cruzarlo.
+	boss.rig.lift = maxf(line.y + leap_height * 4.0 * t * (1.0 - t) - boss.global_position.y, 0.0)
 	if t > 0.55:
 		boss.rig.set_pose(LobsterRig.Pose.DIVE)
 		boss.rig.set_dust(false)
 
 
 func _impact() -> void:
-	boss.glide_to(_mark)
+	boss.fly_to(_mark)
 	boss.rig.lift = 0.0
 	_send_ring(boss.strike_ground([_mark], scaled(radius), height_window, damage))
 	boss.fx.landing(_mark, scaled(radius))

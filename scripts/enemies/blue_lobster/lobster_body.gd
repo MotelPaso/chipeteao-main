@@ -29,6 +29,10 @@ const GROUND_LEVEL_SLACK: float = 1.2
 const GROUND_SUPPORT: int = 2
 ## Cosas angostas que se saltan, como mucho, al buscar el suelo bajo un punto.
 const GROUND_TRIES: int = 4
+## Desnivel máximo, en metros, que el cuerpo sube o baja de un frame al otro
+## cuando un ataque lo lleva por tierra. Más que eso es el borde de un corte
+## del relieve o de una roca, y por tierra no lo cruza.
+const GLIDE_MAX_RISE: float = 1.0
 ## Por debajo de esta fracción de lo que quería avanzar en un frame cuenta
 ## como trabada; no cuenta si se mueve en vertical (trepa o cae) a más de
 ## STUCK_VERTICAL_SPEED metros por segundo.
@@ -170,9 +174,16 @@ func core_point() -> Vector3:
 	return floor_point(rig.center_point())
 
 
-## `point` llevado a un lugar de la arena donde cabe el cuerpo, a ras de suelo.
+## `point` llevado al lugar más cercano de la arena donde cabe el cuerpo, a ras
+## de suelo. Busca en anillos alrededor del mismo punto
+## (arena_bounds.nearest_place): así la marca que persigue a un raider junto a
+## un corte se corre de a poco, en vez de saltar de un lado a otro.
 func safe_point(point: Vector3) -> Vector3:
-	var safe := _safe_arena_point(point)
+	var at := _clamp_to_arena(point)
+	if not _is_walkable(at) and _bounds != null and _bounds.has_method(&"nearest_place"):
+		var spot: Vector2 = _bounds.call(&"nearest_place", Vector2(at.x, at.z), relief_margin)
+		at = _clamp_to_arena(Vector3(spot.x, at.y, spot.y))
+	var safe := at if _is_walkable(at) else _safe_arena_point(point)
 	safe.y = ground_height(safe)
 	return safe
 
@@ -185,10 +196,24 @@ func floor_point(point: Vector3) -> Vector3:
 	return at
 
 
-## Lleva el cuerpo a `point`, a ras de suelo, sin chocar con nada (un salto,
-## un túnel, una embestida).
-func glide_to(point: Vector3) -> void:
-	global_position = Vector3(point.x, ground_height(point), point.z)
+## Lleva el cuerpo a `point`, a ras de suelo, sin chocar con nada (una
+## embestida, un túnel). Por tierra no sube ni baja más de GLIDE_MAX_RISE de
+## golpe: si el suelo de `point` queda más arriba o más abajo (el otro lado de
+## un corte), se queda donde está y devuelve false. Bajo tierra (`under` en
+## true) pasa por debajo de los cortes.
+func glide_to(point: Vector3, under: bool = false) -> bool:
+	var ground := ground_height(point)
+	velocity = Vector3.ZERO
+	if not under and absf(ground - global_position.y) > GLIDE_MAX_RISE:
+		return false
+	global_position = Vector3(point.x, ground, point.z)
+	return true
+
+
+## Lleva el cuerpo por el aire a `point` (un salto): a esa altura, o sobre el
+## suelo si ahí el suelo queda más alto.
+func fly_to(point: Vector3) -> void:
+	global_position = Vector3(point.x, maxf(point.y, ground_height(point)), point.z)
 	velocity = Vector3.ZERO
 
 

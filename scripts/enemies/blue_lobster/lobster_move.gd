@@ -7,7 +7,7 @@ extends Node
 ## La agresividad de la langosta (0-1, sale de StageBossScaling) acorta las
 ## esperas y los avisos y suma golpes: cada ataque dice cuánto.
 ## El cuerpo viaja en todos los ataques: lo llevan con boss.walk() (camina) o
-## con boss.glide_to() (un salto, un túnel, una embestida).
+## con boss.glide_to() (una embestida, un túnel) o con boss.fly_to() (un salto).
 ## Las distancias y velocidades de cada ataque son las de un raider SIN
 ## mejoras de velocidad: en cada uso pasan por scaled(), que las lleva a la
 ## medida del raider al que apunta (lo mide el nodo Reach de la langosta

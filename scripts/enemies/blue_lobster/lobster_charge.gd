@@ -202,7 +202,9 @@ func _dash() -> void:
 func _tick_dash(delta: float) -> void:
 	var before := boss.global_position
 	_travelled = minf(_travelled + scaled(run_speed) * delta, _run)
-	boss.glide_to(_from + _direction * _travelled)
+	if not boss.glide_to(_from + _direction * _travelled) and _travelled > 0.0:
+		# El borde de un corte le corta la carrera: derrapa donde quedó.
+		_run = _travelled
 	var now := boss.global_position
 	boss.fx.charge_trail(before, now)
 	if boss.strike_along(before, now, scaled(width) * 0.5, height_window, damage, _hit) > 0:

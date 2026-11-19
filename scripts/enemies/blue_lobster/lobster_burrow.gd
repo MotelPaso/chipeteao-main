@@ -190,7 +190,7 @@ func _creep(delta: float) -> void:
 		return
 	var direction := to_mark / distance
 	var before := boss.global_position
-	boss.glide_to(before + direction * minf(scaled(tunnel_speed) * delta, distance))
+	boss.glide_to(before + direction * minf(scaled(tunnel_speed) * delta, distance), true)
 	boss.fx.tunnel_trail(before, boss.global_position)
 	boss.face_along(direction)
 
@@ -213,7 +213,7 @@ func _erupt() -> void:
 	_pop_height = final_pop_height if last else pop_height
 	_pop_seconds = final_pop_seconds if last else pop_seconds
 	_timer = _pop_seconds
-	boss.glide_to(_mark)
+	boss.glide_to(_mark, true)
 	boss.pass_under_raiders(false)
 	boss.aim_height = _aim_height
 	boss.rig.sink = 0.0
