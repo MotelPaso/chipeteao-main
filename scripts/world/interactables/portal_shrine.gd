@@ -82,6 +82,13 @@ func pair_color() -> Color:
 	return pair_colors[pair_index % pair_colors.size()]
 
 
+## Metros que ocupa alrededor de su centro: el marco de piedra (se arma un
+## frame después, así que se calcula) o, si llega más lejos, el punto donde
+## aparece quien viene de la pareja.
+func footprint_reach() -> float:
+	return maxf(_visual.footprint(ring_radius), ring_radius + exit_margin)
+
+
 ## Verdadero si está recargado y tiene pareja.
 func is_ready() -> bool:
 	return _cooldown_left <= 0.0 and twin != null and is_instance_valid(twin)

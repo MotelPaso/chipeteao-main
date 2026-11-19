@@ -80,12 +80,13 @@ static func _measure(prop: Node3D) -> float:
 		if holder == null or holder.disabled or holder.shape == null:
 			continue
 		var offset := Vector2(holder.position.x, holder.position.z).length()
-		reach = maxf(reach, offset + _shape_reach(holder.shape))
+		reach = maxf(reach, offset + shape_reach(holder.shape))
 	return reach
 
 
-## Radio en planta de una forma de colisión, en metros.
-static func _shape_reach(shape: Shape3D) -> float:
+## Radio en planta de una forma de colisión, en metros. Público: un POI mide
+## con esto lo que ocupa (Interactable.footprint_reach).
+static func shape_reach(shape: Shape3D) -> float:
 	if shape is CylinderShape3D:
 		return (shape as CylinderShape3D).radius
 	if shape is CapsuleShape3D:

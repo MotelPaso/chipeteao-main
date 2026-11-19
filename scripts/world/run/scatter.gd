@@ -80,8 +80,8 @@ extends Node3D
 @export var interior_edge_margin: float = 12.0
 ## Radio libre de props alrededor del origen (spawn), en metros.
 @export var spawn_clear_radius: float = 9.0
-## Radio libre de props alrededor de cada nodo "scatter_keepout", en metros
-## (cubre una plataforma con su rampa a la escala máxima).
+## Radio libre de props alrededor de cada nodo "scatter_keepout" (POIs, objetos
+## de inicio de etapa y spots de autor), en metros; cubre un spot de autor con su rampa.
 @export var keepout_radius: float = 10.5
 
 @export_group("Borde")
@@ -150,6 +150,8 @@ extends Node3D
 ## Altura del tablero de la plataforma a escala 1, en metros: ahí se apoya
 ## el cofre de una meseta.
 @export var mesa_deck_height: float = 2.0
+## Metros libres alrededor de la plataforma y la rampa de cada meseta (a su escala) donde no se coloca nada ni crece pasto.
+@export var mesa_footprint_gap: float = 2.0
 
 @export_group("Relieve por zonas")
 ## Solo cuenta si el Terrain de la arena tiene `relief`. Metros que los props
@@ -221,6 +223,8 @@ var _mask: ArenaMask = null
 var _run_seed: int = 0
 ## Centros planos de las mesetas de esta etapa (ver mesa_sites).
 var _mesa_sites: PackedVector2Array = PackedVector2Array()
+## Escala, giro, rampa y huella de cada meseta, desde _enter_tree (MesaBuilder.plan).
+var _mesas := MesaBuilder.Plan.new()
 ## Claros que ocupan las estructuras del relieve, como (x, radio, z).
 var _structure_sites: PackedVector3Array = PackedVector3Array()
 ## Huella de los props con colisión; solo se enciende con relieve por zonas.
@@ -266,8 +270,11 @@ func _enter_tree() -> void:
 	elif mask_enabled:
 		_mask.build(_protected_seeds())
 	# Sitios de meseta justo después de la máscara: el Terrain los lee como
-	# claros planos en su _ready, y place_props() construye cada meseta.
+	# claros planos en su _ready, y place_props() construye cada meseta. Su
+	# escala, giro y rampa salen ya: el director coloca sus POI antes de que
+	# se levanten y tiene que esquivar su huella.
 	_mesa_sites = MesaBuilder.pick_sites(self, _rng, _mask, terrain)
+	_mesas = MesaBuilder.plan(self, _rng, _mesa_sites)
 
 
 ## Semilla de esta partida, válida desde _enter_tree. El Terrain la lee por
@@ -292,7 +299,7 @@ func place_props() -> void:
 	_lanes = ReliefDressing.raise(self, _arena_terrain(), formation_style, _run_seed)
 	# Cada meseta cuenta como keepout del reparto interior, para que no
 	# crezcan árboles a través de su plataforma.
-	_keepouts_xz.append_array(MesaBuilder.build(self, _rng, _mesa_sites))
+	_keepouts_xz.append_array(MesaBuilder.build(self, _mesas))
 	for node: Node in get_tree().get_nodes_in_group("scatter_keepout"):
 		var spot := node as Node3D
 		if spot == null or not is_inside_tree() or not spot.is_inside_tree():
@@ -378,11 +385,16 @@ func can_place(xz: Vector2, margin: float = 0.0) -> bool:
 
 
 ## True si en `xz` se puede levantar una ESTRUCTURA del director (un POI, un
-## portal, un evento): lo mismo que can_place y, con relieve por zonas, fuera
-## del cañón, que es río. Lo que cae donde murió alguien y los spawns siguen
-## con can_place: pueden quedar en el cañón.
+## portal, un evento): lo mismo que can_place, a `margin` metros o más de la
+## roca de la máscara y de las mesetas en todo mapa y, con relieve por
+## zonas, fuera del cañón, que es río. Lo que cae donde murió alguien y los
+## spawns siguen con can_place: pueden quedar en el cañón.
 func can_build(xz: Vector2, margin: float = 0.0) -> bool:
-	return can_place(xz, margin) and not _in_canyon(xz)
+	if not can_place(xz, margin) or _in_canyon(xz):
+		return false
+	var rock_gap := maxf(formation_clearance, margin)
+	return _mask.rock_distance(xz, rock_gap) >= rock_gap \
+			and _mesas.is_clear(xz, maxf(mesa_footprint_gap, margin))
 
 
 ## True si en `xz` puede crecer la vegetación del suelo: lo mismo que
@@ -396,7 +408,8 @@ func can_grow(xz: Vector2, margin: float = 0.0) -> bool:
 	# Con relieve por zonas, además fuera del faldón de roca que cada
 	# formación asoma más allá de sus celdas y de las estructuras del relieve.
 	return _mask.clear_of(xz, formation_clearance) and _structures_clear(xz) \
-			and ReliefDressing.clear(terrain, xz, margin, _mesa_sites, relief_mesa_keepout)
+			and ReliefDressing.clear(terrain, xz, margin, _mesa_sites, relief_mesa_keepout) \
+			and _mesas.is_clear(xz, mesa_footprint_gap)
 
 
 ## Los puentes de esta arena bajo los que se pasa caminando, como los ve la
@@ -570,6 +583,8 @@ func _is_clear(pos: Vector3) -> bool:
 	if not _mask.clear_of(flat, formation_clearance):
 		return false
 	if not _relief_clear(flat, relief_prop_clearance) or not _structures_clear(flat):
+		return false
+	if not _mesas.is_clear(flat, mesa_footprint_gap):
 		return false
 	for keepout in _keepouts_xz:
 		if keepout.distance_to(flat) < keepout_radius:

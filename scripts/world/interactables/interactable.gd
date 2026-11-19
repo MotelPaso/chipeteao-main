@@ -214,6 +214,22 @@ func map_marker_kind() -> StringName:
 	return marker_kind
 
 
+## Metros que ocupa en el suelo alrededor de su centro: hasta dónde llegan en
+## planta sus cuerpos sólidos. El director guarda sus distancias desde ese
+## borde; un POI que arma sus piezas después (el marco de un portal) lo reemplaza.
+func footprint_reach() -> float:
+	var reach := 0.0
+	for body: Node in find_children("*", "StaticBody3D", true, false):
+		for node: Node in body.get_children():
+			var holder := node as CollisionShape3D
+			if holder == null or holder.disabled or holder.shape == null:
+				continue
+			var center := to_local(holder.global_position)
+			reach = maxf(reach, Vector2(center.x, center.z).length()
+					+ PropFootprints.shape_reach(holder.shape))
+	return reach
+
+
 ## Virtual: el efecto. `player` es el nodo del grupo "player" que apretó.
 func _interact(_player: Node) -> void:
 	pass

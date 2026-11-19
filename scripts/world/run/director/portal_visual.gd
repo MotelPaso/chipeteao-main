@@ -112,6 +112,15 @@ func build(ring_radius: float, color: Color) -> void:
 		_build_frame.call_deferred(ring_radius, color)
 
 
+## Metros que ocupa el portal alrededor de su centro con un anillo de
+## `ring_radius`: hasta el borde de afuera de las losas del marco o, sin
+## marco, hasta el anillo.
+func footprint(ring_radius: float) -> float:
+	if frame_stones <= 0:
+		return ring_radius + ring_half_thickness
+	return ring_radius + frame_gap + frame_width * 1.1
+
+
 func _physics_process(delta: float) -> void:
 	_time += delta
 	if _ring != null:

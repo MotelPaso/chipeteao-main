@@ -133,6 +133,27 @@ func clear_of(center: Vector2, radius: float) -> bool:
 	return true
 
 
+## Metros de `point` al borde de la celda bloqueada más cercana, buscando
+## hasta `limit` (si no hay ninguna más cerca, devuelve `limit`). Exacta:
+## mide hasta cada celda en vez de probar ocho puntos de un círculo, que con
+## un radio grande dejan pasar una celda entera entre dos de ellos.
+func rock_distance(point: Vector2, limit: float) -> float:
+	if not enabled or _blocked.is_empty():
+		return limit
+	var nearest := limit
+	var low := cell_of(point - Vector2.ONE * limit)
+	var high := cell_of(point + Vector2.ONE * limit)
+	var half := cell_size * 0.5
+	for cz in range(low.y, high.y + 1):
+		for cx in range(low.x, high.x + 1):
+			if not _blocked.has(Vector2i(cx, cz)):
+				continue
+			var offset := (point - cell_center(Vector2i(cx, cz))).abs()
+			nearest = minf(nearest, Vector2(maxf(offset.x - half, 0.0),
+					maxf(offset.y - half, 0.0)).length())
+	return nearest
+
+
 func blocked_cell_count() -> int:
 	return _blocked.size()
 
