@@ -8,6 +8,7 @@
 [ext_resource type="Script" path="res://scripts/ui/maps/map_players.gd" id="6_players"]
 [ext_resource type="Script" path="res://scripts/ui/maps/map_chips.gd" id="7_chips"]
 [ext_resource type="Shader" path="res://assets/ui/menu_backdrop.gdshader" id="8_backdrop"]
+[ext_resource type="Script" path="res://scripts/ui/maps/map_side_scroll.gd" id="9_side"]
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_veil"]
 shader = ExtResource("8_backdrop")
@@ -170,12 +171,13 @@ theme_override_constants/separation = 4
 
 [node name="Side" type="ScrollContainer" parent="Layout/Columns/SideColumn" unique_id=111535769]
 unique_name_in_owner = true
-editor_description = "Recorta los paneles si alguna vez no caben: nunca se salen de la celda del jugador. No se desplaza (nada aquí recibe el mouse ni el foco)."
+editor_description = "Recorta los paneles si alguna vez no caben: nunca se salen de la celda del jugador. Sin barras (nada aquí recibe el mouse ni el foco); si ni el escalón más apretado cabe, se desliza sola de arriba abajo (map_side_scroll.gd, grupo Deslizamiento)."
 layout_mode = 2
 size_flags_vertical = 3
 mouse_filter = 2
 horizontal_scroll_mode = 0
 vertical_scroll_mode = 3
+script = ExtResource("9_side")
 
 [node name="Panels" type="VBoxContainer" parent="Layout/Columns/SideColumn/Side" unique_id=1441673950]
 unique_name_in_owner = true

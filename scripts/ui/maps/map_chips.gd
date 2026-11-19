@@ -12,6 +12,8 @@ const CHIP_SCENE := preload("res://scenes/ui/maps/MapChip.tscn")
 @export_group("Fichas")
 ## Espacio en blanco entre familias (armas, tomos, objetos), en píxeles.
 @export var family_gap: float = 6.0
+## Separación horizontal entre fichas en una celda chica, en píxeles (con espacio vale la de la escena).
+@export var compact_h_separation: int = 8
 @export_group("Textos")
 ## Lo que se muestra cuando no hay ninguna ficha.
 @export var empty_text: String = "—"
@@ -27,10 +29,14 @@ var compact: bool = false:
 			return
 		compact = value
 		_shown = ""
+		_apply_spacing()
 
 ## Las fichas en pantalla, como texto: cambia solo cuando hay que rehacerlas.
 var _shown: String = "?"
 var _chips: Array[MapChip] = []
+## La separación horizontal de la escena, para volver a ella con espacio; -1
+## hasta la primera vez que se achica.
+var _roomy_h_separation: int = -1
 
 
 ## Muestra `entries` (ver MapChip.show_entry), en orden.
@@ -69,6 +75,14 @@ func _rebuild(entries: Array[Dictionary]) -> void:
 		add_child(chip)
 		chip.show_entry(entry, compact)
 		_chips.append(chip)
+
+
+## En una celda chica las fichas van más juntas: así entra una más por fila.
+func _apply_spacing() -> void:
+	if _roomy_h_separation < 0:
+		_roomy_h_separation = get_theme_constant(&"h_separation")
+	add_theme_constant_override(&"h_separation",
+			compact_h_separation if compact else _roomy_h_separation)
 
 
 func _empty_label() -> Label:

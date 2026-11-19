@@ -10,8 +10,10 @@ extends Control
 ##
 ## Se adapta a la celda. Parte con todo a la vista (Density.ROOMY) y, si los
 ## paneles no entran, baja un escalón: primero achica la letra y quita nombres
-## y filas en cero (COMPACT), después quita los títulos (TIGHT). Nada se sale
-## nunca de la celda: en co-op al lado está la vista de otro jugador.
+## y filas en cero (COMPACT), después quita los títulos y junta las tarjetas
+## (TIGHT). Nada se sale nunca de la celda: en co-op al lado está la vista de
+## otro jugador. Si ni así caben, la columna de paneles se desliza sola de
+## arriba abajo (map_side_scroll.gd) para que todo se pueda leer.
 ##
 ## NO pausa. Un bullet-heaven no tiene un momento seguro para leer un menú,
 ## así que la horda sigue mientras el mapa está abierto: mirarlo es una
@@ -31,6 +33,8 @@ extends Control
 ##
 ## El soak lee `slot` y marker_count() por el grupo "map_overlay".
 
+## El script de la columna de paneles (%Side), que se desliza cuando no cabe.
+const MapSideScroll := preload("res://scripts/ui/maps/map_side_scroll.gd")
 ## Filas del panel de estadísticas, en orden. `property` es la propiedad de
 ## PlayerStats que se muestra (se lee POR NOMBRE: si se renombra allá, la fila
 ## muestra un guion; el lint stat_rows lo revisa). `show` dice cómo se escribe:
@@ -77,6 +81,8 @@ const STAT_ROWS: Array[Dictionary] = [
 @export_range(0.2, 0.8) var map_share: float = 0.5
 ## Lado mínimo del mapa, en píxeles.
 @export var min_map_side: float = 160.0
+## Ancho mínimo de la columna de paneles, en píxeles: el mapa se achica antes que dejarla más angosta.
+@export var min_side_width: float = 330.0
 ## Una celda al menos así de ancha respecto de su alto (la de 2 jugadores)
 ## lleva la leyenda al pie de los paneles y no bajo el mapa: ahí el alto es lo
 ## que falta y el ancho lo que sobra.
@@ -87,6 +93,8 @@ const STAT_ROWS: Array[Dictionary] = [
 @export var panel_gap: int = 20
 ## Separación entre las tarjetas de los paneles en una celda chica, en píxeles.
 @export var compact_panel_gap: int = 10
+## Separación entre las tarjetas sin título (el escalón más apretado), en píxeles; debe dejar ver su sombra chica.
+@export var tight_panel_gap: int = 6
 @export_group("Aparición")
 ## Segundos que tarda el mapa en aparecer al abrirlo.
 @export var fade_seconds: float = 0.1
@@ -141,6 +149,7 @@ var _sections: Array[MapSection] = []
 var _fade: Tween = null
 
 @onready var _layout: MarginContainer = %Layout
+@onready var _columns: Control = %Columns
 @onready var _map_column: Control = %MapColumn
 @onready var _header_row: Control = %HeaderRow
 @onready var _square: Control = %Square
@@ -149,7 +158,7 @@ var _fade: Tween = null
 @onready var _map_view: MapView = %MapView
 @onready var _legend: MapLegend = %Legend
 @onready var _side_legend: MapLegend = %SideLegend
-@onready var _side: Control = %Side
+@onready var _side: MapSideScroll = %Side
 @onready var _panels: Control = %Panels
 @onready var _extras: Control = %Extras
 @onready var _hint_slot: Control = %HintSlot
@@ -226,6 +235,7 @@ func _open() -> void:
 	_refresh_left = refresh_seconds
 	_settle_frames = 2
 	_refresh_panels()
+	_side.rewind()
 	if _fade != null:
 		_fade.kill()
 	modulate.a = 0.0
@@ -248,8 +258,9 @@ func _on_resized() -> void:
 
 
 ## Da al mapa el lado que le deja el alto de la celda después del encabezado y
-## de la leyenda, sin pasar de su parte del ancho. Se mide cada cuadro mientras
-## el mapa está abierto: la leyenda cambia de alto cuando aparece un tipo nuevo.
+## de la leyenda, sin pasar de su parte del ancho ni dejar la columna de
+## paneles más angosta que min_side_width. Se mide cada cuadro mientras el mapa
+## está abierto: la leyenda cambia de alto cuando aparece un tipo nuevo.
 func _fit_map() -> void:
 	var inner := size - Vector2(
 			_layout.get_theme_constant(&"margin_left") + _layout.get_theme_constant(&"margin_right"),
@@ -261,7 +272,10 @@ func _fit_map() -> void:
 	var chrome := _header_row.get_combined_minimum_size().y + gap
 	if not wide:
 		chrome += _legend.get_combined_minimum_size().y + gap
-	var side := floorf(clampf(inner.y - chrome, min_map_side, inner.x * map_share))
+	# Lo que deja la columna de paneles con su ancho mínimo: más angosta, las
+	# estadísticas y los jugadores pasan a una sola columna y ya no caben.
+	var room := inner.x - float(_columns.get_theme_constant(&"separation")) - min_side_width
+	var side := floorf(clampf(minf(inner.y - chrome, room), min_map_side, inner.x * map_share))
 	if is_equal_approx(side, _square.custom_minimum_size.x):
 		return
 	_square.custom_minimum_size = Vector2(side, side)
@@ -296,8 +310,12 @@ func _set_density(level: MapSection.Density) -> void:
 	_header.add_theme_constant_override("outline_size",
 			compact_header_outline if compact else header_outline)
 	var gap := compact_panel_gap if compact else panel_gap
+	if level == MapSection.Density.TIGHT:
+		gap = tight_panel_gap
 	_panels.add_theme_constant_override("separation", gap)
 	_extras.add_theme_constant_override("separation", gap)
+	# Ya sin otro escalón, lo que no quepa se ve deslizando la columna.
+	_side.auto_scroll = level == MapSection.Density.TIGHT
 	# La indicación de cierre solo cuando sobra el alto.
 	_hint_slot.visible = not compact
 	_settle_frames = 2
