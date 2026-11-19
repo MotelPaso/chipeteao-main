@@ -3,8 +3,9 @@ extends HFlowContainer
 ## Una tira de fichas (MapChip) que salta de línea cuando no cabe: el equipo
 ## del jugador o sus power-ups activos en el mapa de Tab. Recibe las mismas
 ## entradas que las franjas del HUD y solo rehace las fichas cuando cambia
-## cuáles son; si solo cambian las etiquetas (los segundos de un power-up),
-## las escribe en su lugar.
+## cuáles son; si son las mismas, cada ficha se pone al día en su lugar: la
+## etiqueta (los segundos de un power-up) o, si cambió, su nombre, glifo y
+## color (un arma que evoluciona sigue siendo la misma ficha).
 
 const CHIP_SCENE := preload("res://scenes/ui/maps/MapChip.tscn")
 
@@ -42,7 +43,7 @@ func show_entries(entries: Array[Dictionary]) -> void:
 		_rebuild(entries)
 		return
 	for index in mini(entries.size(), _chips.size()):
-		_chips[index].set_tag(String(entries[index].corner))
+		_chips[index].update_entry(entries[index], compact)
 
 
 func _rebuild(entries: Array[Dictionary]) -> void:
