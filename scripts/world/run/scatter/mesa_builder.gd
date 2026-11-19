@@ -45,6 +45,7 @@ class Plan:
 	var mesas: Array[Mesa] = []
 	var bounds := PackedVector3Array()
 
+	## Suma `mesa` al plan, con el círculo que encierra su huella.
 	func add(mesa: Mesa) -> void:
 		mesas.append(mesa)
 		bounds.append(Vector3(mesa.site.x, mesa.reach, mesa.site.y))
@@ -142,7 +143,8 @@ static func _site_ok(scatter: ArenaScatter, terrain: Terrain, site: Vector2,
 
 
 ## Una meseta en `site` con la escala, el giro y la cara de la rampa que tira
-## `rng`, y su huella: un rectángulo por pieza, a escala 1 en `plat_box` y `ramp_box`.
+## `rng`, y su huella: un rectángulo por pieza (`plat_box` y `ramp_box` son la
+## colisión de la plataforma y de la rampa a escala 1).
 static func _shape(scatter: ArenaScatter, rng: RandomNumberGenerator, site: Vector2,
 		plat_box: Rect2, ramp_box: Rect2) -> Mesa:
 	var mesa := Mesa.new()

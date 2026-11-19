@@ -8,7 +8,7 @@ extends RefCounted
 ## La crea y la consulta el scatter (scatter.gd), que responde por ella a
 ## is_walkable() y compañía a través del grupo "arena_bounds". No tiene
 ## Inspector: se ajusta con los exports "Máscara de la arena" del scatter,
-## que _new_mask() copia aquí antes de build().
+## que ScatterMask.build() (scatter_mask.gd) copia aquí antes de build().
 ##
 ## Saca números del MISMO RandomNumberGenerator que el scatter (se lo pasa
 ## al crearla): build() y random_walkable_point() sortean en el orden de

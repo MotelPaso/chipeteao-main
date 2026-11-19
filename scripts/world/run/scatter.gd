@@ -8,6 +8,13 @@ extends Node3D
 ## "scatter_keepout", y una distancia mínima entre props para que la horda
 ## (sin navmesh) siempre tenga pasillos anchos. Las copas no tienen
 ## colisión: solo bloquean troncos y rocas.
+## Aquí quedan los exports, el orden de construcción y la fachada del grupo
+## "arena_bounds"; el trabajo lo hacen ScatterMask (máscara y roca), MesaBuilder,
+## InteriorProps, PerimeterRing y PlacementRules (can_place y compañía), en scatter/.
+
+const ScatterMask := preload("res://scripts/world/run/scatter/scatter_mask.gd")
+const InteriorProps := preload("res://scripts/world/run/scatter/interior_props.gd")
+const PlacementRules := preload("res://scripts/world/run/scatter/placement_rules.gd")
 
 @export_group("Arena")
 ## Mitad del lado de la arena, en metros (el suelo es un cuadrado de 2x
@@ -140,8 +147,7 @@ extends Node3D
 ## Metros desde el borde de la arena que los centros de meseta nunca
 ## cruzan (se sortean en ±(arena_half_extent - esto)).
 @export var mesa_edge_margin: float = 28.0
-## Metros que la huella de cada meseta (plataforma y rampa, a su escala) guarda a toda
-## celda de roca: la roca asoma ~3 m más allá de sus celdas y entre las dos pasa un raider.
+## Metros entre la huella de cada meseta (plataforma y rampa, a su escala) y toda celda de roca: la roca asoma ~3 m y queda paso para un raider.
 @export var mesa_clearance: float = 4.0
 ## Cofre que llevan encima las primeras mesetas de la etapa (vacío = ninguna).
 @export var mesa_chest_scene: PackedScene
@@ -225,18 +231,13 @@ var _run_seed: int = 0
 var _mesa_sites: PackedVector2Array = PackedVector2Array()
 ## Escala, giro, rampa y huella de cada meseta, desde _enter_tree (MesaBuilder.plan).
 var _mesas := MesaBuilder.Plan.new()
-## Claros que ocupan las estructuras del relieve, como (x, radio, z).
-var _structure_sites: PackedVector3Array = PackedVector3Array()
-## Huella de los props con colisión; solo se enciende con relieve por zonas.
-var _footprints := PropFootprints.new()
+## Las preguntas can_place y compañía (placement_rules.gd); se conecta en _enter_tree.
+var _rules := PlacementRules.new()
 ## Los puentes de arcos abiertos de la arena como los ve la horda, o null.
 var _lanes: ReliefLanes = null
 ## El Terrain de esta arena (ver _arena_terrain); se busca una sola vez.
 var _terrain: Terrain = null
 var _terrain_sought: bool = false
-## Posiciones planas de los props interiores ya puestos y de los keepouts.
-var _placed_xz: PackedVector2Array = PackedVector2Array()
-var _keepouts_xz: PackedVector2Array = PackedVector2Array()
 
 
 func _enter_tree() -> void:
@@ -263,18 +264,14 @@ func _enter_tree() -> void:
 	var layout := terrain.plan_relief(_run_seed, arena_half_extent) if terrain != null else null
 	# La máscara debe existir antes del _ready del Terrain y antes de que el
 	# WorldDirector baraje los interactuables (desde Arena._ready).
-	_mask = _new_mask()
-	if mask_enabled and layout != null:
-		_mask.build(_protected_seeds(), ReliefQueries.mask_cells(layout, mask_cell_size),
-				ReliefQueries.mask_barriers(layout, mask_cell_size))
-	elif mask_enabled:
-		_mask.build(_protected_seeds())
+	_mask = ScatterMask.build(self, _rng, layout)
 	# Mesetas justo después de la máscara (su huella esquiva la roca): el
 	# Terrain lee los sitios como claros planos en su _ready, y place_props()
 	# construye cada meseta. Su escala, giro y rampa salen ya: el director
 	# coloca sus POI antes de que se levanten y tiene que esquivar su huella.
 	_mesas = MesaBuilder.plan(self, _rng, _mask, terrain)
 	_mesa_sites = _mesas.sites()
+	_rules.setup(self, _mask, _mesas, terrain)
 
 
 ## Semilla de esta partida, válida desde _enter_tree. El Terrain la lee por
@@ -295,35 +292,19 @@ func mesa_sites() -> PackedVector2Array:
 ## construirse para su etapa.
 func place_props() -> void:
 	if mask_enabled:
-		_raise_formations()
+		ScatterMask.raise_formations(self, _mask, _run_seed)
 	_lanes = ReliefDressing.raise(self, _arena_terrain(), formation_style, _run_seed)
-	# Cada meseta cuenta como keepout del reparto interior, para que no
-	# crezcan árboles a través de su plataforma.
-	_keepouts_xz.append_array(MesaBuilder.build(self, _mesas))
-	for node: Node in get_tree().get_nodes_in_group("scatter_keepout"):
-		var spot := node as Node3D
-		if spot == null or not is_inside_tree() or not spot.is_inside_tree():
-			continue
-		# Solo los keepouts de ESTA arena: durante un cambio de etapa la
-		# arena saliente puede seguir en el árbol, y sus POIs no son nuestros.
-		if not owner_arena_contains(spot):
-			continue
-		_keepouts_xz.append(Vector2(spot.global_position.x, spot.global_position.z))
+	var interior := InteriorProps.new(self, _rng, _mask, _mesas, _rules)
+	interior.collect_keepouts(MesaBuilder.build(self, _mesas))
 	# Las estructuras del relieve van después de los POIs y las mesetas (los
 	# esquivan) y antes de los props (que las esquivan a ellas).
-	var taken := _keepouts_xz.duplicate()
+	var taken := interior.keepouts()
 	taken.append_array(_mesa_sites)
-	_structure_sites = ReliefStructures.raise(self, _arena_terrain(), _run_seed, taken)
+	_rules.structure_sites = ReliefStructures.raise(self, _arena_terrain(), _run_seed, taken)
 	var relief := _arena_terrain() != null and _arena_terrain().has_relief()
 	if relief:
-		_footprints.setup(arena_half_extent)
-	# Los árboles y los tocones no crecen en el agua del cañón; las rocas sí.
-	_place_many(ancient_tree_scene, ancient_tree_count, ancient_tree_scale_min,
-			ancient_tree_scale_max, true)
-	_place_many(mushroom_scene, mushroom_count, mushroom_scale_min, mushroom_scale_max, true)
-	_place_many(tree_scene, tree_count, tree_scale_min, tree_scale_max, true)
-	_place_many(rock_scene, rock_count, rock_scale_min, rock_scale_max)
-	_place_many(stump_scene, stump_count, stump_scale_min, stump_scale_max, true)
+		_rules.footprints.setup(arena_half_extent)
+	interior.plant()
 	PerimeterRing.new(self, _rng, _mask, relief).plant()
 
 
@@ -340,7 +321,7 @@ func owner_arena_contains(node: Node) -> bool:
 
 ## Altura del terreno en una posición plana, o 0 donde aún no hay terreno
 ## (una escena sin él, o un consumidor que corre antes de que se construya).
-## Toda colocación de este archivo pasa por aquí.
+## Toda colocación del scatter y sus ayudantes pasa por aquí.
 func ground_height(x: float, z: float) -> float:
 	var terrain := Terrain.find(get_tree())
 	if terrain == null:
@@ -353,7 +334,7 @@ func ground_height(x: float, z: float) -> float:
 ## uniforme: Godot no soporta escalar formas de colisión de forma no
 ## uniforme. `pos.y` se IGNORA y se usa la altura del terreno en ese XZ: un
 ## prop a y = 0 flotaría sobre una loma o se hundiría en una hondonada.
-## Pública para la franja del borde (PerimeterRing).
+## Pública para el reparto interior (InteriorProps) y el borde (PerimeterRing).
 func spawn_prop(scene: PackedScene, pos: Vector3, uniform_scale: float) -> void:
 	var prop := scene.instantiate() as Node3D
 	if prop == null:
@@ -362,12 +343,12 @@ func spawn_prop(scene: PackedScene, pos: Vector3, uniform_scale: float) -> void:
 	prop.position = Vector3(pos.x, ground_height(pos.x, pos.z), pos.z)
 	prop.rotate_y(_rng.randf_range(0.0, TAU))
 	prop.scale = Vector3.ONE * uniform_scale
-	_footprints.add(prop)
+	_rules.footprints.add(prop)
 
 
-# --- Fachada de la máscara: otros nodos llaman estos métodos por el grupo
-# "arena_bounds" (spawner, director, jefes, jugador, mapa, harness).
-# Conservar nombres y firmas.
+# --- Fachada del grupo "arena_bounds": otros nodos llaman estos métodos por
+# nombre (spawner, director, jefes, jugador, mapa, harness). Reenvían a la
+# máscara o a PlacementRules. Conservar nombres y firmas.
 
 ## True si una posición plana está dentro de la arena y no cae en una celda
 ## bloqueada. Todo lo que coloca cuerpos o POIs pregunta esto primero.
@@ -376,40 +357,20 @@ func is_walkable(xz: Vector2) -> bool:
 
 
 ## True si en `xz` se puede COLOCAR algo (un POI, un spawn, un cofre, un
-## jefe): celda abierta de la máscara y, con relieve por zonas, a `margin`
-## metros o más de todo corte, rampa y puente, fuera de las mesetas y de las
-## estructuras, y nunca encima de un prop con colisión. Es la pregunta de
-## quien pone cosas; is_walkable sigue siendo solo la máscara.
+## jefe), a `margin` metros del relieve. Reglas: PlacementRules.can_place.
 func can_place(xz: Vector2, margin: float = 0.0) -> bool:
-	return can_grow(xz, margin) and _footprints.is_clear(xz)
+	return _rules.can_place(xz, margin)
 
 
 ## True si en `xz` se puede levantar una ESTRUCTURA del director (un POI, un
-## portal, un evento): lo mismo que can_place, a `margin` metros o más de la
-## roca de la máscara y de las mesetas en todo mapa y, con relieve por
-## zonas, fuera del cañón, que es río. Lo que cae donde murió alguien y los
-## spawns siguen con can_place: pueden quedar en el cañón.
+## portal, un evento). Reglas: PlacementRules.can_build.
 func can_build(xz: Vector2, margin: float = 0.0) -> bool:
-	if not can_place(xz, margin) or _in_canyon(xz):
-		return false
-	var rock_gap := maxf(formation_clearance, margin)
-	return _mask.rock_distance(xz, rock_gap) >= rock_gap \
-			and _mesas.is_clear(xz, maxf(mesa_footprint_gap, margin))
+	return _rules.can_build(xz, margin)
 
 
-## True si en `xz` puede crecer la vegetación del suelo: lo mismo que
-## can_place, salvo que el pasto sí llega hasta el pie de un tronco.
+## True si en `xz` puede crecer la vegetación del suelo (PlacementRules.can_grow).
 func can_grow(xz: Vector2, margin: float = 0.0) -> bool:
-	if not _mask.is_walkable(xz):
-		return false
-	var terrain := _arena_terrain()
-	if terrain == null or not terrain.has_relief():
-		return true
-	# Con relieve por zonas, además fuera del faldón de roca que cada
-	# formación asoma más allá de sus celdas y de las estructuras del relieve.
-	return _mask.clear_of(xz, formation_clearance) and _structures_clear(xz) \
-			and ReliefDressing.clear(terrain, xz, margin, _mesa_sites, relief_mesa_keepout) \
-			and _mesas.is_clear(xz, mesa_footprint_gap)
+	return _rules.can_grow(xz, margin)
 
 
 ## Los puentes de esta arena bajo los que se pasa caminando, como los ve la
@@ -418,15 +379,10 @@ func horde_lanes() -> ReliefLanes:
 	return _lanes
 
 
-## El punto donde se puede colocar algo más cercano a `xz` (ver can_place):
-## el mismo `xz` si sirve. Para lo que cae donde murió alguien. Sin RNG.
-## Con `also`, el punto además tiene que pasar esa pregunta (recibe el XZ):
-## un spawn pide que debajo haya suelo y no la punta de algo.
+## El punto más cercano a `xz` donde can_place dice que sí, para lo que cae
+## donde murió alguien. Reglas: PlacementRules.nearest_place.
 func nearest_place(xz: Vector2, margin: float = 0.0, also: Callable = Callable()) -> Vector2:
-	if not also.is_valid():
-		return ReliefDressing.nearest(xz, margin, can_place)
-	return ReliefDressing.nearest(xz, margin, func(at: Vector2, gap: float) -> bool:
-		return can_place(at, gap) and bool(also.call(at)))
+	return _rules.nearest_place(xz, margin, also)
 
 
 func blocked_cell_count() -> int:
@@ -480,137 +436,3 @@ func _arena_terrain() -> Terrain:
 			if sibling is Terrain:
 				_terrain = sibling as Terrain
 	return _terrain
-
-
-## Arma la máscara con los exports de este nodo y el RNG del reparto.
-func _new_mask() -> ArenaMask:
-	var mask := ArenaMask.new(_rng)
-	mask.enabled = mask_enabled
-	mask.half_extent = arena_half_extent
-	mask.cell_size = mask_cell_size
-	mask.blobs_min = mask_blobs_min
-	mask.blobs_max = mask_blobs_max
-	mask.blob_cells_min = mask_blob_cells_min
-	mask.blob_cells_max = mask_blob_cells_max
-	mask.ridge_bias = mask_ridge_bias
-	mask.blob_spacing = mask_blob_spacing
-	mask.formation_gap = mask_formation_gap
-	mask.border_cells = mask_border_cells
-	mask.protect_radius = mask_protect_radius
-	mask.min_open_fraction = mask_min_open_fraction
-	return mask
-
-
-## Puntos planos donde nunca hay roca: el spawn y cada keepout de autor
-## (spots de verticalidad, grupos de rocas), en orden de grupo.
-func _protected_seeds() -> Array[Vector2]:
-	var seeds: Array[Vector2] = [Vector2.ZERO]
-	for node: Node in get_tree().get_nodes_in_group("scatter_keepout"):
-		var spot := node as Node3D
-		if spot != null and not (spot is Interactable):
-			seeds.append(Vector2(spot.global_position.x, spot.global_position.z))
-	return seeds
-
-
-## Cada región conexa de celdas bloqueadas se vuelve UNA RockFormation que
-## cubre toda la región, borde incluido, con roca sólida (rock_formation.gd
-## explica por qué el sello es estructural y no probable). El interior
-## también es roca a propósito: un raider puede saltar a una formación y
-## caminar su cresta, y sobre una región hueca caería a suelo que la máscara
-## llama inalcanzable y quedaría atrapado.
-func _raise_formations() -> void:
-	if _mask.blocked_cell_count() == 0:
-		return
-	var started := Time.get_ticks_msec()
-	var terrain := Terrain.find(get_tree())
-	if terrain != null:
-		terrain.ensure_built()
-	var regions := _mask.blocked_regions()
-	var faces := 0
-	var shapes := 0
-	var seal_low := 0
-	var tallest := 0.0
-	for index in regions.size():
-		var formation := RockFormation.new()
-		formation.name = "RockFormation%d" % index
-		formation.cell_size = mask_cell_size
-		formation.half_extent = arena_half_extent
-		formation.style = formation_style
-		add_child(formation)
-		formation.build(regions[index], terrain, _run_seed)
-		faces += formation.face_count
-		shapes += formation.prism_count
-		seal_low += formation.seal_low
-		tallest = maxf(tallest, formation.tallest)
-	print("Rock formations: %d regions, %d faces, %d shapes, tallest=%.1f in %d ms" % [
-			regions.size(), faces, shapes, tallest, Time.get_ticks_msec() - started])
-	if seal_low > 0:
-		push_warning("Rock formations: %d boundary vertices under %.1f m — the mask seal is thin there"
-				% [seal_low, RockFormation.SEAL_MIN_HEIGHT])
-
-
-## Muestreo por rechazo de `count` posiciones en el cuadrado interior, lejos
-## del spawn, de los keepouts y de los props ya puestos. El tope de intentos
-## evita un bucle infinito si la configuración no cabe.
-## Reparte `count` props de `scene` por el interior. Con `dry`, ninguno cae
-## dentro del cañón del relieve por zonas.
-func _place_many(scene: PackedScene, count: int, min_scale: float, max_scale: float,
-		dry: bool = false) -> void:
-	if scene == null:
-		return
-	var half := _interior_half_extent()
-	var placed := 0
-	var attempts := 0
-	while placed < count and attempts < count * 24:
-		attempts += 1
-		var pos := Vector3(_rng.randf_range(-half, half), 0.0, _rng.randf_range(-half, half))
-		if not _is_clear(pos) or (dry and _in_canyon(Vector2(pos.x, pos.z))):
-			continue
-		spawn_prop(scene, pos, _rng.randf_range(min_scale, max_scale))
-		_placed_xz.append(Vector2(pos.x, pos.z))
-		placed += 1
-
-
-## Mitad del cuadrado donde caen los props interiores, en metros.
-func _interior_half_extent() -> float:
-	return arena_half_extent - interior_edge_margin
-
-
-func _is_clear(pos: Vector3) -> bool:
-	var flat := Vector2(pos.x, pos.z)
-	if flat.length() < spawn_clear_radius:
-		return false
-	if not _mask.clear_of(flat, formation_clearance):
-		return false
-	if not _relief_clear(flat, relief_prop_clearance) or not _structures_clear(flat):
-		return false
-	if not _mesas.is_clear(flat, mesa_footprint_gap):
-		return false
-	for keepout in _keepouts_xz:
-		if keepout.distance_to(flat) < keepout_radius:
-			return false
-	for other in _placed_xz:
-		if other.distance_to(flat) < min_prop_spacing:
-			return false
-	return true
-
-
-## True si `xz` cae dentro del cañón del relieve por zonas, rampas incluidas.
-func _in_canyon(xz: Vector2) -> bool:
-	var terrain := _arena_terrain()
-	return terrain != null and terrain.has_relief() \
-			and terrain.relief_layout().level_at(xz) == -1
-
-
-## True si `xz` queda a `margin` metros o más de todo corte, rampa y puente
-## del relieve por zonas (siempre, en una arena sin él).
-func _relief_clear(xz: Vector2, margin: float) -> bool:
-	return ReliefDressing.clear(_arena_terrain(), xz, margin)
-
-
-## True si `xz` queda fuera del claro de toda estructura del relieve.
-func _structures_clear(xz: Vector2) -> bool:
-	for site: Vector3 in _structure_sites:
-		if Vector2(site.x, site.z).distance_to(xz) < site.y:
-			return false
-	return true
