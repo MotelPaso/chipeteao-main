@@ -33,6 +33,13 @@ const GROUND_TRIES: int = 4
 ## cuando un ataque lo lleva por tierra. Más que eso es el borde de un corte
 ## del relieve o de una roca, y por tierra no lo cruza.
 const GLIDE_MAX_RISE: float = 1.0
+## Metros a los que se mira el suelo, en cruz, alrededor de un punto al que un
+## ataque lleva el cuerpo por tierra. Si a esa distancia sube o baja más que
+## GLIDE_MAX_RISE, el punto está en la pared de un corte, al pie o en el
+## borde. La pared mide cerca de un metro de ancho (la cuadrícula del
+## terreno): un avance lento la subiría de a poco sin pasar nunca
+## GLIDE_MAX_RISE en un frame.
+const GLIDE_WALL_REACH: float = 0.5
 ## Por debajo de esta fracción de lo que quería avanzar en un frame cuenta
 ## como trabada; no cuenta si se mueve en vertical (trepa o cae) a más de
 ## STUCK_VERTICAL_SPEED metros por segundo.
@@ -197,14 +204,16 @@ func floor_point(point: Vector3) -> Vector3:
 
 
 ## Lleva el cuerpo a `point`, a ras de suelo, sin chocar con nada (una
-## embestida, un túnel). Por tierra no sube ni baja más de GLIDE_MAX_RISE de
-## golpe: si el suelo de `point` queda más arriba o más abajo (el otro lado de
-## un corte), se queda donde está y devuelve false. Bajo tierra (`under` en
-## true) pasa por debajo de los cortes.
+## embestida, un túnel). Por tierra no pisa la pared de un corte (ver
+## GLIDE_WALL_REACH) ni sube o baja más de GLIDE_MAX_RISE de golpe: si `point`
+## cae en una pared o su suelo queda más arriba o más abajo (el otro lado de un
+## corte), se queda donde está y devuelve false. Bajo tierra (`under` en true)
+## pasa por debajo de los cortes.
 func glide_to(point: Vector3, under: bool = false) -> bool:
 	var ground := ground_height(point)
 	velocity = Vector3.ZERO
-	if not under and absf(ground - global_position.y) > GLIDE_MAX_RISE:
+	if not under and (absf(ground - global_position.y) > GLIDE_MAX_RISE
+			or _on_wall(point, ground)):
 		return false
 	global_position = Vector3(point.x, ground, point.z)
 	return true
@@ -336,3 +345,13 @@ func _is_broad(space: PhysicsDirectSpaceState3D, point: Vector3, base: float, to
 				and absf((hit["position"] as Vector3).y - top) <= GROUND_LEVEL_SLACK:
 			supported += 1
 	return supported >= GROUND_SUPPORT
+
+
+## True si a GLIDE_WALL_REACH metros de `point`, en cruz, el suelo queda más
+## de GLIDE_MAX_RISE por encima o por debajo de `ground` (el suelo de `point`).
+func _on_wall(point: Vector3, ground: float) -> bool:
+	for side: Vector2 in [Vector2.LEFT, Vector2.RIGHT, Vector2.UP, Vector2.DOWN]:
+		var near := point + Vector3(side.x, 0.0, side.y) * GLIDE_WALL_REACH
+		if absf(ground_height(near) - ground) > GLIDE_MAX_RISE:
+			return true
+	return false
