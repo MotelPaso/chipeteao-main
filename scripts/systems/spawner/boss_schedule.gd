@@ -18,8 +18,10 @@ extends RefCounted
 ## normal hasta que muere y pasa el respiro (spawns_held).
 ## Una arena puede traer además un MINIJEFE (mini_boss_scene): llega en
 ## mini_boss_spawn_minute, sin aviso, y el jefe del bioma espera a que muera
-## y pase su respiro. Si pelea solo (mini_boss_fights_alone), mientras vive
-## tampoco sale ningún enemigo normal, igual que con el jefe de etapa.
+## y pase su respiro. El jefe de etapa también lo espera, hasta que su cuerpo
+## deja la arena: dos llegadas a la vez pisarían sus cinemáticas. Si pelea
+## solo (mini_boss_fights_alone), mientras vive tampoco sale ningún enemigo
+## normal, igual que con el jefe de etapa.
 
 ## Interruptor del harness: BONK_STAGE_BOSS_AT=<segundos> trae al jefe de
 ## etapa en ese segundo de la etapa y no en elder_spawn_minute. Solo
@@ -120,7 +122,8 @@ func tick() -> void:
 	if not _boss_spawned and not spawns_held() and not _mini_boss_holds_boss() \
 			and RunState.stage_time >= spawner.boss_spawn_minute * 60.0:
 		_boss_spawned = spawn_boss(1.0) != null
-	if not _elder_spawned and RunState.stage_time >= _stage_boss_due():
+	if not _elder_spawned and not _mini_boss_holds_stage_boss() \
+			and RunState.stage_time >= _stage_boss_due():
 		var elder := _spawn_stage_boss()
 		_elder_spawned = elder != null
 		if elder != null:
@@ -235,6 +238,24 @@ func _mini_boss_holds_boss() -> bool:
 	if not _mini_boss_spawned:
 		return RunState.stage_time >= _mini_boss_due()
 	return _mini_boss_alive() or _relief_timer > 0.0
+
+
+## True mientras el jefe de etapa tiene que esperar al minijefe: ya le toca
+## llegar y todavía no llegó, o su cuerpo sigue en la arena (llegando,
+## peleando o en su caída). En el mismo tick llegarían los dos, y sus
+## llegadas congelan el mundo una encima de la otra.
+func _mini_boss_holds_stage_boss() -> bool:
+	if _spawner.mini_boss_scene == null:
+		return false
+	if not _mini_boss_spawned:
+		return RunState.stage_time >= _mini_boss_due()
+	return _in_arena(_mini_boss)
+
+
+## True mientras `boss` sigue en la arena, vivo o en su caída. Sin tipo a
+## propósito: un jefe ya liberado no puede pasar por un parámetro tipado.
+func _in_arena(boss: Variant) -> bool:
+	return is_instance_valid(boss) and (boss as Node).is_inside_tree()
 
 
 ## True mientras hay un jefe peleando solo en la arena.

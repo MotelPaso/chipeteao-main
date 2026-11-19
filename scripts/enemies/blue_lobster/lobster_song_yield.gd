@@ -4,9 +4,9 @@ extends Node
 ## de LobsterEntrance.tscn). Dos cosas que nadie más puede hacer, porque la
 ## cinemática de otro jefe congela la arena y con ella a la entrada de la
 ## langosta; por eso este nodo procesa SIEMPRE:
-##   - Si arranca la canción de OTRO jefe mientras esta suena (Mythos llega con
-##     la langosta todavía viva), esta le deja el lugar: se apaga rápido
-##     (BossSong.hand_over).
+##   - Si arranca la canción de OTRO jefe mientras esta suena (Mythos llega
+##     cuando la langosta acaba de morir y su canción todavía se apaga), esta
+##     le deja el lugar: se apaga rápido (BossSong.hand_over).
 ##   - Cuando la langosta ya no está y la canción terminó de apagarse, la
 ##     entrada sobra: se libera sola (así no queda una segunda cinemática de
 ##     jefe colgada de la arena).

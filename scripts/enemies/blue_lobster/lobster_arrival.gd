@@ -72,8 +72,12 @@ func tick(delta: float) -> void:
 		_boss.finish_entrance(plain_seconds, false)
 
 
-## La langosta murió: su canción se apaga de a poco y la marea baja.
+## La langosta murió: su canción se apaga de a poco y la marea baja. Su caída
+## sigue aunque otro jefe congele el mundo mientras tanto (la calma de
+## Mythos): no queda a medias, quieta en el aire, todo lo que dura.
 func on_boss_dead() -> void:
+	if _boss != null and is_instance_valid(_boss):
+		WorldFreeze.exempt(_boss)
 	if _entrance != null and is_instance_valid(_entrance):
 		_entrance.fade_out_song()
 	if _tide != null and is_instance_valid(_tide):
