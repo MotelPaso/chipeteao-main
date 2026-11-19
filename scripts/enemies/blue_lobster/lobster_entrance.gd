@@ -33,7 +33,8 @@ extends Node3D
 
 const GROUP := &"boss_cinematic"
 const CAMERA_GROUP := &"cinematic_camera"
-const SPLIT_SCREEN_GROUP := &"split_screen"
+## El HUD, la pantalla dividida y la cámara, compartidos con la otra cinemática de jefe.
+const BossScreen := preload("res://scripts/enemies/mythos/boss_screen.gd")
 
 @export_group("Entrada")
 ## Segundos de introducción de la canción: lo que dura la entrada. La pelea empieza cuando la canción entra de lleno.
@@ -67,7 +68,6 @@ var _warmup_left: int = 0
 var _shot_index: int = -1
 ## True mientras este nodo tiene tomados el HUD y la cámara.
 var _taken_over: bool = false
-var _previous_camera: Camera3D = null
 var _skip_held: float = 0.0
 var _skip_armed: bool = false
 
@@ -242,13 +242,7 @@ func _enter_shot(index: int) -> void:
 ## El corte: toma el HUD, la pantalla dividida y la cámara. Lo que se toma
 ## aquí se devuelve en _release().
 func _cut_in() -> void:
-	get_tree().call_group(&"hud", "set_cinematic", true)
-	for node: Node in get_tree().get_nodes_in_group(SPLIT_SCREEN_GROUP):
-		var split := node as CanvasItem
-		if split != null:
-			split.visible = false
-	_previous_camera = get_viewport().get_camera_3d()
-	_camera.make_current()
+	BossScreen.take(self, _camera)
 	_boss.rig.visible = true
 	_boss.rig.set_near_fade(false)
 	_overlay.open(_boss.boss_title)
@@ -289,21 +283,11 @@ func _release() -> void:
 	if not _taken_over:
 		return
 	_taken_over = false
-	if is_inside_tree():
-		get_tree().call_group(&"hud", "set_cinematic", false)
-		for node: Node in get_tree().get_nodes_in_group(SPLIT_SCREEN_GROUP):
-			var split := node as CanvasItem
-			if split != null:
-				split.visible = true
 	# El viewport raíz vuelve a tener la MISMA cámara que tenía antes de la
-	# entrada, en solitario y en co-op. clear_current(false) para que Godot no
-	# elija otra por su cuenta.
-	_camera.clear_current(false)
+	# entrada, en solitario y en co-op, y el HUD vuelve con la última
+	# cinemática de jefe que suelta la pantalla (BossScreen).
+	BossScreen.release(self, _camera)
 	_camera.release()
-	if _previous_camera != null and is_instance_valid(_previous_camera) \
-			and _previous_camera.is_inside_tree():
-		_previous_camera.make_current()
-	_previous_camera = null
 
 
 ## La única salida de emergencia: fin de partida, arena que se va, langosta

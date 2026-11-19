@@ -34,7 +34,8 @@ enum Act { ARRIVAL, REBIRTH }
 
 const GROUP := &"boss_cinematic"
 const CAMERA_GROUP := &"cinematic_camera"
-const SPLIT_SCREEN_GROUP := &"split_screen"
+## El HUD, la pantalla dividida y la cámara, compartidos con la otra cinemática de jefe.
+const BossScreen := preload("res://scripts/enemies/mythos/boss_screen.gd")
 ## Metros sobre el jefe alrededor de los que flotan las brasas del mapa
 ## durante un acto.
 const EMBER_FOCUS_HEIGHT: float = 3.0
@@ -72,7 +73,6 @@ var _active: bool = false
 var _elapsed: float = 0.0
 ## True mientras este nodo tiene tomados el mundo, el HUD y la cámara.
 var _taken_over: bool = false
-var _previous_camera: Camera3D = null
 var _skip_held: float = 0.0
 var _skip_armed: bool = false
 
@@ -301,13 +301,7 @@ func _take_over() -> void:
 	_freeze.freeze(get_tree(), keep)
 	# Los números de daño que estaban en el aire quedarían ahí todo el acto.
 	Pools.release_live_of(Pools.DAMAGE_POPUP_SCENE)
-	get_tree().call_group(&"hud", "set_cinematic", true)
-	for node: Node in get_tree().get_nodes_in_group(SPLIT_SCREEN_GROUP):
-		var split := node as CanvasItem
-		if split != null:
-			split.visible = false
-	_previous_camera = get_viewport().get_camera_3d()
-	_act_camera().make_current()
+	BossScreen.take(self, _act_camera())
 	if _act == Act.ARRIVAL:
 		_overlay.open(_boss.boss_title, subtitle_text, false)
 	else:
@@ -322,21 +316,10 @@ func _release() -> void:
 		return
 	_taken_over = false
 	_freeze.thaw()
-	if is_inside_tree():
-		get_tree().call_group(&"hud", "set_cinematic", false)
-		for node: Node in get_tree().get_nodes_in_group(SPLIT_SCREEN_GROUP):
-			var split := node as CanvasItem
-			if split != null:
-				split.visible = true
 	# El viewport raíz vuelve a tener la MISMA cámara que tenía antes de la
-	# cinemática, en solitario y en co-op. clear_current(false) para que
-	# Godot no elija otra por su cuenta: cuando una cámara activa se suelta
-	# (o sale del árbol), le pasa el turno a cualquier otra del viewport.
-	_act_camera().clear_current(false)
-	if _previous_camera != null and is_instance_valid(_previous_camera) \
-			and _previous_camera.is_inside_tree():
-		_previous_camera.make_current()
-	_previous_camera = null
+	# cinemática, en solitario y en co-op, y el HUD vuelve con la última
+	# cinemática de jefe que suelta la pantalla (BossScreen).
+	BossScreen.release(self, _act_camera())
 	_overlay.close()
 	if _transformation != null and is_instance_valid(_transformation):
 		_transformation.set_focus(Vector3.INF)
