@@ -12,6 +12,10 @@ extends LobsterMove
 
 enum Step { CROUCH, AIRBORNE, REST }
 
+## Cuántas veces su avance más rápido puede recorrer el salto en un frame
+## mientras recupera lo que esperó subiendo junto a una pared (ver _fly).
+const CATCH_UP: float = 2.0
+
 @export_group("Salto")
 ## Segundos agazapada antes de saltar.
 @export var crouch_seconds: float = 0.5
@@ -79,6 +83,8 @@ var _target: Node3D = null
 var _from: Vector3 = Vector3.ZERO
 var _mark: Vector3 = Vector3.ZERO
 var _locked: bool = false
+## Fracción del salto ya recorrida en horizontal (0 al despegar, 1 en la marca).
+var _progress: float = 0.0
 ## Réplicas que faltan, segundos hasta la próxima y si ya la anunció.
 var _rings_left: int = 0
 var _ring_timer: float = 0.0
@@ -96,6 +102,7 @@ func begin(target: Node3D) -> void:
 	_target = target
 	_step = Step.CROUCH
 	_locked = false
+	_progress = 0.0
 	_air = maxf(air_seconds * aggression_lerp(1.0, air_at_full_aggression), lock_seconds + 0.1)
 	_timer = crouch_seconds + _air
 	_from = boss.global_position
@@ -129,7 +136,7 @@ func tick(delta: float) -> bool:
 		boss.fx.takeoff(boss.core_point())
 		Sfx.play(jump_sfx)
 	if _step == Step.AIRBORNE:
-		_fly()
+		_fly(delta)
 	if _timer <= 0.0:
 		_impact()
 	return false
@@ -168,13 +175,25 @@ func _lock() -> void:
 
 ## En el aire: el cuerpo va de donde saltó a la marca, y el modelo sube y baja
 ## en arco por encima. En la bajada apunta las pinzas al suelo.
-func _fly() -> void:
+func _fly(delta: float) -> void:
 	var t := 1.0 - clampf(_timer / maxf(_air, 0.01), 0.0, 1.0)
-	var line := _from.lerp(_mark, smoothstep(0.0, 1.0, t))
+	var arc := leap_height * 4.0 * t * (1.0 - t)
+	# smoothstep avanza a lo sumo 1.5 / _air por segundo: para ponerse al día
+	# avanza hasta CATCH_UP veces eso en un frame.
+	var reach := CATCH_UP * 1.5 * delta / maxf(_air, 0.01)
+	var progress := minf(smoothstep(0.0, 1.0, t), _progress + reach)
+	var line := _from.lerp(_mark, progress)
+	# Subiendo, si el suelo de adelante queda por encima del modelo (salta a lo
+	# alto de un corte desde su pie), primero sube en el lugar y avanza cuando
+	# ya lo pasa: así no trepa la pared de un tirón.
+	if t < 0.5 and boss.ground_height(line) > line.y + arc:
+		progress = _progress
+		line = _from.lerp(_mark, progress)
+	_progress = progress
 	boss.fly_to(line)
 	# El modelo sigue su arco sobre la recta del salto aunque el cuerpo haya
 	# tenido que subir al borde de un corte: así no da un tirón al cruzarlo.
-	boss.rig.lift = maxf(line.y + leap_height * 4.0 * t * (1.0 - t) - boss.global_position.y, 0.0)
+	boss.rig.lift = maxf(line.y + arc - boss.global_position.y, 0.0)
 	if t > 0.55:
 		boss.rig.set_pose(LobsterRig.Pose.DIVE)
 		boss.rig.set_dust(false)
