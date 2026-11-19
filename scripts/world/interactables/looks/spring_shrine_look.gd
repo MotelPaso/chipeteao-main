@@ -9,14 +9,15 @@ extends Node3D
 @export_group("Medidas")
 ## Radio del escalón de abajo, en metros.
 @export var step_radius: float = 2.05
-## Radio de afuera y de adentro del borde de la fuente, en metros (el de
-## afuera, igual a la colisión del altar).
+## Radio de afuera del borde de la fuente, en metros (igual a la colisión del altar).
 @export var basin_outer: float = 1.7
+## Radio de adentro del borde de la fuente, en metros.
 @export var basin_inner: float = 1.48
 ## Alto del borde de la fuente, en metros.
 @export var basin_height: float = 0.78
-## Alto de la columna del medio y radio de su cuenco, en metros.
+## Alto de la columna del medio, en metros.
 @export var column_height: float = 1.4
+## Radio del cuenco sobre la columna, en metros.
 @export var bowl_radius: float = 0.5
 ## Helechos alrededor de la fuente.
 @export_range(0, 8) var ferns: int = 4
@@ -30,8 +31,9 @@ extends Node3D
 @export var floor_color: Color = Color(0.3, 0.36, 0.36)
 ## Chorros de agua.
 @export var water_color: Color = Color(0.6, 0.88, 0.98)
-## Musgo y helechos.
+## Color del musgo.
 @export var moss_color: Color = Color(0.36, 0.5, 0.3)
+## Color de los helechos.
 @export var fern_color: Color = Color(0.2, 0.5, 0.3)
 
 var _rng := RandomNumberGenerator.new()

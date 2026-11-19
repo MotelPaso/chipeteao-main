@@ -11,8 +11,9 @@ extends Node3D
 @export var base_half: float = 1.0
 ## Alto de cada escalón, en metros.
 @export var step: float = 0.2
-## Medio lado y alto del bloque del altar, en metros.
+## Medio lado del bloque del altar, en metros.
 @export var block_half: float = 0.45
+## Alto del bloque del altar, en metros.
 @export var block_height: float = 0.58
 ## Garras de bronce alrededor del orbe.
 @export_range(2, 6) var claws: int = 3
@@ -28,8 +29,9 @@ extends Node3D
 @export var bronze_color: Color = Color(0.62, 0.45, 0.22)
 ## Runas talladas.
 @export var rune_color: Color = Color(1.0, 0.8, 0.35)
-## Cera y llama de las velas.
+## Color de la cera de las velas.
 @export var wax_color: Color = Color(0.92, 0.88, 0.76)
+## Color de la llama de las velas.
 @export var flame_color: Color = Color(1.0, 0.7, 0.3)
 ## Musgo.
 @export var moss_color: Color = Color(0.36, 0.5, 0.3)

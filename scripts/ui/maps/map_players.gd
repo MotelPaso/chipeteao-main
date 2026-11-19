@@ -7,27 +7,31 @@ extends GridContainer
 ## de este panel en co-op.
 
 @export_group("Filas")
-## Ancho mínimo de una fila con espacio y en una celda chica, en píxeles: de
-## aquí sale si las filas van en una o en dos columnas.
+## Ancho mínimo de una fila con espacio, en píxeles: de aquí sale si las filas
+## van en una o en dos columnas.
 @export var row_min_width: float = 300.0
+## Ancho mínimo de una fila en una celda chica, en píxeles.
 @export var compact_row_min_width: float = 156.0
 ## Una fila más angosta que esto no escribe el nombre del personaje.
 @export var name_min_row_width: float = 230.0
-## Tamaño de la barra de vida con espacio y en una celda chica, en píxeles.
+## Tamaño de la barra de vida con espacio, en píxeles.
 @export var bar_size: Vector2 = Vector2(90.0, 16.0)
+## Tamaño de la barra de vida en una celda chica, en píxeles.
 @export var compact_bar_size: Vector2 = Vector2(54.0, 14.0)
 ## Radio de las esquinas de la barra, en píxeles.
 @export var bar_corner_radius: int = 6
 ## Separación entre las piezas de una fila, en píxeles.
 @export var row_separation: int = 8
 @export_group("Letra")
-## Tamaño de letra con espacio y en una celda chica, en píxeles.
+## Tamaño de letra con espacio, en píxeles.
 @export var font_size: int = 14
+## Tamaño de letra en una celda chica, en píxeles.
 @export var compact_font_size: int = 12
 @export_group("Colores")
-## Texto del nombre del personaje, de la vida y de los puntos: tinta, porque
-## van sobre una tarjeta de color.
+## Color del nombre del personaje y de su vida: tinta, porque van sobre una
+## tarjeta de color.
 @export var name_color: Color = UiTheme.INK
+## Color de los puntos: tinta, porque van sobre una tarjeta de color.
 @export var points_color: Color = UiTheme.INK
 ## Color de la chapa de un jugador caído.
 @export var knocked_out_color: Color = UiTheme.ACCENT_RED

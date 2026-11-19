@@ -32,12 +32,14 @@ extends Control
 @export var ring_color: Color = UiTheme.INK
 ## Color del aro, entre los dos contornos.
 @export var band_color: Color = UiTheme.PAPER
-## Grosor del contorno de afuera y del de adentro, en píxeles. El aro de
-## color ocupa lo que queda del margen de View.
+## Grosor del contorno de afuera, en píxeles. El aro de color ocupa lo que
+## queda del margen de View.
 @export var outline_width: float = 4.0
+## Grosor del contorno de adentro, en píxeles.
 @export var inner_outline_width: float = 2.5
-## Sombra dura bajo el disco: color y desplazamiento en píxeles.
+## Color de la sombra dura bajo el disco.
 @export var shadow_color: Color = UiTheme.SHADOW_COLOR
+## Desplazamiento de la sombra dura bajo el disco, en píxeles.
 @export var shadow_offset: Vector2 = Vector2(0.0, 5.0)
 @export_group("Norte")
 ## Distancia del centro de la chapa «N» a la orilla del disco, en píxeles.

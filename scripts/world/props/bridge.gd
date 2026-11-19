@@ -70,11 +70,13 @@ extends StaticBody3D
 @export var tower_inset: float = 0.6
 ## Alto del dintel que une las dos torres de cada cabecera, en metros (0 = sin dintel).
 @export var lintel_height: float = 1.1
-## Ancho y largo del estandarte que cuelga de cada dintel, en metros.
+## Ancho del estandarte que cuelga de cada dintel, en metros.
 @export var banner_width: float = 2.2
+## Largo del estandarte que cuelga de cada dintel, en metros.
 @export var banner_length: float = 3.6
-## Color del paño del estandarte y de su franja.
+## Color del paño del estandarte.
 @export var banner_color: Color = Color(0.72, 0.16, 0.14)
+## Color de la franja del estandarte.
 @export var banner_trim_color: Color = Color(0.93, 0.74, 0.28)
 ## Color de la llama de los braseros.
 @export var flame_color: Color = Color(1.0, 0.5, 0.12)

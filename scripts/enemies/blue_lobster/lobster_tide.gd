@@ -71,19 +71,23 @@ const STATE_NAMES: Array[StringName] = [&"low", &"rising", &"high", &"ebbing"]
 @export var coral_clearance: float = 14.0
 ## Metros alrededor de cada raider que quedan libres al brotar.
 @export var raider_clearance: float = 4.0
-## Ramas por grupo, mínimo y máximo.
+## Ramas por grupo, como mínimo.
 @export var branches_min: int = 4
+## Ramas por grupo, como máximo.
 @export var branches_max: int = 7
-## Alto de una rama en metros, mínimo y máximo. Más altas que un raider tapan la pelea.
+## Alto mínimo de una rama, en metros.
 @export var branch_height_min: float = 0.7
+## Alto máximo de una rama, en metros. Más altas que un raider tapan la pelea.
 @export var branch_height_max: float = 2.1
-## Radio de una rama en metros, mínimo y máximo.
+## Radio mínimo de una rama, en metros.
 @export var branch_radius_min: float = 0.11
+## Radio máximo de una rama, en metros.
 @export var branch_radius_max: float = 0.24
 ## Grados que una rama puede inclinarse.
 @export var branch_tilt_degrees: float = 26.0
-## Radio del bulbo de la punta en metros, mínimo y máximo.
+## Radio mínimo del bulbo de la punta, en metros.
 @export var bulb_radius_min: float = 0.17
+## Radio máximo del bulbo de la punta, en metros.
 @export var bulb_radius_max: float = 0.32
 ## Metros de radio de cada grupo (cuánto se separan sus ramas).
 @export var site_radius: float = 0.7

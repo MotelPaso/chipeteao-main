@@ -31,11 +31,13 @@ enum Shot { EMBER, TIDE, PILLAR, HERO }
 @export_group("Plano de la marea")
 ## Fracción del renacer (0-1) hasta la que dura.
 @export_range(0.0, 1.0) var tide_shot_until: float = 0.62
-## Distancia a las cenizas al empezar y al terminar, en metros.
+## Distancia a las cenizas al empezar, en metros.
 @export var tide_distance_start: float = 14.0
+## Distancia a las cenizas al terminar, en metros.
 @export var tide_distance_end: float = 48.0
-## Altura de la cámara al empezar y al terminar, en metros sobre el suelo.
+## Altura de la cámara al empezar, en metros sobre el suelo.
 @export var tide_height_start: float = 6.0
+## Altura de la cámara al terminar, en metros sobre el suelo.
 @export var tide_height_end: float = 36.0
 ## Campo de visión, en grados.
 @export var tide_fov: float = 66.0
@@ -47,15 +49,17 @@ enum Shot { EMBER, TIDE, PILLAR, HERO }
 @export var pillar_distance: float = 15.0
 ## Altura de la cámara, en metros sobre el suelo.
 @export var pillar_eye_height: float = 1.6
-## Altura a la que mira al empezar y al terminar, en metros (sube por la columna).
+## Altura a la que mira al empezar, en metros (después sube por la columna).
 @export var pillar_look_start: float = 3.5
+## Altura a la que mira al terminar, en metros.
 @export var pillar_look_end: float = 11.0
 ## Campo de visión, en grados.
 @export var pillar_fov: float = 64.0
 
 @export_group("Plano héroe")
-## Distancia al jefe al empezar y al terminar, en metros.
+## Distancia al jefe al empezar, en metros.
 @export var hero_distance_start: float = 24.0
+## Distancia al jefe al terminar, en metros.
 @export var hero_distance_end: float = 17.0
 ## Altura de la cámara, en metros sobre el suelo (baja: lo mira desde abajo).
 @export var hero_height: float = 1.8
@@ -65,8 +69,9 @@ enum Shot { EMBER, TIDE, PILLAR, HERO }
 @export var hero_side_degrees: float = 32.0
 ## Parte de la altura del jefe a la que mira (menos de 1 = el jefe queda arriba en pantalla y deja lugar al cartel).
 @export_range(0.2, 1.0) var hero_look_fraction: float = 0.72
-## Campo de visión al empezar y al terminar, en grados.
+## Campo de visión al empezar, en grados.
 @export var hero_fov_start: float = 62.0
+## Campo de visión al terminar, en grados.
 @export var hero_fov_end: float = 52.0
 
 @export_group("Vista despejada")

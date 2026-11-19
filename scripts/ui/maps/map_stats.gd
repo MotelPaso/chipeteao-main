@@ -10,24 +10,28 @@ extends GridContainer
 ## de co-op.
 
 @export_group("Celdas")
-## Ancho mínimo de una celda (nombre y valor), en píxeles: con espacio y en
-## una celda chica. De aquí sale cuántas columnas caben.
+## Ancho mínimo de una estadística (nombre y valor) con espacio, en píxeles.
+## De aquí sale cuántas columnas caben.
 @export var cell_min_width: float = 230.0
+## Ancho mínimo de una estadística (nombre y valor) en una celda chica, en píxeles.
 @export var compact_cell_min_width: float = 148.0
 ## Tope de columnas, por ancho que sea el panel.
 @export var max_columns: int = 4
 ## Separación entre el nombre y el valor, en píxeles.
 @export var name_value_gap: int = 8
 @export_group("Letra")
-## Tamaño de letra con espacio y en una celda chica, en píxeles.
+## Tamaño de letra con espacio, en píxeles.
 @export var font_size: int = 15
+## Tamaño de letra en una celda chica, en píxeles.
 @export var compact_font_size: int = 12
 @export_group("Colores")
-## Nombre de una estadística con valor, y nombre y valor de una en cero.
+## Color del nombre de una estadística con valor.
 @export var name_color: Color = UiTheme.INK
+## Color del nombre y del valor de una estadística en cero.
 @export var idle_color: Color = Color(UiTheme.INK, 0.5)
-## Texto de un valor que subió y de uno que bajó, dentro de su chapa.
+## Color del texto de un valor que subió, dentro de su chapa.
 @export var raised_color: Color = UiTheme.ACCENT_MINT
+## Color del texto de un valor que bajó, dentro de su chapa.
 @export var lowered_color: Color = UiTheme.ACCENT_RED
 @export_group("Chapa del valor")
 ## Fondo de la chapa de un valor que cambió.

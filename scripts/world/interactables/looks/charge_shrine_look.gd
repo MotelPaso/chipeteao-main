@@ -12,18 +12,21 @@ extends Node3D
 @export_group("Zócalo y columna")
 ## Radio del escalón de abajo del zócalo, en metros (igual a la colisión del altar).
 @export var plinth_radius: float = 1.5
-## Escalones del zócalo y alto de cada uno, en metros.
+## Escalones del zócalo.
 @export_range(1, 4) var plinth_tiers: int = 3
+## Alto de cada escalón del zócalo, en metros.
 @export var plinth_step: float = 0.32
-## Alto y radio de la columna, en metros.
+## Alto de la columna, en metros.
 @export var column_height: float = 2.0
+## Radio de la columna, en metros.
 @export var column_radius: float = 0.5
 ## Brazos de bronce de la cuna del cristal.
 @export_range(2, 8) var prongs: int = 4
 
 @export_group("Cristal")
-## Alto y radio del cristal que flota, en metros.
+## Alto del cristal que flota, en metros.
 @export var crystal_height: float = 1.4
+## Radio del cristal que flota, en metros.
 @export var crystal_radius: float = 0.36
 
 @export_group("Círculo de piedras")
@@ -31,8 +34,9 @@ extends Node3D
 @export_range(0, 16) var marker_count: int = 8
 ## Metros más allá del borde de la zona donde se paran.
 @export var marker_gap: float = 0.8
-## Alto mínimo y máximo de cada piedra, en metros.
+## Alto mínimo de cada piedra, en metros.
 @export var marker_height_min: float = 1.2
+## Alto máximo de cada piedra, en metros.
 @export var marker_height_max: float = 1.7
 ## Ancho de cada piedra, en metros.
 @export var marker_width: float = 0.7

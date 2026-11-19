@@ -66,8 +66,9 @@ signal flash_requested(alpha: float)
 @export var waves: int = 2
 ## Segundos entre una onda y la siguiente.
 @export var wave_interval: float = 0.22
-## Radio en metros con que nace cada onda y hasta el que llega.
+## Radio con que nace cada onda, en metros.
 @export var wave_start_radius: float = 3.0
+## Radio hasta el que llega cada onda, en metros.
 @export var wave_radius: float = 60.0
 ## Metros por segundo a los que se abre.
 @export var wave_speed: float = 34.0

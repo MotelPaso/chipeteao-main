@@ -29,9 +29,10 @@ const OVERLAY_SCENE := preload("res://scenes/ui/maps/MapOverlay.tscn")
 ## vista de cada minimapa sigue a su jugador en cada cuadro; esto es cada
 ## cuánto se vuelve a mirar qué hay en el mundo.
 @export var refresh_seconds: float = 0.1
-## Las franjas de equipo del HUD: el mapa de Tab les pide las fichas de armas,
-## tomos y objetos de su jugador, para mostrarlas igual que el HUD.
+## Franja de armas y tomos del HUD: el mapa de Tab le pide las fichas de su
+## jugador, para mostrarlas igual que el HUD.
 @export var build_strip: LoadoutStrip
+## Franja de objetos del HUD: el mapa de Tab le pide las fichas de su jugador.
 @export var bag_strip: LoadoutStrip
 
 var _map: MapDraw = null

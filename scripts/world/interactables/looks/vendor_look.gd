@@ -11,12 +11,15 @@ extends Node3D
 @export_group("Medidas")
 ## Ancho, alto y fondo del mostrador, en metros.
 @export var counter_size: Vector3 = Vector3(2.4, 1.0, 0.8)
-## Ancho del toldo y alto de su borde de atrás y de adelante, en metros.
+## Ancho del toldo, en metros.
 @export var canopy_width: float = 3.0
+## Alto del borde de atrás del toldo, en metros.
 @export var canopy_back_height: float = 2.85
+## Alto del borde de adelante del toldo, en metros.
 @export var canopy_front_height: float = 2.4
-## Fondo del toldo hacia atrás y hacia adelante del mostrador, en metros.
+## Fondo del toldo hacia atrás del mostrador, en metros.
 @export var canopy_back: float = 1.4
+## Fondo del toldo hacia adelante del mostrador, en metros.
 @export var canopy_front: float = 0.9
 ## Ondas que cuelgan del borde de adelante del toldo.
 @export_range(2, 12) var scallops: int = 6
@@ -28,15 +31,18 @@ extends Node3D
 @export var plank_color: Color = Color(0.55, 0.4, 0.27)
 ## Sacos.
 @export var sack_color: Color = Color(0.72, 0.62, 0.44)
-## Alfombra y su borde.
+## Color de la alfombra.
 @export var rug_color: Color = Color(0.62, 0.2, 0.18)
+## Color del borde de la alfombra.
 @export var rug_trim_color: Color = Color(0.95, 0.78, 0.35)
 ## Líquido de las pociones, en orden.
 @export var potion_colors: Array[Color] = [Color(0.95, 0.25, 0.3), Color(0.3, 0.6, 1.0),
 		Color(0.4, 0.95, 0.45), Color(0.85, 0.5, 1.0)]
-## Vidrio de los frascos, oro de las monedas y luz del farol.
+## Color del vidrio de los frascos.
 @export var glass_color: Color = Color(0.82, 0.9, 0.92)
+## Color del oro de las monedas.
 @export var gold_color: Color = Color(0.96, 0.74, 0.22)
+## Color de la luz del farol.
 @export var lantern_color: Color = Color(1.0, 0.78, 0.4)
 ## Sombrero del vendedor.
 @export var hat_color: Color = Color(0.25, 0.18, 0.15)

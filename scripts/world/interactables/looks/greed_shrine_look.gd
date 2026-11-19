@@ -29,9 +29,11 @@ extends Node3D
 ## Gemas entre las monedas.
 @export var gem_colors: Array[Color] = [Color(0.95, 0.15, 0.3), Color(0.2, 0.95, 0.5),
 		Color(0.3, 0.6, 1.0)]
-## Hierro de los candelabros y cera y llama de sus velas.
+## Color del hierro de los candelabros.
 @export var iron_color: Color = Color(0.14, 0.13, 0.14)
+## Color de la cera de las velas de los candelabros.
 @export var wax_color: Color = Color(0.9, 0.85, 0.72)
+## Color de la llama de las velas de los candelabros.
 @export var flame_color: Color = Color(1.0, 0.62, 0.22)
 
 var _rng := RandomNumberGenerator.new()

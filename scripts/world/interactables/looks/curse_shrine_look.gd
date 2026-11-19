@@ -17,13 +17,15 @@ const SEGMENTS: int = 6
 @export var plinth_radius: float = 1.35
 ## Alto del obelisco sobre el zócalo, en metros.
 @export var spire_height: float = 4.3
-## Medio ancho del obelisco abajo y arriba, en metros.
+## Medio ancho del obelisco abajo, en metros.
 @export var spire_base: float = 0.75
+## Medio ancho del obelisco arriba, en metros.
 @export var spire_top: float = 0.16
 ## Cuánto se retuerce de abajo arriba, en grados.
 @export var twist_degrees: float = 28.0
-## Púas de hierro alrededor del zócalo y su largo, en metros.
+## Púas de hierro alrededor del zócalo.
 @export_range(0, 12) var spikes: int = 6
+## Largo de cada púa, en metros.
 @export var spike_length: float = 1.6
 ## Calaveras sobre el zócalo.
 @export_range(0, 6) var skulls: int = 3
@@ -33,8 +35,9 @@ const SEGMENTS: int = 6
 @export_range(0, 16) var marker_count: int = 8
 ## Metros más allá del borde de la zona donde se paran.
 @export var marker_gap: float = 0.6
-## Alto mínimo y máximo de cada piedra, en metros.
+## Alto mínimo de cada piedra, en metros.
 @export var marker_height_min: float = 1.0
+## Alto máximo de cada piedra, en metros.
 @export var marker_height_max: float = 1.5
 
 @export_group("Colores")

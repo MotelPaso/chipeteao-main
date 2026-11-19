@@ -29,12 +29,14 @@ const GROUND_SHADER := preload("res://assets/shaders/map_ground.gdshader")
 ## chica los marcadores se achican en proporción, hasta `min_marker_shrink`.
 ## 0 deja la escala fija.
 @export var marker_reference_side: float = 0.0
+## Lo más que se achican los marcadores en una vista chica (fracción de su tamaño).
 @export_range(0.1, 1.0) var min_marker_shrink: float = 0.7
 ## Cuánto más grande se dibuja la flecha del jugador dueño de la vista.
 @export var own_arrow_scale: float = 1.35
-## Halo bajo esa flecha, para encontrarse de un vistazo: su radio como
-## múltiplo del tamaño de la flecha y su opacidad (0 lo quita).
+## Radio del halo bajo esa flecha (para encontrarse de un vistazo), como
+## múltiplo del tamaño de la flecha.
 @export var own_halo_radius: float = 2.6
+## Opacidad del halo bajo la flecha propia (0 lo quita).
 @export_range(0.0, 1.0) var own_halo_alpha: float = 0.22
 ## Escala de un marcador anclado a la orilla.
 @export var pinned_scale: float = 0.85
@@ -52,8 +54,9 @@ const GROUND_SHADER := preload("res://assets/shaders/map_ground.gdshader")
 @export_range(0.0, 1.0) var unexplored_strength: float = 0.84
 ## Color de lo que queda fuera de la arena.
 @export var outside_color: Color = Color(0.027, 0.063, 0.075)
-## Línea del borde de la arena: color (con su alfa) y grosor en metros.
+## Color (con su alfa) de la línea del borde de la arena.
 @export var border_color: Color = Color(0.58, 0.82, 0.8, 0.55)
+## Grosor de la línea del borde de la arena, en metros.
 @export var border_meters: float = 1.2
 ## Cuánto se oscurece el suelo hacia la orilla de una vista redonda (0-1).
 @export_range(0.0, 1.0) var rim_shade: float = 0.0

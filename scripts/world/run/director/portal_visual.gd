@@ -49,16 +49,19 @@ extends Node3D
 ## Metros entre el borde del anillo y el centro de las piedras. En un portal
 ## de pareja tiene que pasar su exit_margin más el ancho de un raider.
 @export var frame_gap: float = 2.1
-## Alto mínimo y máximo de cada piedra, en metros (bajo 10: la horda trepa 10).
+## Alto mínimo de cada piedra, en metros (bajo 10: la horda trepa 10).
 @export var frame_height_min: float = 1.6
+## Alto máximo de cada piedra, en metros (bajo 10: la horda trepa 10).
 @export var frame_height_max: float = 2.2
 ## Ancho de cada piedra, en metros.
 @export var frame_width: float = 0.6
 ## Con dinteles: une las piedras de a pares con una losa arriba.
 @export var frame_lintels: bool = false
-## Piedra, losas y musgo del marco.
+## Color de la piedra del marco.
 @export var frame_stone_color: Color = Color(0.56, 0.57, 0.56)
+## Color de las losas del marco.
 @export var frame_paving_color: Color = Color(0.66, 0.65, 0.6)
+## Color del musgo del marco.
 @export var frame_moss_color: Color = Color(0.36, 0.5, 0.3)
 
 ## Progreso de la recarga (0-1) que el portal escribe cada frame;

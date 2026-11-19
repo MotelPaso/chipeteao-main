@@ -21,8 +21,9 @@ const FLAME_CORE := Color(1.0, 0.9, 0.55)
 @export var height: float = 2.0
 ## Alto de cada hilada de sillares, en metros.
 @export var course: float = 0.46
-## Largo mínimo y máximo de un sillar, en metros.
+## Largo mínimo de un sillar, en metros.
 @export var block_min: float = 0.8
+## Largo máximo de un sillar, en metros.
 @export var block_max: float = 1.4
 ## Alto de los postes de las esquinas sobre el piso, en metros.
 @export var post_height: float = 1.35
@@ -34,8 +35,9 @@ const FLAME_CORE := Color(1.0, 0.9, 0.55)
 @export_range(0, 8) var ivy_per_side: int = 4
 ## Estandartes que cuelgan de la cornisa (en muros al azar, uno por muro).
 @export_range(0, 4) var banners: int = 2
-## Ancho y largo de cada estandarte, en metros.
+## Ancho de cada estandarte, en metros.
 @export var banner_width: float = 0.9
+## Largo de cada estandarte, en metros.
 @export var banner_length: float = 1.5
 ## Runas talladas en cada muro.
 @export_range(0, 6) var runes_per_side: int = 2
@@ -65,8 +67,9 @@ const FLAME_CORE := Color(1.0, 0.9, 0.55)
 @export var rune_color: Color = Color(0.45, 0.9, 0.8)
 ## Llama de los braseros.
 @export var flame_color: Color = Color(1.0, 0.52, 0.14)
-## Paño de los estandartes y su franja.
+## Color del paño de los estandartes.
 @export var banner_color: Color = Color(0.2, 0.42, 0.36)
+## Color de la franja de los estandartes.
 @export var banner_trim_color: Color = Color(0.93, 0.74, 0.28)
 
 var _rng := RandomNumberGenerator.new()

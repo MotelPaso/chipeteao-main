@@ -29,8 +29,9 @@ extends Node3D
 ## Colores de los gajos de la rueda, en orden.
 @export var slice_colors: Array[Color] = [Color(0.86, 0.22, 0.2), Color(0.97, 0.78, 0.25),
 		Color(0.18, 0.62, 0.6), Color(0.55, 0.3, 0.78)]
-## Dados y sus puntos.
+## Color de los dados.
 @export var dice_color: Color = Color(0.95, 0.93, 0.88)
+## Color de los puntos de los dados.
 @export var pip_color: Color = Color(0.15, 0.12, 0.12)
 
 var _rng := RandomNumberGenerator.new()

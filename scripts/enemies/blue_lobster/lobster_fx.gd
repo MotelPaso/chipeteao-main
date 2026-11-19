@@ -56,8 +56,9 @@ extends Node
 @export_range(0.1, 1.5) var crown_at: float = 0.72
 ## Chorro de cada uno (radio, alto).
 @export var crown_burst: Vector2 = Vector2(0.7, 5.0)
-## Segundos entre el golpe y el primer chorro de la corona, y entre cada chorro y el siguiente.
+## Segundos entre el golpe y el primer chorro de la corona.
 @export var crown_delay: float = 0.06
+## Segundos entre un chorro de la corona y el siguiente.
 @export var crown_step: float = 0.018
 
 @export_group("Embestida")

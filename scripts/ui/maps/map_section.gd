@@ -21,8 +21,9 @@ enum Density {
 @export_group("Panel")
 ## Título del panel, tal como lo ve el jugador.
 @export var title: String = ""
-## Tamaño de letra del título con espacio y en una celda chica, en píxeles.
+## Tamaño de letra del título con espacio, en píxeles.
 @export var title_font_size: int = 24
+## Tamaño de letra del título en una celda chica, en píxeles.
 @export var compact_title_font_size: int = 15
 
 @export_group("Marco")
@@ -31,22 +32,25 @@ enum Density {
 ## Giro del marco, en grados (el texto no gira). En una celda chica el marco
 ## queda derecho: ahí no sobra un píxel.
 @export var tilt_degrees: float = -0.8
-## Grosor del contorno de tinta con espacio y en una celda chica, en píxeles.
+## Grosor del contorno de tinta con espacio, en píxeles.
 @export var border_width: int = 5
+## Grosor del contorno de tinta en una celda chica, en píxeles.
 @export var compact_border_width: int = 3
-## Radio de las esquinas con espacio y en una celda chica, en píxeles.
+## Radio de las esquinas con espacio, en píxeles.
 @export var corner_radius: int = 20
+## Radio de las esquinas en una celda chica, en píxeles.
 @export var compact_corner_radius: int = 12
-## Sombra dura bajo la tarjeta con espacio y en una celda chica
-## (desplazamiento en píxeles).
+## Sombra dura bajo la tarjeta con espacio (desplazamiento en píxeles).
 @export var shadow_offset: Vector2 = Vector2(0.0, 8.0)
+## Sombra dura bajo la tarjeta en una celda chica (desplazamiento en píxeles).
 @export var compact_shadow_offset: Vector2 = Vector2(0.0, 4.0)
 
 @export_group("Contenido")
-## Margen interior (horizontal, vertical), en píxeles: con espacio, en una
-## celda chica y sin título.
+## Margen interior con espacio (horizontal, vertical), en píxeles.
 @export var padding: Vector2 = Vector2(18.0, 12.0)
+## Margen interior en una celda chica (horizontal, vertical), en píxeles.
 @export var compact_padding: Vector2 = Vector2(12.0, 7.0)
+## Margen interior de una tarjeta sin título (horizontal, vertical), en píxeles.
 @export var tight_padding: Vector2 = Vector2(9.0, 5.0)
 
 @export_group("Movimiento")

@@ -82,9 +82,10 @@ const STAT_ROWS: Array[Dictionary] = [
 ## que falta y el ancho lo que sobra.
 @export var wide_cell_aspect: float = 2.6
 @export_group("Tarjetas")
-## Separación entre las tarjetas de los paneles con espacio y en una celda
-## chica, en píxeles. Tiene que dejar ver la sombra dura de la de arriba.
+## Separación entre las tarjetas de los paneles con espacio, en píxeles. Tiene
+## que dejar ver la sombra dura de la de arriba.
 @export var panel_gap: int = 20
+## Separación entre las tarjetas de los paneles en una celda chica, en píxeles.
 @export var compact_panel_gap: int = 10
 @export_group("Aparición")
 ## Segundos que tarda el mapa en aparecer al abrirlo.
@@ -92,12 +93,13 @@ const STAT_ROWS: Array[Dictionary] = [
 ## Retraso, en segundos, entre el salto de una tarjeta y el de la siguiente.
 @export var pop_stagger: float = 0.025
 @export_group("Encabezado")
-## Tamaño de letra del encabezado con espacio y en una celda chica, en píxeles.
+## Tamaño de letra del encabezado con espacio, en píxeles.
 @export var header_font_size: int = 34
+## Tamaño de letra del encabezado en una celda chica, en píxeles.
 @export var compact_header_font_size: int = 20
-## Grosor del contorno de tinta del encabezado con espacio y en una celda
-## chica, en píxeles.
+## Grosor del contorno de tinta del encabezado con espacio, en píxeles.
 @export var header_outline: int = 10
+## Grosor del contorno de tinta del encabezado en una celda chica, en píxeles.
 @export var compact_header_outline: int = 6
 @export_group("Textos")
 ## Encabezado: la etapa (desde 1).

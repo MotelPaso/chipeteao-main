@@ -15,12 +15,13 @@ extends HFlowContainer
 ## Separación entre la muestra y su texto, en píxeles.
 @export var row_separation: int = 5
 @export_group("Letra")
-## Tamaño de letra con espacio y en una celda chica, en píxeles.
+## Tamaño de letra con espacio, en píxeles.
 @export var font_size: int = 14
+## Tamaño de letra en una celda chica, en píxeles.
 @export var compact_font_size: int = 12
-## Color del texto y grosor de su contorno de tinta, en píxeles: la leyenda va
-## sobre el fondo, no sobre una tarjeta.
+## Color del texto. La leyenda va sobre el fondo, no sobre una tarjeta.
 @export var text_color: Color = UiTheme.TEXT_BRIGHT
+## Grosor del contorno de tinta del texto, en píxeles.
 @export var outline_size: int = 5
 
 ## En una celda chica la letra se achica.

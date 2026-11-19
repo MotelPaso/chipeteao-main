@@ -31,9 +31,10 @@ extends Node3D
 ## que los bordes nunca parpadeen (z-fighting).
 @export var ground_drop: float = 0.35
 ## Con relieve por zonas: metros bajo el borde de la arena donde queda el
-## marco de suelo lejano, y metros que se mete bajo ese borde para no dejar
-## una rendija.
+## marco de suelo lejano.
 @export var rim_drop: float = 0.05
+## Con relieve por zonas: metros que el marco de suelo lejano se mete bajo el
+## borde de la arena, para no dejar una rendija.
 @export var rim_overlap: float = 0.5
 
 @export_group("Colinas del horizonte")

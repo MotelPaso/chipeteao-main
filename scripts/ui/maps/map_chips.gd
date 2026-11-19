@@ -14,8 +14,9 @@ const CHIP_SCENE := preload("res://scenes/ui/maps/MapChip.tscn")
 @export_group("Textos")
 ## Lo que se muestra cuando no hay ninguna ficha.
 @export var empty_text: String = "—"
-## Color y tamaño de letra de ese texto.
+## Color del texto que se muestra cuando no hay ninguna ficha.
 @export var empty_color: Color = Color(UiTheme.INK, 0.5)
+## Tamaño de letra de ese texto, en píxeles.
 @export var empty_font_size: int = 14
 
 ## En una celda chica las fichas van sin nombre.
