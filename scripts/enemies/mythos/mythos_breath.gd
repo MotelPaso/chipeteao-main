@@ -12,6 +12,8 @@ extends MythosMove
 
 enum Step { INHALE, SWEEP, TURN, REST }
 
+const AttackFloor := preload("res://scripts/fx/attack_floor.gd")
+
 @export_group("Aliento")
 ## Escena del chorro (FireBeam): dibuja el aviso y las llamas.
 @export var beam_scene: PackedScene = preload("res://scenes/fx/FireBeam.tscn")
@@ -160,10 +162,10 @@ func _tick_sweep() -> void:
 	boss.rig.set_pose(boss.rest_pose())
 
 
-## Quema, una vez por pasada, a cada raider en pie dentro del chorro.
+## Quema, una vez por pasada, a cada raider en pie dentro del chorro, en el
+## suelo por el que corre el chorro (ver AttackFloor).
 func _burn(angle: float) -> void:
 	var heading := Vector3(cos(angle), 0.0, sin(angle))
-	var terrain := Terrain.find(get_tree())
 	for raider: Node3D in Coop.alive_players(get_tree()):
 		var id := raider.get_instance_id()
 		if _burned.has(id):
@@ -175,10 +177,9 @@ func _burn(angle: float) -> void:
 			continue
 		if (offset - heading * along).length() > width * 0.5:
 			continue
-		var ground := _origin.y
-		if terrain != null:
-			ground = terrain.height_at(raider.global_position.x, raider.global_position.z)
-		if raider.global_position.y - ground > height_window:
+		var ground := AttackFloor.height(boss, Vector3(raider.global_position.x, _origin.y,
+				raider.global_position.z))
+		if absf(raider.global_position.y - ground) > height_window:
 			continue
 		_burned[id] = true
 		boss.blast(boss.floor_point(raider.global_position), width)

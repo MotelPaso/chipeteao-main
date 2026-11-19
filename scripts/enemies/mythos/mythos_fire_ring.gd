@@ -6,6 +6,8 @@ extends MultiMeshInstance3D
 ## fire_wall.gdshader) puestos en círculo sobre el relieve: cada tramo crece
 ## cuando el fénix le pasa por encima. Es solo un efecto: no quema a nadie.
 
+const AttackFloor := preload("res://scripts/fx/attack_floor.gd")
+
 @export_group("Aspecto")
 ## Tramos de llama del anillo.
 @export var segments: int = 110
@@ -42,7 +44,6 @@ func lay(center: Vector3, radius: float, toward: Vector3) -> void:
 	_radius = radius
 	global_transform = Transform3D(Basis.IDENTITY, center)
 	var right := Vector3.UP.cross(toward).normalized()
-	var terrain := Terrain.find(get_tree())
 	var count := multimesh.instance_count
 	_bases.clear()
 	_outwards.clear()
@@ -50,8 +51,7 @@ func lay(center: Vector3, radius: float, toward: Vector3) -> void:
 		var turn := TAU * float(index) / float(count)
 		var outward := toward * sin(turn) - right * cos(turn)
 		var at := outward * radius
-		if terrain != null:
-			at.y = terrain.height_at(center.x + at.x, center.z + at.z) - center.y
+		at.y = AttackFloor.height(self, center + at) - center.y
 		_bases.append(at)
 		_outwards.append(outward)
 	draw(0.0, 1.0)

@@ -12,6 +12,8 @@ extends BossBase
 
 enum State { ENTRANCE, PURSUE, SMASH, ROOT_BURST, SUMMON }
 
+const AttackFloor := preload("res://scripts/fx/attack_floor.gd")
+
 @export_group("Llegada")
 ## Segundos que el jefe se queda quieto al aparecer antes de perseguir.
 @export var entrance_duration: float = 0.9
@@ -172,13 +174,15 @@ func _start_root_burst(player: Node3D) -> void:
 	_state_timer = root_burst_windup
 	_root_burst_timer = root_burst_interval
 	_root_spots.clear()
-	var base := _clamp_to_arena(player.global_position)
+	# Cada punto sobre el suelo real bajo él: al otro lado de un corte, o con
+	# el raider en el aire, el disco no flota ni queda enterrado.
+	var base := AttackFloor.on_floor(self, _clamp_to_arena(player.global_position))
 	_root_spots.append(base)
 	var line_angle := randf() * TAU
 	for i in 2:
 		var spot_angle := line_angle + PI * float(i)
-		_root_spots.append(_clamp_to_arena(base
-				+ Vector3(cos(spot_angle), 0.0, sin(spot_angle)) * root_burst_spread))
+		_root_spots.append(AttackFloor.on_floor(self, _clamp_to_arena(base
+				+ Vector3(cos(spot_angle), 0.0, sin(spot_angle)) * root_burst_spread)))
 	for spot: Vector3 in _root_spots:
 		Telegraph.spawn_disc(self, spot, root_burst_radius, root_burst_windup, telegraph_color)
 

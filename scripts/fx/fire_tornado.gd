@@ -13,6 +13,7 @@ extends Node3D
 enum Stage { IDLE, FORMING, SPINNING, FADING }
 
 const GROUP := &"fire_tornados"
+const AttackFloor := preload("res://scripts/fx/attack_floor.gd")
 
 @export_group("Daño")
 ## Segundos entre aplicaciones de daño.
@@ -66,7 +67,6 @@ var _left: float = 0.0
 var _tick_left: float = 0.0
 var _retarget_left: float = 0.0
 var _target: Node3D = null
-var _terrain: Terrain = null
 var _fade_tween: Tween = null
 
 @onready var _funnel: MeshInstance3D = $Funnel
@@ -99,7 +99,6 @@ func start(at: Vector3, radius: float, warn_seconds: float, life_seconds: float,
 		speed: float, chase: bool = true, heading: Vector3 = Vector3.ZERO,
 		turn_rate: float = 0.0) -> void:
 	_kill_fade()
-	_terrain = Terrain.find(get_tree())
 	_radius = radius
 	_dps = dps
 	_speed = speed
@@ -237,10 +236,9 @@ func _downed_raider_close() -> bool:
 	return false
 
 
+## `point` sobre el suelo real, buscado desde su altura (ver AttackFloor).
 func _on_ground(point: Vector3) -> Vector3:
-	if _terrain != null:
-		point.y = _terrain.height_at(point.x, point.z)
-	return point
+	return AttackFloor.on_floor(self, point)
 
 
 ## Cuánto se ve: 0 invisible, 1 formado del todo.

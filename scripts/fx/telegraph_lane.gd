@@ -12,6 +12,7 @@ extends Node3D
 ## Grupo "telegraph_lanes": quien los lanza los apaga al morir (dismiss).
 
 const GROUP := &"telegraph_lanes"
+const AttackFloor := preload("res://scripts/fx/attack_floor.gd")
 
 @export_group("Aspecto")
 ## Largo de cada tramo, en metros.
@@ -35,7 +36,6 @@ var _elapsed: float = 0.0
 var _color: Color = Color.WHITE
 var _fade: float = 1.0
 var _live: bool = false
-var _terrain: Terrain = null
 var _fade_tween: Tween = null
 
 @onready var _strip: MultiMeshInstance3D = $Strip
@@ -73,7 +73,6 @@ static func spawn(scene: PackedScene, from: Vector3, to: Vector3, width: float,
 ## Muestra ESTE carril, con lo mismo que pide spawn().
 func show_lane(from: Vector3, to: Vector3, width: float, seconds: float, color: Color) -> void:
 	_kill_fade()
-	_terrain = Terrain.find(get_tree())
 	_from = from
 	_to = to
 	_width = width
@@ -137,7 +136,7 @@ func _place() -> void:
 	var filled := clampf(_elapsed / _duration, 0.0, 1.0) if _duration != INF else 1.0
 	for index: int in count:
 		var at := _from + forward * (piece * (float(index) + 0.5))
-		at.y = (_terrain.height_at(at.x, at.z) if _terrain != null else _from.y) + lift
+		at.y = AttackFloor.height(self, at) + lift
 		multimesh.set_instance_transform(index, Transform3D(
 				Basis(right * _width, Vector3.UP, forward * piece), at))
 		var reached := float(index) / float(count) < filled

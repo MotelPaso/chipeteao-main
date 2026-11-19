@@ -4,6 +4,11 @@ extends BossBase
 ## un punto, mover el cuerpo, posarlo o hacerlo despegar (nodo Flight),
 ## golpear el suelo y marcar zonas de fuego (nodo Zones). Mythos (mythos.gd)
 ## hereda de aquí y suma las fases, las vidas y la elección de ataques.
+##
+## El suelo que pisa y que golpea es el real (AttackFloor): el tablero del
+## Gran Puente y el estrado de una meseta cuentan, no solo el terreno.
+
+const AttackFloor := preload("res://scripts/fx/attack_floor.gd")
 
 ## Agresividad actual (0-1); la leen los ataques.
 var aggression: float = 0.0
@@ -161,6 +166,18 @@ func _clear_hazards() -> void:
 	tree.call_group(FireWave.GROUP, "dissipate")
 
 
+## Además de lo que deja BossBase, un suelo alto que un raider pisa (el
+## tablero de un puente, el estrado de una meseta) aunque quede cerca de un
+## corte: ahí sigue al raider. Nunca dentro de una formación de roca.
+func _is_walkable(point: Vector3) -> bool:
+	if super._is_walkable(point):
+		return true
+	if _bounds == null or not _bounds.has_method("is_walkable") \
+			or not bool(_bounds.call("is_walkable", Vector2(point.x, point.z))):
+		return false
+	return AttackFloor.is_raised(self, point)
+
+
+## El suelo real bajo `point`, buscado desde su altura (ver AttackFloor).
 func _ground_height(point: Vector3) -> float:
-	var terrain := Terrain.find(get_tree())
-	return terrain.height_at(point.x, point.z) if terrain != null else point.y
+	return AttackFloor.height(self, point)

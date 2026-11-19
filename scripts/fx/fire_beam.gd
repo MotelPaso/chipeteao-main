@@ -16,6 +16,7 @@ extends Node3D
 
 ## Hileras de tramos: los dos bordes del chorro y la del medio.
 const ROWS: int = 3
+const AttackFloor := preload("res://scripts/fx/attack_floor.gd")
 
 @export_group("Chorro")
 ## Tramos de llama de cada hilera.
@@ -47,7 +48,6 @@ const ROWS: int = 3
 ## Opacidad (0-1) de las líneas de aviso.
 @export_range(0.0, 1.0) var warn_fade: float = 0.55
 
-var _terrain: Terrain = null
 var _fade_tween: Tween = null
 
 @onready var _wall: MultiMeshInstance3D = $Wall
@@ -124,8 +124,6 @@ func snuff() -> void:
 
 func _show(origin: Vector3, fade: float) -> void:
 	_kill_fade()
-	if _terrain == null or not is_instance_valid(_terrain):
-		_terrain = Terrain.find(get_tree())
 	global_transform = Transform3D(Basis.IDENTITY, origin)
 	_set_fade(fade)
 	_wall.visible = true
@@ -184,8 +182,9 @@ func _place_embers(origin: Vector3, heading: Vector3, inner: float, reach: float
 	_embers.emitting = true
 
 
+## El suelo real bajo `point`, buscado desde su altura (ver AttackFloor).
 func _ground(point: Vector3) -> float:
-	return _terrain.height_at(point.x, point.z) if _terrain != null else point.y
+	return AttackFloor.height(self, point)
 
 
 func _set_fade(amount: float) -> void:

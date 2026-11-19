@@ -10,6 +10,7 @@ extends Node3D
 ## Grupo "fire_waves": el jefe las apaga todas al morir (dissipate).
 
 const GROUP := &"fire_waves"
+const AttackFloor := preload("res://scripts/fx/attack_floor.gd")
 
 @export_group("Aspecto")
 ## Tramos de llama del anillo.
@@ -35,7 +36,6 @@ var _attacker: Node3D = null
 var _live: bool = false
 ## Raiders que esta onda ya golpeó (ids de instancia).
 var _hit: Dictionary[int, bool] = {}
-var _terrain: Terrain = null
 var _fade_tween: Tween = null
 
 @onready var _wall: MultiMeshInstance3D = $Wall
@@ -94,7 +94,6 @@ func dissipate() -> void:
 func open(center: Vector3, start_radius: float, end_radius: float, speed: float,
 		damage: float, height_window: float, band: float, attacker: Node3D) -> void:
 	_kill_fade()
-	_terrain = Terrain.find(get_tree())
 	_radius = start_radius
 	_end_radius = end_radius
 	_speed = absf(speed)
@@ -142,16 +141,15 @@ func _place_ring(first: int, count: int, radius: float, height: float) -> void:
 		var angle := TAU * float(index) / float(count)
 		var outward := Vector3(cos(angle), 0.0, sin(angle))
 		var at := outward * radius
-		var ground := center.y
-		if _terrain != null:
-			ground = _terrain.height_at(center.x + at.x, center.z + at.z)
-		at.y = ground - center.y + height * 0.5
+		at.y = AttackFloor.height(self, center + at) - center.y + height * 0.5
 		var tangent := Vector3(-outward.z, 0.0, outward.x)
 		multimesh.set_instance_transform(first + index, Transform3D(
 				Basis(tangent * width, Vector3.UP * height, outward), at))
 
 
-## Golpea una vez a cada raider en pie que el anillo alcanza sin saltar.
+## Golpea una vez a cada raider en pie que el anillo alcanza sin saltar,
+## en el suelo por el que corre (una onda que cruza el cauce pasa bajo el
+## tablero del puente sin tocar a quien está arriba).
 func _hit_raiders() -> void:
 	var center := global_position
 	for body: Node3D in Coop.alive_players(get_tree()):
@@ -162,10 +160,9 @@ func _hit_raiders() -> void:
 		offset.y = 0.0
 		if absf(offset.length() - _radius) > _band * 0.5:
 			continue
-		var ground := center.y
-		if _terrain != null:
-			ground = _terrain.height_at(body.global_position.x, body.global_position.z)
-		if body.global_position.y - ground > _height_window:
+		var ground := AttackFloor.height(self, Vector3(body.global_position.x, center.y,
+				body.global_position.z))
+		if absf(body.global_position.y - ground) > _height_window:
 			continue
 		_hit[id] = true
 		var health := Health.find_in(body)
