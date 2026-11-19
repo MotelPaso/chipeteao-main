@@ -2243,11 +2243,13 @@ En una arena con relieve por zonas trabaja además `ReliefProbe`
   `relief_structures` ni la vegetación del suelo, que no tiene colisión: que
   ninguna tape un paso lo dicen los barridos de alcance), `slope p95=G`
   (la medida congelada de `WorldDigest`, lejos de cortes y rampas) y
-  `hell skipped=N interactable=N backdrop=N bodies=N pooled=N unburnt=N`
+  `hell skipped=N interactable=N backdrop=N bodies=N pooled=N fx=N unburnt=N`
   (las mallas que el infierno no quemaría, por tipo: bajo un interactuable,
   bajo el `Backdrop`, de un cuerpo vivo, de algo que salió del pool —un
-  dardo en vuelo lleva la marca `NodePool.META_OWNER`— y el resto, que es lo
-  que tiene que dar cero). Cada conteo distinto de cero imprime hasta cuatro
+  dardo en vuelo lleva la marca `NodePool.META_OWNER`—, un efecto de un solo
+  uso —una malla sin nombre ni dueño colgada directo de la arena, como las de
+  `WeaponBase.spawn_fx_mesh` o el anillo de nivel de `Juice`— y el resto, que
+  es lo que tiene que dar cero). Cada conteo distinto de cero imprime hasta cuatro
   `Relief sweep detail:` con el lugar. Un interactuable ya gastado no entra
   en la colocación (se está hundiendo), y si a los 120 s una cinemática
   tiene el mundo congelado (`WorldFreeze` saca la arena de la física) la

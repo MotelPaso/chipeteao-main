@@ -309,8 +309,8 @@ func _sweep_slope() -> void:
 ## Las mallas que HellDressing no quemaría, por tipo: bajo un Interactable
 ## (no arden a propósito), bajo el Backdrop (las tiñe HellSky), las de un
 ## cuerpo vivo, las de algo que salió del pool (un dardo en vuelo, una gema:
-## Pools los cuelga de la arena) y el resto, que es lo que quedaría verde en
-## el infierno.
+## Pools los cuelga de la arena), los efectos de un solo uso y el resto, que
+## es lo que quedaría verde en el infierno.
 func _sweep_hell() -> void:
 	var burning: Dictionary[int, bool] = {}
 	for child: Node in _terrain.find_children("*", "MeshInstance3D", true, false):
@@ -327,38 +327,46 @@ func _sweep_hell() -> void:
 				if WorldDigest._prop_burns(child as MeshInstance3D):
 					burning[child.get_instance_id()] = true
 	var backdrop := _terrain.get_node_or_null(_terrain.backdrop_path)
-	var counts := {"interactable": 0, "backdrop": 0, "body": 0, "pooled": 0, "other": 0}
+	var counts := {"interactable": 0, "backdrop": 0, "body": 0, "pooled": 0, "fx": 0, "other": 0}
 	var skipped := 0
 	var notes: Array[String] = []
 	for child: Node in _arena.find_children("*", "MeshInstance3D", true, false):
 		if burning.has(child.get_instance_id()):
 			continue
 		skipped += 1
-		var kind := "other"
-		# Desde la malla misma: un destello del pool ES un MeshInstance3D y
-		# lleva la marca del pool en él, no en un padre.
-		var up: Node = child
-		while up != null and up != _arena:
-			if up is Interactable:
-				kind = "interactable"
-				break
-			if up == backdrop:
-				kind = "backdrop"
-				break
-			# Un cuerpo vivo (la horda que ya apareció) no es parte del mapa.
-			if up is CharacterBody3D:
-				kind = "body"
-				break
-			# Tampoco lo que NodePool creó: lleva su marca desde que nace.
-			if up.has_meta(NodePool.META_OWNER):
-				kind = "pooled"
-				break
-			up = up.get_parent()
+		var kind := _hell_kind(child, backdrop)
 		counts[kind] = int(counts[kind]) + 1
 		if kind == "other" and notes.size() < DETAIL_LIMIT:
 			notes.append(String(_arena.get_path_to(child)))
 	print(("Relief sweep: hell skipped=%d interactable=%d backdrop=%d bodies=%d pooled=%d"
-			+ " unburnt=%d") % [skipped, counts["interactable"], counts["backdrop"],
-			counts["body"], counts["pooled"], counts["other"]])
+			+ " fx=%d unburnt=%d") % [skipped, counts["interactable"], counts["backdrop"],
+			counts["body"], counts["pooled"], counts["fx"], counts["other"]])
 	for note: String in notes:
 		print("Relief sweep detail: hell unburnt %s" % note)
+
+
+## El tipo de una malla que no arde (ver _sweep_hell): "other" si es parte del
+## mapa y quedaría verde en el infierno.
+func _hell_kind(mesh: Node, backdrop: Node) -> String:
+	# Un efecto de un solo uso (WeaponBase.spawn_fx_mesh, el anillo de nivel de
+	# Juice) es una malla sin nombre ni dueño colgada directo de la arena: dura
+	# un instante y no es parte del mapa.
+	if mesh.get_parent() == _arena and mesh.owner == null \
+			and String(mesh.name).begins_with("@"):
+		return "fx"
+	# Desde la malla misma: un destello del pool ES un MeshInstance3D y lleva
+	# la marca del pool en él, no en un padre.
+	var up: Node = mesh
+	while up != null and up != _arena:
+		if up is Interactable:
+			return "interactable"
+		if up == backdrop:
+			return "backdrop"
+		# Un cuerpo vivo (la horda que ya apareció) no es parte del mapa.
+		if up is CharacterBody3D:
+			return "body"
+		# Tampoco lo que NodePool creó: lleva su marca desde que nace.
+		if up.has_meta(NodePool.META_OWNER):
+			return "pooled"
+		up = up.get_parent()
+	return "other"
