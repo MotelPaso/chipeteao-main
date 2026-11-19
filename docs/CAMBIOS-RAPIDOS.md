@@ -378,7 +378,7 @@ La lógica vive en ayudantes de `scripts/systems/spawner/` (`SpawnScaling`, `Spa
 | Destello blanco al golpear | Juice.tscn > Juice («Destello de golpe») | `flash_duration`, `flash_color` |
 | Viñeta al recibir daño (color, fuerza, cuánto dura) | Juice.tscn > Juice («Viñeta de daño») | `vignette_color`, `vignette_strength`, `vignette_hold_time`, `vignette_fade_time` |
 | Anillo al subir de nivel (color, duración, tamaño, altura) | Juice.tscn > Juice («Anillo de subida de nivel») | `level_pulse_color`, `level_pulse_duration`, `level_ring_alpha`, `level_ring_inner_radius`, `level_ring_outer_radius`, `level_ring_height`, `level_ring_start_scale`, `level_ring_end_scale` |
-| Volumen, tope por segundo o variación de un sonido | `scripts/systems/autoloads/sfx.gd` > su fila en `SOUND_LIBRARY` | `volume_db`, `rate_limit`, `jitter`, `loop` |
+| Volumen, tope por segundo o variación de un sonido | `scripts/systems/catalogs/sound_library.gd` > su fila en `ROWS` (`Sfx.SOUND_LIBRARY`) | `volume_db`, `rate_limit`, `jitter`, `loop` |
 | Voces simultáneas de sonido | `scenes/systems/Sfx.tscn` > Sfx | `pool_size`, `default_pitch_jitter` |
 | Volumen de la música antes de que el jugador mueva el slider | `scripts/systems/autoloads/save_data.gd` (constantes al comienzo) | `DEFAULT_MUSIC_VOLUME` (0-100; el slider «Volumen de música» de Ajustes lo guarda) |
 | Texto de la fila de música en Ajustes | `scenes/ui/SettingsPanel.tscn` > Center/Panel/VBox/MusicRow/MusicLabel | `text` |
