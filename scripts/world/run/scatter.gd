@@ -140,9 +140,9 @@ extends Node3D
 ## Metros desde el borde de la arena que los centros de meseta nunca
 ## cruzan (se sortean en ±(arena_half_extent - esto)).
 @export var mesa_edge_margin: float = 28.0
-## Radio en metros alrededor de una meseta que debe quedar libre de celdas
-## bloqueadas: la plataforma más grande más el alcance de la rampa.
-@export var mesa_clearance: float = 12.0
+## Metros que la huella de cada meseta (plataforma y rampa, a su escala) guarda a toda
+## celda de roca: la roca asoma ~3 m más allá de sus celdas y entre las dos pasa un raider.
+@export var mesa_clearance: float = 4.0
 ## Cofre que llevan encima las primeras mesetas de la etapa (vacío = ninguna).
 @export var mesa_chest_scene: PackedScene
 ## Cuántas mesetas llevan un cofre encima.
@@ -269,12 +269,12 @@ func _enter_tree() -> void:
 				ReliefQueries.mask_barriers(layout, mask_cell_size))
 	elif mask_enabled:
 		_mask.build(_protected_seeds())
-	# Sitios de meseta justo después de la máscara: el Terrain los lee como
-	# claros planos en su _ready, y place_props() construye cada meseta. Su
-	# escala, giro y rampa salen ya: el director coloca sus POI antes de que
-	# se levanten y tiene que esquivar su huella.
-	_mesa_sites = MesaBuilder.pick_sites(self, _rng, _mask, terrain)
-	_mesas = MesaBuilder.plan(self, _rng, _mesa_sites)
+	# Mesetas justo después de la máscara (su huella esquiva la roca): el
+	# Terrain lee los sitios como claros planos en su _ready, y place_props()
+	# construye cada meseta. Su escala, giro y rampa salen ya: el director
+	# coloca sus POI antes de que se levanten y tiene que esquivar su huella.
+	_mesas = MesaBuilder.plan(self, _rng, _mask, terrain)
+	_mesa_sites = _mesas.sites()
 
 
 ## Semilla de esta partida, válida desde _enter_tree. El Terrain la lee por

@@ -1,10 +1,10 @@
 class_name MesaBuilder
 extends RefCounted
-## Las mesetas de una arena: sortea dónde van (pick_sites), decide la escala,
-## el giro y la cara de la rampa de cada una (plan) y las levanta (build). Los
-## valores son exports del scatter (grupo «Mesetas»): se cambian en la arena,
-## no aquí. El plan existe desde el _enter_tree del scatter, así lo que se
-## coloca antes de levantarlas (los POI del director) ya esquiva su huella.
+## Las mesetas de una arena: sortea cada una entera, dónde va, su escala, su
+## giro y la cara de su rampa (plan), y las levanta (build). Los valores son
+## exports del scatter (grupo «Mesetas»): se cambian en la arena, no aquí. El
+## plan existe desde el _enter_tree del scatter, así lo que se coloca antes
+## de levantarlas (los POI del director) ya esquiva su huella.
 
 ## Cara de la plataforma donde puede ir la rampa (dirección a escala 1, en
 ## el espacio de la plataforma) y el giro que la deja subiendo hacia ella.
@@ -28,6 +28,14 @@ class Mesa:
 	## Metros del sitio al punto más lejano de la huella.
 	var reach := 0.0
 
+	## True si cada pieza de la huella queda a `gap` metros o más de toda
+	## celda de roca de `mask`.
+	func clear_of_rock(mask: ArenaMask, gap: float) -> bool:
+		for piece in frames.size():
+			if not mask.box_clear(frames[piece], halves[piece], gap):
+				return false
+		return true
+
 
 ## Las mesetas planeadas de una etapa. `bounds` guarda, por meseta, el
 ## círculo que encierra su huella (x, radio, z): casi todo punto queda lejos
@@ -36,6 +44,17 @@ class Plan:
 	extends RefCounted
 	var mesas: Array[Mesa] = []
 	var bounds := PackedVector3Array()
+
+	func add(mesa: Mesa) -> void:
+		mesas.append(mesa)
+		bounds.append(Vector3(mesa.site.x, mesa.reach, mesa.site.y))
+
+	## Los centros (x, z) de las mesetas, en el orden en que se sortearon.
+	func sites() -> PackedVector2Array:
+		var result := PackedVector2Array()
+		for mesa: Mesa in mesas:
+			result.append(mesa.site)
+		return result
 
 	## True si `xz` queda a `gap` metros o más de la huella de toda meseta: su
 	## plataforma y su rampa, a su escala y con su giro.
@@ -54,62 +73,32 @@ class Plan:
 		return true
 
 
-## Sortea los centros de las mesetas de `scatter` con su RNG: lejos del
-## spawn, entre sí, de los spots de autor, de la roca de la máscara y de
-## los cortes del relieve por zonas de `terrain`.
-static func pick_sites(scatter: ArenaScatter, rng: RandomNumberGenerator, mask: ArenaMask,
-		terrain: Terrain) -> PackedVector2Array:
-	var sites := PackedVector2Array()
-	if scatter.mesa_count <= 0 or scatter.mesa_platform_scene == null:
-		return sites
-	var authored: Array[Vector2] = []
-	for node: Node in scatter.get_tree().get_nodes_in_group("scatter_keepout"):
-		var spot := node as Node3D
-		if spot != null and not (spot is Interactable) and scatter.owner_arena_contains(spot):
-			authored.append(Vector2(spot.position.x, spot.position.z))
-	# Mitad del cuadrado donde se sortean los centros, en metros.
-	var half := scatter.arena_half_extent - scatter.mesa_edge_margin
-	for attempt in scatter.mesa_count * 40:
-		if sites.size() >= scatter.mesa_count:
-			break
-		var candidate := Vector2(rng.randf_range(-half, half), rng.randf_range(-half, half))
-		if candidate.length() < scatter.mesa_min_spacing:
-			continue
-		if scatter.mask_enabled and not (mask.clear_of(candidate, scatter.mesa_clearance)
-				and mask.clear_of(candidate, scatter.mesa_clearance * 0.5)):
-			continue
-		if not ReliefDressing.clear(terrain, candidate, scatter.relief_mesa_clearance):
-			continue
-		if _far_from(candidate, authored, scatter.mesa_min_spacing) \
-				and _far_from(candidate, sites, scatter.mesa_min_spacing):
-			sites.append(candidate)
-	return sites
-
-
-## Decide la escala, el giro y la cara de la rampa de cada sitio con el RNG
-## del scatter, en el orden en que se levantan: escala, giro y cara por
-## sitio. Corre justo después de pick_sites; build() ya no tira nada.
-static func plan(scatter: ArenaScatter, rng: RandomNumberGenerator,
-		sites: PackedVector2Array) -> Plan:
+## Sortea las mesetas de `scatter` con su RNG, cada una entera: el centro y,
+## si el centro sirve (ver _site_ok), su escala, su giro y la cara de su
+## rampa, en ese orden. Se queda con ella solo si toda su huella (plataforma
+## y rampa, a su escala y con su giro) guarda mesa_clearance de la roca de
+## `mask`. Corre en el _enter_tree del scatter; build() ya no tira nada.
+static func plan(scatter: ArenaScatter, rng: RandomNumberGenerator, mask: ArenaMask,
+		terrain: Terrain) -> Plan:
 	var result := Plan.new()
-	if scatter.mesa_platform_scene == null:
+	if scatter.mesa_count <= 0 or scatter.mesa_platform_scene == null:
 		return result
 	var plat_box := _local_box(scatter.mesa_platform_scene)
 	var ramp_box := Rect2()
 	if scatter.mesa_ramp_scene != null:
 		ramp_box = _local_box(scatter.mesa_ramp_scene)
-	for site: Vector2 in sites:
-		var mesa := Mesa.new()
-		mesa.site = site
-		mesa.scale = rng.randf_range(scatter.mesa_scale_min, scatter.mesa_scale_max)
-		mesa.angle = rng.randf_range(0.0, TAU)
-		_add_piece(mesa, site, mesa.angle, plat_box)
-		if scatter.mesa_ramp_scene != null:
-			mesa.side = rng.randi_range(0, 3)
-			_add_piece(mesa, _ramp_site(scatter, mesa), mesa.angle + RAMP_TURNS[mesa.side],
-					ramp_box)
-		result.mesas.append(mesa)
-		result.bounds.append(Vector3(site.x, mesa.reach, site.y))
+	var authored := _authored_spots(scatter)
+	# Mitad del cuadrado donde se sortean los centros, en metros.
+	var half := scatter.arena_half_extent - scatter.mesa_edge_margin
+	for attempt in scatter.mesa_count * 40:
+		if result.mesas.size() >= scatter.mesa_count:
+			break
+		var site := Vector2(rng.randf_range(-half, half), rng.randf_range(-half, half))
+		if not _site_ok(scatter, terrain, site, authored, result.sites()):
+			continue
+		var mesa := _shape(scatter, rng, site, plat_box, ramp_box)
+		if not scatter.mask_enabled or mesa.clear_of_rock(mask, scatter.mesa_clearance):
+			result.add(mesa)
 	return result
 
 
@@ -137,6 +126,45 @@ static func build(scatter: ArenaScatter, planned: Plan) -> PackedVector2Array:
 			_add_ramp(scatter, plat, mesa)
 		built.append(mesa.site)
 	return built
+
+
+## True si `site` sirve de centro de meseta: a mesa_min_spacing o más del
+## spawn, de los spots de autor (`authored`) y de las otras mesetas (`sites`),
+## y a relief_mesa_clearance de todo corte del relieve por zonas de `terrain`.
+static func _site_ok(scatter: ArenaScatter, terrain: Terrain, site: Vector2,
+		authored: Array[Vector2], sites: PackedVector2Array) -> bool:
+	if site.length() < scatter.mesa_min_spacing:
+		return false
+	if not _far_from(site, authored, scatter.mesa_min_spacing) \
+			or not _far_from(site, sites, scatter.mesa_min_spacing):
+		return false
+	return ReliefDressing.clear(terrain, site, scatter.relief_mesa_clearance)
+
+
+## Una meseta en `site` con la escala, el giro y la cara de la rampa que tira
+## `rng`, y su huella: un rectángulo por pieza, a escala 1 en `plat_box` y `ramp_box`.
+static func _shape(scatter: ArenaScatter, rng: RandomNumberGenerator, site: Vector2,
+		plat_box: Rect2, ramp_box: Rect2) -> Mesa:
+	var mesa := Mesa.new()
+	mesa.site = site
+	mesa.scale = rng.randf_range(scatter.mesa_scale_min, scatter.mesa_scale_max)
+	mesa.angle = rng.randf_range(0.0, TAU)
+	_add_piece(mesa, site, mesa.angle, plat_box)
+	if scatter.mesa_ramp_scene != null:
+		mesa.side = rng.randi_range(0, 3)
+		_add_piece(mesa, _ramp_site(scatter, mesa), mesa.angle + RAMP_TURNS[mesa.side], ramp_box)
+	return mesa
+
+
+## Los spots de autor de la arena de `scatter` (keepouts que no son POI), en
+## orden de grupo.
+static func _authored_spots(scatter: ArenaScatter) -> Array[Vector2]:
+	var authored: Array[Vector2] = []
+	for node: Node in scatter.get_tree().get_nodes_in_group("scatter_keepout"):
+		var spot := node as Node3D
+		if spot != null and not (spot is Interactable) and scatter.owner_arena_contains(spot):
+			authored.append(Vector2(spot.position.x, spot.position.z))
+	return authored
 
 
 ## La rampa de `mesa`, pegada a la cara elegida de su plataforma `plat`.

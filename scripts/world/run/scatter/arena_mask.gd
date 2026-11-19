@@ -154,6 +154,30 @@ func rock_distance(point: Vector2, limit: float) -> float:
 	return nearest
 
 
+## True si el rectángulo girado que `frame` lleva a su propio plano (centro en
+## el origen, medio lado `half`, en metros) queda a `gap` metros o más de toda
+## celda bloqueada. Exacta: ejes separadores contra cada celda cercana, con el
+## rectángulo agrandado `gap` por lado (en sus esquinas pide un poco más).
+func box_clear(frame: Transform2D, half: Vector2, gap: float) -> bool:
+	if not enabled or _blocked.is_empty():
+		return true
+	var grown := half + Vector2.ONE * gap
+	var center := frame.affine_inverse().origin
+	var reach := grown.length() + cell_size
+	var low := cell_of(center - Vector2.ONE * reach)
+	var high := cell_of(center + Vector2.ONE * reach)
+	# Los lados de una celda (los ejes del mundo) vistos desde el rectángulo.
+	var side_x := frame.basis_xform(Vector2(1.0, 0.0))
+	var side_z := frame.basis_xform(Vector2(0.0, 1.0))
+	for cz in range(low.y, high.y + 1):
+		for cx in range(low.x, high.x + 1):
+			var cell := Vector2i(cx, cz)
+			if _blocked.has(cell) and _box_meets_cell(frame * cell_center(cell), side_x, side_z,
+					grown):
+				return false
+	return true
+
+
 func blocked_cell_count() -> int:
 	return _blocked.size()
 
@@ -222,6 +246,20 @@ func blocked_regions() -> Array[Dictionary]:
 func _in_grid(cell: Vector2i) -> bool:
 	return cell.x >= 0 and cell.y >= 0 \
 			and cell.x < _cells_per_side and cell.y < _cells_per_side
+
+
+## True si la celda de centro `at` se cruza con el rectángulo de medio lado
+## `half` centrado en el origen. `at`, `side_x` y `side_z` (los lados de la
+## celda) ya están en el plano del rectángulo.
+func _box_meets_cell(at: Vector2, side_x: Vector2, side_z: Vector2, half: Vector2) -> bool:
+	var cell_half := cell_size * 0.5
+	if absf(at.x) >= half.x + cell_half * (absf(side_x.x) + absf(side_z.x)):
+		return false
+	if absf(at.y) >= half.y + cell_half * (absf(side_x.y) + absf(side_z.y)):
+		return false
+	if absf(at.dot(side_x)) >= half.x * absf(side_x.x) + half.y * absf(side_x.y) + cell_half:
+		return false
+	return absf(at.dot(side_z)) < half.x * absf(side_z.x) + half.y * absf(side_z.y) + cell_half
 
 
 ## Celdas que deben quedar abiertas: toda celda a menos de protect_radius de
