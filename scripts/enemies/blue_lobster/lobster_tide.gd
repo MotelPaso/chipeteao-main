@@ -12,7 +12,9 @@ extends Node3D
 ##     del terreno que solo suma luz).
 ##   - CORALES que brotan del suelo alrededor (nodos Branches y Bulbs, dos
 ##     MultiMesh). Son solo decoración: no chocan con nada.
-##   - BURBUJAS alrededor de cada raider (el nodo Bubbles es la plantilla).
+##   - BURBUJAS alrededor de cada raider, de pie o caído (el nodo Bubbles es
+##     la plantilla). Cada nube es de un raider: si cae uno, las de los demás
+##     no cambian de dueño.
 ## Nunca toca un recurso compartido: el cielo es la copia propia de la arena,
 ## y todo lo demás cuelga de este nodo y se va con él.
 ## Procesa aunque el mundo esté congelado: sube durante la entrada de la
@@ -107,8 +109,8 @@ var _deep: HellSky.Palette = null
 var _original: HellSky.Palette = null
 ## False si otra transformación del mapa ya es dueña del cielo.
 var _owns_sky: bool = false
-## Una nube de burbujas por raider.
-var _bubbles: Array[CPUParticles3D] = []
+## La nube de burbujas de cada raider, por su id de instancia.
+var _bubbles: Dictionary[int, CPUParticles3D] = {}
 
 @onready var _branches: MultiMeshInstance3D = $Branches
 @onready var _bulbs: MultiMeshInstance3D = $Bulbs
@@ -177,7 +179,7 @@ func ebb() -> void:
 	_owns_sky = _owns_sky and not _other_transformation()
 	if _owns_sky:
 		_from = _sky.current()
-	for cloud: CPUParticles3D in _bubbles:
+	for cloud: CPUParticles3D in _bubbles.values():
 		cloud.emitting = false
 	_state = State.EBBING
 	_clock = 0.0
@@ -344,18 +346,26 @@ func _near_raider(point: Vector3) -> bool:
 	return false
 
 
-## Cada raider lleva su nube de burbujas (cada vista de la pantalla dividida
-## tiene la suya).
+## Cada raider lleva su nube de burbujas, de pie o caído (cada vista de la
+## pantalla dividida tiene la suya). La nube va con el raider mismo y no con
+## su lugar en el grupo "player", que cambia cuando alguien cae o revive.
 func _follow_raiders() -> void:
-	var raiders := get_tree().get_nodes_in_group(&"player")
-	while _bubbles.size() < raiders.size():
-		var cloud := _bubble_template.duplicate() as CPUParticles3D
-		add_child(cloud)
-		cloud.emitting = _state != State.EBBING
-		_bubbles.append(cloud)
-	for index: int in _bubbles.size():
-		if index < raiders.size():
-			var raider := raiders[index] as Node3D
-			if raider != null:
-				_bubbles[index].global_position = raider.global_position \
-						+ Vector3.UP * bubble_height
+	var seen: Dictionary[int, bool] = {}
+	for group: StringName in [&"player", &"downed_players"]:
+		for node: Node in get_tree().get_nodes_in_group(group):
+			var raider := node as Node3D
+			if raider == null:
+				continue
+			var id := raider.get_instance_id()
+			seen[id] = true
+			if not _bubbles.has(id):
+				var cloud := _bubble_template.duplicate() as CPUParticles3D
+				add_child(cloud)
+				cloud.emitting = _state != State.EBBING
+				_bubbles[id] = cloud
+			_bubbles[id].global_position = raider.global_position + Vector3.UP * bubble_height
+	# La nube de un raider que ya no está en la partida se va con él.
+	for id: int in _bubbles.keys():
+		if not seen.has(id):
+			_bubbles[id].queue_free()
+			_bubbles.erase(id)
