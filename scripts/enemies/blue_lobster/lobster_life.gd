@@ -40,7 +40,8 @@ const BUCKET_SECONDS: float = 0.5
 ## Cambio mínimo de la vida máxima (0.15 = 15 %) para anotar un recálculo en el log.
 @export var log_change: float = 0.15
 
-## Segundos de pelea y daño que le hizo la party (el desgaste no cuenta).
+## Segundos de pelea y daño que le hizo la party (no cuentan el desgaste ni
+## el barrido de otro jefe).
 var fight_seconds: float = 0.0
 var party_damage: float = 0.0
 ## True desde que el desgaste empezó a quitarle vida.
@@ -106,10 +107,14 @@ func tick(delta: float) -> void:
 	_burnout.tick(delta, fight_seconds)
 
 
-## Un golpe le quitó `amount`: suma el de la party (el del desgaste no cuenta).
+## Un golpe le quitó `amount`: suma el de la party. No cuentan el del desgaste
+## ni un golpe que vale la barra entera o más: ese no es de la party, es el
+## barrido de otro jefe que la saca de la arena (MythosPurge).
 func on_damaged(amount: float) -> void:
 	if _burnout.draining:
 		burning = true
+		return
+	if _health != null and amount >= _health.max_hp:
 		return
 	party_damage += amount
 	if _hit_seconds < 0.0:

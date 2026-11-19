@@ -105,7 +105,9 @@ func _burn(body: Variant) -> void:
 		var health := Health.find_in(enemy)
 		if health != null and not health.is_dead:
 			health.take_damage(health.max_hp * boss_damage_factor)
-			_bosses += 1
+			# Solo cuenta si lo mató: a uno invulnerable el golpe no le hace nada.
+			if health.is_dead:
+				_bosses += 1
 		return
 	enemy.vanish()
 	_burned += 1

@@ -7,8 +7,11 @@ extends Node
 ## de que ningún enemigo vuelva a moverse: nadie más llega a pegar. Los
 ## enemigos normales se van sin pagar nada (EnemyBase.vanish) y caen todos
 ## juntos mientras un anillo se abre desde ella; otro jefe que siguiera vivo
-## muere con su pago de siempre. Los siervos poseídos de la party no se tocan.
-## Línea de log para los soaks: "<título> purge: swept=… bosses=… at …".
+## muere con su pago de siempre, salvo el jefe de etapa y un jefe de varias
+## vidas (GuardedHealth): el barrido nunca le quita una vida a nadie ni le
+## salta su pelea. Los siervos poseídos de la party no se tocan.
+## Línea de log para los soaks: "<título> purge: swept=… bosses=… at …", donde
+## bosses son los jefes que el golpe mató (uno invulnerable no cuenta).
 
 @export_group("Barrido")
 ## Cuántos de los enemigos barridos, los más cercanos a ella, sueltan un salpicón.
@@ -38,9 +41,7 @@ func begin(boss: BlueLobster) -> void:
 	var bosses := 0
 	for body: EnemyBase in _horde(boss, origin):
 		if body is BossBase:
-			var health := Health.find_in(body)
-			if health != null and not health.is_dead:
-				health.take_damage(health.max_hp * boss_damage_factor)
+			if _strike_boss(body as BossBase):
 				bosses += 1
 			continue
 		var at := body.aim_point()
@@ -60,6 +61,19 @@ func begin(boss: BlueLobster) -> void:
 	# Línea de log para los soaks: cuánta horda se llevó.
 	print("%s purge: swept=%d bosses=%d at %.1fs" % [
 			boss.boss_title, swept, bosses, RunState.stage_time])
+
+
+## Mata a otro jefe con su pago de siempre. Al jefe de etapa y a uno de varias
+## vidas no los toca: el golpe le quitaría una vida entera. True si el golpe
+## lo mató (a uno invulnerable no le hace nada).
+func _strike_boss(body: BossBase) -> bool:
+	if body.is_in_group(BossSchedule.STAGE_BOSS_GROUP):
+		return false
+	var health := Health.find_in(body)
+	if health == null or health.is_dead or health is GuardedHealth:
+		return false
+	health.take_damage(health.max_hp * boss_damage_factor)
+	return health.is_dead
 
 
 ## Los enemigos vivos menos `boss`, de más cerca a más lejos de `origin`.
