@@ -242,6 +242,7 @@ func begin(origin: Vector3, seconds: float, front_delay: float = 0.0) -> void:
 	_dressing.write(&"ascend_radius", 0.0)
 	_dressing.write(&"burn_origin", origin)
 	_dressing.write(&"burn_edge", front_edge)
+	_heat = 1.0
 	_dressing.write(&"heat", 1.0)
 	_dressing.write(&"ash", 0.0)
 	_look = Look.IGNITING
@@ -334,6 +335,8 @@ func _apply_ignition(t: float) -> void:
 	if _from_sky != null:
 		_own_sky(_from_sky.blend(_hell_sky(), eased))
 	_sky.blend_backdrop(hell_backdrop_ground, hell_backdrop_hills, eased)
+	# El resplandor llega con el cielo del infierno: a pleno desde la primera fase.
+	_sky.set_glow(_heat * eased)
 	_sound.ignite(eased, t >= 1.0, fire_volume_db)
 
 
