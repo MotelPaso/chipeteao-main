@@ -25,7 +25,7 @@ const SILENT_DB: float = -60.0
 @export_group("Canción")
 ## Canción del jefe. Vacío = la cinemática y la pelea corren sin música.
 @export var song: AudioStream
-## Volumen de la canción, en dB (el slider «Música» de Ajustes va encima).
+## Volumen de la canción, en dB: 0 = el del archivo, más arriba puede saturar (el slider «Música» de Ajustes va encima).
 @export var song_volume_db: float = -6.0
 ## Desfase en segundos entre la canción y el reloj de la calma a partir del cual se reacomoda la canción.
 @export var resync_threshold: float = 0.12

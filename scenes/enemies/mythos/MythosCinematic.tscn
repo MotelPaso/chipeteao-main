@@ -165,10 +165,12 @@ scale_amount_max = 1.5
 [node name="Music" type="AudioStreamPlayer" parent="."]
 script = ExtResource("2_song")
 song = ExtResource("11_first")
+song_volume_db = 0.0
 
 [node name="MusicReborn" type="AudioStreamPlayer" parent="."]
 script = ExtResource("2_song")
 song = ExtResource("3_track")
+song_volume_db = 0.0
 lead_seconds = 1.94
 
 [node name="Overlay" type="CanvasLayer" parent="."]
