@@ -57,12 +57,13 @@ func _facing_direction(steer: Vector3, seek: Vector3) -> Vector3:
 
 
 ## Lo saca de la pelea como si hubiera muerto: las armas dejan de apuntarle,
-## nadie choca con él y la flecha del HUD ya no lo señala. Sigue pisando el
-## suelo (su máscara no cambia).
+## nadie choca con él, la flecha del HUD ya no lo señala y el mapa no lo
+## marca. Sigue pisando el suelo (su máscara no cambia).
 func play_dead() -> void:
 	collision_layer = 0
 	remove_from_group(&"enemies")
 	remove_from_group(&"boss")
+	remove_from_group(&"map_markers")
 
 
 ## Lo devuelve a la pelea después de play_dead().
@@ -70,6 +71,7 @@ func rise_again() -> void:
 	collision_layer = _alive_layer
 	add_to_group(&"enemies")
 	add_to_group(&"boss")
+	add_to_group(&"map_markers")
 
 
 ## Punto del que salen sus plumas y sus bolas de fuego: el pico.
@@ -156,7 +158,7 @@ func spawn_fire_zone(center: Vector3, radius: float, warn_seconds: float,
 	return _zones.mark(at, radius, warn_seconds, burn_seconds, dps, on_raiders)
 
 
-## Apaga todo lo que sus ataques dejaron en la arena.
+## Apaga todo lo que sus ataques dejaron en la arena, plumas en vuelo incluidas.
 func _clear_hazards() -> void:
 	_zones.extinguish_all()
 	var tree := get_tree()
@@ -164,6 +166,11 @@ func _clear_hazards() -> void:
 	tree.call_group(Fireball.GROUP, "fizzle")
 	tree.call_group(FireTornado.GROUP, "dissipate")
 	tree.call_group(FireWave.GROUP, "dissipate")
+	# Grupo que agrega EnemyBolt (contrato por nombre).
+	for node: Node in tree.get_nodes_in_group(&"enemy_projectiles"):
+		var bolt := node as EnemyBolt
+		if bolt != null and bolt.launcher == self:
+			bolt.fizzle()
 
 
 ## Además de lo que deja BossBase, un suelo alto que un raider pisa (el
