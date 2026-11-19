@@ -6,8 +6,11 @@ extends ProgressBar
 ## con sombra dura, el relleno con su franja de brillo, el RASTRO del daño
 ## reciente (queda un momento y después se achica), marcas cada décimo y, si
 ## el jefe tiene fases, un rombo por fase debajo. Al aparecer y en cada fase
-## nueva se llena desde cero; cada golpe la sacude y la hace destellar, y con
-## poca vida late. El nombre (%BossNameLabel) es un nodo de HUD.tscn.
+## nueva se llena desde cero; si el jefe solo cambia cuánta vida hay detrás
+## de la misma barra (otra vida máxima con la misma proporción, como la
+## recalcula LobsterLife), se reescala sin moverse. Cada golpe la sacude y la
+## hace destellar, y con poca vida late.
+## El nombre (%BossNameLabel) es un nodo de HUD.tscn.
 ## Contratos por nombre con el jefe, todos opcionales:
 ##   lives_changed(left, total), lives_left(), lives_total()  -> los rombos
 ##   bar_title() -> el nombre (se vuelve a leer en cada cambio de fase)
@@ -19,6 +22,9 @@ extends ProgressBar
 
 ## Grupos donde se busca otro jefe vivo cuando el seguido muere, en orden.
 const FALLBACK_GROUPS: Array[StringName] = [&"stage_boss", &"boss"]
+## Diferencia de proporción (0-1) por debajo de la cual una vida máxima nueva
+## es la misma barra reescalada y no una fase nueva (ver _on_hp_changed).
+const RESCALE_SLACK: float = 0.001
 
 @export_group("Colores")
 ## Ámbar del jefe: relleno de esta barra si el jefe no trae color propio, y
@@ -80,6 +86,9 @@ const FALLBACK_GROUPS: Array[StringName] = [&"stage_boss", &"boss"]
 var _tracked_boss: Node3D = null
 var _boss_health: Health = null
 var _value_tween: Tween = null
+## Vida del jefe en su último aviso (golpe o cambio): con ella se comparan las
+## proporciones cuando cambia su vida máxima.
+var _known_hp: float = 0.0
 ## Valor al que llega el rastro del daño (en vida, como `value`).
 var _ghost: float = 0.0
 var _ghost_wait: float = 0.0
@@ -196,22 +205,28 @@ func track(boss: Node3D, title: String) -> void:
 	_bind_lives(boss)
 	_read_look(boss)
 	max_value = boss_health.max_hp
+	_known_hp = boss_health.current_hp
 	_fill_in(boss_health.current_hp)
 
 
 func _on_damaged(_amount: float, current: float) -> void:
+	_known_hp = current
 	_shake_left = shake_time
 	_ghost_wait = ghost_delay
 	_ease_to(current)
 
 
 func _on_hp_changed(current: float, new_max: float) -> void:
-	# Otra escala es otra fase: la barra se vuelve a llenar desde cero.
-	if not is_equal_approx(max_value, new_max):
+	var before := _known_hp / maxf(max_value, 0.001)
+	_known_hp = current
+	if is_equal_approx(max_value, new_max):
+		_ease_to(current)
+	elif absf(current / maxf(new_max, 0.001) - before) <= RESCALE_SLACK:
+		_rescale(new_max)
+	else:
+		# Otra escala con otra proporción es otra fase: se llena desde cero.
 		max_value = new_max
 		_fill_in(current)
-	else:
-		_ease_to(current)
 
 
 func _on_died() -> void:
@@ -293,6 +308,7 @@ func _on_bar_visible_changed(shown: bool) -> void:
 		return
 	_read_look(_tracked_boss)
 	max_value = _boss_health.max_hp
+	_known_hp = _boss_health.current_hp
 	_fill_in(_boss_health.current_hp)
 
 
@@ -313,6 +329,19 @@ func _fill_in(target: float) -> void:
 	_value_tween = create_tween()
 	_value_tween.tween_property(self, "value", target, fill_in_time) \
 			.set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+
+
+## La misma proporción con otra vida máxima: la misma barra con más o menos
+## vida detrás. Pasa el valor y el rastro del daño a la escala nueva, en la
+## misma proporción, y sigue hacia la vida de ahora.
+func _rescale(new_max: float) -> void:
+	var factor := new_max / maxf(max_value, 0.001)
+	var shown := value * factor
+	_kill_value_tween()
+	max_value = new_max
+	value = shown
+	_ghost *= factor
+	_ease_to(_known_hp)
 
 
 ## Suaviza la barra hacia `target`; mata la animación anterior para que los
