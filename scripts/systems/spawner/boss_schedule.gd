@@ -60,6 +60,11 @@ var _mini_boss: BossBase = null
 var _mini_boss_at: float = -1.0
 ## True mientras vive un minijefe que pelea solo (mini_boss_fights_alone).
 var _mini_boss_alone: bool = false
+## El jefe de etapa que abre la puerta, desde que llega hasta que muere.
+## _stage_boss_watched va aparte: una referencia a un nodo liberado se lee
+## como null.
+var _stage_boss: BossBase = null
+var _stage_boss_watched: bool = false
 
 
 func _init(spawner: EnemySpawner) -> void:
@@ -114,6 +119,10 @@ func tick() -> void:
 	# enemigos para siempre.
 	if _mini_boss_alone and not _mini_boss_alive():
 		_on_mini_boss_died()
+	# Lo mismo con el jefe de etapa: si se fue sin morir, su hueco vuelve a
+	# abrirse (los spawns no quedan cortados y la puerta todavía puede abrirse).
+	if _stage_boss_watched and not _in_arena(_stage_boss):
+		_on_stage_boss_left()
 	_tick_mini_boss()
 	if spawner.boss_scene == null:
 		return
@@ -310,6 +319,8 @@ func _watch_stage_boss(boss: BossBase) -> void:
 	if health == null:
 		RunState.stage_boss_dead = true
 		return
+	_stage_boss = boss
+	_stage_boss_watched = true
 	_own_stage_boss_alive = _spawner.stage_boss_scene != null
 	if spawns_held():
 		print("Spawns held: stage boss fights alone at %.1fs" % RunState.stage_time)
@@ -322,8 +333,23 @@ func _on_stage_boss_died(title: String) -> void:
 	if spawns_held():
 		_alone_breather_left = _spawner.boss_relief_duration
 	_own_stage_boss_alive = false
+	_stage_boss_watched = false
+	_stage_boss = null
 	# Log de una línea (convención de RunManager) para los soaks headless.
 	print("Stage boss slain: %s at %.1fs" % [title, RunState.stage_time])
+
+
+## El jefe de etapa dejó la arena sin morir (algo lo liberó): nunca va a
+## emitir died. Su hueco se abre otra vez, así vuelve a llegar y la puerta de
+## etapa todavía puede abrirse; mientras tanto los spawns no quedan cortados.
+func _on_stage_boss_left() -> void:
+	_stage_boss_watched = false
+	_stage_boss = null
+	_own_stage_boss_alive = false
+	_elder_spawned = false
+	_bosses_alive = maxi(_bosses_alive - 1, 0)
+	push_warning("BossSchedule: stage boss left without dying at %.1fs; it comes again"
+			% RunState.stage_time)
 
 
 func _on_boss_died() -> void:
