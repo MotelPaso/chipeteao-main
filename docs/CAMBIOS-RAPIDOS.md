@@ -519,7 +519,7 @@ de reparto se llama `ForestScatter`, `DuneScatter` o `MarshScatter`.
 | Barra de vida del jefe: marco, sombra y brillo | `boss_bar.gd` («Forma») | `corner_radius`, `border_width`, `shadow_offset`, `shine_height`, `shine_lighten` |
 | Barra de vida del jefe: rastro del daño, llenado, sacudida y latido con poca vida | `boss_bar.gd` («Animación») | `tween_time`, `ghost_delay`, `ghost_speed`, `fill_in_time`, `shake_pixels`, `shake_time`, `low_fraction`, `low_pulse_speed` |
 | Tamaño y lugar de la barra del jefe y de su nombre | `scenes/ui/HUD.tscn` > BossBar y BossBar/BossNameLabel | sus `offset_*`; en el nombre, `font_size` y `outline_size`; `name_letter_spacing` en `boss_bar.gd` |
-| Rombos de fase bajo la barra de un jefe con varias fases (Mythos) | `boss_bar.gd` («Fases») | `pip_size`, `pip_gap`, `pip_drop`, `pip_spent_color` |
+| Rombos de fase bajo la barra de un jefe que cuenta sus fases (`lives_left()` y `lives_total()`; hoy ninguno: Mythos las esconde a propósito) | `boss_bar.gd` («Fases») | `pip_size`, `pip_gap`, `pip_drop`, `pip_spent_color` |
 | Colores de las fichas de armas, evoluciones y tomos | HUD.tscn > LoadoutDock/BuildStrip | `weapon_color`, `evolved_weapon_color`, `tome_color` |
 | Contorno, sombra y glifo de cada ficha (su color es el de su tipo o rareza) | `scenes/ui/hud/LoadoutTile.tscn` > raíz | `border_width`, `corner_radius`, `shadow_offset`, `show_placeholder_art`, `glyph_font_size` |
 | Tarjeta de botín | `scenes/ui/hud/LootToast.tscn` > raíz | `hold_time`, `fade_time`, `background_color` |
