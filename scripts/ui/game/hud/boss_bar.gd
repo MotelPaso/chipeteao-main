@@ -8,8 +8,10 @@ extends ProgressBar
 ## el jefe tiene fases, un rombo por fase debajo. Al aparecer y en cada fase
 ## nueva se llena desde cero; si el jefe solo cambia cuánta vida hay detrás
 ## de la misma barra (otra vida máxima con la misma proporción, como la
-## recalcula LobsterLife), se reescala sin moverse. Cada golpe la sacude y la
-## hace destellar, y con poca vida late.
+## recalcula LobsterLife), se reescala sin moverse. Un cambio de vida que llega
+## mientras se llena (el apply_tier de BossSchedule, en el mismo cuadro en que
+## aparece) cambia hasta dónde llega el llenado sin acortarlo. Cada golpe la
+## sacude y la hace destellar, y con poca vida late.
 ## El nombre (%BossNameLabel) es un nodo de HUD.tscn.
 ## Contratos por nombre con el jefe, todos opcionales:
 ##   lives_changed(left, total), lives_left(), lives_total()  -> los rombos
@@ -86,6 +88,9 @@ const RESCALE_SLACK: float = 0.001
 var _tracked_boss: Node3D = null
 var _boss_health: Health = null
 var _value_tween: Tween = null
+## Segundos que dura `_value_tween` si es un llenado desde cero (_fill_to), o
+## 0 si es un suavizado: con ellos se sabe cuánto le queda al llenado.
+var _fill_seconds: float = 0.0
 ## Vida del jefe en su último aviso (golpe o cambio): con ella se comparan las
 ## proporciones cuando cambia su vida máxima.
 var _known_hp: float = 0.0
@@ -323,21 +328,18 @@ func _read_look(boss: Node3D) -> void:
 
 ## Llena la barra desde cero hasta `target`: al aparecer y en cada fase nueva.
 func _fill_in(target: float) -> void:
-	_kill_value_tween()
 	value = 0.0
 	_ghost = 0.0
-	_value_tween = create_tween()
-	_value_tween.tween_property(self, "value", target, fill_in_time) \
-			.set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+	_fill_to(target, fill_in_time)
 
 
 ## La misma proporción con otra vida máxima: la misma barra con más o menos
 ## vida detrás. Pasa el valor y el rastro del daño a la escala nueva, en la
-## misma proporción, y sigue hacia la vida de ahora.
+## misma proporción, y sigue hacia la vida de ahora. El tween en curso sigue
+## vivo hasta _ease_to, que necesita saber si era un llenado.
 func _rescale(new_max: float) -> void:
 	var factor := new_max / maxf(max_value, 0.001)
 	var shown := value * factor
-	_kill_value_tween()
 	max_value = new_max
 	value = shown
 	_ghost *= factor
@@ -345,15 +347,37 @@ func _rescale(new_max: float) -> void:
 
 
 ## Suaviza la barra hacia `target`; mata la animación anterior para que los
-## golpes seguidos converjan en vez de apilarse.
+## golpes seguidos converjan en vez de apilarse. Si la barra se está llenando
+## desde cero, el llenado sigue hacia `target` en el tiempo que le quedaba.
 func _ease_to(target: float) -> void:
+	var fill_left := _fill_left()
+	if fill_left > 0.0:
+		_fill_to(target, fill_left)
+		return
 	_kill_value_tween()
 	_value_tween = create_tween()
 	_value_tween.tween_property(self, "value", target, tween_time) \
 			.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 
 
+## Lleva la barra a `target` en `seconds` con la curva del llenado desde cero.
+func _fill_to(target: float, seconds: float) -> void:
+	_kill_value_tween()
+	_fill_seconds = seconds
+	_value_tween = create_tween()
+	_value_tween.tween_property(self, "value", target, seconds) \
+			.set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+
+
+## Segundos que le quedan al llenado desde cero en curso; 0 si no hay uno.
+func _fill_left() -> float:
+	if _fill_seconds <= 0.0 or _value_tween == null or not _value_tween.is_running():
+		return 0.0
+	return maxf(_fill_seconds - _value_tween.get_total_elapsed_time(), 0.0)
+
+
 func _kill_value_tween() -> void:
 	if _value_tween != null and _value_tween.is_valid():
 		_value_tween.kill()
 	_value_tween = null
+	_fill_seconds = 0.0
