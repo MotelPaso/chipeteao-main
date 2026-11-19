@@ -155,13 +155,15 @@ func cancel() -> void:
 # --- privados ---------------------------------------------------------------------
 
 ## Adónde va el raider, llevado a un lugar donde la langosta cabe y que
-## alcanza de un salto. Sin raider a quien seguir, la marca se queda.
+## alcanza de un salto, también sobre el piso elevado que pise él (el tablero
+## del Gran Puente). Sin raider a quien seguir, la marca se queda.
 func _aim_point() -> Vector3:
 	if not has_target(_target):
 		return _mark
 	var wanted := LobsterAim.short_of(_from,
 			LobsterAim.predicted(_target, lead_seconds, max_lead), stand_off)
-	return boss.safe_point(LobsterAim.within(_from, wanted, scaled(max_distance)))
+	return boss.safe_point(LobsterAim.within(_from, wanted, scaled(max_distance)),
+			_target.global_position)
 
 
 ## El disco se clava: ya no persigue, y un segundo aviso marca dónde cae.

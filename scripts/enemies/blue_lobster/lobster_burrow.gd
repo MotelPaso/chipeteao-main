@@ -256,10 +256,12 @@ func _dig_time() -> float:
 	return redig_seconds if _redigging else dig_seconds
 
 
-## Adónde va el raider, llevado a un lugar donde la langosta cabe. Sin raider
+## Adónde va el raider, llevado a un lugar donde la langosta cabe, también
+## sobre el piso elevado que pise él (el tablero del Gran Puente). Sin raider
 ## a quien seguir, la marca se queda donde estaba.
 func _aim_point() -> Vector3:
 	if not has_target(_target):
 		return _mark
 	return boss.safe_point(LobsterAim.short_of(_dug_at,
-			LobsterAim.predicted(_target, lead_seconds, max_lead), stand_off))
+			LobsterAim.predicted(_target, lead_seconds, max_lead), stand_off),
+			_target.global_position)

@@ -45,6 +45,8 @@ const GLIDE_WALL_REACH: float = 0.5
 ## STUCK_VERTICAL_SPEED metros por segundo.
 const STUCK_PROGRESS: float = 0.25
 const STUCK_VERTICAL_SPEED: float = 0.5
+## Pisos elevados (el tablero del Gran Puente): ver safe_point.
+const LobsterFooting := preload("res://scripts/enemies/blue_lobster/lobster_footing.gd")
 
 ## Agresividad actual (0-1); la leen los ataques.
 var aggression: float = 0.0
@@ -185,8 +187,16 @@ func core_point() -> Vector3:
 ## de suelo. Busca en anillos alrededor del mismo punto
 ## (arena_bounds.nearest_place): así la marca que persigue a un raider junto a
 ## un corte se corre de a poco, en vez de saltar de un lado a otro.
-func safe_point(point: Vector3) -> Vector3:
+## Con `raider_at` (los pies del raider al que va el ataque): si ese raider
+## pisa un piso elevado, como el tablero del Gran Puente, el punto se queda en
+## ese piso donde el cuerpo quepa (LobsterFooting), aunque la máscara de la
+## arena no cuente ahí lugar para un cuerpo.
+func safe_point(point: Vector3, raider_at: Vector3 = Vector3.INF) -> Vector3:
 	var at := _clamp_to_arena(point)
+	if raider_at != Vector3.INF:
+		var raised := LobsterFooting.raised_spot(self, at, raider_at)
+		if raised != Vector3.INF:
+			return raised
 	if not _is_walkable(at) and _bounds != null and _bounds.has_method(&"nearest_place"):
 		var spot: Vector2 = _bounds.call(&"nearest_place", Vector2(at.x, at.z), relief_margin)
 		at = _clamp_to_arena(Vector3(spot.x, at.y, spot.y))
