@@ -666,6 +666,7 @@ entera sobre la meseta de otra, y así tres cortes de 6 m hacen una montaña de
 | `relief_layout.gd` (`ReliefLayout`) | El trazado y sus preguntas de geometría en planta: `offset_at`, `level_at`, `on_plateau`, `raised_offset`, `ravine_coords`, `ravine_drop`, `digest`. |
 | `relief_cuts.gd` (`ReliefCuts`) | Las **líneas de corte** (`CutPath`): por dónde pasa cada acantilado y cuánto mide en cada punto. Una zona con N rampas da N líneas; el cañón, sus dos paredes, partidas en cada puente y en cada collado. El lado alto queda a la izquierda al recorrerlas. |
 | `relief_field.gd` (`ReliefField`) | Las alturas: suelo base (ruido + lomas + la vaguada del cañón), borde plano, claros y, encima, las zonas (el padre antes que la hija). |
+| `relief_lattice.gd` (`ReliefLattice`) | La retícula gruesa del suelo base que `ReliefField` interpola a 1 m: ruido, la loma de cada zona, las lomas sueltas y la vaguada del cañón. |
 | `relief_mesh.gd` (`ReliefMesh`) | La malla: 2 m, con **parches de 1 m** en los bloques que tocan un corte. |
 | `relief_queries.gd` (`ReliefQueries`) | Distancia a cortes/rampas/puentes, celdas y barreras para la máscara, la línea `Relief layout:` y la consulta de la etapa. |
 | `scripts/world/cliff_wall.gd` (`CliffWall`) | La **roca** de un corte: una cinta facetada sobre su línea, con una cornisa caminable del lado alto y una cara empinada del lado bajo. La colisión es la malla (prismas convexos, como `RockFormation`). |
@@ -695,7 +696,7 @@ entera sobre la meseta de otra, y así tres cortes de 6 m hacen una montaña de
   a cero sin pasar por la franja prohibida.
 - **El suelo se amansa junto a un corte.** La ondulación del suelo queda al
   35% a menos de 5 m del contorno de una zona y sobre sus rampas, y recupera
-  su fuerza a 13 m (`ReliefField.EDGE_DETAIL`, `EDGE_FLAT`, `EDGE_REACH`). La
+  su fuerza a 13 m (`ReliefLattice.EDGE_DETAIL`, `EDGE_FLAT`, `EDGE_REACH`). La
   cornisa de un corte se apoya en ese suelo: sobre una loma fuerte quedaría
   con caras de 45 grados, y una rampa inclinada de más deja de caminarse.
 - **Alturas.** El llano queda en 0, el macizo en +6, el segundo nivel en +12 y
