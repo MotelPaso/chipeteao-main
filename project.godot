@@ -167,6 +167,8 @@ camera_zoom_out={
 
 [physics]
 
+common/physics_ticks_per_second=48
+common/max_physics_steps_per_frame=10
 3d/physics_engine="Jolt Physics"
 3d/default_gravity=20.0
 
