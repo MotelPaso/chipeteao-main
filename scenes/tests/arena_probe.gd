@@ -86,6 +86,18 @@ extends Node
 ##                          de la primera etapa ya lo recibe
 ##   BONK_SHOT_EVERY=<s>    segundos entre fotos periódicas (por defecto 10).
 ##                          Las fotos de eventos se toman igual
+##   BONK_STAGE_BOSS_AT=<s> trae al jefe de etapa a ese segundo de la etapa en
+##                          vez de en el minuto 11 (lo lee BossSchedule)
+##   BONK_STAGE_GOAL=<s>    acorta SOLO la mitad de tiempo de la puerta de
+##                          etapa; la mitad del jefe se conserva (lo lee RunManager)
+##   BONK_MINI_BOSS_AT=<s>  trae al minijefe de la arena a ese segundo de la
+##                          etapa en vez de en su minuto (lo lee BossSchedule);
+##                          lo que el arnés observa de él está en mini_boss_probe.gd
+##   BONK_CINEMATIC_SKIP, BONK_PAUSE_AT, BONK_EXTRACT_AT, BONK_WIPE_AT,
+##   BONK_WEATHER_AT, BONK_ADVANCE_AT, BONK_UI_DISMISS, BONK_VIEW_SHOTS:
+##                          las pruebas alrededor del jefe de etapa; viven en
+##                          stage_boss_switches.gd y stage_boss_probe.gd,
+##                          que las explican
 ##
 ## Por defecto el raider CAMINA E INTERACTÚA. Un raider quieto se salta en
 ## silencio todo sistema que depende del movimiento (Slime Trail solo deja
@@ -277,6 +289,14 @@ var _rng := RandomNumberGenerator.new()
 ## partida. Nada de esta sección puede facilitar un gate: sin la variable,
 ## cada línea no hace nada.
 var _camera: ShotCamera = null
+## Todo lo del jefe de etapa (variables nuevas y su observación): ver
+## stage_boss_probe.gd.
+var _boss_probe: StageBossProbe = null
+## Barridos, ruteo, paseo y retención en arenas con relieve por zonas
+## (relief_probe.gd). En las demás no hace nada.
+var _relief: ReliefProbe = null
+## Lo que se observa del minijefe de la arena: ver mini_boss_probe.gd.
+var _mini_probe: MiniBossProbe = null
 ## Medidor del costo por frame: una línea `Perf` cada 10 s de juego y un
 ## `Perf summary` al salir. Siempre activo: solo lee el reloj.
 var _perf: PerfMeter = null
@@ -536,6 +556,9 @@ func _ready() -> void:
 	# add_child() de abajo y le pide un frame a esta cámara, así que si se crea
 	# más abajo sería null cuando toca la primera foto.
 	_camera = ShotCamera.new(get_viewport())
+	_boss_probe = StageBossProbe.new(self, _camera)
+	_relief = ReliefProbe.new(get_tree())
+	_mini_probe = MiniBossProbe.new(self, _camera)
 	_perf = PerfMeter.new(get_tree())
 	# Nunca mezclar un soak con el guardado real: SaveData apunta a un archivo
 	# temporal (valores por defecto) antes de arrancar la arena. BONK_SAVE_PATH
@@ -722,7 +745,13 @@ func _on_stage_changed(stage_index: int, map_id: String) -> void:
 	_sky_probe_left = STAGE_SKY_DELAY
 	_dwell_left = 0.0
 	_exit_rush = false
+	_boss_probe.on_stage_changed()
+	_relief.on_stage_changed(_frames)
+	_mini_probe.on_stage_changed()
 	print("ArenaProbe: stage %d is %s" % [stage_index + 1, map_id])
+	# El mundo ya está construido y vestido: RunRoot emite stage_changed
+	# después del add_child de la arena y de colocar al equipo.
+	WorldDigest.report(get_tree(), RunRoot.stage_parent(get_tree()) as Node3D)
 	_request_settled_shot(SHOT_SETTLE, "stage%d" % (stage_index + 1))
 
 
@@ -835,6 +864,7 @@ func _body_in_slot(slot: int) -> Node3D:
 func _on_run_ended(victory: bool) -> void:
 	_run_ended_at = RunState.run_time
 	_run_end_left = RUN_END_QUIT_FRAMES
+	_boss_probe.on_run_ended()
 	print("Probe: run ended victory=%s" % victory)
 
 
@@ -856,6 +886,9 @@ func _exit_tree() -> void:
 	# cayó y nada se levantó.
 	print("Party: downs=%d revives=%d" % [_party_downs, _party_revives])
 	print("Party pets: %s" % _party_pets_seen)
+	_boss_probe.summary()
+	_relief.report()
+	_mini_probe.summary()
 	if _saiyan_watch:
 		# Un aura son SAIYAN_BOONS_PER_AURA bonos. Más a la vez significa que un
 		# re-disparo se apiló con el aura que debía reemplazar, y la primera
@@ -877,7 +910,10 @@ func _exit_tree() -> void:
 	# porque una partida con godmode no tiene por qué terminar.
 	if _run_ended_at >= 0.0:
 		print("Probe fog: skipped (run ended at %.1fs)" % _run_ended_at)
-	elif not _stage_fast and _powerup_now.is_empty() and explored < FOG_MIN_EXPLORED:
+	# Cuarta, por la misma razón que BONK_STAGE_FAST: BONK_STAGE_GOAL acorta la
+	# puerta de etapa, la partida cruza de mapa y la niebla se reinicia.
+	elif not _stage_fast and not _boss_probe.shortens_stage_gate() \
+			and _powerup_now.is_empty() and explored < FOG_MIN_EXPLORED:
 		push_warning("ArenaProbe: fog barely explored — %.2f < %.2f"
 				% [explored, FOG_MIN_EXPLORED])
 
@@ -1048,6 +1084,8 @@ func _physics_process(delta: float) -> void:
 	if not _swept and _frames >= _sweep_at_frame:
 		_swept = true
 		_run_mask_sweep()
+	if _relief.tick(delta, _frames, _lead_raider(), _raider_rids()):
+		_perf.skip_frame()
 	_tick_stage_flow(delta)
 	_tick_map_overlay(delta)
 	_watch_shot_events()
@@ -1061,6 +1099,8 @@ func _physics_process(delta: float) -> void:
 	_watch_time_stop()
 	_watch_airborne(delta)
 	_watch_blocked_cell(delta)
+	_boss_probe.tick(delta, _frames)
+	_mini_probe.tick(delta, _frames)
 	if _frames % 120 == 0:
 		# Solo se le AGREGAN campos al final, nunca se reordena: verificar.sh lee
 		# level= de la última de estas líneas.
@@ -1265,7 +1305,8 @@ func _report_hud_offset() -> void:
 ## entrada forzada que usa el altar de eventos: corta lo que esté activo e
 ## ignora la pausa entre climas.
 func _tick_weather_now() -> void:
-	if _weather_forced or _weather_now.is_empty() or RunState.run_time < WEATHER_NOW_AT:
+	if _weather_forced or _weather_now.is_empty() or RunState.run_time < WEATHER_NOW_AT \
+			or _boss_probe.owns_weather_timing():
 		return
 	_weather_forced = true
 	get_tree().call_group("world_director", "start_sky_event", _weather_now)
@@ -1688,6 +1729,20 @@ func _drive_walk(delta: float) -> void:
 	# regla co-op que este soak existe para probar nunca corre.
 	if _drive_rescue(lead, delta):
 		return
+	# BONK_HOLD_AT: el líder se queda en su punto, sin recorrido ni interacciones.
+	if _relief.hold_active():
+		if _relief.hold_drifted(lead):
+			_walk_toward(lead, _relief.hold_point(), delta)
+		else:
+			_release_move()
+		return
+	# El paseo por el relieve va antes que el recorrido, salvo en la carrera
+	# a la salida.
+	var forced := _relief.forced_goal()
+	if forced != Vector3.INF and not _exit_rush:
+		_walk_toward(lead, forced, delta)
+		_unstick(lead, delta)
+		return
 	if _linger_left > 0.0:
 		_linger_left -= delta
 		_release_move()
@@ -1719,8 +1774,19 @@ func _drive_walk(delta: float) -> void:
 			print("ArenaProbe: leg timed out %.1fm short of %v"
 					% [_flat(lead.global_position).distance_to(_flat(_waypoint)), _waypoint])
 		_pick_waypoint(lead.global_position)
-	_hold_move_toward(lead, _waypoint)
+	_walk_toward(lead, _waypoint, delta)
 	_unstick(lead, delta)
+
+
+## Lleva al cuerpo del puesto `slot` hacia `goal`: en línea recta o, en una
+## arena con relieve por zonas, por el camino que dice ReliefProbe (rampas y
+## puentes), saltando donde el camino sube un escalón.
+func _walk_toward(body: CharacterBody3D, goal: Vector3, delta: float, slot: int = 0) -> void:
+	_hold_move_toward(body, _relief.route(slot, body.global_position, goal, delta), slot)
+	if _relief.wants_jump(slot) and body.is_on_floor():
+		var jump := Coop.action(slot, &"jump")
+		Input.action_press(jump)
+		Input.action_release.bind(jump).call_deferred()
 
 
 ## Salta cuando se estanca el avance horizontal. Bordes, rampas y muros de
@@ -1999,7 +2065,7 @@ func _tick_followers(delta: float) -> void:
 		if lead != null and _flat(body.global_position) \
 				.distance_to(_flat(lead.global_position)) > FOLLOW_DISTANCE:
 			_follow_left[slot] = 0.0
-			_hold_move_toward(body, lead.global_position, slot)
+			_walk_toward(body, lead.global_position, delta, slot)
 			continue
 		# Lo bastante cerca: tramos cortos al azar, para que el seguidor no sea una
 		# estatua sobre la cabeza del líder. Su código de movimiento, el interés de
@@ -2095,7 +2161,7 @@ func _drive_rescue(lead: CharacterBody3D, delta: float) -> bool:
 	if _flat(lead.global_position).distance_to(_flat(body.global_position)) \
 			> REVIVE_APPROACH:
 		_hold_action(0, &"interact", false)
-		_hold_move_toward(lead, body.global_position)
+		_walk_toward(lead, body.global_position, delta)
 		_unstick(lead, delta)
 		return true
 	_release_move()

@@ -23,7 +23,7 @@ Lo que NO se traduce nunca: los `id` de catálogo, los `node_name`, los nombres 
 18. Compuestos: verbo + sustantivo en plural (Perforacorazones, Matarreyes, Cazacoronas, Levantatapas); mata- no elide nunca. Escupesol va en singular (quitasol, girasol).
 19. Los glifos de dos letras de item_catalog.gd se re-siglan al nombre español (tabla en «terminos»); un glifo «WS» sobre «Piedra de afilar» se lee como bug.
 20. Brevedad: la etiqueta española no debe crecer más de ~10% sobre la inglesa en HUD, insignias y botones. Si crece, se recorta el adjetivo, nunca el sentido.
-21. El mapa de Tab **no** es un menú y su título no lleva verbo: la cabecera es «Etapa N · Vuelta M — MM:SS» y los paneles son sustantivos sueltos — hoy cinco: «Power-ups», «Mascota», «Estadísticas», «Jugadores», «Objetos». La leyenda nombra **familias** en plural («Cofres», «Altares», «Portales») y en singular solo lo que es único en la etapa («Jefe», «Salida», «Manantial», «Ruleta»).
+21. El mapa de Tab **no** es un menú y su título no lleva verbo: la cabecera es «Etapa N · Vuelta M — MM:SS», con la chapa «Explorado N%» en la esquina del mapa, y los paneles son sustantivos sueltos — hoy cinco: «Estadísticas», «Jugadores» (solo en co-op: en solitario repetiría el HUD), «Power-ups», «Mascota», «Objetos». La leyenda nombra **familias** en plural («Cofres», «Altares», «Portales») y en singular solo lo que es único en la etapa («Jefe», «Salida», «Manantial», «Ruleta»), y lista solo los tipos que están a la vista. La chapa del minimapa es «N», de norte.
 
 ## Personajes (no se traducen)
 
@@ -181,6 +181,46 @@ Lo que NO se traduce nunca: los `id` de catálogo, los `node_name`, los nombres 
 | Fenwraith Elder | Espectro de la Ciénaga Ancestral |
 | X Elder (patrón) | X Ancestral (patrón para todo elder_title) |
 | Ascendant (título de rejefe) | Ascendente |
+| Mythos | Mythos (nombre propio del fénix; no se traduce) |
+| Stage boss | Jefe de etapa (el que abre la puerta de la etapa: Mythos en el Bosque Hueco, el Ancestral en los otros mapas) |
+| The ember phoenix (cartel de la cinemática) | El fénix de las brasas |
+| Burning feathers (ataque de Mythos) | Plumas ardientes |
+| Dive (ataque de Mythos) | Picada |
+| Ember ring (ataque de Mythos) | Cerco de brasas |
+| Fireballs (ataque de Mythos) | Bolas de fuego |
+| Fire deluge (ataque de Mythos, segunda fase) | Diluvio de fuego |
+| Fire tornado (ataque de Mythos) | Tornado de fuego |
+| Tornado cage (ataque de Mythos: un anillo de tornados que gira y se cierra) | Jaula de tornados |
+| Feather storm (ataque de Mythos, segunda fase: plumas en espiral) | Tormenta de plumas |
+| Tornado mill (ataque de Mythos, segunda fase: aspas de tornados que giran) | Molino de tornados |
+| Fire tide (ataque de Mythos, segunda fase: ondas que salen y vuelven) | Marea de fuego |
+| Chain dive (ataque de Mythos, segunda fase) | Picada en cadena |
+| Reborn from his ashes (cartel del renacer) | Renacido de sus cenizas |
+| Fire wave (ataque de Mythos; se esquiva saltando) | Onda de fuego |
+| Mythos reborn (nombre de su segunda fase) | Mythos renacido |
+| Phase (de un jefe) | Fase |
+| Claws (ataque de Mythos en tierra) | Garras |
+| Wing blast (el despegue de Mythos) | Aletazo |
+| Fire pass (ataque de Mythos) | Pasada de fuego |
+| Charge (ataque de Mythos, primera fase: una sola pasada rasante) | Embestida |
+| Fire breath (ataque de Mythos: un chorro de fuego que barre la arena) | Aliento de fuego |
+| Scorching breath (ataque de Mythos, segunda fase: el Aliento que barre y vuelve) | Aliento abrasador |
+| Fire column (lo que levanta un golpe grande de Mythos) | Columna de fuego |
+| Blink (Mythos renacido cruza la arena de un tirón) | Fogonazo |
+| Dread vignette (los bordes de la pantalla se oscurecen mientras Mythos carga un ataque grande) | Viñeta de peligro |
+| Dawn (el golpe más fuerte de Mythos) | Amanecer |
+| Safe circle | Círculo a salvo |
+| Fire zone | Zona de fuego |
+| Blue Lobster | Langosta Azul (nombre propio del minijefe del Bosque Hueco) |
+| Mini-boss | Minijefe (el que llega a mitad de la etapa, antes del jefe del bioma: la Langosta Azul en el Bosque Hueco; los ocultos son «minijefe secreto») |
+| Pincers (ataque de la Langosta Azul) | Tenazas |
+| Charge (ataque de la Langosta Azul: cruza un carril de un tirón) | Embestida |
+| Crushing leap (ataque de la Langosta Azul) | Salto aplastante |
+| Shock wave (la onda que deja el Salto aplastante; se esquiva saltando) | Onda de choque |
+| Tail sweep (ataque de la Langosta Azul; se esquiva saltando) | Coletazo |
+| Ambush (ataque de la Langosta Azul: se entierra y sale junto al raider) | Emboscada |
+| %s wears out, out of the water (aviso de desgaste de la Langosta Azul) | %s se agota fuera del agua |
+| the blue scare of the Hollow Woods (Colección) | el susto azul del Bosque Hueco |
 
 ## Mapas
 
@@ -417,7 +457,12 @@ Lo que NO se traduce nunca: los `id` de catálogo, los `node_name`, los nombres 
 | Roulette | Ruleta |
 | Portals | Portales |
 | Exit | Salida |
-| `J%d  %s  %s  %s  %d pts` | `J%d  %s  %s  %s  %d pts` |
+| `Explored %d%%` | `Explorado %d%%` |
+| `N` (north, la chapa del minimapa) | `N` |
+| `Close` (indicación del botón que cierra el mapa de Tab) | Cerrar |
+| `Attack speed` en las celdas chicas del mapa de Tab (co-op) | Vel. de ataque |
+| `J%d K.O.` | `J%d K.O.` |
+| `%d/%d` (vida) | `%d/%d` |
 
 Las filas del panel **Estadísticas** reusan tal cual los términos de la tabla
 «Estadísticas» de más abajo, incluida la **regla 7**: `cooldown_multiplier` se
@@ -663,6 +708,8 @@ evolución.
 | `SETTINGS` | AJUSTES |
 | `SFX Volume` | Volumen de efectos |
 | `Ambient Volume` | Volumen ambiente |
+| `Music Volume` | Volumen de música |
+| `Hold to skip` | Mantén para saltar |
 | `Mouse Sensitivity` | Sensibilidad del mouse |
 | `1.00x` | 1.00x |
 | `%.2fx` | %.2fx |
@@ -759,6 +806,10 @@ evolución.
 | `The grumble swells. The mushroom quivers angrily.` | El gruñido crece. El hongo tiembla de rabia. |
 | `The roots burst apart!` | ¡Las raíces revientan! |
 | `Something hidden stirs...` | Algo oculto se remueve... |
+| `What sleeps here does not dare come out...` | Lo que duerme aquí no se atreve a salir... |
+| `Dawn! Run to a safe circle` | ¡Amanecer! Corre a un círculo a salvo |
+| `%s burns itself out` | %s se consume en su propio fuego |
+| `Mythos is reborn!` | ¡Mythos renace! |
 | `CHARACTER UNLOCKED: %s!` | ¡RAIDER DESBLOQUEADO: %s! |
 | `A charge altar rises — stand in its ring` | Se alza un altar de carga — párate en su anillo |
 | `A demonic obelisk claws out of the ground...` | Un obelisco demoníaco sale del suelo a zarpazos... |
@@ -923,6 +974,7 @@ evolución.
 | `boss of the Gloomfen` | jefe de la Ciénaga Lóbrega |
 | `what sleeps beneath the woods` | lo que duerme bajo el bosque |
 | `the tomb-thing of the dunes` | la cosa sepulcral de las dunas |
+| `the phoenix that sets the Hollow Woods ablaze` | el fénix que incendia el Bosque Hueco |
 | `Defeat 100 enemies.` | Derrota a 100 enemigos. |
 | `Defeat 500 enemies.` | Derrota a 500 enemigos. |
 | `Defeat 2,000 enemies.` | Derrota a 2000 enemigos. |

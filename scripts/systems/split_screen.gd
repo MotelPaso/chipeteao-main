@@ -12,6 +12,8 @@ extends Control
 ## Las cámaras origen también entran a Juice.FEEL_CAMERA_GROUP: así la
 ## sacudida y el empujón de FOV llegan a la pantalla dividida, donde el
 ## viewport raíz no tiene cámara activa.
+## Entra al grupo "split_screen": la cinemática de un jefe la oculta para
+## mostrar una sola vista a pantalla completa (mythos_cinematic.gd).
 
 # --- Edita aquí -------------------------------------------------------------
 # SplitScreen no tiene escena (RunSystems la arma con SplitScreen.build()),
@@ -60,6 +62,7 @@ var _pairs: Array[CameraPair] = []
 static func build(players: Array) -> SplitScreen:
 	var split := SplitScreen.new()
 	split.name = "SplitScreen"
+	split.add_to_group(&"split_screen")
 	split.set_anchors_preset(Control.PRESET_FULL_RECT)
 	split.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var count := players.size()

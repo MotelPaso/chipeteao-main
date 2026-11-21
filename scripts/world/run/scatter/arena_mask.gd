@@ -8,7 +8,7 @@ extends RefCounted
 ## La crea y la consulta el scatter (scatter.gd), que responde por ella a
 ## is_walkable() y compañía a través del grupo "arena_bounds". No tiene
 ## Inspector: se ajusta con los exports "Máscara de la arena" del scatter,
-## que _new_mask() copia aquí antes de build().
+## que ScatterMask.build() (scatter_mask.gd) copia aquí antes de build().
 ##
 ## Saca números del MISMO RandomNumberGenerator que el scatter (se lo pasa
 ## al crearla): build() y random_walkable_point() sortean en el orden de
@@ -47,6 +47,13 @@ var _rng: RandomNumberGenerator
 ## Celdas bloqueadas (coordenadas de cuadrícula -> true) y celdas por lado.
 var _blocked: Dictionary[Vector2i, bool] = {}
 var _cells_per_side: int = 0
+## Aristas entre celdas vecinas que no se cruzan a pie: las separa un corte
+## del relieve por zonas (ver ReliefQueries.mask_barriers). Vacío sin relieve.
+var _barriers: Dictionary[Vector3i, bool] = {}
+## Encendido (lo enciende build() cuando recibe `keep_open`, o sea con
+## relieve por zonas), los pasillos de una sola celda entre dos brazos de
+## roca también se rellenan (ver MaskPasses.fill_slots).
+var _seal_slots: bool = false
 
 
 func _init(rng: RandomNumberGenerator) -> void:
@@ -55,10 +62,16 @@ func _init(rng: RandomNumberGenerator) -> void:
 
 ## Construye la máscara de la etapa e imprime `Arena mask:`. `protected_seeds`
 ## son los puntos planos donde nunca hay roca (el spawn y los keepouts de
-## autor), en el orden en que el scatter los recorre.
-func build(protected_seeds: Array[Vector2]) -> void:
+## autor), en el orden en que el scatter los recorre. Una arena con relieve
+## por zonas pasa además `keep_open` (celdas que el relieve necesita sin
+## roca) y `barriers` (aristas que un corte vuelve infranqueables a pie).
+func build(protected_seeds: Array[Vector2], keep_open: Dictionary[Vector2i, bool] = {},
+		barriers: Dictionary[Vector3i, bool] = {}) -> void:
 	_cells_per_side = maxi(ceili(half_extent * 2.0 / cell_size), 3)
+	_barriers = barriers
+	_seal_slots = not keep_open.is_empty()
 	var protected := _protected_cells(protected_seeds)
+	protected.merge(keep_open)
 	var formations := _rng.randi_range(blobs_min, blobs_max)
 	for attempt in 4:
 		_blocked.clear()
@@ -74,8 +87,14 @@ func build(protected_seeds: Array[Vector2]) -> void:
 			_grow_formation(seed_cell,
 					_rng.randi_range(blob_cells_min, blob_cells_max),
 					protected, owners, seeds.size())
-		_fill_notches(protected)
-		_seal_unreachable(protected)
+		var may_grow := _rock_may_grow.bind(protected)
+		MaskPasses.fill_notches(_blocked, _cells_per_side, may_grow)
+		if _seal_slots:
+			MaskPasses.fill_slots(_blocked, _cells_per_side, may_grow)
+		MaskPasses.seal_unreachable(_blocked, _cells_per_side, cell_of(Vector2.ZERO),
+				protected, _barriers)
+		if _seal_slots:
+			MaskPasses.free_squeezed(_blocked, _cells_per_side, protected)
 		if float(open_cell_count()) / float(_cells_per_side * _cells_per_side) \
 				>= min_open_fraction:
 			break
@@ -111,6 +130,51 @@ func clear_of(center: Vector2, radius: float) -> bool:
 	for index in 8:
 		if not is_walkable(center + Vector2.from_angle(float(index) * TAU / 8.0) * radius):
 			return false
+	return true
+
+
+## Metros de `point` al borde de la celda bloqueada más cercana, buscando
+## hasta `limit` (si no hay ninguna más cerca, devuelve `limit`). Exacta:
+## mide hasta cada celda en vez de probar ocho puntos de un círculo, que con
+## un radio grande dejan pasar una celda entera entre dos de ellos.
+func rock_distance(point: Vector2, limit: float) -> float:
+	if not enabled or _blocked.is_empty():
+		return limit
+	var nearest := limit
+	var low := cell_of(point - Vector2.ONE * limit)
+	var high := cell_of(point + Vector2.ONE * limit)
+	var half := cell_size * 0.5
+	for cz in range(low.y, high.y + 1):
+		for cx in range(low.x, high.x + 1):
+			if not _blocked.has(Vector2i(cx, cz)):
+				continue
+			var offset := (point - cell_center(Vector2i(cx, cz))).abs()
+			nearest = minf(nearest, Vector2(maxf(offset.x - half, 0.0),
+					maxf(offset.y - half, 0.0)).length())
+	return nearest
+
+
+## True si el rectángulo girado que `frame` lleva a su propio plano (centro en
+## el origen, medio lado `half`, en metros) queda a `gap` metros o más de toda
+## celda bloqueada. Exacta: ejes separadores contra cada celda cercana, con el
+## rectángulo agrandado `gap` por lado (en sus esquinas pide un poco más).
+func box_clear(frame: Transform2D, half: Vector2, gap: float) -> bool:
+	if not enabled or _blocked.is_empty():
+		return true
+	var grown := half + Vector2.ONE * gap
+	var center := frame.affine_inverse().origin
+	var reach := grown.length() + cell_size
+	var low := cell_of(center - Vector2.ONE * reach)
+	var high := cell_of(center + Vector2.ONE * reach)
+	# Los lados de una celda (los ejes del mundo) vistos desde el rectángulo.
+	var side_x := frame.basis_xform(Vector2(1.0, 0.0))
+	var side_z := frame.basis_xform(Vector2(0.0, 1.0))
+	for cz in range(low.y, high.y + 1):
+		for cx in range(low.x, high.x + 1):
+			var cell := Vector2i(cx, cz)
+			if _blocked.has(cell) and _box_meets_cell(frame * cell_center(cell), side_x, side_z,
+					grown):
+				return false
 	return true
 
 
@@ -182,6 +246,20 @@ func blocked_regions() -> Array[Dictionary]:
 func _in_grid(cell: Vector2i) -> bool:
 	return cell.x >= 0 and cell.y >= 0 \
 			and cell.x < _cells_per_side and cell.y < _cells_per_side
+
+
+## True si la celda de centro `at` se cruza con el rectángulo de medio lado
+## `half` centrado en el origen. `at`, `side_x` y `side_z` (los lados de la
+## celda) ya están en el plano del rectángulo.
+func _box_meets_cell(at: Vector2, side_x: Vector2, side_z: Vector2, half: Vector2) -> bool:
+	var cell_half := cell_size * 0.5
+	if absf(at.x) >= half.x + cell_half * (absf(side_x.x) + absf(side_z.x)):
+		return false
+	if absf(at.y) >= half.y + cell_half * (absf(side_x.y) + absf(side_z.y)):
+		return false
+	if absf(at.dot(side_x)) >= half.x * absf(side_x.x) + half.y * absf(side_x.y) + cell_half:
+		return false
+	return absf(at.dot(side_z)) < half.x * absf(side_z.x) + half.y * absf(side_z.y) + cell_half
 
 
 ## Celdas que deben quedar abiertas: toda celda a menos de protect_radius de
@@ -300,92 +378,3 @@ func _pick_frontier_cell(frontier: Dictionary[Vector2i, bool], grown: Dictionary
 		if pick <= 0.0:
 			return options[option]
 	return options[options.size() - 1]
-
-
-## Las celdas abiertas rodeadas de roca por tres o cuatro lados se vuelven
-## roca: una muesca cerrada por tres lados no sirve para pelear, y su
-## contorno cuadrado es lo único que el margen de la formación no esconde.
-func _fill_notches(protected: Dictionary[Vector2i, bool]) -> void:
-	for sweep in 3:
-		var notches: Array[Vector2i] = []
-		for x in _cells_per_side:
-			for y in _cells_per_side:
-				var cell := Vector2i(x, y)
-				if _blocked.has(cell) or not _rock_may_grow(cell, protected):
-					continue
-				var walls := 0
-				for step: Vector2i in STEPS:
-					if _blocked.has(cell + step):
-						walls += 1
-				if walls >= 3:
-					notches.append(cell)
-		if notches.is_empty():
-			return
-		for cell: Vector2i in notches:
-			_blocked[cell] = true
-
-
-## Flood fill desde la celda del spawn; las celdas abiertas que no alcanza
-## se sellan, así toda celda abierta que queda se alcanza a pie. Las celdas
-## PROTEGIDAS nunca se sellan: si una quedó aislada, se abre un pasillo
-## hasta suelo alcanzado y se repite el relleno. Así se cumplen las dos
-## cosas: todo lo abierto es alcanzable y ningún spot de autor queda bajo
-## una formación.
-func _seal_unreachable(protected: Dictionary[Vector2i, bool]) -> void:
-	var reached := _reachable_cells()
-	var carved := false
-	for cell: Vector2i in protected:
-		if not _in_grid(cell) or reached.has(cell):
-			continue
-		if _carve_corridor(cell, reached):
-			carved = true
-	if carved:
-		reached = _reachable_cells()
-	for x in _cells_per_side:
-		for y in _cells_per_side:
-			var cell := Vector2i(x, y)
-			if not reached.has(cell):
-				_blocked[cell] = true
-
-
-## Flood fill vecindad-4 desde la celda del spawn sobre las celdas abiertas.
-func _reachable_cells() -> Dictionary[Vector2i, bool]:
-	var start := cell_of(Vector2.ZERO)
-	var reached: Dictionary[Vector2i, bool] = {start: true}
-	var frontier: Array[Vector2i] = [start]
-	while not frontier.is_empty():
-		var cell: Vector2i = frontier.pop_back()
-		for step: Vector2i in STEPS:
-			var next := cell + step
-			if not _in_grid(next) or reached.has(next) or _blocked.has(next):
-				continue
-			reached[next] = true
-			frontier.append(next)
-	return reached
-
-
-## Desbloquea una escalera de celdas desde `from` hasta la celda alcanzada
-## más cercana. Conexa-4 a propósito (un eje por paso), para que el pasillo
-## se camine con la misma vecindad del flood fill. True si abrió algo.
-func _carve_corridor(from: Vector2i, reached: Dictionary[Vector2i, bool]) -> bool:
-	var target := from
-	var best := INF
-	for cell: Vector2i in reached:
-		var distance := Vector2(cell - from).length_squared()
-		if distance < best:
-			best = distance
-			target = cell
-	if target == from:
-		return false
-	var carved := false
-	var cursor := from
-	_blocked.erase(cursor)
-	while cursor != target:
-		var delta := target - cursor
-		if absi(delta.x) >= absi(delta.y):
-			cursor.x += signi(delta.x)
-		else:
-			cursor.y += signi(delta.y)
-		if _blocked.erase(cursor):
-			carved = true
-	return carved

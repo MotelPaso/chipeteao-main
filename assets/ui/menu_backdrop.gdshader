@@ -3,7 +3,9 @@ shader_type canvas_item;
 // sobre el mapa 3D que el autoload MenuBackdrop mantiene vivo detrás, para
 // que el texto se lea. Lo usan las pantallas de menú (MainMenu,
 // CharacterSelect, QuestLog, Collection, RelicShop) en su nodo Background, a
-// través de un solo material: assets/ui/menu_backdrop.tres.
+// través de un solo material: assets/ui/menu_backdrop.tres. El mapa de Tab
+// (MapOverlay.tscn > Dim) usa este mismo shader con un material propio y
+// `reveal` fijo en 1: detrás tiene la partida, no el mapa de los menús.
 //
 // Sin mapa detrás (headless o una escena de prueba) `reveal` queda en 0 y la
 // capa es opaca: el color petróleo es el fondo de respaldo.

@@ -22,6 +22,11 @@ extends RefCounted
 ## adquirir, así que un proyectil congelado con set_physics_process(false)
 ## volvería inerte del pool para siempre.
 ##
+## Un cuerpo que sale de la pelea durante el congelado (muere, finge morir
+## como Mythos, cambia de bando) también sale del congelado: corre lo suyo a
+## tiempo y conserva la capa de colisión que él mismo se puso. Si vuelve a la
+## pelea mientras dura, se congela de nuevo.
+##
 ## No procesa solo: EnemySpawner llama tick() desde su _physics_process.
 
 var _spawner: EnemySpawner = null
@@ -64,6 +69,7 @@ func tick(delta: float) -> void:
 	if _freeze_left <= 0.0:
 		return
 	_freeze_left -= delta
+	_release_departed()
 	if _freeze_left > 0.0:
 		# Lo que nace (o se invoca) durante el congelado también se congela:
 		# una horda que sigue entrando no es tiempo detenido.
@@ -74,10 +80,7 @@ func tick(delta: float) -> void:
 
 func _freeze_new_bodies() -> void:
 	var tree := _spawner.get_tree()
-	# "burrowed" no es decorativo: un Duneburrower bajo tierra sale de
-	# "enemies" a propósito, y sin este grupo sería el único cuerpo que
-	# podría dañar a la party durante un congelado.
-	for group: StringName in [&"enemies", &"boss", Duneburrower.BURROWED_GROUP]:
+	for group: StringName in _fight_groups():
 		for node: Node in tree.get_nodes_in_group(group):
 			var body := node as Node3D
 			if body == null or not body.is_inside_tree():
@@ -98,6 +101,34 @@ func _freeze_new_bodies() -> void:
 	# Grupo que agrega el script de EnemyBolt (contrato por nombre).
 	for node: Node in tree.get_nodes_in_group(&"enemy_projectiles"):
 		node.set("frozen", true)
+
+
+## Suelta a los congelados que ya no están en ningún grupo de pelea: no les
+## devuelve ni la capa ni la velocidad de antes (las puso su propia lógica).
+func _release_departed() -> void:
+	for id: int in _frozen.keys():
+		var body := _frozen[id]
+		if is_instance_valid(body) and _in_fight(body):
+			continue
+		if is_instance_valid(body) and body.process_mode == Node.PROCESS_MODE_DISABLED:
+			body.process_mode = Node.PROCESS_MODE_INHERIT
+		_frozen.erase(id)
+		_frozen_velocity.erase(id)
+		_frozen_layer.erase(id)
+
+
+## Los grupos que congela. "burrowed" no es decorativo: un Duneburrower bajo
+## tierra sale de "enemies" a propósito, y sin este grupo sería el único
+## cuerpo que podría dañar a la party durante un congelado.
+static func _fight_groups() -> Array[StringName]:
+	return [&"enemies", &"boss", Duneburrower.BURROWED_GROUP]
+
+
+static func _in_fight(body: Node) -> bool:
+	for group: StringName in _fight_groups():
+		if body.is_in_group(group):
+			return true
+	return false
 
 
 func _thaw_all() -> void:

@@ -202,6 +202,13 @@ const ELITE_CHANCE_CAP: float = 0.6
 @export var boss_scene: PackedScene
 ## Minuto de etapa en que llega el jefe del bioma.
 @export var boss_spawn_minute: float = 5.0
+## Escena del minijefe de esta arena: llega sin aviso en mini_boss_spawn_minute
+## y el jefe del bioma espera a que muera. Vacío = la arena no tiene minijefe.
+@export var mini_boss_scene: PackedScene
+## Minuto de etapa en que llega el minijefe.
+@export var mini_boss_spawn_minute: float = 5.0
+## Si el minijefe pelea SOLO: desde que llega no aparece ningún enemigo normal (ni flujo, ni hordas, ni jaurías, ni lluvia de enemigos) y el respiro tras su muerte es total. La horda que ya estaba en la arena se la lleva él al empezar la pelea.
+@export var mini_boss_fights_alone: bool = true
 ## Minuto de etapa en que llega su revancha Ancestral (el jefe de etapa).
 @export var elder_spawn_minute: float = 11.0
 ## Multiplicador de stats del Ancestral (y base de los jefes recurrentes).
@@ -209,6 +216,12 @@ const ELITE_CHANCE_CAP: float = 0.6
 ## Título del Ancestral en el HUD; cada arena pone el suyo (este vale solo
 ## para una arena que no lo ponga).
 @export var elder_title: String = "Jefe Ancestral"
+## Escena del jefe de etapa propio de esta arena. Con una escena puesta, ese
+## jefe llega en elder_spawn_minute EN LUGAR de la revancha Ancestral, con su
+## propio título y sin elder_stat_multiplier. Vacío = la revancha de siempre.
+@export var stage_boss_scene: PackedScene
+## Si el jefe de etapa propio pelea SOLO: mientras vive no aparece ningún enemigo normal (ni flujo, ni hordas, ni jaurías) y el respiro tras su muerte es total.
+@export var stage_boss_fights_alone: bool = true
 ## Minutos entre jefes recurrentes tras el Ancestral (0 = ninguno).
 @export var boss_repeat_minutes: float = 4.0
 ## Cuánto más fuerte es cada jefe recurrente que el anterior (multiplicador).
@@ -284,6 +297,10 @@ func _physics_process(delta: float) -> void:
 	_scaling.tick(delta)
 	_scaling.tick_endless_log()
 	_bosses.tick()
+	if _bosses.spawns_held():
+		# El jefe de etapa pelea solo: ni hordas ni flujo hasta que muera.
+		_hordes.hold()
+		return
 	_hordes.tick(delta)
 	_spawn_timer -= delta
 	if _spawn_timer > 0.0:
@@ -547,6 +564,18 @@ func spawn_pressure_burst(center: Vector3, count: int, force_elites: bool = fals
 
 ## --- Ubicación (fachadas sobre SpawnPoints; también las usa BossSchedule) ---
 
+## True mientras el jefe de etapa propio pelea solo: nada aparece.
+func spawns_held() -> bool:
+	return _bosses.spawns_held()
+
+
+## Lo mismo, para quien solo tiene el árbol: el clima, los jefes ocultos, el
+## jefe de etapa (que quema a la horda que quedaba) y el harness.
+static func is_holding(tree: SceneTree) -> bool:
+	var spawner := tree.get_first_node_in_group(&"enemy_spawner") as EnemySpawner
+	return spawner != null and spawner.spawns_held()
+
+
 ## Posición del anillo alrededor del jugador, a distancia de spawn y sobre
 ## el suelo.
 func ring_position(player: Node3D) -> Vector3:
@@ -574,6 +603,8 @@ func make_enemy_at(pos: Vector3, force_elite: bool = false,
 	# pasan por aquí, así que la regla de espacio libre no se le puede olvidar
 	# a un llamador nuevo. Los muestreadores de posición ya prefieren puntos
 	# libres; esto es lo que pasa cuando no hay ninguno.
+	if _bosses.spawns_held():
+		return null
 	if not _points.has_player_clearance(pos):
 		_points.register_clearance_skip()
 		return null

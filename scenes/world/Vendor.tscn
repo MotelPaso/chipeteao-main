@@ -1,16 +1,12 @@
-[gd_scene load_steps=9 format=3 uid="uid://cvendor1k2p0a"]
+[gd_scene load_steps=8 format=3 uid="uid://cvendor1k2p0a"]
 
 [ext_resource type="Script" path="res://scripts/world/interactables/vendor.gd" id="1_vendor"]
+
+[ext_resource type="Script" path="res://scripts/world/interactables/looks/vendor_look.gd" id="look_1"]
 
 [sub_resource type="CylinderShape3D" id="CylinderShape3D_ring"]
 radius = 2.4
 height = 3.5
-
-[sub_resource type="BoxMesh" id="BoxMesh_counter"]
-size = Vector3(2.2, 1, 0.8)
-
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_wood"]
-albedo_color = Color(0.35, 0.26, 0.18, 1)
 
 [sub_resource type="CapsuleMesh" id="CapsuleMesh_figure"]
 radius = 0.35
@@ -29,7 +25,7 @@ size = Vector3(2.4, 0.12, 1.2)
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_awning"]
 resource_local_to_scene = true
 emission_enabled = true
-emission_energy_multiplier = 1.1
+emission_energy_multiplier = 0.4
 
 [node name="Vendor" type="Area3D"]
 collision_layer = 0
@@ -43,11 +39,6 @@ marker_kind = &"vendor"
 [node name="CollisionShape3D" type="CollisionShape3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.75, 0)
 shape = SubResource("CylinderShape3D_ring")
-
-[node name="Stall" type="MeshInstance3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.5, 0)
-mesh = SubResource("BoxMesh_counter")
-material_override = SubResource("StandardMaterial3D_wood")
 
 [node name="Figure" type="MeshInstance3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.15, -0.7)
@@ -66,3 +57,6 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2, 0)
 editor_description = "El color lo pone vendor.gd con el de la fila de VENDOR_LIBRARY."
 light_energy = 1.5
 omni_range = 7.0
+
+[node name="Look" type="Node3D" parent="."]
+script = ExtResource("look_1")

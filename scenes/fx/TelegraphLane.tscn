@@ -1,0 +1,24 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scripts/fx/telegraph_lane.gd" id="1_script"]
+[ext_resource type="Shader" path="res://assets/shaders/telegraph_lane.gdshader" id="2_lane"]
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_lane"]
+shader = ExtResource("2_lane")
+
+[sub_resource type="PlaneMesh" id="PlaneMesh_segment"]
+material = SubResource("ShaderMaterial_lane")
+size = Vector2(1, 1)
+
+[sub_resource type="MultiMesh" id="MultiMesh_strip"]
+transform_format = 1
+use_colors = true
+mesh = SubResource("PlaneMesh_segment")
+
+[node name="TelegraphLane" type="Node3D" unique_id=46644055]
+script = ExtResource("1_script")
+
+[node name="Strip" type="MultiMeshInstance3D" parent="." unique_id=1303560300]
+visible = false
+cast_shadow = 0
+multimesh = SubResource("MultiMesh_strip")

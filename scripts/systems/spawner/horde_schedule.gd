@@ -66,6 +66,15 @@ func tick(delta: float) -> void:
 			_horde_wave_size * spawner.horde_waves, spawner.horde_waves, RunState.stage_time])
 
 
+## El jefe de etapa pelea solo: corta la horda en curso y da por pasada la
+## que venza mientras tanto, para que no llegue de golpe cuando él muera.
+## El spawner lo llama en cada tick mientras dura la espera.
+func hold() -> void:
+	_horde_waves_left = 0
+	if RunState.stage_time >= next_horde_time():
+		_hordes_fired += 1
+
+
 ## Segundo de etapa en que llega la próxima horda.
 func next_horde_time() -> float:
 	var minutes := _spawner.horde_minutes

@@ -1,0 +1,16 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scripts/fx/impact_ripple.gd" id="1_script"]
+[ext_resource type="Shader" path="res://assets/shaders/impact_ripple.gdshader" id="2_ripple"]
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_ripple"]
+shader = ExtResource("2_ripple")
+
+[sub_resource type="PlaneMesh" id="PlaneMesh_ripple"]
+material = SubResource("ShaderMaterial_ripple")
+
+[node name="ImpactRipple" type="MeshInstance3D" unique_id=1679309945]
+visible = false
+cast_shadow = 0
+mesh = SubResource("PlaneMesh_ripple")
+script = ExtResource("1_script")

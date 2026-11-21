@@ -23,6 +23,18 @@ const PROBE_UNDERSHOOT: float = 2.0
 const POI_PLATFORM_Y: float = 0.5
 ## Semiancho (metros) que se usa si la arena no publica el suyo.
 const DEFAULT_HALF_EXTENT: float = 80.0
+## Metros que todo lo que coloca el director guarda con un corte, una rampa
+## o un puente del relieve por zonas (la cornisa de roca de un corte mide
+## 3.3 m) y, en todo mapa, con la roca de la máscara (su faldón asoma 2 m) y
+## con la huella de cada meseta. Se cuentan desde el borde de lo que se pone.
+const RELIEF_MARGIN: float = 5.0
+## Veces que se le pide a la máscara otro punto al azar cuando el que dio
+## cae sobre el relieve.
+const FALLBACK_ATTEMPTS: int = 8
+## Con relieve por zonas, metros sobre el suelo a partir de los cuales lo
+## que hay bajo un punto es la punta de algo (otro POI, un prop) y no un
+## lugar donde poner la salida o un evento: un raider salta 1.5 m.
+const TOP_LIMIT: float = 1.2
 
 ## Distancias del reparto (metros). Sin valor propio: el director les copia
 ## sus exports del grupo "Reparto de POI" al crear el layout; edítalas ahí.
@@ -96,8 +108,18 @@ func spawn_at(scene: PackedScene, at: Vector3) -> Node3D:
 
 ## --- máscara y suelo --------------------------------------------------------
 
-func walkable_xz(xz: Vector2) -> bool:
-	if _bounds == null or not _bounds.has_method("is_walkable"):
+## True si en `xz` se puede poner algo que ocupa `reach` metros alrededor de
+## su centro: celda abierta de la máscara, a RELIEF_MARGIN de la roca y de
+## las mesetas y, con relieve por zonas, de cortes, rampas y puentes, y fuera
+## del cañón (arena_bounds.can_build). Todo muestreo de este archivo pasa por aquí.
+func walkable_xz(xz: Vector2, reach: float = 0.0) -> bool:
+	if _bounds == null:
+		return true
+	if _bounds.has_method("can_build"):
+		return bool(_bounds.call("can_build", xz, RELIEF_MARGIN + reach))
+	if _bounds.has_method("can_place"):
+		return bool(_bounds.call("can_place", xz, RELIEF_MARGIN + reach))
+	if not _bounds.has_method("is_walkable"):
 		return true
 	return bool(_bounds.call("is_walkable", xz))
 
@@ -110,7 +132,13 @@ func walkable(pos: Vector3) -> bool:
 ## propia máscara, que sabe dónde están las celdas abiertas.
 func random_walkable_point() -> Vector2:
 	if _bounds != null and _bounds.has_method("random_walkable_point"):
-		var point: Variant = _bounds.call("random_walkable_point", bounds_margin)
+		# La máscara no sabe del relieve: se le pide otro punto mientras el
+		# suyo caiga sobre un corte. En una arena sin relieve sirve el primero.
+		var point: Variant = Vector2.ZERO
+		for attempt in FALLBACK_ATTEMPTS:
+			point = _bounds.call("random_walkable_point", bounds_margin)
+			if point is Vector2 and walkable_xz(point):
+				return point
 		if point is Vector2:
 			return point
 	return Vector2.ZERO
@@ -119,10 +147,16 @@ func random_walkable_point() -> Vector2:
 ## Altura del suelo (capa 1) bajo un punto: un POI bajo una meseta
 ## quedaría enterrado y su Area3D no vería al jugador que subió.
 func ground_height(pos: Vector3) -> float:
-	var space := _tree().root.world_3d.direct_space_state
+	return ground_under(_tree(), pos)
+
+
+## La sonda de ground_height para quien no tiene el layout de la etapa (el
+## minijefe de un disparador secreto).
+static func ground_under(tree: SceneTree, pos: Vector3) -> float:
+	var space := tree.root.world_3d.direct_space_state
 	# El rayo cubre TODO el relieve: desde sobre la meseta más alta hasta
 	# bajo la hondonada más honda.
-	var terrain := Terrain.find(_tree())
+	var terrain := Terrain.find(tree)
 	var top := GROUND_PROBE_HEIGHT
 	var bottom := -1.0
 	if terrain != null:
@@ -132,7 +166,7 @@ func ground_height(pos: Vector3) -> float:
 			Vector3(pos.x, top, pos.z), Vector3(pos.x, bottom, pos.z), 1)
 	# Los jugadores comparten la capa 1 con el mundo: una cabeza no es suelo.
 	var excluded: Array[RID] = []
-	for node: Node in Coop.alive_players(_tree()):
+	for node: Node in Coop.alive_players(tree):
 		var body := node as CollisionObject3D
 		if body != null:
 			excluded.append(body.get_rid())
@@ -146,6 +180,16 @@ func ground_height(pos: Vector3) -> float:
 	return hit_position.y
 
 
+## True si lo que hay bajo `pos` es suelo y no la punta de otro POI o de un
+## prop. Solo se pregunta con relieve por zonas; en las demás arenas lo que
+## aparece durante la etapa se apoya en lo que toque el rayo, como siempre.
+func lands_on_ground(pos: Vector3) -> bool:
+	var terrain := Terrain.find(_tree())
+	if terrain == null or not terrain.has_relief():
+		return true
+	return ground_height(pos) - terrain.height_at(pos.x, pos.z) <= TOP_LIMIT
+
+
 ## Altura del terreno en un punto, o 0 sin terreno. Para apoyar algo en el
 ## suelo sin el rayo, que también vería los props de encima.
 func terrain_height(xz: Vector2) -> float:
@@ -155,8 +199,9 @@ func terrain_height(xz: Vector2) -> float:
 
 ## --- reparto ----------------------------------------------------------------
 
-## Mueve cada interactuable de "scatter_keepout" a un punto libre; el resto
-## del grupo (plataformas, rocas) queda como obstáculo fijo.
+## Mueve cada interactuable de "scatter_keepout" a un punto libre, con sus
+## distancias contadas desde lo que ocupa (Interactable.footprint_reach); el
+## resto del grupo (plataformas, rocas) queda como obstáculo fijo.
 func shuffle_ground_interactables() -> void:
 	var movable: Array[Node3D] = []
 	var anchors: Array[Vector2] = []
@@ -171,7 +216,8 @@ func shuffle_ground_interactables() -> void:
 	var placed: Array[Vector2] = []
 	var limit := _arena_half_extent - bounds_margin
 	for poi: Node3D in movable:
-		var spot_xz := _find_clear_point(limit, placed, anchors)
+		var spot_xz := _find_clear_point(limit, placed, anchors,
+				(poi as Interactable).footprint_reach())
 		placed.append(spot_xz)
 		# Los POI de suelo se apoyan en el relieve del punto nuevo; los que
 		# están sobre una plataforma (y > POI_PLATFORM_Y) conservan su
@@ -196,9 +242,11 @@ func refresh_placed_points() -> void:
 
 
 ## Un punto libre nuevo para algo que se crea durante la etapa, apoyado en
-## el terreno; queda anotado para los siguientes.
-func claim_clear_point() -> Vector3:
-	var spot := _find_clear_point(_arena_half_extent - bounds_margin, _placed_points, _anchor_points)
+## el terreno; queda anotado para los siguientes. `reach` son los metros que
+## ocupa alrededor de su centro (el marco de un portal).
+func claim_clear_point(reach: float = 0.0) -> Vector3:
+	var spot := _find_clear_point(_arena_half_extent - bounds_margin, _placed_points,
+			_anchor_points, reach)
 	_placed_points.append(spot)
 	return Vector3(spot.x, terrain_height(spot), spot.y)
 
@@ -223,7 +271,7 @@ func ring_sample(origin: Vector3, angle: float, min_distance: float,
 func ring_point(origin: Vector3, min_distance: float, max_distance: float) -> Vector3:
 	for attempt in RING_POINT_ATTEMPTS:
 		var pos := ring_sample(origin, randf() * TAU, min_distance, max_distance)
-		if walkable(pos):
+		if walkable(pos) and lands_on_ground(pos):
 			return pos
 	return Vector3.INF
 
@@ -259,7 +307,7 @@ func exit_portal_point(min_distance: float) -> Vector3:
 	var best_distance := -1.0
 	for attempt in CLEAR_POINT_ATTEMPTS:
 		var candidate := Vector3(randf_range(-limit, limit), 0.0, randf_range(-limit, limit))
-		if not walkable(candidate):
+		if not walkable(candidate) or not lands_on_ground(candidate):
 			continue
 		var nearest := distance_to_nearest_player(candidate)
 		if nearest > best_distance:
@@ -286,16 +334,17 @@ func distance_to_nearest_player(at: Vector3) -> float:
 
 
 ## Busca al azar un punto dentro de +-limit que cumpla todas las
-## distancias; si se acaban los intentos devuelve el mejor candidato visto,
-## así un mapa lleno empeora en vez de colgarse.
+## distancias, para algo que ocupa `reach` metros alrededor de su centro; si
+## se acaban los intentos devuelve el mejor candidato visto, así un mapa
+## lleno empeora en vez de colgarse.
 func _find_clear_point(limit: float, placed: Array[Vector2],
-		anchors: Array[Vector2]) -> Vector2:
+		anchors: Array[Vector2], reach: float = 0.0) -> Vector2:
 	var best := Vector2.ZERO
 	var best_score := -INF
 	for attempt in CLEAR_POINT_ATTEMPTS:
 		var candidate := Vector2(randf_range(-limit, limit), randf_range(-limit, limit))
 		# Nunca en una celda bloqueada de la máscara.
-		if not walkable_xz(candidate):
+		if not walkable_xz(candidate, reach):
 			continue
 		var clearance := candidate.length() - min_distance_from_spawn
 		for other: Vector2 in placed:

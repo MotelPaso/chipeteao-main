@@ -7,8 +7,9 @@ extends SubViewport
 ##
 ## Del enemigo solo entra su nodo Visual (las mallas): la escena se instancia
 ## fuera del árbol, se le saca ese nodo y el resto se libera, así su IA, su
-## vida y su colisión nunca corren aquí. Una escena que no existe o que no
-## tiene Visual deja el escenario vacío, sin errores.
+## vida y su colisión nunca corren aquí. Lo que sí corre es el rig que viva
+## bajo Visual (el de un jefe), que anima el modelo. Una escena que no existe
+## o que no tiene Visual deja el escenario vacío, sin errores.
 
 ## Nombre del nodo con las mallas en cada escena de enemigo.
 const VISUAL_NODE := "Visual"
@@ -37,6 +38,7 @@ func show_enemy(scene_path: String) -> bool:
 		return false
 	var visual := enemy.get_node_or_null(VISUAL_NODE) as Node3D
 	if visual != null:
+		_adopt_parts(visual, enemy)
 		enemy.remove_child(visual)
 	enemy.free()
 	if visual == null:
@@ -57,6 +59,15 @@ func clear() -> void:
 ## Gira el cuerpo a ese ángulo (grados): 0 = de frente a la cámara.
 func set_angle(degrees: float) -> void:
 	_pivot.rotation = Vector3(0.0, deg_to_rad(degrees), 0.0)
+
+
+## Pasa a `visual` los nodos de su rama que eran de `enemy`. Un rig con
+## script (Mythos, la Langosta) busca sus piezas con %Nombre, que se resuelve
+## por el owner: sin esto quedarían sin owner al liberar al enemigo.
+func _adopt_parts(visual: Node, enemy: Node) -> void:
+	for part: Node in visual.find_children("*", "", true, false):
+		if part.owner == enemy:
+			part.owner = visual
 
 
 ## Aleja la cámara hasta que el cuerpo entero quepa, lo mida lo que mida.

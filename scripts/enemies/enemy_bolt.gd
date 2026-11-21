@@ -86,6 +86,13 @@ func _on_body_entered(body: Node3D) -> void:
 	_spend()
 
 
+## Se apaga en el aire sin dañar a nadie (murió quien la disparó). Una que
+## ya volvió al pool no cambia.
+func fizzle() -> void:
+	if not _spent:
+		_spend()
+
+
 func _spend() -> void:
 	_spent = true
 	Pools.release(self)

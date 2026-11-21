@@ -2,10 +2,51 @@
 
 [ext_resource type="Script" path="res://scripts/ui/maps/map_overlay.gd" id="1_overlay"]
 [ext_resource type="PackedScene" path="res://scenes/ui/maps/MapSection.tscn" id="2_section"]
+[ext_resource type="PackedScene" path="res://scenes/ui/maps/MapView.tscn" id="3_view"]
+[ext_resource type="Script" path="res://scripts/ui/maps/map_legend.gd" id="4_legend"]
+[ext_resource type="Script" path="res://scripts/ui/maps/map_stats.gd" id="5_stats"]
+[ext_resource type="Script" path="res://scripts/ui/maps/map_players.gd" id="6_players"]
+[ext_resource type="Script" path="res://scripts/ui/maps/map_chips.gd" id="7_chips"]
+[ext_resource type="Shader" path="res://assets/ui/menu_backdrop.gdshader" id="8_backdrop"]
+[ext_resource type="Script" path="res://scripts/ui/maps/map_side_scroll.gd" id="9_side"]
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_veil"]
+shader = ExtResource("8_backdrop")
+shader_parameter/dim = 0.86
+shader_parameter/vignette = 0.1
+shader_parameter/reveal = 1.0
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_frame"]
+content_margin_left = 10.0
+content_margin_top = 10.0
+content_margin_right = 10.0
+content_margin_bottom = 10.0
+bg_color = Color(1, 0.957, 0.863, 1)
+border_width_left = 5
+border_width_top = 5
+border_width_right = 5
+border_width_bottom = 5
+border_color = Color(0.082, 0.075, 0.102, 1)
+corner_radius_top_left = 16
+corner_radius_top_right = 16
+corner_radius_bottom_right = 16
+corner_radius_bottom_left = 16
+shadow_color = Color(0.082, 0.075, 0.102, 1)
+shadow_size = 1
+shadow_offset = Vector2(0, 7)
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_inner"]
+draw_center = false
+border_width_left = 3
+border_width_top = 3
+border_width_right = 3
+border_width_bottom = 3
+border_color = Color(0.082, 0.075, 0.102, 1)
 
 [node name="MapOverlay" type="Control" unique_id=1633279274]
 process_mode = 3
 visible = false
+clip_contents = true
 layout_mode = 3
 anchors_preset = 15
 anchor_right = 1.0
@@ -16,6 +57,8 @@ mouse_filter = 2
 script = ExtResource("1_overlay")
 
 [node name="Dim" type="ColorRect" parent="." unique_id=1761164385]
+editor_description = "El velo: el mismo oscurecido petróleo con viñeta de los menús (menu_backdrop.gdshader), con el mundo vivo detrás. Cuánto tapa se cambia en su material (dim, vignette)."
+material = SubResource("ShaderMaterial_veil")
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -23,82 +66,226 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
-color = Color(0.051, 0.133, 0.153, 0.95)
+color = Color(0.055, 0.165, 0.188, 1)
 
-[node name="Header" type="Label" parent="." unique_id=1590550050]
-unique_name_in_owner = true
-layout_mode = 0
-offset_left = 18.0
-offset_top = 18.0
-offset_right = 18.0
-offset_bottom = 18.0
-theme_override_colors/font_color = Color(1, 0.957, 0.863, 1)
-theme_override_colors/font_outline_color = Color(0.082, 0.075, 0.102, 1)
-theme_override_constants/outline_size = 6
-theme_override_font_sizes/font_size = 20
-text = "Etapa 1 — 00:00"
-
-[node name="Legend" type="VBoxContainer" parent="." unique_id=1187012115]
+[node name="Layout" type="MarginContainer" parent="." unique_id=604419873]
 unique_name_in_owner = true
 layout_mode = 1
-anchors_preset = 2
-anchor_top = 1.0
-anchor_bottom = 1.0
-offset_left = 18.0
-offset_top = -18.0
-offset_right = 18.0
-offset_bottom = -18.0
-grow_vertical = 0
-mouse_filter = 2
-theme_override_constants/separation = 3
-
-[node name="Panels" type="VBoxContainer" parent="." unique_id=111535769]
-layout_mode = 1
-anchors_preset = -1
-anchor_left = 0.6
+anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
-offset_left = 14.0
-offset_top = 18.0
-offset_right = -18.0
-offset_bottom = -18.0
-grow_horizontal = 0
+grow_horizontal = 2
+grow_vertical = 2
 mouse_filter = 2
-theme_override_constants/separation = 10
+theme_override_constants/margin_left = 16
+theme_override_constants/margin_top = 10
+theme_override_constants/margin_right = 16
+theme_override_constants/margin_bottom = 14
 
-[node name="PowerUps" parent="Panels" unique_id=266595182 instance=ExtResource("2_section")]
+[node name="Columns" type="HBoxContainer" parent="Layout" unique_id=1195520367]
 unique_name_in_owner = true
 layout_mode = 2
-title = "Power-ups"
+mouse_filter = 2
+theme_override_constants/separation = 18
 
-[node name="Pet" parent="Panels" unique_id=1332296838 instance=ExtResource("2_section")]
+[node name="MapColumn" type="VBoxContainer" parent="Layout/Columns" unique_id=1924698427]
 unique_name_in_owner = true
 layout_mode = 2
-title = "Mascota"
+mouse_filter = 2
+theme_override_constants/separation = 8
 
-[node name="Stats" parent="Panels" unique_id=2056912096 instance=ExtResource("2_section")]
+[node name="HeaderRow" type="HBoxContainer" parent="Layout/Columns/MapColumn" unique_id=853306121]
+unique_name_in_owner = true
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/separation = 8
+
+[node name="Header" type="Label" parent="Layout/Columns/MapColumn/HeaderRow" unique_id=1590550050]
+unique_name_in_owner = true
+editor_description = "El título, como el del menú principal: amarillo, con contorno de tinta. Su tamaño lo pone map_overlay.gd (grupo Encabezado)."
+layout_mode = 2
+size_flags_horizontal = 3
+theme_type_variation = &"TitleLabel"
+text = "Etapa 1 — 00:00"
+clip_text = true
+text_overrun_behavior = 3
+
+[node name="Square" type="AspectRatioContainer" parent="Layout/Columns/MapColumn" unique_id=1320087745]
+unique_name_in_owner = true
+layout_mode = 2
+mouse_filter = 2
+alignment_horizontal = 0
+alignment_vertical = 0
+
+[node name="MapFrame" type="PanelContainer" parent="Layout/Columns/MapColumn/Square" unique_id=977253614]
+editor_description = "El marco del mapa: un sticker de papel con contorno de tinta y sombra dura."
+layout_mode = 2
+mouse_filter = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_frame")
+
+[node name="MapView" parent="Layout/Columns/MapColumn/Square/MapFrame" unique_id=1688142093 instance=ExtResource("3_view")]
+unique_name_in_owner = true
+layout_mode = 2
+marker_scale = 1.7
+marker_reference_side = 600.0
+show_player_tags = true
+
+[node name="Inner" type="Panel" parent="Layout/Columns/MapColumn/Square/MapFrame" unique_id=1502336178]
+editor_description = "La línea de tinta entre el papel del marco y el mapa."
+layout_mode = 2
+mouse_filter = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_inner")
+
+[node name="BadgeSlot" type="MarginContainer" parent="Layout/Columns/MapColumn/Square/MapFrame" unique_id=1298847750]
+editor_description = "La chapa va en la esquina del mapa, como el dato vivo de una tarjeta del menú principal."
+layout_mode = 2
+size_flags_horizontal = 0
+size_flags_vertical = 0
+mouse_filter = 2
+theme_override_constants/margin_left = 8
+theme_override_constants/margin_top = 8
+theme_override_constants/margin_right = 8
+theme_override_constants/margin_bottom = 8
+
+[node name="Explored" type="Label" parent="Layout/Columns/MapColumn/Square/MapFrame/BadgeSlot" unique_id=411936685]
+unique_name_in_owner = true
+layout_mode = 2
+theme_type_variation = &"BadgeLabel"
+theme_override_colors/font_color = Color(0.498, 0.831, 0.941, 1)
+theme_override_font_sizes/font_size = 14
+text = "Explorado 0%"
+
+[node name="Legend" type="HFlowContainer" parent="Layout/Columns/MapColumn" unique_id=1187012115]
+unique_name_in_owner = true
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/h_separation = 12
+theme_override_constants/v_separation = 2
+script = ExtResource("4_legend")
+
+[node name="SideColumn" type="VBoxContainer" parent="Layout/Columns" unique_id=1077340125]
+layout_mode = 2
+size_flags_horizontal = 3
+mouse_filter = 2
+theme_override_constants/separation = 4
+
+[node name="Side" type="ScrollContainer" parent="Layout/Columns/SideColumn" unique_id=111535769]
+unique_name_in_owner = true
+editor_description = "Recorta los paneles si alguna vez no caben: nunca se salen de la celda del jugador. Sin barras (nada aquí recibe el mouse ni el foco); si ni el escalón más apretado cabe, se desliza sola de arriba abajo (map_side_scroll.gd, grupo Deslizamiento)."
+layout_mode = 2
+size_flags_vertical = 3
+mouse_filter = 2
+horizontal_scroll_mode = 0
+vertical_scroll_mode = 3
+script = ExtResource("9_side")
+
+[node name="Panels" type="VBoxContainer" parent="Layout/Columns/SideColumn/Side" unique_id=1441673950]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+mouse_filter = 2
+
+[node name="StatsPanel" parent="Layout/Columns/SideColumn/Side/Panels" unique_id=2056912096 instance=ExtResource("2_section")]
 unique_name_in_owner = true
 layout_mode = 2
 title = "Estadísticas"
+tile_color = Color(1, 0.824, 0.247, 1)
+tilt_degrees = -0.7
 
-[node name="Players" parent="Panels" unique_id=1179300555 instance=ExtResource("2_section")]
+[node name="Stats" type="GridContainer" parent="Layout/Columns/SideColumn/Side/Panels/StatsPanel/Content/Box" unique_id=1722908465]
+unique_name_in_owner = true
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/h_separation = 20
+theme_override_constants/v_separation = 2
+script = ExtResource("5_stats")
+
+[node name="PlayersPanel" parent="Layout/Columns/SideColumn/Side/Panels" unique_id=1179300555 instance=ExtResource("2_section")]
 unique_name_in_owner = true
 layout_mode = 2
 title = "Jugadores"
+tile_color = Color(1, 0.957, 0.863, 1)
+tilt_degrees = 0.6
 
-[node name="Items" parent="Panels" unique_id=1426141947 instance=ExtResource("2_section")]
+[node name="Players" type="GridContainer" parent="Layout/Columns/SideColumn/Side/Panels/PlayersPanel/Content/Box" unique_id=590114276]
+unique_name_in_owner = true
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/h_separation = 20
+theme_override_constants/v_separation = 4
+script = ExtResource("6_players")
+
+[node name="Extras" type="HBoxContainer" parent="Layout/Columns/SideColumn/Side/Panels" unique_id=1602775931]
+unique_name_in_owner = true
+layout_mode = 2
+mouse_filter = 2
+
+[node name="PowerUpsPanel" parent="Layout/Columns/SideColumn/Side/Panels/Extras" unique_id=266595182 instance=ExtResource("2_section")]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+title = "Power-ups"
+tile_color = Color(0.949, 0.329, 0.176, 1)
+tilt_degrees = 0.9
+
+[node name="PowerUps" type="HFlowContainer" parent="Layout/Columns/SideColumn/Side/Panels/Extras/PowerUpsPanel/Content/Box" unique_id=833514027]
+unique_name_in_owner = true
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/h_separation = 10
+theme_override_constants/v_separation = 4
+script = ExtResource("7_chips")
+
+[node name="PetPanel" parent="Layout/Columns/SideColumn/Side/Panels/Extras" unique_id=1332296838 instance=ExtResource("2_section")]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+title = "Mascota"
+tile_color = Color(0.357, 0.839, 0.627, 1)
+tilt_degrees = -1.0
+
+[node name="Pet" type="Label" parent="Layout/Columns/SideColumn/Side/Panels/Extras/PetPanel/Content/Box" unique_id=1045238819]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.082, 0.075, 0.102, 1)
+theme_override_font_sizes/font_size = 15
+text = "Sin mascota"
+clip_text = true
+text_overrun_behavior = 3
+
+[node name="ItemsPanel" parent="Layout/Columns/SideColumn/Side/Panels" unique_id=1426141947 instance=ExtResource("2_section")]
 unique_name_in_owner = true
 layout_mode = 2
 title = "Objetos"
+tile_color = Color(0.498, 0.831, 0.941, 1)
+tilt_degrees = 0.5
 
-[node name="MapArea" type="Control" parent="." unique_id=1924698427]
+[node name="Items" type="HFlowContainer" parent="Layout/Columns/SideColumn/Side/Panels/ItemsPanel/Content/Box" unique_id=2118406392]
 unique_name_in_owner = true
-layout_mode = 1
-anchors_preset = -1
-anchor_right = 0.6
-anchor_bottom = 1.0
-offset_left = 18.0
-offset_top = 58.0
-offset_right = -18.0
-offset_bottom = -18.0
+layout_mode = 2
 mouse_filter = 2
+theme_override_constants/h_separation = 12
+theme_override_constants/v_separation = 4
+script = ExtResource("7_chips")
+
+[node name="SideLegend" type="HFlowContainer" parent="Layout/Columns/SideColumn/Side/Panels" unique_id=736019452]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/h_separation = 12
+theme_override_constants/v_separation = 2
+script = ExtResource("4_legend")
+
+[node name="HintSlot" type="HBoxContainer" parent="Layout/Columns/SideColumn" unique_id=1930842267]
+unique_name_in_owner = true
+editor_description = "map_overlay.gd agrega aquí la indicación del botón que cierra el mapa (InputHints), como las del pie del menú principal. Solo se ve cuando hay espacio."
+layout_mode = 2
+mouse_filter = 2
+alignment = 2
+
+[editable path="Layout/Columns/SideColumn/Side/Panels/StatsPanel"]
+[editable path="Layout/Columns/SideColumn/Side/Panels/PlayersPanel"]
+[editable path="Layout/Columns/SideColumn/Side/Panels/Extras/PowerUpsPanel"]
+[editable path="Layout/Columns/SideColumn/Side/Panels/Extras/PetPanel"]
+[editable path="Layout/Columns/SideColumn/Side/Panels/ItemsPanel"]

@@ -1,120 +1,120 @@
 class_name Minimap
 extends Control
-## Minimapa con el norte arriba, uno por vista de jugador. Dibuja la
-## composición de MapDraw (el relieve de la etapa, oscurecido donde la máscara
-## de la arena lo bloquea y atenuado donde la niebla no se ha explorado) más
-## los marcadores que la niebla ya reveló.
+## Minimapa de una vista de jugador (Minimap.tscn): un disco con el aspecto de
+## un sticker del menú principal (contorno de tinta grueso, un aro de papel y
+## sombra dura) que muestra el mapa alrededor de SU jugador, con la flecha de
+## ese jugador al centro. Lo que queda fuera de la vista y vale la pena
+## perseguir (compañeros, jefe y salida) se ancla a la orilla.
 ##
 ## Los enemigos comunes NUNCA se dibujan: un minimapa con cuarenta puntos es
 ## ruido, y la horda es lo que el jugador ya está mirando. El mapa sirve para
 ## lo que NO ves desde donde estás: el cofre tras dos colinas, el altar sin
 ## cargar, la salida.
 ##
-## Se reconstruye desde WorldDirector.on_stage_started (reenviado por el HUD),
-## no desde la señal stage_changed: esa llamada también ocurre en la etapa 0,
-## así que la primera etapa no necesita caso especial.
+## El mapa en sí (suelo, niebla y marcadores) es el hijo View, un MapView:
+## cuánto terreno muestra, la escala de los marcadores y los colores del suelo
+## son exports de ese nodo. El grosor total del aro es el margen de View
+## dentro de este nodo. Posición y tamaño los pone quien lo crea: ViewWidgets,
+## con el rectángulo de HUD.tscn > ViewWidgets > MinimapSlot.
 ##
-## Posición y tamaño los pone quien lo crea: ViewWidgets, con el rectángulo de
-## HUD.tscn > ViewWidgets > MinimapSlot.
+## Ningún nodo de la escena toma foco ni recibe el mouse: Tab tiene que llegar
+## al mapa grande, no recorrer la cadena de foco, y un clic es del mundo.
 
-# --- Edita aquí: se crea con .new(), así que no tiene Inspector. -----------
-## Margen del mapa dentro de su marco, en píxeles.
-const FRAME_PAD: float = 3.0
-## Escala de los marcadores respecto del mapa de Tab (más chicos aquí).
-const MARKER_SCALE: float = 0.75
-## Color de fondo del marco.
-const BACKGROUND_COLOR := Color(0.05, 0.055, 0.08, 0.85)
-## Grosor del borde, en píxeles.
-const BORDER_WIDTH: float = 2.0
-## Cuánto se oscurece el turquesa de UiTheme.ACCENT para el borde (0-1).
-const BORDER_DARKEN: float = 0.2
-## Segundos entre recolecciones de marcadores y revisiones de la composición.
-## La niebla pinta en su propio tick, más lento; esto la convierte en imagen
-## cuando cambió (ver _composite_if_changed).
-const REFRESH: float = 0.1
+@export_group("Jugador")
+## Qué jugador es dueño de este minimapa (ranura 0-3). Lo asigna ViewWidgets.
+@export var slot: int = 0
+@export_group("Vista")
+## Gira el mapa con la cámara del jugador, así lo que tiene delante queda
+## arriba. Apagado, el norte queda siempre arriba y solo gira la flecha.
+@export var rotate_with_view: bool = true
+@export_group("Marco")
+## Color del contorno de tinta, por fuera y por dentro del aro.
+@export var ring_color: Color = UiTheme.INK
+## Color del aro, entre los dos contornos.
+@export var band_color: Color = UiTheme.PAPER
+## Grosor del contorno de afuera, en píxeles. El aro de color ocupa lo que
+## queda del margen de View.
+@export var outline_width: float = 4.0
+## Grosor del contorno de adentro, en píxeles.
+@export var inner_outline_width: float = 2.5
+## Color de la sombra dura bajo el disco.
+@export var shadow_color: Color = UiTheme.SHADOW_COLOR
+## Desplazamiento de la sombra dura bajo el disco, en píxeles.
+@export var shadow_offset: Vector2 = Vector2(0.0, 5.0)
+@export_group("Norte")
+## Distancia del centro de la chapa «N» a la orilla del disco, en píxeles.
+@export var north_inset: float = 9.0
 
-var _map: MapDraw = null
-var _refresh_left: float = 0.0
-## composite_key() de la última composición de este widget. Vacío significa
-## "desconocido": el próximo refresco compone sin mirar la clave.
-var _composited: Array = []
+## Último cuerpo visto para esta ranura. Solo evita buscarlo en los grupos
+## cada cuadro: si deja de servir, se vuelve a buscar.
+var _raider: Node3D = null
+
+@onready var _view: MapView = $View
+@onready var _north: Label = $North
 
 
 func _ready() -> void:
-	# Nunca se come un clic destinado al mundo ni toma el foco (Tab tiene que
-	# llegar al mapa grande, no recorrer la cadena de foco).
-	mouse_filter = Control.MOUSE_FILTER_IGNORE
-	focus_mode = Control.FOCUS_NONE
-	_map = MapDraw.new(get_tree())
-	_map.build_background()
+	_view.focus_slot = slot
+	resized.connect(queue_redraw)
 
 
-## Gancho de etapa, reenviado por el HUD desde WorldDirector.on_stage_started.
-func on_stage_started(_arena: Node3D = null) -> void:
-	if _map == null:
-		_map = MapDraw.new(get_tree())
-	_map.build_background()
-	# build_background reescribe los píxeles de la imagen, y la clave no ve un
-	# cambio dentro de una Image que ya conoce: se olvida, para que el próximo
-	# refresco componga sí o sí.
-	_composited = []
-	_map.collect_markers()
-	queue_redraw()
-
-
-func _process(delta: float) -> void:
-	if _map == null:
+func _process(_delta: float) -> void:
+	var raider := _own_raider()
+	if raider == null:
 		return
-	_refresh_left -= delta
-	if _refresh_left > 0.0:
-		return
-	_refresh_left = REFRESH
-	# Ambos son métodos simples sin Control, así que un soak headless ejercita
-	# el mapa aunque _draw() nunca se despache. Los marcadores se mueven y se
-	# recolectan en cada tick; la composición solo cuando cambiaron sus entradas.
-	_map.collect_markers()
-	_composite_if_changed()
-	queue_redraw()
-
-
-## MapDraw.composite() depende solo de la imagen de fondo y de la de niebla:
-## un bucle de get_pixel/set_pixel sobre 14 400 píxeles (~1.5 ms de GDScript).
-## La niebla solo cambia cuando un jugador pisa suelo que nadie había visto,
-## así que en la mayoría de los ticks la textura sería la que ya está en pantalla.
-func _composite_if_changed() -> void:
-	var key := composite_key(_map, get_tree())
-	if key == _composited:
-		return
-	_composited = key
-	_map.composite()
-
-
-## Todo lo que lee MapDraw.composite(), como un valor comparable: la Image de
-## fondo del mapa (build_background pone una nueva por etapa), el nodo de
-## niebla y su revisión (que cambia justo cuando cambia su imagen). Claves
-## iguales significan que composite() escribiría los mismos píxeles. Los
-## cambios DENTRO del fondo no se ven aquí; por eso cada llamada a
-## build_background también borra la clave del llamador. Estático y compartido
-## con MapOverlay, para que ambos coincidan sobre cuándo su imagen está vieja.
-static func composite_key(map: MapDraw, tree: SceneTree) -> Array:
-	var fog := FogOfWar.find(tree)
-	return [
-		map.background.get_instance_id() if map.background != null else 0,
-		fog.get_instance_id() if fog != null else 0,
-		fog.revision if fog != null else -1,
-	]
-
-
-func marker_count() -> int:
-	return _map.marker_count() if _map != null else 0
+	# Cada cuadro y no en el refresco del mapa: la vista sigue al jugador, y a
+	# diez pasos por segundo el mapa se vería a saltos al girar.
+	var yaw := _view_yaw(raider) if rotate_with_view else 0.0
+	_view.look_at_world(Vector2(raider.global_position.x, raider.global_position.z), yaw)
+	_place_north()
 
 
 func _draw() -> void:
-	if _map == null:
-		return
-	var frame := Rect2(Vector2.ZERO, size)
-	draw_rect(frame, BACKGROUND_COLOR, true)
-	var inner := Rect2(Vector2(FRAME_PAD, FRAME_PAD),
-			size - Vector2(FRAME_PAD, FRAME_PAD) * 2.0)
-	_map.draw_into(self, inner, MARKER_SCALE)
-	draw_rect(frame, UiTheme.ACCENT.darkened(BORDER_DARKEN), false, BORDER_WIDTH)
+	var radius := minf(size.x, size.y) * 0.5
+	var middle := size * 0.5
+	# De afuera hacia adentro: sombra, tinta, aro de color y tinta otra vez.
+	var inner := radius - _view.offset_left
+	_draw_disc(middle + shadow_offset, radius, shadow_color)
+	_draw_disc(middle, radius, ring_color)
+	_draw_disc(middle, radius - outline_width, band_color)
+	_draw_disc(middle, inner + inner_outline_width, ring_color)
+
+
+## El mapa compartido que muestra este minimapa (lo crea ViewWidgets).
+func set_map(map: MapDraw) -> void:
+	$View.set_map(map)
+
+
+## Disco relleno con la orilla suavizada (draw_circle solo deja dientes).
+func _draw_disc(middle: Vector2, radius: float, color: Color) -> void:
+	draw_circle(middle, radius - 0.5, color)
+	draw_arc(middle, radius - 0.75, 0.0, TAU, 64, color, 1.5, true)
+
+
+## El jugador de esta ranura, de pie o caído; null si la ranura está vacía.
+func _own_raider() -> Node3D:
+	if is_instance_valid(_raider) and _raider.is_inside_tree() \
+			and int(_raider.get("player_index")) == slot:
+		return _raider
+	_raider = PartySlots.raider_at(get_tree(), slot)
+	return _raider
+
+
+## Giro de la VISTA del jugador: hacia dónde mira su cámara, que en órbita
+## libre no es hacia donde mira el cuerpo. Sin cámara, el giro del cuerpo.
+func _view_yaw(raider: Node3D) -> float:
+	var camera: Camera3D = raider.call(&"view_camera") if raider.has_method(&"view_camera") \
+			else null
+	if camera == null:
+		return raider.global_rotation.y
+	var forward := -camera.global_transform.basis.z
+	# Mirando recto hacia abajo no hay rumbo plano: se queda con el del cuerpo.
+	if Vector2(forward.x, forward.z).length_squared() < 0.0001:
+		return raider.global_rotation.y
+	return atan2(-forward.x, -forward.z)
+
+
+## Lleva la chapa «N» a la orilla, hacia donde queda el norte en la vista.
+func _place_north() -> void:
+	var reach := minf(size.x, size.y) * 0.5 - north_inset
+	_north.position = size * 0.5 + _view.north() * reach - _north.size * 0.5

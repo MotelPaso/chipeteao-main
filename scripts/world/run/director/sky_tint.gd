@@ -7,6 +7,9 @@ extends RefCounted
 ## Orden obligatorio: forget() en cada inicio de etapa (si no, la etapa 2
 ## teñiría el sol ya liberado de la etapa 1 y ningún cielo se vería) y
 ## snap_back() antes de que la arena se libere.
+## Una arena puede cambiar de cielo a mitad de etapa (el bosque que se vuelve
+## infierno): rebase() reemplaza el cielo «original» al que vuelven restore()
+## y snap_back(), así ningún clima devuelve el cielo anterior.
 
 ## Edita aquí: segundos del paso al tinte y de la vuelta al cielo original.
 const TINT_SECONDS: float = 1.5
@@ -67,6 +70,35 @@ func cache(layout: StageLayout) -> void:
 		_ambient_color = _environment.ambient_light_color
 		_ambient_energy = _environment.ambient_light_energy
 		break
+
+
+## Reemplaza el cielo «original» de la arena: desde ahora restore() y
+## snap_back() vuelven a estos valores y tint() multiplica esta energía. No
+## mueve ninguna luz: quien cambia el cielo de la arena lo anima por su
+## cuenta. Corta el tinte o la vuelta que estuviera en curso: ese tween
+## apunta al cielo anterior y lo traería de vuelta al terminar.
+func rebase(sun_color: Color, sun_energy: float, ambient_color: Color,
+		ambient_energy: float) -> void:
+	_kill_tween()
+	_sun_color = sun_color
+	_sun_energy = sun_energy
+	_ambient_color = ambient_color
+	_ambient_energy = ambient_energy
+
+
+## El Environment propio de esta arena (la copia que hizo cache()), o null.
+func environment() -> Environment:
+	return _environment
+
+
+## El cielo «original» de ahora, el que devuelve restore(): quien cambia el
+## cielo de la arena por un rato lo guarda para devolverlo con rebase().
+## Claves: sun_color, sun_energy, ambient_color y ambient_energy.
+func base() -> Dictionary:
+	return {
+		"sun_color": _sun_color, "sun_energy": _sun_energy,
+		"ambient_color": _ambient_color, "ambient_energy": _ambient_energy,
+	}
 
 
 ## Lleva el sol y el ambiente a un tinte en TINT_SECONDS. `sun_energy`

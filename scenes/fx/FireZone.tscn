@@ -1,0 +1,60 @@
+[gd_scene load_steps=11 format=3]
+
+[ext_resource type="Script" path="res://scripts/fx/fire_zone.gd" id="1_zone"]
+[ext_resource type="Shader" path="res://assets/shaders/fire_zone.gdshader" id="2_shader"]
+[ext_resource type="Shader" path="res://assets/shaders/fire_spark.gdshader" id="3_spark"]
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_zone"]
+shader = ExtResource("2_shader")
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_disc"]
+material = SubResource("ShaderMaterial_zone")
+top_radius = 1.0
+bottom_radius = 1.0
+height = 0.1
+radial_segments = 48
+rings = 0
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_flame"]
+shader = ExtResource("3_spark")
+shader_parameter/color = Color(1, 0.6, 0.14, 1)
+shader_parameter/ascended_color = Color(0.3, 0.75, 1, 1)
+
+[sub_resource type="BoxMesh" id="BoxMesh_flame"]
+material = SubResource("ShaderMaterial_flame")
+size = Vector3(0.2, 0.2, 0.2)
+
+[sub_resource type="Curve" id="Curve_shrink"]
+_data = [Vector2(0, 1), 0.0, 0.0, 0, 0, Vector2(1, 0), 0.0, 0.0, 0, 0]
+point_count = 2
+
+[sub_resource type="CurveTexture" id="CurveTexture_shrink"]
+curve = SubResource("Curve_shrink")
+
+[sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_flames"]
+emission_shape = 3
+emission_box_extents = Vector3(1.7, 0.05, 1.7)
+direction = Vector3(0, 1, 0)
+spread = 12.0
+initial_velocity_min = 1.2
+initial_velocity_max = 2.6
+gravity = Vector3(0, 2.5, 0)
+scale_min = 0.5
+scale_max = 1.1
+scale_curve = SubResource("CurveTexture_shrink")
+
+[node name="FireZone" type="Node3D"]
+script = ExtResource("1_zone")
+
+[node name="Disc" type="MeshInstance3D" parent="."]
+cast_shadow = 0
+mesh = SubResource("CylinderMesh_disc")
+
+[node name="Flames" type="GPUParticles3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.1, 0)
+cast_shadow = 0
+emitting = false
+amount = 22
+lifetime = 0.9
+process_material = SubResource("ParticleProcessMaterial_flames")
+draw_pass_1 = SubResource("BoxMesh_flame")

@@ -57,6 +57,7 @@ const BACKUP_SUFFIX := ".bak"
 ## jugador.
 const DEFAULT_SFX_VOLUME := 100.0
 const DEFAULT_AMBIENT_VOLUME := 100.0
+const DEFAULT_MUSIC_VOLUME := 100.0
 const DEFAULT_MOUSE_SENSITIVITY := 1.0
 const MIN_MOUSE_SENSITIVITY := 0.3
 const MAX_MOUSE_SENSITIVITY := 2.0
@@ -113,6 +114,7 @@ var relic_ranks: Dictionary[String, int] = {}
 # y a la ventana y es el único que los escribe, ver settings_apply.gd) ------
 var sfx_volume: float = DEFAULT_SFX_VOLUME
 var ambient_volume: float = DEFAULT_AMBIENT_VOLUME
+var music_volume: float = DEFAULT_MUSIC_VOLUME
 ## Multiplicador de la velocidad de mirada sobre la base exportada del jugador.
 var mouse_sensitivity: float = DEFAULT_MOUSE_SENSITIVITY
 var fullscreen: bool = false
@@ -527,6 +529,7 @@ func _apply_defaults() -> void:
 	relic_ranks = {}
 	sfx_volume = DEFAULT_SFX_VOLUME
 	ambient_volume = DEFAULT_AMBIENT_VOLUME
+	music_volume = DEFAULT_MUSIC_VOLUME
 	mouse_sensitivity = DEFAULT_MOUSE_SENSITIVITY
 	fullscreen = false
 	show_fps = false
@@ -542,6 +545,8 @@ func _load_settings(value: Variant) -> void:
 	sfx_volume = clampf(_as_float(settings.get("sfx_volume"), DEFAULT_SFX_VOLUME), 0.0, 100.0)
 	ambient_volume = clampf(
 			_as_float(settings.get("ambient_volume"), DEFAULT_AMBIENT_VOLUME), 0.0, 100.0)
+	music_volume = clampf(
+			_as_float(settings.get("music_volume"), DEFAULT_MUSIC_VOLUME), 0.0, 100.0)
 	mouse_sensitivity = clampf(
 			_as_float(settings.get("mouse_sensitivity"), DEFAULT_MOUSE_SENSITIVITY),
 			MIN_MOUSE_SENSITIVITY, MAX_MOUSE_SENSITIVITY)
@@ -567,6 +572,7 @@ func _to_save_dict() -> Dictionary[String, Variant]:
 		"settings": {
 			"sfx_volume": sfx_volume,
 			"ambient_volume": ambient_volume,
+			"music_volume": music_volume,
 			"mouse_sensitivity": mouse_sensitivity,
 			"fullscreen": fullscreen,
 			"show_fps": show_fps,

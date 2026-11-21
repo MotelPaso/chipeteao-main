@@ -3,11 +3,7 @@
 importer="scene"
 importer_version=1
 type="PackedScene"
-<<<<<<< HEAD
-uid="uid://e5hyymuk0plm"
-=======
 uid="uid://sq36h66v0r30"
->>>>>>> origin/main
 path="res://.godot/imported/chest.glb-4f01f29d9bf9aeaf0dd3255b4486773a.scn"
 
 [deps]
@@ -20,11 +16,6 @@ dest_files=["res://.godot/imported/chest.glb-4f01f29d9bf9aeaf0dd3255b4486773a.sc
 nodes/root_type=""
 nodes/root_name=""
 nodes/root_script=null
-<<<<<<< HEAD
-mesh_library/use_node_names_as_mesh_names=false
-array_mesh/deduplicate_surfaces=true
-=======
->>>>>>> origin/main
 nodes/apply_root_scale=true
 nodes/root_scale=1.0
 nodes/import_as_skeleton_bones=false
@@ -49,7 +40,3 @@ materials/extract_path=""
 _subresources={}
 gltf/naming_version=2
 gltf/embedded_image_handling=1
-<<<<<<< HEAD
-gltf/texture_map_mode=1
-=======
->>>>>>> origin/main

@@ -59,8 +59,8 @@ const SFX_EXPORT_PATTERN := "^@export var \\w+_(?:sound|loop): StringName = &\"(
 const SFX_SCENE_PATTERN := "^\\w+_(?:sound|loop) = &\"([^\"]+)\"$"
 ## Un literal StringName dentro de los argumentos de una llamada.
 const STRING_NAME_PATTERN := "&\"([^\"]*)\""
-## Valores de `show` en MapOverlay.STAT_ROWS: las ramas del match de
-## MapOverlay._stat_value más "flat", su rama por defecto.
+## Valores de `show` en MapOverlay.STAT_ROWS: los que MapStats._bonus y
+## MapStats._bonus_text saben escribir.
 const STAT_ROW_SHOWS: Array[String] = ["multiplier", "attack_speed", "fraction", "flat"]
 
 var _checks_run: int = 0
@@ -706,8 +706,8 @@ func _check_sfx_ids() -> void:
 
 
 ## Cada fila de MapOverlay.STAT_ROWS. El mapa de Tab lee `property` de
-## PlayerStats por nombre: una propiedad renombrada muestra empty_text para
-## siempre sin ningún error, y un `show` desconocido se escribe como "flat".
+## PlayerStats por nombre: una propiedad renombrada muestra un guion para
+## siempre sin ningún error, y un `show` desconocido se escribe como fracción.
 func _check_stat_rows() -> void:
 	var failures: Array[String] = []
 	var rows := 0
@@ -725,6 +725,10 @@ func _check_stat_rows() -> void:
 		if not properties.has(property):
 			failures.append("stat row '%s' property '%s' is not a PlayerStats property"
 					% [label, property])
+		var base := String(row.get("base_property", ""))
+		if not base.is_empty() and not properties.has(base):
+			failures.append("stat row '%s' base_property '%s' is not a PlayerStats property"
+					% [label, base])
 		var shown := String(row.get("show", ""))
 		if not STAT_ROW_SHOWS.has(shown):
 			failures.append("stat row '%s' show '%s' is not one of %s"

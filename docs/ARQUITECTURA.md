@@ -57,7 +57,16 @@ El acoplamiento cruzado va siempre por aquí. Lista actual:
 | `ui_blocking`                 | toda UI que se adueña de la pausa (`BlockingUi.GROUP`)                                               | `is_blocking() -> bool`; `BlockingUi.any_open(tree)` / `other_open(...)` hacen la consulta                                                       |
 | `blocking_ui_closable`        | UI bloqueante que acepta cierre por código (`BlockingUi.CLOSABLE_GROUP`): todo `ModalPanel` (ruleta y vendedor) | `dismiss()` — **llamado por `RunRoot._freeze_world`** (primer paso de `_swap_stage`) antes de tomar la pausa; las dos además se resuelven solas en headless |
 | `feel_camera`                 | cámaras que Juice sacude (`Juice.FEEL_CAMERA_GROUP`)                                                 | shake / FOV kick en pantalla dividida                                                                                                             |
-| `scatter_keepout`             | props y POIs colocados a mano                                                                        | el scatter no siembra encima                                                                                                                      |
+| `scatter_keepout`             | props y POIs colocados a mano, y lo que `StageFixtures` pone al empezar la etapa                     | el scatter no siembra encima                                                                                                                      |
+| `party_power`                 | el `PartyPower` de `RunSystems`                                                                      | `dps(window)`, `focus_dps(window)`, `score()`, `breakdown()`; se busca con `PartyPower.find(tree)`                                                |
+| `stage_boss`                  | el jefe de etapa vivo (lo mete `BossSchedule`)                                                       | mientras hay uno los rejefes esperan; el harness le lee `fight_state()`                                                                           |
+| `fire_zones`                  | zonas de fuego vivas (`FireZone.GROUP`)                                                              | `extinguish()` cuando muere Mythos; el tope de `MythosZones`                                                                                      |
+| `stage_transformation`        | la `HellTransformation` de la arena                                                                  | `state_name()` (lo lee el harness)                                                                                                                |
+| `boss_cinematic`, `cinematic_camera`, `boss_music` | la cinemática de llegada de un jefe, su cámara y su canción                     | `is_calm_active()`, `calm_elapsed()`, `calm_progress()`, `skip_action()` (los lee el harness)                                                     |
+| `mini_boss`                   | el minijefe vivo de la arena (la Langosta Azul); lo pone `BossSchedule`                              | `fight_state()`, `move_name()` (los lee `MiniBossProbe`). **No** está en `stage_boss`                                                               |
+| `shock_rings`, `telegraph_lanes`, `splash_bursts` | efectos del pool que deja un ataque de jefe: onda de choque, carril de aviso y salpicón | `dissipate()` / `dismiss()`: quien los lanzó los apaga al morir; el harness cuenta lo que quede                                                   |
+| `lobster_tide`                | la `LobsterTide` de la arena mientras la Langosta Azul vive (y lo que tarda en bajar)                | `state_name()` (lo lee `MiniBossProbe`)                                                                                                           |
+| `split_screen`                | el `SplitScreen` de co-op                                                                            | la cinemática lo oculta durante la calma y lo devuelve                                                                                            |
 
 ## Clases base y helpers compartidos
 
@@ -73,7 +82,7 @@ Estas piezas existen para que un mismo cálculo no viva copiado en varios archiv
 | `scripts/systems/pickups/magnet_pickup.gd`      | `MagnetPickup`   | Chasis de los pickups tirados (`XpGem`, `HealthOrb`): idle con giro/bob, homing acelerado al raider en pie más cercano (radio × `RunState.pickup_radius_multiplier`), captura por proximidad y caducidad. La subclase aporta `LIVE_GROUP`, qué hace recolectar y el adorno propio.                                                          |
 | `scripts/ui/meta/meta_screen.gd`                | `MetaScreen`     | Chasis de las dos pantallas de lista entre partidas (Registro de misiones, Armería): fondo, insignia, botón Volver, entrada escalonada y el conteo de esquirlas. Contrato de escena: `%BadgeLabel`, `%List`, `%BackButton` (el título vive entero en la escena). Hooks: `_tracks_shards()`, `_slides_in()` (false = la pantalla hace su propia entrada en vez de deslizarse), `_build_rows(list)`; momentos compartidos: `payoff()`, `reject()`, `rebuild()`. |
 | `scripts/ui/card_factory.gd`                    | `CardFactory`    | Dos constructores sin estado, `label(...)` y `card_box(card)`, para las cartas que se arman en código (las ofertas del vendedor). Los colores siguen viniendo de `UiTheme`.                                                                                                                                                                |
-| `scripts/ui/ui_layers.gd`                       | `UiLayers`       | El orden de dibujo de las `CanvasLayer` que se crean en código (viñeta de Juice 4, mapa de Tab 8, fundido 100). Las capas de escena (HUD 5, cartas 10, modales 15, fin 20, pausa 30) guardan su número en la raíz de su `.tscn`.                                                                                                              |
+| `scripts/ui/ui_layers.gd`                       | `UiLayers`       | El orden de dibujo de las `CanvasLayer` que se crean en código (viñeta de Juice 4, mapa de Tab 8, fundido 100). Las capas de escena (HUD 5, carteles de las cinemáticas de jefe 9, cartas 10, modales 15, fin 20, pausa 30) guardan su número en su `.tscn`: en la raíz, o en el nodo `Overlay` de `MythosCinematic.tscn` y `LobsterEntrance.tscn` (y `Feel`, la viñeta de peligro de los jefes, en 4).                                                                                                              |
 | `scripts/ui/scene_paths.gd`                     | `ScenePaths`     | Las rutas de las escenas entre las que navega la UI (selector, Registro, Colección, Armería, `Run.tscn`).                                                                                                                                                                                                                                   |
 | `scripts/ui/game/modal/blocking_ui.gd`          | `BlockingUi`     | El contrato de pausa: los grupos `ui_blocking` / `blocking_ui_closable` y las consultas `any_open(tree)` / `other_open(tree, yo)`.                                                                                                                                                                                                          |
 | `scripts/ui/game/modal/modal_panel.gd`          | `ModalPanel`     | Chasis de los paneles que pausan la partida desde el mundo (vendedor, ruleta): toma y devuelve la pausa, se cierra si el comprador o el puesto desaparecen, `dismiss()` y el juego solo en headless. Escena base `scenes/ui/modal/ModalPanel.tscn`.                                                                                       |
@@ -277,16 +286,204 @@ cartel y luz) son nodos de `scenes/world/Vendor.tscn`.
 - **`apply_tier(hp_mult, damage_mult = -1.0, payout_mult = -1.0)`**: tres canales separados, `-1.0` = «igual que HP». El spawner los llena así, y la razón está en su comentario: HP lleva revancha × vuelta × dificultad × tamaño de party; **daño** lleva lo mismo **sin** el factor de party (cuatro cuerpos ya absorben más golpes: escalar también el golpe cobra doble); pago lleva revancha × vuelta solamente (`RunState.difficulty_xp_multiplier()` ya paga la parte de dificultad al recolectar). Compone: llamarlo dos veces multiplica dos veces.
 - Piezas compartidas del chasis: `_clamp_to_arena` y `_safe_arena_point` (respetan `arena_bounds`), la llegada (`_play_boss_entrance`, `_tick_entrance` / `_play_entrance`), `_consume_thresholds` (umbrales de vida que disparan fases), `_resolve_ground_hit(spots, radio, ventana_y, ...)` (resuelve un golpe de suelo telegrafiado con su destello y su temblor), `_spawn_spike_cluster(centro, radio)` (instancia `spike_cluster_scene`) y **un único slot de tween de señal** (`_play_cue`/`_begin_cue`/`_kill_cue`): dos telégrafos solapados no se pisan el visual.
 - Invocaciones: `call_group("enemy_spawner", "spawn_minions", escena, posiciones)`. Los esbirros pasan por **el mismo** escalado que un spawn de anillo (tier, rampa tardía, dificultad, buff temporal, HP de co-op, variante de cielo, tirada de shiny). Instanciarlos a mano se saltaba todo eso.
-- Horario: exportado en el spawner y **overrideado por arena** en la escena del mapa — `boss_scene`, `boss_spawn_minute` (5), `elder_spawn_minute` (11), `elder_stat_multiplier`, `elder_title`, `boss_warning_text`. El spawner imprime `Boss spawned:` para los soaks.
+- Horario: exportado en el spawner y **overrideado por arena** en la escena del mapa — `boss_scene`, `boss_spawn_minute` (5), `elder_spawn_minute` (11), `elder_stat_multiplier`, `elder_title`, `boss_warning_text`. El spawner imprime `Boss spawned:` para los soaks. `stage_boss_scene` cambia **quién** llega en el minuto 11 (ver «Jefe de etapa: Mythos»).
 - **No hay maldición por jefe.** El altar demoníaco sube `RunState.difficulty_bonus` para toda la partida y la ficha `DifficultyChip` del HUD (junto al reloj) muestra `+N%` con el icono de dificultad.
 - Jefes ocultos: `extends SecretBossBase` (ver Secretos).
+
+## Jefe de etapa: Mythos
+
+El **jefe de etapa** es el que abre la puerta de la etapa. Por defecto es la revancha Ancestral del jefe del mapa; una arena puede traer **otro jefe** en ese lugar. Hoy lo hace solo el Bosque Hueco, con Mythos, el fénix de fuego.
+
+### El slot
+
+- `EnemySpawner.stage_boss_scene` (grupo «Jefes»). Vacío: la revancha Ancestral de siempre (`boss_scene` otra vez, con `elder_stat_multiplier` y `elder_title`). Con una escena: **esa** llega en `elder_spawn_minute` (11), con multiplicador de stats 1.0 y el `boss_title` de su propia escena. Solo `HollowWoods.tscn` la pone (`scenes/enemies/Mythos.tscn`); Dunas de Ceniza y Ciénaga Lóbrega siguen con su Ancestral.
+- `BossSchedule._spawn_stage_boss` mete al jefe en el grupo `stage_boss` y ata su `Health.died` a `RunState.stage_boss_dead`. El log es `Stage boss slain: <boss_title> at …`, con el título del que cayó. Si el jefe de etapa deja la arena sin morir (algo lo liberó), su hueco se abre otra vez: vuelve a llegar, así los spawns no quedan cortados y la puerta todavía puede abrirse (aviso `BossSchedule: stage boss left without dying at …`).
+- **Un jefe a la vez**: mientras viva el jefe de etapa propio de una arena, y durante el respiro de spawns tras su muerte, los rejefes de `boss_repeat_minutes` esperan (`_repeats_held`). Si la pelea se alargó más allá de varios turnos, los atrasados llegan de a uno, separados por `boss_repeat_minutes`, y no todos juntos. Las arenas sin `stage_boss_scene` conservan su horario de siempre. Cuando salen, salen de `boss_scene` con los títulos de siempre («Rey Pútrido Ancestral Ascendente N»): `elder_title` no se tocó.
+- **Pelea solo** (`EnemySpawner.stage_boss_fights_alone`, encendido). Mientras vive el jefe de etapa propio, y durante el respiro tras su muerte (`boss_relief_duration`), el spawner no saca nada: `BossSchedule.spawns_held()` corta el flujo, las hordas (`HordeSchedule.hold` da por pasada la que venza en la pelea) y todo lo que pase por `make_enemy_at` (jaurías, lluvia de enemigos). `EnemySpawner.is_holding(tree)` es la misma respuesta para quien solo tiene el árbol: el clima no empieza `enemy_rain` ni `enemy_tsunami`, y un disparador de jefe oculto (`SecretTrigger`) avisa con `held_text` sin gastarse. Los logs son `Spawns held: stage boss fights alone at …` y `Spawns resumed at …`.
+- El jefe del bioma (`boss_scene`, en `boss_spawn_minute`: minuto 5, y minuto 8 en el Bosque Hueco, que antes trae a su minijefe) no cambia; si le tocara llegar con el jefe de etapa peleando solo, espera a que termine.
+- Para darle un jefe de etapa propio a otro mapa: una escena de jefe (ver «Añadir un jefe») en el `stage_boss_scene` de su spawner. Si debe pelear por vidas y escalar por duración, lleva un `Health` con `guarded_health.gd` y un hijo `Scaling` con `stage_boss_scaling.gd`, como Mythos; ninguno de los dos sabe qué jefe lo usa.
+
+### Las piezas de Mythos
+
+| Pieza | Dónde | Qué hace |
+| --- | --- | --- |
+| `Mythos` | `scripts/enemies/mythos.gd`, `scenes/enemies/Mythos.tscn` | `extends MythosBody`. Fases, vidas y cuándo ataca. El nombre del archivo es su id de bestiario (`kills_mythos`). |
+| `MythosBody` | `scripts/enemies/mythos/mythos_body.gd` | `extends BossBase`. Lo que los ataques le piden al cuerpo: ubicar un punto en la arena, moverlo, golpear el suelo marcar zonas de fuego (`spawn_fire_zone`), posarse y despegar (`land`, `take_off`). Pide el aviso en el suelo y el estallido de cada golpe (`warn_disc`, `blast`). Lleva además el nodo `Feel` (`feel`), le pide la dirección de vuelo a `MythosFlight` (entera entre ataques y, en medio de uno, la parte que ese ataque le deje: `_flight_share`) y decide hacia dónde mira. También apaga lo que los ataques dejaron (`_clear_hazards`, plumas en vuelo incluidas: `EnemyBolt.fizzle()` a cada saeta cuyo `launcher` es él) y lo saca del juego mientras parece muerto: `play_dead()` le quita la colisión y los grupos `enemies`, `boss` y `map_markers`, y `rise_again()` se los devuelve. Su suelo es el real (`AttackFloor`, ver «La regla de apoyado»): `safe_point`, `floor_point`, `glide_to` y `spawn_fire_zone` ven el tablero del Gran Puente y el estrado de una meseta, y su `_is_walkable` acepta además esos suelos altos (aunque queden cerca de un corte), así persigue al raider que se sube ahí. |
+| `MythosRig` + `MythosPoses` + `MythosPoseTarget` | `scripts/enemies/mythos/mythos_rig.gd` (nodo `Visual`), `mythos_poses.gd`, `mythos_pose_target.gd`, `assets/shaders/phoenix_plumage.gdshader`, `phoenix_body.gdshader`, `phoenix_nova.gdshader` | Lo que vuela. Poses de vuelo (`FLY`, `WINDUP`, `CAST`, `GLIDE`, `NOVA` y `HUNT`, con la que se le viene encima al raider), de tierra (`PERCH`, `REAR`, `SLASH` y `PROWL`, con la que lo acecha a pie), la caída (`DIVE`) y la brasa entre vidas (`ASHES`). El rig guarda dos `MythosPoseTarget`: lo que pide la pose y lo que se ve ahora, que lo persigue (`approach`). Mueve pivotes de nombre único (`%Hover`, `%Body`, `%Neck`, `%Head`, `%Jaw`, `%WingL/R`, `%HandL/R`, `%Tail`, `%Legs`, `%Nova`) y enciende sus chispas (`%Trail`, `%Burst`, `%Aura`). `flap_phase` es la fase de su aleteo, para quien acompañe cada golpe de alas. `ascend()` lo pasa a su forma renacida, `gaze_at()` le da un punto para seguir con la cabeza y `fly_at()` saca el modelo del cuerpo y lo lleva por el aire (la cinemática). La bola de luz es `MythosNova` (`mythos_nova.gd`, nodo `Visual/Hover/Nova`) y el resplandor del cuerpo, `MythosHalo` (`mythos_halo.gd`, nodo `Visual/Hover/Body/Halo`), que cambia de color con la forma sobre una copia propia de su material. |
+| `MythosGestures` | `scripts/enemies/mythos/mythos_gestures.gd` (nodo `Visual/Gestures`) | Gestos sueltos que se suman a la pose (`rig.gesture(&"roar")`, `screech`, `spit`, `flap`, `slam`, `swipe_left`, `swipe_right`, `flinch`, `stagger`, `shake`, `spin`) y el ladeo al moverse de costado. Cada ataque pide el suyo. |
+| `MythosMotion` | `scripts/enemies/mythos/mythos_motion.gd` (nodo `Visual/Motion`) | Lo que el fénix hace solo: sigue a su blanco con la cabeza, la cola y las patas van atrasadas con rebote, se inclina y aletea más rápido al volar, CAMINA en tierra y cada tanto ladea la cabeza o mira a los costados. El paso avanza con los metros que recorre (con `leg_length` y `stride_degrees` los pies no patinan): una pata apoya y barre hacia atrás, la otra se recoge y pasa adelante, y el cuerpo baja y sube sobre la pata apoyada y se carga hacia ella. Es el único que mueve los pivotes `%LegL` y `%LegR`, y emite `stepped(left)` en cada pisada. Las manías usan su propio `RandomNumberGenerator`. |
+| `MythosFlight` | `scripts/enemies/mythos/mythos_flight.gd` (nodo `Flight`) | Las dos posturas (en vuelo y en tierra), hacia dónde se mueve y a qué raider persigue. En vuelo lleva también la persecución (cruza la arena volando hacia un raider que se alejó) y, en la segunda fase, los fogonazos. `pose()` dice con qué pose se mueve ahora (`FLY` o `HUNT` en vuelo, `PERCH` o `PROWL` en tierra); la aplica él entre ataques y es la `rest_pose()` a la que los ataques vuelven. |
+| `MythosPresence` | `scripts/enemies/mythos/mythos_presence.gd` (nodo `Presence`; las brasas son `Visual/StepEmbers` y `Visual/GustEmbers`) | Lo que se siente cuando va hacia el raider: cada pisada (`MythosMotion.stepped`) retumba con un golpe sordo, un temblor y brasas bajo la pata; cada golpe de alas de la pose `HUNT` (lo detecta en `MythosRig.flap_phase`) levanta una ráfaga de brasas del suelo; y pide la viñeta de peligro a `MythosFeel.dread` según lo cerca que esté. Todo se apaga con la distancia al raider más cercano. |
+| `MythosFeel` | `scripts/enemies/mythos/mythos_feel.gd` (nodo `Feel`, un `CanvasLayer` con el `ColorRect` `Vignette`), `assets/shaders/dread_vignette.gdshader` | Lo que se siente de sus golpes. Los ataques dicen qué pasó: `shock(tamaño, punto)` con `LIGHT`, `HEAVY` o `CATACLYSM` (temblor de cámara que se apaga con la distancia al raider más cercano, pausa de impacto y, en el cataclismo, destello) y `dread(0-1)` en cada frame mientras cargan algo grande (la viñeta de peligro, que se va sola cuando dejan de pedirla). |
+| `MythosArrival` | `scripts/enemies/mythos/mythos_arrival.gd` (nodo `Arrival`) | Trae la cinemática y la transformación del mapa y las cuelga de la arena; sin cinemática, la entrada simple. |
+| `MythosPurge` | `scripts/enemies/mythos/mythos_purge.gd` (nodo `Purge`) | La ola que quema a la horda al empezar la pelea. |
+| `MythosRebirth` | `scripts/enemies/mythos/mythos_rebirth.gd` (nodo `Rebirth`) | El paso de la primera fase a la segunda. La muerte fingida (`fall`: estalla como un jefe que muere y suelta los orbes de vida), lo que cambia en la forma renacida (nombre, color de la barra y de los avisos) y el renacer cuando no hay cinemática (aviso, columna de fuego, estallido, ondas, destello, cámara lenta y cartel). |
+| `BossBurnout` | `scripts/enemies/boss/boss_burnout.gd` (nodo `Burnout`) | El desgaste: si una vida se alarga, el jefe pierde vida solo hasta que esa vida se acaba. No sabe qué jefe lo lleva. |
+| `MythosMoveset` | `scripts/enemies/mythos/mythos_moveset.gd` (nodo `Moves`) | Corre las esperas de los ataques y elige el próximo: de los que están listos, el que hace más que no se usa. `follow_up()` devuelve el ataque que otro encadena (`chain_to`), que sale sin pausa y sin mirar su espera. |
+| `MythosMove` y sus ataques | `scripts/enemies/mythos/mythos_move.gd`, `mythos_volley.gd`, `mythos_fireballs.gd`, `mythos_dive.gd`, `mythos_tornados.gd`, `mythos_waves.gd`, `mythos_ring.gd`, `mythos_strafe.gd`, `mythos_dawn.gd`, `mythos_storm.gd`, `mythos_mill.gd`, `mythos_breath.gd`, `mythos_claws.gd`, `mythos_takeoff.gd` (hijos del nodo `Moves`) | Cada ataque es un nodo con sus exports: enfriamiento, alcance, daño, vida desde la que entra en la rotación (`unlock_life`) y desde la que sale (`retire_life`, 0 = nunca), postura (`stance`: vuelo, tierra o las dos), grito (`call_sfx`), cuánto sigue volando mientras lo hace (`flight_factor`) y qué ataque encadena (`chain_to`, `chain_from_life`, `chain_chance`). Cinco nodos reúsan un script con otros valores: `Deluge` el de `Fireballs`, `DiveChain` el de `Dive` (con `chain`), `Tide` el de `Waves` (con `return_waves`), `Charge` el de `Strafe` (una sola pasada, en la primera fase) y `Scorch` el de `Breath` (con `passes = 2`). |
+| `MythosVoice` | `scripts/enemies/mythos/mythos_voice.gd` (nodo `Voice`) | Sus gritos de pájaro: al empezar, en cada ataque, sueltos, al dolerle y al morir. |
+| `Fireball`, `FireTornado`, `FireWave` | `scripts/fx/fireball.gd`, `fire_tornado.gd`, `fire_wave.gd`, `scenes/fx/Fireball.tscn`, `FireTornado.tscn`, `FireWave.tscn`, `assets/shaders/fireball.gdshader`, `fire_tornado.gdshader`, `fire_wall.gdshader` (filas `fireball`, `fire_tornado`, `fire_wave` de `Pools`) | Los peligros grandes: la bola que cae en arco y estalla (con su cola de llama, `fire_tail.gdshader`, que apunta contra el rumbo, humo y brasas), el tornado que persigue y la onda que se abre a ras de suelo, seguida de una estela de llamas bajas (`wake_distance`). Cada uno lleva su propio tick; el jefe los apaga todos al morir (`fizzle`, `dissipate`). La bola estalla con un `FireBlast` (abajo), no con el `EmberBurst` de la Vara de brasas. `FireTornado.orbit()` lo hace girar alrededor de un punto mientras se cierra (la jaula) y `FireWave.open()` abre una onda que no salió del pool, y sirve para una que crece o para una que se cierra (radio inicial mayor que el final: la Marea) (la cinemática cuelga las suyas de su propio nodo, porque lo del pool cuelga de la arena y queda congelado durante la calma). |
+| `FireBlast`, `FireSigil` | `scripts/fx/fire_blast.gd`, `fire_sigil.gd`, `scenes/fx/FireBlast.tscn`, `FireSigil.tscn`, `assets/shaders/fire_blast.gdshader`, `fire_shock.gdshader`, `fire_sigil.gdshader` (filas `fire_blast` y `fire_sigil` de `Pools`) | Lo que se ve de un golpe de Mythos, sin dañar a nadie. `FireSigil` es su aviso en el suelo: un aro que marca desde el principio hasta dónde llega el golpe, una rueda de marcas y un relleno de brasas que crece (`show_disc(centro, radio, segundos, locked)`, `move_to()` para el que persigue); los ataques lo piden con `MythosBody.warn_disc()`. Los discos planos de `Telegraph` quedan para los pies de los tornados y para los demás jefes. `FireBlast` es el estallido en capas (bola que se deshace, anillo de choque, chispas, luz que ilumina el suelo y quemadura con grietas): `FireBlast.spawn(escena, punto, radio)`, o `MythosBody.blast()` desde un ataque. |
+| `ClawScar`, `PooledTrail` | `scripts/fx/claw_scar.gd`, `pooled_trail.gd`, `scenes/fx/ClawScar.tscn`, `assets/shaders/claw_scar.gdshader`, `fire_tail.gdshader`, `smoke_puff.gdshader` (fila `claw_scar` de `Pools`) | Detalles que no dañan a nadie. `ClawScar.spawn(escena, punto, rumbo, largo)` deja en el suelo los tres tajos al rojo de un zarpazo, que se enfrían y se apagan (lo piden las Garras). `PooledTrail` es la estela de brasas de la pluma ardiente (`FireFeather.tscn` > `Trail`): arranca limpia cada vez que el pool vuelve a mostrar la pluma. `fire_tail.gdshader` es la cola de llama, sobre un cono, de las plumas, las bolas y la llama que baja del pico en el Aliento; `smoke_puff.gdshader`, el humo de la bola. |
+| `FireBurst`, `FireBeam` | `scripts/fx/fire_burst.gd`, `fire_beam.gd`, `scenes/fx/FireBurst.tscn`, `FireBeam.tscn` (fila `fire_burst` de `Pools`; el chorro no sale del pool: cada nodo del Aliento instancia el suyo) | Dos efectos hechos con los tramos de llama de `fire_wall.gdshader`, que no dañan a nadie (el shader funde los tramos vecinos donde se pisan, `seam`, y dibuja chispas que suben sobre las llamas). `FireBurst.spawn(escena, punto, radio, alto)` es la columna de fuego de los golpes grandes, con su fogonazo de luz. `FireBeam` es el chorro del Aliento: `warn()` dibuja las dos líneas bajas entre las que va a barrer y `blaze()`, llamado en cada frame con el ángulo de ahora, tres hileras de llamas (los bordes y una más alta al medio) que corren sobre el relieve, la llama `Jet` que une el pico de Mythos con el suelo y las brasas `Embers` que suben de todo el chorro; a quién quema lo decide `MythosBreath`. |
+| `MythosBolts` | `scripts/enemies/mythos/mythos_bolts.gd` | Las tandas de plumas que comparten los ataques: abanico apuntado adonde va el raider, anillo a ras de suelo y `shot()`, una pluma suelta en una dirección (la Tormenta). |
+| `SafeCircle` | `scripts/fx/safe_circle.gd`, `scenes/fx/SafeCircle.tscn` (fila `safe_circle` de `Pools`) | El círculo a salvo del Amanecer: anillo y columna de luz dorados, que se distinguen del fuego de las dos fases. |
+| `MythosZones` | `scripts/enemies/mythos/mythos_zones.gd` (nodo `Zones`) | Tope de zonas de fuego vivas y sus reglas: nunca junto a un raider caído ni pisando un círculo a salvo; bajo un raider en pie solo si el ataque lo pide y con aviso. |
+| `FireZone` | `scripts/fx/fire_zone.gd`, `scenes/fx/FireZone.tscn`, `assets/shaders/fire_zone.gdshader` | Zona de fuego del pool: aviso y después lava. |
+| `GuardedHealth` | `scripts/enemies/boss/guarded_health.gd` (nodo `Health`) | Las vidas: frena los golpes en 2 HP hasta la última. |
+| `StageBossScaling` | `scripts/enemies/boss/stage_boss_scaling.gd` (nodo `Scaling`) | Vida de cada vida, agresividad y daño extra. |
+| `MythosCinematic` + `MythosCinematicOverlay` + `BossSong` | `scripts/enemies/mythos/mythos_cinematic.gd`, `mythos_cinematic_overlay.gd` (nodo `Overlay`), `boss_song.gd` (nodos `Music` y `MusicReborn`), `scenes/enemies/mythos/MythosCinematic.tscn` | Las dos cinemáticas (actos): la llegada y el renacer. En las dos: mundo congelado, la canción de esa fase, cartel y una cámara propia. El cartel (franjas negras, nombre, subtítulo, la indicación de saltar y los destellos) lo dibuja `Overlay`. |
+| `MythosCinematicCamera` + `MythosRebirthCamera` + `MythosSightline` | `scripts/enemies/mythos/mythos_cinematic_camera.gd` (nodo `Camera`), `mythos_rebirth_camera.gd` (nodo `Rebirth/Camera`), `mythos_sightline.gd` | Las cámaras de los dos actos, con cuatro planos cada una (llegada: cometa, anillo, cielo y héroe; renacer: brasa, marea, columna y héroe). Eligen de qué lado filmar midiendo con `MythosSightline` el pasillo que va de ellas al jefe a la altura de los troncos (la copa de un árbol tapa aunque su tronco quede al costado, y los marcadores del mapa, grupo `map_markers`, también cuentan), buscan un lugar sin árboles delante para los planos a ras de suelo y corren el plano héroe a un costado de la party. |
+| `MythosRebirthAct` | `scripts/enemies/mythos/mythos_rebirth_act.gd` (nodo `Rebirth` de la cinemática, con sus chispas `Gather` y `Shards`) | Lo que se ve en el renacer: las cenizas se juntan, sube una columna de fuego del color de la segunda fase, ese color recorre el mapa (`HellTransformation.ascend`), Mythos toma su forma renacida dentro de la columna, estalla y grita. Sus efectos cuelgan de él, no del pool, y no dañan a nadie. |
+| `MythosEntrance` + `MythosEntrancePath` + `MythosFireRing` | `scripts/enemies/mythos/mythos_entrance.gd` (nodo `Entrance` de la cinemática), `mythos_entrance_path.gd`, `mythos_fire_ring.gd` (nodo `Entrance/Ring`) | Lo que el fénix HACE durante la calma: cae como un cometa, da una vuelta dejando un anillo de fuego, sube en espiral, cae a plomo, golpea el suelo y sale de una columna de fuego. El recorrido es una función del avance de la calma (saltar o pausar no lo desordena). La onda del golpe saca de la vista a la horda congelada (`MythosHordeVeil`, `mythos_horde_veil.gd`: solo toca `visible`) para que no tape el plano final; vuelve a verse al terminar la calma, cuando Mythos la quema. |
+| `HellTransformation` + `HellDressing` + `HellSky` + `HellEmbers` + `HellSound` | `scripts/enemies/mythos/hell_transformation.gd`, `hell_dressing.gd`, `hell_sky.gd`, `hell_embers.gd`, `hell_sound.gd`, `scenes/enemies/mythos/HellTransformation.tscn`, `HellSmoke.tscn`, `assets/shaders/forest_ground.gdshader`, `burnt_prop.gdshader` | El bosque se vuelve infierno, toma el color de la segunda fase cuando Mythos renace y después queda carbonizado. `HellEmbers` lleva las brasas y el humo (una nube por raider) y `HellSound`, el cruce del viento al fuego. |
+| `FireTint` | `scripts/fx/fire_tint.gd`, el uniform global `fire_ascend` (`project.godot`, `[shader_globals]`), `assets/shaders/fire_spark.gdshader` | El color del fuego para todo lo que arde a la vez: 0 es el de la primera fase y 1 el de la segunda. Los shaders de fuego (`fire_zone`, `fire_wall`, `fire_tornado`, `fireball`, `phoenix_nova`, `fire_spark` para las chispas, y los dos del mapa) mezclan hacia sus colores del grupo «Renacido»; lo que se pinta desde un script (los avisos, el brillo del suelo de un tornado, el cartel) lo lee con `FireTint.amount()`. Lo escribe `HellTransformation`, que lo deja en 0 cuando empieza otra llegada o la arena se va. |
+| `WorldFreeze` | `scripts/systems/world_freeze.gd` | Congela arena, raiders, director y reloj sin pausar el árbol. |
+| `PartyPower` | `scripts/systems/party/party_power.gd` (nodo `PartyPower` de `RunSystems.tscn`) | Daño por segundo de la party y puntaje de poder. |
+
+- **Vuela el rig, no el cuerpo.** El `CharacterBody3D` va por el suelo como todo enemigo: las armas barren el origen del cuerpo contra una ventana de altura, y el detector de voladores del harness no lo ve subir. Lo que flota es `Visual` (`MythosRig`): su nodo `Hover` sube, baja y se inclina, y las alas y la cola se animan ahí. `aim_height` apunta al torso y la cápsula de colisión lo cubre. Los ataques solo piden poses (`rig.set_pose`) y gestos (`rig.gesture`); lo que se mueve solo lo suma `MythosMotion`. El modelo son primitivas dentro de la escena: cintas (`RibbonTrailMesh`) para las plumas y esferas, conos y cilindros de tamaño 1 para el cuerpo, estirados por el transform de cada nodo, así pocos materiales sirven a todas las piezas. Está hecho para dar miedo: cuerpo de placas oscuras con grietas de fuego que laten (`seam_glow` de `phoenix_body.gdshader`), ojos rasgados bajo cejas en V, cuernos, púas en el lomo y los hombros, garras en las alas y patas largas con garras, cada una con su pivote (`LegL`, `LegR`) para caminar. La altura a la que se posa (`perch_height`) va con el largo de esas patas (`MythosMotion.leg_length`). Los dos shaders del fénix lo deshacen en una trama de puntos cerca de la cámara (`fade_near`, `fade_far`) para que no tape la pantalla.
+- **Pelea solo.** Al terminar la calma, `MythosPurge` recorre a los enemigos vivos de cerca a lejos (`wave_speed`) y los saca con `EnemyBase.vanish()`: sin crédito, XP, botín ni contador del bestiario. Otro jefe que siguiera vivo muere con su pago de siempre; los siervos poseídos de la party no se tocan. Log: `Mythos purge: burned=… bosses=… took=…` (`bosses` son los jefes que mató). Desde ahí el spawner no saca nada hasta que Mythos muere (ver «El slot»).
+- **Dos posturas** (`MythosFlight`). EN VUELO gira rápido alrededor del raider (`orbit_speed_factor`) a una distancia que «respira» alrededor de `air_distance` (`breath_metres`: cuando se achica se le viene encima), sube y baja (`lift_metres`, que llega al rig por `MythosRig.flight_lift`) y sigue girando mientras lanza los ataques que traen `flight_factor`. Si el raider se le acerca retrocede despacio (`retreat_speed_factor`), así corriendo se lo alcanza con armas cortas. Si se le va a más de `chase_from` metros (un portal, una carrera larga), no lo sigue por el suelo, donde las rocas lo trabarían: lo PERSIGUE volando derecho con `glide_to`, sin chocar con nada, hasta `chase_until`, y si en `chase_max_seconds` no lo alcanzó (quedó fuera de su arena) deja de intentarlo un rato. En la segunda fase además da FOGONAZOS (`blink_every`): cruza de un tirón al otro lado del raider. Mientras cruza (`is_crossing`) no empieza ataques. La Picada lo deja EN TIERRA (`Mythos.land`): camina hacia el raider hasta `ground_distance`, usa sus ataques de tierra y, pasados `ground_seconds`, despega con el Aletazo (`Mythos.take_off`). Cambia de raider cada `focus_seconds`. Si el raider se aleja más de `ground_leash` despega antes. Las ventanas para pegarle con armas cortas son los descansos tras la Picada y tras las Garras (`recover` de cada una). **Cuando va hacia el raider se nota**: en vuelo, al dejar de girar para acortar la distancia (o al perseguirlo) toma la pose `HUNT` (baja, se tiende con la cabeza por delante y el pico abierto, bate las alas hondo lanzándose con cada golpe, lleva las garras abiertas y deja una estela) y chilla (`hunt_sfx`); en tierra lo acecha con la pose `PROWL` (cabeza gacha, alas abiertas como un manto) caminando a embestidas (`stride_seconds`, `stride_rest`). `MythosPresence` le pone el peso: pisadas que retumban, ráfagas de brasas y la viñeta que se cierra.
+- **Dos fases, y la segunda es una sorpresa** (`GuardedHealth`, `life_shares` con dos entradas). Nada en la primera fase avisa que hay otra: la barra no muestra fases y su nombre es solo «Mythos». Con la guarda armada ningún golpe lo baja de `GUARD_HP` (2): al llegar ahí emite `guard_reached` y Mythos **parece morir** (`Mythos._on_life_spent`): grito de muerte, el estallido de un jefe que cae (`Juice.boss_died`), orbes de vida (`ash_orbs`: la única curación de la pelea), la barra se va, la canción se apaga y las llamas del mapa bajan (`HellTransformation.falter`). Mientras tanto el cuerpo queda fuera del juego (`MythosBody.play_dead`): invulnerable, sin colisión y fuera de los grupos `enemies`, `boss` y `map_markers`, así ningún arma le apunta y el mapa no lo marca. Pasados `fakeout_seconds` empieza el **renacer**: con cinemática es su segundo acto (`MythosCinematic.play_rebirth`, ver «La calma»); sin ella corre en plena pelea desde `MythosRebirth` (disco de aviso, columna de fuego, estallido, ondas, destello, cámara lenta y cartel). Renace en su **forma renacida** (`rig.ascend`): más grande, de otro color (los shaders del fénix mezclan hacia su paleta `ascended_*` con el uniform por instancia `ascend`) y con las piezas de los pivotes `Ascended*`. Sus avisos y destellos pasan a `ascended_telegraph_color` y `ascended_impact_color`, y todo el fuego y el mapa cambian de color con él (`FireTint`, ver «Infierno y bosque carbonizado»). La segunda fase trae más agresividad (`aggression_per_life`) y otro repertorio (`unlock_life = 2`, `retire_life = 2`). Solo la última vida suelta la guarda, así que **`Health.died` se emite una sola vez**: de esa señal cuelgan la puerta de etapa, el alivio de spawns, `bosses_killed`, las gemas y los cofres.
+- **Barra del jefe.** `BossBar` se dibuja entera en su `_draw` (marco, rastro del daño, relleno, marcas y, si el jefe lleva la cuenta, un rombo por fase) y lee por duck-typing `bar_title()`, `bar_color()`, `bar_visible_changed(shown)` y, para los rombos, `lives_changed`, `lives_left()` y `lives_total()`. Mythos **no** expone la cuenta de vidas, a propósito: su segunda fase es una sorpresa. Cuando parece morir emite `bar_visible_changed(false)` y la barra se va; al renacer emite `true` y la barra vuelve a leer nombre, color y vida máxima y se llena desde cero («Mythos renacido»). Una vida máxima nueva con otra proporción también es una fase nueva y la barra se llena desde cero; con la misma proporción (así recalcula `LobsterLife`) es la misma barra con más o menos vida detrás, y se reescala sin moverse (`RESCALE_SLACK`). Si el jefe que seguía muere y queda otro vivo, pasa a ese (`_follow_another_boss`).
+- **Ataques.** Todos avisan antes de dañar y casi todos apuntan adonde el raider VA a estar (`MythosBolts.predicted`). `MythosMoveset` elige, de los listos para su postura, el que hace más que no se usa, y Mythos deja el log `Mythos move: <nodo> life=… at …`. El tope del adelanto (`max_lead` de cada ataque) es para un raider a su velocidad base y crece en proporción si corre más rápido (`MythosBolts.speed_ratio`, hasta `LEAD_GROWTH_MAX`). Algunos ataques salen encadenados, sin pausa (`chain_to`): el Aletazo encadena Plumas ardientes, la Jaula de tornados a veces Bolas de fuego, el Aliento a veces una Picada y, en la segunda fase, la Pasada de fuego a veces el Diluvio. Un ataque encadenado no encadena otro. Los golpes avisan a `MythosFeel` de su tamaño.
+  - En vuelo, en la primera fase: **Plumas ardientes** (`mythos_volley.gd`: tandas en abanico de `FireFeather.tscn`; también las lanza posado), **Bolas de fuego** (`mythos_fireballs.gd`: bolas enormes en arco que estallan donde se avisó y dejan fuego), **Jaula de tornados** (`mythos_tornados.gd`: un anillo de diez o más tornados alrededor de cada raider que gira, se cierra y, al cerrarse, estalla en una onda de fuego; se sale por un hueco a tiempo, cruzando el muro o quedándose en el ojo y saltando la onda), **Ondas de fuego** (`mythos_waves.gd`: anillos de llamas que se abren desde él y se esquivan SALTANDO), **Cerco de brasas** (`mythos_ring.gd`: anillo de zonas con un hueco y estallido del centro) **Picada** (`mythos_dive.gd`: se remonta y el disco de aviso PERSIGUE al raider, `Telegraph.spawn_moving_disc`; a `lock_seconds` del golpe el disco se clava, un segundo aviso lo marca y cae como un cometa: golpe, columna de fuego y onda; lo deja en tierra), **Embestida** (el nodo `Charge`: una pasada rasante por donde va el raider) y **Aliento de fuego** (`mythos_breath.gd`: toma aire mientras dos líneas de llamas marcan entre dónde y dónde va a barrer, y suelta un chorro que barre la arena; quema una vez por pasada a quien alcance en el suelo, y se esquiva saltándolo, saliendo de su alcance o pegándose a Mythos, donde no llega).
+  - La segunda fase cambia el repertorio. Plumas ardientes, Bolas de fuego, Ondas de fuego, Picada, Embestida y Aliento de fuego se retiran (`retire_life = 2`) y entran sus versiones grandes: **Tormenta de plumas** (`mythos_storm.gd`: gira sobre sí mismo soltando plumas en varios brazos que rotan, como un aspersor; se esquiva tomando distancia y pasando por los huecos), **Picada en cadena** (el nodo `DiveChain`: `chain` picadas seguidas, cada una con su disco de aviso), **Marea de fuego** (el nodo `Tide`: ondas que se abren y después vuelven desde lejos cerrándose sobre él, `return_waves`) y **Molino de tornados** (`mythos_mill.gd`: aspas de tornados alrededor de él que giran como un molino; se esquiva yendo hacia adentro, pasando entre dos tornados de un aspa o saliendo de su alcance). Siguen la Jaula de tornados y el Cerco de brasas, y se suman **Pasada de fuego** (`mythos_strafe.gd`: vuelo rasante que deja una pared de fuego), **Aliento abrasador** (el nodo `Scorch`: el Aliento que barre, se detiene y vuelve sobre lo barrido), **Diluvio de fuego** (el nodo `Deluge`: bolas que caen del cielo sobre toda la zona, y una sola cada tanto de fondo) y **Amanecer** (`mythos_dawn.gd`: estallido en toda la arena del que solo salvan los círculos a salvo, `SafeCircle`; un raider caído siempre queda dentro de uno).
+  - En tierra: **Garras** (`mythos_claws.gd`: zarpazos avisados, avanzando) y **Aletazo** (`mythos_takeoff.gd`: el despegue, con golpe alrededor y una onda de fuego; no entra en la rotación, lo dispara `MythosFlight.wants_takeoff`).
+- **Música.** Cada fase tiene su canción (`Music` y `MusicReborn` en `MythosCinematic.tscn`); un hueco vacío deja esa fase sin música. Durante una cinemática la canción la sigue y se detiene con la pausa; desde que empieza la pelea no se corta con ninguna pausa del juego (subidas de nivel, vendedor, menú): `BossSong.set_pausable`.
+- **Zonas de fuego** (`FireZone`, fila `fire_zone` de `Pools`). Primero el aviso (un aro y un relleno que crece) y después lava que daña **solo a raiders en pie** dentro del disco. Una zona se apaga sola si un raider cae cerca (`downed_clearance`), así siempre se lo puede reanimar. `MythosZones` respeta `max_live_zones`, nunca deja nacer una junto a un raider caído ni sobre un círculo a salvo, y bajo un raider en pie solo las que el ataque pide así, con al menos `min_warn_on_raiders` segundos de aviso; al morir Mythos las apaga todas.
+
+### Escalado por duración (`StageBossScaling`)
+
+La vida de cada vida es el daño por segundo que la party le hace a **un solo cuerpo**, por los segundos que le tocan a esa vida.
+
+- **Objetivo**: `target_fight_seconds` (165) repartido con `life_shares` (0.18, 0.36, 0.46; la cantidad de entradas es la cantidad de vidas), descontando lo que duran los renaceres.
+- **Primera vida**: `PartyPower.focus_dps(dps_window_seconds)` por `focus_on_boss` (la parte del tiempo en que la party lo tiene a tiro: de lejos solo le llegan las armas de alcance). En co-op el aporte de cada jugador extra se rebaja con `extra_player_focus`, porque el jefe acosa a un raider a la vez y los demás no siempre lo tienen a tiro. Ese daño se midió contra la horda, que infla a las builds de área y castiga a las de un solo blanco, así que se acota entre `power_check_low` y `power_check_high` veces lo que predice el puntaje de poder (`jugadores × expected_dps_base × exp(expected_dps_growth × puntaje / jugadores)`).
+- **Vidas siguientes**: el daño que el jefe recibió de verdad (el de la vida que terminó mezclado con el de toda la pelea, `recent_life_weight`) y el tiempo que queda del objetivo: una vida que se alargó la pagan las siguientes.
+- **Piso**: el `Health.max_hp` de la escena del jefe (2000 en `Mythos.tscn`), ya multiplicado por vuelta, dificultad y tamaño de party en `spawn_boss`, repartido entre las vidas. Con el piso la pelea puede durar más que el objetivo. **Techo**: `max_hp_over_floor` veces el piso.
+- **Ventaja**: de lo que la party supere al daño de referencia (piso / objetivo), el jefe absorbe `advantage_absorbed` como vida y el resto acorta la pelea; `min_fight_seconds` es lo mínimo que dura con el daño estimado.
+- **Agresividad** (0-1, la leen los ataques: más proyectiles y zonas, pausas más cortas): jugadores extra × `aggression_per_extra_player` + puntaje × `aggression_per_power` + vidas pasadas × `aggression_per_life`. **Daño**: los factores de `spawn_boss` más `damage_per_power` × puntaje, con techo `damage_power_cap`.
+- **Desgaste** (`BossBurnout`): cada plan trae `burnout_after` (el tiempo previsto de esa vida por el export `burnout_after`, 1.5) y `burnout_drain` (la vida entera en `burnout_seconds`, 25). Pasado ese tiempo el jefe se consume solo, con el aviso del HUD y el log `Mythos burnout: after=… drain=…`. Es el tope de la pelea: sin horda no hay XP para mejorar a mitad de pelea, y una party que casi no le pega no debe quedar atascada. Ese daño no cuenta como daño de la party al calcular la vida siguiente.
+
+### Poder de la party (`PartyPower`)
+
+- `WeaponBase.deal_damage` avisa cada golpe (`PartyPower.record_weapon_damage`). El medidor lo guarda en baldes de un segundo de `RunState.run_time`, que se detiene con la pausa.
+- `dps(ventana)` es el daño **aplicado** por segundo. `focus_dps(ventana)` usa el daño **tirado** y, por arma, solo el golpe más fuerte de cada frame de física: lo que esa arma le haría a un solo cuerpo.
+- `score()` suma pesos exportados: arma, niveles de arma, evolución, ascensión, tomos y sus stacks, objetos, power-ups activos y mascota. `breakdown()` lo separa por tipo.
+- Cada `log_interval` segundos imprime `Party power: t=… players=… dps=… focus=… score=… weapons=… tomes=… items=… powerups=… pets=…`.
+- Lo que no pasa por `deal_damage` (veneno, espinas, reflejo, siervos del nigromante, meteoritos, bloques de la suerte) no se mide aquí. Las vidas siguientes del jefe lo corrigen, porque usan el daño que recibió de verdad.
+
+### La calma: cinemática, mundo congelado y canción
+
+- Mythos llega invulnerable y quieto (`Phase.ARRIVAL`) e instancia **bajo la arena** `HellTransformation` y `MythosCinematic`: mueren con ella en el cambio de etapa. El CUERPO no se mueve en toda la calma (congelado, el suelo está fuera de la física); lo que se ve volar es el modelo, que `MythosEntrance` lleva con `MythosRig.fly_at()` hasta que golpea el suelo. Desde ahí vuelve a sus poses, y el frente de fuego del mapa arranca en ese momento (`HellTransformation.begin(origin, seconds, front_delay)`). Los efectos de la entrada (anillo, estela, escombros, onda y columna de fuego) cuelgan del nodo `Entrance`, no del pool, y no dañan a nadie. Al congelar el mundo la cinemática recupera los números de daño que estaban en el aire (`Pools.release_live_of`).
+- **El reloj es tiempo de juego.** La llegada dura `calm_seconds` y el renacer `rebirth_seconds` en toda partida, con canción o sin ella, y el menú de pausa los detiene. Cada uno dura lo que la calma con que empieza su canción, así la pelea arranca en el golpe de la música. Cuando termina la llegada, la cinemática llama a `Mythos.finish_calm()`; cuando termina el renacer, a `Mythos.finish_rebirth()`.
+- **El renacer es el segundo acto** (`MythosCinematic.play_rebirth`, lo pide `Mythos._begin_rebirth` cuando termina la muerte fingida). El mundo se congela igual que en la llegada, la canción de la primera fase le deja el lugar a la de la segunda (`BossSong.hand_over`, `handover_seconds`) y `MythosRebirthAct` dispara cada momento por fracciones del acto: brasa, columna de fuego (ahí arranca `HellTransformation.ascend`, que termina justo en el estallido), forma renacida, estallido y grito. El cartel muestra `Mythos.reborn_title()` con `reborn_subtitle_text` en el color de la segunda fase. Si la escena de Mythos no trae cinemática, el renacer corre sin congelar nada (`MythosRebirth`) y el mapa cambia de color igual (`Mythos.ascend_world`).
+- **Mundo congelado** (`WorldFreeze`): pone `process_mode = DISABLED` a los grupos `arena_root`, `player`, `downed_players` y `world_director` y detiene el reloj de `RunState`. No usa `get_tree().paused`: el menú de pausa no abre sobre un árbol ya pausado, y el harness cuelga la partida de un nodo siempre activo. Lo que debe seguir (la cinemática, Mythos y la transformación) pasa antes a `PAUSABLE`. Durante la calma no hay daño, spawns, eventos ni clima que empiece, ni UI que se abra sola. Dos congelados pueden solaparse, en cualquier orden: todas las instancias llevan una sola cuenta, cada nodo guarda el `process_mode` de antes del primero que lo tocó y sigue congelado (o vivo) mientras algún congelado en curso lo pida; el mundo y el reloj vuelven con el último. Un congelado cuyos nodos ya no existen (una partida liberada sin descongelar) sale de la cuenta. `WorldFreeze.exempt(nodo)` deja un nodo vivo en todo congelado, el actual y los que vengan (la Langosta Azul al morir). Igual que la pantalla (`BossScreen`, ver «Pantalla»), aunque `BossSchedule` tampoco trae dos llegadas juntas.
+- **Pantalla**: `hud.set_cinematic(true)` oculta el HUD, los minimapas y el mapa de Tab; el grupo `split_screen` se oculta y la cámara de la cinemática toma el viewport raíz, así en co-op se ve una sola vista a pantalla completa. Al terminar le devuelve al viewport raíz **la misma cámara que tenía antes** (`clear_current(false)` y `make_current()` sobre la anterior): cuando una cámara activa se suelta o sale del árbol, Godot le pasa el turno a cualquier otra del viewport, y sin esto el viewport raíz quedaría con una distinta de la que tenía. No se crean ni se quitan vistas: el conteo de `world_views` no cambia. Todo esto lo hace `BossScreen` (`scripts/enemies/mythos/boss_screen.gd`, con preload), que comparten las dos cinemáticas de jefe (esta y la entrada de la Langosta Azul): si se solapan, el HUD y la pantalla dividida vuelven recién con la última que suelta, la que está en pantalla deja la cámara de la que sigue (o la del raider) y la que suelta debajo de otra le pasa su cámara de antes. El cartel va en la capa 9 (`UiLayers`): franjas negras, el `boss_title`, `subtitle_text` y la indicación de saltar.
+- **Saltar**: cualquier raider mantiene `skip_action_name` (`interact`) durante `skip_hold_seconds`. La pelea empieza (o sigue) ya, el mapa salta a como queda al terminar ese acto (`HellTransformation.finish_now`, y en el renacer también `ascend_now`) y la canción al final de su calma. Quien ya traía la acción apretada primero tiene que soltarla.
+- **Canciones** (`BossSong`, nodos `Music` y `MusicReborn`): suenan por el bus `Music` y cada una arranca con su acto. `follow(reloj, delta)` la reacomoda con `seek` si se desfasa más de `resync_threshold`; con el driver de audio `Dummy` (corridas sin ventana) nunca lee su posición, que ahí corre con el reloj de pared. Cuando una canción se acaba vuelve al **final de su calma**, no al principio (`loop_offset` sobre una copia del recurso). Cuando Mythos parece morir y cuando muere de verdad, `fade_out()` (`fade_seconds`). Una canción puede ir **adelantada** a su acto (`lead_seconds`): `follow` y `jump_to` suman ese adelanto, así su parte fuerte cae esos segundos antes de que el acto termine. Si el acto se anuncia con tiempo, arranca sola antes que él: al fingir su muerte, `MythosArrival.feign_death(segundos)` le pasa a la cinemática cuánto falta para el renacer (`fade_out_song(rebirth_in)`), esta avisa a la canción de la segunda fase con `cue(espera, loop_from)` y apaga la de la primera antes de que la otra suene; la canción arranca `lead_seconds` antes del renacer (log `Boss music: started ahead of its act lead=…`) y `start()` no la corta. Sin aviso, `start()` la empieza ya avanzada.
+- **Salidas**: una sola, `_teardown(reason)`. La disparan `RunManager.run_ended` (muerte de la party o extracción), `_exit_tree` (cambio de etapa, salir al menú) y un jefe que desaparece. Devuelve el mundo, el HUD, la pantalla dividida y la cámara, y corta la canción.
+
+### Infierno y bosque carbonizado (`HellTransformation`)
+
+- **Nunca toca un recurso compartido**: la escena de la arena y los modelos glb comparten sus materiales con la vuelta siguiente, con otros mapas y con el fondo del menú. `HellDressing` duplica el material del suelo (`forest_ground.gdshader`) y pone como override una copia de `prop_material` (`burnt_prop.gdshader`) **por tipo de superficie** en las mallas de `arena_bounds` y `scatter_keepout` (menos los `Interactable`): unas 360 mallas, seis materiales. Ningún prop recibe nodos nuevos.
+- **El frente de fuego** son tres uniforms en esas copias (`burn_origin`, `burn_radius`, `burn_edge`), más `heat` y `ash` para enfriar. Avanza desde donde llegó Mythos durante la calma. Un **segundo frente** (`ascend_origin`, `ascend_radius`) lleva el color de la segunda fase desde las cenizas cuando renace (`ascend(origin, seconds)`): detrás de él la lava y las llamas del mapa usan sus colores `ascended_*`, y `FireTint` cambia a la vez el fuego de los ataques (en `ascend_tint_seconds`). Mientras Mythos parece muerto, `falter(seconds)` baja `heat` hasta `falter_heat`; el renacer lo devuelve a 1.
+- **Cielo** (`HellSky`): `WorldDirector.rebase_sky()` → `SkyTint.rebase()` entrega el `Environment` propio de la arena (el mismo que tiñen los climas) y cambia el cielo «original» al que vuelven: el del infierno al empezar, el del infierno renacido en la segunda fase (grupo «Cielo renacido») y el carbonizado al enfriarse. Así un clima que empieza o termina durante la pelea o después nunca devuelve el verde, y la transformación nunca escribe en un `Environment` que ya no está puesto. Mientras el cielo está cambiando (el avance del fuego y el enfriamiento) lo reemplaza en **cada frame**: `rebase()` corta el tinte o la vuelta de clima que estuviera en curso, así en esos segundos el sol y el ambiente tienen un solo dueño. El `Sky` y su material se copian. `HellSky` lleva además el **resplandor** del fuego (`set_glow`, que `HellTransformation` mueve con el calor del mapa: sube al encenderse el infierno, baja en la muerte fingida y se apaga al carbonizarse): el glow del `Environment`, con sus valores en el bloque «Edita aquí» de `hell_sky.gd`. Es lo que le da halo a todo lo que arde; fuera de la pelea con Mythos el `Environment` no trae glow.
+- **Horizonte y sonido**: tiñe los materiales del `Backdrop` (que ya son de cada instancia), apaga el viento del bosque (`AmbientBed`) y enciende `FireBed` (`hell_fire.wav`); el viento no vuelve con el bosque carbonizado.
+- **Partículas**: una nube de brasas y una de humo por raider (cada vista de la pantalla dividida tiene las suyas). El humo vive en `HellSmoke.tscn` porque una escena con dos `GPUParticles3D` con material de proceso deja un shader sin liberar al cerrar sin ventana.
+- **Estados** (`state_name()`): `green`, `igniting`, `hell`, `cooling`, `charred`. Por dentro hay dos más, `ASCENDING` y `REBORN` (la segunda fase), que hacia afuera siguen siendo `hell`. Al morir Mythos, `cool_down()`: las llamas se apagan, el follaje quemado se deshace y queda humo hasta que la party cruza el portal.
+- **No hay nada que deshacer**: todo cuelga de la arena o es una copia, así que se va con ella. La arena no gana nodos, y `MenuBackdrop.STRIPPED_NODES` no cambia. El color del minimapa se lee de `Backdrop.ground_color` al empezar la etapa y no cambia con el infierno.
+
+### Logs del jefe de etapa
+
+`Boss spawned: Mythos at …`, `Mythos scaling: life=… players=… dps=… power=… hp=… budget=…s source=… measured=… expected=… clamp=… aggression=… damage=x…` (al llegar y en cada renacer), `Mythos calm started:`, `Mythos fight started: calm=…s skipped=…`, `Mythos life over: life=… took=…s`, `Mythos fight over: took=…s lives=…`, `Boss cinematic: started / ended / teardown reason=…` (las dos primeras terminan en `act=arrival` o `act=rebirth`), `Boss music: fading out over …s / stopped`, `Hell transformation: begin / hell / ascending / reborn / cooling / charred` y `Stage boss slain: Mythos at …`. El prefijo es el `boss_title`, así que otro jefe con las mismas piezas imprime el suyo.
+
+## Minijefe: la Langosta Azul
+
+El Bosque Hueco tiene un **minijefe**: llega a mitad de la etapa, antes del jefe del bioma, sin aviso y con una entrada propia. **Pelea solo**: desde que llega no aparece ningún enemigo más y, al empezar la pelea, se lleva a la horda que quedaba. Mientras vive, el mapa queda bajo su marea azul. Tiene una sola fase.
+
+### El hueco del minijefe
+
+- `EnemySpawner.mini_boss_scene` y `mini_boss_spawn_minute` (grupo «Jefes»). Vacío: la arena no tiene minijefe y nada cambia. Solo `HollowWoods.tscn` lo pone (`BlueLobster.tscn`, minuto 5) y por eso mueve su `boss_spawn_minute` a 8; las Dunas de Ceniza y la Ciénaga Lóbrega siguen con su jefe en el minuto 5.
+- `BossSchedule._tick_mini_boss` lo trae con `spawn_boss(..., warn = false)`: sin el aviso del HUD. Lo mete en el grupo `mini_boss`; **no** entra a `stage_boss` ni pasa por `_watch_stage_boss`.
+- **El jefe del bioma espera** (`_mini_boss_holds_boss`): desde que al minijefe le toca llegar, mientras vive y durante el respiro de spawns. **El jefe de etapa también espera** (`_mini_boss_holds_stage_boss`): desde que al minijefe le toca llegar hasta que su cuerpo deja la arena (llegando, peleando o en su caída); sus llegadas nunca coinciden. Los rejefes (`boss_repeat_minutes`) no esperan.
+- **Pelea solo** (`EnemySpawner.mini_boss_fights_alone`, grupo «Jefes», `true` por defecto): desde que llega, `BossSchedule.spawns_held()` corta todo spawn normal (flujo, hordas, jaurías y la lluvia de enemigos; log `Spawns held: mini boss fights alone at …`) y lo devuelve `boss_relief_duration` segundos después de su muerte (`Spawns resumed at …`). A la horda que ya estaba en la arena se la lleva el propio minijefe al empezar a pelear (en la langosta, el nodo `Purge`). En `false` pelea en medio de la horda.
+- **El minijefe espera al jefe de etapa**: con los spawns cortados (`spawns_held()`, Mythos peleando solo) no llega; llega cuando vuelven (`Spawns resumed`).
+- Si el jefe de etapa llega cuando el minijefe acaba de morir, la canción de la langosta, que todavía se apaga, le deja el lugar (`LobsterSongYield`). Con `stage_boss_fights_alone` apagado el minijefe puede llegar en plena pelea del jefe de etapa: su barrido no lo toca.
+- `BONK_MINI_BOSS_AT=<s>` lo trae a ese segundo de la etapa (lo lee `BossSchedule`).
+- Para darle un minijefe a otro mapa: una escena de jefe (ver «Añadir un jefe») en el `mini_boss_scene` de su spawner.
+
+### Las piezas de la Langosta Azul
+
+| Pieza | Dónde | Qué hace |
+| --- | --- | --- |
+| `BlueLobster` | `scripts/enemies/blue_lobster.gd`, `scenes/enemies/BlueLobster.tscn` | `extends LobsterBody`. Fases (`arrival`, `stalk`, `move`, `dead`), cuándo ataca, el atasco y su muerte. El nombre del archivo es su id de bestiario (`kills_blue_lobster`). |
+| `LobsterBody` | `scripts/enemies/blue_lobster/lobster_body.gd` | `extends BossBase`. Lo que los ataques le piden al cuerpo: caminar (`walk`), deslizarse por tierra o bajo tierra (`glide_to`: por tierra no pisa la pared de un corte del relieve, ni de golpe ni de a poco; se queda al pie o en el borde), volar en un salto (`fly_to`), mirar (`face_along`), puntos seguros (`safe_point`, que busca el lugar libre más cercano con `arena_bounds.nearest_place` y, con `raider_at`, si el raider pisa un piso elevado (el tablero del Gran Puente) se queda en ese piso donde el cuerpo quepa (`lobster_footing.gd`, con preload); `floor_point`, `core_point`), golpear (`strike_ground`, `strike_along`), el suelo real (`ground_height`), pasar por debajo de los raiders mientras va enterrada (`pass_under_raiders`) y el detector de atasco. Su máscara de colisión solo ve el mundo y a los raiders. |
+| `LobsterPurge` | `lobster_purge.gd` (nodo `Purge`) | El barrido con que abre la pelea: en el mismo instante en que termina la entrada se lleva a toda la horda (`EnemyBase.vanish`, sin pagar nada) y a las saetas en vuelo, antes de que nadie vuelva a moverse. Otro jefe vivo muere con su pago de siempre, salvo el jefe de etapa y uno de varias vidas (`GuardedHealth`): el barrido nunca le quita una vida a nadie. No hace nada si `mini_boss_fights_alone` está apagado. |
+| `LobsterLife` | `lobster_life.gd` (nodo `Life`) | La vida durante la pelea: la estima al empezar y la recalcula cada `replan_seconds` con el daño que le hacen de verdad (ver abajo). Arma el desgaste. |
+| `LobsterReach` | `lobster_reach.gd` (nodo `Reach`) | Ataques a la medida del raider: al empezar cada ataque mide al raider al que apunta (ver «La pelea»). |
+| `LobsterStalk` | `lobster_stalk.gd` (nodo `Stalk`) | La ronda: a qué raider sigue (cambia cada `focus_seconds` en co-op), a qué distancia lo rodea y cuándo corre a alcanzarlo. |
+| `LobsterMoveset` + `LobsterMove` | `lobster_moveset.gd` (nodo `Moves`), `lobster_move.gd` | Los ataques son los hijos de `Moves`. `next_ready(distance)` elige, entre los listos para esa distancia, el que hace más que no se usa. |
+| `LobsterPincers`, `LobsterCharge`, `LobsterLeap`, `LobsterTailSpin`, `LobsterBurrow` | `lobster_pincers.gd`, `lobster_charge.gd`, `lobster_leap.gd`, `lobster_tail_spin.gd`, `lobster_burrow.gd` | Tenazas, Embestida, Salto aplastante, Coletazo y Emboscada. Cada uno lleva sus valores y su coreografía: en todos el cuerpo viaja, el aviso persigue al raider adelantándose a su carrera hasta que se clava, y el golpe viene en cadena (ver «La pelea»). |
+| `LobsterAim` | `lobster_aim.gd` | Puntería: dónde va a estar un raider (`predicted`), hasta dónde llegar (`within`) y dónde frenar para no quedarle encima (`short_of`). |
+| `LobsterFeel` | `lobster_feel.gd` (nodo `Feel`, un `CanvasLayer` con `Vignette` y `Flash`) | Lo que se siente de sus golpes, en tres tamaños (`Shock.LIGHT`, `HEAVY`, `CRUSHING`): temblor, pausa de impacto, el fogonazo a pantalla completa de los demoledores y la viñeta de peligro (`assets/shaders/lobster_dread.gdshader`). |
+| `LobsterFx` | `lobster_fx.gd` (nodo `Fx`) | Lo que se VE de sus golpes. Los ataques dicen qué pasó y dónde (`snap`, `slam`, `takeoff`, `landing`, `aftershock`, `charge_trail`, `charge_hit`, `skid`, `sweep`, `sweep_hit`, `dig`, `tunnel_trail`, `eruption`) y este nodo decide los chorros de agua, las ondas del suelo, las medialunas y los salpicones, con sus tamaños. |
+| `LobsterVoice` | `lobster_voice.gd` (nodo `Voice`) | Rugido, tableteos, siseo y gruñido de muerte (filas `lobster_*` de `Sfx.SOUND_LIBRARY`, recetas `_gen_lobster_*`). |
+| `LobsterRig` + `LobsterPoses` + `LobsterPoseTarget` | `lobster_rig.gd` (nodo `Visual`), `lobster_poses.gd`, `lobster_pose_target.gd`, `assets/shaders/lobster_shell.gdshader` | El modelo: primitivas estiradas por nodos, un solo material de caparazón (uniforms por instancia `tone`, `pale`, `anger`, `near_fade`), pivotes por nombre único y una tabla de poses. `lift`, `sink` y `spin` lo levantan, lo entierran y lo hacen girar sin mover el cuerpo físico. `body_setback` deja el cuerpo físico en su cabeza. |
+| `LobsterGestures`, `LobsterMotion`, `LobsterHead`, `LobsterGait` | nodos `Gestures`, `Motion`, `HeadLife` y `Gait` bajo `Visual` | Gestos sueltos encima de la pose, respiración e inercia, ojos y antenas que siguen un punto, y las ocho patas (pisadas plantadas con IK de dos huesos). |
+| `LobsterArrival` | `lobster_arrival.gd` (nodo `Arrival`) | Trae la entrada y la marea y las cuelga de la arena; sin entrada, la llegada simple de un jefe. |
+| `LobsterTide` | `lobster_tide.gd`, `scenes/enemies/blue_lobster/LobsterTide.tscn`, `assets/shaders/tide_coral.gdshader`, `tide_caustics.gdshader` | La marea: mientras la langosta vive, el mapa queda como bajo el mar (ver abajo). Grupo `lobster_tide`. |
+| `LobsterEntrance` + `LobsterEntranceCamera` + `LobsterEntranceShot` + `LobsterEntranceOverlay` | `lobster_entrance.gd`, `lobster_entrance_camera.gd`, `lobster_entrance_shot.gd`, `lobster_entrance_overlay.gd`, `scenes/enemies/blue_lobster/LobsterEntrance.tscn`, `assets/shaders/lobster_backdrop.gdshader` | La entrada (ver abajo). Su canción es el nodo `Music` (`BossSong`), con `LobsterSongYield` de hijo. |
+| `ShockRing`, `TelegraphLane`, `SplashBurst` | `scripts/fx/shock_ring.gd`, `telegraph_lane.gd`, `splash_burst.gd`, `scenes/fx/*.tscn` | La onda de choque que se salta (`spare()` le dice a quién no tocar), el carril de galones de la Embestida y el salpicón de arena y gotas de un golpe. Salen de `Pools` (grupos `shock_rings`, `telegraph_lanes`, `splash_bursts`) y se van solos. |
+| `WaterBurst`, `ImpactRipple` | `scripts/fx/water_burst.gd`, `impact_ripple.gd`, `scenes/fx/WaterBurst.tscn`, `ImpactRipple.tscn`, `assets/shaders/water_column.gdshader`, `impact_ripple.gdshader` | El chorro de agua de un golpe (una columna de tramos en círculo que brota, se abre y cae, con gotas y, si es grande, un destello de luz) y la onda que el golpe deja en el suelo (fogonazo, anillos y rayos). Solo efectos, del pool; los lanza `LobsterFx`. Las medialunas son el `SlashArc` de las armas. |
+
+### La pelea
+
+- **Pelea sola**: al terminar la entrada, `LobsterPurge` se lleva a la horda de una vez (`Langosta Azul purge: swept=… bosses=… at …`; `bosses` son los jefes que mató); los spawns siguen cortados hasta después de su muerte (ver «El hueco del minijefe»).
+- **Ronda**: entre un ataque y otro rodea al raider a `orbit_distance` con las pinzas en alto, y si se le fue lejos corre (`chase_distance`, `chase_speed_factor`). Pasada su pausa (`attack_pause`, el respiro del raider; más corta con agresividad) suelta el próximo ataque listo.
+- **Los avisos persiguen y se adelantan**: el disco (o el carril) sigue al raider durante el aviso, apuntando adonde va a estar (`lead_seconds`, `max_lead`), y se **clava** un instante antes del golpe (`lock_seconds`): ahí cambia de color y ya no se mueve. El golpe cae donde se clavó. Correr derecho no alcanza: se esquiva reaccionando al clavado, con un salto (`height_window`), un derrape o un cambio de rumbo.
+- **Cada ataque es una cadena**: las Tenazas son una ráfaga de pinzazos de ritmo irregular (`windup_jitter`) que termina en un remate de las dos pinzas sobre dos discos; la Embestida vuelve a pasar (`passes`) con avisos más cortos; el Salto manda una réplica (`rings`, la anuncia levantando la cola) y su primera onda no toca a quien ya recibió el golpe (`ShockRing.spare`); el Coletazo gira dos veces y cada giro suelta una ola hacia afuera; la Emboscada sale varias veces seguidas (`eruptions`) y la última es la grande. Bajo tierra pasa por debajo de los raiders (`pass_under_raiders`).
+- **Al tocar un `lock_seconds`**: entre que el aviso se clava y el golpe tiene que quedar tiempo para reaccionar (unos 0.2 s) y, además, para saltar por encima de `height_window` (un salto tarda unos 0.25 s en pasar 1.5 m) o derrapar fuera del disco. Con menos, el golpe no se puede esquivar reaccionando.
+- **A la medida del raider** (`LobsterReach`, nodo `Reach`): los valores de cada ataque son los de un raider sin mejoras de velocidad. Al empezar cada ataque la langosta mide al raider al que apunta, y el ataque pasa sus distancias y velocidades por `LobsterMove.scaled()`: radios de discos y carriles, alcance, distancia del salto, velocidad de la embestida, del túnel y de las ondas crecen como su `move_speed_multiplier` (poderes incluidos, hasta `max_growth`). Los tiempos no cambian: con más velocidad hay que recorrer más, y esquivar cuesta lo mismo. El log de cada ataque lo dice: `move: <ataque> at …s reach=x…`. Los saltos extra no cuentan: el golpe cae antes de que un segundo salto suba más que el primero (subir la altura de los golpes hacía imposible esquivarlos saltando al ver el aviso). El Coletazo y su ola crecen desde la langosta: contra un raider rápido que pelea pegado a ella cuestan algo más que contra uno lento a la misma distancia.
+- **El cuerpo va en la cabeza** (`LobsterRig.body_setback`): las distancias, la colisión y la puntería de las armas se miden desde su cara, así las armas cortas la alcanzan cuando ronda y el Salto y la Emboscada frenan antes del raider (`stand_off`) en vez de caerle encima.
+- **Suelo real** (`LobsterBody.ground_height`): un ataque que desliza el cuerpo lo deja sobre lo que haya (una formación de roca, una meseta), no a la altura del terreno. Se busca con un rayo hacia abajo; lo angosto (un tronco) y los personajes no cuentan. El Salto y la Emboscada alcanzan a un raider sobre el tablero del Gran Puente: su marca se queda en ese piso donde quepa el cuerpo.
+- **Atasco** (`stuck_seconds`, `escape_moves`): si quiere avanzar rondando y no puede, no espera su pausa: sale con un Salto o una Emboscada.
+- **Detenida a mitad de un ataque** (un «tiempo detenido», la cinemática de otro jefe): el ataque se corta (`BlueLobster._interrupt_move`, con `NOTIFICATION_DISABLED`). Suelta sus avisos, apaga sus ondas y carriles y, cuando vuelve a moverse, ronda su pausa y elige otro. Sus avisos corren con su propio reloj: sin esto se cumplirían mientras ella está quieta y el golpe llegaría sin aviso.
+- **Muerte**: suelta el ataque en curso, apaga lo que dejó en el suelo (`ShockRing.dissipate`, `TelegraphLane.dismiss`) y se retuerce panza arriba antes de liberarse. `Health.died` sale una sola vez.
+
+### La vida: estimar y recalcular (`LobsterLife`)
+
+`StageBossScaling` estima la vida con el daño que la party le hacía a la horda (`plan_first_life`; `Scaling.life_shares` es `[1.0]`: una sola vida), y esa estimación puede errar mucho. Por eso, durante la pelea, `LobsterLife` recalcula cada `replan_seconds` la vida que le queda (`StageBossScaling.plan_rest`): lo que falta de la barra tiene que durar lo que falta de `target_fight_seconds` con el daño que le hacen de verdad. Ese daño es el de toda la pelea mezclado con el de los últimos `recent_seconds` (`recent_weight`), y en los primeros `trust_seconds` de golpes pesa poco frente a la estimación: un primer golpe enorme no la infla. La barra **no se mueve** al recalcular (`current_hp` y `max_hp` cambian en la misma proporción, y `BossBar` lo reconoce por eso: se reescala en vez de llenarse de nuevo). En un recálculo la vida baja como mucho `max_drop_per_replan` (un rato esquivando sin pegarle no la deja de papel), y deja de recalcularse cuando faltan menos de `stop_with_seconds_left` segundos o le queda menos de `stop_with_bar_left` de la barra: casi muerta no vuelve a crecer. El desgaste (`BossBurnout`) mira la pelea entera: empieza a los `target_fight_seconds × burnout_after` segundos, y desde ahí ya no se recalcula.
+
+### La entrada: el susto
+
+- La langosta llega invulnerable, invisible y sin barra, flecha ni marcador (`LobsterBody.hide_presence`). `LobsterArrival` instancia `LobsterEntrance` **bajo la arena** y le pide `play(boss)`.
+- **El mundo se congela al llegar** (`WorldFreeze`, igual que con Mythos) y arranca la canción. **La pantalla se toma recién en el corte**, el primer golpe de la canción (`Shot1.at_seconds`): se oculta el HUD (`set_cinematic`), la pantalla dividida y la cámara de la entrada toma el viewport raíz. El último frame antes del corte es la partida.
+- **Los planos** son los hijos `Shot` del nodo `Camera`, uno por golpe de la introducción. Son cortes, no movimientos: cada uno dice desde dónde filma, qué mira y qué hace la langosta. Los **aislados** la muestran sola contra un fondo oscuro: la cámara solo ve la capa visual `LobsterEntranceCamera.ISOLATION_LAYER`, que la langosta suma a sus piezas (`LobsterRig.add_visual_layer`), más el fondo y una luz propia; nada del mapa puede taparla. Los demás muestran el mundo con la horda congelada; antes de congelar se mide cuánta vista libre tiene cada uno (`stage`).
+- **Nada la tapa en los planos del mundo**: en cada corte no aislado, `LobsterEntranceCamera` oculta la escenografía (hijos de los grupos `arena_bounds` y `scatter_keepout`) y los enemigos congelados que queden entre la cámara y la langosta (a menos de `sight_clearance` metros de la línea a su cabeza, su centro, su cola o sus pinzas), y los devuelve en el corte siguiente y al terminar. Lo muy grande (`hide_radius_limit`) y lo que ella pisa no se ocultan. El log del plano lo cuenta: `Boss cinematic: shot=N … hidden=N`.
+- **El cartel** (`LobsterEntranceOverlay`, capa 9) entra con el plano `title_shot` y lleva solo su nombre: una tarjeta como las del menú principal (marco de color con contorno de tinta y sombra dura, apenas girado; el texto no gira).
+- **El reloj es tiempo de juego**: dura `intro_seconds` con canción o sin ella, y el menú de pausa la detiene. Reloj y canción arrancan juntos `warmup_frames` frames después de congelar el mundo: lo que llega con la langosta (la marea) se dibuja por primera vez en ese instante, y ese tirón, con la canción ya sonando, dejaba los cortes atrasados respecto de sus golpes. Si más adelante un frame tarda de más (el motor le cuenta al juego solo una parte de ese tiempo y la canción lo suena entero), es la entrada la que salta a alcanzar a la canción cuando queda más de `catch_up_after` segundos detrás: los cortes siguen con sus golpes y la música no retrocede. Al terminar llama a `BlueLobster.finish_entrance()`: ahí se planea la vida, aparecen la barra y la flecha y empieza la pelea.
+- **Saltar**, **salidas** (`_teardown`) y **canción** (`BossSong`) funcionan como en la cinemática de Mythos. Además `LobsterSongYield` hace que su canción le deje el lugar a la de otro jefe y libera la entrada cuando la langosta ya no está y la canción calló.
+- Sin `entrance_scene`, la llegada simple de un jefe (anillo, rugido, `plain_seconds`).
+
+### La marea: el mapa bajo el mar
+
+- `LobsterArrival` instancia `LobsterTide` **bajo la arena** cuando la langosta llega y le pide `begin(origen)`; cuando muere, `ebb()`, y el nodo se libera solo al terminar de bajar. Procesa con el mundo congelado: sube durante la entrada, así cuando la cámara muestra el mapa ya está azul.
+- **Cielo**: usa el mismo ayudante que el infierno de Mythos (`HellSky`) sobre la copia propia del cielo de la arena: sol, ambiente, niebla, colores del cielo y del horizonte van a la paleta «Cielo de la marea». Le dice al clima cuál es ahora el cielo original (`HellSky.rebase_weather`), así una luna o una lluvia que termine en plena pelea vuelve al azul; al bajar devuelve el de antes, que leyó de `WorldDirector.sky_base()` (el cielo sin el tinte del clima en curso). Si el mapa ya tiene la transformación de un jefe de etapa (grupo `stage_transformation`), no toca el cielo.
+- **Decoración**, toda colgada del nodo y sin colisión: reflejos de agua sobre el suelo (`Caustics`, una copia de la malla del `Terrain` que solo suma luz), corales que brotan alrededor de donde llegó (`Branches` y `Bulbs`, dos `MultiMesh` con un material que los hace crecer con `rise`) y burbujas alrededor de cada raider, de pie o caído (`Bubbles` es la plantilla; cada nube es de su raider, no de su lugar en el grupo `player`).
+- **Lo que tiene que leerse sobre el azul va en cálido**: los avisos de la langosta (`telegraph_color` e `impact_color` de `BlueLobster.tscn`), la onda de choque que daña (`danger_color` de `shock_ring.gdshader`; la que es solo un efecto sigue de agua) y el brillo de su caparazón mientras carga un ataque (`anger_color` de `lobster_shell.gdshader`). La luz de la marea guarda algo de rojo (`sun_color`, `ambient_color`) para no apagar a los raiders. Los corales son bajos y se deshacen cerca de la cámara (`fade_near`, `fade_far` de `tide_coral.gdshader`): no tapan la pelea.
+- Contrato por nombre para el harness: grupo `lobster_tide` y `state_name()` (`low`, `rising`, `high`, `ebbing`). Logs: `Lobster tide: rising over …s sky=… at …`, `high at …`, `ebbing over …`, `gone at …`.
+
+### Logs del minijefe
+
+`Boss spawned: Langosta Azul at …`, `Spawns held: mini boss fights alone at …`, `Lobster tide: rising / high / ebbing / gone`, `Langosta Azul entrance started: seconds=… plain=…`, `Boss cinematic: started / shot=N at=…s song=… hidden=N / ended / teardown` (con `act=entrance`), `Langosta Azul scaling: life=…` (al empezar, `life=1`, y en cada recálculo que mueve su vida máxima más de `log_change`), `Langosta Azul purge: swept=… bosses=… at …`, `Langosta Azul fight started: entrance=…s skipped=…`, `Langosta Azul move: <ataque> at … reach=x…`, `Langosta Azul burnout:`, `Langosta Azul fight over: took=…s damage=… dps=… burnout=…` (`damage` es el de la party: no cuentan el desgaste ni el barrido de otro jefe), `Boss chests dropped:`, `Boss music: fading out / stopped`, `Spawns resumed at …`. El harness suma las líneas `Probe mini …` (`scenes/tests/mini_boss_probe.gd`): `calm` (nada cambió de vida ni nació entre el primer y el último frame de la entrada; lo mide `MiniBossCalm`, `mini_boss_calm.gd`), `stage` (cómo quedó la pantalla y en qué anda la marea, `tide=`, en plena entrada, al terminar y tras su muerte), `fight`, `alone` (si los spawns estaban cortados y cuántos enemigos más hubo como mucho durante la pelea), `states`, `damage` (por arma y por estado), `hits on raiders`, `hazards` (lo que quedó 5 s después de morir) y `tide` (en qué quedó la marea al salir: baja con el reloj del juego, así que una pausa la retrasa).
 
 ## Añadir un mapa
 
 - Qué es: una fila de catálogo + una escena de arena. **El orden de `MAP_LIBRARY` es el orden de la partida**: una fila nueva insertada en medio cambia la progresión de todos inmediatamente. No hay desbloqueos de mapa ni grados; a un bioma se llega jugando.
 - Archivos: `scripts/systems/catalogs/map_catalog.gd` (`MAP_LIBRARY`), `scripts/world/run/run_root.gd`, `scripts/world/run/arena.gd`, `scripts/world/run/scatter.gd`, arenas existentes como plantilla.
 - Fila: `id`, `display_name` (topónimo, mayúscula en las dos partes), `blurb`, `scene_path`, `palette`. Nada más.
-- Escena de arena (copiar `AshDunes.tscn`): raíz `Node3D` **con `scripts/world/run/arena.gd` y su `map_id`**, `WorldEnvironment` + luz (`Sun`), `Perimeter` (muros, capa 1), `Backdrop` (`scripts/world/run/backdrop.gd`, sus anillos de colinas se derivan de `arena_half_extent`), spots de verticalidad y props a mano (en grupo `scatter_keepout`), nodo de scatter con `scatter.gd` (seed determinista; su `arena_half_extent` es la **fuente única del tamaño de arena** — 120.0 = 240x240 — publicada por el grupo `arena_bounds`: la leen `BossBase` y `EnemySpawner` restando su margen, el `Terrain` (su lado es `2 × arena_half_extent`, leído al construirse) y el propio scatter, que deriva de ahí las zonas de mesetas, interior y perímetro con los márgenes `mesa_edge_margin`, `interior_edge_margin` y `perimeter_edge_margin_min/max`; el scatter además necesita su `formation_style`, un `RockFormationStyle` en `assets/world/rock_style_<mapa>.tres`), `Interactables`, `EnemySpawner` (con `phase_preset` y sus escenas/horario), `AmbientBed`, un nodo **`Terrain`** con `scripts/world/run/terrain.gd`, su `amplitude` del bioma, el `ShaderMaterial` del suelo en `surface_material` y un `backdrop_path` válido (por defecto `../Backdrop`, de donde saca el tinte del minimapa) (colocado **después** del scatter en orden de árbol), y un `Marker3D` llamado `SpawnPoint` (dónde aterriza el equipo). Los muros del `Perimeter` se escriben **estáticos** en la escena: formas `(1, 17, 242)` / `(242, 17, 1)` centradas en ±120.5 y y = 3.5. Unos **13 POI barajables** bajo `Interactables`. **NO** instancia `RunSystems.tscn`: eso vive una sola vez en `Run.tscn`.
+- Escena de arena (copiar `AshDunes.tscn`): raíz `Node3D` **con `scripts/world/run/arena.gd` y su `map_id`**, `WorldEnvironment` + luz (`Sun`), `Perimeter` (muros, capa 1), `Backdrop` (`scripts/world/run/backdrop.gd`, sus anillos de colinas se derivan de `arena_half_extent`), spots de verticalidad y props a mano (en grupo `scatter_keepout`), nodo de scatter con `scatter.gd` (seed determinista; su `arena_half_extent` es la **fuente única del tamaño de arena** — 120.0 = 240x240 — publicada por el grupo `arena_bounds`: la leen `BossBase` y `EnemySpawner` restando su margen, el `Terrain` (su lado es `2 × arena_half_extent`, leído al construirse) y el propio scatter, que deriva de ahí las zonas de mesetas, interior y perímetro con los márgenes `mesa_edge_margin`, `interior_edge_margin` y `perimeter_edge_margin_min/max`; el scatter además necesita su `formation_style`, un `RockFormationStyle` en `assets/world/rock_style_<mapa>.tres`), `Interactables`, `EnemySpawner` (con `phase_preset` y sus escenas/horario), `AmbientBed`, un nodo **`Terrain`** con `scripts/world/run/terrain.gd`, su `amplitude` del bioma, el `ShaderMaterial` del suelo en `surface_material`, un `backdrop_path` válido (por defecto `../Backdrop`, de donde saca el tinte del minimapa) y, si el mapa lleva montaña, cañón y puentes, un `relief` (un `ReliefSettings` en `assets/world/relief_<mapa>.tres`; ver «Terreno → Relieve por zonas»: con él no se ponen spots de verticalidad a mano, que clavarían el trazado en el mismo sitio en todas las semillas; ahí mismo se eligen sus estructuras, y la vegetación del suelo es una `GroundCover.tscn` hija del scatter) (colocado **después** del scatter en orden de árbol), y un `Marker3D` llamado `SpawnPoint` (dónde aterriza el equipo). Los muros del `Perimeter` se escriben **estáticos** en la escena: formas `(1, 17, 242)` / `(242, 17, 1)` centradas en ±120.5 y y = 3.5. Unos **13 POI barajables** bajo `Interactables`. **NO** instancia `RunSystems.tscn`: eso vive una sola vez en `Run.tscn`.
 - Las tres arenas guardan en su `.tscn` algunos `@export` del `EnemySpawner` (las escenas de enemigos, `phase_preset`, `boss_scene`, `elder_title` y `boss_warning_text`), y cualquiera puede guardar otro: si un export se muda a un colaborador, el valor que una escena guarda con ese nombre se pierde sin aviso. Por eso `SpawnScaling`, `SpawnPoints`, `HordeSchedule`, `BossSchedule`, `PowerUpDrops` y `EnemyFreeze` (`scripts/systems/spawner/`) tienen la lógica pero leen los exports del spawner. Son `RefCounted` sin proceso propio: el `_physics_process` del spawner los avanza, así que parar el spawner los para a todos.
 
 ## Partida por etapas
@@ -303,9 +500,9 @@ Una partida es una **secuencia de etapas**, una por mapa, en el orden de `MAP_LI
 | `scripts/world/run/world_director.gd` (`WorldDirector`, grupo `world_director`) | Dura toda la partida: los hooks de etapa, el tick de eventos (`EVENT_LIBRARY`), el portal de salida y las balizas. Sus dos hijos en `RunSystems.tscn` hacen el resto. |
 | `scripts/world/run/director/weather_director.gd` (`WeatherDirector`, nodo `WorldDirector/Weather`) | El clima: lunas, lluvias y desastres, el canal de uno a la vez, sus exports y los charcos ácidos. |
 | `scripts/world/run/director/weather_catalog.gd` (`WeatherCatalog`, `RefCounted`) | La tabla de climas `WEATHER_CATALOG`, `STRETCHABLE_GROUPS`, `COMPASS_WORDS` y las tiradas por peso (`roll_group`, `roll_altar`). `WeatherDirector.WEATHER_CATALOG` y `weather_row()` reenvían aquí. |
-| `scripts/world/run/director/sky_tint.gd` (`SkyTint`, `RefCounted`) | El tinte del cielo: cachea el Sol y el `Environment` de la arena, los tiñe y los devuelve con **un solo** tween, creado sobre el nodo `Weather`. |
-| `scripts/world/run/director/stage_fixtures.gd` (`StageFixtures`, nodo `WorldDirector/StageFixtures`) | Lo que se pone al empezar cada etapa: inicio irregular, cofres gratis, portales emparejados, ruletas, cajas de mascotas, altares de eventos y bloques de la suerte. |
-| `scripts/world/run/director/stage_layout.gd` (`StageLayout`, `RefCounted`) | Las preguntas de geometría de una etapa: `event_point`, `claim_clear_point`, `ring_point`, `exit_portal_point`, `ground_height`, `shuffle_ground_interactables`. Un `StageLayout` nuevo por etapa. |
+| `scripts/world/run/director/sky_tint.gd` (`SkyTint`, `RefCounted`) | El tinte del cielo: cachea el Sol y el `Environment` de la arena, los tiñe y los devuelve con **un solo** tween, creado sobre el nodo `Weather`. `rebase()` cambia el cielo «original» al que vuelven los climas y entrega el `Environment` propio de la arena (lo usa `HellTransformation` por `WorldDirector.rebase_sky`). |
+| `scripts/world/run/director/stage_fixtures.gd` (`StageFixtures`, nodo `WorldDirector/StageFixtures`) | Lo que se pone al empezar cada etapa: inicio irregular, cofres gratis, portales emparejados, ruletas, cajas de mascotas, altares de eventos y bloques de la suerte. Todo lo que pone entra a `scatter_keepout`; los portales y los cofres extra buscan su punto con su propio borde (`footprint_reach`; el marco de un portal, unos 4.4 m). |
+| `scripts/world/run/director/stage_layout.gd` (`StageLayout`, `RefCounted`) | Las preguntas de geometría de una etapa: `event_point`, `claim_clear_point(reach)`, `ring_point`, `exit_portal_point`, `ground_height`, `ground_under` (la sonda de suelo, estática), `shuffle_ground_interactables`. Un `StageLayout` nuevo por etapa. |
 | `scenes/world/director/` | Las escenas que pone el director: `ExitPortal.tscn`, `PortalShrine.tscn`, `PortalVisual.tscn` (`portal_visual.gd`, el aspecto que comparten los dos portales), `Beacon.tscn` (`beacon.gd`, la baliza) y `SupplyChest.tscn`. |
 | `RunState`                                                                              | `stage_index`, `lap`, `stage_time`, `stage_boss_dead`, `stage_cleared`, `pseudo_infinite_time`, `stages_cleared_total`, `endless_seconds_total`, `laps_completed`, `visited_map_ids`, `cleared_map_ids`, señal `stage_changed(stage_index, map_id)`, y `begin_stage()` / `mark_stage_cleared(map_id)`. Los índices son **0-based**; todo lo que ve el jugador (o un log) imprime `+ 1`. |
 
@@ -338,28 +535,47 @@ Corre dentro de `ScreenFade.transition_async(action)` — el hermano que **esper
 
 ### La puerta de etapa y el modo pseudo-infinito
 
-- **Puerta** (`RunManager`): la etapa se supera cuando `RunState.stage_time >= stage_goal` (900 s) **y** el jefe de etapa (el Elder) está muerto. Una arena sin `boss_scene` cuenta como «jefe muerto». Log `Stage gate: time=%.1f boss=%s`, y `Stage boss slain:` cuando cae el Elder (`BossSchedule._watch_stage_boss`, en `scripts/systems/spawner/boss_schedule.gd`, conectado a **esa** instancia: los jefes recurrentes posteriores no reabren nada).
+- **Puerta** (`RunManager`): la etapa se supera cuando `RunState.stage_time >= stage_goal` (900 s) **y** el jefe de etapa (el Elder, o el `stage_boss_scene` de la arena: Mythos en el Bosque Hueco) está muerto. Una arena sin `boss_scene` cuenta como «jefe muerto». Log `Stage gate: time=%.1f boss=%s`, y `Stage boss slain: <boss_title>` cuando cae (`BossSchedule._watch_stage_boss`, en `scripts/systems/spawner/boss_schedule.gd`, conectado a **esa** instancia: los jefes recurrentes posteriores no reabren nada).
 - Superarla abre el **portal de salida** (`WorldDirector._tick_exit_portal`, a `exit_portal_min_distance` 40 m o más de todo raider, con baliza hasta usarse; el aviso del HUD es el export `exit_portal_announce`) y la flecha de jefe lo apunta mientras no viva ningún jefe (`track_objective`). Logs `Exit portal opened at %.1fs` y `Portal used: exit`.
 - **Pseudo-infinito**: mientras la etapa está superada, cada minuto de `RunState.pseudo_infinite_time` suma HP +15%, daño +10% y velocidad +4% (con tope `endless_speed_cap` 1.8), comprime el intervalo de spawn ×0.85 y agranda las hordas ×1.5. Exports en el spawner (`endless_*`), aplicados en spawns frescos por `SpawnScaling.scale_fresh_spawn`; la velocidad es su canal propio porque `apply_tier_scaling` cubre HP/daño/pago solamente. Log `Pseudo-infinite: minute %d hp x%.2f dmg x%.2f speed x%.2f`, uno por minuto.
 - **Vueltas**: los grados de mapa desaparecieron; su lugar lo ocupa `lap_hp_mult` 1.5 / `lap_damage_mult` 1.3 / `lap_xp_mult` 1.3 por vuelta completa, aplicados por el mismo canal `apply_tier_scaling` / `apply_tier`.
-- El horario de jefes y las hordas leen **`RunState.stage_time`**, no `run_time`: cada mapa tiene su jefe en el minuto 5 y su Elder en el 11. Las rampas globales (intervalo, conteo, rampa tardía) siguen leyendo `run_time`.
+- El horario de jefes y las hordas leen **`RunState.stage_time`**, no `run_time`: cada mapa tiene su jefe en el minuto 5 y su jefe de etapa en el 11 (el Elder; en el Bosque Hueco, Mythos). Las rampas globales (intervalo, conteo, rampa tardía) siguen leyendo `run_time`.
 
 ### Interruptores del harness
 
 `BONK_STAGE_FAST=1` supera la etapa a los 60 s y sin jefe; el harness se queda entonces `PSEUDO_INFINITE_DWELL` (70 s) antes de ir al portal, para que la rampa registre al menos un minuto, y después abandona su ruta y va directo. `BONK_ARENA` ya no nombra la escena a instanciar sino el **bioma inicial** (`GameConfig.start_map_id`); el harness siempre arranca `Run.tscn`. `BONK_SAVE_PATH` re-apunta el guardado antes de la primera lectura, para cualquier arranque headless que no sea el probe.
 
+`BONK_MINI_BOSS_AT=<s>` trae al minijefe de la arena a ese segundo de la etapa en vez de en `mini_boss_spawn_minute` (lo lee `BossSchedule`); el soak del minijefe de `tools/verificar.sh` lo usa. Con las variables de la tanda de abajo (`BONK_CINEMATIC_SKIP`, `BONK_PAUSE_AT`, `BONK_EXTRACT_AT`, `BONK_WIPE_AT`, `BONK_ADVANCE_AT`) se prueba su entrada igual que la calma de Mythos: operan sobre cualquier nodo del grupo `boss_cinematic`.
+
+`BONK_STAGE_BOSS_AT=<s>` trae al jefe de etapa a ese segundo de **cada** etapa en vez de en el minuto 11 (lo lee `BossSchedule`), y `BONK_STAGE_GOAL=<s>` acorta **solo la mitad de tiempo** de la puerta: la mitad del jefe se conserva, que es justo lo que `BONK_STAGE_FAST` tira. Juntas dejan probar la llegada, la pelea, la muerte y el cruce en unos minutos; el soak del jefe de etapa de `tools/verificar.sh` las usa. `BONK_BOSS_HURT_AT=a,b` agota la vida que el jefe esté peleando en esos segundos del reloj del harness (el de `--quit-after`, que sigue corriendo durante las cinemáticas): con `BONK_STAGE_BOSS_AT=20 BONK_BOSS_HURT_AT=45` la primera fase dura menos de 10 s.
+
 ## Terreno
 
 Desde la iteración 51 el suelo de una arena **no es una placa plana**: es
 `scripts/world/run/terrain.gd` (`class_name Terrain extends StaticBody3D`, grupo
-`terrain`, `static func find(tree)`), un heightmap suave de amplitud baja
-(bosque 2.5, dunas 3.0, ciénaga 1.5) con mesetas encima.
+`terrain`, `static func find(tree)`). Tiene dos formas, según su export `relief`:
 
-**El relieve es deliberadamente bajo.** Esto es un bullet-heaven: la horda no
-tiene navmesh, persigue en línea recta y trepa lo que la bloquea, así que un
-terreno capaz de esconder a un raider o cortar una persecución rompería la
-persecución en vez de enriquecerla. Lo que compra el relieve es legibilidad
-(saber dónde estás en 240×240) y silueta.
+- **Sin `relief`** (Dunas de Ceniza, Ciénaga Lóbrega): un heightmap suave de
+  amplitud baja (dunas 3.0, ciénaga 1.5) con mesetas encima.
+- **Con `relief`** (Bosque Hueco): **relieve por zonas**. Sobre un suelo
+  ondulado (amplitud 2.4) va una montaña escalonada de tres niveles —el
+  macizo donde aparece el equipo, un segundo nivel y la cumbre—, un cañón
+  con río a su pie que cruza el Gran Puente, cerros sueltos y las rampas
+  que entran a cada zona. Ver «Relieve por zonas» abajo.
+
+**La regla que manda sobre todo relieve.** Esto es un bullet-heaven: la horda no
+tiene navmesh, persigue en línea recta, camina hasta 45 grados y trepa lo que
+la bloquea desde 60 grados hacia arriba, hasta 10 m de una vez. Un terreno
+capaz de esconder a un raider o de cortar una persecución rompería el juego.
+Por eso el suelo base es suave, y por eso el relieve por zonas pone su altura
+en **cortes que la horda cruza**: ninguno mide más de 8 m (la montaña es alta
+porque **apila** cortes de 6 m, no porque alguno sea más alto), toda cara es
+claramente caminable o claramente pared (nunca entre 45 y 60 grados), a toda
+zona se entra caminando por alguna rampa, y bajo un puente de arcos abiertos
+la horda no se queda esperando: entra por sus cabeceras (`ReliefLanes`).
+Dentro de cada zona el suelo sigue igual de
+suave que antes: los barridos de las armas y los golpes de jefe leen la
+altura con ventanas de 1.6 a 2.2 m.
 
 - **Semilla**: la del scatter (`scatter.run_seed()`, válida desde su
   `_enter_tree`, leída por el grupo `arena_bounds`), así que `BONK_SEED`,
@@ -386,10 +602,13 @@ persecución en vez de enriquecerla. Lo que compra el relieve es legibilidad
   del scatter, leído al construir (la fuente única del tamaño de arena).
 - **Técnica**: el ruido se muestrea en una retícula de `noise_step` 2 m y se
   interpola a la rejilla de 1 m del `HeightMapShape3D` (que es **fija** en una
-  unidad por muestra: 241×241 y el nodo sin escalar). La malla se arma con
+  unidad por muestra: 321×321 en el Bosque Hueco, de 320 m, y 241×241 en las
+  otras dos arenas, de 240; el nodo sin escalar). La malla se arma con
   `add_surface_from_arrays` sobre arrays empaquetados, no con `SurfaceTool`:
   un vértice por llamada sobre 241×241 son cientos de miles de llamadas de
-  GDScript y tarda segundos. Presupuesto: **400 ms**; medido 92-115 ms.
+  GDScript y tarda segundos. Presupuesto: **400 ms**; medido 97-134 ms sin
+  relieve por zonas y 87-104 ms con él. La malla clásica vive en
+  `scripts/world/run/terrain/terrain_mesh.gd` (`TerrainMesh`).
 - **El sentido de los triángulos (iteración 60).** Godot considera **frontal
   la cara horaria vista desde delante**, así que un suelo que se pisa se
   emite **horario visto desde +Y** — lo mismo que decir que
@@ -408,28 +627,293 @@ persecución en vez de enriquecerla. Lo que compra el relieve es legibilidad
   mezcla de `pad_blend` (6 m). **Nunca bajo los POI barajables**, cuyo XZ cambia después: a
   esos se los apoya en el relieve. Una banda de `rim_flat_band` 10 m aplana el
   borde para que los muros estáticos y el disco del backdrop encuentren suelo
-  llano.
+  llano. Sin relieve por zonas un claro se aplana **hacia 0**; con él, **al
+  nivel de su propio suelo** (la altura que el suelo base tiene en su
+  centro), y las dos cabeceras de un puente al nivel de su tablero.
 - **Regla de nulos**: quien corre desde `on_stage_started` en adelante trata un
   `find()` nulo como un `push_error` una vez; quien corre en construcción
   (Backdrop, HUD, overlay) lo tolera en silencio y se reconstruye al empezar la
   etapa.
 
+### Relieve por zonas (Bosque Hueco)
+
+Opt-in por arena: el nodo `Terrain` lleva en `relief` un `ReliefSettings`
+(`assets/world/relief_hollow_woods.tres`; los valores de diseño son exports
+de `scripts/world/run/terrain/relief_settings.gd`). Una arena sin él no
+ejecuta nada de esto y no saca ni una tirada distinta del RNG.
+
+**Qué arma.** Todo gira alrededor de un rumbo al azar, hacia donde queda la
+montaña vista desde el punto de aparición:
+
+| Pieza | Qué es |
+| --- | --- |
+| **Macizo** | Un nivel ancho (radio 52-56 m, 6 m sobre el llano), alargado hacia la montaña. **Contiene el punto de aparición.** 3-6 rampas al llano. |
+| **Segundo nivel** | Una zona apilada sobre el macizo, pegada a su borde lejano (+6 m). 2-3 rampas; la primera mira hacia el spawn. |
+| **Cumbre** | Una zona apilada sobre el segundo nivel (+5.5 m), con 1-2 rampas y el Árbol Hueco. Queda a unos 18 m sobre el llano. |
+| **Cañón** | Un pasillo hundido con río (5.8-6 m de hondo, 24-27 m de ancho, 140-170 m de largo) al pie del macizo por el lado contrario a la montaña, con una rampa en cada punta y el **Gran Puente** más o menos al medio, con cuatro escaleras que bajan al agua. |
+| **Cerros** | 2-3 mesetas chicas sueltas en el llano, con 1-2 rampas. |
+| **Lomas** | 5 lomas anchas del llano, más la que sostiene a la montaña y la de cada cerro. |
+
+Las zonas se **apilan** (`Zone.parent`, `Zone.floor`): una zona puede estar
+entera sobre la meseta de otra, y así tres cortes de 6 m hacen una montaña de
+18 sin que ninguno pase de lo que la horda trepa.
+
+| Archivo (`scripts/world/run/terrain/` salvo que diga otra cosa) | Qué hace |
+| --- | --- |
+| `relief_planner.gd` (`ReliefPlanner`) | Sortea el trazado con un **RNG propio** sembrado con `run_seed` (no toca el flujo de la partida): macizo, segundo nivel, cumbre, cañón, rampas del macizo, cerros y lomas, en ese orden. Cada pieza se sortea por rechazo; si una obligatoria no cabe, se tira el trazado y se sortea otro (hasta 60; medido: 9 como mucho en 300 semillas). Si ninguno cabe usa el de reserva (`fallback=true` en el log): la montaña mira a una esquina y cada medida toma el medio de su rango. |
+| `relief_ramps.gd` (`ReliefRamps`) | Las rampas de una zona: dónde caben alrededor de su contorno (dentro de la arena, fuera del claro del spawn, sobre la meseta del padre si la zona está apilada, lejos de otras zonas, de sus rampas y del cañón, y con meseta libre detrás de la boca). |
+| `relief_ravine.gd` (`ReliefRavine`) | El cañón: su eje (una Bézier que abraza al macizo), en cuántos tramos se parte su fondo, los collados y los puentes. |
+| `relief_layout.gd` (`ReliefLayout`) | El trazado y sus preguntas de geometría en planta: `offset_at`, `level_at`, `on_plateau`, `raised_offset`, `ravine_coords`, `ravine_drop`, `digest`. |
+| `relief_cuts.gd` (`ReliefCuts`) | Las **líneas de corte** (`CutPath`): por dónde pasa cada acantilado y cuánto mide en cada punto. Una zona con N rampas da N líneas; el cañón, sus dos paredes, partidas en cada puente y en cada collado. El lado alto queda a la izquierda al recorrerlas. |
+| `relief_field.gd` (`ReliefField`) | Las alturas: suelo base (ruido + lomas + la vaguada del cañón), borde plano, claros y, encima, las zonas (el padre antes que la hija). |
+| `relief_lattice.gd` (`ReliefLattice`) | La retícula gruesa del suelo base que `ReliefField` interpola a 1 m: ruido, la loma de cada zona, las lomas sueltas y la vaguada del cañón. |
+| `relief_mesh.gd` (`ReliefMesh`) | La malla: 2 m, con **parches de 1 m** en los bloques que tocan un corte. |
+| `relief_queries.gd` (`ReliefQueries`) | Distancia a cortes/rampas/puentes, celdas y barreras para la máscara, la línea `Relief layout:` y la consulta de la etapa. |
+| `scripts/world/cliff_wall.gd` (`CliffWall`) | La **roca** de un corte: una cinta facetada sobre su línea, con una cornisa caminable del lado alto y una cara empinada del lado bajo. La colisión es la malla (prismas convexos, como `RockFormation`). |
+| `scripts/world/props/bridge.gd` + `scenes/world/props/Bridge.tscn` (`Bridge`) | El Gran Puente, armado en código: tablero entre barandas, **arcos abiertos** sobre pilas con tajamar, estribos macizos, cuatro torres con brasero unidas por un dintel con estandartes, y cuatro escaleras macizas hasta el fondo. Sus medidas y colores son exports de la escena. |
+| `scripts/world/props/bridge/bridge_masonry.gd` (`BridgeMasonry`) | La cantería del puente: su malla, un tono por sillar (`LowPolyMesh.plate`/`block`). Sin colisión: las formas las pone `Bridge`. |
+| `relief_lanes.gd` (`ReliefLanes`) | Los puentes como los ve la horda: hacia dónde camina un enemigo cuando su objetivo está sobre un tablero o él quedó debajo. Lo lee `EnemyBase`. |
+| `scripts/world/run/scatter/relief_dressing.gd` (`ReliefDressing`) | Lo que hace el scatter con el relieve: levanta las `CliffWall` y los puentes **como hijos suyos** (así arden con el bosque en el infierno de Mythos) y responde `can_place` / `nearest_place`. |
+| `scripts/world/run/scatter/relief_structures.gd` (`ReliefStructures`) | Las estructuras que visten el relieve (ver «Estructuras y vegetación» abajo). |
+| `scripts/world/run/scatter/relief_road.gd` (`ReliefRoad`) | El camino antiguo: losas del punto de aparición al puente y un trecho más allá, con faroles de piedra. |
+| `scripts/world/run/scatter/relief_waters.gd` (`ReliefWaters`), `scripts/world/props/cascade_flow.gd` (`CascadeFlow`) | El agua: el río del cañón, sus nenúfares y juncos, y la cascada que lo alimenta, con la espuma que baja por cada caída. |
+| `scripts/world/run/backdrop/giant_trees.gd` (`GiantTrees`) | Los árboles colosales del horizonte, una malla hija del `Backdrop`. |
+| `scripts/world/props/giant_mushroom.gd` + `scenes/world/props/GiantMushroom.tscn` (`GiantMushroom`) | El hongo gigante que reparte el scatter (`mushroom_scene`). |
+| `scripts/fx/falling_leaves.gd` (`FallingLeaves`) | Las hojas que caen alrededor de la cámara; es un nodo hijo de la arena. |
+| `scripts/world/run/scatter/mesa_builder.gd` (`MesaBuilder`), `scripts/world/run/scatter/perimeter_ring.gd` (`PerimeterRing`) | Las mesetas (sorteo, plataforma y rampa) y la franja de props del borde, fuera de `scatter.gd` (`ArenaScatter`) para que ese archivo no crezca. Sus valores siguen siendo los exports del scatter (grupos «Mesetas» y «Borde») y sacan los números del RNG del scatter. `MesaBuilder.plan` sortea cada meseta entera en el `_enter_tree` del scatter (centro; después escala, giro y cara de la rampa) y se queda con ella solo si toda su huella guarda `mesa_clearance` (4 m) de la roca (`ArenaMask.box_clear`, exacta). Guarda esa huella (`Plan.is_clear`): los POI del director, los props y, con relieve, `can_grow` la esquivan con `mesa_footprint_gap`. |
+| `scripts/world/run/scatter/scatter_mask.gd` (`ScatterMask`), `interior_props.gd` (`InteriorProps`), `placement_rules.gd` (`PlacementRules`), sin `class_name` (los precarga `scatter.gd`) | Lo que hacía `scatter.gd`, partido por responsabilidad: armar la máscara con los exports «Máscara de la arena» y levantar una `RockFormation` por región; el reparto interior (árboles, rocas, tocones, hongos, árboles antiguos); y las preguntas `can_place` / `can_build` / `can_grow` / `nearest_place`, que `ArenaScatter` reenvía con los mismos nombres. Los exports y los métodos públicos siguen en `ArenaScatter`. |
+| `scripts/world/run/scatter/prop_footprints.gd` (`PropFootprints`) | La huella en planta de cada prop con colisión que planta el scatter (troncos, rocas, tocones): una grilla de 1 m que `can_place` lee, para que nada se coloque encima de un tronco. Solo se enciende con relieve por zonas. |
+
+- **Dos superficies por corte.** Un heightmap de 1 m por muestra no puede
+  dibujar una pared limpia: un escalón entre dos muestras vecinas da una cara
+  que, con poca altura, cae justo entre 45 y 60 grados. Por eso el
+  colisionador lleva cada corte como un **escalón duro corrido 1.5 m hacia el
+  lado alto** (`ReliefLayout.LEDGE_INSET`) y la `CliffWall` lo tapa entero con
+  su cornisa: lo que se pisa y se ve junto a un corte es roca. `height_at`
+  responde **la superficie donde se pisa** (el escalón en la línea nominal del
+  corte, cornisa incluida), no el colisionador. La cara de roca avanza una
+  fracción fija de lo que baja (`CliffWall.FACE_RUN`, 76 grados) a cualquier
+  altura, así que donde el corte se acaba (el pie de una rampa) la roca baja
+  a cero sin pasar por la franja prohibida.
+- **El suelo se amansa junto a un corte.** La ondulación del suelo queda al
+  35% a menos de 5 m del contorno de una zona y sobre sus rampas, y recupera
+  su fuerza a 13 m (`ReliefLattice.EDGE_DETAIL`, `EDGE_FLAT`, `EDGE_REACH`). La
+  cornisa de un corte se apoya en ese suelo: sobre una loma fuerte quedaría
+  con caras de 45 grados, y una rampa inclinada de más deja de caminarse.
+- **Alturas.** El llano queda en 0, el macizo en +6, el segundo nivel en +12 y
+  la cumbre en unos +17.5, todo sobre una loma de 2-3 m; el fondo del cañón,
+  en −6. Medido en doce semillas: `min` entre −6.4 y −6.6 (no baja de −7:
+  el rescate del vacío del raider está en −10), `max` entre 19.3 y 20.9, o
+  sea 26-27 m de cima a fondo.
+- **Un puente, y si son más, un collado entre cada dos.** El Bosque Hueco
+  lleva un solo puente (`bridge_count_min/max` = 1) y su río corre de punta
+  a punta. Con más de uno, entre cada dos el fondo **sube por una rampa
+  hasta el borde, sigue plano 10 m y vuelve a bajar** (`Ravine.saddles`,
+  `ReliefRavine.SADDLE_HALF`), así cada tramo tiene su salida.
+- **Las salidas del río.** Un raider salta 1.5 m y las paredes miden 6: del
+  fondo se sale por las rampas de las dos puntas o por las **cuatro
+  escaleras del puente**, dos por orilla, una hacia cada lado. Cada escalera
+  es un macizo con la cara de afuera en talud (más de 60 grados: la horda
+  la trepa); su colisión es una rampa lisa de unos 35 grados y los peldaños
+  son dibujo. `bridge_stair_reach` es lo que ocupa cada una a lo largo del
+  cañón: de ahí sale su pendiente. El trazado de reserva acorta su cañón
+  hasta que cabe (`ReliefRavine.CALM_SHRINK`).
+- **El orden.** El scatter llama a `Terrain.plan_relief(run_seed, medio_lado)`
+  en su `_enter_tree`, **antes** de armar su máscara y elegir sus mesetas (el
+  `Terrain` todavía no entró al árbol: es puro cálculo). La máscara recibe del
+  relieve `keep_open` (celdas sobre zonas, cañón y a 9 m de un corte, rampa
+  o puente: ahí nunca hay roca) y `barriers` (aristas entre celdas que un
+  corte separa): su flood fill ya no cruza un acantilado, así que «alcanzable
+  desde el spawn» significa lo mismo para ella que para un raider. Las
+  mesetas guardan `relief_mesa_clearance` (18 m) y los props
+  `relief_prop_clearance` (5 m).
+- **Colocar sobre el relieve.** Nadie pone nada sobre un corte, una rampa o un
+  puente. La pregunta es `arena_bounds.can_place(xz, margen)` (máscara +
+  lejos del relieve + fuera del faldón de las formaciones, de las mesetas y
+  del claro de cada estructura, y nunca sobre la huella de un prop con
+  colisión, `PropFootprints`: un portal de salida encima de un tronco de
+  8 m no lo alcanza nadie); `is_walkable` sigue siendo **solo** la máscara,
+  porque los vigilantes del harness la leen así. `can_grow` es la misma
+  pregunta sin la huella de los props, para la vegetación del suelo, que sí
+  llega hasta el pie de un tronco. `can_build` (la pregunta del director) es
+  `can_place` más: fuera del cañón y, en todo mapa, a su margen de la roca de
+  la máscara (distancia exacta, `ArenaMask.rock_distance`) y de la huella de
+  cada meseta. El margen se cuenta desde el borde de lo que se pone:
+  `Interactable.footprint_reach()` mide sus cuerpos sólidos. La hacen
+  `StageLayout.walkable_xz` (POIs, eventos, lluvias, portal de salida; 5 m),
+  `SpawnPoints` (4 m, y un spawn tampoco cae sobre la punta de un árbol) y
+  `BossBase._safe_arena_point` (su export `relief_margin`, 5 m; además sube el
+  punto al suelo si quedó bajo una zona elevada). Un spawn que no encuentra
+  lugar en los ocho intentos de su banda se corre al punto libre más cercano
+  (`SpawnPoints._off_relief`) en vez de nacer sobre una cornisa.
+  `nearest_place` busca en anillos hasta 76 m: con el raider parado sobre
+  una formación de roca grande, el punto libre más cercano queda a más de
+  20 m, y sin eso el enemigo nacía sobre la roca. `can_build` es
+  `can_place` fuera del cañón: el cauce mide 24-27 m, así que su medio queda
+  lejos de las paredes y pasa la pregunta de colocar, pero un santuario no
+  se levanta en el río. La usa `StageLayout.walkable_xz` (todo lo que pone
+  el director); lo que cae al morir y los spawns siguen con `can_place`. Lo que cae
+  donde murió alguien pasa por `EnemyLoot.drop_point` →
+  `arena_bounds.nearest_place` y se apoya **siempre** en el suelo: un cofre
+  soltado en mitad de una rampa aparece al costado, y el de quien murió
+  encima de una piedra no queda flotando. La estrella que ronda
+  (`PowerUpPickup`) rebota al pie de un corte como contra una roca
+  (`roam_max_rise`: el suelo no puede subir más de 2 m en lo que mira
+  adelante) y sube por las rampas; bajar, baja por donde sea.
+- **El puente no es un refugio: `ReliefLanes`.** Bajo los arcos se pasa
+  caminando, así que ahí no hay pared que trepar: un enemigo que persigue
+  en línea recta a quien está parado en el tablero se quedaría debajo para
+  siempre. `ReliefLanes` le cambia el rumbo en tres casos: si su objetivo
+  está **sobre el tablero** y él en una orilla, va a la boca de su
+  cabecera y de ahí derecho por el tablero; si él está **en el cañón**, va
+  a un punto de la orilla al costado de la obra (trepa la pared o la
+  escalera que encuentre) y de ahí a la cabecera; y si quedó **bajo el
+  tablero** persiguiendo a alguien de arriba, sale por el costado en vez
+  de quedarse contra el estribo. En todo lo demás devuelve la línea recta
+  de siempre. `ReliefDressing.raise` lo arma con los puentes ya colocados,
+  el scatter lo publica (`arena_bounds.horde_lanes()`) y `EnemyBase` lo pide
+  una vez al nacer y llama a `seek()` en cada tick; mientras ningún raider
+  anda por un puente cuesta una comparación por enemigo. Las torres y las
+  barandas van en un cuerpo aparte (`Bridge/Barriers`): son obstáculos, no
+  pisos (el arnés lee como suelo todo lo que choca del `Bridge`, y por una
+  baranda nadie camina). El tablero queda 3 cm bajo el claro de sus
+  cabeceras: se entra sin escalón.
+- **El Backdrop** de una arena con relieve por zonas arma el suelo lejano como
+  un **marco** de cuatro `PlaneMesh` alrededor de la arena, al nivel de su
+  borde (`rim_drop`). Un plano entero bajo el fondo del cañón dejaría un
+  escalón de 6 m en el borde, y al nivel del borde taparía el cañón.
+  `PlaneMesh` a propósito: `HellSky` reconoce el suelo lejano por ese tipo.
+  Con `peak_count` mayor que cero levanta además una **cordillera**: picos
+  facetados de 55-130 m en un anillo lejano (2.1-3 veces la mitad de la
+  arena), en una sola malla con color de vértice y su propio RNG. Es lo que
+  le da horizonte al mapa desde cualquier punto.
+- **Logs.** `Relief layout: <mapa> zones=N raised=N ravines=N cuts=N tallest=M
+  peak=M bridges=N ramps=N fallback=B digest=H` (junto a `Terrain built:`;
+  `tallest` es el corte más alto, `peak` la cumbre sobre el llano; el digest
+  se repite con la misma semilla y cambia con otra), `Relief dressing: N
+  cuts, N faces, N shapes, tallest=M, N bridges in N ms` (un `WARNING` si
+  alguna cara de roca queda entre 45 y 60 grados) y `Ground cover: N chunks,
+  N faces in N ms`.
+
+#### Estructuras y vegetación
+
+Lo que le da altura y carácter al relieve. Las escenas salen del
+`ReliefSettings` de la arena (grupo «Estructuras»): una escena vacía apaga
+esa pieza. Todo cuelga del scatter, así arde con el bosque, y nada saca
+números del RNG de la partida.
+
+| Pieza | Dónde va | Con qué |
+| --- | --- | --- |
+| **Árbol Hueco** | Al borde de la cumbre que queda más lejos de su rampa, con la boca del hueco hacia el centro. 30 m: se ve desde todo el mapa. | `scenes/world/props/HollowTree.tscn` (`hollow_tree.gd`) |
+| **Portales** | En la boca de cada rampa de los niveles altos: un pilar detrás de cada esquina de la rampa y el dintel encima. | `StandingStones.tscn`, `layout = GATE` |
+| **Menhires** | Una pareja al pie de cada rampa que baja al llano. | `layout = MENHIR` |
+| **Círculo de piedras** | En un claro del macizo, a unos 36 m del spawn. | `layout = CIRCLE` |
+| **Ruinas** | Hasta `ruin_count` columnatas rotas en claros del llano. | `layout = RUIN` |
+| **Monolitos** | Hasta `monolith_count` piedras de 6.5-9.5 m, sueltas por el mapa. | `layout = MENHIR`, con otras medidas |
+| **Agua** | Una cinta a nivel en cada tramo de fondo del cañón. | `water_material` |
+| **Árboles antiguos** | 38 por etapa, 2.5 veces más altos que los demás; los planta el scatter (`ancient_tree_scene`, `ancient_tree_count`). | `scenes/world/props/AncientTree.tscn` |
+| **Vegetación del suelo** | Arbustos, matas, flores, hongos y piedras chicas en todo el mapa. | `scenes/world/props/GroundCover.tscn` (`ground_cover.gd`), hija del scatter en la escena de la arena |
+
+- **`LowPolyMesh`** (`scripts/world/props/low_poly_mesh.gd`) arma mallas
+  facetadas con color de vértice a partir de piezas simples (caras, prismas
+  entre dos anillos, cajas, copas). El material es
+  `assets/materials/vertex_paint.tres`: blanco por color de vértice, que es
+  lo que `HellDressing` sabe quemar. **No uses `MultiMesh` para nada que
+  cuelgue del scatter**: el infierno solo viste `MeshInstance3D`, y lo demás
+  quedaría verde en un bosque en llamas.
+- **`StandingStones`** hace las cuatro formas de piedra con una sola escena;
+  quien la coloca fija `layout`, `span` y `shape_seed` antes de que entre al
+  árbol. Cada piedra parada lleva su cilindro de colisión; los dinteles y
+  las piedras caídas, no. Nada pasa de 10 m: la horda trepa 10 de una vez, y
+  lo que no cruza lo rodea.
+- **`GroundCover`** parte el mapa en trozos de 20 m y arma una malla por
+  trozo, unos pocos por frame desde que empieza la etapa (unos 135 trozos,
+  unas 40 000 caras, 90 ms en total): arbustos, pasto, flores, hongos,
+  piedras y helechos. No tiene colisión. No planta sobre roca, cortes,
+  rampas, puentes, el fondo del cañón ni el claro de una estructura
+  (`arena_bounds.can_grow`).
+- **El camino antiguo (`ReliefRoad`)** sale del punto de aparición, baja por
+  la rampa del macizo que queda más cerca del puente, llega a su cabecera
+  por el llano (nunca sobre un corte) y sigue 28 m por la otra orilla
+  hasta perderse. Las losas se apoyan en el suelo por sus cuatro esquinas
+  y no tienen colisión; cada 15 m va un farol de piedra (un solo cuerpo,
+  `RoadLamps`, con un poste por farol). Devuelve su franja como claros, así
+  ni un prop ni el pasto ni un círculo de piedras caen encima.
+- **El agua (`ReliefWaters`)**: el río es una cinta a nivel por tramo hondo
+  del cañón, con nenúfares y juncos lejos del puente. La **cascada** nace en
+  un manantial sobre el macizo, cae por su acantilado a una poza, cruza el
+  llano y vuelve a caer al cañón; se busca a unos 40 m del puente, donde
+  el macizo queda cerca y no hay una rampa, y si no cabe en ningún lado no
+  se pone. El agua que cae deja la cornisa antes de caer (la roca del corte
+  asoma) y `CascadeFlow` hace bajar unos copos de espuma para que se vea
+  correr. Se apaga con `ReliefSettings.cascade`.
+- **Los árboles colosales (`GiantTrees`)** son del `Backdrop` (grupo
+  «Árboles colosales», `giant_count`): troncos de 125 a 190 m alrededor de
+  la arena, con la copa sobre la niebla. Una malla, sin colisión.
+- **`GiantMushroom`** es un prop del scatter (`mushroom_scene`,
+  `mushroom_count`): solo frena su pie; el sombrero y los hongos chicos se
+  atraviesan. Su forma se siembra con su posición. Ni los hongos ni los
+  árboles ni los tocones crecen dentro del cañón; las rocas sí.
+- **`FallingLeaves`** es un `GPUParticles3D` hijo de la arena que sigue a la
+  cámara y deja de soltar hojas cuando empieza una transformación de etapa.
+  Ojo con las semillas: el motor saca un número del RNG global al instanciar
+  un nodo de partículas, así que agregar o quitar uno de una arena cambia el
+  mundo que arma un mismo `BONK_GAME_SEED` (la Cacería diaria siembra el
+  scatter directo y no se mueve).
+- Las estructuras entran al grupo `relief_structures` (`ReliefStructures.GROUP`)
+  y devuelven su claro al scatter: `can_place` y el reparto de props lo
+  esquivan. Se colocan **después** de los POIs y las mesetas (los esquivan) y
+  **antes** de los props.
+
+**La consulta de la etapa: `Terrain.relief_features()`.** Solo lectura, para
+quien construya encima (mecánicas de mapa, estructuras). Vacía sin relieve
+por zonas. Posiciones en el mundo, con su altura real:
+
+| Llave | Cada fila |
+| --- | --- |
+| `crossings` | `a`, `b` (los dos extremos del tablero), `span`, `width` |
+| `cuts` | `foot`, `rim`, `height`, `normal` (hacia el lado bajo), `zone` (−1 = pared del cañón): un tramo por punto de cada línea de corte |
+| `floors` | `kind` (`"ravine"` o `"raised"`), `center`, `extent` (largo y ancho), `zone`, `tier` (`"massif"`, `"tier"`, `"summit"` o `"butte"`) y `parent` (la zona sobre la que está apilada, o −1) |
+| `ramps` | `top`, `foot`, `width`, `zone` (−1 = del cañón: las de las dos puntas y las de cada collado) |
+| `sites` | `center`, `radius`: claros casi planos donde cabe una estructura de 10 m lejos de todo corte (no mira rocas ni props: eso se le pregunta a `can_place`) |
+
+Los puentes son escenas sueltas (`Bridge.tscn`, con `span`, `width`, `drop`,
+`overlap`, `stair_reach` y `deck_ends()`), hijas del scatter: una mecánica
+que los rompa los encuentra ahí. Si un puente deja de servir, hay que
+sacarlo también de `ReliefLanes`, o la horda seguirá yendo a su cabecera.
+
 ### La regla de apoyado
 
-**Nada se coloca a y = 0.** Todo pasa por `Terrain.height_at`:
+**Nada se coloca a y = 0.** Todo pasa por `Terrain.height_at`, que responde
+la superficie donde se pisa (con relieve por zonas, las cornisas de roca
+incluidas).
+
+Lo que se pone **encima** del terreno (el tablero de un puente, el estrado
+de una meseta, una roca) no está en `height_at`. Los ataques que miden
+contra un raider usan el suelo **real**: `AttackFloor`
+(`scripts/fx/attack_floor.gd`, con `preload`) tira un rayo hacia abajo
+desde la altura de quien pregunta + `RISE` (2 m), saltándose los cuerpos.
+Así un raider en el Gran Puente está sobre el tablero, y una onda que corre
+por el cauce pasa por debajo sin tocarlo. Lo usan `MythosBody`, el Aliento,
+`FireWave`, `ShockRing`, `FireBeam`, `FireTornado`, `TelegraphLane`, el
+anillo de la llegada de Mythos y el Estallido de raíces del Rey Pútrido;
+el golpe falla si `|raider.y - suelo| > height_window`.
+
 
 | Dónde                                                              | Cómo                                                                                                                       |
 | ------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------- |
-| Props del scatter                                                  | `_spawn_prop` **ignora** el `pos.y` que le pasan y usa `ground_height()`                                                   |
-| Línea de perímetro, mesetas                                        | por el mismo `_spawn_prop`                                                                                                 |
+| Props del scatter                                                  | `spawn_prop` **ignora** el `pos.y` que le pasan y usa `ground_height()`                                                    |
+| Línea de perímetro, mesetas                                        | por el mismo `spawn_prop` (el borde, `PerimeterRing`) y por `ground_height()` (las mesetas, `MesaBuilder`)                                                                                               |
 | Formaciones rocosas de la máscara                                  | `RockFormation.build` levanta cada vértice sobre `height_at` de su propio XZ                                               |
 | Puntos del director                                                | `StageLayout.claim_clear_point()` → `terrain_height()`                                                                     |
 | Eventos, portales, ruletas, altares, manantiales, cofres de evento | `StageLayout.event_point()` / `claim_clear_point()`                                                                        |
+| Minijefe secreto                                                   | `SecretTrigger.miniboss_spawn_point`: el punto libre más cercano a `spawn_offset` donde cabe su cuerpo, apoyado con `StageLayout.ground_under` |
 | Portal de salida                                                   | `StageLayout.exit_portal_point()`, apoyado por `ground_height`                                                             |
 | POI barajados                                                      | `StageLayout.shuffle_ground_interactables` apoya en el relieve los que la escena deja por debajo de `POI_PLATFORM_Y` 0.5; los de plataforma conservan su y |
 | Spawn del equipo                                                   | `Arena.spawn_origin()` y `RunSystems.place_party` (cada offset del anillo lee su propia altura)                            |
 | Anillo de cofres del jefe                                          | uno por uno en `BossBase._drop_chests`                                                                                     |
 | Spawns de enemigos                                                 | `EnemySpawner.ring_position` → `SpawnPoints.ground_height`                                                                 |
+| Cofres soltados por un cuerpo (shiny, anillo del jefe)             | `EnemyLoot.drop_point`: con relieve por zonas, el punto libre más cercano y `height_at`                                    |
 
 **Las dos sondas de suelo** (`StageLayout.ground_height`,
 `SpawnPoints.ground_height`, en `scripts/systems/spawner/spawn_points.gd`) barren **todo** el relieve —desde sobre la
@@ -447,17 +931,18 @@ y muros siguen contando); el vigilante de celda bloqueada compara
 
 ## Arena irregular
 
-- Qué es: cada partida el cuadrado de **240x240** recibe una **máscara de celdas**. Vive en `scripts/world/run/scatter/arena_mask.gd` (`ArenaMask`, `RefCounted`, sin Inspector): el scatter (`scatter.gd`, grupo `arena_bounds`) la crea en su `_enter_tree`, con **su** RNG, y le copia sus exports `mask_*` del grupo «Máscara de la arena» antes de `build()`; ahí viven la acreción, `_fill_notches`, el flood fill y los pasillos. `mask_cell_size` (**5 m**, o sea 48x48 celdas), y entre `mask_blobs_min` y `mask_blobs_max` (**5-8**) formaciones crecen por **acreción** desde una semilla hasta `mask_blob_cells_min..max` (20-50) celdas: cada paso añade una celda de la frontera, con peso hacia el eje propio de la formación (crestas, `mask_ridge_bias`) y hacia celdas ya rodeadas por dos o más lados (masas compactas). Las semillas guardan `mask_blob_spacing` (10 celdas) entre sí, dos formaciones distintas dejan siempre `mask_formation_gap` (2) celdas abiertas entre ellas, el anillo exterior de `mask_border_cells` (2) celdas nunca lleva roca y nada crece a menos de `mask_protect_radius` (15 m, medido al cuadrado de la celda) del spawn ni de los spots de verticalidad. Una celda abierta rodeada por tres lados se rellena (`_fill_notches`) y un flood fill 4-vecinos desde el spawn **sella** cualquier bolsa no alcanzable. Si queda menos de `mask_min_open_fraction` (0.84) abierto se reintenta con menos formaciones. Los enemigos trepadores cruzan la roca; el jugador solo si sube encima (la cresta se camina).
+- Qué es: cada partida el cuadrado de la arena (**240x240**; **320x320** en el Bosque Hueco) recibe una **máscara de celdas**. Vive en `scripts/world/run/scatter/arena_mask.gd` (`ArenaMask`, `RefCounted`, sin Inspector): el scatter (`scatter.gd`, grupo `arena_bounds`) la crea en su `_enter_tree` (`ScatterMask.build`, `scripts/world/run/scatter/scatter_mask.gd`), con **su** RNG, y le copia sus exports `mask_*` del grupo «Máscara de la arena» antes de `build()`; ahí vive la acreción, y sus repasos (muescas, rendijas, el flood fill y los pasillos) están al lado, en `MaskPasses` (`mask_passes.gd`). `mask_cell_size` (**5 m**, o sea 48x48 celdas), y entre `mask_blobs_min` y `mask_blobs_max` (**5-8**) formaciones crecen por **acreción** desde una semilla hasta `mask_blob_cells_min..max` (20-50) celdas: cada paso añade una celda de la frontera, con peso hacia el eje propio de la formación (crestas, `mask_ridge_bias`) y hacia celdas ya rodeadas por dos o más lados (masas compactas). Las semillas guardan `mask_blob_spacing` (10 celdas) entre sí, dos formaciones distintas dejan siempre `mask_formation_gap` (2) celdas abiertas entre ellas, el anillo exterior de `mask_border_cells` (2) celdas nunca lleva roca y nada crece a menos de `mask_protect_radius` (15 m, medido al cuadrado de la celda) del spawn ni de los spots de verticalidad. Una celda abierta rodeada por tres lados se rellena (`MaskPasses.fill_notches`) y un flood fill 4-vecinos desde el spawn **sella** cualquier bolsa no alcanzable. Si queda menos de `mask_min_open_fraction` (0.84) abierto se reintenta con menos formaciones. Los enemigos trepadores cruzan la roca; el jugador solo si sube encima (la cresta se camina).
   - **Cuánto tapa.** Medido en 34 arranques (3 biomas × semillas 1-8 más las arenas de un `verificar.sh`): **7.3-15.5%** de las celdas, 5-8 formaciones por etapa; el techo es 16% por `mask_min_open_fraction`.
-  - **Una formación por región** (`scripts/world/rock_formation.gd`, `class_name RockFormation`). `_raise_formations()` parte las celdas bloqueadas en regiones 4-conexas y levanta **un** `StaticBody3D` por región: una malla facetada (sombreado plano, un color por faceta) con un acantilado que empieza `margin_min..margin_max` (1-2 m, campos del `RockFormationStyle`) **fuera** de las celdas y una cresta cuya altura sigue la distancia al contorno —una cresta larga se lee como cresta, una masa compacta tiene cumbre—, picos de ruido _ridged_ y un techo suave en `max_height` 8 m (también del estilo), por debajo de los 10 m que un trepador escala de una vez (`EnemyBase.max_climb_height`). Log `Rock formations: %d regions, %d faces, %d shapes, tallest=%.1f in %d ms`.
+  - **Una formación por región** (`scripts/world/rock_formation.gd`, `class_name RockFormation`). `ScatterMask.raise_formations()` parte las celdas bloqueadas en regiones 4-conexas y levanta **un** `StaticBody3D` por región: una malla facetada (sombreado plano, un color por faceta) con un acantilado que empieza `margin_min..margin_max` (1-2 m, campos del `RockFormationStyle`) **fuera** de las celdas y una cresta cuya altura sigue la distancia al contorno —una cresta larga se lee como cresta, una masa compacta tiene cumbre—, picos de ruido _ridged_ y un techo suave en `max_height` 8 m (también del estilo), por debajo de los 10 m que un trepador escala de una vez (`EnemyBase.max_climb_height`). Log `Rock formations: %d regions, %d faces, %d shapes, tallest=%.1f in %d ms`.
   - **La colisión ES la malla.** Cada cuadrilátero visible es también un prisma convexo (sus 4 esquinas más las mismas hundidas bajo el terreno), partido por la diagonal **más alta**, que es justo la envolvente superior de las 4 esquinas: el techo del prisma son los dos triángulos que se ven. Nada invisible contra lo que chocar, nada visible que se atraviese. Convexo y no trimesh a propósito: un trimesh no tiene interior, y el barrido de máscara del harness para una cápsula **dentro** de la roca en cada frontera.
   - **El sello es estructural.** El paso de la malla divide exacto el tamaño de celda, así que cada frontera de celda es una fila de aristas de la malla (los vértices sobre una frontera solo se desplazan A LO LARGO de ella), y la huella empieza siempre al menos `margin_min` fuera de la frontera, donde el perfil ya está alto (peor caso del perfil por defecto ≈ 0.95 m). `build()` mide cada vértice de frontera y `push_warning` si queda bajo `SEAL_MIN_HEIGHT` (0.75 m): hace fallar `verificar.sh`.
   - **No hay muros invisibles**: lo que bloquea es lo que se ve, y una formación es roca maciza de borde a borde, sin interior hueco al que un raider pueda saltar ni techo plano por el que un trepador camine.
   - **Paleta por bioma** en el `formation_style` de cada scatter (un `RockFormationStyle`, `scripts/world/run/scatter/rock_formation_style.gd`): `assets/world/rock_style_hollow_woods.tres` (granito con musgo), `assets/world/rock_style_ash_dunes.tres` (arenisca roja con estratos y escalones: `strata_strength`, `terrace_strength`, `terrace_step`) y `assets/world/rock_style_gloomfen.tres` (pizarra oscura musgosa). Para cambiar cómo se ve la roca de un mapa se edita su `.tres` en el Inspector. El color va **horneado en vértices** sobre `assets/materials/rock_formation.tres` (blanco × color de vértice, sRGB), incluido el sombreado por pendiente: con el ambiente y la niebla de las arenas el sol solo no separaba un acantilado de una cresta y la primera versión se leía como una maqueta de papel.
   - Los árboles (`scenes/world/props/Tree.tscn`, script `scripts/world/props/tree_prop.gd`) cambian su `TreeModel` de vista previa por uno de dos modelos al azar con una escala al azar al entrar al juego: los modelos, la probabilidad y los rangos de escala son exports de la escena (tres tiradas del RNG de la partida, siempre en el mismo orden).
-  - Los props interiores (`_is_clear`) guardan `formation_clearance` (2.5 m) a cualquier celda bloqueada y las mesetas `mesa_clearance` (12 m), para que ni un árbol ni una rampa salgan de un acantilado.
-  - Las rocas sueltas (`Rock.tscn`, `DuneRock.tscn`) siguen llevando **un `ConvexPolygonShape3D` por blob visible**, con los puntos horneados en la transformación del blob para que `_spawn_prop` pueda escalar **uniformemente** (Godot no soporta escalar una forma de colisión de forma no uniforme). `DuneRock.tscn` se pinta con `assets/shaders/faceted_rock.gdshader` (`boulder_red.tres`): normal de cara por derivadas, para que no parezca un canto rodado junto a las formaciones. `Rock.tscn` es el modelo `rock-a.glb`, con el color de su textura `colormap.png`; `boulder.tres` no lo usa ninguna escena. `rock.tres` y `red_rock.tres` siguen en plataformas y santuarios, sin cambios.
-- API: `is_walkable(Vector2)`, `random_walkable_point()`, `blocked_cell_count()`, `open_cell_count()`, `blocked_cells()`, `cell_center(Vector2i)`, `cell_of(Vector2)` (las tres últimas las usa el barrido de máscara del harness). Son métodos de `scatter.gd` que reenvían a su `ArenaMask`. Consumidores: `SpawnPoints.ring_position` / `band_position` (`scripts/systems/spawner/spawn_points.gd`, detrás de `EnemySpawner.ring_position` y `spawn_pressure_burst`) (reintentan hasta hallar celda abierta, no clampean), el `StageLayout` del director (un **único** camino respeta la máscara para portales, ruleta, altares y cofres de evento), `scatter._is_clear`, y el harness de pruebas. La máscara se construye en `_enter_tree` (antes del barajado del director) con el mismo RNG. Log `Arena mask:`, que **imprime la fracción abierta** (la puerta que persigue el bucle de reconstrucción).
+  - Los props interiores (`InteriorProps._is_clear`) guardan `formation_clearance` (2.5 m) a cualquier celda bloqueada, y la huella de cada meseta (plataforma y rampa, a su escala y con su giro) guarda `mesa_clearance` (4 m) a toda celda de roca (`ArenaMask.box_clear`, exacta: la roca asoma hasta ~3 m más allá de sus celdas), para que ni un árbol ni una rampa salgan de un acantilado.
+  - Las rocas sueltas (`Rock.tscn`, `DuneRock.tscn`) siguen llevando **un `ConvexPolygonShape3D` por blob visible**, con los puntos horneados en la transformación del blob para que `spawn_prop` pueda escalar **uniformemente** (Godot no soporta escalar una forma de colisión de forma no uniforme). `DuneRock.tscn` se pinta con `assets/shaders/faceted_rock.gdshader` (`boulder_red.tres`): normal de cara por derivadas, para que no parezca un canto rodado junto a las formaciones. `Rock.tscn` es el modelo `rock-a.glb`, con el color de su textura `colormap.png`; `boulder.tres` no lo usa ninguna escena. `rock.tres` y `red_rock.tres` siguen en plataformas y santuarios, sin cambios.
+- API: `is_walkable(Vector2)`, `random_walkable_point()`, `blocked_cell_count()`, `open_cell_count()`, `blocked_cells()`, `cell_center(Vector2i)`, `cell_of(Vector2)` (las tres últimas las usa el barrido de máscara del harness), más `can_place(Vector2, margen)` y `nearest_place(Vector2, margen)`. Son métodos de `scatter.gd` que reenvían a su `ArenaMask` y, las dos últimas, a `PlacementRules` (`scripts/world/run/scatter/placement_rules.gd`), que también responde `can_build` y `can_grow` y le pregunta al relieve con `ReliefDressing`. **Dos preguntas distintas:** `is_walkable` es solo la máscara (lo que la roca bloquea; la leen los vigilantes del harness); `can_place` es la de quien **coloca** algo, y en una arena con relieve por zonas suma «lejos de cortes, rampas, puentes, faldones de formación y mesetas» (en las demás es idéntica a `is_walkable`). Consumidores de `can_place`: `SpawnPoints.ring_position` / `band_position` (`scripts/systems/spawner/spawn_points.gd`, detrás de `EnemySpawner.ring_position` y `spawn_pressure_burst`) (reintentan hasta hallar un punto que sirva, no clampean), el `StageLayout` del director (un **único** camino, `walkable_xz`, para portales, ruleta, altares, cofres de evento, lluvias y el portal de salida) y `BossBase._safe_arena_point`; `nearest_place` lo usa `EnemyLoot.drop_point`. `InteriorProps._is_clear` y `MesaBuilder.plan` preguntan lo mismo con sus propios márgenes.
+- Con relieve por zonas la máscara recibe dos cosas más en `ArenaMask.build(protected_seeds, keep_open, barriers)`: las celdas que el relieve necesita sin roca y las aristas entre celdas que un corte separa. El flood fill desde el spawn no cruza esas aristas, así que sella (o abre un pasillo hasta) cualquier bolsa que quedara encerrada entre una formación y un acantilado. Y **no deja pasillos de una celda**: una celda abierta con roca a los dos lados opuestos se rellena (`MaskPasses.fill_slots`), y si es una de las que el relieve mantiene abiertas, se abre la roca que la aprieta (`MaskPasses.free_squeezed`). El faldón de dos brazos de roca cierra la boca de un pasillo así y deja adentro un rincón al que no se entra caminando pero donde sí aterriza un raider que vuela. En el Bosque Hueco, además, los props guardan `formation_clearance` 4.5 m con la roca (entre un tronco y un faldón siempre cabe un cuerpo), el borde no planta en las esquinas (`perimeter_corner_gap`) ni sobre el faldón de una formación. La máscara se construye en `_enter_tree` (antes del barajado del director) con el mismo RNG. Log `Arena mask:`, que **imprime la fracción abierta** (la puerta que persigue el bucle de reconstrucción).
 - Inicio irregular: `StageFixtures._randomize_starting_pois` (`scripts/world/run/director/stage_fixtures.gd`) elimina cofres/altares colocados con `poi_skip_chance` (conserva al menos el primer cofre) y añade `extra_start_chests_min..max` cofres en puntos libres. Log `Start layout:`.
 
 ## Minimapa y mapa (Tab)
@@ -466,46 +951,81 @@ Cada vista de jugador tiene **su propio** minimapa en la esquina y **su
 propio** mapa a pantalla completa con Tab. En 240×240 con relieve, «¿dónde
 estoy y dónde está lo que no he abierto?» no se responde mirando alrededor.
 
-### Las tres piezas
+### Las piezas
 
-| Pieza                    | Qué es                                                                  | Dónde vive                                                                                   |
-| ------------------------ | ----------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
-| `FogOfWar`               | lo que el equipo **ha visto** de la etapa                               | `scripts/systems/fog_of_war.gd`, nodo de `RunSystems.tscn`, grupo `fog`, `static find(tree)` |
-| `MapDraw`                | **el** dibujante: fondo, composición con niebla, marcadores, proyección | `scripts/ui/maps/map_draw.gd` (`RefCounted`, `MapDraw.new(get_tree())`)                      |
-| `Minimap` / `MapOverlay` | los dos consumidores                                                    | `scripts/ui/maps/minimap.gd`, `scripts/ui/maps/map_overlay.gd` (escena `scenes/ui/maps/MapOverlay.tscn`), ambos creados por `ViewWidgets` del HUD |
+| Pieza                    | Qué es                                                                              | Dónde vive                                                                                   |
+| ------------------------ | ----------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| `FogOfWar`               | lo que el equipo **ha visto** de la etapa                                           | `scripts/systems/fog_of_war.gd`, nodo de `RunSystems.tscn`, grupo `fog`, `static find(tree)` |
+| `MapDraw`                | **el** estado del mapa: texturas de suelo y niebla, marcadores y sus formas         | `scripts/ui/maps/map_draw.gd` (`RefCounted`; `ViewWidgets` crea **uno solo**)                |
+| `MapGround`              | la imagen del suelo de la etapa: relieve y formaciones de roca                      | `scripts/ui/maps/map_ground.gd` (funciones estáticas)                                        |
+| `MapView`                | **una vista** del mapa: el suelo con su niebla, los marcadores y la proyección      | `scripts/ui/maps/map_view.gd`, `scenes/ui/maps/MapView.tscn`, shader `assets/shaders/map_ground.gdshader` |
+| `Minimap` / `MapOverlay` | los dos widgets; cada uno lleva un `MapView`                                        | `scenes/ui/maps/Minimap.tscn` (`minimap.gd`) y `scenes/ui/maps/MapOverlay.tscn` (`map_overlay.gd`), ambos creados por `ViewWidgets` del HUD |
 
-**`MapDraw` es uno solo a propósito.** Un widget de 150 px y un overlay de
-media pantalla comparten el 100% de la lógica (la imagen del terreno, el
-oscurecido de celdas bloqueadas, la composición con la niebla, el filtrado de
-marcadores y la proyección mundo→pantalla). Escrita dos veces, la única
-pregunta interesante —«¿por qué el marcador cae en un sitio distinto en el
-minimapa?»— habría tenido respuesta.
+**`MapDraw` es uno solo a propósito, y una sola instancia**: `ViewWidgets`
+la crea en `build()` y se la pasa a cada minimapa y a cada mapa de Tab con
+`set_map()`. Todos los widgets de todos los jugadores muestran el mismo estado
+(la niebla es del equipo y el suelo es el mismo), así que se mira una vez por
+refresco y no una vez por widget, que en co-op de cuatro serían ocho. Y
+escrito dos veces, la única pregunta interesante —«¿por qué el marcador cae
+en un sitio distinto en el minimapa?»— tendría respuesta.
 
 Reparto de trabajo, y **cuándo** corre cada cosa:
 
-- `build_background(arena)` — **una vez por etapa**, desde el hook de etapa del
-  consumidor. Pide `Terrain.map_image(PIXELS_PER_METER)` (tinte del bioma
-  sombreado por altura; 0.5 px/m = 240 px para una arena de 240 m) y oscurece
-  las celdas que la máscara bloquea, para que el mapa tenga la **forma
-  irregular** de la etapa y no un cuadrado limpio.
-- `composite()` — en el tick de refresco (10 Hz), **pero solo si cambió algo
-  que lee**: el minimapa y el overlay comparan
-  `Minimap.composite_key()` —identidad de la `Image` de fondo, identidad del
-  nodo de niebla y `FogOfWar.revision`— y se la saltan si es la misma de la
-  última vez; `on_stage_started` borra la clave. Recomponer cuesta 1,5-2,8 ms,
-  demasiado para hacerlo cada 6 frames sin motivo. **Contrato**: si
-  `composite()` empieza a leer otra cosa, esa cosa entra en la clave; y quien
-  escriba `FogOfWar.image` fuera de `fog_of_war.gd` sube `revision`. Fondo × niebla en una única
-  `ImageTexture` que el consumidor solo blitea. Lo inexplorado se atenúa a
-  `FOG_ALPHA` 0.85, **no** se pinta opaco: la silueta del mapa es una pista, lo
-  que hay **encima** es la recompensa.
-- `collect_markers()` — 10 Hz. Quién está dónde, filtrado por la niebla.
-- `draw_into(canvas, rect, marker_scale)` — desde el `_draw` de cada consumidor.
+- `build_background(arena)` — **una vez por etapa**, desde
+  `ViewWidgets.on_stage_started`. Pide la imagen a `MapGround.build()`:
+  `Terrain.map_image(PIXELS_PER_METER)` (tinte del bioma sombreado por altura;
+  1.0 px/m = 240 px para una arena de 240 m) con las **formaciones de roca**
+  pintadas encima, para que el mapa tenga la **forma irregular** de la etapa.
+  Cada celda que la máscara bloquea toma el `rock_color` del
+  `formation_style` del scatter (la roca del mapa es la del mundo); el borde
+  sale de interpolar la máscara entre centros de celda, así que una formación
+  se ve como una mancha de borde redondo con contorno oscuro y no como una
+  escalera de cuadrados de 5 m. Cuesta unos 29 ms por etapa (medido sin
+  ventana en los tres biomas), una sola vez para todos los widgets.
+- `refresh()` — cada `ViewWidgets.refresh_seconds` (0.1 s). Hace las dos
+  cosas de abajo y emite `refreshed`, que es lo que hace redibujar a las vistas.
+  - `sync_fog()` sube la `Image` de la niebla a `fog_texture`, **pero solo si
+    cambió**: compara la identidad del nodo de niebla y `FogOfWar.revision`
+    con lo último que subió. **Contrato**: quien escriba `FogOfWar.image`
+    fuera de `fog_of_war.gd` sube `revision`.
+  - `collect_markers()` junta quién está dónde, filtrado por la niebla, con
+    los de `order` más alto al final (se dibujan encima).
 
-Las tres primeras son **métodos planos sin Control**: un soak headless las
-ejercita aunque `_draw()` no se despache jamás bajo el renderer dummy. Esa es
-la razón de que el minimapa y el overlay refresquen llamándolas en vez de
-dejarlo todo dentro de `_draw`.
+Son **métodos planos sin Control**: un soak headless los ejercita aunque nada
+se dibuje bajo el renderer dummy.
+
+**La niebla se mezcla en la GPU**, no en GDScript: el shader
+`map_ground.gdshader` lee el suelo y la niebla como dos texturas y las mezcla
+al dibujar. Componerlas en una imagen son 57 600 `get_pixel`/`set_pixel` cada
+vez que alguien pisa suelo nuevo; subir la niebla tal cual deja el refresco
+entero en centésimas de milisegundo. Del
+shader salen además el **borde suave** de la niebla (la imagen es de 2 m por
+píxel y sin suavizar se ve en escalones), el zoom, el giro y el recorte
+circular del minimapa. Lo inexplorado se va hacia `MapView.unexplored_color` con
+`unexplored_strength` 0.84, **no** se pinta opaco: la silueta del mapa es una
+pista, lo que hay **encima** es la recompensa. Los valores del shader los
+pone `map_view.gd` desde sus exports; el `.gdshader` no se edita para cambiar
+un color.
+
+### `MapView`: una vista
+
+`MapView.tscn` es un `Control` con dos hijos: `Ground` (un `TextureRect` con
+el shader) y `Markers` (un `Control` vacío donde `map_view.gd` dibuja los
+marcadores por su señal `draw`). Siempre usa el cuadrado más grande que cabe
+en su rectángulo.
+
+- `set_map(map)` le da el `MapDraw`; `look_at_world(centro_xz, giro)` mueve
+  y gira la vista. Con `view_radius` 0 muestra toda la arena.
+- `to_view(xz)` es **la** proyección mundo→vista (centro, zoom y giro), y el
+  shader usa la inversa con los mismos tres números: un marcador nunca cae
+  donde no está su suelo.
+- Las formas las dibuja `MapDraw.draw_glyph()` (estática, también la usa la
+  leyenda): el relleno y un **contorno de tinta** suavizado, para que un
+  marcador se lea sobre cualquier suelo. La flecha de un jugador apunta con
+  `MapDraw.facing_of(rotation.y)` — un cuerpo camina hacia su −Z local, que en
+  el mapa es `(-sin, -cos)`.
+- Cada jugador tiene su color (`MapDraw.PLAYER_COLORS`, J1 a J4); un caído
+  lleva además un anillo rojo.
 
 ### Niebla de guerra
 
@@ -533,8 +1053,9 @@ se une solo al grupo `map_markers` cuando ese export no está vacío, y expone
 `map_marker_kind()`. `Player` y `BossBase` hacen lo mismo por su cuenta.
 
 - La tabla es `MapDraw.MARKER_STYLES`: color, forma (`dot` / `square` /
-  `triangle` / `diamond`), tamaño y `always_visible`. **Un kind que no está en
-  la tabla no se dibuja.**
+  `triangle` / `diamond`), tamaño, `always_visible` y, opcionales, `pin` (el
+  minimapa lo ancla a su orilla) y `order` (los más altos se dibujan encima).
+  **Un kind que no está en la tabla no se dibuja.**
 - Solo los raiders y la **salida** son `always_visible`; todo lo demás hay que
   **encontrarlo** (la niebla filtra en `collect_markers`).
 - **Los enemigos normales no se dibujan nunca.** Un minimapa con cuarenta
@@ -551,42 +1072,131 @@ se une solo al grupo `map_markers` cuando ese export no está vacío, y expone
 - Un nodo puede además implementar `map_marker_color()` para pintarse con su
   propio color (rareza de cofre, por ejemplo) sin tocar la tabla.
 
-### Los dos consumidores
+### Los dos widgets
 
-- **`Minimap`** (150 px): norte arriba, marcadores a 0.75 de escala, refresco
-  0.1 s. En solitario va arriba a la derecha, **bajo las bajas y la insignia
-  de FPS**; en co-op, uno por celda de pantalla dividida.
+- **`Minimap`** (`scenes/ui/maps/Minimap.tscn`): un disco con el aspecto de un
+  sticker del menú principal (contorno de tinta grueso, aro de papel y sombra
+  dura), **centrado en su jugador**. Muestra `view_radius` 55 m
+  alrededor del raider y no la arena entera: los 240 m en 150 px dejan cada
+  marcador de dos píxeles, y para eso está el mapa de Tab.
+  - **Gira con la cámara** (`rotate_with_view`): lo que el jugador tiene
+    delante queda arriba, y una chapa «N» en la orilla dice dónde quedó el
+    norte. El giro es el de la **cámara** (`Player.view_camera()`), no el del
+    cuerpo: en órbita libre no coinciden. Con el export apagado el norte queda
+    arriba y solo gira la flecha.
+  - Sigue a su jugador **cada cuadro** (`_process`), no en el refresco del
+    mapa: a diez pasos por segundo el giro se vería a saltos.
+  - **Lo que queda fuera de la vista y vale la pena perseguir se ancla a la
+    orilla**: los tipos con `pin` en `MARKER_STYLES` (jugadores, jefe y
+    salida). El resto se ve en el mapa de Tab.
+  - La flecha propia va al centro, más grande y encima de todo
+    (`MapView.own_arrow_scale`).
+  - El zoom, la escala de los marcadores y los colores del suelo son exports
+    del nodo `View` dentro de `Minimap.tscn`; el grosor total del aro es el
+    margen de ese nodo, y `outline_width` / `inner_outline_width` de la raíz
+    dicen cuánto de él es tinta.
+  - Con el mapa de Tab de su jugador abierto, el minimapa se transparenta
+    (`modulate`, no `visible`): quedaría justo bajo los paneles.
   - **Dónde va, exactamente.** El rectángulo del minimapa en las celdas que
     tocan el borde superior de la ventana es el nodo
     `HUD.tscn > ViewWidgets > MinimapSlot`: se mueve y se redimensiona en el
-    editor. Las celdas de abajo (co-op) usan el mismo ancho y alto con el
-    margen superior `lower_cell_top_margin` de
-    `scripts/ui/game/hud/view_widgets.gd`.
+    editor. Las celdas de abajo (co-op) usan el margen superior
+    `lower_cell_top_margin`, y en co-op todos miden `coop_size_scale` (0.8)
+    de ese tamaño; los dos son exports de `ViewWidgets`.
 - **`MapOverlay`** (`scenes/ui/maps/MapOverlay.tscn`): en su propia
   `CanvasLayer` de capa **8** (`UiLayers.MAP_OVERLAY` en `scripts/ui/ui_layers.gd`; bajo
   `UpgradeCardUI` 10 — una carta abierta tiene que verse por encima),
-  `PROCESS_MODE_ALWAYS`, grupo `map_overlay`. Cabecera «Etapa N · Vuelta M —
-  MM:SS», leyenda abajo a la izquierda y cinco paneles a la derecha, cada uno
-  una instancia de `scenes/ui/maps/MapSection.tscn` que solo pone su `title`:
-  **Power-ups**, **Mascota**, **Estadísticas** (la capa derivada, con
-  `cooldown_multiplier` mostrado como **velocidad de ataque en positivo**,
-  regla 7 del glosario; qué filas salen y en qué orden es `STAT_ROWS`, al
-  principio de `map_overlay.gd`), **Jugadores** (HP, nivel y puntos de los
-  cuatro slots, caídos incluidos) y **Objetos** (objetos con copias, armas
-  con nivel, tomos con su numeral).
+  `PROCESS_MODE_ALWAYS`, grupo `map_overlay`.
+  - **Usa el diseño de la primera pantalla del menú** (`MainMenu.tscn`), y solo
+    ese: el velo es el mismo oscurecido petróleo con viñeta
+    (`assets/ui/menu_backdrop.gdshader`, en un material propio con `reveal` en
+    1: el mundo sigue vivo detrás); la cabecera es un `TitleLabel` amarillo con
+    contorno de tinta; «Explorado N%» es un `BadgeLabel`; y cada panel es una
+    tarjeta como `MenuTile`.
+  - A la izquierda, la columna del mapa: cabecera «Etapa N · Vuelta M —
+    MM:SS», el mapa de toda la arena con el norte arriba dentro de un marco de
+    papel con contorno de tinta y sombra dura (`MapFrame`), con la chapa
+    «Explorado N%» en su esquina como el dato vivo de una tarjeta del menú, y
+    la leyenda.
+  - A la derecha, los paneles. Cada uno es una instancia de
+    `scenes/ui/maps/MapSection.tscn` (`map_section.gd`): un marco de **color
+    plano con contorno de tinta grueso y sombra dura, apenas girado**, con el
+    título y el contenido en tinta. Como en `MenuTile`, solo gira el nodo
+    `Frame`, que cuelga de un `Control` que no es contenedor (un contenedor
+    endereza a sus hijos en cada acomodo); el texto queda recto. Cada
+    instancia pone su `title`, su `tile_color` y su `tilt_degrees`, y su
+    contenido se agrega en `MapOverlay.tscn` bajo `Content/Box` («Hijos
+    editables»). Al abrir el mapa las tarjetas saltan una tras otra
+    (`MapSection.pop`).
+  - **Estadísticas** (`map_stats.gd`, tarjeta amarilla): una celda por fila de
+    `STAT_ROWS` (al principio de `map_overlay.gd`, que dice qué filas salen y
+    en qué orden). Un valor que subió o bajó va dentro de una **chapa oscura**
+    (verde o rojo), como el dato vivo de las tarjetas del menú; uno en cero
+    queda apagado. Dos claves opcionales por fila: `short`, el nombre para las
+    celdas chicas («Vel. de ataque»), y `base_property`, la propiedad de
+    `PlayerStats` con el valor de partida (el daño crítico parte en +100% y
+    hasta que no sube se ve apagado); el lint `stat_rows` revisa las dos
+    propiedades. `cooldown_multiplier` se muestra como **velocidad de ataque
+    en positivo** (regla 7 del glosario). Las columnas salen del ancho
+    disponible.
+  - **Jugadores** (`map_players.gd`, tarjeta de papel, solo en co-op): chapa
+    del color de su flecha, personaje, barra de vida (con la rampa de color
+    del HUD, pedida por el grupo `hud`) y puntos; los caídos quedan en la
+    lista, marcados.
+  - **Power-ups** (roja) y **Objetos** (celeste), con `map_chips.gd`: fichas
+    `MapChip.tscn`, la misma casilla de color del HUD (`LoadoutTile`) en chico
+    más el nombre completo y su etiqueta. Las entradas de armas, tomos y
+    objetos las arman **las franjas del HUD**
+    (`LoadoutStrip.gather_build(body)` / `gather_bag(body)`), así que glifos y
+    colores son los mismos y el mapa sirve para aprender qué es cada casilla.
+    Las fichas se rehacen solo cuando cambia cuáles son (biblioteca e id); si
+    son las mismas, cada `MapChip` se pone al día en su lugar
+    (`update_entry`): la etiqueta o, si cambió, nombre, glifo y color (un
+    arma que evoluciona conserva su id).
+    `map_entries.gd` (`MapEntries`, estático) junta esas entradas, las de los
+    power-ups y el texto de la mascota.
+  - **Mascota** (verde): nombre, arma y la estadística que da.
+  - **Leyenda** (`map_legend.gd`): una fila por tipo de marcador **que está a
+    la vista ahora**, con su forma y su color reales.
+  - Al pie de los paneles, la indicación del botón que cierra el mapa
+    (`InputHints`, con la acción `map_overlay` de ese jugador), como las del
+    pie del menú.
+- **Se adapta a la celda** (`MapSection.Density`). Parte en `ROOMY` y baja un
+  escalón cada vez que los paneles no caben en su columna: `COMPACT` achica
+  la letra, afina y endereza las tarjetas, junta las fichas
+  (`compact_h_separation` de `map_chips.gd`), oculta las estadísticas en
+  cero, los nombres de las fichas y la indicación de cierre, y pasa la
+  mascota a ser una ficha más; `TIGHT` además quita los títulos, aprieta los
+  márgenes y junta las tarjetas (`tight_panel_gap`). El lado del mapa es lo
+  que deja el alto de la celda, sin pasar de `map_share` del ancho ni dejar
+  la columna de paneles más angosta que `min_side_width` (más angosta,
+  estadísticas y jugadores pasan a una sola columna), y en una celda ancha y
+  baja (la de dos jugadores) la leyenda baja al pie de los paneles. **Nada se
+  sale de la celda**: los paneles van dentro de un `ScrollContainer` sin
+  barras (`Side`, `map_side_scroll.gd`) que recorta, y la raíz tiene
+  `clip_contents`. Con el equipo lleno (armas y tomos al tope, mascota, los
+  16 objetos y hasta 4 power-ups) hoy cabe todo en las tres formas de celda
+  (1280×720 en solitario, 1280×360 con dos jugadores y 640×360 con tres o
+  cuatro). Si en `TIGHT` todavía no cabe (más filas de estadísticas o muchos
+  power-ups a la vez), la columna se desliza sola: quieta arriba
+  `scroll_pause` segundos, baja a `scroll_speed` px/s hasta el fondo, espera
+  y vuelve, así lo de abajo también se lee sin mouse ni foco.
 - **No pausa la partida.** Es un mapa, no un menú: el mundo sigue vivo detrás,
   y por eso el overlay tampoco entra en `ui_blocking`. Se oculta solo si la
   partida no está activa, si el árbol está pausado o si el slot no tiene raider.
 - **Todo Control de ambos widgets es `FOCUS_NONE` y `MOUSE_FILTER_IGNORE`**:
   **Tab es `ui_focus_next` de Godot**, así que un solo Control enfocable
   dentro del overlay se come la tecla y el mapa deja de cerrarse. Las filas
-  que se arman en código pasan por `_own()`; los nodos de `MapOverlay.tscn`
-  tienen foco None por defecto y `mouse_filter = 2` en la escena. **Un nodo
-  nuevo en esa escena tiene que quedar con foco None.**
+  que se arman en código pasan por `_own()`; los nodos de las escenas tienen
+  foco None por defecto y `mouse_filter = 2`. **Un nodo nuevo en esas escenas
+  tiene que quedar con foco None.**
 - Los construye `ViewWidgets` (`scripts/ui/game/hud/view_widgets.gd`, nodo
-  `HUD.tscn > ViewWidgets`): `build(player_count)` crea un par por jugador y
-  `_anchor_to_cell` ancla el overlay usando **`SplitScreenView.cell_rect(i, n)`**
-  (con un caso `1:` explícito que devuelve el rect entero).
+  `HUD.tscn > ViewWidgets`): `build(player_count)` crea el `MapDraw` y un par
+  de widgets por jugador, y `_anchor_to_cell` ancla el overlay usando
+  **`SplitScreenView.cell_rect(i, n)`** (con un caso `1:` explícito que
+  devuelve el rect entero). Sus exports `build_strip` y `bag_strip` apuntan a
+  las franjas del HUD que arman las fichas (`LoadoutDock/BuildStrip` y
+  `LoadoutDock/BagStrip`): si las mueves, vuelve a elegirlas en el Inspector.
 
 ### Entrada
 
@@ -662,6 +1272,14 @@ cuerpos, jefes y los bolts en vuelo.
   teletransporte la distancia que «debía».
 - **Lo que se genera durante el congelado se congela también**: una horda
   que sigue entrando a través del tiempo detenido no es tiempo detenido.
+- **Lo que sale de la pelea durante el congelado sale del congelado**: un
+  cuerpo que ya no está en `enemies`, `boss` ni `burrowed` (murió, fingió
+  morir como Mythos, cambió de bando) vuelve a `PROCESS_MODE_INHERIT` en el
+  siguiente tick, **sin** la capa ni la velocidad de antes: las puso su
+  propia lógica. Así la muerte fingida de Mythos corre a tiempo (su canción
+  de la segunda fase no se adelanta) y su cuerpo «muerto» no recupera la
+  colisión. Si vuelve a la pelea mientras dura el congelado, se congela de
+  nuevo.
 - **`EnemyBase._on_died` restaura el `process_mode` antes de crear su tween
   de muerte.** Un nodo deshabilitado **sí** recibe llamadas y señales: se
   lo puede matar congelado, y su tween quedaría atado a un nodo que no
@@ -905,7 +1523,7 @@ Lo que mata el báculo **se levanta de tu lado**.
 | `skirmisher`                                         | no         | dispara `EnemyBolt`s que solo dañan al grupo `player`                          |
 | `sunspitter`                                         | no         | su rayo se filtra por el mismo grupo                                           |
 | `duneburrower`                                       | no         | guarda y restaura sus propias capas y grupo en cada ciclo de excavación        |
-| `boss_base` (y `rotking`, `sarcognath`, `fenwraith`) | no         | los jefes llegan al equipo por `damage_players_in_disc` / `Coop.alive_players` |
+| `boss_base` (y `rotking`, `sarcognath`, `fenwraith`, `blue_lobster`) | no | los jefes llegan al equipo por `damage_players_in_disc` / `Coop.alive_players` |
 | `secret_boss_base` (y `grubthing`, `coffer_mimic`)   | no         | un minijefe secreto es un jefe, y su muerte desbloquea un raider               |
 
 - **Capas**: el siervo sale del grupo `enemies` (que declara la escena), lo
@@ -1004,6 +1622,28 @@ apertura, nombrando lo que de verdad se pagó.
 ## Santuarios, cofres y secretos
 
 - Qué es: interactuables de mundo con prompt flotante y acción `interact`.
+- **Cómo se ven.** Cada santuario, el puesto del vendedor y los portales se
+  arman en código con `ShrineKit` (`scripts/world/props/kit/shrine_kit.gd`:
+  zócalos escalonados, columnas, braseros, piedras con runa, velas,
+  cristales, monedas, calaveras, musgo, puntales) sobre `LowPolyMesh`. Lo
+  hace un nodo `Look` con su propio script (`scripts/world/interactables/
+  looks/<santuario>_look.gd`; en los portales, `PortalVisual`), que tiene
+  las medidas y los colores como exports: hijo de `Visual` en
+  `ChargeShrine`, `CurseShrine`, `EventAltar`, `GreedShrine`,
+  `RouletteShrine` y `SpringShrine`, y de la raíz en `Vendor`. Las piezas
+  que el script de lógica anima siguen en la escena con su nombre (el
+  cristal, el anillo y el disco de progreso del altar de carga, el orbe del
+  altar de eventos, la rueda de la ruleta, el agua del manantial, la
+  figura, el cartel y la luz del vendedor): el `Look` les cambia la forma
+  en su `_ready`, que corre antes del `_ready` del interactuable, y arma lo
+  demás un frame después (`call_deferred`), cuando el director ya lo puso
+  en su lugar: los círculos de piedras se apoyan cada una en el suelo de su
+  punto. El cartel del vendedor es el toldo del puesto (lo tiñe el color de
+  su fila de `VENDOR_LIBRARY`). La colisión de cada santuario es su
+  `Body` (un cilindro o una caja del tamaño de la base); las piedras de los
+  portales chocan (cuerpo `FrameStones`) y, en un portal de pareja, quedan
+  más afuera que el punto donde aparece quien llega teletransportado; lo
+  demás no tiene colisión. Todo se apaga a gris con `dim_visuals()`.
 - Archivos: base `scripts/world/interactables/interactable.gd` (`Interactable extends Area3D`); `chest.gd`, `charge_shrine.gd`, `curse_shrine.gd` (extiende `ChargeShrine`), `greed_shrine.gd`, `spring_shrine.gd`, `roulette_shrine.gd` + `scripts/ui/game/roulette_ui.gd`, `portal_shrine.gd`; secretos: `secret_trigger.gd`, `odd_stump.gd`, `humming_skull.gd`, `scripts/enemies/secret_boss_base.gd`.
 - Contrato `Interactable`: sobreescribir `_interact(player)` (y opcionalmente `_on_range_entered()` / `_on_range_exited()`); llamar `consume()` al gastarse (bumpea `meta_stat_id` y apaga el prompt); `dim_visuals()` para el gris de «usado» (`spent_color`); `sink_away(keep_alive)` para hundirse y liberarse (exports `sink_duration`, `sink_depth`, `sink_end_scale`, que cada escena ajusta); `_emit_completed()` da destello + sonido (`complete_sound`).
 - **Quién está en el anillo**: `_players_in_range` es la lista real; `player_in_range` es solo «alguno». Un raider **derribado sigue en la lista** (su cuerpo nunca sale del árbol, así que `body_exited` no dispara): para saber quién puede sostener un ritual, usar **`live_players_in_range()`** y `nearest_live_player()`. `best_kind_count_in_range(kind)` da el mejor conteo de copias de un `kind` de objeto entre los presentes.
@@ -1015,11 +1655,11 @@ apertura, nombrando lo que de verdad se pagó.
   - `WorldDirector` ya no da vida a los altares: los siembra por el tick de eventos con **cadencia creciente** (el hueco entre eventos se comprime con el minuto hacia `event_gap_floor` ≈ 20 s, y el peso de las filas marcadas `altar` sube con `altar_weight_per_minute`) y un **cupo de altares sin gastar** que crece con el minuto (`altar_cap_base + minuto / altar_cap_minutes`); al tope, el peso del altar cae a 0 y la tirada elige otro evento. La baliza de un altar vive hasta que el altar se gasta (`TimedBeacon` con `INF` + `poi_worth_showing()`). Log `Altar placed: <kind>`. _Codicia_: apuesta de HP (log `Greed shrine:`). _Manantial_: precio fijo en puntos, `heal_full` + **un power-up al azar** vía `PowerUps.apply(PowerUpCatalog.roll_id(true))` — nunca la estrella; dura el `duration` de su fila en `POWERUP_LIBRARY`, como cualquier power-up. _Ruleta_: `RouletteShrine.price` es la **base**; cada giro **duplica** el precio para el resto de la partida y para toda la party (`RunState.roulette_price_multiplier` / `roulette_price()` / `register_roulette_spin()`, reiniciado en `reset()` junto a los precios de cofre). El prompt y el botón releen `current_price()`. `RouletteShrine.OUTCOMES` (clasificador puro `outcome_for(roll)`), `apply_outcome(id, player)`; la UI (`RouletteUi`, `scripts/ui/game/roulette_ui.gd`, escena `scenes/ui/modal/RoulettePanel.tscn`, que hereda de `ModalPanel.tscn`; grupos `ui_blocking` + `blocking_ui_closable`) se instancia **bajo la raíz de la arena** (`RunRoot.stage_parent`), nunca bajo root ni bajo `current_scene`, pausa el árbol y se resuelve sola en headless. _Portal_: `StageFixtures._spawn_portals` crea `portal_count` portales emparejados (el color de cada par sale de `PortalShrine.pair_colors`; el aspecto es `PortalVisual.tscn`); E teletransporta al gemelo y ambos recargan `cooldown / (1 + 0.25 × cosmic_worm)`.
 - WorldDirector: los eventos temporizados salen de un **catálogo de filas** (`EVENT_LIBRARY`: cofre de suministros / jauría shiny / grieta / altar de carga / altar demoníaco / manantial / vendedor / caja de mascotas / …), y cada fila lleva su `scene` y/o `method`, su `announce`, su baliza (`beacon_color`, `beacon_time`) y su cupo (`cap_group` + `cap`). `event_weight_overrides` cambia pesos por id para toda la partida (hay un solo director). Las balizas son `scenes/world/director/Beacon.tscn` y viven en una lista tipada con clase interna. Logs: `Altar charged:`, `Altar left:`, `Altar placed:`, `Demonic altar used:`, `Demonic pact:`, `Roulette spun:`, `Portal used:`, `Portals placed:`, `Spring used:`, `Boss chests dropped:`.
 - Presión vía `call_group("enemy_spawner", "spawn_pressure_burst", centro, n)`; buff temporal de enemigos vía `apply_temp_enemy_buff(mult, s)`.
-- Secreto nuevo: `extends SecretTrigger`, define la condición (Tocón raro: 3 interacciones; Cráneo zumbante: canal quieto de 4 s) y llama `_awaken()` — gasta, anuncia por `boss_ui` y spawnea `miniboss_scene` (raíz `extends SecretBossBase` con `secret_boss_id` exportado: su muerte bumpea `slain_<id>` y desbloquea el personaje cuya fila tenga ese `unlock_boss`). Logs `Secret miniboss awakened:` / `Secret boss slain:`.
+- Secreto nuevo: `extends SecretTrigger`, define la condición (Tocón raro: 3 interacciones; Cráneo zumbante: canal quieto de 4 s) y llama `_awaken()` — gasta, anuncia por `boss_ui` y spawnea `miniboss_scene` en `miniboss_spawn_point()` (raíz `extends SecretBossBase` con `secret_boss_id` exportado: su muerte bumpea `slain_<id>` y desbloquea el personaje cuya fila tenga ese `unlock_boss`). Logs `Secret miniboss awakened:` / `Secret boss slain:`.
 
 ## UI
 
-- Capas (CanvasLayer): SplitScreen (capa por defecto) → viñeta de Juice 4 → HUD 5 → MapOverlay 8 → UpgradeCardUI 10 → paneles modales (vendedor, ruleta) 15 → RunEndScreen 20 → PauseMenu 30 → ScreenFade 100. Las capas de escena guardan su número en la raíz de su `.tscn`; `UiLayers` (`scripts/ui/ui_layers.gd`) solo tiene las que se crean en código (4, 8 y 100). Las rutas de las escenas entre las que navega la UI están en `ScenePaths` (`scripts/ui/scene_paths.gd`). Archivos en `scripts/ui/` + `scenes/ui/`; los componentes de una pantalla viven junto a su dueña (`scripts/ui/game/hud/`, `scripts/ui/game/modal/`, `scripts/ui/game/upgrade_card_ui/`, `scripts/ui/meta/character_select/`, con sus escenas en `scenes/ui/hud/`, `scenes/ui/modal/`, `scenes/ui/upgrade_card_ui/`, `scenes/ui/meta/character_select/`).
+- Capas (CanvasLayer): SplitScreen (capa por defecto) → viñeta de Juice 4 → HUD 5 → MapOverlay 8 → carteles de las cinemáticas de jefe 9 (`MythosCinematic`, `LobsterEntrance`) → UpgradeCardUI 10 → paneles modales (vendedor, ruleta) 15 → RunEndScreen 20 → PauseMenu 30 → ScreenFade 100. Las capas de escena guardan su número en la raíz de su `.tscn`; `UiLayers` (`scripts/ui/ui_layers.gd`) solo tiene las que se crean en código (4, 8 y 100). Las rutas de las escenas entre las que navega la UI están en `ScenePaths` (`scripts/ui/scene_paths.gd`). Archivos en `scripts/ui/` + `scenes/ui/`; los componentes de una pantalla viven junto a su dueña (`scripts/ui/game/hud/`, `scripts/ui/game/modal/`, `scripts/ui/game/upgrade_card_ui/`, `scripts/ui/meta/character_select/`, con sus escenas en `scenes/ui/hud/`, `scenes/ui/modal/`, `scenes/ui/upgrade_card_ui/`, `scenes/ui/meta/character_select/`).
 - **`UiTheme`** (`scripts/ui/ui_theme.gd`, todo `static`) es el sistema de diseño: la paleta compartida (`ACCENT`, `ACCENT_AMBER`, `TEXT_BRIGHT`…), radios, `style_card()` (un único constructor de tarjeta de 4 estados), `style_button`, `style_badge`, `style_bar`, `style_toggle`, `attach_motion`, `pop`, `reject()` (la sacudida de «no alcanza»), `spaced_font(spacing)` (con caché por spacing) y los textos compartidos: `LEVEL_ABBREV` («Nv %d»), `WEAPON_LEVEL_ABBREV` («N%d»), `SHARDS_BALANCE`, `POINTS_AMOUNT`, `POINTS_BALANCE`… **No inventes styleboxes nuevas en una pantalla**: si falta un estilo, se añade aquí. Los títulos de los menús se estilan **en sus escenas** (fuente, color, contorno), y los cuatro fondos de menú comparten `assets/ui/menu_backdrop.tres`.
 - **Estilo «cómic de kiosko» y Theme global.** La paleta (tinta, papel, amarillo, rojo naranja, menta, petróleo), las dos fuentes (`assets/ui/fonts/`: Lilita One para títulos y botones, Nunito para texto; ambas OFL, con su licencia al lado) y todas las medidas viven en `UiTheme`. De ahí sale `assets/ui/theme/game_theme.tres`, el tema de todo el proyecto (`gui/theme/custom` en `project.godot`): lo escribe `scripts/tools/build_ui_theme.gd` (`godot --headless --path . -s res://scripts/tools/build_ui_theme.gd`), que hay que volver a correr tras cambiar un color, una fuente o una medida en `ui_theme.gd`. Un nodo nuevo nace con el estilo sin código; para un título, un botón principal o una tarjeta se elige una Type Variation (`TitleLabel`, `HeadingLabel`, `DimLabel`, `BadgeLabel`, `PrimaryButton`, `DangerButton`, `CardPanel`). Reglas del estilo: contorno de tinta, sombra dura desplazada (`add_hard_shadow`), colores planos, y el foco del control es SIEMPRE el anillo amarillo (`focus_ring`), que un `Button` dibuja encima de su estado normal. Las fuentes se cargan con `load()` al primer uso y no con `preload`: en un clon recién bajado los scripts se compilan antes de que Godot importe los `.ttf`.
 - **Menús y su fondo.** La escena de entrada es `scenes/ui/MainMenu.tscn` (`scripts/ui/menu/main_menu.gd`): cuatro `MenuTile.tscn` (Cacería → selector de personaje, Misiones, Colección, Armería) más Ajustes y Salir. Cada tarjeta lleva un dibujo (`art_texture`): Misiones, Colección y Armería usan un SVG propio de `assets/ui/icons/`, y Cacería la foto del raider de `GameConfig.selected_character_id` que saca `PortraitStudio` (el inicial si su modelo no existe); `assets/ui/sticker_art.gdshader` les dibuja el contorno de tinta y la sombra dura. En `MenuTile` el texto y el dibujo son hijos del marco (`Frame/Content`), así que giran, crecen y se hunden con él en un solo Tween; `Content` usa Texture Filter Linear para que las letras giradas no se vean dentadas. Las pantallas meta y el selector vuelven a ella con su botón Volver o con `ui_cancel`. Toda pantalla de menú está en el grupo `menu_screen` y entra y sale con `MenuNav` (`scripts/ui/menu/menu_nav.gd`: `go(contenido, ruta, dirección)` / `arrive(contenido)`), que desliza el contenido en vez de fundir a negro porque el fondo sigue vivo: el autoload **`MenuBackdrop`** (`scripts/ui/menu/menu_backdrop.gd`) instancia la arena del Bosque Hueco sin spawner, interactuables, viento ni muros, la mira con una cámara que solo gira, y la mantiene mientras la escena actual sea un menú. Cada pantalla le pone encima su nodo `Background` con `assets/ui/menu_backdrop.tres` (oscurecido con viñeta; opaco en color petróleo cuando no hay mapa). **El selector llama a `MenuBackdrop.release()` dentro del corte de `ScreenFade` antes de cargar `Run.tscn`**: la partida busca su arena y su terreno por grupo y no debe encontrar los del menú. En headless el mapa nunca se arma. Mover un `Control` anclado antes de su primer layout se hace con `MenuNav.shift` (desplaza sus offsets); asignarle `position` ahí rompe sus anclas.
@@ -1043,7 +1683,7 @@ La existencia se comprueba con `ResourceLoader.exists(path, "Texture2D")`, **no*
 - HUD (`scenes/ui/HUD.tscn`, raíz `scripts/ui/game/hud.gd`): grupos `hud` y `boss_ui`. `hud.gd` se queda con las barras de HP y XP, el nivel, el cronómetro (se repinta solo cuando cambia el segundo), las bajas, los puntos y la etapa, todos con sus colores, formatos y tiempos como exports agrupados («Vida», «Experiencia», «Textos», «Animación»…). Al principio del archivo está la API por grupo (`announce`, `announce_major`, `show_loot`, `track_boss`, `track_objective`, `show_stage_tag`, `on_stage_started`, `set_quake_offset`), que reenvía a los componentes. Cada componente es un nodo de `HUD.tscn` con su script en `scripts/ui/game/hud/`, dueño de su propio look:
   - `StreakLabel` → `streak_popup.gd` (`StreakPopup`): las rachas de bajas, sus palabras, colores y umbrales.
   - `AnnounceLabel` → `announce_banner.gd` (`AnnounceBanner`): los avisos y los banners mayores (`announce_major`: evoluciones, etapa superada).
-  - `BossBar` → `boss_bar.gd` (`BossBar`), con sus marcas `Tick1..3` y `BossNameLabel`.
+  - `BossBar` → `boss_bar.gd` (`BossBar`), con su `BossNameLabel`.
   - `BuildStrip` y `BagStrip` → `loadout_strip.gd` (`LoadoutStrip`, export `contents`), apiladas en `LoadoutDock` abajo a la izquierda: armas, tomos y mascota en la fila de abajo, objetos encima; cada casilla es `scenes/ui/hud/LoadoutTile.tscn`. Si el equipo no cambió de forma, las casillas se actualizan en su lugar y la que subió recibe un golpe de escala.
   - `RunInfo/DifficultyChip` → `difficulty_chip.gd` (`DifficultyChip`, escena `scenes/ui/hud/DifficultyChip.tscn`): la dificultad extra de la partida, junto al reloj y la etapa.
   - `PowerUpRow` → `powerup_row.gd` (`PowerUpRow`): las fichas de power-ups, abajo al centro (bajo la tarjeta de botín).
@@ -1052,7 +1692,7 @@ La existencia se comprueba con `ResourceLoader.exists(path, "Texture2D")`, **no*
   - `FpsBadge` → `fps_badge.gd`: el **badge de FPS** opcional (`SaveData.show_fps`, Ajustes → «Mostrar FPS»; se sondea, no se escucha, porque la opción se cambia con el HUD vivo o antes de que exista).
   - `TimerLabel/WeatherBadge` → `weather_badge.gd`: la chapa de clima.
   - `PerfProbe` → `perf_probe.gd`: el overlay de rendimiento, oculto salvo con su export `enabled` o `BONK_PERF=1`.
-  - `ViewWidgets` → `view_widgets.gd`: **construye y ancla** el minimapa y el mapa de Tab de cada jugador y les reenvía `on_stage_started(arena)` — ver «Minimapa y mapa (Tab)».
+  - `ViewWidgets` → `view_widgets.gd`: **construye y ancla** el minimapa y el mapa de Tab de cada jugador, y es dueño del `MapDraw` que todos muestran: lo refresca cada `refresh_seconds` y lo reconstruye en `on_stage_started(arena)` — ver «Minimapa y mapa (Tab)».
   - **Las posiciones son de la escena**: para mover algo del HUD se mueve su nodo en `HUD.tscn` (anclas y offsets), no se toca código. Lo que tiene que respetarse al moverlos:
   - **Arriba a la izquierda**: el cronómetro, y **debajo de su caja** —no encima— la chapa de clima, que es hija de `TimerLabel` y cuelga de su borde inferior: si el reloj cambia de alto, la chapa lo sigue sola.
   - **Arriba a la derecha**: las bajas, la insignia de FPS y el minimapa (`ViewWidgets/MinimapSlot`) debajo de las dos.
@@ -1107,10 +1747,11 @@ colocar un `Control`: eso es lo que el stretch ya resuelve.
 
 ## Sistemas transversales
 
-- **Pools** (`scripts/systems/autoloads/pools.gd` + `node_pool.gd`): pooling de los **15** hotspots (gemas, orbes, dardos, flechas, bumerán, bolts enemigos, bursts de muerte, popups, discos de telégrafo, arco de tajo, fogonazo, latigazo, brasas, charcos de sangre y charcos ácidos). Contrato de uso: spawn = `Pools.acquire_scene(escena)`, despawn = `Pools.release(nodo)`; el script pooled implementa `pool_reset()` restaurando estado recién-spawneado. **Escena nueva de alta rotación = UNA fila en `Pools.POOLS`** (`name`, `scene`, `warm`, `cap`); los tamaños se ajustan en esa misma fila. Sin registrar, `acquire_scene` cae a instanciar normal.
+- **Pools** (`scripts/systems/autoloads/pools.gd` + `node_pool.gd`): pooling de los **17** hotspots (gemas, orbes, dardos, flechas, bumerán, bolts enemigos, bursts de muerte, popups, discos de telégrafo, arco de tajo, fogonazo, latigazo, brasas, charcos de sangre, charcos ácidos, zonas de fuego y plumas ardientes). Contrato de uso: spawn = `Pools.acquire_scene(escena)`, despawn = `Pools.release(nodo)`; el script pooled implementa `pool_reset()` restaurando estado recién-spawneado. **Escena nueva de alta rotación = UNA fila en `Pools.POOLS`** (`name`, `scene`, `warm`, `cap`); los tamaños se ajustan en esa misma fila. Sin registrar, `acquire_scene` cae a instanciar normal.
   - Contrato del `NodePool`: `release()` **registra** en el nodo lo que apaga (`process`, `physics_process`, `monitoring`, `monitorable`) y `acquire()` restaura exactamente eso. El pool no inventa estado (no fuerza processing sobre escenas que no definen callbacks) ni deja un `Area3D` aparcado escuchando. Métricas: `total_created` (churn) y `peak_parked`.
 - **Juice** (`scripts/systems/autoloads/juice.gd`, autoload cargado desde `scenes/systems/Juice.tscn`): hooks semánticos de una línea — `enemy_died(pos, color)`, `boss_died(...)`, `crit_punch()`, `player_hurt()`, `sparkle(pos)`, `burst(...)`, `flash(visual)`, `shake(...)`, `hit_stop(...)`, `fov_kick_begin(camera)` / `fov_kick_end(camera)`. Una mecánica nueva con impacto debería llamar a uno existente antes que inventar efectos propios; los tunables son exports agrupados que se editan en el Inspector de `Juice.tscn`. `Juice.damp(tasa, delta)` es el peso de suavizado compartido: se usa como `lerp(a, b, Juice.damp(r, d))` y es independiente del framerate (el `tasa * delta` de siempre es su aproximación de Euler y deriva con el frame time). El rig de la foca, las mascotas y la cámara se asientan a la misma velocidad real gracias a él.
-- **Sfx** (`scripts/systems/autoloads/sfx.gd`, autoload cargado desde `scenes/systems/Sfx.tscn`, donde se ajustan voces y variación de tono): `Sfx.play(&"id")` sobre un pool de voces con jitter de pitch y rate-limit; loops con `acquire_loop/release_loop`, siempre **con refcount** (un solo camino, sin caso especial para el primer dueño) y `stop_all_loops()` para los cortes de escena. **Cada sonido es una fila de `SOUND_LIBRARY`** (al principio de `sfx.gd`): `stream`, `volume_db` y, si aplica, `loop`, `jitter` y `rate_limit`. Sonido nuevo = receta en `scripts/tools/generate_sfx.gd` (síntesis determinista) + una fila en `SOUND_LIBRARY`. Regenerar todos los wav (efectos y fondos de ambiente): `godot --headless --path . -s res://scripts/tools/generate_sfx.gd`.
+- **Sfx** (`scripts/systems/autoloads/sfx.gd`, autoload cargado desde `scenes/systems/Sfx.tscn`, donde se ajustan voces y variación de tono): `Sfx.play(&"id")` sobre un pool de voces con jitter de pitch y rate-limit; loops con `acquire_loop/release_loop`, siempre **con refcount** (un solo camino, sin caso especial para el primer dueño) y `stop_all_loops()` para los cortes de escena. **Cada sonido es una fila de `Sfx.SOUND_LIBRARY`**, que vive en su propio catálogo (`scripts/systems/catalogs/sound_library.gd`, `SoundLibrary.ROWS`): `stream`, `volume_db` y, si aplica, `loop`, `jitter` y `rate_limit`. Sonido nuevo = receta en `scripts/tools/generate_sfx.gd` (síntesis determinista) + una fila en ese catálogo. Los bloques de síntesis viven en `SfxDsp` (`scripts/tools/generate_sfx/sfx_dsp.gd`: osciladores, ruido, pasa-bajos, pasa-altos, pasa-banda que barre, aleteo, saturación, chisporroteo y una reverberación chica) y las recetas de los ataques de Mythos en `SfxMythos` (`sfx_mythos.gd`, una función por sonido, armada por capas: golpe grave, cuerpo de ruido, chasquido, brasas y cola); el generador conserva las demás recetas y llama a los bloques con sus nombres cortos (`_tone`, `_lowpass`…). Cada ataque de Mythos tiene su sonido propio (`claw_swipe`, `dive_fall`, `dive_impact`, `wing_blast`, `strafe_pass`, `fire_wave`, `ring_blast`, `tornado_burst`, `fireball_fall`, `zone_ignite`, `breath_inhale`, `dawn_riser`, `fire_blink`, además de los que ya había), elegido por el export `…_sfx` del ataque. Regenerar todos los wav (efectos y fondos de ambiente): `godot --headless --path . -s res://scripts/tools/generate_sfx.gd`; como regenerar cambia hasta 1 LSB los wav que no tocaste, devuélvelos con `git checkout -- assets/audio` antes de agregar los nuevos.
+- **Música**: `Sfx` crea tres buses en código (`Sfx`, `Ambient` y `Music`, `Sfx.MUSIC_BUS_NAME`). `SaveData.music_volume` llega al bus por `SettingsApply.set_music_volume` y el slider «Volumen de música» de `SettingsPanel` (`%MusicSlider`), igual que `ambient_volume`. No hay un sistema de música general: en esta rama solo suena por ese bus la canción del jefe (`BossSong`).
 - **Player** (`scenes/player/Player.tscn`, `scripts/player/player.gd`): el raider es un `CharacterBody3D` con un hijo por responsabilidad — `CollisionShape3D`, `SealRig` (el cuerpo), `CameraRig` (`SpringArm3D` + `Camera3D`, script `player_camera.gd`: modos de cámara y mirada), `Weapons` (el montaje de armas), `Health`, `Stats`, `ItemBag`, `PowerUps`, `Revive` (+ `RevivePrompt`; derribo y reanimación, `player_revive.gd`), `Flight` (`player_flight.gd`), `PetSlot` (`pet_slot.gd`) y `Wallet` (puntos de partida, `player_wallet.gd`). Los componentes nuevos están en `scripts/player/components/`; `player.gd` conserva los métodos públicos de siempre (`set_pet`, `end_flight`, `add_points`, `set_points_source`, `view_camera`…) como reenvíos, así que el resto del juego no cambia de llamada.
 - **Capa de stats** (`scripts/systems/player_stats.gd`, nodo `Stats` del Player): guarda stacks de tomos + pasiva + reliquias + objetos + boons y **recalcula todo desde cero** en `recompute()` en cada cambio (nunca acumular sobre valores derivados). `recompute()` está partido en cuatro fases nombradas; `_apply_boons()` recorre gamble/altar/temporales en un solo bucle y `_apply_items()` hace una sola pasada por la bolsa. Stat nuevo: campo derivado + rama en `_apply_effect(stat, amount)` + que el consumidor lo lea (armas vía helpers de `WeaponBase`; `Health` recibe `armor`/`evasion` empujados). Los suelos de multiplicador son const documentadas.
 - **Saltos y suerte de power-ups**: `extra_jumps` (id `jumps`) da saltos en el aire extra — `Player._try_jump` gasta un presupuesto `_jumps_left` que se recarga **al pisar suelo** (no dentro del salto, para que quien se cae de un borde conserve los suyos), con tope `PlayerStats.MAX_EXTRA_JUMPS`; y `powerup_drop_chance` (id `powerup_chance`, en porcentaje). Ambos entran al pool de boons de altar y `extra_jumps` además al catálogo de objetos («Botas de resorte», Rara).
@@ -1222,18 +1863,21 @@ sin haber exigido nada: un soak corto «pasa» aunque ningún cofre, altar
 ni portal se haya resuelto en las tres arenas. 360 s es lo que tarda el
 recorrido en cruzar una arena de 240x240.
 
-Hace `godot --headless --import`, el **lint de catálogos** y el **harness de UI** (iteración 57, los dos abajo), un soak de **las tres arenas** (`HollowWoods`, `AshDunes`, `Gloomfen`) con `BONK_GODMODE=1 BONK_SEED=4242 BONK_GAME_SEED=4242`, un **cuarto soak de etapa** (iteración 49): Bosque Hueco con `BONK_STAGE_FAST=1` y **el doble de reloj** (60 s hasta la puerta + 70 s de espera deliberada + cruzar el mapa hasta un portal que sale a 40 m o más no cabe en 240 s, y el RNG del juego se `randomize()`a por corrida, así que la semilla solo fija el paseo del harness). Ese cuarto soak queda **fuera** de la cuenta de interactuables, y `Portal used: exit` no cuenta como portal usado. Falla (exit 1) si:
+Hace `godot --headless --import`, el **lint de catálogos** y el **harness de UI** (iteración 57, los dos abajo), un soak de **las tres arenas** (`HollowWoods`, `AshDunes`, `Gloomfen`) con `BONK_GODMODE=1 BONK_SEED=4242 BONK_GAME_SEED=4242`, un **cuarto soak de etapa** (iteración 49): Bosque Hueco con `BONK_STAGE_FAST=1` y **el doble de reloj** (60 s hasta la puerta + 70 s de espera deliberada + cruzar el mapa hasta un portal que sale a 40 m o más no cabe en 240 s, y el RNG del juego se `randomize()`a por corrida, así que la semilla solo fija el paseo del harness). Ese cuarto soak queda **fuera** de la cuenta de interactuables, y `Portal used: exit` no cuenta como portal usado. Y un **sexto soak, el del jefe de etapa**: Bosque Hueco, 450 s, con `BONK_STAGE_BOSS_AT=60 BONK_STAGE_GOAL=90`, para que Mythos llegue, pelee, muera y la party cruce de etapa antes del jefe del minuto 5 (con ese jefe y su horda encima, el raider del soak queda rodeado y no llega al portal). Falla (exit 1) si:
 
 - el import o algún soak imprime errores/warnings de Godot (patrón amplio: `SCRIPT ERROR`, `ERROR:`, `WARNING:`, `null instance`, `previously freed`, `Resource file not found`…),
 - una arena no llega al final del soak (se colgó o murió antes) — lo mide contando las líneas `frame N ...` que el harness imprime cada 120 frames,
 - **cobertura**: el raider no pasó del nivel 3 (señal de que el arma no hace daño), o —solo en corridas de ≥240 s— ningún interactuable se resolvió. Un soak que no sube de nivel ni toca nada puede pasar «limpio» sin haber ejercitado nada.
 - **etapa**: el soak de etapa no abrió su portal, no cruzó de `hollow_woods` a `ash_dunes`, dejó algo vivo en un `Stage sweep:`, perdió progreso entre el par de `Stage carry:` de un cruce, o no produjo ningún `Sky event:` después del cruce (lo que probaría que el director no volvió a cachear las luces del mapa nuevo).
 - **co-op** (iteración 57): el quinto soak no arrancó con dos raiders (`ArenaProbe: players=2`), no cruzó de etapa, ensució un `Stage sweep:` o no produjo ningún `Player revived:`. Desde la iteración 64 corre en calidad Media y además falla sin la línea `Graphics: quality=1 scale=0.75 suns=1 views=2` (el preset llegó al sol y a las dos `SubViewport`).
-- **tope de cofres** (iteración 64): a cualquiera de los cinco soaks le falta `Probe bounty chests: max=N cap=M`, o `N` pasa de `M`. El conteo cuenta los cofres que hay, no pasa por el tope, así que quitar el tope se ve en cuanto un soak deja caer más de 30 — cosa que no pasa siempre: de las dos corridas que cerraron la iteración 64, el soak de etapa llegó a 30 en una y a 6 en la otra.
+- **jefe de etapa**: al sexto soak le falta `Boss spawned: Mythos at`, la línea `Probe calm:` no termina en `changed=0 born=0` (algo cambió de vida o apareció durante la calma), falta `Probe alone: held=true … others_max_after_purge=0` (quedó o apareció algún enemigo normal durante la pelea), el `Probe stage: reason=calm_end` no muestra el HUD de vuelta, la cámara de cinemática suelta, el mundo descongelado y el reloj corriendo, hay menos de dos líneas `Mythos scaling: life=` (no renació), `Stage boss slain: Mythos at` no sale **exactamente una vez**, o falta `Stage gate: … boss=true`, `Exit portal opened`, el cruce a `ash_dunes` o un `Stage sweep:` limpio.
+- **minijefe**: al séptimo soak le falta `Boss spawned: Langosta Azul at`, la línea `Probe mini calm:` no termina en `changed=0 born=0` (algo cambió de vida o apareció durante la entrada), falta `Probe mini stage: reason=entrance hud_visible=false … cinematic_camera=true … world_frozen=true clock_running=false tide=…` (en plena entrada la pantalla no era suya) o `reason=entrance_end hud_visible=true … cinematic_camera=false … world_frozen=false clock_running=true tide=…` (no devolvió algo), `Langosta Azul scaling: life=1` o `Langosta Azul fight over:` no salen exactamente una vez, usó menos de tres ataques distintos (`Langosta Azul move:`), pelea sola (`Spawns held: mini boss fights alone`) pero falta `Langosta Azul purge:`, `Probe mini alone:` no dice `held=true others_max_after_purge=0` (hubo otro enemigo durante la pelea) o falta `Spawns resumed`, trae su marea (`Lobster tide: rising`) pero al terminar la entrada no dice `tide=high` o al final del soak falta `Lobster tide: gone` o `Probe mini tide: left=none`, o `Probe mini hazards:` no termina en `total=0 body=false song_playing=false died_signals=1` (5 s después de morir quedó un efecto, el cuerpo o la canción, o `Health.died` salió más de una vez).
+- **tope de cofres** (iteración 64): a cualquiera de los siete soaks le falta `Probe bounty chests: max=N cap=M`, o `N` pasa de `M`. El conteo cuenta los cofres que hay, no pasa por el tope, así que quitar el tope se ve en cuanto un soak deja caer más de 30 — cosa que no pasa siempre: de las dos corridas que cerraron la iteración 64, el soak de etapa llegó a 30 en una y a 6 en la otra.
 - **lint / UI**: falta cualquiera de las dieciséis líneas `Catalog lint: check <nombre> ok rows=N` (con `rows` > 0) o de los trece `UiProbe: step <nombre> ok`. Las listas de nombres viven en `tools/verificar.sh` y se greppean **una por una**: una comprobación que deja de ejecutarse desaparece del log sin ruido, y un conteo la daría por buena mientras otra se repite.
+- **relieve por zonas**: a un soak que pasa por una arena con relieve por zonas (los cuatro que arrancan en el Bosque Hueco) le falta una línea `Relief sweep:`, alguna no da cero, la pendiente pasa de `RELIEVE_PENDIENTE_MAX` (17.76 grados: la p95 de antes del relieve, 12.76, más 5), o —solo en el soak del bosque— falta `Relief sweep: placement at=120`, `Probe relief: stood on raised zone` o `Probe relief: crossed bridge`. La función es `chequear_relieve` y revisa **todas** las líneas del log: el soak de etapa vuelve al bosque con otro trazado. Ver «El harness del relieve por zonas».
 - **partida godmode terminada**: cualquier soak inmortal que imprima `Probe fog: skipped` (ver la regla de fin de partida abajo). Un raider con 10M de HP no tiene por qué morirse.
 
-La corrida completa (import + lint + harness de UI + 3×360 s + 1×720 s + 1×360 s de co-op) tarda **entre ~16 y ~75 minutos**, más que el timeout de una llamada de shell: lánzala en segundo plano. El reloj de una corrida lo manda el TAMAÑO DE LA HORDA, no el número de frames: medido en dos corridas de la misma cabeza y las mismas semillas, **16 min** y **75 min**. El soak de co-op es el que más se mueve (la horda escala +50% de HP y +30% de ritmo de spawn por raider extra, y un cuerpo vivo cuesta física cada frame): 78 s en una corrida y 32 min en la otra. Por eso `verificar.sh` imprime los segundos de cada fase y el total — una estimación fija envejece mal. **Desde Jolt (iteración 64)** la corrida completa tardó 3-5 min en las tres medidas de esa iteración: el costo por cuerpo que estiraba el reloj es lo que Jolt se llevó.
+La corrida completa (import + lint + harness de UI + 3×360 s + 1×720 s + 1×360 s de co-op + 1×450 s del jefe de etapa) tarda **entre ~16 y ~75 minutos**, más que el timeout de una llamada de shell: lánzala en segundo plano. El reloj de una corrida lo manda el TAMAÑO DE LA HORDA, no el número de frames: medido en dos corridas de la misma cabeza y las mismas semillas, **16 min** y **75 min**. El soak de co-op es el que más se mueve (la horda escala +50% de HP y +30% de ritmo de spawn por raider extra, y un cuerpo vivo cuesta física cada frame): 78 s en una corrida y 32 min en la otra. Por eso `verificar.sh` imprime los segundos de cada fase y el total — una estimación fija envejece mal. **Desde Jolt (iteración 64)** la corrida completa tardó 3-5 min en las tres medidas de esa iteración: el costo por cuerpo que estiraba el reloj es lo que Jolt se llevó.
 
 Logs en `$TMPDIR/bonkraiders-verify/`. Cada arena imprime su resumen `nivel=… cofres=… altares=… portales=…`.
 
@@ -1277,7 +1921,7 @@ cada una que pasa y un `push_error` por cada fallo:
 | `text_values`               | las filas de objetos y power-ups que arman su texto con `RowText`: cada campo de `text_values` es un número (int o float) de la fila, la descripción tiene un `%d` por campo y, en esas filas, ningún `%` suelto (el signo de porcentaje se escribe `%%`); un campo que falta se dibujaría como 0 y un `%` suelto dejaría la plantilla cruda en pantalla |
 | `item_kinds_unique`         | cada `kind` de comportamiento aparece en una sola fila de `ITEM_LIBRARY`: `ItemCatalog.kind_row()` lee los números de la primera, así que una segunda fila mostraría sus números en el texto y jugaría con los de la otra |
 | `sfx_ids`                   | todo id de sonido escrito a mano existe como clave de `Sfx.SOUND_LIBRARY`: los `&"…"` de `Sfx.play(…)`, `acquire_loop(…)` y demás llamadas a `Sfx`, los de `MetaScreen.payoff(…)`, las constantes con `SOUND` o `SFX` en el nombre (`FANFARE_SFX`, `SOUND`), los defaults de los exports `*_sound`/`*_loop` y sus valores en escenas: un id mal escrito solo avisa en tiempo de ejecución y el sonido no suena |
-| `stat_rows`                 | toda fila de `MapOverlay.STAT_ROWS` (panel «Estadísticas» del mapa de Tab) nombra una propiedad que existe en `PlayerStats` y un `show` conocido: una propiedad renombrada se mostraría como `empty_text` sin avisar |
+| `stat_rows`                 | toda fila de `MapOverlay.STAT_ROWS` (panel «Estadísticas» del mapa de Tab) nombra una propiedad que existe en `PlayerStats` (y su `base_property`, si la trae) y un `show` conocido: una propiedad renombrada se mostraría como `empty_text` sin avisar |
 
 `rows` es lo que se inspeccionó **de verdad**, y **cero filas es un fallo**: una
 comprobación que recorre una lista vacía pasa por el motivo equivocado, que es
@@ -1443,9 +2087,9 @@ Desde la iteración 45 **el raider camina e interactúa por defecto**. Un raider
   `map_overlay`, lo mantiene `MAP_OVERLAY_HOLD` 2 s y suelta. Imprime
   `Map overlay: open markers=%d` y `Map overlay: closed`. El conteo se lee
   `MAP_OVERLAY_REPORT_DELAY` 0.5 s **después** de la pulsación, no en el mismo
-  frame: el overlay refresca en su propio `_process`, que cae en un frame de
-  idle **posterior** al de física que sintetizó la tecla, y leerlo antes
-  reportaba el mapa de antes de abrirse (`markers=0`).
+  frame: el overlay atiende su tecla en su propio `_process`, que cae en un
+  frame de idle **posterior** al de física que la sintetizó. El número es el
+  del `MapDraw` compartido (`MapOverlay.marker_count()` lo reenvía).
 - `_send_action(base, pressed)` es el sintetizador de teclas genérico (antes
   era solo `_send_interact`): misma regla de soltar en un frame posterior.
 - **Power-ups** (iteración 53): el recorrido se desvía a la gema más cercana dentro de `PICKUP_DETOUR` 20 m (caminar encima **es** la interacción: ni pulsación ni linger). Bajo `BONK_POWERUP_NOW=time_stop` muestrea hasta tres cuerpos congelados por frame y al descongelar imprime `Time stop: sampled=%d moved=%d damage_events=%d` — `moved` y `damage_events` son las dos formas en que un congelado puede ser mentira, y las dos tienen que salir en cero. Al terminar imprime `Immortal blocked:` con `Health.blocked_hits` (cacheado en vida, como la niebla). Bajo `BONK_POWERUP_NOW=flight` **mantiene el salto** 5 s cada 15 s, porque Vuelo solo hace algo mientras se mantiene; el resto de los soaks conservan el paseo de siempre.
@@ -1482,6 +2126,20 @@ Variables de entorno:
 | `BONK_POINTS=<n>`                             | le da esos puntos al slot 0 al arrancar, para que un soak de vendedor pueda pagar                                                                                                                                                                                                                                                                                                                            |
 | `BONK_PERF=1`                                 | enciende el overlay de rendimiento del HUD                                                                                                                                                                                                                                                                                                                                                                   |
 | `BONK_GRAPHICS=<0-2>`                         | preset gráfico del soak (iteración 64): 0 Alta, 1 Media, 2 Baja. Se aplica antes de arrancar la partida, así que el sol de la primera etapa ya lo recibe. **No se guarda** en el save del soak, y un valor que no sea 0-2 es un `push_error`, como un `BONK_CHARACTER` desconocido. Sin el interruptor, el harness aplica el preset del save del soak (no el del jugador, que `Settings` aplicó al arrancar) |
+| `BONK_STAGE_BOSS_AT=<s>`                      | trae al jefe de etapa a ese segundo de cada etapa en vez de en `elder_spawn_minute` (lo lee `BossSchedule`)                                                                                                       |
+| `BONK_STAGE_GOAL=<s>`                         | acorta **solo la mitad de tiempo** de la puerta de etapa; la mitad del jefe se conserva (lo lee `RunManager`). La puerta de niebla no se aplica, como con `BONK_STAGE_FAST`                                        |
+| `BONK_MINI_BOSS_AT=<s>`                       | trae al minijefe de la arena a ese segundo de la etapa en vez de en `mini_boss_spawn_minute` (lo lee `BossSchedule`)                                                                         |
+| `BONK_CINEMATIC_SKIP=1`                       | mantiene la acción de saltar del slot 0 apenas pasa un segundo de cinemática                                                                                                                                      |
+| `BONK_PAUSE_AT=<s>`                           | a ese segundo abre el menú de pausa de verdad, mueve el slider de Música (`Probe music slider:`), espera 3 s y lo cierra; imprime el reloj de la calma antes y después (`Probe pause:`)                            |
+| `BONK_EXTRACT_AT=<s>`                         | extrae la party a ese segundo                                                                                                                                                                                     |
+| `BONK_WIPE_AT=<s>`                            | golpe letal a toda la party a ese segundo                                                                                                                                                                         |
+| `BONK_WEATHER_AT=a,b,c`                       | fuerza el clima de `BONK_WEATHER_NOW` (o `blood_moon`) en esos segundos, en lugar de los 30 s de siempre, y lee el cielo después de cada clima (`Probe sky:`)                                                      |
+| `BONK_ADVANCE_AT=a,b,c`                       | cambia de etapa en esos segundos por `RunRoot.advance_stage`, esté como esté la etapa (en plena cinemática o pelea); imprime `Probe advance:` y, dos frames después del cambio, `Probe stage: reason=stage_change …`                              |
+| `BONK_BOSS_HURT_AT=a,b`                        | en esos segundos del reloj del harness le da al jefe de etapa un golpe que agota la vida que esté peleando (si llega o renace, espera a que pelee) e imprime `Probe boss hurt:`. Sirve para llegar rápido a su segunda fase. Ese golpe cuenta como daño de la party, así que la vida siguiente sale más grande que en una pelea real. El reloj del harness no se detiene con la pausa ni con las cinemáticas: deja margen entre cada golpe y el momento en que el jefe empieza a pelear |
+| `BONK_UI_DISMISS=1`                           | cierra por código (`dismiss()`) la ruleta o el vendedor que lleve más de 3 s con la pausa tomada e imprime `Probe dismiss:`. Sin ventana esos paneles se resuelven solos; con ventana una corrida larga de capturas se quedaría pausada ahí |
+| `BONK_VIEW_SHOTS=1`                           | con `BONK_SHOT_DIR`: fotos desde tres puntos fijos antes del jefe, en la calma, en la pelea, después y tras cada clima (`view_aerial_*`, `view_spawn_*`, `view_raider_*`). Solo con ventana                         |
+
+Los segundos de las cinco variables `…_AT` y de `BONK_PAUSE_AT` de esta tanda son del **reloj del probe** (frames de física / 60), no de `RunState.run_time`, que se detiene durante la calma: con `run_time` no se podría caer en medio de una cinemática. Viven en `scenes/tests/stage_boss_switches.gd`; lo que el harness **observa** del jefe de etapa (siempre, sin variable) está en `scenes/tests/stage_boss_probe.gd`: `Probe calm:`, `Probe stage:`, `Probe hazards:`, `Probe boss hit:`, `Probe boss damage:`, `Probe boss hits on raiders:` y `Probe sky:`.
 
 Uso directo:
 
@@ -1558,6 +2216,100 @@ semilla, mismo mundo— siempre que el cambio no altere cuántas veces se tira
 del RNG antes del scatter; uno que cambie la máscara misma da otro trazado y
 se compara por estilo, no píxel a píxel.
 
+### `scenes/tests/shader_check.gd`
+
+Compila **todos** los `.gdshader` del proyecto sin ventana (menos `addons/`, `builds/` y carpetas ocultas): carga cada uno y le pide `get_shader_uniform_list()`, que es lo que fuerza la compilación. `load()` solo no compila nada, y un soak puede no llegar a usar el shader.
+
+```sh
+godot --headless --script res://scenes/tests/shader_check.gd > shaders.log 2>&1
+grep -nE "SHADER ERROR|Shader compilation failed" shaders.log   # sin salida = pasa
+```
+
+El código de salida no prueba nada: un shader roto imprime `SHADER ERROR:` y el proceso sale con 0. Para comprobar que el chequeo ve un error, pásale un shader roto después de `--`.
+
+### Fotos desde puntos fijos: `scenes/tests/view_shots.gd`
+
+La cámara del soak solo ve lo que el raider tenga delante; para juzgar cómo cambia el **mapa** hacen falta los mismos encuadres antes y después. Con `BONK_VIEW_SHOTS=1` y `BONK_SHOT_DIR`, `StageBossProbe` pide tres fotos sin HUD por momento (`before`, `calm`, `hell`, `charred`): `view_aerial_<momento>.png` (la arena desde lo alto, sin niebla), `view_spawn_<momento>.png` (a la altura de los ojos desde el spawn) y `view_raider_<momento>.png` (desde arriba y atrás del raider líder). Salen de un `SubViewport` propio con su cámara: mira el mismo mundo 3D que la partida, pero no dibuja nada 2D (ni HUD ni mapa de Tab) y no le quita la cámara a nadie. Nunca sin ventana.
+
+### El harness del relieve por zonas: `scenes/tests/relief_*.gd` y `world_digest.gd`
+
+**`WorldDigest` (`world_digest.gd`) está congelado.** En cada comienzo de
+etapa `ArenaProbe` imprime tres líneas que sirven de línea base para probar
+que un cambio no movió un mapa: `World digest: <mapa> nodes=N hash=H` (la
+transformación al milímetro de cada prop, formación, meseta y POI),
+`Hell skip: <mapa> meshes=N total=N` (mallas que la regla de `HellDressing`
+no quemaría) y `Ground slope: <mapa> p95=G max=G cells=N`. No se les cambia
+el cálculo ni el formato: una medida nueva va en su propia línea.
+
+En una arena con relieve por zonas trabaja además `ReliefProbe`
+(`relief_probe.gd`), que `ArenaProbe` solo crea, avanza y consulta:
+
+| Archivo | Qué hace |
+| --- | --- |
+| `relief_graph.gd` (`ReliefGraph`) | El mapa como lo ve la física: una celda por metro cuadrado con el piso que encuentra un rayo desde arriba (el `Terrain`, la cornisa de un corte, un puente, una meseta y su rampa; lo demás es obstáculo) y adónde lleva cada una de las ocho direcciones para un raider y para la horda. |
+| `relief_search.gd` (`ReliefSearch`) | Los recorridos sobre el grafo: qué celdas se alcanzan desde una, desde cuáles se llega a una, y el camino de un raider entre dos (una búsqueda repartida en frames). |
+| `relief_sweeps.gd` (`ReliefSweeps`) | Los barridos: una línea `Relief sweep:` cada uno (hueco 45-60, alcance, pendiente, infierno). |
+| `relief_placement.gd` (`ReliefPlacement`) | El barrido de colocación (`Relief sweep: placement …`): props, POIs, spawns y formaciones contra los cortes, con sus tolerancias. |
+| `relief_nav.gd` (`ReliefNav`) | El ruteo del bot: el próximo punto del camino a su destino por rampas y puentes, y cuándo saltar. La celda de un cuerpo es la más cercana **a su altura** (al pie de un corte, la más cercana a secas es una de arriba). La búsqueda del camino (`ReliefSearch.begin` / `advance`) se reparte en frames (`SEARCH_BUDGET` celdas por frame): recorrer el mapa de una vez es un tirón de más de 100 ms en las líneas `Perf`. Sin grafo devuelve el destino tal cual. |
+| `relief_probe.gd` (`ReliefProbe`) | Agenda los barridos (10 frames tras el cambio de etapa y la colocación otra vez a los 120 s), el paseo y `BONK_HOLD_AT`. El frame de un barrido (unos 0.7 s el de comienzo de etapa) no entra en las líneas `Perf`: `PerfMeter.skip_frame()`. |
+
+- **Celda abierta**: su piso tiene menos de 45 grados, no cae en una
+  formación de la máscara (sus celdas más los 2 m de faldón de roca) y la
+  cápsula del raider cabe parada ahí sin tocar nada. Una celda donde la
+  cápsula roza el suelo o la roca de un corte es **justa**: se camina por
+  ella, no cuenta como lugar donde estar.
+- **Pasos**: caminar a la vecina si el desnivel es menor que el avance (en
+  diagonal, si un cuerpo cabe por la esquina: la rampa de una meseta toca su
+  plataforma así); caer a una celda más baja pasando sobre la cara de un
+  corte (de ida solamente); el raider, saltar hasta 1.5 m; la horda, trepar
+  hasta 8 m si lo que tiene delante es una cara de 60 grados o más (dos rayos
+  horizontales lo comprueban). Son las reglas del barrido: no se tocan para
+  hacerlo pasar.
+- **Los barridos** (`Relief graph: cells=… open=… tight=… wall=… obstacle=…`
+  y después): `gap faces=N ground=N rock=N` (caras entre 45 y 60 grados del
+  colisionador del terreno que ninguna roca tapa, y de la roca de los cortes
+  que asoma sobre el suelo), `raider open=N unreachable=N no_return=N` y
+  `horde …` (celdas abiertas que el spawn no alcanza, o que no vuelven a él),
+  `placement at=start|120 … on_relief=N misplaced=N raider_unreachable=N
+  horde_unreachable=N crowding=N` (props, POIs, 200 spawns muestreados del
+  anillo y de la banda de oleadas y 2000 lugares que el director elegiría
+  durante la etapa, `places=N`, muestreados con `StageLayout.exit_portal_point`
+  y con el anillo de los eventos: sobre un corte, rampa o puente; enterrado
+  o flotando; un POI o un lugar que el raider no alcanza; un spawn que la
+  horda no alcanza; una meseta o formación a menos de 3 m de un corte; lo arma
+  `ReliefPlacement`, y no cuenta como prop lo que ES el relieve: la roca de
+  un corte, un puente, una formación, las estructuras del grupo
+  `relief_structures` ni la vegetación del suelo, que no tiene colisión: que
+  ninguna tape un paso lo dicen los barridos de alcance), `slope p95=G`
+  (la medida congelada de `WorldDigest`, lejos de cortes y rampas) y
+  `hell skipped=N interactable=N backdrop=N bodies=N pooled=N fx=N unburnt=N`
+  (las mallas que el infierno no quemaría, por tipo: bajo un interactuable,
+  bajo el `Backdrop`, de un cuerpo vivo, de algo que salió del pool —un
+  dardo en vuelo lleva la marca `NodePool.META_OWNER`—, un efecto de un solo
+  uso —una malla sin nombre ni dueño colgada directo de la arena, como las de
+  `WeaponBase.spawn_fx_mesh` o el anillo de nivel de `Juice`— y el resto, que
+  es lo que tiene que dar cero). Cada conteo distinto de cero imprime hasta cuatro
+  `Relief sweep detail:` con el lugar. Un interactuable ya gastado no entra
+  en la colocación (se está hundiendo), y si a los 120 s una cinemática
+  tiene el mundo congelado (`WorldFreeze` saca la arena de la física) la
+  colocación espera a que vuelva. **Jamás se afloja una tolerancia para
+  hacerlos pasar**: cede el relieve o quien coloca.
+- **El paseo**: antes del recorrido de siempre, el bot va a la cumbre y de
+  una cabecera del puente más largo a la otra (`Probe relief: stood on raised
+  zone …`, `Probe relief: crossed bridge …`; un salto sobre el tablero sigue
+  contando como estar en el puente, caer bajo él no); la carrera a la salida
+  y un rescate pasan por delante.
+- **`BONK_HOLD_AT=high|ravine|bridge`**: pone al raider en su punto y lo deja
+  quieto; una **llegada** es un enemigo que apareció 3 m o más arriba o abajo
+  de ese nivel y se le acercó a 3 m (y a no más de 1.5 m de altura). `Probe
+  hold: at=… window=A-Bs arrivals=N` por ventana de 20 s desde el segundo 10
+  y `Probe hold summary: … empty_after_30=N reached=N` al salir (`reached`:
+  todos los enemigos que lo alcanzaron, hayan aparecido en su nivel o no).
+  En `bridge` es la prueba de `ReliefLanes`: casi toda la horda nace en el
+  cañón, 6 m más abajo, y tiene que subir y entrar por una cabecera. Es un soak aparte, no
+  del gate; con el raider quieto, el aviso de niebla poco explorada sale y
+  es esperado.
+
 ## Convenciones
 
 - **GDScript con tipado estático** en el 100% del código (parámetros, retornos, variables con tipo, `:=` solo con tipo inferible), incluidos los `Array`/`Dictionary` tipados (`Array[Dictionary]`, `Dictionary[String, int]`). Mantenerlo: el codebase compila limpio y los soaks dependen de ello. Un `Array` sin tipar cruzando una firma tipada lanza `Invalid type in function` en runtime, no en parseo.
@@ -1573,5 +2325,5 @@ se compara por estilo, no píxel a píxel.
 - **Una sola fuente de verdad por valor.** Un script usado por una sola escena no lleva overrides en esa escena: el valor vive en el default del script, así editar el script siempre funciona. Los valores por instancia (la vida de cada enemigo, el scatter de cada mapa, el horario de jefes por arena, las escenas del spawner) viven en cada escena. **Nunca dejes que `_ready` pise un valor del Inspector**: si el código lo sobreescribe, editarlo en la escena no hace nada. Antes de mover un `@export` de sitio, comprueba qué `.tscn` lo overridea: las tres arenas overridean el `EnemySpawner`.
 - **Cada catálogo dice en su cabecera qué campos son llaves** («NUNCA las cambies») y cuáles se pueden cambiar libremente. Los ids de personaje son `snake_case` (el lint `id_format` lo exige en todo catálogo); renombrar uno exige una fila en `SaveData.ID_ALIASES` para que los guardados viejos no lo pierdan.
 - **Nada de números sueltos.** Un `0.5` repetido en dos archivos es la forma en que dos copias del mismo cálculo se separan: si es diseño, es un `@export` (regla de arriba); si no, una `const` con nombre.
-- **Logs de una línea** en eventos clave — son la interfaz de verificación de los soaks headless, van **en inglés** y se conservan. Inventario actual: `Run ended:`, `Meta saved:`, `Save recovered from backup:`, `Boss spawned:`, `Boss chests dropped:`, `Elite chest dropped:`, `Horde:`, `Sky event:`, `Chest opened:`, `Altar charged:`, `Altar left:`, `Altar placed:`, `Demonic altar used:`, `Demonic pact:`, `Spawn skipped:`, `Stage advanced:`, `Stage sweep:`, `Stage carry:`, `Stage gate:`, `Stage boss slain:`, `Exit portal opened`, `Portal used: exit`, `Pseudo-infinite:`, `Run stages:`, `Terrain built:`, `Probe legs:`, `Greed shrine:`, `Roulette spun:`, `Spring used:`, `Portal used:`, `Portals placed:`, `Weapon evolved:`, `Weapon ascended:`, `Pet joined:`, `Secret miniboss awakened:`, `Secret boss slain:`, `Arena mask:`, `Rock formations:`, `Start layout:`, `Daily run scored:`, `Void rescue:`, `Power-up picked:`, `Power-up dropped:`, `Star roam:`, `Flight landing:`, `Pet box opened:`, `Vendor arrived:`, `Vendor sold:`, `Time stop:`, `Immortal blocked:`, `Weather started:`, `Weather ended:`, `Disaster:`, `Event altar used:`, `Possessed spawned:`, `Possessed expired:`, `Belt bolt:`, `Saiyan aura:`, `Zenkai triggered:`, `Lucky block:`, `Save path overridden:`, `Save migrated:`, `Player revived:`, `Vendor buyer:`, `Elite chest capped:`, `Graphics:`, `Skirmisher degenerate aim:`. Al crear un evento mayor, añade el tuyo con el mismo formato. Las líneas de los harness van aparte y también se conservan (`tools/verificar.sh` greppea `Probe fog:`, `Probe bounty chests:`, `Catalog lint:` y `UiProbe:`; las otras se leen a mano al revisar un soak): `Probe legs:`, `Probe fog:` (incluida su forma `Probe fog: skipped`), `Probe: run ended`, `Mask sweep:`, `Map overlay:`, `Time stop:`, `Immortal blocked:`, `HUD offset:`, `Party:`, `Party pets:`, `Points sources:`, `Catalog lint:`, `UiProbe:`, `Swap menu:`, `Saiyan boons:`, `Time stop worms:`, `Probe bounty chests:`, `Perf` (y `Perf summary:`, del `PerfMeter`).
+- **Logs de una línea** en eventos clave — son la interfaz de verificación de los soaks headless, van **en inglés** y se conservan. Inventario actual: `Run ended:`, `Meta saved:`, `Save recovered from backup:`, `Boss spawned:`, `Boss chests dropped:`, `Elite chest dropped:`, `Horde:`, `Sky event:`, `Chest opened:`, `Altar charged:`, `Altar left:`, `Altar placed:`, `Demonic altar used:`, `Demonic pact:`, `Spawn skipped:`, `Stage advanced:`, `Stage sweep:`, `Stage carry:`, `Stage gate:`, `Stage boss slain:`, `Exit portal opened`, `Portal used: exit`, `Pseudo-infinite:`, `Run stages:`, `Terrain built:`, `Probe legs:`, `Greed shrine:`, `Roulette spun:`, `Spring used:`, `Portal used:`, `Portals placed:`, `Weapon evolved:`, `Weapon ascended:`, `Pet joined:`, `Secret miniboss awakened:`, `Secret boss slain:`, `Arena mask:`, `Rock formations:`, `Ground cover:`, `Start layout:`, `Daily run scored:`, `Void rescue:`, `Power-up picked:`, `Power-up dropped:`, `Star roam:`, `Flight landing:`, `Pet box opened:`, `Vendor arrived:`, `Vendor sold:`, `Time stop:`, `Immortal blocked:`, `Weather started:`, `Weather ended:`, `Disaster:`, `Event altar used:`, `Possessed spawned:`, `Possessed expired:`, `Belt bolt:`, `Saiyan aura:`, `Zenkai triggered:`, `Lucky block:`, `Relief layout:`, `Relief dressing:`, `Save path overridden:`, `Save migrated:`, `Player revived:`, `Vendor buyer:`, `Elite chest capped:`, `Graphics:`, `Skirmisher degenerate aim:`. Al crear un evento mayor, añade el tuyo con el mismo formato. Las líneas de los harness van aparte y también se conservan (`tools/verificar.sh` greppea `Probe fog:`, `Probe bounty chests:`, `Catalog lint:` y `UiProbe:`; las otras se leen a mano al revisar un soak): `Probe legs:`, `Probe fog:` (incluida su forma `Probe fog: skipped`), `Probe: run ended`, `Mask sweep:`, `Map overlay:`, `Time stop:`, `Immortal blocked:`, `HUD offset:`, `Party:`, `Party pets:`, `Points sources:`, `Catalog lint:`, `UiProbe:`, `Swap menu:`, `Saiyan boons:`, `Time stop worms:`, `Probe bounty chests:`, `Perf` (y `Perf summary:`, del `PerfMeter`), `World digest:`, `Hell skip:`, `Ground slope:`, `Relief graph:`, `Relief sweep:` (y `Relief sweep detail:`), `Probe relief:`, `Probe hold:`. `tools/verificar.sh` también greppea `Relief sweep:` y `Probe relief:`.
 - **Verificar antes de dar por hecho un cambio**: `tools/verificar.sh`. Un cambio que no pasa el import o ensucia el log de un soak no está terminado.

@@ -12,7 +12,7 @@ extends Node
 ## reproductores mezclan en el driver falso).
 ## Procesa siempre, para que cartas y avisos finales suenen en pausa.
 ## Se carga desde scenes/systems/Sfx.tscn (Inspector: voces y variación de
-## tono); cada sonido se edita en SOUND_LIBRARY, abajo.
+## tono); cada sonido se edita en scripts/systems/catalogs/sound_library.gd.
 ## Orden del RNG: play() tira randf_range solo para ids con variación de
 ## tono y solo si pasa el límite por segundo; ese orden lo usan los soaks
 ## con semilla.
@@ -22,89 +22,13 @@ const BUS_NAME := &"Sfx"
 ## él). Se crea aquí junto al bus Sfx para que los buses hechos en código
 ## tengan un solo dueño; el autoload Settings solo les pone volumen.
 const AMBIENT_BUS_NAME := &"Ambient"
+## Bus de la música (hoy, la canción de un jefe de etapa: mythos_cinematic.gd
+## sale por él). Toda música del juego va por este bus y su slider.
+const MUSIC_BUS_NAME := &"Music"
 
-## Edita aquí cada sonido: una fila por id, el id es la llave que pasan
-## Sfx.play(&"id") y acquire_loop(&"id") (renombrarlo rompe a quien lo
-## llama). Campos:
-##   stream:     el .wav (los genera scripts/tools/generate_sfx.gd).
-##   volume_db:  volumen base en dB; el volume_db_offset de play() se suma.
-##   rate_limit: OPCIONAL, tope de reproducciones por segundo móvil (sin el
-##               campo, sin tope), para que la horda no sature.
-##   jitter:     OPCIONAL, true = variación de tono al azar
-##               (default_pitch_jitter) cuando play() no pide otra.
-##   loop:       OPCIONAL, true = id de play_loop(): en _ready se hace una
-##               copia en bucle, porque los wav generados no traen metadatos.
-const SOUND_LIBRARY: Dictionary[StringName, Dictionary] = {
-	&"hit_soft": {
-		"stream": preload("res://assets/audio/sfx/hit_soft.wav"), "volume_db": -14.0,
-		"rate_limit": 10, "jitter": true,
-	},
-	&"hit_crit": {
-		"stream": preload("res://assets/audio/sfx/hit_crit.wav"), "volume_db": -7.0,
-		"rate_limit": 10, "jitter": true,
-	},
-	&"enemy_die": {
-		"stream": preload("res://assets/audio/sfx/enemy_die.wav"), "volume_db": -10.0,
-		"rate_limit": 12, "jitter": true,
-	},
-	&"gem_pickup": {
-		"stream": preload("res://assets/audio/sfx/gem_pickup.wav"), "volume_db": -12.0,
-		"rate_limit": 10, "jitter": true,
-	},
-	&"heal": {
-		"stream": preload("res://assets/audio/sfx/heal.wav"), "volume_db": -7.0,
-		"rate_limit": 4, "jitter": true,
-	},
-	&"level_up": {
-		"stream": preload("res://assets/audio/sfx/level_up.wav"), "volume_db": -4.0,
-	},
-	&"card_pick": {
-		"stream": preload("res://assets/audio/sfx/card_pick.wav"), "volume_db": -6.0,
-	},
-	&"player_hurt": {
-		"stream": preload("res://assets/audio/sfx/player_hurt.wav"), "volume_db": -5.0,
-		"rate_limit": 6,
-	},
-	&"dodge": {
-		"stream": preload("res://assets/audio/sfx/dodge.wav"), "volume_db": -8.0,
-	},
-	&"slide": {
-		"stream": preload("res://assets/audio/sfx/slide.wav"), "volume_db": -10.0,
-	},
-	&"shrine_channel": {
-		"stream": preload("res://assets/audio/sfx/shrine_channel.wav"), "volume_db": -10.0,
-		"loop": true,
-	},
-	&"shrine_done": {
-		"stream": preload("res://assets/audio/sfx/shrine_done.wav"), "volume_db": -5.0,
-	},
-	&"chest_open": {
-		"stream": preload("res://assets/audio/sfx/chest_open.wav"), "volume_db": -5.0,
-	},
-	&"boss_roar": {
-		"stream": preload("res://assets/audio/sfx/boss_roar.wav"), "volume_db": -3.0,
-	},
-	&"boss_roar_2": {
-		"stream": preload("res://assets/audio/sfx/boss_roar_2.wav"), "volume_db": -3.0,
-	},
-	&"boss_die": {
-		"stream": preload("res://assets/audio/sfx/boss_die.wav"), "volume_db": -2.0,
-	},
-	&"streak": {
-		"stream": preload("res://assets/audio/sfx/streak.wav"), "volume_db": -6.0,
-	},
-	&"laser_hum": {
-		"stream": preload("res://assets/audio/sfx/laser_hum.wav"), "volume_db": -16.0,
-		"loop": true,
-	},
-	&"burrow_pop": {
-		"stream": preload("res://assets/audio/sfx/burrow_pop.wav"), "volume_db": -8.0,
-		"rate_limit": 8, "jitter": true,
-	},
-	&"secret_fanfare": {
-		"stream": preload("res://assets/audio/sfx/secret_fanfare.wav"), "volume_db": -3.0,
-	},
-}
+## Los sonidos, uno por id. Sus filas se editan en
+## scripts/systems/catalogs/sound_library.gd (SoundLibrary.ROWS).
+const SOUND_LIBRARY: Dictionary[StringName, Dictionary] = SoundLibrary.ROWS
 
 @export_group("Voces")
 ## Voces para sonidos de un disparo; los que se solapan rotan entre ellas.
@@ -336,6 +260,7 @@ func _now() -> float:
 func _setup_bus() -> void:
 	_ensure_bus(BUS_NAME)
 	_ensure_bus(AMBIENT_BUS_NAME)
+	_ensure_bus(MUSIC_BUS_NAME)
 
 
 static func _ensure_bus(bus_name: StringName) -> void:

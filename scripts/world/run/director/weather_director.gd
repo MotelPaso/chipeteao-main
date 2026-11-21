@@ -29,6 +29,9 @@ const TSUNAMI_PER_FRAME: int = 6
 ## de la primera las reemplaza en vez de sumarlas (solo clear_timed_boons
 ## quita por etiqueta).
 const FULL_MOON_TAG: String = "full_moon"
+## Climas que solo traen enemigos (ids de WeatherCatalog): no empiezan
+## mientras el jefe de etapa pelea solo (EnemySpawner.is_holding).
+const ENEMY_WEATHERS: Array[String] = ["enemy_rain", "enemy_tsunami"]
 
 @export_group("Probabilidad y pausa")
 ## Probabilidad (0-1) de desastre en cada evento; se tira antes que la
@@ -276,6 +279,25 @@ func spawn_acid_pool(at: Vector3) -> void:
 	fresh.play(at, acid_pool_radius, acid_pool_lifetime, acid_pool_damage_per_second)
 
 
+## La arena cambió de cielo a mitad de etapa (HellTransformation): desde
+## ahora el tinte de cada clima vuelve a ESTE sol y ambiente. Devuelve el
+## Environment propio de la arena, que es el que hay que escribir.
+func rebase_sky(sun_color: Color, sun_energy: float, ambient_color: Color,
+		ambient_energy: float) -> Environment:
+	# cache() primero: si ningún clima corrió en esta etapa, todavía no hay
+	# copia propia del Environment ni sol guardado.
+	_sky.cache(layout)
+	_sky.rebase(sun_color, sun_energy, ambient_color, ambient_energy)
+	return _sky.environment()
+
+
+## El cielo «original» de la arena ahora, sin el tinte del clima que esté en
+## curso (ver SkyTint.base()): lo pide quien va a cambiarlo por un rato.
+func sky_base() -> Dictionary:
+	_sky.cache(layout)
+	return _sky.base()
+
+
 ## Verdadero mientras `id` sea el clima activo.
 func is_weather_active(id: String) -> bool:
 	return not active_weather.is_empty() and String(active_weather.id) == id
@@ -294,6 +316,10 @@ func _weather_duration(row: Dictionary) -> float:
 
 func _start_weather(id: String, forced: bool = false) -> void:
 	if id.is_empty():
+		return
+	if not forced and ENEMY_WEATHERS.has(id) and EnemySpawner.is_holding(get_tree()):
+		# El jefe de etapa pelea solo: un clima que solo trae enemigos no
+		# empieza (anunciaría una ola que el spawner no va a sacar).
 		return
 	var row := weather_row(id)
 	if row.is_empty():

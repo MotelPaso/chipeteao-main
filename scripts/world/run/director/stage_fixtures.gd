@@ -7,8 +7,9 @@ extends Node
 ## Es el nodo RunSystems.tscn > WorldDirector > StageFixtures: sus números
 ## se editan en el Inspector de ese nodo. El director llama a place() en
 ## cada etapa, después de mover los POI y antes de que el scatter ponga
-## sus props. Todo sale del RNG de la partida: el orden de place() es
-## parte del sorteo de cada semilla.
+## sus props: todo lo que pone entra a "scatter_keepout", así el scatter no
+## le planta props ni estructuras encima. Todo sale del RNG de la partida:
+## el orden de place() es parte del sorteo de cada semilla.
 
 const CHEST_SCENE := preload("res://scenes/world/chests/Chest.tscn")
 const PORTAL_SHRINE_SCENE := preload("res://scenes/world/director/PortalShrine.tscn")
@@ -16,6 +17,8 @@ const ROULETTE_SHRINE_SCENE := preload("res://scenes/world/shrines/RouletteShrin
 const PET_BOX_SCENE := preload("res://scenes/world/PetBox.tscn")
 const EVENT_ALTAR_SCENE := preload("res://scenes/world/shrines/EventAltar.tscn")
 const LUCKY_BLOCK_SCENE := preload("res://scenes/world/chests/LuckyBlock.tscn")
+## Grupo de lo que el scatter deja libre de props y estructuras.
+const KEEPOUT_GROUP: StringName = &"scatter_keepout"
 
 @export_group("Inicio irregular")
 ## Probabilidad (0-1) de quitar cada cofre o altar de la escena en esta
@@ -65,7 +68,7 @@ func _randomize_starting_pois() -> void:
 	var removed := 0
 	var chests_kept := 0
 	var freebies := 0
-	for node: Node in get_tree().get_nodes_in_group("scatter_keepout"):
+	for node: Node in get_tree().get_nodes_in_group(KEEPOUT_GROUP):
 		if node is Chest or node is ChargeShrine or node is GreedShrine:
 			if node is Chest and chests_kept == 0:
 				chests_kept += 1  # el primer cofre de suelo siempre se queda
@@ -88,7 +91,8 @@ func _randomize_starting_pois() -> void:
 			chest.free_open = true
 			freebies += 1
 		_layout.stage_parent().add_child(chest)
-		chest.global_position = _layout.claim_clear_point()
+		chest.global_position = _layout.claim_clear_point(chest.footprint_reach())
+		_keep_clear(chest)
 	print("Start layout: %d POI(s) skipped, %d extra chest(s), %d free" % [
 			removed, extra, freebies])
 
@@ -113,7 +117,9 @@ func _spawn_portals() -> void:
 		portal.name = "Portal%d" % (i + 1)
 		portal.pair_index = i / 2
 		_layout.stage_parent().add_child(portal)
-		portal.global_position = _layout.claim_clear_point()
+		# Su marco ocupa unos 4 m: las distancias se guardan desde ese borde.
+		portal.global_position = _layout.claim_clear_point(portal.footprint_reach())
+		_keep_clear(portal)
 		portals.append(portal)
 	portals.shuffle()
 	for i in range(0, portals.size() - 1, 2):
@@ -125,7 +131,7 @@ func _spawn_portals() -> void:
 
 func _spawn_roulettes() -> void:
 	for i in roulette_count:
-		_layout.spawn_at(ROULETTE_SHRINE_SCENE, _layout.claim_clear_point())
+		_keep_clear(_layout.spawn_at(ROULETTE_SHRINE_SCENE, _layout.claim_clear_point()))
 
 
 ## 0-1 cajas de mascota: una mascota tiene que sentirse como algo que el
@@ -136,18 +142,25 @@ func _spawn_roulettes() -> void:
 func _spawn_start_pet_boxes() -> void:
 	if start_pet_box_chance <= 0.0 or randf() >= start_pet_box_chance:
 		return
-	_layout.spawn_at(PET_BOX_SCENE, _layout.claim_clear_point())
+	_keep_clear(_layout.spawn_at(PET_BOX_SCENE, _layout.claim_clear_point()))
 
 
 ## 0-1 altares de evento, como la caja de mascota.
 func _spawn_start_event_altars() -> void:
 	if start_event_altar_chance <= 0.0 or randf() >= start_event_altar_chance:
 		return
-	_layout.spawn_at(EVENT_ALTAR_SCENE, _layout.claim_clear_point())
+	_keep_clear(_layout.spawn_at(EVENT_ALTAR_SCENE, _layout.claim_clear_point()))
 
 
 ## 0-1 bloques de la suerte, como la caja de mascota.
 func _spawn_start_lucky_blocks() -> void:
 	if lucky_block_start_chance <= 0.0 or randf() >= lucky_block_start_chance:
 		return
-	_layout.spawn_at(LUCKY_BLOCK_SCENE, _layout.claim_clear_point())
+	_keep_clear(_layout.spawn_at(LUCKY_BLOCK_SCENE, _layout.claim_clear_point()))
+
+
+## Mete `node` (recién puesto) en KEEPOUT_GROUP: el scatter viste la arena
+## después de place() y lee ese grupo para saber dónde no plantar nada.
+func _keep_clear(node: Node) -> void:
+	if node != null:
+		node.add_to_group(KEEPOUT_GROUP)

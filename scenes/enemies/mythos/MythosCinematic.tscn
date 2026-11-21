@@ -1,0 +1,280 @@
+[gd_scene load_steps=20 format=3]
+
+[ext_resource type="Script" path="res://scripts/enemies/mythos/mythos_cinematic.gd" id="1_cinematic"]
+[ext_resource type="AudioStream" path="res://assets/audio/music/infernal_catharsis.mp3" id="11_first"]
+[ext_resource type="Script" path="res://scripts/enemies/mythos/boss_song.gd" id="2_song"]
+[ext_resource type="Script" path="res://scripts/enemies/mythos/mythos_cinematic_camera.gd" id="4_camera"]
+[ext_resource type="Script" path="res://scripts/enemies/mythos/mythos_entrance.gd" id="5_entrance"]
+[ext_resource type="Script" path="res://scripts/enemies/mythos/mythos_fire_ring.gd" id="6_ring"]
+[ext_resource type="Shader" path="res://assets/shaders/fire_wall.gdshader" id="7_wall"]
+[ext_resource type="Script" path="res://scripts/enemies/mythos/mythos_cinematic_overlay.gd" id="8_overlay"]
+[ext_resource type="Script" path="res://scripts/enemies/mythos/mythos_rebirth_act.gd" id="9_rebirth"]
+[ext_resource type="Script" path="res://scripts/enemies/mythos/mythos_rebirth_camera.gd" id="10_rebirth_camera"]
+[ext_resource type="Shader" path="res://assets/shaders/fire_spark.gdshader" id="12_spark"]
+[ext_resource type="AudioStream" path="res://assets/audio/music/roar_of_the_jungle_dragon.mp3" id="3_track"]
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_ring"]
+shader = ExtResource("7_wall")
+
+[sub_resource type="QuadMesh" id="QuadMesh_ring"]
+material = SubResource("ShaderMaterial_ring")
+
+[sub_resource type="MultiMesh" id="MultiMesh_ring"]
+transform_format = 1
+mesh = SubResource("QuadMesh_ring")
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_chunk"]
+shading_mode = 0
+vertex_color_use_as_albedo = true
+vertex_color_is_srgb = true
+
+[sub_resource type="BoxMesh" id="BoxMesh_chunk"]
+material = SubResource("StandardMaterial3D_chunk")
+size = Vector3(0.32, 0.32, 0.32)
+
+[sub_resource type="Curve" id="Curve_shrink"]
+_data = [Vector2(0, 1), 0.0, 0.0, 0, 0, Vector2(1, 0), 0.0, 0.0, 0, 0]
+point_count = 2
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_gather"]
+shader = ExtResource("12_spark")
+shader_parameter/color = Color(1, 0.55, 0.14, 1)
+shader_parameter/ascended_color = Color(0.3, 0.74, 1, 1)
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_shards"]
+shader = ExtResource("12_spark")
+shader_parameter/color = Color(1, 0.8, 0.35, 1)
+shader_parameter/ascended_color = Color(0.6, 0.92, 1, 1)
+shader_parameter/glow = 1.6
+
+[sub_resource type="Gradient" id="Gradient_trail"]
+offsets = PackedFloat32Array(0, 0.35, 1)
+colors = PackedColorArray(1, 0.82, 0.3, 1, 1, 0.4, 0.05, 1, 0.38, 0.05, 0.02, 1)
+
+[node name="MythosCinematic" type="Node3D"]
+process_mode = 1
+script = ExtResource("1_cinematic")
+
+[node name="Camera" type="Camera3D" parent="."]
+far = 900.0
+script = ExtResource("4_camera")
+
+[node name="Entrance" type="Node3D" parent="."]
+script = ExtResource("5_entrance")
+
+[node name="Ring" type="MultiMeshInstance3D" parent="Entrance"]
+visible = false
+cast_shadow = 0
+multimesh = SubResource("MultiMesh_ring")
+script = ExtResource("6_ring")
+
+[node name="CometTrail" type="CPUParticles3D" parent="Entrance"]
+cast_shadow = 0
+emitting = false
+mesh = SubResource("BoxMesh_chunk")
+scale_amount_curve = SubResource("Curve_shrink")
+color_ramp = SubResource("Gradient_trail")
+amount = 700
+lifetime = 1.2
+local_coords = false
+emission_shape = 1
+emission_sphere_radius = 1.5
+direction = Vector3(0, 1, 0)
+spread = 180.0
+gravity = Vector3(0, 1.5, 0)
+initial_velocity_min = 0.5
+initial_velocity_max = 3.0
+scale_amount_min = 0.9
+scale_amount_max = 2.6
+
+[node name="Debris" type="CPUParticles3D" parent="Entrance"]
+cast_shadow = 0
+emitting = false
+mesh = SubResource("BoxMesh_chunk")
+scale_amount_curve = SubResource("Curve_shrink")
+amount = 170
+lifetime = 1.9
+one_shot = true
+explosiveness = 0.96
+local_coords = false
+emission_shape = 1
+emission_sphere_radius = 2.2
+direction = Vector3(0, 1, 0)
+spread = 58.0
+gravity = Vector3(0, -24, 0)
+initial_velocity_min = 12.0
+initial_velocity_max = 34.0
+scale_amount_min = 0.7
+scale_amount_max = 2.4
+color = Color(0.13, 0.07, 0.05, 1)
+
+[node name="Rebirth" type="Node3D" parent="."]
+script = ExtResource("9_rebirth")
+
+[node name="Camera" type="Camera3D" parent="Rebirth"]
+far = 900.0
+script = ExtResource("10_rebirth_camera")
+
+[node name="Gather" type="CPUParticles3D" parent="Rebirth"]
+material_override = SubResource("ShaderMaterial_gather")
+cast_shadow = 0
+emitting = false
+mesh = SubResource("BoxMesh_chunk")
+scale_amount_curve = SubResource("Curve_shrink")
+amount = 260
+lifetime = 1.3
+local_coords = false
+emission_shape = 6
+emission_ring_axis = Vector3(0, 1, 0)
+emission_ring_height = 0.3
+emission_ring_radius = 4.2
+emission_ring_inner_radius = 2.6
+direction = Vector3(0, 1, 0)
+spread = 25.0
+gravity = Vector3(0, 1.2, 0)
+initial_velocity_min = 0.2
+initial_velocity_max = 1.0
+radial_accel_min = -5.0
+radial_accel_max = -3.0
+tangential_accel_min = 2.5
+tangential_accel_max = 4.5
+scale_amount_min = 0.18
+scale_amount_max = 0.5
+
+[node name="Shards" type="CPUParticles3D" parent="Rebirth"]
+material_override = SubResource("ShaderMaterial_shards")
+cast_shadow = 0
+emitting = false
+mesh = SubResource("BoxMesh_chunk")
+scale_amount_curve = SubResource("Curve_shrink")
+amount = 190
+lifetime = 1.7
+one_shot = true
+explosiveness = 0.96
+local_coords = false
+emission_shape = 1
+emission_sphere_radius = 2.5
+direction = Vector3(0, 1, 0)
+spread = 180.0
+gravity = Vector3(0, -9, 0)
+initial_velocity_min = 10.0
+initial_velocity_max = 30.0
+scale_amount_min = 0.5
+scale_amount_max = 1.5
+
+[node name="Music" type="AudioStreamPlayer" parent="."]
+script = ExtResource("2_song")
+song = ExtResource("11_first")
+song_volume_db = 0.0
+
+[node name="MusicReborn" type="AudioStreamPlayer" parent="."]
+script = ExtResource("2_song")
+song = ExtResource("3_track")
+song_volume_db = 0.0
+lead_seconds = 1.94
+
+[node name="Overlay" type="CanvasLayer" parent="."]
+layer = 9
+visible = false
+script = ExtResource("8_overlay")
+
+[node name="Root" type="Control" parent="Overlay"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="BarTop" type="ColorRect" parent="Overlay/Root"]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = -1
+anchor_right = 1.0
+mouse_filter = 2
+color = Color(0, 0, 0, 1)
+
+[node name="BarBottom" type="ColorRect" parent="Overlay/Root"]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = -1
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+color = Color(0, 0, 0, 1)
+
+[node name="Title" type="Label" parent="Overlay/Root"]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = -1
+anchor_top = 0.76
+anchor_right = 1.0
+anchor_bottom = 0.76
+offset_top = -52.0
+offset_bottom = 52.0
+grow_horizontal = 2
+theme_override_colors/font_color = Color(1, 0.84, 0.42, 1)
+theme_override_colors/font_outline_color = Color(0.25, 0.05, 0.02, 1)
+theme_override_constants/outline_size = 12
+theme_override_font_sizes/font_size = 84
+text = "Mythos"
+horizontal_alignment = 1
+vertical_alignment = 1
+uppercase = true
+
+[node name="Subtitle" type="Label" parent="Overlay/Root"]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = -1
+anchor_top = 0.76
+anchor_right = 1.0
+anchor_bottom = 0.76
+offset_top = 54.0
+offset_bottom = 86.0
+grow_horizontal = 2
+theme_override_colors/font_color = Color(0.99, 0.95, 0.87, 1)
+theme_override_colors/font_outline_color = Color(0.082, 0.075, 0.102, 1)
+theme_override_constants/outline_size = 6
+theme_override_font_sizes/font_size = 22
+text = "El fénix de las brasas"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="SkipHint" type="VBoxContainer" parent="Overlay/Root"]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = -1
+anchor_left = 1.0
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -250.0
+offset_top = -62.0
+offset_right = -24.0
+offset_bottom = -12.0
+grow_horizontal = 0
+grow_vertical = 0
+mouse_filter = 2
+alignment = 2
+
+[node name="SkipBar" type="ProgressBar" parent="Overlay/Root/SkipHint"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 6)
+layout_mode = 2
+mouse_filter = 2
+max_value = 1.0
+step = 0.01
+show_percentage = false
+
+[node name="Flash" type="ColorRect" parent="Overlay/Root"]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+color = Color(1, 0.82, 0.5, 0)

@@ -116,6 +116,10 @@ var _xp_multiplier: int = 1
 var _tier_xp_multiplier: float = 1.0
 ## Límite de la arena para los trepadores (del nodo "arena_bounds"; INF = sin límite).
 var _arena_limit: float = INF
+## Los puentes de la arena bajo los que se pasa caminando (del nodo
+## "arena_bounds"), o null si no tiene: quien persigue a alguien parado
+## sobre uno entra por una cabecera en vez de quedarse debajo.
+var _lanes: ReliefLanes = null
 ## Último empuje de separación calculado, reusado en los ticks alternos.
 var _separation_cache: Vector3 = Vector3.ZERO
 ## Altura donde empezó la trepada actual y si hay una en curso; juntas
@@ -145,6 +149,8 @@ func _ready() -> void:
 		var extent: Variant = bounds.get("arena_half_extent")
 		if extent is float or extent is int:
 			_arena_limit = float(extent) - ARENA_CLAMP_MARGIN
+		if bounds.has_method("horde_lanes"):
+			_lanes = bounds.call("horde_lanes") as ReliefLanes
 
 
 ## El bucle más caliente del juego (corre por cada enemigo en cada tick de
@@ -184,6 +190,8 @@ func _physics_process(delta: float) -> void:
 		var distance := to_player.length()
 		if distance > 0.001:
 			seek = to_player / distance
+			if _lanes != null:
+				seek = _lanes.seek(global_position, player.global_position, seek)
 		steer = _movement_intent(seek, distance)
 		_combat_tick(player, distance)
 
@@ -350,6 +358,21 @@ func make_possessed(carrier: Node3D, duration: float) -> void:
 	# fuera de las capas se borraría con el primer golpe.
 	_overlays.set_possessed(LOOK.possessed_color)
 	print("Possessed spawned: %s" % _script_name())
+
+
+## Saca este cuerpo de la partida SIN pagar nada: ni crédito, ni XP, ni
+## botín, ni contador del bestiario; solo queda la caída. Lo usa el jefe de
+## etapa que pelea solo para quemar a la horda que quedó en la arena.
+func vanish() -> void:
+	if _health.is_dead:
+		return
+	_health.is_dead = true
+	# Como en _on_died: un cuerpo congelado tiene que poder correr su caída.
+	process_mode = Node.PROCESS_MODE_INHERIT
+	remove_from_group("enemies")
+	set_physics_process(false)
+	_collision.set_deferred("disabled", true)
+	_death_tween()
 
 
 ## El raider al que sirve este siervo, o null si no está poseído.

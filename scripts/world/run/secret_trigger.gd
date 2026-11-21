@@ -12,10 +12,12 @@ extends Interactable
 @export_group("Secreto")
 ## Escena del minijefe oculto (su raíz debe extender BossBase).
 @export var miniboss_scene: PackedScene
-## Dónde aparece el minijefe respecto del disparador (ejes del mundo, metros); apúntalo a terreno abierto.
+## Dónde aparece el minijefe respecto del disparador (ejes del mundo, metros); se corre al suelo libre más cercano y la y es la altura sobre ese suelo.
 @export var spawn_offset: Vector3 = Vector3(4.0, 0.1, -4.0)
 ## Línea del cartel de aviso (grupo "boss_ui") al despertar.
 @export var awaken_text: String = "Algo oculto se remueve..."
+## Aviso del HUD si se cumple la condición mientras el jefe de etapa pelea solo: el minijefe no sale hasta que esa pelea termine.
+@export var held_text: String = "Lo que duerme aquí no se atreve a salir..."
 @export_group("Frase flotante")
 ## Tamaño de letra de la frase flotante (show_flavor), en píxeles.
 @export var flavor_font_size: int = 48
@@ -60,10 +62,28 @@ func show_flavor(line: String) -> void:
 	tween.chain().tween_callback(label.queue_free)
 
 
+## Dónde aparece `boss`: el punto más cercano a spawn_offset donde se puede
+## poner algo a su relief_margin de todo corte (arena_bounds.nearest_place) y
+## donde su cuerpo cabe apoyado en el suelo real, más spawn_offset.y.
+func miniboss_spawn_point(boss: BossBase) -> Vector3:
+	var at := global_position + spawn_offset
+	var bounds := get_tree().get_first_node_in_group(&"arena_bounds")
+	if bounds != null and bounds.has_method(&"nearest_place"):
+		var spot: Vector2 = bounds.call(&"nearest_place", Vector2(at.x, at.z), boss.relief_margin,
+				func(xz: Vector2) -> bool: return _fits(boss, xz))
+		at = Vector3(spot.x, at.y, spot.y)
+	return _on_ground(Vector2(at.x, at.z))
+
+
 ## Gasta el disparador y saca al minijefe. El guardia sobre `available`
 ## impide que una subclase lo despierte dos veces.
 func _awaken() -> void:
 	if not available:
+		return
+	if EnemySpawner.is_holding(get_tree()):
+		# El jefe de etapa pelea solo: el disparador no se gasta y el
+		# minijefe espera a que esa pelea termine.
+		get_tree().call_group("boss_ui", "announce", held_text)
 		return
 	consume()
 	dim_visuals()
@@ -88,6 +108,39 @@ func _spawn_miniboss() -> void:
 		return
 	spawned_boss = boss
 	scene_root.add_child(boss)
-	boss.global_position = global_position + spawn_offset
+	boss.global_position = miniboss_spawn_point(boss)
 	# Línea de log para las corridas headless.
 	print("Secret miniboss awakened: %s" % boss.boss_title)
+
+
+## `xz` apoyado en el suelo real que tiene debajo, más spawn_offset.y.
+func _on_ground(xz: Vector2) -> Vector3:
+	var at := Vector3(xz.x, 0.0, xz.y)
+	at.y = StageLayout.ground_under(get_tree(), at) + spawn_offset.y
+	return at
+
+
+## True si el cuerpo de `boss` cabe parado en `xz`: sus formas de colisión,
+## apoyadas en el suelo real, no cruzan nada sólido del mundo (una roca, un
+## tronco, un raider) salvo el terreno que tienen bajo los pies.
+func _fits(boss: BossBase, xz: Vector2) -> bool:
+	var feet := _on_ground(xz)
+	var skip: Array[RID] = []
+	var terrain := Terrain.find(get_tree())
+	if terrain != null:
+		skip.append(terrain.get_rid())
+	for body: Node in find_children("*", "CollisionObject3D", true, false):
+		skip.append((body as CollisionObject3D).get_rid())
+	var space := get_world_3d().direct_space_state
+	for node: Node in boss.get_children():
+		var holder := node as CollisionShape3D
+		if holder == null or holder.disabled or holder.shape == null:
+			continue
+		var query := PhysicsShapeQueryParameters3D.new()
+		query.shape = holder.shape
+		query.transform = Transform3D(Basis.IDENTITY, feet + holder.position)
+		query.collision_mask = 1
+		query.exclude = skip
+		if not space.intersect_shape(query, 1).is_empty():
+			return false
+	return true

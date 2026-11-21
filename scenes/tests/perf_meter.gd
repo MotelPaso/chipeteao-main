@@ -43,6 +43,12 @@ func _init(tree: SceneTree) -> void:
 	_tree = tree
 
 
+## El frame en curso lo gastó el propio arnés (un barrido del relieve): la
+## próxima muestra no se registra. Mide la partida, no al medidor.
+func skip_frame() -> void:
+	_last_usec = 0
+
+
 ## Lo llama el _process del arnés, una vez por frame dibujado.
 func tick() -> void:
 	var now := Time.get_ticks_usec()

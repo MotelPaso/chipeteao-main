@@ -16,6 +16,10 @@ signal run_ended(victory: bool)
 ## Solo pruebas; nada del juego lo pone.
 const STAGE_FAST_ENV: String = "BONK_STAGE_FAST"
 const STAGE_FAST_GOAL: float = 60.0
+## Interruptor del harness: BONK_STAGE_GOAL=<segundos> acorta SOLO la mitad
+## de tiempo de la puerta de etapa; la mitad del jefe sigue en pie. Solo
+## pruebas; nada del juego lo pone.
+const STAGE_GOAL_ENV: String = "BONK_STAGE_GOAL"
 
 @export_group("Puerta de etapa")
 ## Segundos que debe durar una ETAPA antes de que su puerta pueda abrirse.
@@ -30,6 +34,8 @@ const STAGE_FAST_GOAL: float = 60.0
 var _run_over: bool = false
 ## True si BONK_STAGE_FAST está puesto (se lee una vez, en _ready).
 var _stage_fast: bool = false
+## Segundos de la mitad de tiempo con BONK_STAGE_GOAL (-1 = sin interruptor).
+var _stage_goal_override: float = -1.0
 
 ## El Health de cada miembro de la party, conectado un frame después de
 ## _ready (el co-op crea los cuerpos extra en RunSystems._ready, que corre
@@ -43,6 +49,10 @@ func _ready() -> void:
 	_stage_fast = OS.get_environment(STAGE_FAST_ENV) == "1"
 	if _stage_fast:
 		print("RunManager: fast stage gate (%.0fs, no boss)" % STAGE_FAST_GOAL)
+	var goal := OS.get_environment(STAGE_GOAL_ENV)
+	if goal.is_valid_float():
+		_stage_goal_override = maxf(goal.to_float(), 0.0)
+		print("RunManager: stage goal override (%.0fs, boss half kept)" % _stage_goal_override)
 	_bind_party.call_deferred()
 
 
@@ -91,7 +101,9 @@ func _physics_process(_delta: float) -> void:
 ## Segundos que debe durar esta etapa. El interruptor del harness lo acorta
 ## para que un soak llegue a un cambio de etapa.
 func _stage_goal() -> float:
-	return STAGE_FAST_GOAL if _stage_fast else stage_goal
+	if _stage_fast:
+		return STAGE_FAST_GOAL
+	return _stage_goal_override if _stage_goal_override >= 0.0 else stage_goal
 
 
 ## La puerta de etapa: el reloj Y el jefe de etapa. El interruptor del

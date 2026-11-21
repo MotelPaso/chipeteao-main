@@ -13,6 +13,8 @@ extends EnemyBase
 @export var boss_title: String = "Jefe"
 ## Distancia en metros que el jefe guarda del muro, para que sus ataques de suelo caigan en el piso.
 @export var arena_clamp_margin: float = 4.0
+## Distancia en metros que el jefe guarda de un corte, una rampa o un puente del relieve por zonas al elegir dónde ponerse (en una arena sin relieve no cuenta).
+@export var relief_margin: float = 5.0
 
 @export_group("Llegada compartida")
 ## Segundos que dura el anillo de destello de la llegada.
@@ -247,7 +249,7 @@ func _clamp_to_arena(point: Vector3) -> Vector3:
 func _safe_arena_point(point: Vector3, tries: int = 6) -> Vector3:
 	var clamped := _clamp_to_arena(point)
 	if _is_walkable(clamped):
-		return clamped
+		return _above_ground(clamped)
 	var to_point := clamped - global_position
 	to_point.y = 0.0
 	var radius := to_point.length()
@@ -262,7 +264,7 @@ func _safe_arena_point(point: Vector3, tries: int = 6) -> Vector3:
 					+ Vector3(cos(angle), 0.0, sin(angle)) * radius)
 			candidate.y = point.y
 			if _is_walkable(candidate):
-				return candidate
+				return _above_ground(candidate)
 	return global_position
 
 
@@ -280,10 +282,28 @@ func _spawn_spike_cluster(center: Vector3, spread_radius: float) -> void:
 	cluster.erupt(center, spread_radius)
 
 
+## True si un cuerpo puede ponerse en `point`: celda abierta de la máscara
+## y, con relieve por zonas, lejos de cortes, rampas y puentes
+## (arena_bounds.can_place).
 func _is_walkable(point: Vector3) -> bool:
-	if _bounds == null or not _bounds.has_method("is_walkable"):
+	if _bounds == null:
+		return true
+	if _bounds.has_method("can_place"):
+		return bool(_bounds.call("can_place", Vector2(point.x, point.z), relief_margin))
+	if not _bounds.has_method("is_walkable"):
 		return true
 	return bool(_bounds.call("is_walkable", Vector2(point.x, point.z)))
+
+
+## `point` subido al suelo si quedó por debajo. Solo con relieve por zonas:
+## el punto conserva la altura de quien lo pidió, y al otro lado de un corte
+## esa altura puede caer bajo una zona elevada, donde no hay suelo que lo
+## sostenga.
+func _above_ground(point: Vector3) -> Vector3:
+	var terrain := Terrain.find(get_tree())
+	if terrain != null and terrain.has_relief():
+		point.y = maxf(point.y, terrain.height_at(point.x, point.z))
+	return point
 
 
 ## Cofres de recompensa del jefe: repartidos en un anillo; cada altar

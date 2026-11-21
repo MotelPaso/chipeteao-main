@@ -1,0 +1,55 @@
+[gd_scene load_steps=8 format=3]
+
+[sub_resource type="Gradient" id="Gradient_puff"]
+offsets = PackedFloat32Array(0, 0.55, 1)
+colors = PackedColorArray(1, 1, 1, 1, 1, 1, 1, 0.45, 1, 1, 1, 0)
+
+[sub_resource type="GradientTexture2D" id="GradientTexture2D_puff"]
+gradient = SubResource("Gradient_puff")
+width = 64
+height = 64
+fill = 1
+fill_from = Vector2(0.5, 0.5)
+fill_to = Vector2(1, 0.5)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_smoke"]
+transparency = 1
+shading_mode = 0
+vertex_color_use_as_albedo = true
+albedo_color = Color(0.16, 0.15, 0.15, 0.5)
+albedo_texture = SubResource("GradientTexture2D_puff")
+billboard_mode = 3
+billboard_keep_scale = true
+
+[sub_resource type="QuadMesh" id="QuadMesh_smoke"]
+material = SubResource("StandardMaterial3D_smoke")
+size = Vector2(4, 4)
+
+[sub_resource type="Gradient" id="Gradient_smoke"]
+offsets = PackedFloat32Array(0, 0.2, 1)
+colors = PackedColorArray(1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 0)
+
+[sub_resource type="GradientTexture1D" id="GradientTexture1D_smoke"]
+gradient = SubResource("Gradient_smoke")
+
+[sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_smoke"]
+emission_shape_offset = Vector3(0, 0.5, 0)
+emission_shape = 3
+emission_box_extents = Vector3(24, 0.5, 24)
+direction = Vector3(0.15, 1, 0)
+spread = 12.0
+initial_velocity_min = 0.7
+initial_velocity_max = 1.6
+gravity = Vector3(0, 0.15, 0)
+scale_min = 0.8
+scale_max = 1.8
+color_ramp = SubResource("GradientTexture1D_smoke")
+
+[node name="HellSmoke" type="GPUParticles3D"]
+cast_shadow = 0
+emitting = false
+amount = 36
+lifetime = 7.0
+visibility_aabb = AABB(-28, -2, -28, 56, 22, 56)
+process_material = SubResource("ParticleProcessMaterial_smoke")
+draw_pass_1 = SubResource("QuadMesh_smoke")

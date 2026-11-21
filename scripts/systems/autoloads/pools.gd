@@ -25,9 +25,24 @@ const TELEGRAPH_DISC_SCENE: PackedScene = preload("res://scenes/fx/TelegraphDisc
 const SLASH_ARC_SCENE: PackedScene = preload("res://scenes/fx/SlashArc.tscn")
 const MUZZLE_FLASH_SCENE: PackedScene = preload("res://scenes/fx/MuzzleFlash.tscn")
 const WHIP_CRACK_SCENE: PackedScene = preload("res://scenes/fx/WhipCrack.tscn")
+const SHOCK_RING_SCENE: PackedScene = preload("res://scenes/fx/ShockRing.tscn")
+const TELEGRAPH_LANE_SCENE: PackedScene = preload("res://scenes/fx/TelegraphLane.tscn")
+const WATER_BURST_SCENE: PackedScene = preload("res://scenes/fx/WaterBurst.tscn")
+const IMPACT_RIPPLE_SCENE: PackedScene = preload("res://scenes/fx/ImpactRipple.tscn")
+const SPLASH_BURST_SCENE: PackedScene = preload("res://scenes/fx/SplashBurst.tscn")
 const EMBER_BURST_SCENE: PackedScene = preload("res://scenes/fx/EmberBurst.tscn")
 const BLOOD_POOL_SCENE: PackedScene = preload("res://scenes/fx/BloodPool.tscn")
 const ACID_POOL_SCENE: PackedScene = preload("res://scenes/fx/AcidPool.tscn")
+const FIRE_ZONE_SCENE: PackedScene = preload("res://scenes/fx/FireZone.tscn")
+const FIRE_FEATHER_SCENE: PackedScene = preload("res://scenes/enemies/FireFeather.tscn")
+const SAFE_CIRCLE_SCENE: PackedScene = preload("res://scenes/fx/SafeCircle.tscn")
+const FIREBALL_SCENE: PackedScene = preload("res://scenes/fx/Fireball.tscn")
+const FIRE_TORNADO_SCENE: PackedScene = preload("res://scenes/fx/FireTornado.tscn")
+const FIRE_WAVE_SCENE: PackedScene = preload("res://scenes/fx/FireWave.tscn")
+const FIRE_BURST_SCENE: PackedScene = preload("res://scenes/fx/FireBurst.tscn")
+const FIRE_BLAST_SCENE: PackedScene = preload("res://scenes/fx/FireBlast.tscn")
+const FIRE_SIGIL_SCENE: PackedScene = preload("res://scenes/fx/FireSigil.tscn")
+const CLAW_SCAR_SCENE: PackedScene = preload("res://scenes/fx/ClawScar.tscn")
 
 ## La lista de pools: name, scene, `warm` (instancias creadas al arrancar
 ## para que los primeros spawns no tironeen) y `cap` (máximo guardado, que
@@ -45,9 +60,24 @@ const POOLS: Array[Dictionary] = [
 	{"name": "slash_arc", "scene": SLASH_ARC_SCENE, "warm": 8, "cap": 32},
 	{"name": "muzzle_flash", "scene": MUZZLE_FLASH_SCENE, "warm": 6, "cap": 24},
 	{"name": "whip_crack", "scene": WHIP_CRACK_SCENE, "warm": 4, "cap": 16},
+	{"name": "shock_ring", "scene": SHOCK_RING_SCENE, "warm": 2, "cap": 6},
+	{"name": "telegraph_lane", "scene": TELEGRAPH_LANE_SCENE, "warm": 1, "cap": 4},
+	{"name": "water_burst", "scene": WATER_BURST_SCENE, "warm": 4, "cap": 24},
+	{"name": "impact_ripple", "scene": IMPACT_RIPPLE_SCENE, "warm": 3, "cap": 12},
+	{"name": "splash_burst", "scene": SPLASH_BURST_SCENE, "warm": 3, "cap": 10},
 	{"name": "ember_burst", "scene": EMBER_BURST_SCENE, "warm": 4, "cap": 16},
 	{"name": "blood_pool", "scene": BLOOD_POOL_SCENE, "warm": 4, "cap": 16},
 	{"name": "acid_pool", "scene": ACID_POOL_SCENE, "warm": 8, "cap": 48},
+	{"name": "fire_zone", "scene": FIRE_ZONE_SCENE, "warm": 8, "cap": 48},
+	{"name": "fire_feather", "scene": FIRE_FEATHER_SCENE, "warm": 16, "cap": 96},
+	{"name": "safe_circle", "scene": SAFE_CIRCLE_SCENE, "warm": 2, "cap": 8},
+	{"name": "fireball", "scene": FIREBALL_SCENE, "warm": 4, "cap": 24},
+	{"name": "fire_tornado", "scene": FIRE_TORNADO_SCENE, "warm": 10, "cap": 30},
+	{"name": "fire_wave", "scene": FIRE_WAVE_SCENE, "warm": 2, "cap": 8},
+	{"name": "fire_burst", "scene": FIRE_BURST_SCENE, "warm": 2, "cap": 8},
+	{"name": "fire_blast", "scene": FIRE_BLAST_SCENE, "warm": 4, "cap": 16},
+	{"name": "fire_sigil", "scene": FIRE_SIGIL_SCENE, "warm": 6, "cap": 32},
+	{"name": "claw_scar", "scene": CLAW_SCAR_SCENE, "warm": 2, "cap": 8},
 ]
 
 var _pools_by_path: Dictionary[String, NodePool] = {}
@@ -64,6 +94,17 @@ func _ready() -> void:
 	for row: Dictionary in POOLS:
 		_register(String(row["name"]), row["scene"] as PackedScene,
 				Vector2i(int(row["warm"]), int(row["cap"])))
+
+
+## Recupera lo que el pool de `packed` tiene en el mundo, y solo ese: por
+## ejemplo los números de daño, que si no quedan colgados en el aire cuando
+## una cinemática congela el mundo.
+func release_live_of(packed: PackedScene) -> void:
+	if packed == null:
+		return
+	var pool: NodePool = _pools_by_path.get(packed.resource_path, null)
+	if pool != null:
+		pool.release_all_live()
 
 
 ## Reemplazo con pool de scene.instantiate() + add_child(): devuelve una
@@ -95,7 +136,11 @@ func acquire_scene(packed: PackedScene) -> Node3D:
 func release(node: Node3D) -> void:
 	if node == null or not is_instance_valid(node):
 		return
-	var pool := node.get_meta(NodePool.META_OWNER, null) as NodePool
+	# has_meta primero: get_meta con valor por defecto null registra un error
+	# cuando el nodo no trae la marca (una instancia que no salió del pool).
+	var pool: NodePool = null
+	if node.has_meta(NodePool.META_OWNER):
+		pool = node.get_meta(NodePool.META_OWNER) as NodePool
 	if pool != null and is_instance_valid(pool):
 		pool.release(node)
 	elif not node.is_queued_for_deletion():
