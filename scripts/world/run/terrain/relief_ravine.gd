@@ -1,12 +1,13 @@
 class_name ReliefRavine
 extends RefCounted
 ## El cañón del relieve: por dónde pasa su eje, en cuántos tramos se parte
-## su fondo, dónde van los collados y dónde los puentes. Lo pide
-## ReliefPlanner una vez que el macizo está puesto.
-##
-## Pasa al pie del macizo por el lado contrario a la montaña, a ravine_gap
-## de su borde donde más se acerca, y lo abraza un poco. Entre dos puentes
-## lleva siempre un collado: sin él, ese tramo de fondo sería un pozo.
+## su fondo, dónde van los collados y dónde los puentes. En la Montaña
+## Escalonada lo pide ReliefPlanner una vez que el macizo está puesto (place):
+## pasa al pie del macizo por el lado contrario a la montaña, a ravine_gap
+## de su borde donde más se acerca, y lo abraza un poco. Las otras recetas
+## trazan su propio eje y lo arman con set_axis, split, add_crossing y
+## add_pier. Entre dos puentes lleva siempre un collado: sin él, ese tramo
+## de fondo sería un pozo.
 
 ## Edita aquí (no hay Inspector); los valores de diseño están en ReliefSettings.
 ##
@@ -46,8 +47,8 @@ static func place(layout: ReliefLayout, rng: RandomNumberGenerator, bearing: flo
 				mid + along * (length * 0.5) - out * bend, length)
 		if not _ravine_fits(layout, points, half_width):
 			continue
-		_set_ravine(layout, points, half_width, depth)
-		_split_ravine(layout, rng, ReliefPlanner.roll_int(rng, s.bridge_count_min, s.bridge_count_max, calm),
+		set_axis(layout, points, half_width, depth)
+		split(layout, rng, ReliefPlanner.roll_int(rng, s.bridge_count_min, s.bridge_count_max, calm),
 				calm)
 		return true
 	return false
@@ -55,7 +56,7 @@ static func place(layout: ReliefLayout, rng: RandomNumberGenerator, bearing: flo
 
 ## Parte el fondo del cañón en `wanted` tramos (menos si no caben), con un
 ## collado entre cada dos y un puente en cada uno.
-static func _split_ravine(layout: ReliefLayout, rng: RandomNumberGenerator, wanted: int,
+static func split(layout: ReliefLayout, rng: RandomNumberGenerator, wanted: int,
 		calm: bool) -> void:
 	var ravine := layout.ravine
 	ravine.saddle_half = SADDLE_HALF
@@ -73,10 +74,24 @@ static func _split_ravine(layout: ReliefLayout, rng: RandomNumberGenerator, want
 		var middle := cursor + deep * 0.5
 		if not calm:
 			middle += deep * rng.randf_range(-CROSSING_JITTER, CROSSING_JITTER)
-		_set_crossing(layout, middle)
+		add_crossing(layout, middle)
 		if index < count - 1:
 			ravine.saddles.append(cursor + deep + ravine.ramp + SADDLE_HALF)
 		cursor += deep + saddle_span
+
+
+## El eje como tramos rectos de unos CENTER_STEP metros sobre una Bézier
+## cúbica de `from` a `to` con dos puntos de control.
+static func bezier3(from: Vector2, first: Vector2, second: Vector2, to: Vector2,
+		length: float) -> PackedVector2Array:
+	var pieces := maxi(ceili(length / ReliefLayout.CENTER_STEP), 4)
+	var points := PackedVector2Array()
+	for index in pieces + 1:
+		var t := float(index) / float(pieces)
+		var u := 1.0 - t
+		points.append(from * (u * u * u) + first * (3.0 * u * u * t) + second * (3.0 * u * t * t)
+				+ to * (t * t * t))
+	return points
 
 
 ## El eje como tramos rectos de unos CENTER_STEP metros sobre una Bézier
@@ -106,7 +121,9 @@ static func _ravine_fits(layout: ReliefLayout, points: PackedVector2Array,
 	return true
 
 
-static func _set_ravine(layout: ReliefLayout, points: PackedVector2Array,
+## Pone en `layout` el cañón de eje `points`, medio ancho `half_width` y
+## hondura `depth`, con una rampa en cada punta.
+static func set_axis(layout: ReliefLayout, points: PackedVector2Array,
 		half_width: float, depth: float) -> void:
 	var ravine := ReliefLayout.Ravine.new()
 	ravine.points = points
@@ -127,9 +144,9 @@ static func _set_ravine(layout: ReliefLayout, points: PackedVector2Array,
 	layout.ravine = ravine
 
 
-## Un cruce (un puente) a `along` metros del inicio del cañón. Sin escena de
-## puente no hay cruces: las paredes siguen de largo.
-static func _set_crossing(layout: ReliefLayout, along: float) -> void:
+## Un cruce (un puente) de pared a pared a `along` metros del inicio del
+## cañón. Sin escena de puente no hay cruces: las paredes siguen de largo.
+static func add_crossing(layout: ReliefLayout, along: float) -> void:
 	if layout.settings.bridge_scene == null:
 		return
 	var ravine := layout.ravine
@@ -138,9 +155,33 @@ static func _set_crossing(layout: ReliefLayout, along: float) -> void:
 	var frame := layout.ravine_frame(crossing.s)
 	crossing.center = frame[0]
 	crossing.axis = Vector2(-frame[1].y, frame[1].x)
-	crossing.span = ravine.half_width * 2.0
+	crossing.span = ravine.half_at(along) * 2.0
 	crossing.width = layout.settings.bridge_width
-	var reach := ravine.half_width + ReliefLayout.HEAD_SETBACK
+	var reach := ravine.half_at(along) + ReliefLayout.HEAD_SETBACK
 	crossing.head_a = crossing.center + crossing.axis * reach
 	crossing.head_b = crossing.center - crossing.axis * reach
 	layout.crossings.append(crossing)
+
+
+## Un muelle: un puente desde la pared `side` del cañón (+1 = la izquierda
+## del eje) en `wall` hasta el borde de la isla `island` en `shore`, a
+## `along` metros del inicio del cañón, con sus escaleras al fondo como todo
+## puente. La cabecera A queda en la orilla y la B en la isla. False si no
+## hay escena de puente.
+static func add_pier(layout: ReliefLayout, along: float, side: int, island: int,
+		wall: Vector2, shore: Vector2) -> bool:
+	if layout.settings.bridge_scene == null:
+		return false
+	var crossing := ReliefLayout.Crossing.new()
+	crossing.s = along
+	crossing.side = side
+	crossing.island = island
+	crossing.center = (wall + shore) * 0.5
+	crossing.axis = (wall - shore).normalized()
+	crossing.span = wall.distance_to(shore)
+	crossing.width = layout.settings.bridge_width
+	var reach := crossing.span * 0.5 + ReliefLayout.HEAD_SETBACK
+	crossing.head_a = crossing.center + crossing.axis * reach
+	crossing.head_b = crossing.center - crossing.axis * reach
+	layout.crossings.append(crossing)
+	return true

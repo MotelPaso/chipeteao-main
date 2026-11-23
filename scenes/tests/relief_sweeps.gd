@@ -326,7 +326,19 @@ func _sweep_reach(who: String, home: int, next: PackedInt32Array) -> PackedByteA
 
 func _cell_text(index: int) -> String:
 	var at := graph.stand(index)
-	return "(%.1f, %.1f, %.1f)" % [at.x, at.y, at.z]
+	return "(%.1f, %.1f, %.1f) on %s" % [at.x, at.y, at.z, _floor_name(at)]
+
+
+## Qué cuerpo hace de piso en `at`: el nombre del primero que toca un rayo
+## que baja desde un poco más arriba. Solo para las líneas de detalle.
+func _floor_name(at: Vector3) -> String:
+	var ray := PhysicsRayQueryParameters3D.create(at + Vector3.UP * 0.6, at + Vector3.DOWN * 0.6,
+			ReliefGraph.WORLD_LAYER, _raiders)
+	var hit := _terrain.get_world_3d().direct_space_state.intersect_ray(ray)
+	if hit.is_empty():
+		return "nothing"
+	var body := hit["collider"] as Node
+	return String(body.name) if body != null else "?"
 
 
 # --- borde, pendiente e infierno ----------------------------------------------------

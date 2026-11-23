@@ -1,9 +1,11 @@
 class_name ReliefWaters
 extends RefCounted
-## El agua del relieve por zonas: el RÍO que llena el fondo del cañón y la
-## CASCADA que lo alimenta. La cascada nace en un manantial sobre el macizo,
-## cae por su acantilado a una poza, cruza el llano como arroyo y vuelve a
-## caer al cañón, lejos del puente para que se vea desde él.
+## El agua del relieve por zonas: el RÍO que llena el fondo del cañón (o el
+## lago, que es un cañón que se ensancha) y la CASCADA que lo alimenta. La
+## cascada nace en un manantial sobre la zona que diga la receta
+## (ReliefLayout.cascade_zone: el macizo en la Montaña Escalonada, la
+## meseta-manantial en el Gran Río), cae por su acantilado a una poza, cruza
+## el llano como arroyo y vuelve a caer al cañón. Sin esa zona no hay cascada.
 ##
 ## Todo es malla sin colisión, hija del scatter (así arde con el bosque en
 ## el infierno de Mythos) y del grupo ReliefStructures.GROUP. El material
@@ -56,21 +58,26 @@ const FLAKES: int = 7
 
 
 ## Levanta el agua de `terrain` como hija de `scatter`. `run_seed` siembra
-## dónde crecen los nenúfares y los juncos.
+## dónde crecen los nenúfares y los juncos. Anota en `pieces` el río
+## ("river") y la cascada ("waterfall") si los puso.
 static func raise(scatter: Node3D, terrain: Terrain, layout: ReliefLayout,
-		run_seed: int) -> void:
+		run_seed: int, pieces: Dictionary = {}) -> void:
 	var material := layout.settings.water_material
 	if material == null or layout.ravine == null:
 		return
 	var level := _place_river(scatter, terrain, layout, material)
 	if level == -INF:
 		return
+	pieces["river"] = 1
 	_place_life(scatter, terrain, layout, level, run_seed)
-	if not layout.settings.cascade:
+	if not layout.settings.cascade or layout.cascade_zone < 0:
 		return
-	var spot := _cascade_spot(layout)
-	if not spot.is_empty():
-		_place_cascade(scatter, terrain, material, spot, level)
+	var spot := cascade_spot(layout)
+	if spot.is_empty():
+		print("Relief waters: no room for the cascade off zone %d" % (layout.cascade_zone + 1))
+		return
+	_place_cascade(scatter, terrain, material, spot, level)
+	pieces["waterfall"] = 1
 
 
 # --- el río ------------------------------------------------------------------------
@@ -81,7 +88,6 @@ static func raise(scatter: Node3D, terrain: Terrain, layout: ReliefLayout,
 static func _place_river(scatter: Node3D, terrain: Terrain, layout: ReliefLayout,
 		material: Material) -> float:
 	var ravine := layout.ravine
-	var half := ravine.half_width + RIVER_MARGIN
 	var runs: Array[Vector2] = []
 	var run_from := -1.0
 	var along := 0.0
@@ -112,7 +118,7 @@ static func _place_river(scatter: Node3D, terrain: Terrain, layout: ReliefLayout
 		s = run.x
 		while s <= run.y + 0.01:
 			var frame := layout.ravine_frame(s)
-			var side := Vector2(-frame[1].y, frame[1].x) * half
+			var side := Vector2(-frame[1].y, frame[1].x) * (ravine.half_at(s) + RIVER_MARGIN)
 			var row := PackedVector3Array([
 				Vector3(frame[0].x + side.x, level, frame[0].y + side.y),
 				Vector3(frame[0].x - side.x, level, frame[0].y - side.y)])
@@ -146,12 +152,15 @@ static func _place_life(scatter: Node3D, terrain: Terrain, layout: ReliefLayout,
 		for crossing: ReliefLayout.Crossing in layout.crossings:
 			if absf(along - crossing.s) < crossing.width * 0.5 + LIFE_FROM_BRIDGE:
 				clear = false
+		var wide := ravine.half_at(along)
 		if clear and rng.randf() < 1.0 / PAD_EVERY:
-			var at := frame[0] + side * rng.randf_range(-1.0, 1.0) * (ravine.half_width - 4.0)
-			_pad(life, rng, Vector3(at.x, level + 0.03, at.y))
+			var at := frame[0] + side * rng.randf_range(-1.0, 1.0) * (wide - 4.0)
+			# Solo sobre el agua: una isla asoma en medio del lago.
+			if terrain.height_at(at.x, at.y) < level:
+				_pad(life, rng, Vector3(at.x, level + 0.03, at.y))
 		if clear and rng.randf() < 2.0 / REEDS_EVERY:
 			var bank := 1.0 if rng.randf() < 0.5 else -1.0
-			var at := frame[0] + side * bank * (ravine.half_width - rng.randf_range(3.6, 5.2))
+			var at := frame[0] + side * bank * (wide - rng.randf_range(3.6, 5.2))
 			# Solo donde el agua tapa el suelo: un junco no crece en seco.
 			if terrain.height_at(at.x, at.y) < level:
 				_reeds(life, rng, Vector3(at.x, level - 0.1, at.y))
@@ -189,38 +198,59 @@ static func _reeds(life: LowPolyMesh, rng: RandomNumberGenerator, center: Vector
 # --- la cascada --------------------------------------------------------------------
 
 ## Dónde cabe la cascada: {rim, dir, strip} con el borde del cañón del lado
-## de la montaña (XZ), la dirección hacia ella y los metros de llano hasta
-## el borde del macizo. Vacío si no cabe en ningún lado.
-static func _cascade_spot(layout: ReliefLayout) -> Dictionary:
+## de la zona que la alimenta (XZ), la dirección hacia ella y los metros de
+## llano hasta su borde. Vacío si no cabe en ningún lado. En la Montaña
+## Escalonada se busca a unas distancias del puente (que se vea desde él);
+## en las otras recetas, frente a la zona que la alimenta. Público para el
+## planificador: una meseta-manantial solo se queda si su cascada cabe.
+static func cascade_spot(layout: ReliefLayout) -> Dictionary:
 	var ravine := layout.ravine
-	var massif := layout.zones[0]
-	var bridge := ravine.length * 0.5
-	if not layout.crossings.is_empty():
-		bridge = layout.crossings[0].s
+	var source := layout.zones[layout.cascade_zone]
 	var low := ravine.ramp + 8.0
 	var high := ravine.length - ravine.ramp - 8.0
-	# Primero hacia el lado del cañón donde queda más tramo.
-	var roomy := 1.0 if ravine.length - bridge > bridge else -1.0
-	for apart: float in CASCADE_APART:
-		for turn: float in [roomy, -roomy]:
-			var s := bridge + turn * apart
-			if s < low or s > high:
-				continue
-			var frame := layout.ravine_frame(s)
-			var normal := Vector2(-frame[1].y, frame[1].x)
-			var dir := normal * signf((massif.center - frame[0]).dot(normal))
-			var rim := frame[0] + dir * ravine.half_width
-			var strip := _strip_to(layout, massif, rim, dir)
-			if strip > 0.0:
-				return {"rim": rim, "dir": dir, "strip": strip}
+	for s: float in _cascade_candidates(layout, source):
+		if s < low or s > high:
+			continue
+		var frame := layout.ravine_frame(s)
+		var normal := Vector2(-frame[1].y, frame[1].x)
+		var dir := normal * signf((source.center - frame[0]).dot(normal))
+		var rim := frame[0] + dir * ravine.half_at(s)
+		var strip := _strip_to(layout, layout.cascade_zone, rim, dir)
+		if strip > 0.0:
+			return {"rim": rim, "dir": dir, "strip": strip}
 	return {}
 
 
-## Metros de llano desde `rim` hacia `dir` hasta el acantilado de `massif`,
-## o -1 si en ese rumbo no hay un acantilado limpio: queda lejos, cae en una
-## rampa o no deja lugar para la poza.
-static func _strip_to(layout: ReliefLayout, massif: ReliefLayout.Zone, rim: Vector2,
+## Los lugares del eje del cañón donde se prueba la cascada, en orden.
+static func _cascade_candidates(layout: ReliefLayout, source: ReliefLayout.Zone) -> PackedFloat32Array:
+	var ravine := layout.ravine
+	var out := PackedFloat32Array()
+	if layout.recipe == &"massif":
+		var bridge := ravine.length * 0.5
+		if not layout.crossings.is_empty():
+			bridge = layout.crossings[0].s
+		# Primero hacia el lado del cañón donde queda más tramo.
+		var roomy := 1.0 if ravine.length - bridge > bridge else -1.0
+		for apart: float in CASCADE_APART:
+			for turn: float in [roomy, -roomy]:
+				out.append(bridge + turn * apart)
+		return out
+	var facing := layout.ravine_coords(source.center).x
+	if facing < 0.0:
+		# La zona queda más allá de una punta: se mira desde la punta más cercana.
+		facing = 0.0 if source.center.distance_to(ravine.points[0]) \
+				< source.center.distance_to(ravine.points[ravine.points.size() - 1]) else ravine.length
+	for apart: float in [0.0, 5.0, -5.0, 10.0, -10.0, 15.0, -15.0, 20.0, -20.0]:
+		out.append(facing + apart)
+	return out
+
+
+## Metros de llano desde `rim` hacia `dir` hasta el acantilado de la zona de
+## índice `zone_index`, o -1 si en ese rumbo no hay un acantilado limpio:
+## queda lejos, cae en una rampa o no deja lugar para la poza.
+static func _strip_to(layout: ReliefLayout, zone_index: int, rim: Vector2,
 		dir: Vector2) -> float:
+	var massif := layout.zones[zone_index]
 	var side := Vector2(-dir.y, dir.x)
 	var reach := 1.0
 	while reach <= STRIP_MAX:
@@ -238,12 +268,12 @@ static func _strip_to(layout: ReliefLayout, massif: ReliefLayout.Zone, rim: Vect
 		if layout.level_at(column + dir * (reach - 2.5)) != 0 \
 				or layout.level_at(column + dir * (reach * 0.5)) != 0:
 			return -1.0
-	if layout.level_at(rim + dir * (reach + SPRING_INSET + SPRING_RADIUS)) != 1:
+	if layout.level_at(rim + dir * (reach + SPRING_INSET + SPRING_RADIUS)) != zone_index + 1:
 		return -1.0
 	return reach
 
 
-## Las piezas de la cascada en `spot` (ver _cascade_spot), con el río a `level`.
+## Las piezas de la cascada en `spot` (ver cascade_spot), con el río a `level`.
 static func _place_cascade(scatter: Node3D, terrain: Terrain, material: Material,
 		spot: Dictionary, level: float) -> void:
 	var rim: Vector2 = spot["rim"]

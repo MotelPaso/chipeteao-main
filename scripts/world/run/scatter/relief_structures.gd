@@ -2,10 +2,14 @@ class_name ReliefStructures
 extends RefCounted
 ## Las estructuras que visten el relieve por zonas de una etapa:
 ##
-##   - el HITO de la cumbre (el Árbol Hueco), al borde lejano de la cumbre;
-##   - un PORTAL de piedra en la boca de cada rampa de los niveles altos;
+##   - el HITO (el Árbol Hueco) en la zona más alta de la receta (`top`): al
+##     borde lejano de la cumbre, o en el medio de la isla del lago;
+##   - un PORTAL de piedra en la boca de cada rampa de los niveles altos y
+##     de la isla;
 ##   - una pareja de MENHIRES al pie de cada rampa que baja al llano;
-##   - un CÍRCULO de piedras en un claro del macizo;
+##   - un CÍRCULO de piedras en un claro al nivel donde aparece el equipo
+##     (en la Montaña Escalonada, el macizo), y en el Paso de los Dos Montes
+##     uno en cada cima y un PORTAL en cada boca del paso, sobre el camino;
 ##   - RUINAS en claros del llano;
 ##   - MONOLITOS sueltos, altos, repartidos por todo el mapa;
 ##   - el CAMINO antiguo, del punto de aparición al puente (ReliefRoad);
@@ -40,10 +44,19 @@ const CIRCLE_RADIUS: float = 7.5
 const CIRCLE_KEEPOUT: float = 11.0
 ## A cuántos metros del punto de aparición se busca el claro del círculo.
 const CIRCLE_DISTANCE: float = 36.0
+## Los portales del paso: a cuántos metros del punto de aparición, sobre el
+## camino, y el ancho entre sus pilares.
+const PASS_GATE_DISTANCE: float = 44.0
+const PASS_GATE_SPAN: float = 9.0
 ## Largo de una ruina, metros libres a su alrededor, y separación mínima
 ## entre dos estructuras de claro.
 const RUIN_SPAN: float = 13.0
 const RUIN_KEEPOUT: float = 9.0
+## Metros que el centro de una ruina guarda con el borde de la arena (el
+## anillo de árboles vive en los últimos 8 m) y que sus piedras guardan con la
+## roca de la máscara: entre el muro roto y una roca no queda un rincón cerrado.
+const RUIN_EDGE_GAP: float = 18.0
+const RUIN_ROCK_GAP: float = 4.5
 const SITE_SPACING: float = 48.0
 ## Metros que un claro guarda con un POI ya puesto o con una meseta.
 const SITE_CLEAR: float = 14.0
@@ -61,8 +74,10 @@ const MONOLITH_TRIES: int = 30
 ## Levanta las estructuras de la etapa como hijas de `scatter`. `taken` son
 ## los puntos (XZ) que ya ocupa otra cosa: POIs y mesetas. Devuelve los
 ## claros que ocuparon, como (x, radio, z), para que nadie ponga nada encima.
+## Anota en `pieces` lo que puso: el hito ("hollow_tree"), el camino
+## ("road"), el río y la cascada (ReliefWaters).
 static func raise(scatter: Node3D, terrain: Terrain, run_seed: int,
-		taken: PackedVector2Array) -> PackedVector3Array:
+		taken: PackedVector2Array, pieces: Dictionary = {}) -> PackedVector3Array:
 	var claimed := PackedVector3Array()
 	if terrain == null or not terrain.has_relief():
 		return claimed
@@ -73,22 +88,27 @@ static func raise(scatter: Node3D, terrain: Terrain, run_seed: int,
 		var zone := layout.zones[index]
 		if zone.top and settings.landmark_scene != null:
 			claimed.append(_place_landmark(scatter, terrain, layout, zone, run_seed + order))
+			pieces["hollow_tree"] = 1
 			order += 1
 		for ramp: ReliefLayout.Ramp in zone.ramps:
 			order += 1
-			if zone.parent >= 0:
+			if zone.parent >= 0 or zone.kind == &"island":
 				_place_gate(scatter, terrain, layout, zone, ramp, run_seed + order * 131)
 			else:
 				_place_menhirs(scatter, terrain, ramp, run_seed + order * 131)
 	# El camino va antes que los claros y los monolitos: lo esquivan.
 	var road := ReliefRoad.raise(scatter, terrain, run_seed)
+	if not road.is_empty():
+		pieces["road"] = 1
 	claimed.append_array(road)
+	if layout.recipe == &"twin":
+		_place_pass(scatter, terrain, layout, run_seed, claimed)
 	var busy := taken.duplicate()
 	for site: Vector3 in road:
 		busy.append(Vector2(site.x, site.z))
 	_place_sites(scatter, terrain, layout, run_seed, busy, claimed)
 	_place_monoliths(scatter, terrain, layout, run_seed, taken, claimed)
-	ReliefWaters.raise(scatter, terrain, layout, run_seed)
+	ReliefWaters.raise(scatter, terrain, layout, run_seed, pieces)
 	return claimed
 
 
@@ -124,9 +144,18 @@ static func _ground(terrain: Terrain, xz: Vector2) -> Vector3:
 
 
 ## El hito: al borde de la cumbre que queda más lejos de su rampa, con el
-## frente hacia el centro. Devuelve su claro.
+## frente hacia el centro; en una isla, en su medio, con el frente hacia el
+## muelle. Devuelve su claro.
 static func _place_landmark(scatter: Node3D, terrain: Terrain, layout: ReliefLayout,
 		zone: ReliefLayout.Zone, seed_value: int) -> Vector3:
+	if zone.kind == &"island":
+		var facing := Vector2.RIGHT
+		for crossing: ReliefLayout.Crossing in layout.crossings:
+			if crossing.island >= 0 and layout.zones[crossing.island] == zone:
+				facing = crossing.head_b - zone.center
+		_spawn(scatter, layout.settings.landmark_scene, _ground(terrain, zone.center),
+				_yaw_to(facing), seed_value)
+		return Vector3(zone.center.x, LANDMARK_KEEPOUT, zone.center.y)
 	var away := Vector2.RIGHT
 	if not zone.ramps.is_empty():
 		away = -zone.ramps[0].dir
@@ -135,6 +164,36 @@ static func _place_landmark(scatter: Node3D, terrain: Terrain, layout: ReliefLay
 	_spawn(scatter, layout.settings.landmark_scene, _ground(terrain, xz),
 			_yaw_to(zone.center - xz), seed_value)
 	return Vector3(xz.x, LANDMARK_KEEPOUT, xz.y)
+
+
+## El Paso de los Dos Montes: un portal de piedra sobre el camino en cada
+## boca del paso y un círculo de piedras en cada cima.
+static func _place_pass(scatter: Node3D, terrain: Terrain, layout: ReliefLayout, run_seed: int,
+		claimed: PackedVector3Array) -> void:
+	var scene := layout.settings.stones_scene
+	if scene == null:
+		return
+	for index in layout.road_legs.size():
+		var points: PackedVector2Array = layout.road_legs[index]["points"]
+		var way := (points[points.size() - 1] - points[0]).normalized()
+		var at := way * PASS_GATE_DISTANCE
+		if layout.level_at(at) != 0:
+			continue
+		var across := Vector2(-way.y, way.x)
+		var node := _spawn(scatter, scene, _ground(terrain, at), atan2(-across.y, across.x),
+				run_seed + 4999 + index * 17, StandingStones.Layout.GATE, PASS_GATE_SPAN)
+		if node != null:
+			node.name = "PassGate"
+		for side: float in [-1.0, 1.0]:
+			var foot := at + across * (PASS_GATE_SPAN * 0.5 * side)
+			claimed.append(Vector3(foot.x, 2.0, foot.y))
+	for index in layout.zones.size():
+		var zone := layout.zones[index]
+		if zone.parent < 0:
+			continue
+		_spawn(scatter, scene, _ground(terrain, zone.center), 0.0, run_seed + 6007 + index * 29,
+				StandingStones.Layout.CIRCLE, CIRCLE_RADIUS)
+		claimed.append(Vector3(zone.center.x, CIRCLE_KEEPOUT, zone.center.y))
 
 
 ## Un portal en la boca de `ramp`: un pilar detrás de cada esquina de la
@@ -186,10 +245,12 @@ static func _place_sites(scatter: Node3D, terrain: Terrain, layout: ReliefLayout
 	var used := PackedVector2Array()
 	var circle := Vector2.INF
 	var best := INF
+	# El círculo, al nivel donde aparece el equipo (el macizo, o el llano).
+	var home := layout.level_at(Vector2.ZERO)
 	for site: Dictionary in sites:
 		var center: Vector3 = site["center"]
 		var xz := Vector2(center.x, center.z)
-		if layout.level_at(xz) != 1 or not _site_free(xz, taken, used):
+		if layout.level_at(xz) != home or not _site_free(xz, taken, used):
 			continue
 		var score := absf(xz.length() - CIRCLE_DISTANCE)
 		if score < best:
@@ -206,7 +267,8 @@ static func _place_sites(scatter: Node3D, terrain: Terrain, layout: ReliefLayout
 			break
 		var center: Vector3 = site["center"]
 		var xz := Vector2(center.x, center.z)
-		if layout.level_at(xz) != 0 or not _site_free(xz, taken, used):
+		if layout.level_at(xz) != 0 or not _site_free(xz, taken, used) \
+				or not _ruin_room(scatter, layout, xz):
 			continue
 		# El giro sale de la posición: la misma semilla, la misma ruina.
 		var yaw := fposmod(xz.x * 0.37 + xz.y * 0.61 + float(run_seed % 97), TAU)
@@ -260,6 +322,15 @@ static func _apart(xz: Vector2, placed: PackedVector2Array, claimed: PackedVecto
 		if Vector2(site.x, site.z).distance_to(xz) < site.y + MONOLITH_KEEPOUT:
 			return false
 	return true
+
+
+## True si una ruina cabe en `xz` lejos del anillo del borde y de la roca
+## (ArenaScatter.can_build mide la roca con el margen que se le pide).
+static func _ruin_room(scatter: Node3D, layout: ReliefLayout, xz: Vector2) -> bool:
+	if layout.half - maxf(absf(xz.x), absf(xz.y)) < RUIN_EDGE_GAP:
+		return false
+	return not scatter.has_method(&"can_build") \
+			or bool(scatter.call(&"can_build", xz, RUIN_SPAN * 0.5 + RUIN_ROCK_GAP))
 
 
 ## True si en `xz` no hay un POI ni una meseta cerca (`taken`) ni otra

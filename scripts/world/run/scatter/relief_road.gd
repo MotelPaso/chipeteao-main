@@ -1,9 +1,13 @@
 class_name ReliefRoad
 extends RefCounted
 ## El CAMINO ANTIGUO del relieve por zonas: losas gastadas que salen del
-## punto de aparición, bajan por la rampa del macizo que queda más cerca
-## del puente, llegan a su cabecera y siguen un trecho por la otra orilla
-## hasta perderse en el bosque. Cada tantos metros lleva un farol de piedra.
+## punto de aparición y llevan a la pieza que importa. En la Montaña
+## Escalonada bajan por la rampa del macizo que queda más cerca del puente,
+## llegan a su cabecera y siguen un trecho por la otra orilla hasta perderse
+## en el bosque; en las otras recetas siguen los tramos que dejó la receta
+## (ReliefLayout.road_legs: al puente, al muelle de la isla, por el paso).
+## Cada tantos metros lleva un farol de piedra. Puede faltar: la receta lo
+## sortea con ReliefSettings.road_chance (la pieza opcional "road").
 ##
 ## Las losas no tienen colisión; cada farol es un poste que se rodea. Todo
 ## cuelga del scatter (arde con el bosque en el infierno de Mythos) y entra
@@ -48,31 +52,21 @@ const LAMP_GLOW := Color(1.0, 0.8, 0.42)
 
 
 ## Tiende el camino de `terrain` como hijo de `scatter` y devuelve los claros
-## que reserva, como (x, radio, z). Sin puente no hay camino.
+## que reserva, como (x, radio, z). Sin tramos (una receta que sorteó no
+## tener camino, o la montaña sin puente) no hay camino.
 static func raise(scatter: Node3D, terrain: Terrain, run_seed: int) -> PackedVector3Array:
 	var claimed := PackedVector3Array()
 	var layout := terrain.relief_layout()
-	if layout.crossings.is_empty() or layout.zones.is_empty():
+	var legs := _legs(layout)
+	if legs.is_empty():
 		return claimed
 	var rng := RandomNumberGenerator.new()
 	rng.seed = run_seed ^ 0x524F4144
-	var crossing := layout.crossings[0]
-	var massif := layout.zones[0]
-	var near := crossing.head_a
-	var far := crossing.head_b
-	if far.distance_to(massif.center) < near.distance_to(massif.center):
-		near = crossing.head_b
-		far = crossing.head_a
 	var slabs := LowPolyMesh.new(run_seed)
 	var lamps: Array[Vector3] = []
-	var onward := (far - near).normalized()
-	var legs: Array[PackedVector2Array] = [
-		_way_down(layout, massif, near),
-		PackedVector2Array([far, far + onward * BEYOND]),
-	]
-	for index in legs.size():
-		_pave(scatter, terrain, layout, rng, slabs, legs[index], index == 1, lamps, claimed,
-				crossing)
+	for leg: Dictionary in legs:
+		_pave(scatter, terrain, layout, rng, slabs, leg["points"], bool(leg["fading"]), lamps,
+				claimed)
 	if slabs.is_empty():
 		return claimed
 	var view := slabs.instance("Road")
@@ -81,6 +75,28 @@ static func raise(scatter: Node3D, terrain: Terrain, run_seed: int) -> PackedVec
 	scatter.add_child(view)
 	_raise_lamps(scatter, lamps, run_seed)
 	return claimed
+
+
+## Los tramos del camino: {points, fading}. Los de la receta, o los de la
+## Montaña Escalonada (del macizo al primer puente y un trecho más allá).
+static func _legs(layout: ReliefLayout) -> Array[Dictionary]:
+	if not layout.road_legs.is_empty():
+		return layout.road_legs
+	var legs: Array[Dictionary] = []
+	if layout.recipe != &"massif" or not bool(layout.options.get("road", true)) \
+			or layout.crossings.is_empty() or layout.zones.is_empty():
+		return legs
+	var crossing := layout.crossings[0]
+	var massif := layout.zones[0]
+	var near := crossing.head_a
+	var far := crossing.head_b
+	if far.distance_to(massif.center) < near.distance_to(massif.center):
+		near = crossing.head_b
+		far = crossing.head_a
+	var onward := (far - near).normalized()
+	legs.append({"points": _way_down(layout, massif, near), "fading": false})
+	legs.append({"points": PackedVector2Array([far, far + onward * BEYOND]), "fading": true})
+	return legs
 
 
 ## El trecho del lado de la montaña: del punto de aparición a la rampa del
@@ -120,8 +136,7 @@ static func _way_down(layout: ReliefLayout, massif: ReliefLayout.Zone,
 ## Con `fading`, el camino se va perdiendo hacia el final.
 static func _pave(scatter: Node3D, terrain: Terrain, layout: ReliefLayout,
 		rng: RandomNumberGenerator, slabs: LowPolyMesh, way: PackedVector2Array, fading: bool,
-		lamps: Array[Vector3], claimed: PackedVector3Array,
-		crossing: ReliefLayout.Crossing) -> void:
+		lamps: Array[Vector3], claimed: PackedVector3Array) -> void:
 	var total := 0.0
 	for index in way.size() - 1:
 		total += way[index].distance_to(way[index + 1])
@@ -153,12 +168,20 @@ static func _pave(scatter: Node3D, terrain: Terrain, layout: ReliefLayout,
 				next_lamp = walked + LAMP_EVERY
 				lamp_side = -lamp_side
 				var post := center + side * (LAMP_ASIDE * lamp_side)
-				var heads := minf(post.distance_to(crossing.head_a),
-						post.distance_to(crossing.head_b))
-				if heads > LAMP_FROM_HEAD and layout.level_at(post) == layout.level_at(center) \
+				if _head_distance(layout, post) > LAMP_FROM_HEAD \
+						and layout.level_at(post) == layout.level_at(center) \
 						and terrain.relief_distance(post, 4.0) >= 4.0:
 					lamps.append(Vector3(post.x, terrain.height_at(post.x, post.y), post.y))
 					claimed.append(Vector3(post.x, LAMP_KEEPOUT, post.y))
+
+
+## Metros de `point` a la cabecera de puente más cercana (INF sin puentes).
+static func _head_distance(layout: ReliefLayout, point: Vector2) -> float:
+	var nearest := INF
+	for crossing: ReliefLayout.Crossing in layout.crossings:
+		nearest = minf(nearest, minf(point.distance_to(crossing.head_a),
+				point.distance_to(crossing.head_b)))
+	return nearest
 
 
 ## Una fila del camino: dos losas con la junta corrida, cada una apoyada en

@@ -32,9 +32,10 @@ const FAR_STEP: float = 5.0
 
 ## Levanta la roca de cada corte y los puentes de `terrain` como hijos de
 ## `scatter`, e imprime `Relief dressing:`. Devuelve los puentes como los ve
-## la horda (ReliefLanes), o null si la arena no tiene ninguno.
+## la horda (ReliefLanes), o null si la arena no tiene ninguno. Anota en
+## `pieces` cuántos puentes levantó ("bridges").
 static func raise(scatter: Node3D, terrain: Terrain, style: RockFormationStyle,
-		run_seed: int) -> ReliefLanes:
+		run_seed: int, pieces: Dictionary = {}) -> ReliefLanes:
 	if terrain == null or not terrain.has_relief():
 		return null
 	var started := Time.get_ticks_msec()
@@ -54,6 +55,11 @@ static func raise(scatter: Node3D, terrain: Terrain, style: RockFormationStyle,
 		shapes += wall.prism_count
 		gaps += wall.gap_faces
 		tallest = maxf(tallest, wall.tallest)
+		if wall.gap_faces > 0:
+			var cut := layout.cuts[index]
+			print("Relief dressing detail: %s zone=%d gap faces=%d from (%.1f, %.1f) to (%.1f, %.1f)" % [
+					wall.name, cut.zone, wall.gap_faces, cut.points[0].x, cut.points[0].y,
+					cut.points[cut.points.size() - 1].x, cut.points[cut.points.size() - 1].y])
 	var bridges := 0
 	var lanes := ReliefLanes.new(scatter.get_tree())
 	for crossing: ReliefLayout.Crossing in layout.crossings:
@@ -61,6 +67,7 @@ static func raise(scatter: Node3D, terrain: Terrain, style: RockFormationStyle,
 		if bridge != null:
 			lanes.add(bridge)
 			bridges += 1
+	pieces["bridges"] = bridges
 	print("Relief dressing: %d cuts, %d faces, %d shapes, tallest=%.1f, %d bridges in %d ms" % [
 			layout.cuts.size(), faces, shapes, tallest, bridges,
 			Time.get_ticks_msec() - started])
@@ -141,11 +148,12 @@ static func _place_bridge(scatter: Node3D, terrain: Terrain,
 	# El fondo del cañón ondula: la obra baja hasta su punto más hondo bajo
 	# el puente y al pie de las escaleras, así ninguna queda colgando.
 	var side := Vector2(-crossing.axis.y, crossing.axis.x)
+	var aside := crossing.width * 0.5 + settings.bridge_stair_reach
 	var floor := INF
 	for across: float in [-1.0, 0.0, 1.0]:
 		for along: float in [-0.25, 0.0, 0.25]:
 			var probe := crossing.center + crossing.axis * (crossing.span * along) \
-					+ side * (across * (crossing.width * 0.5 + settings.bridge_stair_reach))
+					+ side * (across * aside)
 			floor = minf(floor, terrain.height_at(probe.x, probe.y))
 	bridge.drop = crossing.level - DECK_SINK - floor
 	scatter.add_child(bridge)

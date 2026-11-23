@@ -110,7 +110,10 @@ func _plan(slot: int, here: int, there: int, from: Vector3, delta: float) -> Pac
 	var stale := search == null and age >= REPLAN_SECONDS \
 			and (path.is_empty() or old_goal != there)
 	if jumped or lost or stale:
-		search = ReliefSearch.begin(graph, here, there)
+		# Primero a pie: un salto al borde de una cornisa puede no alcanzar
+		# por poco y el bot se queda intentándolo. Si a pie no hay camino,
+		# se busca otra vez con saltos (abajo).
+		search = ReliefSearch.begin(graph, here, there, true)
 		_searches[slot] = search
 		_goals[slot] = there
 		age = 0.0
@@ -120,6 +123,9 @@ func _plan(slot: int, here: int, there: int, from: Vector3, delta: float) -> Pac
 			_paths[slot] = path
 	_ages[slot] = age
 	if search != null and ReliefSearch.advance(graph, search, SEARCH_BUDGET):
+		if search.path.is_empty() and search.walk_only:
+			_searches[slot] = ReliefSearch.begin(graph, here, there)
+			return path
 		path = search.path
 		_paths[slot] = path
 		_searches.erase(slot)

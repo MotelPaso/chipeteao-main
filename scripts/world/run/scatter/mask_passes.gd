@@ -59,8 +59,8 @@ static func fill_slots(blocked: Dictionary[Vector2i, bool], side: int,
 
 ## Una celda PROTEGIDA con roca a los dos lados opuestos no se puede
 ## rellenar (ver fill_slots), así que se abre la roca: las dos celdas que
-## la aprietan pasan a ser suelo. Va al final, después de todo lo que
-## bloquea: abrir una celda nunca aprieta a otra ni deja nada sin alcanzar.
+## la aprietan pasan a ser suelo. Va después de todo lo que bloquea salvo
+## seal_pinched: abrir una celda nunca deja nada sin alcanzar.
 static func free_squeezed(blocked: Dictionary[Vector2i, bool], side: int,
 		protected: Dictionary[Vector2i, bool]) -> void:
 	var opened: Array[Vector2i] = []
@@ -73,6 +73,33 @@ static func free_squeezed(blocked: Dictionary[Vector2i, bool], side: int,
 				opened.append(cell - axis)
 	for cell: Vector2i in opened:
 		blocked.erase(cell)
+
+
+## Dos celdas abiertas vecinas no se cruzan a pie si su borde común tiene
+## roca en las dos puntas: el faldón que cada formación asoma de sus celdas
+## (1-2 m) tapa los 5 m del borde. Pasa en una rendija y en una Z (una celda
+## de roca a cada lado, en diagonal). Este repaso devuelve a suelo toda celda
+## protegida que quedó con roca (ninguna formación se pega a un corte),
+## rellena desde `start` sin cruzar esos bordes ni `barriers`, une cada celda
+## protegida que quedó afuera con un pasillo ancho que no cruza un corte, y
+## sella lo demás que no alcanza. Va al final. Solo con relieve por zonas: en
+## las demás arenas la máscara queda como siempre.
+static func seal_pinched(blocked: Dictionary[Vector2i, bool], side: int, start: Vector2i,
+		protected: Dictionary[Vector2i, bool], barriers: Dictionary[Vector3i, bool]) -> void:
+	for cell: Vector2i in protected:
+		blocked.erase(cell)
+	var reached := _reach_unpinched(blocked, side, start, barriers)
+	# Un pasillo por grupo aislado: tras abrir uno se rellena de nuevo, así
+	# las otras celdas del mismo grupo ya cuentan como alcanzadas.
+	for cell: Vector2i in protected:
+		if _in_grid(cell, side) and not reached.has(cell) \
+				and _carve_wide(blocked, side, cell, reached, barriers):
+			reached = _reach_unpinched(blocked, side, start, barriers)
+	for x in side:
+		for y in side:
+			var cell := Vector2i(x, y)
+			if not blocked.has(cell) and not reached.has(cell) and not protected.has(cell):
+				blocked[cell] = true
 
 
 ## Flood fill desde `start` (la celda del spawn); las celdas abiertas que no
@@ -156,4 +183,68 @@ static func _carve_corridor(blocked: Dictionary[Vector2i, bool], from: Vector2i,
 			cursor.y += signi(delta.y)
 		if blocked.erase(cursor):
 			carved = true
+	return carved
+
+
+## Como reachable_cells, sin cruzar tampoco los bordes apretados (_pinched).
+static func _reach_unpinched(blocked: Dictionary[Vector2i, bool], side: int, start: Vector2i,
+		barriers: Dictionary[Vector3i, bool]) -> Dictionary[Vector2i, bool]:
+	var reached: Dictionary[Vector2i, bool] = {start: true}
+	var frontier: Array[Vector2i] = [start]
+	while not frontier.is_empty():
+		var cell: Vector2i = frontier.pop_back()
+		for step: Vector2i in ArenaMask.STEPS:
+			var next := cell + step
+			if not _in_grid(next, side) or reached.has(next) or blocked.has(next) \
+					or _barred(barriers, cell, next) or _pinched(blocked, cell, step):
+				continue
+			reached[next] = true
+			frontier.append(next)
+	return reached
+
+
+## True si el borde entre `cell` y `cell + step` tiene roca en sus dos puntas:
+## en cada costado del borde, la celda de `cell` o la de su vecina.
+static func _pinched(blocked: Dictionary[Vector2i, bool], cell: Vector2i, step: Vector2i) -> bool:
+	var across := Vector2i(step.y, step.x)
+	var next := cell + step
+	return (blocked.has(cell + across) or blocked.has(next + across)) \
+			and (blocked.has(cell - across) or blocked.has(next - across))
+
+
+## Abre un pasillo de tres celdas de ancho desde `from` hasta la celda
+## alcanzada más cercana por un camino que no cruza `barriers` (busca a lo
+## ancho, por roca o por suelo): con ese ancho ningún borde suyo queda
+## apretado, y no termina del otro lado de un corte. True si abrió algo.
+static func _carve_wide(blocked: Dictionary[Vector2i, bool], side: int, from: Vector2i,
+		reached: Dictionary[Vector2i, bool], barriers: Dictionary[Vector3i, bool]) -> bool:
+	var came: Dictionary[Vector2i, Vector2i] = {from: from}
+	var queue: Array[Vector2i] = [from]
+	var head := 0
+	var target := from
+	while head < queue.size():
+		var cell := queue[head]
+		head += 1
+		if reached.has(cell):
+			target = cell
+			break
+		for step: Vector2i in ArenaMask.STEPS:
+			var next := cell + step
+			if not _in_grid(next, side) or came.has(next) or _barred(barriers, cell, next):
+				continue
+			came[next] = cell
+			queue.append(next)
+	if target == from:
+		return false
+	var carved := false
+	var cursor := target
+	while true:
+		for dx in range(-1, 2):
+			for dy in range(-1, 2):
+				var cell := cursor + Vector2i(dx, dy)
+				if _in_grid(cell, side) and blocked.erase(cell):
+					carved = true
+		if cursor == from:
+			break
+		cursor = came[cursor]
 	return carved

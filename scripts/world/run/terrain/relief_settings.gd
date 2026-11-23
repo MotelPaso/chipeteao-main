@@ -20,6 +20,92 @@ extends Resource
 ##   raider está en -10.
 ## - Las rampas van bajo 30 grados: sobre 45 nadie camina.
 
+@export_group("Recetas")
+## Peso de La Montaña Escalonada (macizo, segundo nivel y cumbre con el Árbol
+## Hueco, y el cañón al pie): cuántas veces sale frente a las otras. 0 = nunca.
+@export_range(0.0, 10.0) var massif_weight: float = 1.0
+## Peso de El Gran Río (un río que cruza el mapa con varios puentes). 0 = nunca.
+@export_range(0.0, 10.0) var river_weight: float = 1.0
+## Peso de El Paso de los Dos Montes (dos montañas enfrentadas, el equipo en
+## el valle entre ellas). 0 = nunca.
+@export_range(0.0, 10.0) var twin_weight: float = 1.0
+## Peso de El Lago de la Isla (un lago hundido con una isla y el Árbol Hueco
+## en ella). 0 = nunca.
+@export_range(0.0, 10.0) var lake_weight: float = 1.0
+## Probabilidad (0-1) de que el camino antiguo aparezca en La Montaña
+## Escalonada, El Gran Río y El Lago de la Isla. El Paso de los Dos Montes lo
+## lleva siempre: el paso es el camino.
+@export_range(0.0, 1.0) var road_chance: float = 0.7
+
+@export_group("Receta: el gran río")
+## Largo mínimo del río (el cañón con agua), en metros.
+@export var river_length_min: float = 236.0
+## Largo máximo del río, en metros.
+@export var river_length_max: float = 290.0
+## Metros del punto de aparición al eje del río, donde más se acerca, como mínimo.
+@export var river_gap_min: float = 46.0
+## Metros del punto de aparición al eje del río, como máximo.
+@export var river_gap_max: float = 64.0
+## Cuánto serpentea el río: metros que sus curvas se apartan de la recta.
+@export var river_meander: float = 26.0
+## Puentes sobre el río, como mínimo (entre dos puentes el río tiene un vado).
+@export var river_bridges_min: int = 2
+## Puentes sobre el río, como máximo.
+@export var river_bridges_max: int = 3
+## Probabilidad (0-1) de que el río nazca en la cascada de una meseta-manantial.
+@export_range(0.0, 1.0) var springhead_chance: float = 0.75
+## Radio medio mínimo de la meseta del manantial, en metros.
+@export var springhead_radius_min: float = 15.0
+## Radio medio máximo de la meseta del manantial, en metros.
+@export var springhead_radius_max: float = 19.0
+
+@export_group("Receta: el paso de los dos montes")
+## Metros del punto de aparición al centro de cada monte, como mínimo.
+@export var twin_distance_min: float = 64.0
+## Metros del punto de aparición al centro de cada monte, como máximo.
+@export var twin_distance_max: float = 80.0
+## Radio medio mínimo de la base de cada monte, en metros.
+@export var twin_radius_min: float = 32.0
+## Radio medio máximo de la base de cada monte, en metros.
+@export var twin_radius_max: float = 40.0
+## Radio medio mínimo del nivel de arriba de cada monte, en metros.
+@export var twin_top_radius_min: float = 14.0
+## Radio medio máximo del nivel de arriba de cada monte, en metros.
+@export var twin_top_radius_max: float = 18.0
+## Metros libres a cada lado del camino que cruza el paso: ahí no cae el pie
+## de ninguna rampa de los montes.
+@export var twin_road_clearance: float = 9.0
+
+@export_group("Receta: el lago de la isla")
+## Metros del punto de aparición a la orilla más cercana del lago, como mínimo.
+@export var lake_shore_min: float = 30.0
+## Metros del punto de aparición a la orilla más cercana del lago, como máximo.
+@export var lake_shore_max: float = 40.0
+## Largo mínimo del lago (sin sus brazos de río), en metros.
+@export var lake_length_min: float = 112.0
+## Largo máximo del lago, en metros.
+@export var lake_length_max: float = 136.0
+## Medio ancho mínimo del lago, en metros.
+@export var lake_half_min: float = 33.0
+## Medio ancho máximo del lago, en metros.
+@export var lake_half_max: float = 39.0
+## Largo mínimo de cada brazo de río que entra y sale del lago, en metros.
+@export var lake_arm_min: float = 34.0
+## Largo máximo de cada brazo de río que entra y sale del lago, en metros.
+@export var lake_arm_max: float = 52.0
+## Radio medio mínimo de la isla, en metros.
+@export var island_radius_min: float = 13.0
+## Radio medio máximo de la isla, en metros.
+@export var island_radius_max: float = 16.0
+## Probabilidad (0-1) de que el lago tenga una cascada: cae desde una
+## meseta-manantial junto al brazo de río de arriba, y el río la lleva al lago.
+@export_range(0.0, 1.0) var lake_falls_chance: float = 0.6
+## Radio medio mínimo de la meseta de la cascada del lago, en metros: más
+## chica que la del río, cabe junto al brazo antes de que el lago se abra.
+@export var lake_spring_radius_min: float = 11.0
+## Radio medio máximo de la meseta de la cascada del lago, en metros.
+@export var lake_spring_radius_max: float = 14.0
+
 @export_group("Macizo")
 ## Radio medio mínimo del macizo (el nivel ancho donde aparece el equipo), en metros.
 @export var massif_radius_min: float = 52.0
