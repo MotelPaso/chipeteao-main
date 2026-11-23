@@ -123,6 +123,29 @@ static func exempt(node: Node) -> void:
 	_apply(node)
 
 
+## Suma `node` a TODOS los congelados en curso: un mundo que entra al árbol con
+## una cinemática ya empezada (la arena de un jefe) queda desactivado igual que
+## el que estaba, y vuelve con el último congelado. Sin ninguno en curso no
+## hace nada: freeze() solo ve los grupos del instante en que corre.
+static func hold_late(node: Node) -> void:
+	_drop_stale()
+	if _active.is_empty() or node == null:
+		return
+	for freeze: WorldFreeze in _active:
+		freeze._held[node.get_instance_id()] = node
+	_apply(node)
+
+
+## Deja a `node` vivo mientras dure ESTE congelado, aunque cuelgue de algo
+## desactivado: el jefe que la cinemática crea a mitad de camino, cuando
+## freeze() ya corrió. Sin congelado en curso no hace nada.
+func keep(node: Node) -> void:
+	if not _frozen or node == null:
+		return
+	_kept[node.get_instance_id()] = node
+	_apply(node)
+
+
 ## Deja a `node` como lo piden los congelados en curso: vivo (PAUSABLE) si
 ## alguno lo mantiene, desactivado si alguno lo congela y, si ya ninguno lo
 ## toca, con el process_mode que tenía antes del primero.

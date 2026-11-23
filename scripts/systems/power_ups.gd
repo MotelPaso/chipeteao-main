@@ -65,6 +65,14 @@ func _ready() -> void:
 		_stage_changed = true)
 
 
+## El mundo bajo el raider cambió sin cambiar de etapa: el equipo fue a la
+## arena de un jefe o volvió de ella (BossArenaHost), y el spawner que
+## congela a los enemigos es otro. Igual que en un cambio de etapa, cada
+## estado se vuelve a publicar en el próximo tick.
+func world_changed() -> void:
+	_stage_changed = true
+
+
 ## El componente PowerUps de un cuerpo, o null.
 static func find_in(body: Node) -> PowerUps:
 	if body == null:

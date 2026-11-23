@@ -1,10 +1,11 @@
 class_name LobsterPurge
 extends Node
 ## El barrido con que la Langosta Azul abre la pelea (nodo Purge de
-## BlueLobster.tscn). La langosta pelea sola
-## (EnemySpawner.mini_boss_fights_alone): en el instante en que termina su
-## entrada se lleva a TODA la horda que quedaba en la arena, de una vez, antes
-## de que ningún enemigo vuelva a moverse: nadie más llega a pegar. Los
+## BlueLobster.tscn). La langosta pelea sola: en el instante en que termina su
+## entrada se lleva a TODA la horda que quedaba, de una vez, antes de que
+## ningún enemigo vuelva a moverse: nadie más llega a pegar. Si pelea en su
+## arena propia (BossArenaHost), esa horda es la que quedó en el mapa de la
+## etapa: cuando el equipo vuelve, ya no está. Los
 ## enemigos normales se van sin pagar nada (EnemyBase.vanish) y caen todos
 ## juntos mientras un anillo se abre desde ella; otro jefe que siguiera vivo
 ## muere con su pago de siempre, salvo el jefe de etapa y un jefe de varias
@@ -54,6 +55,13 @@ func begin(boss: BlueLobster) -> void:
 		var bolt := node as Node3D
 		if bolt != null:
 			Pools.release(bolt)
+	# En su arena propia la horda quedó en el mapa de la etapa, que espera
+	# fuera del árbol: el anfitrión se la lleva de ahí, y los jefes que
+	# murieron cuando el equipo partió cuentan igual.
+	var host := BossArenaHost.find(get_tree())
+	if host != null and host.is_away():
+		swept += host.sweep_stage_horde()
+		bosses += host.rivals_slain()
 	Sfx.play(wave_sfx)
 	if ring_scene != null:
 		ShockRing.spawn(ring_scene, boss.floor_point(origin), 1.0, ring_radius, ring_speed,

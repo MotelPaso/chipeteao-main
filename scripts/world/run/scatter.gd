@@ -244,6 +244,12 @@ func _enter_tree() -> void:
 	# Se publica antes del _ready de cualquier hermano (orden del árbol): el
 	# spawner y el Terrain siempre lo encuentran.
 	add_to_group("arena_bounds")
+	# Una arena entra al árbol más de una vez si el equipo viaja a la arena de
+	# un jefe y vuelve (BossArenaHost la saca y la vuelve a colgar). La
+	# máscara, las mesetas y la semilla se deciden solo la primera: sortearlas
+	# otra vez dejaría la roca que ya se levantó sin su máscara.
+	if _mask != null:
+		return
 	if GameConfig.daily_mode and GameConfig.daily_seed != 0:
 		# Cacería diaria: todos juegan el mismo campo ese día.
 		_rng.seed = GameConfig.daily_seed

@@ -297,6 +297,8 @@ var _boss_probe: StageBossProbe = null
 var _relief: ReliefProbe = null
 ## Lo que se observa del minijefe de la arena: ver mini_boss_probe.gd.
 var _mini_probe: MiniBossProbe = null
+## Lo que se observa de un viaje a la arena de un jefe (boss_arena_probe.gd).
+var _trip: BossArenaProbe = null
 ## Medidor del costo por frame: una línea `Perf` cada 10 s de juego y un
 ## `Perf summary` al salir. Siempre activo: solo lee el reloj.
 var _perf: PerfMeter = null
@@ -559,6 +561,7 @@ func _ready() -> void:
 	_boss_probe = StageBossProbe.new(self, _camera)
 	_relief = ReliefProbe.new(get_tree())
 	_mini_probe = MiniBossProbe.new(self, _camera)
+	_trip = BossArenaProbe.new(self)
 	_perf = PerfMeter.new(get_tree())
 	# Nunca mezclar un soak con el guardado real: SaveData apunta a un archivo
 	# temporal (valores por defecto) antes de arrancar la arena. BONK_SAVE_PATH
@@ -889,6 +892,7 @@ func _exit_tree() -> void:
 	_boss_probe.summary()
 	_relief.report()
 	_mini_probe.summary()
+	_trip.summary()
 	if _saiyan_watch:
 		# Un aura son SAIYAN_BOONS_PER_AURA bonos. Más a la vez significa que un
 		# re-disparo se apiló con el aura que debía reemplazar, y la primera
@@ -1084,7 +1088,9 @@ func _physics_process(delta: float) -> void:
 	if not _swept and _frames >= _sweep_at_frame:
 		_swept = true
 		_run_mask_sweep()
-	if _relief.tick(delta, _frames, _lead_raider(), _raider_rids()):
+	# Con el equipo en la arena de un jefe, el relieve del mapa no es el mundo
+	# que hay en el árbol: sus barridos esperan a la vuelta.
+	if not _trip.away() and _relief.tick(delta, _frames, _lead_raider(), _raider_rids()):
 		_perf.skip_frame()
 	_tick_stage_flow(delta)
 	_tick_map_overlay(delta)
@@ -1101,6 +1107,7 @@ func _physics_process(delta: float) -> void:
 	_watch_blocked_cell(delta)
 	_boss_probe.tick(delta, _frames)
 	_mini_probe.tick(delta, _frames)
+	_trip.tick(_frames)
 	if _frames % 120 == 0:
 		# Solo se le AGREGAN campos al final, nunca se reordena: verificar.sh lee
 		# level= de la última de estas líneas.
@@ -1641,7 +1648,9 @@ func _leave_blocked_cell() -> void:
 ## El nodo de límites de la arena (scatter.gd), por el grupo como toda
 ## búsqueda entre escenas aquí. En caché: ambos guardias preguntan cada frame.
 func _arena_bounds() -> Node3D:
-	if is_instance_valid(_bounds):
+	# Dentro del árbol: en un viaje a la arena de un jefe los límites del mapa
+	# siguen existiendo, pero el mundo vivo es otro.
+	if is_instance_valid(_bounds) and _bounds.is_inside_tree():
 		return _bounds
 	for node: Node in get_tree().get_nodes_in_group("arena_bounds"):
 		var bounds := node as Node3D
@@ -1730,15 +1739,15 @@ func _drive_walk(delta: float) -> void:
 	if _drive_rescue(lead, delta):
 		return
 	# BONK_HOLD_AT: el líder se queda en su punto, sin recorrido ni interacciones.
-	if _relief.hold_active():
+	if _relief.hold_active() and not _trip.away():
 		if _relief.hold_drifted(lead):
 			_walk_toward(lead, _relief.hold_point(), delta)
 		else:
 			_release_move()
 		return
 	# El paseo por el relieve va antes que el recorrido, salvo en la carrera
-	# a la salida.
-	var forced := _relief.forced_goal()
+	# a la salida (y en la arena de un jefe, que no es el mapa del paseo).
+	var forced := _relief.forced_goal() if not _trip.away() else Vector3.INF
 	if forced != Vector3.INF and not _exit_rush:
 		_walk_toward(lead, forced, delta)
 		_unstick(lead, delta)
@@ -1782,6 +1791,10 @@ func _drive_walk(delta: float) -> void:
 ## arena con relieve por zonas, por el camino que dice ReliefProbe (rampas y
 ## puentes), saltando donde el camino sube un escalón.
 func _walk_toward(body: CharacterBody3D, goal: Vector3, delta: float, slot: int = 0) -> void:
+	if _trip.away():
+		# La arena de un jefe es un claro: en línea recta.
+		_hold_move_toward(body, goal, slot)
+		return
 	_hold_move_toward(body, _relief.route(slot, body.global_position, goal, delta), slot)
 	if _relief.wants_jump(slot) and body.is_on_floor():
 		var jump := Coop.action(slot, &"jump")

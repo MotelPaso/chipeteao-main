@@ -71,6 +71,21 @@ func current_arena() -> Node3D:
 	return arena_root()
 
 
+## El nodo bajo el que cuelga la arena viva. Lo usa BossArenaHost, que saca
+## de ahí la arena de la etapa mientras el equipo pelea en la arena de un
+## jefe y la vuelve a colgar después.
+func arena_host() -> Node3D:
+	return _arena_host
+
+
+## Cambia cuál es la arena viva SIN cambiar de etapa (BossArenaHost: la arena
+## de un jefe, o la de la etapa cuando el equipo vuelve). Como en
+## _load_stage, se llama ANTES de colgar la arena: lo que entra al árbol ya
+## pregunta por arena_root(). null = ninguna, un instante entre dos mundos.
+func set_live_arena(arena: Node3D) -> void:
+	_arena = arena
+
+
 ## EL padre de todo lo que se genera EN EL MUNDO desde cualquier parte del
 ## código (FX de pool, cofres soltados, púas del jefe, proyectiles, la UI
 ## bloqueante de la ruleta). Estático y recibe el árbol para que scripts sin
@@ -95,6 +110,12 @@ static func stage_parent(tree: SceneTree) -> Node:
 ## portal ya se liberó con su arena.
 func can_advance_stage() -> bool:
 	return not _swapping and RunState.run_active and not ScreenFade.is_busy()
+
+
+## True desde que empieza un cambio de etapa hasta que la nueva está viva
+## (BossArenaHost no empieza un viaje en medio).
+func is_swapping() -> bool:
+	return _swapping
 
 
 ## Público (portal de salida, por el grupo "run_root"): desarma la etapa
@@ -159,6 +180,10 @@ func _swap_stage() -> void:
 	var from_index := RunState.stage_index
 	var from_id := String(MapCatalog.MAP_LIBRARY[from_index % MapCatalog.MAP_LIBRARY.size()].id)
 	var was_paused := _freeze_world()
+	# Si el equipo está en la arena de un jefe (o en camino), el viaje termina
+	# aquí: su arena se libera y la de la etapa vuelve a ser la viva, así el
+	# desmontaje y el barrido de abajo la recorren como en cualquier cambio.
+	get_tree().call_group(BossArenaHost.GROUP, "abandon_trip", BossArenaHost.ABANDON_ADVANCE)
 	# Lo que lleva el equipo, leído de los nodos vivos (la otra mitad del par
 	# se imprime al final).
 	_print_carry()
