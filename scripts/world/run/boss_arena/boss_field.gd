@@ -39,6 +39,8 @@ const RANDOM_TRIES: int = 64
 @export_group("Colocación")
 ## Metros que guarda con el borde del claro y con cada cobertura lo que se COLOCA (el jefe, un cofre, el portal): así nada queda pegado a una pared.
 @export var place_margin: float = 1.5
+## Tope, en metros, del margen propio de quien pregunta dónde colocar algo. Un jefe pide el suyo pensando en los cortes de un mapa (la langosta, 5 m); aquí el borde y las coberturas son sólidos y bajos, y con un margen así pegarse a ellos dejaría al raider fuera del alcance de sus saltos y sus salidas de túnel. Más alto = el jefe cae más lejos de las coberturas y del borde.
+@export var asked_margin_cap: float = 2.0
 
 @export_group("Borde")
 ## Altura de la pared sin dibujo del borde, en metros (más que el techo del Vuelo).
@@ -76,9 +78,9 @@ func is_walkable(xz: Vector2) -> bool:
 
 
 ## True si en `xz` se puede COLOCAR algo: dentro del claro y a place_margin
-## más `margin` metros de su borde y de cada cobertura.
+## más `margin` metros (hasta asked_margin_cap) de su borde y de cada cobertura.
 func can_place(xz: Vector2, margin: float = 0.0) -> bool:
-	var gap := place_margin + maxf(margin, 0.0)
+	var gap := place_margin + clampf(margin, 0.0, asked_margin_cap)
 	return _in_clearing(xz, gap) and not _in_cover(xz, gap)
 
 
@@ -202,6 +204,32 @@ func cover_distance(xz: Vector2) -> float:
 	return nearest
 
 
+## True si llevar un cuerpo por tierra, en línea recta, de `from` a `to` lo
+## mete en una cobertura o lo saca del claro: el tramo cruza una huella, o
+## termina a menos de `clearance` metros de una (o del borde) acercándose.
+## Alejarse nunca se bloquea: quien ya está pegado puede salir. Lo pregunta
+## un jefe cuando un ataque lo desliza sin chocar con nada (una embestida).
+func blocks_path(from: Vector2, to: Vector2, clearance: float = 0.0) -> bool:
+	var centre := _center()
+	var out := to.distance_to(centre)
+	if out > clearing_radius - clearance and out > from.distance_to(centre):
+		return true
+	_build_footprints()
+	for footprint: Dictionary in _footprints:
+		var middle := footprint["center"] as Vector2
+		var reach := float(footprint["radius"]) + clearance
+		if Geometry2D.get_closest_point_to_segment(middle, from, to).distance_to(middle) > reach:
+			continue
+		var polygon := footprint["polygon"] as PackedVector2Array
+		var starts := _polygon_distance(from, polygon)
+		var ends := _polygon_distance(to, polygon)
+		if ends <= clearance and ends < starts:
+			return true
+		if starts > 0.0 and ends > 0.0 and _crosses(from, to, polygon):
+			return true
+	return false
+
+
 # --- privados -------------------------------------------------------------------
 
 func _center() -> Vector2:
@@ -243,6 +271,15 @@ func _polygon_distance(point: Vector2, polygon: PackedVector2Array) -> float:
 		nearest = minf(nearest,
 				point.distance_to(Geometry2D.get_closest_point_to_segment(point, from, to)))
 	return nearest
+
+
+## True si el tramo de `from` a `to` corta algún lado del contorno `polygon`.
+func _crosses(from: Vector2, to: Vector2, polygon: PackedVector2Array) -> bool:
+	for index: int in polygon.size():
+		if Geometry2D.segment_intersects_segment(from, to, polygon[index],
+				polygon[(index + 1) % polygon.size()]) != null:
+			return true
+	return false
 
 
 ## Arma la huella de cada cobertura con sus formas de colisión. Se guarda una

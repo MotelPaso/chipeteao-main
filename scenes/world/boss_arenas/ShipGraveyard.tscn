@@ -4,12 +4,31 @@
 [ext_resource type="Script" path="res://scripts/world/run/boss_arena/boss_field.gd" id="2_field"]
 [ext_resource type="Script" path="res://scripts/world/run/terrain.gd" id="3_terrain"]
 [ext_resource type="Script" path="res://scripts/systems/enemy_spawner.gd" id="4_spawner"]
+[ext_resource type="Script" path="res://scripts/world/run/backdrop.gd" id="5_backdrop"]
+[ext_resource type="Shader" path="res://assets/shaders/seabed_sand.gdshader" id="6_sand"]
+[ext_resource type="Script" path="res://scripts/world/boss_arenas/ship_graveyard/coral_reef.gd" id="7_reef"]
+[ext_resource type="Script" path="res://scripts/world/boss_arenas/ship_graveyard/seabed_scatter.gd" id="8_scatter"]
+[ext_resource type="PackedScene" path="res://scenes/enemies/blue_lobster/LobsterTide.tscn" id="9_tide"]
+[ext_resource type="Script" path="res://scripts/world/run/boss_arena/grounded_props.gd" id="10_grounded"]
+[ext_resource type="Script" path="res://scripts/world/boss_arenas/ship_graveyard/galleon_wreck.gd" id="11_galleon"]
+[ext_resource type="Script" path="res://scripts/world/boss_arenas/ship_graveyard/whale_bones.gd" id="12_whale"]
+[ext_resource type="Script" path="res://scripts/world/boss_arenas/ship_graveyard/sunken_boat.gd" id="13_boat"]
+[ext_resource type="Script" path="res://scripts/world/boss_arenas/ship_graveyard/giant_anchor.gd" id="14_anchor"]
+[ext_resource type="Script" path="res://scripts/world/boss_arenas/ship_graveyard/hull_fragment.gd" id="15_hull"]
+[ext_resource type="Script" path="res://scripts/world/boss_arenas/ship_graveyard/coral_head.gd" id="16_coral"]
+[ext_resource type="Script" path="res://scripts/world/boss_arenas/ship_graveyard/kelp_forest.gd" id="17_kelp"]
+[ext_resource type="Script" path="res://scripts/world/boss_arenas/ship_graveyard/fish_school.gd" id="18_fish"]
+[ext_resource type="Script" path="res://scripts/world/boss_arenas/ship_graveyard/jellyfish_bloom.gd" id="19_jelly"]
+[ext_resource type="Script" path="res://scripts/world/boss_arenas/ship_graveyard/light_shafts.gd" id="20_shafts"]
 
 [sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_sea"]
-sky_top_color = Color(0.02, 0.1, 0.3, 1)
-sky_horizon_color = Color(0.1, 0.38, 0.66, 1)
+sky_top_color = Color(0.2, 0.62, 0.86, 1)
+sky_horizon_color = Color(0.07, 0.3, 0.56, 1)
+sky_curve = 0.3
 ground_bottom_color = Color(0.01, 0.05, 0.15, 1)
 ground_horizon_color = Color(0.06, 0.26, 0.48, 1)
+sun_angle_max = 50.0
+sun_curve = 0.2
 
 [sub_resource type="Sky" id="Sky_sea"]
 sky_material = SubResource("ProceduralSkyMaterial_sea")
@@ -23,41 +42,196 @@ ambient_light_energy = 1.15
 tonemap_mode = 2
 fog_enabled = true
 fog_light_color = Color(0.08, 0.32, 0.62, 1)
-fog_density = 0.016
-fog_sky_affect = 0.2
+fog_density = 0.009
+fog_sky_affect = 0.35
 
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_sand"]
-albedo_color = Color(0.78, 0.74, 0.6, 1)
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_sand"]
+render_priority = 0
+shader = ExtResource("6_sand")
+shader_parameter/sand_light = null
+shader_parameter/sand_dark = null
+shader_parameter/patch_scale = null
+shader_parameter/ripple_shade = null
+shader_parameter/ripple_scale = null
+shader_parameter/ripple_strength = null
+shader_parameter/ripple_warp = null
+shader_parameter/current_degrees = null
 
-[node name="ShipGraveyard" type="Node3D" unique_id=1645178495]
+[node name="ShipGraveyard" type="Node3D" unique_id=1197221764]
 script = ExtResource("1_arena")
 map_id = "ship_graveyard"
 
-[node name="WorldEnvironment" type="WorldEnvironment" parent="." unique_id=1784101332]
+[node name="WorldEnvironment" type="WorldEnvironment" parent="." unique_id=1321878968]
 environment = SubResource("Environment_sea")
 
-[node name="Sun" type="DirectionalLight3D" parent="." unique_id=187977191]
-transform = Transform3D(0.866025, 0.383022, -0.321394, 0, 0.642788, 0.766044, 0.5, -0.663414, 0.55667, 0, 12, 0)
+[node name="Backdrop" type="Node3D" parent="." unique_id=1718325015]
+script = ExtResource("5_backdrop")
+ground_color = Color(0.42, 0.5, 0.52, 1)
+hill_color = Color(0.1, 0.2, 0.34, 1)
+far_hill_color = Color(0.06, 0.14, 0.28, 1)
+hill_height_max = 30.0
+
+[node name="Sun" type="DirectionalLight3D" parent="." unique_id=880123525]
+transform = Transform3D(0.819152, -0.515529, 0.25144, 0, 0.438371, 0.898794, -0.573576, -0.736249, 0.359092, 0, 12, 0)
 light_color = Color(0.62, 0.82, 1, 1)
 shadow_enabled = true
 
-[node name="Field" type="Node3D" parent="." unique_id=1698274585]
+[node name="Field" type="Node3D" parent="." unique_id=97994504]
 script = ExtResource("2_field")
 
-[node name="Terrain" type="StaticBody3D" parent="." unique_id=1371873795]
+[node name="Terrain" type="StaticBody3D" parent="." unique_id=703201038]
 script = ExtResource("3_terrain")
 amplitude = 0.6
 feature_size = 60.0
-surface_material = SubResource("StandardMaterial3D_sand")
+surface_material = SubResource("ShaderMaterial_sand")
 
-[node name="EnemySpawner" type="Node3D" parent="." unique_id=1921291235]
+[node name="Reef" type="Node3D" parent="." unique_id=352334055]
+script = ExtResource("7_reef")
+
+[node name="Scatter" type="Node3D" parent="." unique_id=958735680]
+script = ExtResource("8_scatter")
+
+[node name="Landmarks" type="Node3D" parent="." unique_id=490269370]
+script = ExtResource("10_grounded")
+
+[node name="GalleonStern" type="Node3D" parent="Landmarks" unique_id=153471769]
+transform = Transform3D(-1.6944922, 0.09416364, -0.5998575, -0.045910865, 1.753265, 0.40491188, 0.6054652, 0.3964778, -1.648095, -9, -0.8, -70)
+script = ExtResource("11_galleon")
+shape_seed = 3
+
+[node name="GalleonBow" type="Node3D" parent="Landmarks" unique_id=197142671]
+transform = Transform3D(1.6959771, -0.100210674, -0.5946589, -0.06067858, 1.7376072, -0.46587425, 0.5999829, 0.45899734, 1.633812, 9, -0.8, -70)
+script = ExtResource("11_galleon")
+half = 0
+shape_seed = 27
+mast_count = 1
+
+[node name="WhaleBones" type="Node3D" parent="Landmarks" unique_id=186870940]
+transform = Transform3D(-0.70000005, 0, 1.2124355, 0, 1.4, 0, -1.2124355, 0, -0.70000005, -52.4, 0, 53.3)
+script = ExtResource("12_whale")
+
+[node name="SloopBow" type="Node3D" parent="Landmarks" unique_id=243053052]
+transform = Transform3D(0.25881907, 0, 0.9659258, 0, 1, 0, -0.9659258, 0, 0.25881907, -2.2, 0, 64)
+script = ExtResource("13_boat")
+shape_seed = 3
+
+[node name="CapsizedWest" type="Node3D" parent="Landmarks" unique_id=1022891090]
+transform = Transform3D(0.34202015, 0, 0.9396926, 0, 1, 0, -0.9396926, 0, 0.34202015, -66, 0, -22)
+script = ExtResource("13_boat")
+kind = 1
+
+[node name="CapsizedSouth" type="Node3D" parent="Landmarks" unique_id=1920612272]
+transform = Transform3D(-0.76604444, 0, -0.64278764, 0, 1, 0, 0.64278764, 0, -0.76604444, 29.4, 0, 60.2)
+script = ExtResource("13_boat")
+kind = 1
+shape_seed = 77
+
+[node name="LongboatGap" type="Node3D" parent="Landmarks" unique_id=1765141827]
+transform = Transform3D(0.8660254, 0, 0.5, 0, 1, 0, -0.5, 0, 0.8660254, 1.5, 0, -64)
+script = ExtResource("13_boat")
+kind = 2
+
+[node name="LongboatSkull" type="Node3D" parent="Landmarks" unique_id=1730703794]
+transform = Transform3D(-0.9396926, 0, -0.34202015, 0, 1, 0, 0.34202015, 0, -0.9396926, -24.5, 0, 57.5)
+script = ExtResource("13_boat")
+kind = 2
+shape_seed = 3
+
+[node name="LongboatEast" type="Node3D" parent="Landmarks" unique_id=1961839876]
+transform = Transform3D(0.34202015, 0, -0.9396926, 0, 1, 0, 0.9396926, 0, 0.34202015, 55.7, 0, -24.8)
+script = ExtResource("13_boat")
+kind = 2
+shape_seed = 77
+
+[node name="Covers" type="Node3D" parent="." unique_id=1706541746]
+script = ExtResource("10_grounded")
+
+[node name="AnchorEast" type="StaticBody3D" parent="Covers" unique_id=1772269906]
+transform = Transform3D(0.25881907, 0, 0.9659258, 0, 1, 0, -0.9659258, 0, 0.25881907, 25.98, 0, 15)
+script = ExtResource("14_anchor")
+
+[node name="CoralHeadSouth" type="StaticBody3D" parent="Covers" unique_id=1288703553]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -6.24, 0, 29.34)
+script = ExtResource("16_coral")
+
+[node name="HullWest" type="StaticBody3D" parent="Covers" unique_id=1022466422]
+transform = Transform3D(-0.40673658, 0, 0.9135455, 0, 1, 0, -0.9135455, 0, -0.40673658, -29.84, 0, 3.14)
+script = ExtResource("15_hull")
+
+[node name="AnchorNorth" type="StaticBody3D" parent="Covers" unique_id=252578133]
+transform = Transform3D(0.98768836, 0, 0.15643448, 0, 1, 0, -0.15643448, 0, 0.98768836, -12.2, 0, -27.4)
+script = ExtResource("14_anchor")
+shape_seed = 3
+
+[node name="HullNorthEast" type="StaticBody3D" parent="Covers" unique_id=141094012]
+transform = Transform3D(-0.46947157, 0, 0.88294756, 0, 1, 0, -0.88294756, 0, -0.46947157, 22.3, 0, -20.07)
+script = ExtResource("15_hull")
+shape_seed = 3
+
+[node name="Kelp" type="Node3D" parent="." unique_id=1936942546]
+script = ExtResource("17_kelp")
+
+[node name="FishGalleon" type="Node3D" parent="." unique_id=1791363607]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 22, -60)
+script = ExtResource("18_fish")
+count = 80
+loop_radius = Vector2(24, 9)
+
+[node name="FishWhale" type="Node3D" parent="." unique_id=1080756968]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -52, 11, 36)
+script = ExtResource("18_fish")
+count = 60
+shape_seed = 5
+loop_radius = Vector2(15, 10)
+
+[node name="FishHigh" type="Node3D" parent="." unique_id=467709843]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6, 24, 4)
+script = ExtResource("18_fish")
+count = 110
+shape_seed = 9
+loop_radius = Vector2(34, 26)
+loop_speed = 0.028
+
+[node name="FishReef" type="Node3D" parent="." unique_id=1821555455]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 44, 6, 38)
+script = ExtResource("18_fish")
+count = 50
+shape_seed = 13
+loop_radius = Vector2(11, 7)
+
+[node name="JellyfishNorth" type="Node3D" parent="." unique_id=2064578572]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -30, 27, -84)
+script = ExtResource("19_jelly")
+shape_seed = 1
+
+[node name="JellyfishEast" type="Node3D" parent="." unique_id=490690601]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 72, 18, 30)
+script = ExtResource("19_jelly")
+shape_seed = 2
+
+[node name="JellyfishWest" type="Node3D" parent="." unique_id=2133918465]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -76, 17, -22)
+script = ExtResource("19_jelly")
+shape_seed = 3
+
+[node name="JellyfishSouth" type="Node3D" parent="." unique_id=391934812]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 10, 20, 74)
+script = ExtResource("19_jelly")
+shape_seed = 4
+
+[node name="LightShafts" type="Node3D" parent="." unique_id=1764116567]
+script = ExtResource("20_shafts")
+
+[node name="Tide" parent="." unique_id=793199004 instance=ExtResource("9_tide")]
+
+[node name="EnemySpawner" type="Node3D" parent="." unique_id=454712183]
 script = ExtResource("4_spawner")
 dormant = true
 
-[node name="SpawnPoint" type="Marker3D" parent="." unique_id=1976533197]
+[node name="SpawnPoint" type="Marker3D" parent="." unique_id=199083623]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 11)
 
-[node name="BossPoint" type="Marker3D" parent="." unique_id=710077221]
+[node name="BossPoint" type="Marker3D" parent="." unique_id=2026404137]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -11)
 
-[node name="PortalPoint" type="Marker3D" parent="." unique_id=1552964868]
+[node name="PortalPoint" type="Marker3D" parent="." unique_id=1366208194]

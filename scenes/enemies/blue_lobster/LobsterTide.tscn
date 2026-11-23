@@ -12,7 +12,7 @@ shader = ExtResource("2_coral")
 top_radius = 0.28
 height = 1.0
 radial_segments = 6
-rings = 2
+rings = 1
 
 [sub_resource type="MultiMesh" id="MultiMesh_ewu57"]
 resource_local_to_scene = true
@@ -21,8 +21,8 @@ use_custom_data = true
 mesh = SubResource("CylinderMesh_branch")
 
 [sub_resource type="SphereMesh" id="SphereMesh_bulb"]
-radial_segments = 8
-rings = 4
+radial_segments = 6
+rings = 3
 
 [sub_resource type="MultiMesh" id="MultiMesh_o4y1q"]
 resource_local_to_scene = true

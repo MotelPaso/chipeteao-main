@@ -40,6 +40,9 @@ const GLIDE_MAX_RISE: float = 1.0
 ## terreno): un avance lento la subiría de a poco sin pasar nunca
 ## GLIDE_MAX_RISE en un frame.
 const GLIDE_WALL_REACH: float = 0.5
+## Metros que el cuerpo guarda con una cobertura y con el borde de un campo
+## de jefe cuando un ataque lo lleva por tierra: el radio de su cápsula y algo más.
+const GLIDE_COVER_GAP: float = 1.4
 ## Por debajo de esta fracción de lo que quería avanzar en un frame cuenta
 ## como trabada; no cuenta si se mueve en vertical (trepa o cae) a más de
 ## STUCK_VERTICAL_SPEED metros por segundo.
@@ -217,16 +220,27 @@ func floor_point(point: Vector3) -> Vector3:
 ## embestida, un túnel). Por tierra no pisa la pared de un corte (ver
 ## GLIDE_WALL_REACH) ni sube o baja más de GLIDE_MAX_RISE de golpe: si `point`
 ## cae en una pared o su suelo queda más arriba o más abajo (el otro lado de un
-## corte), se queda donde está y devuelve false. Bajo tierra (`under` en true)
-## pasa por debajo de los cortes.
+## corte), se queda donde está y devuelve false. Tampoco atraviesa una
+## cobertura ni sale del claro de un campo de jefe. Bajo tierra (`under` en
+## true) pasa por debajo de los cortes y de las coberturas.
 func glide_to(point: Vector3, under: bool = false) -> bool:
 	var ground := ground_height(point)
 	velocity = Vector3.ZERO
 	if not under and (absf(ground - global_position.y) > GLIDE_MAX_RISE
-			or _on_wall(point, ground)):
+			or _on_wall(point, ground) or _blocked_by_cover(point)):
 		return false
 	global_position = Vector3(point.x, ground, point.z)
 	return true
+
+
+## True si llevar el cuerpo por tierra hasta `point` lo mete en una cobertura
+## o lo saca del claro de un campo de jefe (BossField.blocks_path). Los
+## límites de un mapa de etapa no traen esa pregunta: ahí no cambia nada.
+func _blocked_by_cover(point: Vector3) -> bool:
+	if _bounds == null or not _bounds.has_method(&"blocks_path"):
+		return false
+	return bool(_bounds.call(&"blocks_path", Vector2(global_position.x, global_position.z),
+			Vector2(point.x, point.z), GLIDE_COVER_GAP))
 
 
 ## Lleva el cuerpo por el aire a `point` (un salto): a esa altura, o sobre el
@@ -236,9 +250,9 @@ func fly_to(point: Vector3) -> void:
 	velocity = Vector3.ZERO
 
 
-## Bajo tierra pasa por DEBAJO de los raiders: mientras `on`, ni ella choca con
-## ellos ni ellos con ella (pueden pisar el montículo). Con `on` en false
-## vuelve a chocar con todos.
+## Bajo tierra pasa por DEBAJO de los raiders y de las coberturas de un campo
+## de jefe: mientras `on`, ni ella choca con ellos ni ellos con ella (pueden
+## pisar el montículo). Con `on` en false vuelve a chocar con todos.
 func pass_under_raiders(on: bool) -> void:
 	for body: PhysicsBody3D in _passed_raiders:
 		if is_instance_valid(body):
@@ -247,7 +261,7 @@ func pass_under_raiders(on: bool) -> void:
 	_passed_raiders.clear()
 	if not on:
 		return
-	for group: StringName in [&"player", &"downed_players"]:
+	for group: StringName in [&"player", &"downed_players", BossField.COVER_GROUP]:
 		for node: Node in get_tree().get_nodes_in_group(group):
 			var body := node as PhysicsBody3D
 			if body != null:
@@ -310,8 +324,9 @@ func strike_along(from: Vector3, to: Vector3, half_width: float, height_window: 
 
 ## Altura del suelo REAL bajo `point`: el terreno o lo que tenga encima y sea
 ## lo bastante ancho para pararse (una formación de roca, una meseta). Los
-## personajes y lo angosto (un tronco) no cuentan. Así un ataque que lleva el
-## cuerpo nunca lo deja metido dentro de una roca.
+## personajes, lo angosto (un tronco) y las coberturas de un campo de jefe no
+## cuentan. Así un ataque que lleva el cuerpo nunca lo deja metido dentro de
+## una roca ni subido a una cobertura.
 func ground_height(point: Vector3) -> float:
 	var terrain := Terrain.find(get_tree())
 	var base := terrain.height_at(point.x, point.z) if terrain != null else point.y
@@ -326,7 +341,8 @@ func ground_height(point: Vector3) -> float:
 		if hit.is_empty():
 			return base
 		var top := (hit["position"] as Vector3).y
-		if not hit["collider"] is CharacterBody3D \
+		var collider := hit["collider"] as Node
+		if not collider is CharacterBody3D and not collider.is_in_group(BossField.COVER_GROUP) \
 				and (top - base <= GROUND_STEP or _is_broad(space, point, base, top, skip)):
 			return top
 		skip.append(hit["rid"] as RID)
