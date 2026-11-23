@@ -1,14 +1,16 @@
 #!/usr/bin/env bash
 # Verificación headless del proyecto: import limpio + lint de catálogos +
-# harness de UI + harness del selector + soak por arena + soak de etapa +
-# soak de co-op + soak del jefe de etapa (Mythos) + soak del minijefe (la
-# Langosta Azul).
+# harness de UI + harness del selector + sonda del campo de las arenas de
+# jefe + soak por arena + soak de etapa + soak de co-op + soak del jefe de
+# etapa (Mythos) + soak del minijefe (la Langosta Azul y el viaje a su arena).
 # Uso: tools/verificar.sh [segundos_por_arena]   (por defecto 360)
+#      tools/verificar.sh --revisar-minijefe <log>   (solo revisar_minijefe
+#      sobre un log ya escrito; ver esa función)
 #
 # 360 s no es arbitrario: por debajo, el recorrido del harness no da tiempo a
 # cruzar una arena de 240x240 y la puerta de cobertura no puede exigir nada.
 # La corrida completa tarda ~45 min (3 x 360 s + 1 x 720 s + 1 x 360 s de
-# co-op + 1 x 450 s del jefe de etapa + 1 x 270 s del minijefe + el lint + el
+# co-op + 1 x 450 s del jefe de etapa + 1 x 390 s del minijefe + el lint + el
 # harness de UI + import).
 #
 # BONK_GAME_SEED fija el RNG del juego (cartas, spawns, scatter y por tanto
@@ -45,11 +47,20 @@
 #   - una etapa con RELIEVE POR ZONAS (el Bosque Hueco) no imprime sus
 #     barridos, alguno no da cero, la pendiente pasa de su cota, o el bot
 #     del soak del bosque no pisa una zona elevada ni cruza un puente.
-#   - el soak del MINIJEFE no ve llegar a la Langosta Azul, su entrada no
-#     congela el mundo o no devuelve la pantalla, la pelea no empieza y
-#     termina exactamente una vez, o 5 s después de morir queda algo suyo.
+#   - el soak del MINIJEFE no muestra el viaje entero a la arena de la
+#     Langosta Azul (presagio, cinemática con el mundo congelado, ida, pelea
+#     a solas, portal y vuelta), el bosque no vuelve tal como quedó, o tras
+#     la vuelta queda algo de la arena, de la langosta o de su cinemática.
+#   - la sonda del CAMPO encuentra una arena de jefe donde no se puede
+#     pelear (claro chico, coberturas mal puestas, un estorbo, un hueco).
 
 set -uo pipefail
+# Modo de una sola revisión: la ruta del log se resuelve antes del cd.
+SOLO_MINIJEFE=""
+if [ "${1:-}" = "--revisar-minijefe" ]; then
+	SOLO_MINIJEFE="$(cd "$(dirname "${2:?uso: tools/verificar.sh --revisar-minijefe <log>}")" && pwd)/$(basename "$2")"
+	shift 2
+fi
 cd "$(dirname "$0")/.."
 
 SECS="${1:-360}"
@@ -174,6 +185,116 @@ chequear_relieve() {
 	fi
 }
 
+# --- Minijefe: el viaje a su arena ------------------------------------------
+# Lo que el soak del minijefe tiene que mostrar de la Langosta Azul, de punta
+# a punta: el presagio, la cinemática entera con el mundo congelado, la ida
+# al Cementerio de barcos, la pelea a solas, el portal, la vuelta y el Bosque
+# Hueco tal como quedó. Suma un fallo por cada cosa que falte: aquí no hay
+# ramas que se salten una comprobación porque falte su línea de guarda.
+# Corre también sola, sobre un log ya escrito (así se comprueba que falla
+# cuando al log le falta una línea):
+#     tools/verificar.sh --revisar-minijefe <log>
+#
+# Cada una de estas líneas sale EXACTAMENTE una vez por viaje.
+MINIJEFE_UNA_VEZ=(
+	'^Boss omen: Langosta Azul in=[0-9.]+s sun=\([0-9.,]+\)->\([0-9.,]+\) at [0-9.]+s'
+	'^Spawns held: mini boss fights alone at [0-9.]+s'
+	'^Boss arena: left hollow_woods for ship_graveyard at [0-9.]+s party=[0-9]+'
+	'^Boss arena: entered ship_graveyard at [0-9.]+s'
+	'^Boss spawned: Langosta Azul at [0-9.]+s'
+	'^Probe mini world: where=away arena_root=1 arena_bounds=1 terrain=1 enemy_spawner=1 world_environments=1 live=ship_graveyard map_markers=[0-9]+ stage_markers=0 '
+	'^Probe mini calm: frames=[0-9]+ seconds=[0-9.]+ healths=[0-9]+ changed=0 born=0 '
+	'^Boss cinematic: ended after=[0-9.]+s skipped=false '
+	'^Langosta Azul scaling: life=1 '
+	'^Langosta Azul purge: swept=[0-9]+ bosses=[0-9]+ at '
+	'^Langosta Azul fight over: took='
+	'^Probe mini alone: held=true others_max_after_purge=0$'
+	'^Boss arena: portal opened at [0-9.]+s closes_in=[0-9]+s'
+	'^Probe mini loot: chests=[0-9]+ gems=[0-9]+ orbs=[0-9]+ pickups=[0-9]+ off_sand=0$'
+	'^Probe mini portal: can_place=true cover_gap=[0-9.]+ rim_gap=[0-9.]+ arrow=true closes_in=[0-9.]+s prompt=true$'
+	'^Probe mini hazards: .* total=0 body=false song_playing=false died_signals=1$'
+	'^Boss arena: returning reason=(portal|timeout) at [0-9.]+s'
+	'^Probe mini return loot: gems_left=0 orbs_left=0 chests_lost=[0-9]+$'
+	'^Probe mini portal closed: reason=(portal|timeout) '
+	'^Probe mini trip: snapshot equal=true diffs=0 sky=equal enemies_left=0 '
+	'^Probe mini spots: raiders=[0-9]+ moved_max=[0-9.]+m within=true off_floor=0 unanchored=0$'
+	'^Boss arena: back in hollow_woods at [0-9.]+s away=[0-9.]+s'
+	'^Probe mini leftovers: boss_arenas=0 cinematics=0 portals=0 tides=0 covers=0$'
+	'^Probe mini world: where=back arena_root=1 arena_bounds=1 terrain=1 enemy_spawner=1 world_environments=1 live=hollow_woods$'
+	'^Lobster tide: rising over '
+	'^Lobster tide: gone at '
+	'^Probe mini tide: left=none$'
+	'^Probe mini trips: 1$'
+)
+# La pantalla y el mundo en cada parte de la cinemática: tomados en el bosque
+# y en el fondo del mar, y devueltos enteros (con la marea alta) al terminar.
+MINIJEFE_PANTALLA=(
+	'^Probe mini stage: reason=entrance hud_visible=false .*cinematic_camera=true .*world_frozen=true clock_running=false tide=[a-z]+$'
+	'^Probe mini stage: reason=seabed hud_visible=false .*cinematic_camera=true .*world_frozen=true clock_running=false tide=[a-z]+$'
+	'^Probe mini stage: reason=entrance_end hud_visible=true .*cinematic_camera=false .*world_frozen=false clock_running=true tide=high$'
+)
+revisar_minijefe() {
+	local log="$1"
+	local patron veces
+	for patron in "${MINIJEFE_UNA_VEZ[@]}"; do
+		veces=$(grep -cE "$patron" "$log")
+		if [ "$veces" -ne 1 ]; then
+			echo "  FALLO (minijefe): salió $veces vez/veces y debe salir 1: $patron"
+			FALLOS=$((FALLOS + 1))
+		fi
+	done
+	for patron in "${MINIJEFE_PANTALLA[@]}"; do
+		if ! grep -qE "$patron" "$log"; then
+			echo "  FALLO (minijefe): la cinemática no tomó o no devolvió la pantalla y el mundo: $patron"
+			grep -n '^Probe mini stage: ' "$log" | head -4
+			FALLOS=$((FALLOS + 1))
+		fi
+	done
+	# El presagio tiñe la luz: el Sol de antes y el del presagio lleno difieren.
+	local soles
+	soles=$(sed -n 's/^Boss omen: .* sun=\(([0-9.,]*)\)->\(([0-9.,]*)\) at .*/\1 \2/p' "$log" | head -1)
+	if [ -z "$soles" ] || [ "${soles% *}" = "${soles#* }" ]; then
+		echo "  FALLO (minijefe): el presagio no cambió la luz del mapa (sun=${soles:-?})"
+		FALLOS=$((FALLOS + 1))
+	fi
+	# La ventana de la calma cubre la cinemática entera: 60 frames por segundo.
+	if ! sed -n 's/^Probe mini calm: frames=\([0-9]*\) seconds=\([0-9.]*\) .*/\1 \2/p' "$log" \
+		| awk 'NF == 2 { seen = 1; if ($1 + 0 < $2 * 60 - 1) bad = 1 } END { exit (seen && !bad) ? 0 : 1 }'; then
+		echo "  FALLO (minijefe): la calma no cubrió la cinemática entera"
+		grep -n '^Probe mini calm: ' "$log" | head -3
+		FALLOS=$((FALLOS + 1))
+	fi
+	# Ningún plano de la cinemática deja decoración entre la cámara y la langosta.
+	if ! grep -q '^Boss cinematic: shot=' "$log" \
+		|| grep '^Boss cinematic: shot=' "$log" | grep -qv ' blocking=0 '; then
+		echo "  FALLO (minijefe): falta un plano de la cinemática, o alguno tiene decoración tapando a la langosta"
+		grep -n '^Boss cinematic: shot=' "$log" | grep -v ' blocking=0 ' | head -4
+		FALLOS=$((FALLOS + 1))
+	fi
+	# El equipo viaja entero: al llegar, al empezar la pelea y al volver.
+	veces=$(grep -cE '^Probe mini party: at=(arrived|fight|back) raiders=[0-9]+ lost=0 ' "$log")
+	if [ "$veces" -ne 3 ] || grep '^Probe mini party: ' "$log" | grep -qv ' lost=0 '; then
+		echo "  FALLO (minijefe): el equipo perdió algo en el viaje, o falta una de sus tres líneas"
+		grep -n '^Probe mini party: ' "$log" | head -4
+		FALLOS=$((FALLOS + 1))
+	fi
+	# Un viaje no es un cambio de etapa: no barre ni compara el progreso.
+	if grep -qE '^Stage (sweep|carry):' "$log"; then
+		echo "  FALLO (minijefe): el viaje imprimió líneas de cambio de etapa"
+		grep -nE '^Stage (sweep|carry):' "$log" | head -4
+		FALLOS=$((FALLOS + 1))
+	fi
+	veces=$(sed -n 's/^Langosta Azul move: \([a-z_]*\) at .*/\1/p' "$log" | sort -u | wc -l | tr -d ' ')
+	if [ "$veces" -lt 3 ]; then
+		echo "  FALLO (minijefe): la langosta usó $veces ataque(s) distinto(s) (se esperan al menos 3)"
+		FALLOS=$((FALLOS + 1))
+	fi
+	if ! grep -q '^Spawns resumed at ' "$log"; then
+		echo "  FALLO (minijefe): los spawns no volvieron después de la vuelta al mapa"
+		FALLOS=$((FALLOS + 1))
+	fi
+}
+
 # --- Listas fijas de líneas esperadas ---------------------------------------
 # Se greppean UNA POR UNA, no por conteo: una comprobación que deja de
 # ejecutarse desaparece del log sin ruido, y un conteo la daría por buena
@@ -186,6 +307,16 @@ UI_STEPS=(collection quests relics hunt_back hunt coop_count_reject unlock_confi
 	start_run pause_open settings_toggle pause_close extract retry done)
 # Lienzos que resultan de las ventanas de select_probe.gd (WINDOWS).
 SELECT_SIZES=(1280x720 1280x831 1280x960 1706x720)
+
+if [ -n "$SOLO_MINIJEFE" ]; then
+	revisar_minijefe "$SOLO_MINIJEFE"
+	if [ "$FALLOS" -eq 0 ]; then
+		echo "REVISIÓN OK — $SOLO_MINIJEFE"
+		exit 0
+	fi
+	echo "REVISIÓN FALLIDA: $FALLOS problema(s) — $SOLO_MINIJEFE"
+	exit 1
+fi
 
 echo "== import =="
 fase
@@ -226,6 +357,30 @@ else
 	else
 		echo "  ok (${#LINT_CHECKS[@]} comprobaciones)"
 	fi
+fi
+fase_fin
+
+# --- Campo de las arenas de jefe --------------------------------------------
+# Arma cada arena de BossArenaCatalog con su jefe, sin partida, y mide que
+# se pueda pelear en ella: el claro, las coberturas, el suelo y el borde
+# (scenes/tests/boss_field_probe.gd). Tarda unos segundos; --quit-after es
+# un techo.
+echo "== campo de las arenas de jefe =="
+fase
+FIELD_LOG="$LOGDIR/boss_field_probe.log"
+BONK_SAVE_PATH="$(save_path_for campo)" \
+	godot --headless --fixed-fps 60 --quit-after 7200 \
+	res://scenes/tests/BossFieldProbe.tscn >"$FIELD_LOG" 2>&1
+if grep -qE "$PATRON_ERROR" "$FIELD_LOG"; then
+	echo "  FALLO: la sonda del campo reportó problemas"
+	grep -nE "$PATRON_ERROR" "$FIELD_LOG" | head -30
+	FALLOS=$((FALLOS + 1))
+elif ! grep -qE '^Probe field: done arenas=[1-9][0-9]* failed=0$' "$FIELD_LOG"; then
+	echo "  FALLO: una arena de jefe no cumple su campo (o la sonda no llegó al final)"
+	grep -n '^Probe field' "$FIELD_LOG" | grep -v ' ok=true$' | head -12
+	FALLOS=$((FALLOS + 1))
+else
+	echo "  ok ($(grep -c '^Probe field: arena=' "$FIELD_LOG") arena(s))"
 fi
 fase_fin
 
@@ -611,22 +766,25 @@ fi
 
 # --- Soak del minijefe ------------------------------------------------------
 # El séptimo soak es el único que ve al MINIJEFE del Bosque Hueco (la Langosta
-# Azul), que llega en el minuto 5: BONK_MINI_BOSS_AT lo trae a los 60 s. Mide
-# su entrada (el mundo congelado, la pantalla tomada y devuelta), la pelea de
-# punta a punta, que su muerte salga exactamente una vez y que 5 s después no
-# quede nada suyo (ni efectos, ni cuerpo, ni canción). Si pelea sola
-# (EnemySpawner.mini_boss_fights_alone), que se lleve a la horda y no haya
-# ningún otro enemigo durante la pelea; si trae su marea
-# (LobsterArrival.tide_scene), que esté alta al terminar la entrada y se haya
-# ido tras su muerte. Fuera de la cuenta de interactuables, como el del jefe
-# de etapa. Pasa igual con la canción puesta o con su hueco vacío.
-LOBSTER_SECS=270
+# Azul) y el VIAJE a su arena. Su minuto es el 5: BONK_MINI_BOSS_AT lo trae a
+# los 150 s, con el presagio desde los 120. Lo que tiene que mostrar está en
+# revisar_minijefe: el presagio, la cinemática, la ida, la pelea a solas, el
+# portal, la vuelta y el bosque intacto. Fuera de la cuenta de interactuables,
+# como el del jefe de etapa. Pasa igual con la canción puesta o sin ella.
+#
+# A los 150 s y no antes: mientras el equipo está en la arena del jefe (unos
+# dos minutos entre la cinemática, la pelea y el portal) la niebla del bosque
+# no avanza, y a la vuelta la horda ya no deja caminar al recorrido. Lo que
+# la puerta de niebla del harness exige se explora antes del viaje, y con el
+# viaje al minuto no alcanza. 390 s dejan ver la vuelta, el respiro y los
+# spawns de regreso aunque el portal se cierre solo.
+LOBSTER_SECS=390
 LOBSTER_FRAMES=$(( LOBSTER_SECS * 60 ))
 echo "== soak minijefe (HollowWoods, Langosta Azul, ${LOBSTER_SECS}s de partida) =="
 fase
 LOBSTER_LOG="$LOGDIR/soak_minijefe.log"
 BONK_ARENA="res://scenes/world/HollowWoods.tscn" BONK_GODMODE=1 BONK_SEED=4242 \
-	BONK_GAME_SEED=4242 BONK_MINI_BOSS_AT=60 \
+	BONK_GAME_SEED=4242 BONK_MINI_BOSS_AT=150 \
 	BONK_SAVE_PATH="$(save_path_for minijefe)" \
 	godot --headless --fixed-fps 60 --quit-after "$LOBSTER_FRAMES" \
 	res://scenes/tests/ArenaProbe.tscn >"$LOBSTER_LOG" 2>&1
@@ -638,11 +796,11 @@ if grep -qE "$PATRON_ERROR" "$LOBSTER_LOG"; then
 else
 	LOBSTER_REPORTES=$(grep -c '^frame ' "$LOBSTER_LOG")
 	LOBSTER_ESPERADO=$(( LOBSTER_FRAMES / 120 ))
-	LOBSTER_PLANES=$(grep -c '^Langosta Azul scaling: life=1 ' "$LOBSTER_LOG")
-	LOBSTER_MUERTES=$(grep -c '^Langosta Azul fight over: took=' "$LOBSTER_LOG")
 	LOBSTER_PELEA=$(sed -n 's/^Langosta Azul fight over: took=\([0-9.]*\)s.*/\1/p' "$LOBSTER_LOG" | head -1)
-	LOBSTER_ATAQUES=$(sed -n 's/^Langosta Azul move: \([a-z_]*\) at .*/\1/p' "$LOBSTER_LOG" | sort -u | wc -l | tr -d ' ')
-	echo "  planes=$LOBSTER_PLANES muertes=$LOBSTER_MUERTES pelea=${LOBSTER_PELEA:-?}s ataques_distintos=$LOBSTER_ATAQUES"
+	LOBSTER_FUERA=$(sed -n 's/^Boss arena: back in .* away=\([0-9.]*\)s$/\1/p' "$LOBSTER_LOG" | head -1)
+	echo "  pelea=${LOBSTER_PELEA:-?}s fuera_del_bosque=${LOBSTER_FUERA:-?}s"
+	# Informativo: los frames de más de 33 ms de la cinemática y dónde cayeron.
+	grep '^Probe mini frames: ' "$LOBSTER_LOG" | sed 's/^/  /' | head -1
 	fase_fin
 	if [ "$LOBSTER_REPORTES" -lt "$LOBSTER_ESPERADO" ]; then
 		echo "  FALLO: terminó antes de tiempo ($LOBSTER_REPORTES/$LOBSTER_ESPERADO reportes)"
@@ -653,82 +811,7 @@ else
 		echo "  FALLO: la partida godmode terminó sola"
 		FALLOS=$((FALLOS + 1))
 	fi
-	if ! grep -q '^Boss spawned: Langosta Azul at ' "$LOBSTER_LOG"; then
-		echo "  FALLO: la Langosta Azul nunca llegó (¿HollowWoods perdió su mini_boss_scene?)"
-		FALLOS=$((FALLOS + 1))
-	fi
-	# La entrada congela el mundo: ninguna vida cambió y nada nació mientras duró.
-	if ! grep -qE '^Probe mini calm: frames=[0-9]+ .* changed=0 born=0 ' "$LOBSTER_LOG"; then
-		echo "  FALLO: algo cambió de vida o apareció durante la entrada de la langosta"
-		grep -n '^Probe mini calm: ' "$LOBSTER_LOG" | head -3
-		FALLOS=$((FALLOS + 1))
-	fi
-	# En plena entrada la pantalla es de la langosta; al terminar vuelve entera.
-	if ! grep -qE '^Probe mini stage: reason=entrance hud_visible=false .*cinematic_camera=true .*world_frozen=true clock_running=false tide=[a-z]+$' "$LOBSTER_LOG"; then
-		echo "  FALLO: en plena entrada el HUD, la cámara o el mundo no estaban tomados"
-		grep -n '^Probe mini stage: ' "$LOBSTER_LOG" | head -3
-		FALLOS=$((FALLOS + 1))
-	fi
-	if ! grep -qE '^Probe mini stage: reason=entrance_end hud_visible=true .*cinematic_camera=false .*world_frozen=false clock_running=true tide=[a-z]+$' "$LOBSTER_LOG"; then
-		echo "  FALLO: la entrada no devolvió el HUD, la cámara, el mundo o el reloj"
-		grep -n '^Probe mini stage: ' "$LOBSTER_LOG" | head -3
-		FALLOS=$((FALLOS + 1))
-	fi
-	if [ "$LOBSTER_PLANES" -ne 1 ]; then
-		echo "  FALLO: 'Langosta Azul scaling: life=1' salió $LOBSTER_PLANES vez/veces (debe ser 1)"
-		FALLOS=$((FALLOS + 1))
-	fi
-	if [ "$LOBSTER_MUERTES" -ne 1 ]; then
-		echo "  FALLO: 'Langosta Azul fight over' salió $LOBSTER_MUERTES vez/veces (debe ser 1)"
-		FALLOS=$((FALLOS + 1))
-	fi
-	if [ "$LOBSTER_ATAQUES" -lt 3 ]; then
-		echo "  FALLO: la langosta usó $LOBSTER_ATAQUES ataque(s) distinto(s) (se esperan al menos 3)"
-		FALLOS=$((FALLOS + 1))
-	fi
-	# Si pelea sola: se llevó a la horda al empezar y no hubo nadie más.
-	if grep -q '^Spawns held: mini boss fights alone at ' "$LOBSTER_LOG"; then
-		if ! grep -qE '^Langosta Azul purge: swept=[0-9]+ bosses=[0-9]+ at ' "$LOBSTER_LOG"; then
-			echo "  FALLO: la langosta pelea sola pero no barrió a la horda al empezar"
-			FALLOS=$((FALLOS + 1))
-		fi
-		if ! grep -q '^Probe mini alone: held=true others_max_after_purge=0$' "$LOBSTER_LOG"; then
-			echo "  FALLO: hubo otros enemigos durante la pelea de la langosta, o los spawns no estaban cortados"
-			grep -n '^Probe mini alone: ' "$LOBSTER_LOG" | head -3
-			FALLOS=$((FALLOS + 1))
-		fi
-		if ! grep -q '^Spawns resumed at ' "$LOBSTER_LOG"; then
-			echo "  FALLO: los spawns no volvieron después de la muerte de la langosta"
-			FALLOS=$((FALLOS + 1))
-		fi
-	else
-		echo "  nota: la langosta pelea en medio de la horda (mini_boss_fights_alone apagado)"
-	fi
-	# Si trae su marea: alta cuando la entrada devuelve la pantalla, y nada
-	# de ella (ni el cielo azul) tras su muerte.
-	if grep -q '^Lobster tide: rising over ' "$LOBSTER_LOG"; then
-		if ! grep -qE '^Probe mini stage: reason=entrance_end .* tide=high$' "$LOBSTER_LOG"; then
-			echo "  FALLO: la marea no estaba alta al terminar la entrada de la langosta"
-			grep -n '^Probe mini stage: ' "$LOBSTER_LOG" | head -3
-			FALLOS=$((FALLOS + 1))
-		fi
-		# Baja con el reloj del juego (una pausa por subir de nivel la detiene):
-		# se mira al final del soak, no unos segundos después de la muerte.
-		if ! grep -q '^Lobster tide: gone at ' "$LOBSTER_LOG" \
-				|| ! grep -q '^Probe mini tide: left=none$' "$LOBSTER_LOG"; then
-			echo "  FALLO: la marea de la langosta no se fue después de su muerte"
-			grep -n '^Lobster tide: \|^Probe mini tide: ' "$LOBSTER_LOG" | head -6
-			FALLOS=$((FALLOS + 1))
-		fi
-	else
-		echo "  nota: la langosta llega sin marea (tide_scene vacío)"
-	fi
-	# Cinco segundos después de morir no queda nada suyo.
-	if ! grep -qE '^Probe mini hazards: .* total=0 body=false song_playing=false died_signals=1$' "$LOBSTER_LOG"; then
-		echo "  FALLO: tras su muerte quedó algo de la langosta (efectos, cuerpo o canción), o murió más de una vez"
-		grep -n '^Probe mini hazards: ' "$LOBSTER_LOG" | head -3
-		FALLOS=$((FALLOS + 1))
-	fi
+	revisar_minijefe "$LOBSTER_LOG"
 	chequear_tope_cofres "$LOBSTER_LOG"
 fi
 

@@ -219,7 +219,16 @@ Lo que NO se traduce nunca: los `id` de catálogo, los `node_name`, los nombres 
 | Shock wave (la onda que deja el Salto aplastante; se esquiva saltando) | Onda de choque |
 | Tail sweep (ataque de la Langosta Azul; se esquiva saltando) | Coletazo |
 | Ambush (ataque de la Langosta Azul: se entierra y sale junto al raider) | Emboscada |
-| %s wears out, out of the water (aviso de desgaste de la Langosta Azul) | %s se agota fuera del agua |
+| %s runs out of strength (aviso de desgaste de la Langosta Azul) | %s se queda sin fuerzas |
+| Boss arena (el campo de batalla propio de un jefe, fuera del mapa de la etapa) | Arena de jefe |
+| Ship graveyard (la arena de la Langosta Azul, en el fondo del mar) | Cementerio de barcos |
+| Omen (el aviso que llega al mapa antes de que un jefe se lleve al equipo a su arena) | Presagio |
+| `The %s approaches` (título de la tarjeta del presagio) | Se acerca la %s |
+| `The tide rises · %d s` (cuenta del presagio de la Langosta Azul) | La marea sube · %d s |
+| `The tide is here` (último aviso del presagio) | La marea llegó |
+| Return portal (el portal que aparece en la arena de un jefe cuando muere) | Portal de regreso |
+| `Closes in %d s` (cuenta del portal de regreso) | Se cierra en %d s |
+| `[E] Back to the map` (el portal de regreso) | `[E] Volver al mapa` |
 | the blue scare of the Hollow Woods (Colección) | el susto azul del Bosque Hueco |
 
 ## Mapas
