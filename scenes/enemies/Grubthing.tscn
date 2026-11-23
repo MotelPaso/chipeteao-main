@@ -86,14 +86,14 @@ height = 1.6
 
 [node name="Grubthing" type="CharacterBody3D" groups=["boss", "enemies"]]
 collision_layer = 2
-collision_mask = 3
+collision_mask = 1
 script = ExtResource("1_grub")
 secret_boss_id = "grubthing"
 boss_title = "Larvón"
 boss_gem_count = 12
 boss_gem_value = 5
 health_orb_count = 1
-move_speed = 2.6
+move_speed = 2.1
 turn_speed = 6.0
 separation_strength = 0.0
 xp_gem_scene = ExtResource("3_gem")

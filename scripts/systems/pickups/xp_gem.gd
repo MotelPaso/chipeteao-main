@@ -13,7 +13,7 @@ const LIVE_GROUP: StringName = &"gems"
 
 @export_group("Experiencia")
 ## XP que da la gema antes de multiplicadores; quien la suelta la escala.
-@export var xp_value: int = 1000
+@export var xp_value: int = 1
 @export_group("")
 
 var _default_xp_value: int = 1

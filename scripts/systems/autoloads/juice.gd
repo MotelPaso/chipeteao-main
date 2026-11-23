@@ -54,8 +54,8 @@ void fragment() {
 @export_group("Hit-stop")
 ## Escala de tiempo (0-1) durante el micro hit-stop de un crítico.
 @export var crit_stop_scale: float = 0.3
-## Segundos reales que dura el hit-stop de un crítico.
-@export var crit_stop_duration: float = 0.05
+## Segundos reales que dura el hit-stop de un crítico (0 = sin pausa: con muchos críticos la pausa se siente como lag).
+@export var crit_stop_duration: float = 0.0
 ## Segundos mínimos entre golpes de crítico: una build de críticos rápidos
 ## no debe encadenar el juego en cámara lenta permanente.
 @export var crit_punch_cooldown: float = 0.35

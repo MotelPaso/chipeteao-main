@@ -1,9 +1,0 @@
-[gd_scene load_steps=2 format=3]
-
-[ext_resource type="Script" path="res://scripts/weapons/thorn_whip.gd" id="1_whip"]
-
-[node name="ThornWhip" type="Node3D"]
-script = ExtResource("1_whip")
-damage = 7.0
-cooldown = 0.8
-attack_range = 5.0

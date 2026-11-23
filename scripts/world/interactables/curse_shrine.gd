@@ -2,82 +2,55 @@ class_name CurseShrine
 extends ChargeShrine
 ## Altar demoníaco (obelisco): se carga igual que un altar de carga (por
 ## cercanía, pausa al salir, se hunde tras pagar), pero paga un PACTO. Al
-## completar ofrece tres pactos: cada uno es un BENEFICIO con un COSTO que la
-## carta explica (un don mayor, puntos o un cofre gratis, a cambio de
-## dificultad, más élites, cielos más largos, más eventos o desastres). La
-## Sangre de demonio agranda las dos mitades del trato. Los jefes sueltan un
-## cofre extra por uso (BossBase lee RunState.demonic_uses).
+## completar ofrece tres cartas: cada una junta una stat al azar del jugador
+## (ALTAR_BOONS, sin repetir en el altar) al MÁXIMO de su lista x
+## max_multiplier, con un costo al azar de COST_LIBRARY (cada costo con su
+## cantidad sorteada entre min y max). Todo uso sube además la dificultad
+## (difficulty_per_use). La Sangre de demonio agranda las dos mitades del
+## trato.
 
 ## Kind del objeto que agranda las dos mitades del pacto (Sangre de demonio);
 ## su fila de ItemCatalog lleva el porcentaje por copia (boost_percent).
 const DEMON_BLOOD_KIND: String = "demonic_boost"
 
-## Pactos: cada fila es una carta. `benefit` y `cost` son filas {kind, ...}
-## resueltas por los dos match de abajo: un pacto nuevo es una fila nueva y
-## un KIND nuevo es una rama en cada match, nunca un caso por id.
-## Beneficios: "boon" (stat plano para la party, ~2× un ALTAR_BOONS),
-## "points" (puntos para quien sostuvo el anillo), "chest" (cofre gratis
-## junto al altar). Los costos escriben knobs de RunState. `label` lleva
-## exactamente los marcadores que llena su kind (el cofre, ninguno).
-const PACT_LIBRARY: Array[Dictionary] = [
-	{
-		"id": "pact_fury", "name": "Pacto de furia",
-		"benefit": {"kind": "boon", "stat": "damage", "amount": 20.0,
-			"label": "daño +%d%%"},
-		"cost": {"kind": "difficulty", "amount": 15.0, "label": "dificultad +%d%%"},
-	},
-	{
-		"id": "pact_rhythm", "name": "Pacto del pulso",
-		"benefit": {"kind": "boon", "stat": "cooldown", "amount": 12.0,
-			"label": "velocidad de ataque +%d%%"},
-		"cost": {"kind": "elites", "amount": 6.0, "label": "prob. de shiny +%d%%"},
-	},
-	{
-		"id": "pact_hide", "name": "Pacto de la coraza",
-		"benefit": {"kind": "boon", "stat": "armor", "amount": 4.0,
-			"label": "armadura +%d"},
-		"cost": {"kind": "sky_duration", "amount": 40.0,
-			"label": "las lunas duran %d%% más"},
-	},
-	{
-		"id": "pact_flesh", "name": "Pacto de carne",
-		"benefit": {"kind": "boon", "stat": "max_hp", "amount": 40.0,
-			"label": "HP máx. +%d"},
-		"cost": {"kind": "events", "amount": 10.0,
-			"label": "prob. de luna +%d%%"},
-	},
-	{
-		"id": "pact_swarm", "name": "Pacto del enjambre",
-		"benefit": {"kind": "boon", "stat": "projectiles", "amount": 2.0,
-			"label": "+%d proyectil(es)"},
-		"cost": {"kind": "difficulty", "amount": 20.0, "label": "dificultad +%d%%"},
-	},
-	{
-		"id": "pact_greed", "name": "Pacto de codicia",
-		"benefit": {"kind": "points", "amount": 150.0, "label": "+%d pts"},
-		"cost": {"kind": "elites", "amount": 8.0, "label": "prob. de shiny +%d%%"},
-	},
-	{
-		"id": "pact_hoard", "name": "Pacto del arcón",
-		"benefit": {"kind": "chest", "amount": 0.0, "label": "un cofre gratis aquí mismo"},
-		"cost": {"kind": "difficulty", "amount": 25.0, "label": "dificultad +%d%%"},
-	},
-	{
-		"id": "pact_omen", "name": "Pacto del augurio",
-		"benefit": {"kind": "boon", "stat": "luck", "amount": 20.0,
-			"label": "suerte +%d"},
-		"cost": {"kind": "disasters", "amount": 15.0,
-			"label": "prob. de desastre +%d%%"},
-	},
+## Costos de los pactos, edita aquí. `kind` decide qué paga (una rama en
+## _pay_cost, nunca la cambies); `min`/`max` es el rango en que se sortea la
+## cantidad, en %; `label` lleva exactamente un "%d" con esa cantidad.
+##   difficulty      dificultad de la partida
+##   sky_duration    las lunas y lluvias duran más
+##   bad_events      lunas malas, lluvias malas y desastres salen más seguido
+##   enemy_speed     enemigos más rápidos (los que aparecen desde ahora)
+##   points          pierdes ese % de tus puntos
+const COST_LIBRARY: Array[Dictionary] = [
+	{"id": "cost_difficulty", "kind": "difficulty", "min": 20, "max": 30,
+		"label": "dificultad +%d%%"},
+	{"id": "cost_long_nights", "kind": "sky_duration", "min": 30, "max": 50,
+		"label": "las lunas y lluvias duran %d%% más"},
+	{"id": "cost_bad_omens", "kind": "bad_events", "min": 30, "max": 50,
+		"label": "eventos malos %d%% más seguido"},
+	{"id": "cost_swift_horde", "kind": "enemy_speed", "min": 10, "max": 20,
+		"label": "enemigos %d%% más rápidos"},
+	{"id": "cost_tithe", "kind": "points", "min": 10, "max": 30,
+		"label": "pierdes el %d%% de tus puntos"},
 ]
 
 @export_group("Pactos")
-## Multiplica el costo de dificultad de cada pacto (1 = el número de PACT_LIBRARY, 2 = el doble).
+## La stat del pacto vale el máximo de su lista (ver ALTAR_BOONS) por esto, redondeado hacia arriba.
+@export var max_multiplier: float = 1.0
+## Multiplica el costo de dificultad de cada pacto (1 = el número de COST_LIBRARY, 2 = el doble).
 @export var difficulty_scale: float = 1.0
-## Distancia en metros desde el obelisco a la que cae el cofre gratis del pacto.
-@export var chest_drop_distance: float = 2.4
-## Texto de cada carta: beneficio (%s) arriba y costo (%s) abajo, en dos líneas para que el costo se lea.
-@export_multiline var pact_description: String = "Ganas: %s\nPagas: %s"
+## Texto de cada carta bajo el título (la stat que da); %s = el costo del pacto.
+@export_multiline var pact_description: String = "Pagas: %s"
+
+
+## Grupo de los altares demoníacos (ver ChargeShrine.type_group).
+func type_group() -> StringName:
+	return &"demonic_altars"
+
+
+## La Llave maestra solo agranda los altares de carga.
+func _uses_master_key() -> bool:
+	return false
 
 
 func _demon_blood_in_ring() -> int:
@@ -92,117 +65,103 @@ func _blood_scale() -> float:
 	return 1.0 + per_copy * float(_demon_blood_in_ring())
 
 
-func _effective_boon_scale() -> float:
-	return boon_scale * _blood_scale()
-
-
-## Tres pactos distintos de la tabla, con precio según las Llaves maestras y
-## la Sangre de demonio de quien carga.
-func _reward_options(keys: int) -> Array[Dictionary]:
-	var pool := PACT_LIBRARY.duplicate()
+## Tres pactos: stats distintas al máximo, cada una con un costo al azar.
+func _reward_options(_keys: int) -> Array[Dictionary]:
+	var pool := ALTAR_BOONS.duplicate()
 	pool.shuffle()
 	var options: Array[Dictionary] = []
 	for i in mini(ALTAR_CHOICE_COUNT, pool.size()):
-		var pact: Dictionary = pool[i]
+		var boon: Dictionary = pool[i]
+		var amount := _max_amount(boon)
+		var cost: Dictionary = COST_LIBRARY.pick_random()
+		var cost_amount := float(randi_range(int(cost.min), int(cost.max)))
+		var gained := String(boon.label) % roundi(amount)
 		options.append({
-			"title": String(pact.name),
-			"description": pact_description % [_benefit_text(pact.benefit, keys),
-					_cost_text(pact.cost)],
+			"title": gained,
+			"description": pact_description % _cost_text(cost, cost_amount),
 			"color": accent_color,
-			"pact": pact,
+			"label": gained,
+			"stat": String(boon.stat),
+			"amount": amount,
+			"cost": cost,
+			"cost_amount": cost_amount,
 		})
 	return options
 
 
-## Cómo se lee el beneficio de un pacto en la carta, con la escala de ESTE altar.
-func _benefit_text(benefit: Dictionary, keys: int) -> String:
-	var label := String(benefit.label)
-	if String(benefit.kind) == "chest":
-		return label
-	return label % roundi(_benefit_amount(benefit, keys))
+## El don del pacto: el máximo de la lista de esa stat x max_multiplier y la
+## Sangre de demonio, redondeado hacia arriba.
+func _max_amount(boon: Dictionary) -> float:
+	var top := 1.0
+	for value: Variant in boon_values(boon):
+		top = maxf(top, float(value))
+	return ceilf(top * max_multiplier * _blood_scale())
 
 
-## Cómo se lee el costo. Solo la dificultad crece con la Sangre de demonio,
-## así que es el único número que cambia con la bolsa del raider.
-func _cost_text(cost: Dictionary) -> String:
-	return String(cost.label) % roundi(_cost_amount(cost))
-
-
-## Tamaño del beneficio: los dones de stat usan la escala del altar y las
-## Llaves maestras como cualquier don; puntos y cofre son fijos.
-func _benefit_amount(benefit: Dictionary, keys: int) -> float:
-	if String(benefit.kind) == "boon":
-		return boon_amount(float(benefit.amount), keys)
-	return float(benefit.amount)
-
-
-func _cost_amount(cost: Dictionary) -> float:
-	var amount := float(cost.amount)
+## Cómo se lee el costo: solo el del pacto. La dificultad que suma todo uso
+## del altar se cobra igual, pero la carta no la muestra.
+func _cost_text(cost: Dictionary, amount: float) -> String:
 	if String(cost.kind) == "difficulty":
-		return amount * _blood_scale() * difficulty_scale
-	return amount
+		return String(cost.label) % roundi(_difficulty_cost(amount))
+	return String(cost.label) % roundi(amount)
 
 
-## Paga el pacto elegido: primero el beneficio, luego el costo. Devuelve el
-## texto del beneficio, que es lo que anuncian el cartel y el log
-## `Altar charged:`; el costo tiene sus propios logs.
-func _grant_choice(option: Dictionary, keys: int, recipient: Node) -> String:
-	var pact: Dictionary = option.pact
-	var benefit: Dictionary = pact.benefit
-	var gained := _benefit_text(benefit, keys)
-	_pay_benefit(benefit, keys, recipient)
-	var difficulty_step := _pay_cost(pact.cost)
+## Dificultad (en %) que suma todo uso del altar, con la escala de ESTE altar.
+func _base_difficulty() -> float:
+	return difficulty_per_use * _blood_scale() * difficulty_scale
+
+
+## Un costo de dificultad con la Sangre de demonio y difficulty_scale.
+func _difficulty_cost(amount: float) -> float:
+	return amount * _blood_scale() * difficulty_scale
+
+
+## Paga el pacto elegido: la stat para toda la party, el costo y la
+## dificultad de siempre. Devuelve el texto del don, que anuncian el cartel
+## y el log `Altar charged:`; el costo tiene sus propios logs.
+func _grant_choice(option: Dictionary, _keys: int, recipient: Node) -> String:
+	grant_boon(String(option.stat), float(option.amount))
+	var cost: Dictionary = option.cost
+	var difficulty_step := _pay_cost(cost, float(option.cost_amount), recipient)
+	var always := _base_difficulty() / 100.0
+	RunState.add_difficulty(always, "altars")
+	difficulty_step += always
 	RunState.demonic_uses += 1
-	# Logs de una línea para los soaks. Un pacto cuyo costo no es dificultad
-	# informa un paso de 0.
-	print("Demonic pact: %s" % String(pact.id))
+	print("Demonic pact: %s +%s / %s %d" % [String(option.stat), option.amount,
+			String(cost.id), roundi(float(option.cost_amount))])
 	print("Demonic altar used: difficulty +%d%% (total +%d%%)" % [
 			roundi(difficulty_step * 100.0), roundi(RunState.difficulty_bonus * 100.0)])
-	return gained
-
-
-## Una rama por kind de beneficio.
-func _pay_benefit(benefit: Dictionary, keys: int, recipient: Node) -> void:
-	match String(benefit.kind):
-		"boon":
-			grant_boon(String(benefit.stat), _benefit_amount(benefit, keys))
-		"points":
-			if recipient != null and is_instance_valid(recipient) \
-					and recipient.has_method("add_points"):
-				recipient.call("add_points", roundi(float(benefit.amount)))
-		"chest":
-			_drop_free_chest()
-		_:
-			push_warning("CurseShrine: unknown benefit kind '%s'" % benefit.kind)
+	return String(option.label)
 
 
 ## Una rama por kind de costo. Devuelve la fracción de DIFICULTAD sumada (0
 ## para los demás kinds), que es lo que informa el log.
-func _pay_cost(cost: Dictionary) -> float:
-	var fraction := _cost_amount(cost) / 100.0
+func _pay_cost(cost: Dictionary, amount: float, recipient: Node) -> float:
+	var fraction := amount / 100.0
 	match String(cost.kind):
 		"difficulty":
-			RunState.add_difficulty(fraction, "altars")
-			return fraction
-		"elites":
-			RunState.elite_chance_bonus += fraction
+			var step := _difficulty_cost(amount) / 100.0
+			RunState.add_difficulty(step, "altars")
+			return step
 		"sky_duration":
 			RunState.sky_duration_multiplier *= 1.0 + fraction
-		"events":
-			RunState.event_chance_bonus += fraction
-		"disasters":
-			# Lo lee WeatherDirector.maybe_roll.
-			RunState.disaster_chance_bonus += fraction
+		"bad_events":
+			# Lo lee WeatherCatalog al sortear: pesa más cada fila `bad`.
+			RunState.bad_weather_bonus += fraction
+		"enemy_speed":
+			RunState.enemy_speed_multiplier *= 1.0 + fraction
+		"points":
+			_lose_points(recipient, fraction)
 		_:
 			push_warning("CurseShrine: unknown cost kind '%s'" % cost.kind)
 	return 0.0
 
 
-## El beneficio "cofre gratis": un cofre sin precio que tira su rareza al
-## abrirse, a chest_drop_distance del obelisco en una dirección al azar.
-## Chest.spawn_free lo cuelga de la arena: el obelisco se libera unos
-## segundos después de pagar y no se lleva el premio.
-func _drop_free_chest() -> void:
-	var angle := randf() * TAU
-	Chest.spawn_free(get_tree(), global_position
-			+ Vector3(cos(angle), 0.0, sin(angle)) * chest_drop_distance)
+## Quien sostuvo el anillo pierde esa fracción de sus puntos.
+func _lose_points(recipient: Node, fraction: float) -> void:
+	if recipient == null or not is_instance_valid(recipient) \
+			or not recipient.has_method("spend_points"):
+		return
+	var lost := floori(float(recipient.get("points")) * fraction)
+	if lost > 0:
+		recipient.call("spend_points", lost)

@@ -23,7 +23,7 @@ Lo que NO se traduce nunca: los `id` de catálogo, los `node_name`, los nombres 
 18. Compuestos: verbo + sustantivo en plural (Perforacorazones, Matarreyes, Cazacoronas, Levantatapas); mata- no elide nunca. Escupesol va en singular (quitasol, girasol).
 19. Los glifos de dos letras de item_catalog.gd se re-siglan al nombre español (tabla en «terminos»); un glifo «WS» sobre «Piedra de afilar» se lee como bug.
 20. Brevedad: la etiqueta española no debe crecer más de ~10% sobre la inglesa en HUD, insignias y botones. Si crece, se recorta el adjetivo, nunca el sentido.
-21. El mapa de Tab **no** es un menú y su título no lleva verbo: la cabecera es «Etapa N · Vuelta M — MM:SS», con la chapa «Explorado N%» en la esquina del mapa, y los paneles son sustantivos sueltos — hoy cinco: «Estadísticas», «Jugadores» (solo en co-op: en solitario repetiría el HUD), «Power-ups», «Mascota», «Objetos». La leyenda nombra **familias** en plural («Cofres», «Altares», «Portales») y en singular solo lo que es único en la etapa («Jefe», «Salida», «Manantial», «Ruleta»), y lista solo los tipos que están a la vista. La chapa del minimapa es «N», de norte.
+21. El mapa de Tab **no** es un menú y su título no lleva verbo: la cabecera es «Etapa N · Vuelta M — MM:SS», con la chapa «Explorado N%» en la esquina del mapa, y los paneles son sustantivos sueltos — hoy cuatro: «Estadísticas», «Jugadores» (solo en co-op: en solitario repetiría el HUD), «Power-ups», «Objetos». La leyenda nombra **familias** en plural («Cofres», «Altares», «Portales») y en singular solo lo que es único en la etapa («Jefe», «Salida», «Manantial», «Ruleta»), y lista solo los tipos que están a la vista. La chapa del minimapa es «N», de norte.
 
 ## Personajes (no se traducen)
 
@@ -135,15 +135,6 @@ Lo que NO se traduce nunca: los `id` de catálogo, los `node_name`, los nombres 
 | glyph "SS" | glifo "SS" (Sangre Sayayin) |
 | glyph "ZK" | glifo "ZK" (Zenkai) |
 | glyph "SP" (Spring Boots) | glifo "RS" (por «reSorte»: «BR» ya es Tomo de Bruma) |
-
-## Mascotas
-
-| Inglés | Español |
-|---|---|
-| Alien | Alienígena |
-| Dinosaur | Dinosaurio |
-| Angry Bird | Pájaro furioso |
-| Capybara | Capibara |
 
 ## Reliquias (Armería)
 
@@ -409,6 +400,7 @@ Lo que NO se traduce nunca: los `id` de catálogo, los `node_name`, los nombres 
 | armor | armadura |
 | evasion | evasión |
 | luck | suerte |
+| luck % | suerte % |
 | thorns | espinas |
 | max HP | HP máx. |
 | HP | HP (nunca «PV») |
@@ -498,45 +490,25 @@ en su propio pedido y la que cualquier jugador de este género reconoce;
 lleva apellido: en el juego es solo «Estrella», y el guiño a Mario vive en
 el arcoíris, no en el nombre.
 
-## Vendedores, caja de mascotas y mascotas nuevas (iteración 54)
+## Vendedores y manantiales (iteración 54)
 
 | Inglés | Español |
 |---|---|
 | vendor | vendedor |
-| Animal trafficker | Traficante de animales |
-| Power-up vendor | Vendedor de power-ups |
 | Item vendor | Vendedor de objetos |
-| pet box | caja de mascotas |
-| companion / pet | mascota (nunca «compañero», que es el otro jugador en co-op) |
-| `A vendor arrives!` | ¡Llega un vendedor! |
 | `The vendor packs up.` | El vendedor recoge el puesto. |
-| `[E] See the animals` | `[E] Ver los animales` |
-| `[E] See the power-up` | `[E] Ver el power-up` |
 | `[E] See the goods` | `[E] Ver la mercancía` |
 | `[E] Trade` (respaldo de una fila sin `prompt`) | `[E] Comerciar` |
 | `Serving again in %d s` (espera tras cerrar sin comprar; **sin `[E] `**, porque no hay nada que pulsar) | Atiende de nuevo en %d s |
-| `[E] Open the box` | `[E] Abrir la caja` |
-| `A box with a paw appears...` | Una caja con una huella aparece en el campo... |
-| `The box is empty.` | La caja está vacía. |
-| `The box opens by itself` | La caja se abre sola |
 | `Swap for %s` | Cambiar por %s |
 | `Keep %s` | Quedarme con %s |
 | `Choose what you take.` | Elige lo que te llevas. |
 | `Deal! %s` | ¡Trato hecho! %s |
+| `Sold` | Vendido |
 | `The vendor has nothing for you.` | El vendedor no tiene nada para ti. |
-| `No pet` | Sin mascota |
-| `%s joins` | %s se une |
-| `%s says goodbye` | %s se despide |
-| Doki | Doki |
-| Pony | Pony |
-| Cj7 | Cj7 |
-| Magic Pumpkin | Calabaza mágica |
-| Pokemon | Pokemon |
-
-Los cinco nombres de mascota son palabras del compañero de equipo y viajan
-sin traducir, como el roster de personajes: «Calabaza mágica» llegó ya en
-español y ya en caja baja tipo oración, así que traducir o reestilar
-cualquiera de los cinco inventaría un nombre que nadie del equipo usa.
+| spring | manantial |
+| `[E] Activate — healing zone (free)` | `[E] Activar — zona de curación (gratis)` |
+| `The spring heals whoever is near` | El manantial cura a quien esté cerca |
 
 ## Clima (iteración 55)
 
@@ -552,7 +524,6 @@ cualquiera de los cinco inventaría un nombre que nadie del equipo usa.
 | Enemy tsunami | Tsunami |
 | Earthquake | Terremoto |
 | Meteor shower | Lluvia de meteoritos |
-| event altar | altar de eventos |
 | acid pool | charco ácido |
 | `BLOOD MOON — the horde goes mad!` | LUNA DE SANGRE — ¡la horda enloquece! |
 | `ECLIPSE — shadows pour in` | ECLIPSE — las sombras entran por todos lados |
@@ -604,7 +575,7 @@ evolución.
 
 ## Rarezas
 
-> **Cuidado:** `Rarity.TIERS[].name` y el campo `rarity` de `ItemCatalog` son **claves de lógica**, no texto. Se leen como id en los precios de cofre (`RunState.CHEST_BASE_PRICES`), en la tirada de objetos y en varios santuarios. Se traducen **solo al pintarlos**, con `Rarity.display_name()`.
+> **Cuidado:** `Rarity.TIERS[].name` y el campo `rarity` de `ItemCatalog` son **claves de lógica**, no texto. Se leen como id en los precios de cofre (`Vendor.item_price_factors`), en la tirada de objetos y en varios santuarios. Se traducen **solo al pintarlos**, con `Rarity.display_name()`.
 
 | Inglés | Español |
 |---|---|

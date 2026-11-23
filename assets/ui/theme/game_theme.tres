@@ -1,7 +1,7 @@
-[gd_resource type="Theme" format=3]
+[gd_resource type="Theme" format=3 uid="uid://8bdcn2lcbnq3"]
 
-[ext_resource type="FontFile" path="res://assets/ui/fonts/LilitaOne-Regular.ttf" id="1_ijclu"]
-[ext_resource type="FontFile" path="res://assets/ui/fonts/Nunito-Variable.ttf" id="2_0dagf"]
+[ext_resource type="FontFile" uid="uid://b2l51oq468gji" path="res://assets/ui/fonts/LilitaOne-Regular.ttf" id="1_ijclu"]
+[ext_resource type="FontFile" uid="uid://dibj7t6vth7ty" path="res://assets/ui/fonts/Nunito-Variable.ttf" id="2_0dagf"]
 
 [sub_resource type="FontVariation" id="FontVariation_ijclu"]
 base_font = ExtResource("1_ijclu")

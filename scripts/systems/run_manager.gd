@@ -24,14 +24,21 @@ const STAGE_GOAL_ENV: String = "BONK_STAGE_GOAL"
 @export_group("Puerta de etapa")
 ## Segundos que debe durar una ETAPA antes de que su puerta pueda abrirse.
 ## Se mide con RunState.stage_time, así cada mapa de la partida tiene su
-## tramo completo.
-@export var stage_goal: float = 900.0
+## tramo completo. Va junto con elder_spawn_minute del spawner: el jefe de
+## etapa llega al cumplirse este tiempo y la etapa se supera al matarlo.
+@export var stage_goal: float = 600.0
 ## Aviso del momento en que se supera una etapa. Sin marcadores de formato:
 ## habla de la puerta que se acaba de abrir, no de un número.
 @export var survival_text: String = "¡Etapa superada! Se abrió el portal — quédate cuanto quieras"
+
+@export_group("Dificultad por minuto")
+## Dificultad, en %, que sube cada minuto de partida (15 = +15% por minuto, acumulado). 0 = no sube con el tiempo.
+@export var difficulty_per_minute: float = 15.0
 @export_group("")
 
 var _run_over: bool = false
+## Minutos de partida ya cobrados en dificultad (ver difficulty_per_minute).
+var _difficulty_minutes: int = 0
 ## True si BONK_STAGE_FAST está puesto (se lee una vez, en _ready).
 var _stage_fast: bool = false
 ## Segundos de la mitad de tiempo con BONK_STAGE_GOAL (-1 = sin interruptor).
@@ -89,6 +96,7 @@ func _on_player_died() -> void:
 func _physics_process(_delta: float) -> void:
 	# Modo de proceso pausable: mientras la UI de cartas pausa el árbol, este
 	# chequeo se congela junto con RunState.stage_time.
+	_tick_difficulty_per_minute()
 	if not RunState.stage_cleared and _stage_gate_open():
 		RunState.mark_stage_cleared(GameConfig.selected_map_id)
 		get_tree().call_group("boss_ui", "announce_major", survival_text)
@@ -96,6 +104,21 @@ func _physics_process(_delta: float) -> void:
 		# portal de salida puede aparecer, con las dos mitades de la puerta.
 		print("Stage gate: time=%.1f boss=%s" % [
 				RunState.stage_time, RunState.stage_boss_dead])
+
+
+## Cada minuto completo de partida suma difficulty_per_minute a la
+## dificultad (fuente "time" de RunState, la misma que leen enemigos y HUD).
+func _tick_difficulty_per_minute() -> void:
+	if difficulty_per_minute <= 0.0:
+		return
+	var minutes := floori(RunState.run_time / 60.0)
+	if minutes <= _difficulty_minutes:
+		return
+	RunState.add_difficulty(difficulty_per_minute / 100.0 * float(minutes - _difficulty_minutes),
+			"time")
+	_difficulty_minutes = minutes
+	print("Difficulty per minute: minute %d, total +%d%%" % [
+			minutes, roundi(RunState.difficulty_bonus * 100.0)])
 
 
 ## Segundos que debe durar esta etapa. El interruptor del harness lo acorta

@@ -61,7 +61,7 @@ const SFX_SCENE_PATTERN := "^\\w+_(?:sound|loop) = &\"([^\"]+)\"$"
 const STRING_NAME_PATTERN := "&\"([^\"]*)\""
 ## Valores de `show` en MapOverlay.STAT_ROWS: los que MapStats._bonus y
 ## MapStats._bonus_text saben escribir.
-const STAT_ROW_SHOWS: Array[String] = ["multiplier", "attack_speed", "fraction", "flat"]
+const STAT_ROW_SHOWS: Array[String] = ["multiplier", "attack_speed", "fraction", "flat", "luck"]
 
 var _checks_run: int = 0
 var _checks_failed: int = 0
@@ -142,21 +142,19 @@ func _id_libraries() -> Array[Array]:
 		["TOME_LIBRARY", Tome.TOME_LIBRARY, "id"],
 		["ITEM_LIBRARY", ItemCatalog.ITEM_LIBRARY, "id"],
 		["POWERUP_LIBRARY", PowerUpCatalog.POWERUP_LIBRARY, "id"],
-		["PET_LIBRARY", PetCatalog.PET_LIBRARY, "id"],
 		["CHARACTER_LIBRARY", CharacterCatalog.CHARACTER_LIBRARY, "id"],
 		["RELIC_LIBRARY", RelicCatalog.RELIC_LIBRARY, "id"],
 		["MAP_LIBRARY", MapCatalog.MAP_LIBRARY, "id"],
 		["QUEST_LIBRARY", QuestCatalog.QUEST_LIBRARY, "id"],
 		["EVENT_LIBRARY", WORLD_DIRECTOR.EVENT_LIBRARY, "id"],
 		["WEATHER_CATALOG", WEATHER_DIRECTOR.WEATHER_CATALOG, "id"],
-		["PACT_LIBRARY", CurseShrine.PACT_LIBRARY, "id"],
+		["COST_LIBRARY", CurseShrine.COST_LIBRARY, "id"],
 	]
 
 
 ## Los glifos son la sigla de dos letras que pinta un espacio del HUD cuando
 ## no hay ícono PNG. Se comparan por CONTENIDO, no por biblioteca: el mismo
-## «PA» en un arma y en un objeto se lee como la misma cosa. La mascota se
-## dibuja en la misma tira que armas y tomos, por eso entra también.
+## «PA» en un arma y en un objeto se lee como la misma cosa.
 func _check_glyphs_unique() -> void:
 	var failures: Array[String] = []
 	var rows := 0
@@ -167,7 +165,6 @@ func _check_glyphs_unique() -> void:
 		["TOME_LIBRARY", Tome.TOME_LIBRARY, "id"],
 		["ITEM_LIBRARY", ItemCatalog.ITEM_LIBRARY, "id"],
 		["POWERUP_LIBRARY", PowerUpCatalog.POWERUP_LIBRARY, "id"],
-		["PET_LIBRARY", PetCatalog.PET_LIBRARY, "id"],
 	]
 	for entry: Array in sources:
 		var library_name := String(entry[0])
@@ -194,7 +191,6 @@ func _check_paths_exist() -> void:
 	var rows := 0
 	var sources: Array[Array] = [
 		["WEAPON_LIBRARY", WeaponCatalog.WEAPON_LIBRARY, "id"],
-		["PET_LIBRARY", PetCatalog.PET_LIBRARY, "id"],
 		["CHARACTER_LIBRARY", CharacterCatalog.CHARACTER_LIBRARY, "id"],
 		["MAP_LIBRARY", MapCatalog.MAP_LIBRARY, "id"],
 		["ITEM_LIBRARY", ItemCatalog.ITEM_LIBRARY, "id"],
@@ -252,12 +248,6 @@ func _check_stat_ids() -> void:
 				if not accepted.has(stat):
 					failures.append("%s/%s effect stat '%s' is not a PlayerStats effect"
 							% [library_name, String(row.get(key, "?")), stat])
-	for row: Dictionary in PetCatalog.PET_LIBRARY:
-		rows += 1
-		var stat := String(row.get("stat", ""))
-		if not accepted.has(stat):
-			failures.append("pet '%s' stat '%s' is not a PlayerStats effect"
-					% [String(row.get("id", "?")), stat])
 	for row: Dictionary in RelicCatalog.RELIC_LIBRARY:
 		rows += 1
 		var stat := String(row.get("stat", ""))
@@ -269,16 +259,7 @@ func _check_stat_ids() -> void:
 		var stat := String(row.get("stat", ""))
 		if not accepted.has(stat):
 			failures.append("altar boon '%s' stat '%s' is not a PlayerStats effect"
-					% [String(row.get("name", "?")), stat])
-	for row: Dictionary in CurseShrine.PACT_LIBRARY:
-		var benefit: Dictionary = row.get("benefit", {})
-		if String(benefit.get("kind", "")) != "boon":
-			continue
-		rows += 1
-		var stat := String(benefit.get("stat", ""))
-		if not accepted.has(stat):
-			failures.append("pact '%s' benefit stat '%s' is not a PlayerStats effect"
-					% [String(row.get("id", "?")), stat])
+					% [String(row.get("label", "?")), stat])
 	_report("stat_ids", rows, failures)
 
 
@@ -560,7 +541,7 @@ func _check_quest_stats() -> void:
 
 
 ## Números que un texto repite de su propia fila: la pasiva de cada
-## personaje, la etiqueta de cada mascota y el texto de rango de cada
+## personaje y el texto de rango de cada
 ## reliquia. El texto se escribe a mano al lado del número que de verdad se
 ## aplica; si alguien cambia uno y no el otro, la carta miente.
 func _check_text_numbers() -> void:
@@ -577,13 +558,6 @@ func _check_text_numbers() -> void:
 		if base > 0.0 and not _has_number(numbers, base):
 			failures.append("character '%s' passive_description '%s' does not show passive_base %s"
 					% [String(row.get("id", "?")), text, str(base)])
-	for row: Dictionary in PetCatalog.PET_LIBRARY:
-		rows += 1
-		var label := String(row.get("stat_label", ""))
-		var numbers := _numbers_in(label)
-		if numbers.is_empty() or not is_equal_approx(numbers[0], float(row.get("amount_per_level", 0.0))):
-			failures.append("pet '%s' stat_label '%s' does not show amount_per_level %s"
-					% [String(row.get("id", "?")), label, str(row.get("amount_per_level", 0.0))])
 	for row: Dictionary in RelicCatalog.RELIC_LIBRARY:
 		rows += 1
 		var amount_text := String(row.get("amount_text", ""))

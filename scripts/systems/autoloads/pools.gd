@@ -17,6 +17,7 @@ const XP_GEM_SCENE: PackedScene = preload("res://scenes/systems/XpGem.tscn")
 const HEALTH_ORB_SCENE: PackedScene = preload("res://scenes/systems/HealthOrb.tscn")
 const DART_SCENE: PackedScene = preload("res://scenes/weapons/Projectile.tscn")
 const ARROW_SCENE: PackedScene = preload("res://scenes/weapons/Arrow.tscn")
+const EMBER_BALL_SCENE: PackedScene = preload("res://scenes/weapons/EmberBall.tscn")
 const BOOMERANG_SCENE: PackedScene = preload("res://scenes/weapons/BoomerangProjectile.tscn")
 const ENEMY_BOLT_SCENE: PackedScene = preload("res://scenes/enemies/EnemyBolt.tscn")
 const DEATH_BURST_SCENE: PackedScene = preload("res://scenes/fx/DeathBurst.tscn")
@@ -24,7 +25,6 @@ const DAMAGE_POPUP_SCENE: PackedScene = preload("res://scenes/fx/DamagePopup.tsc
 const TELEGRAPH_DISC_SCENE: PackedScene = preload("res://scenes/fx/TelegraphDisc.tscn")
 const SLASH_ARC_SCENE: PackedScene = preload("res://scenes/fx/SlashArc.tscn")
 const MUZZLE_FLASH_SCENE: PackedScene = preload("res://scenes/fx/MuzzleFlash.tscn")
-const WHIP_CRACK_SCENE: PackedScene = preload("res://scenes/fx/WhipCrack.tscn")
 const SHOCK_RING_SCENE: PackedScene = preload("res://scenes/fx/ShockRing.tscn")
 const TELEGRAPH_LANE_SCENE: PackedScene = preload("res://scenes/fx/TelegraphLane.tscn")
 const WATER_BURST_SCENE: PackedScene = preload("res://scenes/fx/WaterBurst.tscn")
@@ -52,6 +52,7 @@ const POOLS: Array[Dictionary] = [
 	{"name": "health_orb", "scene": HEALTH_ORB_SCENE, "warm": 4, "cap": 16},
 	{"name": "dart", "scene": DART_SCENE, "warm": 16, "cap": 96},
 	{"name": "arrow", "scene": ARROW_SCENE, "warm": 16, "cap": 96},
+	{"name": "ember_ball", "scene": EMBER_BALL_SCENE, "warm": 8, "cap": 48},
 	{"name": "boomerang", "scene": BOOMERANG_SCENE, "warm": 4, "cap": 24},
 	{"name": "enemy_bolt", "scene": ENEMY_BOLT_SCENE, "warm": 16, "cap": 96},
 	{"name": "death_burst", "scene": DEATH_BURST_SCENE, "warm": 12, "cap": 64},
@@ -59,7 +60,6 @@ const POOLS: Array[Dictionary] = [
 	{"name": "telegraph_disc", "scene": TELEGRAPH_DISC_SCENE, "warm": 6, "cap": 32},
 	{"name": "slash_arc", "scene": SLASH_ARC_SCENE, "warm": 8, "cap": 32},
 	{"name": "muzzle_flash", "scene": MUZZLE_FLASH_SCENE, "warm": 6, "cap": 24},
-	{"name": "whip_crack", "scene": WHIP_CRACK_SCENE, "warm": 4, "cap": 16},
 	{"name": "shock_ring", "scene": SHOCK_RING_SCENE, "warm": 2, "cap": 6},
 	{"name": "telegraph_lane", "scene": TELEGRAPH_LANE_SCENE, "warm": 1, "cap": 4},
 	{"name": "water_burst", "scene": WATER_BURST_SCENE, "warm": 4, "cap": 24},

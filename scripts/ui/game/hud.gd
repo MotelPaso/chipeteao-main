@@ -14,6 +14,9 @@ extends CanvasLayer
 ## estos nombres sin buscar cada llamada (grep -rn '"hud"\|"boss_ui"' scripts):
 ##   announce(message)                 jefes, altares, eventos, objetos
 ##   announce_major(message)           evoluciones, etapa nueva, supervivencia
+##   begin_event_batch() / event_batch_kind(kind) / end_event_batch()
+##                                     WorldDirector: junta los avisos de un
+##                                     pulso por minuto en una sola lista
 ##   show_loot(title, description, color, player_index)  bolsas, power-ups, cartas
 ##   track_boss(boss, title)           BossBase al entrar a la arena
 ##   track_objective(node)             WorldDirector (portal de salida)
@@ -97,6 +100,10 @@ var _last_kills: int = 0
 ## Último segundo entero pintado en el reloj: el texto cambia una vez por
 ## segundo, y darle formato cada cuadro rehace el layout de la fuente espaciada.
 var _shown_second: int = -1
+## Avisos juntados durante un pulso por minuto: {"text", "kind"}.
+var _batch: Array[Dictionary] = []
+var _batching: bool = false
+var _batch_kind: String = ""
 
 @onready var _hp_bar: ProgressBar = %HpBar
 @onready var _hp_label: Label = %HpLabel
@@ -109,6 +116,7 @@ var _shown_second: int = -1
 @onready var _stage_label: Label = %StageLabel
 @onready var _streak: StreakPopup = %StreakLabel
 @onready var _announce: AnnounceBanner = %AnnounceLabel
+@onready var _event_burst: EventBurst = %EventBurst
 @onready var _boss_bar: BossBar = %BossBar
 @onready var _boss_arrow: BossArrow = %BossArrow
 @onready var _build_strip: LoadoutStrip = %BuildStrip
@@ -146,9 +154,35 @@ func _process(_delta: float) -> void:
 
 # --- API por grupo ("hud" y "boss_ui"): ver la lista arriba. ----------------
 
-## Cartel breve que se desvanece solo.
+## Cartel breve que se desvanece solo. Dentro de un pulso por minuto se
+## guarda para la lista de end_event_batch.
 func announce(message: String) -> void:
+	if _batching:
+		_batch.append({"text": message, "kind": _batch_kind})
+		return
 	_announce.announce(message)
+
+
+## Empieza a juntar los avisos de un pulso por minuto.
+func begin_event_batch() -> void:
+	_batching = true
+	_batch.clear()
+	_batch_kind = ""
+
+
+## Tipo de los avisos que lleguen desde ahora ("weather", "horde").
+func event_batch_kind(kind: String) -> void:
+	_batch_kind = kind
+
+
+## Muestra lo juntado: con un aviso, el cartel normal; con varios, la lista.
+func end_event_batch() -> void:
+	_batching = false
+	if _batch.size() == 1:
+		_announce.announce(String(_batch[0]["text"]))
+	elif _batch.size() > 1:
+		_event_burst.show_events(_batch.duplicate())
+	_batch.clear()
 
 
 ## Cartel de recompensa: dorado, con golpe de escala y más tiempo en pantalla.

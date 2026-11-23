@@ -1,8 +1,8 @@
 class_name PartyPower
 extends Node
 ## Poder de la party en la partida actual: cuánto daño hacen sus armas por
-## segundo y un puntaje de sus «poderes» (armas, tomos, objetos, power-ups y
-## mascotas), cada uno con su peso. Es el nodo RunSystems.tscn > PartyPower:
+## segundo y un puntaje de sus «poderes» (armas, tomos, objetos y
+## power-ups), cada uno con su peso. Es el nodo RunSystems.tscn > PartyPower:
 ## nace y muere con la partida, y sus pesos se editan en su Inspector.
 ## El daño llega desde WeaponBase.deal_damage (record_weapon_damage). El
 ## veneno, las espinas, los siervos y el clima no pasan por ahí y no cuentan.
@@ -45,8 +45,6 @@ const HISTORY_SECONDS: int = 180
 @export var item_weight: float = 0.6
 ## Puntos de poder por cada power-up activo en este momento.
 @export var powerup_weight: float = 2.0
-## Puntos de poder por llevar mascota.
-@export var pet_weight: float = 2.0
 
 @export_group("Registro")
 ## Segundos de partida entre líneas "Party power:" del log (0 = nunca).
@@ -132,10 +130,10 @@ func score() -> float:
 	return breakdown()["total"]
 
 
-## El puntaje por tipo de poder: weapons, tomes, items, powerups, pets y total.
+## El puntaje por tipo de poder: weapons, tomes, items, powerups y total.
 func breakdown() -> Dictionary[String, float]:
 	var parts: Dictionary[String, float] = {
-		"weapons": 0.0, "tomes": 0.0, "items": 0.0, "powerups": 0.0, "pets": 0.0,
+		"weapons": 0.0, "tomes": 0.0, "items": 0.0, "powerups": 0.0,
 	}
 	for group: String in ["player", "downed_players"]:
 		for node: Node in get_tree().get_nodes_in_group(group):
@@ -148,10 +146,8 @@ func breakdown() -> Dictionary[String, float]:
 			var powerups := PowerUps.find_in(raider)
 			if powerups != null:
 				parts["powerups"] += powerup_weight * float(powerups.count())
-			if not raider.pet_id.is_empty():
-				parts["pets"] += pet_weight
 	parts["total"] = parts["weapons"] + parts["tomes"] + parts["items"] \
-			+ parts["powerups"] + parts["pets"]
+			+ parts["powerups"]
 	return parts
 
 
@@ -159,10 +155,10 @@ func breakdown() -> Dictionary[String, float]:
 func log_line() -> String:
 	var parts := breakdown()
 	return ("Party power: t=%.0fs players=%d dps=%.1f focus=%.1f score=%.1f weapons=%.1f"
-			+ " tomes=%.1f items=%.1f powerups=%.1f pets=%.1f") % [
+			+ " tomes=%.1f items=%.1f powerups=%.1f") % [
 			RunState.run_time, maxi(Coop.player_count, 1), dps(log_window),
 			focus_dps(log_window), parts["total"], parts["weapons"], parts["tomes"],
-			parts["items"], parts["powerups"], parts["pets"]]
+			parts["items"], parts["powerups"]]
 
 
 func _add(weapon: WeaponBase, applied: float, rolled: float) -> void:

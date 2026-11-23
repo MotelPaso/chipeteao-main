@@ -16,10 +16,10 @@ extends WeaponBase
 @export_group("Orbes")
 ## Radio visual de cada orbe, en metros (escala la malla unitaria orb_mesh); no cambia el daño.
 @export var orb_radius: float = 0.4
-## Distancia de contacto desde el centro de un orbe hasta un enemigo, en metros; independiente de orb_radius. Las mejoras de tamaño lo suben y el visual lo sigue.
-@export var hit_radius: float = 3.1
+## Distancia de contacto desde el centro de un orbe hasta el BORDE del cuerpo de un enemigo, en metros (un poco más que orb_radius, para que pegue al verse tocar). Las mejoras de tamaño y los tomos de área lo suben y el visual lo sigue.
+@export var hit_radius: float = 0.9
 ## Velocidad angular del anillo, en radianes por segundo.
-@export var orbit_speed: float = 2.6
+@export var orbit_speed: float = 3.4
 ## Altura del anillo sobre los pies del portador, en metros.
 @export var orb_height: float = 1.0
 ## Oscilación vertical del anillo, en metros, para que no se lea como una calcomanía plana.
@@ -60,13 +60,14 @@ func _physics_process(delta: float) -> void:
 func _update_ring(delta: float) -> void:
 	_angle = wrapf(_angle + orbit_speed * delta, 0.0, TAU)
 	var radius := attack_range
-	# Los orbes crecen en la misma proporción que el contacto (hit_radius).
-	var size_ratio := hit_radius / maxf(_base_hit_radius, 0.001)
+	# Los orbes crecen en la misma proporción que el contacto: las mejoras de
+	# tamaño (hit_radius) y los tomos de área (area_scale sobre su base).
+	var size_ratio := hit_radius / maxf(_base_hit_radius, 0.001) \
+			* area_scale() / maxf(base_area_scale, 0.001)
 	# Anillo en espacio mundial alrededor de los pies del portador: el ángulo
 	# de la órbita tiene su propio reloj, así girar o moverse de lado no
 	# arrastra el anillo con el cuerpo (los orbes son hijos, de ahí
-	# global_position). El centro sigue al montaje portador: el anillo de una
-	# mascota orbita a la mascota.
+	# global_position). El centro sigue al montaje portador.
 	_ring_center = global_position
 	var carrier := carrier_node()
 	if carrier != null:
@@ -102,7 +103,6 @@ func _touch_enemies() -> void:
 	if get_tree().get_first_node_in_group("enemies") == null:
 		return
 	var reach := hit_radius * area_scale()
-	var reach_sq := reach * reach
 	# Fase amplia alrededor del centro del anillo. Ningún orbe está más lejos
 	# que attack_range en horizontal más orb_height + bob_height en vertical,
 	# y ningún contacto pasa de `reach` desde un orbe, así que esta esfera
@@ -121,8 +121,11 @@ func _touch_enemies() -> void:
 		# Una vez por cuerpo: el bucle de orbes daña como máximo una vez y
 		# corta, así que el cuerpo no puede moverse entre dos lecturas.
 		var aim := body.global_position + aim_lift
+		# El orbe toca el CUERPO, no solo su centro.
+		var touch := reach + body_hit_radius(body)
+		var touch_sq := touch * touch
 		for orb_position: Vector3 in _orb_positions:
-			if orb_position.distance_squared_to(aim) > reach_sq:
+			if orb_position.distance_squared_to(aim) > touch_sq:
 				continue
 			var health := Health.find_in(body)
 			if health != null and not health.is_dead:

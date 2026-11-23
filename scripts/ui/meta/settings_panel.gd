@@ -69,6 +69,7 @@ const VOLUME_MAX := 100.0
 @onready var _music_value: Label = %MusicValue
 @onready var _fullscreen_check: CheckButton = %FullscreenCheck
 @onready var _fps_check: CheckButton = %FpsCheck
+@onready var _ground_check: CheckButton = %GroundCheck
 ## Preset gráfico: un botón por índice de SaveData.graphics_quality (Alta,
 ## Media, Baja, en ese orden), en un ButtonGroup. No es un OptionButton: el
 ## panel no tiene ningún popup, y una lista desplegable sería una superficie
@@ -89,6 +90,7 @@ func _ready() -> void:
 	_sensitivity_slider.value_changed.connect(_on_sensitivity_changed)
 	_fullscreen_check.toggled.connect(_on_fullscreen_toggled)
 	_fps_check.toggled.connect(_on_fps_toggled)
+	_ground_check.toggled.connect(_on_ground_toggled)
 	var quality_group := ButtonGroup.new()
 	for index in _quality_buttons.size():
 		var button := _quality_buttons[index]
@@ -147,6 +149,7 @@ func _refresh_controls() -> void:
 	_sensitivity_slider.set_value_no_signal(SaveData.mouse_sensitivity)
 	_fullscreen_check.set_pressed_no_signal(SaveData.fullscreen)
 	_fps_check.set_pressed_no_signal(SaveData.show_fps)
+	_ground_check.set_pressed_no_signal(SaveData.show_ground_cover)
 	for index in _quality_buttons.size():
 		_quality_buttons[index].set_pressed_no_signal(index == SaveData.graphics_quality)
 	_refresh_sensitivity_label(_sensitivity_slider.value)
@@ -160,12 +163,12 @@ func _refresh_controls() -> void:
 ## quedan más cerca que las filas de arriba). Cada fila nombra a sus vecinos
 ## y la columna da la vuelta, así que el foco nunca sale del panel:
 ##   Efectos ↕ Ambiente ↕ Música ↕ Sensibilidad ↕ Pantalla completa ↕ FPS
-##   ↕ Calidad (Alta ↔ Media ↔ Baja) ↕ Volver ↕ (de vuelta a Efectos)
+##   ↕ Pasto y piedras ↕ Calidad (Alta ↔ Media ↔ Baja) ↕ Volver ↕ (de vuelta a Efectos)
 ## Izquierda/derecha sobre un slider mueve su valor (lo hace HSlider); sobre
 ## un control simple no va a ningún lado en vez de salir del panel.
 func _link_focus() -> void:
 	var column: Array[Control] = [_sfx_slider, _ambient_slider, _music_slider,
-			_sensitivity_slider, _fullscreen_check, _fps_check,
+			_sensitivity_slider, _fullscreen_check, _fps_check, _ground_check,
 			_quality_buttons[0], _back_button]
 	for i in column.size():
 		var here := column[i]
@@ -181,7 +184,7 @@ func _link_focus() -> void:
 	# abajo, e izquierda/derecha recorren la fila sin salirse de ella.
 	for i in _quality_buttons.size():
 		var button := _quality_buttons[i]
-		button.focus_neighbor_top = button.get_path_to(_fps_check)
+		button.focus_neighbor_top = button.get_path_to(_ground_check)
 		button.focus_neighbor_bottom = button.get_path_to(_back_button)
 		button.focus_neighbor_left = button.get_path_to(_quality_buttons[maxi(i - 1, 0)])
 		button.focus_neighbor_right = button.get_path_to(
@@ -196,7 +199,7 @@ func _aim_at_chosen_quality() -> void:
 	for button in _quality_buttons:
 		if button.button_pressed:
 			chosen = button
-	_fps_check.focus_neighbor_bottom = _fps_check.get_path_to(chosen)
+	_ground_check.focus_neighbor_bottom = _ground_check.get_path_to(chosen)
 	_back_button.focus_neighbor_top = _back_button.get_path_to(chosen)
 
 
@@ -238,6 +241,10 @@ func _on_fullscreen_toggled(on: bool) -> void:
 
 func _on_fps_toggled(on: bool) -> void:
 	Settings.set_show_fps(on)
+
+
+func _on_ground_toggled(on: bool) -> void:
+	Settings.set_show_ground_cover(on)
 
 
 ## Un ButtonGroup también APAGA la opción anterior; solo el botón que se
@@ -287,7 +294,7 @@ func _apply_styles() -> void:
 		slider.add_theme_icon_override("grabber", grabber)
 		slider.add_theme_icon_override("grabber_highlight", grabber_hi)
 		slider.add_theme_icon_override("grabber_disabled", grabber)
-	for check: CheckButton in [_fullscreen_check, _fps_check]:
+	for check: CheckButton in [_fullscreen_check, _fps_check, _ground_check]:
 		UiTheme.style_toggle(check)
 	for button: Button in _quality_buttons:
 		UiTheme.style_button(button, UiTheme.ACCENT)

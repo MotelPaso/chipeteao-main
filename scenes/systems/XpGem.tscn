@@ -23,7 +23,6 @@ rings = 2
 collision_layer = 0
 monitorable = false
 script = ExtResource("1_gem")
-xp_value = 1
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="." unique_id=409959188]
 shape = SubResource("SphereShape3D_pickup")

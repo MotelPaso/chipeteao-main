@@ -5,44 +5,52 @@ extends Interactable
 ## un altar que nadie toca espera para siempre. Con un raider cerca
 ## (approach_band_scale radios) el anillo brilla y late para invitar desde lejos.
 ##
-## Al completar abre una elección de tres dones en el selector de cartas: la
-## elige el raider que sostuvo el anillo y el don llega a toda la party
-## (PlayerStats.add_altar_boon). Las Llaves maestras aceleran la carga y
-## agrandan el don. Todo altar se hunde tras pagar (spent_lifetime).
+## Al completar abre una elección de tres dones en el selector de cartas: tres
+## stats DISTINTAS de ALTAR_BOONS (cualquiera del jugador); la cantidad de
+## cada una es un valor al azar de la lista `values` del tomo de esa stat
+## (Tome.TOME_LIBRARY). La elige
+## el raider que sostuvo el anillo y el don llega a toda la party
+## (PlayerStats.add_altar_boon). Cada Llave maestra de la party agranda el
+## don un boon_percent (20%). Todo altar se hunde tras pagar (spent_lifetime).
 
 ## Dones ofrecidos al completar (la UI de cartas tiene tres huecos).
 const ALTAR_CHOICE_COUNT: int = 3
 ## Radio de respaldo si la escena no trae una zona cilíndrica, en metros.
 const DEFAULT_ZONE_RADIUS: float = 9.3
-## Kind del objeto que acelera la carga y agranda el don (Llave maestra); su
-## fila de ItemCatalog lleva los porcentajes por copia (charge_speed_percent,
-## boon_percent).
+## Kind del objeto que agranda los dones del altar de carga (Llave maestra);
+## su fila de ItemCatalog lleva el porcentaje por copia (boon_percent).
 const MASTER_KEY_KIND: String = "charge_boost"
 
-## Dones planos que puede dar un altar: {stat, amount, name, label}. `stat`
-## es un id de PlayerStats; `name` titula la carta (caja baja tipo oración)
-## y `label` lleva exactamente un "%d" con la cantidad ya escalada.
+## Dones que puede dar un altar, edita aquí: una fila por stat del jugador
+## (id de PlayerStats). `label` es el título de la carta, sin nombre propio:
+## la stat y exactamente un "%d" con la cantidad. La cantidad es un valor al azar de la lista
+## `values` del tomo que sube esa stat; las stats sin tomo llevan aquí su
+## propia lista `values` de cantidades posibles.
 const ALTAR_BOONS: Array[Dictionary] = [
-	{"stat": "damage", "amount": 10.0, "name": "Furia", "label": "daño +%d%%"},
-	{"stat": "cooldown", "amount": 6.0, "name": "Ritmo",
-		"label": "velocidad de ataque +%d%%"},
-	{"stat": "area", "amount": 10.0, "name": "Amplitud", "label": "área +%d%%"},
-	{"stat": "move_speed", "amount": 6.0, "name": "Ligereza", "label": "velocidad +%d%%"},
-	{"stat": "max_hp", "amount": 20.0, "name": "Vigor", "label": "HP máx. +%d"},
-	{"stat": "armor", "amount": 2.0, "name": "Coraza", "label": "armadura +%d"},
-	{"stat": "luck", "amount": 10.0, "name": "Fortuna", "label": "suerte +%d"},
-	{"stat": "crit_chance", "amount": 5.0, "name": "Precisión",
-		"label": "prob. de crítico +%d%%"},
-	{"stat": "xp_gain", "amount": 8.0, "name": "Sabiduría",
-		"label": "ganancia de XP +%d%%"},
-	# El altar demoníaco escala este por encima de 1: la etiqueta vale para
-	# ambos números.
-	{"stat": "projectiles", "amount": 1.0, "name": "Multitud",
-		"label": "+%d proyectil(es)"},
+	{"stat": "damage", "label": "Daño +%d%%"},
+	{"stat": "cooldown", "label": "Velocidad de ataque +%d%%"},
+	{"stat": "area", "label": "Área +%d%%"},
+	{"stat": "projectiles", "label": "Proyectiles +%d"},
+	{"stat": "crit_chance", "label": "Prob. de crítico +%d%%"},
+	{"stat": "crit_damage", "label": "Daño crítico +%d%%",
+		"values": [15, 20, 25, 30]},
+	{"stat": "lifesteal", "label": "Robo de vida +%d%%"},
+	{"stat": "duration", "label": "Duración de efectos +%d%%"},
+	{"stat": "max_hp", "label": "HP máx. +%d"},
+	{"stat": "armor", "label": "Armadura +%d"},
+	{"stat": "evasion", "label": "Evasión +%d%%"},
+	{"stat": "thorns", "label": "Espinas +%d",
+		"values": [3, 5, 7, 10]},
+	{"stat": "move_speed", "label": "Velocidad +%d%%"},
 	# PlayerStats limita los saltos (MAX_EXTRA_JUMPS).
-	{"stat": "jumps", "amount": 1.0, "name": "Impulso", "label": "+%d salto(s)"},
-	{"stat": "powerup_chance", "amount": 10.0, "name": "Fortuna menor",
-		"label": "prob. de power-up +%d%%"},
+	{"stat": "jumps", "label": "Saltos +%d",
+		"values": [1, 1, 2, 2]},
+	{"stat": "luck", "label": "Suerte +%d"},
+	{"stat": "xp_gain", "label": "Ganancia de XP +%d%%"},
+	{"stat": "pickup_radius", "label": "Radio de recogida +%d%%",
+		"values": [20, 25, 30, 40]},
+	{"stat": "powerup_chance", "label": "Prob. de power-up +%d%%",
+		"values": [10, 15, 20, 30]},
 ]
 
 @export_group("Carga")
@@ -54,6 +62,8 @@ const ALTAR_BOONS: Array[Dictionary] = [
 @export var channel_loop: StringName = &"shrine_channel"
 ## Multiplicador del tamaño del don (el altar demoníaco paga más).
 @export var boon_scale: float = 1.0
+## Dificultad, en %, que suma SIEMPRE cada uso del altar. El de carga usa este valor; el demoníaco pone el suyo en CurseShrine.tscn.
+@export var difficulty_per_use: float = 5.0
 @export_group("Textos")
 ## Aviso mientras carga; %d%% es el porcentaje.
 @export var charging_prompt: String = "Cargando... %d%%"
@@ -63,10 +73,8 @@ const ALTAR_BOONS: Array[Dictionary] = [
 @export var choice_title: String = "El altar te ofrece un don"
 ## Etiqueta (cinta) de las cartas de la elección.
 @export var choice_tag: String = "Bendición"
-## Descripción de cada carta de don; %s es la etiqueta del don.
-@export var boon_description: String = "%s para toda la party"
 ## Anuncio al recibir el don; %s es la etiqueta del don.
-@export var completed_text: String = "El altar zumba: %s para todos"
+@export var completed_text: String = "El altar zumba: %s"
 @export_group("Anillo")
 ## Color del anillo, del disco de progreso y de las cartas; tiñe los materiales de Ring y ProgressDisc (el resto del material sale de la escena).
 @export var accent_color: Color = Color(0.4, 0.8, 1.0)
@@ -120,11 +128,18 @@ var _marked_alpha: float = NAN
 @onready var _progress_disc: MeshInstance3D = $Visual/ProgressDisc
 
 
+## Grupo de este tipo de altar (el demoníaco lo cambia).
+func type_group() -> StringName:
+	return &"charge_altars"
+
+
 func _ready() -> void:
 	super()
 	# El WorldDirector limita los altares SIN GASTAR a la vez y encuentra los
 	# de la arena por este grupo.
 	add_to_group("altars")
+	# Grupo por tipo: el director lo usa para el tope de altares de cada tipo.
+	add_to_group(type_group())
 	_zone_radius = _measure_zone_radius()
 	if _crystal != null:
 		_crystal_rest_y = _crystal.position.y
@@ -156,7 +171,7 @@ func _physics_process(delta: float) -> void:
 	if live_players_in_range().is_empty():
 		_on_range_exited()
 		return
-	progress += delta * _charge_speed()
+	progress += delta
 	_progress_disc.visible = true
 	var fraction := clampf(progress / channel_time, 0.001, 1.0)
 	_progress_disc.scale = Vector3(fraction, 1.0, fraction)
@@ -278,13 +293,23 @@ func _player_near() -> bool:
 			and global_position.distance_squared_to(nearest.global_position) <= band_sq
 
 
-## Llaves maestras de los raiders en pie del anillo: cuenta la mayor.
-func _keys_in_ring() -> int:
-	return best_kind_count_in_range(MASTER_KEY_KIND)
+## Llaves maestras de la party: cuenta la de quien lleva más, esté donde
+## esté (el don le llega a toda la party). El altar demoníaco no las usa.
+func _party_keys() -> int:
+	if not _uses_master_key():
+		return 0
+	var best := 0
+	for node: Node in get_tree().get_nodes_in_group("player"):
+		var bag := ItemBag.find_in(node)
+		if bag != null:
+			best = maxi(best, bag.count_kind(MASTER_KEY_KIND))
+	return best
 
 
-func _charge_speed() -> float:
-	return 1.0 + _master_key_fraction("charge_speed_percent") * float(_keys_in_ring())
+## Virtual: si las Llaves maestras agrandan los dones de este altar (solo el
+## de carga).
+func _uses_master_key() -> bool:
+	return true
 
 
 ## Un porcentaje por copia de la fila de la Llave maestra, como fracción
@@ -297,7 +322,7 @@ func _complete() -> void:
 	channeling = false
 	_drop_loop()
 	progress = channel_time
-	var keys := _keys_in_ring()
+	var keys := _party_keys()
 	# Se resuelve ANTES de consume(): el premio es de quien sostuvo el anillo,
 	# y en co-op el selector de cartas tiene que saberlo.
 	var recipient := nearest_live_player()
@@ -329,24 +354,47 @@ func _offer_reward(keys: int, recipient: Node) -> void:
 
 
 ## Virtual: las opciones de este altar. El de carga saca ALTAR_CHOICE_COUNT
-## dones DISTINTOS; el demoníaco ofrece pactos.
+## stats DISTINTAS, cada una con una cantidad al azar; el demoníaco ofrece
+## pactos.
 func _reward_options(keys: int) -> Array[Dictionary]:
 	var pool := ALTAR_BOONS.duplicate()
 	pool.shuffle()
 	var options: Array[Dictionary] = []
 	for i in mini(ALTAR_CHOICE_COUNT, pool.size()):
 		var boon: Dictionary = pool[i]
-		var amount := boon_amount(float(boon.amount), keys)
+		var amount := boon_amount(_boon_value(boon), keys)
 		var label := String(boon.label) % roundi(amount)
 		options.append({
-			"title": String(boon.name),
-			"description": boon_description % label,
+			# Solo la stat y su cantidad: ni nombre propio, ni la party, ni la
+			# dificultad que suma el altar (se aplican igual).
+			"title": label,
+			"description": "",
 			"color": accent_color,
 			"label": label,
 			"stat": String(boon.stat),
 			"amount": amount,
 		})
 	return options
+
+
+## Cantidades posibles de un don: la lista `values` de la fila si la tiene;
+## si no, la del tomo que sube esa stat. Sin ninguna, [1]. También la usan el
+## altar demoníaco y el Tomo del Azar.
+static func boon_values(boon: Dictionary) -> Array:
+	var values: Array = boon.get("values", [])
+	if not values.is_empty():
+		return values
+	var stat := String(boon.stat)
+	for tome: Dictionary in Tome.TOME_LIBRARY:
+		for effect: Dictionary in tome.get("effects", []) as Array:
+			if String(effect.get("stat", "")) == stat and effect.has("values"):
+				return effect.values
+	return [1]
+
+
+## Cantidad de un don del altar: un valor al azar de boon_values.
+static func _boon_value(boon: Dictionary) -> float:
+	return float(boon_values(boon).pick_random())
 
 
 ## El selector de cartas devuelve aquí la opción elegida.
@@ -365,6 +413,7 @@ func _on_choice_picked(option: Dictionary, keys: int, recipient: Node) -> void:
 ## altar demoníaco paga el beneficio Y el costo del pacto.
 func _grant_choice(option: Dictionary, _keys: int, _recipient: Node) -> String:
 	grant_boon(String(option.stat), float(option.amount))
+	RunState.add_difficulty(difficulty_per_use / 100.0, "altars")
 	return String(option.label)
 
 

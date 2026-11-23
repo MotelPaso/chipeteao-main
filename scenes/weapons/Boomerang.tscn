@@ -7,5 +7,8 @@
 script = ExtResource("1_boomerang")
 damage = 8.0
 cooldown = 1.4
-attack_range = 10.0
+hit_push = 4.0
+hit_slow = 0.6
+hit_slow_seconds = 0.12
+attack_range = 12.0
 projectile_scene = ExtResource("2_blade")

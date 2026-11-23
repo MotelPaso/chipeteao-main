@@ -6,11 +6,8 @@ extends Node
 ##   filas de stats -> PlayerStats.add_timed_boon, con etiqueta para que una
 ##                     renovación se reemplace a sí misma y no se acumule
 ##   immortal       -> Health.invulnerable
-##   reflect        -> Health.reflect_fraction
 ##   gold           -> Player.set_points_source (un factor con nombre, no
 ##                     una segunda billetera)
-##   vampire        -> boon de robo de vida + permanent_max_hp guardado AQUÍ
-##   flight         -> el Player lee has("flight") en cada tick de física
 ##   time_stop      -> EnemySpawner.freeze_enemies por el grupo
 ##   star           -> todas las demás filas a la vez, con el reloj de la
 ##                     ESTRELLA
@@ -26,9 +23,8 @@ extends Node
 signal active_changed
 
 ## Nombre con que «Fiebre del oro» registra su multiplicador de puntos en el
-## Player (fuentes con nombre). Los números de cada power-up (multiplicador
-## de oro, HP por baja del vampiro, fracción de Reflejo) viven en su fila de
-## PowerUpCatalog.
+## Player (fuentes con nombre). Los números de cada power-up (como el
+## multiplicador de oro) viven en su fila de PowerUpCatalog.
 const POINTS_SOURCE := "powerup_gold"
 ## Prefijo de etiqueta de los boons temporales de una fila, para que volver a
 ## tomarla limpie los suyos y solo los suyos.
@@ -38,11 +34,6 @@ const BOON_TAG_PREFIX := "powerup:"
 ## Segunda línea del aviso de un power-up: %s = descripción, %d = segundos.
 @export var toast_template: String = "%s (%d s)"
 
-## HP máx. permanente guardado por «Modo vampiro». Es un TOTAL GUARDADO que
-## PlayerStats.recompute vuelve a sumar en cada reconstrucción; nunca se suma
-## sobre un valor derivado, que _reset_derived borraría.
-var permanent_max_hp: float = 0.0
-
 ## Filas vivas: {id, kind, expires_at}, en orden de recolección.
 var _active: Array[Dictionary] = []
 ## Lo levanta RunState.stage_changed y se consume en el siguiente frame de
@@ -51,10 +42,6 @@ var _active: Array[Dictionary] = []
 var _stage_changed: bool = false
 ## Un recompute por frame, por muchas bajas que caigan en él.
 var _recompute_queued: bool = false
-## Detección de flanco para el único consumidor que necesita el momento
-## "recién terminó" y no un estado (el raider puede estar sobre una roca
-## cuando se acaba el vuelo).
-var _was_flying: bool = false
 
 
 ## El componente cruza el cambio de etapa con el raider; los nodos a los que
@@ -139,15 +126,6 @@ func count() -> int:
 	return _active.size()
 
 
-## ItemBag.on_weapon_kill reenvía cada baja de las armas de este raider. Hoy
-## solo escucha «Modo vampiro».
-func on_kill() -> void:
-	if not has("vampire"):
-		return
-	permanent_max_hp += _live_value("vampire", "max_hp_per_kill")
-	_request_recompute()
-
-
 func _physics_process(_delta: float) -> void:
 	if _active.is_empty():
 		return
@@ -206,8 +184,6 @@ func _sync() -> void:
 	var health := Health.find_in(body)
 	if health != null:
 		health.invulnerable = has("immortal")
-		health.reflect_fraction = _live_value("reflect", "reflect_fraction") \
-				if has("reflect") else 0.0
 	if body != null and body.has_method("set_points_source"):
 		if has("gold"):
 			body.call("set_points_source", POINTS_SOURCE, _live_value("gold", "points_multiplier"))
@@ -222,12 +198,6 @@ func _sync() -> void:
 	var freeze_left := _remaining("time_stop")
 	if freeze_left > 0.0:
 		get_tree().call_group("enemy_spawner", "freeze_enemies", freeze_left)
-	var flying := has("flight")
-	if _was_flying and not flying and body != null and body.has_method("end_flight"):
-		# Un flanco, no un estado: el raider puede estar sobre una celda
-		# bloqueada y hay que dejarlo en un lugar caminable.
-		body.call("end_flight")
-	_was_flying = flying
 	active_changed.emit()
 
 
@@ -260,8 +230,8 @@ func _duration_multiplier() -> float:
 	return stats.duration_multiplier if stats != null else 1.0
 
 
-## Agrupado: un arma de área puede sumar una docena de bajas vampiro en un
-## frame, y cada una reconstruiría toda la capa de stats.
+## Agrupado: varios cambios en un mismo frame reconstruyen la capa de stats
+## una sola vez.
 func _request_recompute() -> void:
 	if _recompute_queued:
 		return

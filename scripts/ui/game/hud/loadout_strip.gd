@@ -3,7 +3,7 @@ extends Container
 ## Franja de equipo del jugador 1. HUD.tscn tiene dos, apiladas en LoadoutDock
 ## (abajo a la izquierda, crece hacia arriba y nunca llega a la barra de vida):
 ##   - BuildStrip, la fila de abajo: armas con su nivel, tomos con sus pilas y
-##     la mascota, con una línea de tinta entre grupo y grupo;
+##     con una línea de tinta entre grupo y grupo;
 ##   - BagStrip, encima: los objetos con sus copias en casillas chicas, en una
 ##     cuadrícula (sus columnas son `columns` del nodo). Si no caben en
 ##     `max_tiles`, la última casilla pasa a ser "+N".
@@ -17,7 +17,7 @@ extends Container
 
 ## Qué muestra una franja.
 enum Contents {
-	BUILD, ## Armas, tomos y mascota.
+	BUILD, ## Armas y tomos.
 	BAG, ## Objetos de la bolsa.
 }
 
@@ -29,7 +29,7 @@ const TILE_SCENE := preload("res://scenes/ui/hud/LoadoutTile.tscn")
 const TOME_NAME_PREFIXES: Array[String] = ["Tome of ", "Tomo del ", "Tomo de "]
 
 @export_group("Franja")
-## Qué muestra esta franja: el equipo (armas, tomos y mascota) o la bolsa (objetos).
+## Qué muestra esta franja: el equipo (armas y tomos) o la bolsa (objetos).
 @export var contents: Contents = Contents.BUILD
 ## Segundos entre consultas del equipo del jugador.
 @export var refresh_seconds: float = 0.5
@@ -39,7 +39,7 @@ const TOME_NAME_PREFIXES: Array[String] = ["Tome of ", "Tomo del ", "Tomo de "]
 ## Pasado el tope, la última casilla es "+N" con lo que no cupo.
 @export var max_tiles: int = 0
 @export_group("Separador de grupos")
-## Tamaño de la línea entre los grupos de casillas (armas, tomos, mascota), en
+## Tamaño de la línea entre los grupos de casillas (armas, tomos), en
 ## píxeles (ancho, alto).
 @export var divider_size: Vector2 = Vector2(3.0, 30.0)
 ## Color de esa línea.
@@ -52,12 +52,8 @@ const TOME_NAME_PREFIXES: Array[String] = ["Tome of ", "Tomo del ", "Tomo de "]
 ## Borde de las casillas de tomo.
 @export var tome_color: Color = Color(0.72, 0.5, 0.95)
 @export_group("Textos")
-## Esquina de un arma que pasó su primer hito: ★ y el rango (★2 es el nivel 20).
-@export var tier_format: String = "★%d"
 ## Esquina de un objeto con más de una copia.
 @export var copies_format: String = "x%d"
-## Tooltip de la mascota: su nombre y la estadística que da.
-@export var pet_tip_format: String = "%s — %s"
 ## Casilla "+N": cuántos objetos no cupieron en la franja.
 @export var overflow_format: String = "+%d"
 ## Tooltip de la casilla "+N".
@@ -111,8 +107,7 @@ func refresh() -> void:
 	_primed = true
 
 
-## Armas (nivel, o rango con ★ desde el primer hito), tomos (pilas) y
-## mascota, en ese orden: del jugador de la franja o, si se pasa uno, de
+## Armas (nivel) y tomos (pilas), en ese orden: del jugador de la franja o, si se pasa uno, de
 ## `body` (el mapa de Tab pide las de su propio jugador).
 func gather_build(body: Node = null) -> Array[Dictionary]:
 	var player := body if body != null else _player
@@ -134,11 +129,9 @@ func gather_build(body: Node = null) -> Array[Dictionary]:
 				"library": LoadoutTile.ICON_LIBRARY_WEAPONS,
 				"entry_id": UpgradePool.weapon_id_for_node(weapon.name),
 				"color": evolved_weapon_color if weapon.evolved else weapon_color,
-				# Dos lecturas de la misma escala: el NIVEL del arma mientras
-				# sube a su primer hito, después el RANGO del hito. "Sube el arma
-				# al nivel 10" es esta esquina llegando a N10, y ★2 es el nivel 20.
-				"corner": (tier_format % weapon.ascension_tier) if weapon.ascension_tier > 0 \
-						else (UiTheme.WEAPON_LEVEL_ABBREV % weapon.upgrade_level),
+				# Siempre el NIVEL del arma, también evolucionada (el borde ámbar
+				# ya dice que evolucionó).
+				"corner": UiTheme.WEAPON_LEVEL_ABBREV % weapon.upgrade_level,
 				"tip": title, "icon": String(row.get("icon", "")),
 			})
 	var stats := PlayerStats.find_in(player)
@@ -153,22 +146,6 @@ func gather_build(body: Node = null) -> Array[Dictionary]:
 				"color": tome_color,
 				"corner": Tome.stack_label(stats.stack_count(tome_id)),
 				"tip": title, "icon": String(tome.get("icon", "")), "row": tome,
-			})
-	# La mascota cierra la franja de armas y tomos: es un arma fuera del tope
-	# de cinco más una estadística, así que va junto a ellos y no entre los objetos.
-	var pet_id: Variant = player.get("pet_id")
-	if pet_id != null and not String(pet_id).is_empty():
-		var pet := PetCatalog.by_id(String(pet_id))
-		if not pet.is_empty():
-			entries.append({
-				"glyph": String(pet.get("glyph", "??")),
-				"library": LoadoutTile.ICON_LIBRARY_PETS,
-				"entry_id": String(pet_id),
-				"color": pet.get("color", Color.WHITE) as Color,
-				"corner": "",
-				"tip": pet_tip_format % [String(pet.display_name),
-						String(pet.get("stat_label", ""))],
-				"icon": String(pet.get("icon", "")),
 			})
 	return entries
 
@@ -198,7 +175,7 @@ func gather_bag(body: Node = null) -> Array[Dictionary]:
 
 ## Muestra `entries` en la franja. Si son las mismas casillas en el mismo
 ## orden las actualiza en su lugar; si no, las rehace con una línea cada vez
-## que cambia la biblioteca (armas, tomos, mascota). Con más entradas que
+## que cambia la biblioteca (armas, tomos). Con más entradas que
 ## `max_tiles`, la última casilla es "+N". La casilla nueva o cuya esquina
 ## cambió recibe un golpe de escala (salvo en la primera consulta).
 func show_entries(entries: Array[Dictionary]) -> void:

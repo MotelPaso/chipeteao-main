@@ -25,7 +25,6 @@ const ICON_LIBRARY_WEAPONS := "weapons"
 const ICON_LIBRARY_TOMES := "tomes"
 const ICON_LIBRARY_ITEMS := "items"
 const ICON_LIBRARY_POWERUPS := "powerups"
-const ICON_LIBRARY_PETS := "pets"
 ## Bibliotecas cuyas filas de catálogo tienen icono de estadística (paso 3).
 const STAT_ICON_LIBRARIES: Array[String] = [ICON_LIBRARY_TOMES, ICON_LIBRARY_ITEMS]
 

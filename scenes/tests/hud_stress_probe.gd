@@ -1,7 +1,7 @@
 extends Node
 ## Arnés del HUD con el equipo al máximo. Abre HUD.tscn solo (sin partida) en
 ## cada tamaño de WINDOWS y con 1 a 4 jugadores, le inyecta un caso extremo
-## (3 armas, 3 tomos, mascota, BAG_ITEMS objetos, power-ups, dificultad,
+## (3 armas, 3 tomos, BAG_ITEMS objetos, power-ups, dificultad,
 ## etapa con vuelta, puntos altos y una tarjeta de botín) y revisa:
 ##   - que nada salga de la pantalla;
 ##   - que ningún elemento toque a otro: información de partida, bajas,
@@ -51,7 +51,6 @@ class FakeRaider extends Node3D:
 	signal points_changed(total: int)
 	var player_index: int = 0
 	var points: int = 0
-	var pet_id: String = ""
 
 
 var _failed: bool = false
@@ -160,13 +159,6 @@ func _build_entries(strip: LoadoutStrip) -> Array[Dictionary]:
 			"icon": String(tome.get("icon", "")), "row": tome,
 			"tip": String(tome.get("display_name", tome.id)),
 		})
-	var pet: Dictionary = PetCatalog.PET_LIBRARY[0]
-	entries.append({
-		"glyph": String(pet.get("glyph", "??")),
-		"library": LoadoutTile.ICON_LIBRARY_PETS, "entry_id": String(pet.id),
-		"color": pet.get("color", Color.WHITE) as Color, "corner": "",
-		"icon": String(pet.get("icon", "")), "tip": String(pet.get("display_name", pet.id)),
-	})
 	return entries
 
 

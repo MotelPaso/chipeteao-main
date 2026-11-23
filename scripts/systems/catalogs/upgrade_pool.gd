@@ -29,7 +29,9 @@ extends RefCounted
 ##   kind: "stat" (por defecto, se omite), "new_weapon" o "tome".
 ##   target: "player" | "health" | "run_state" | "weapon/<NodeName>" (las armas
 ##       se buscan bajo el montaje Weapons del jugador).
-##   op: "mul_percent" (amount = +/- porcentaje) | "add" (cantidad plana).
+##   op: "mul_percent" (amount = +/- puntos porcentuales del valor ORIGINAL:
+##       20 = +20% del tamaño base, nunca % sobre lo ya mejorado) | "add"
+##       (cantidad plana).
 ##   effects: forma OPCIONAL de varios stats: una lista de
 ##       {property, op, amount} que se aplica junta sobre el mismo target, en
 ##       lugar del trío property/op/amount. La descripción lleva un "%d" por
@@ -40,7 +42,7 @@ extends RefCounted
 ##       defecto).
 ##   rarity: fija la rareza de la carta por nombre en vez de sortearla.
 ##   values: OPCIONAL. Cantidad FIJA por rareza, en el orden de Rarity.TIERS
-##       (Común, Raro, Épico, Legendario). Si existe, sustituye a
+##       (Poco común, Raro, Épico, Legendario). Si existe, sustituye a
 ##       amount x potency; si no, se usa el escalado por potencia de siempre.
 ## La suerte del jugador (PlayerStats) inclina el sorteo de rareza.
 ##
@@ -66,15 +68,17 @@ const MAX_SAME_SIDE_STREAK: int = 3
 ##   [0.0, 0.5, 0.5]        -> nunca una sola; 2 o 3 a partes iguales
 ##   [0.4, 0.3, 0.2, 0.1]   -> permite hasta 4 stats
 ## Si el arma tiene menos stats válidas que el máximo, se limita a las que tenga.
-const STAT_COUNT_WEIGHTS: Array[float] = [0.55, 0.30, 0.15]
+const STAT_COUNT_WEIGHTS: Array[float] = [0.65, 0.25, 0.10]
+## La SUERTE del raider sube un poco la opción de cartas con más stats: cada
+## punto multiplica los pesos de 2 o más stats por (1 + esto x suerte).
+## 0.004 = con 50 de suerte esos pesos valen un 20% más. 0 = la suerte no influye.
+const LUCK_EXTRA_STAT_PER_POINT: float = 0.004
 
 ## Peso de oferta de las cartas de arma nueva (menos que las de stats).
 const NEW_WEAPON_OFFER_WEIGHT: float = 0.6
 ## Peso de oferta de cada carta de tomo, algo bajo para que los tomos no
 ## llenen el pool.
 const TOME_OFFER_WEIGHT: float = 0.8
-## Rareza fija de las cartas de arma nueva (un name de Rarity.TIERS).
-const NEW_WEAPON_RARITY: String = "Rare"
 
 ## Nombre, título de carta y formato de cada stat de arma. AQUÍ NO HAY NÚMEROS:
 ## lo que sube cada stat está por arma en WEAPON_UPGRADE_STATS.
@@ -101,9 +105,10 @@ const WEAPON_STAT_DEFS: Dictionary = {
 ## MEJORAS POR ARMA. Cada arma (id de WeaponCatalog) tiene su propio bloque, y
 ## cada stat dentro de él lleva:
 ##   property: la propiedad del nodo del arma que sube.
-##   values:   cuánto sube por rareza, en el orden [Común, Raro, Épico, Legendario].
+##   values:   cuánto sube por rareza, en el orden [Poco común, Raro, Épico, Legendario].
 ##   op:       opcional. "add" (por defecto, suma el valor tal cual) o
-##             "mul_percent" (el valor es un % que multiplica el actual).
+##             "mul_percent" (el valor es un % del valor ORIGINAL que se suma:
+##             100% -> 120% -> 140%, no 100% -> 120% -> 144%).
 ## Para que una arma no ofrezca una stat, borra esa línea de SU bloque. Para
 ## que ofrezca otra, añade la línea (la stat debe existir en WEAPON_STAT_DEFS).
 ## Un arma que no esté aquí no ofrece mejoras.
@@ -121,64 +126,63 @@ const WEAPON_UPGRADE_STATS: Dictionary = {
 		"damage": {"property": "damage", "values": [1, 2, 3, 4]},
 		"size": {"property": "pool_radius", "op": "mul_percent", "values": [6, 10, 14, 20]},
 		"duration": {"property": "pool_ticks", "values": [1, 1, 2, 2]},
-		"lifesteal": {"property": "heal_fraction", "values": [0.02, 0.03, 0.04, 0.06]},
 		"projectile_speed": {"property": "projectile_speed", "values": [0.1, 0.15, 0.2, 0.3]},
-		"count": {"property": "projectile_count", "values": [1, 1.4, 1.7, 2]},
+		"count": {"property": "projectile_count", "values": [1, 1.3, 1.7, 2]},
 	},
 	"boomerang": {
 		"damage": {"property": "damage", "values": [1, 2, 3, 4]},
 		"size": {"property": "blade_scale", "op": "mul_percent", "values": [6, 10, 14, 20]},
-		"count": {"property": "projectile_count", "values": [1, 1.4, 1.7, 2]},
+		"count": {"property": "projectile_count", "values": [1, 1.3, 1.7, 2]},
 	},
 	"dart_pistol": {
 		"damage": {"property": "damage", "values": [1, 2, 3, 4]},
-		"count": {"property": "projectile_count", "values": [1, 1.4, 1.7, 2]},
+		"count": {"property": "projectile_count", "values": [1, 1.3, 1.7, 2]},
 		"crit": {"property": "crit_chance_bonus", "values": [2, 3, 5, 7]},
 		"crit_damage": {"property": "crit_damage_bonus", "values": [5, 7, 15, 20]},
-		"bounces": {"property": "bounces", "values": [1, 2, 3, 4]},
+		"bounces": {"property": "bounces", "values": [1, 1.3, 1.7, 2]},
 	},
 	"ember_wand": {
 		"damage": {"property": "damage", "values": [1, 2, 3, 4]},
 		"size": {"property": "burst_radius", "op": "mul_percent", "values": [6, 10, 14, 20]},
-		"count": {"property": "projectile_count", "values": [1, 1.4, 1.7, 2]},
+		"count": {"property": "projectile_count", "values": [1, 1.3, 1.7, 2]},
 	},
 	"kamehameha": {
 		"damage": {"property": "damage", "values": [1, 2, 3, 4]},
 		"size": {"property": "beam_width", "op": "mul_percent", "values": [6, 10, 14, 20]},
-		"count": {"property": "projectile_count", "values": [1, 1.4, 1.7, 2]},
+		"count": {"property": "projectile_count", "values": [1, 1.3, 1.7, 2]},
 	},
 	"shortsword": {
 		"damage": {"property": "damage", "values": [1, 2, 3, 4]},
 		"size": {"property": "attack_range", "op": "mul_percent", "values": [6, 10, 14, 20]},
-		"count": {"property": "projectile_count", "values": [1, 1.4, 1.7, 2]},
+		"count": {"property": "projectile_count", "values": [1, 1.3, 1.7, 2]},
 	},
 	"slime_trail": {
 		"damage": {"property": "damage", "values": [1, 2, 3, 4]},
 		"duration": {"property": "puddle_life", "values": [0.1, 0.2, 0.3, 0.4]},
-		"count": {"property": "projectile_count", "values": [1, 1.4, 1.7, 2]},
+		"count": {"property": "projectile_count", "values": [1, 1.3, 1.7, 2]},
 		"size": {"property": "puddle_radius", "op": "mul_percent", "values": [6, 10, 14, 20]},
 	},
 	"spirit_orbs": {
 		"damage": {"property": "damage", "values": [1, 2, 3, 4]},
 		"size": {"property": "hit_radius", "op": "mul_percent", "values": [6, 10, 14, 20]},
-		"count": {"property": "projectile_count", "values": [1, 1.4, 1.7, 2]},
+		"count": {"property": "projectile_count", "values": [1, 1.3, 1.7, 2]},
 	},
 	"storm_rod": {
 		"damage": {"property": "damage", "values": [1, 2, 3, 4]},
-		"count": {"property": "projectile_count", "values": [1, 1.4, 1.7, 2]},
-		"bounces": {"property": "chain_count", "values": [1, 1, 2, 2]},
+		"count": {"property": "projectile_count", "values": [1, 1.3, 1.7, 2]},
+		"bounces": {"property": "chain_count", "values": [1, 1.3, 1.7, 2]},
 	},
 	"twin_daggers": {
 		"damage": {"property": "damage", "values": [1, 2, 3, 4]},
 		"size": {"property": "slash_radius", "op": "mul_percent", "values": [6, 10, 14, 20]},
-		"count": {"property": "projectile_count", "values": [1, 1.4, 1.7, 2]},
+		"count": {"property": "projectile_count", "values": [1, 1.3, 1.7, 2]},
 		"crit": {"property": "crit_chance_bonus", "values": [2, 3, 5, 7]},
 		"crit_damage": {"property": "crit_damage_bonus", "values": [5, 7, 15, 20]},
 	},
 	"stench": {
 		"damage": {"property": "damage", "values": [1, 2, 3, 4]},
 		"size": {"property": "attack_range", "op": "mul_percent", "values": [2, 5, 8, 14]},
-		"count": {"property": "projectile_count", "values": [1, 1.4, 1.7, 2]},
+		"count": {"property": "projectile_count", "values": [1, 1.3, 1.7, 2]},
 		"duration": {"property": "poison_duration", "values": [0.1, 0.2, 0.3, 0.4]},
 	},
 }
@@ -191,8 +195,8 @@ const FALLBACK_WEAPON_STATS: Dictionary = {
 }
 
 ## Cartas de stats sin tomo equivalente, siempre disponibles en el lado de
-## tomos. Hoy está vacío: HP máx. (Tomo de Vitalidad) y radio de recolección
-## (Tomo de Codicia) pasaron a Tome.TOME_LIBRARY. Si añades una carta aquí,
+## tomos. Hoy está vacío: HP máx. (Tomo de Vitalidad) pasó a
+## Tome.TOME_LIBRARY. Si añades una carta aquí,
 ## el código de _generic_preview y del target sigue funcionando como antes.
 const GENERIC_POOL: Array[Dictionary] = []
 
@@ -236,7 +240,10 @@ static func roll_offer(player: Node, count: int = 3, luck_bonus: float = 0.0,
 	var luck := (stats.luck if stats != null else 0.0) + luck_bonus
 	var floor_index := Rarity.index_of(min_rarity)
 	for entry: Dictionary in _weighted_pick(build_pool(player, side), count):
-		var rarity := Rarity.resolve(String(entry.get("rarity", "")), luck, floor_index)
+		# Lo NUEVO (primer tomo, arma nueva) no tiene rareza: lleva la base
+		# gris (Rarity.BASE). Toda mejora de lo que ya tienes sortea la suya.
+		var rarity := Rarity.BASE if bool(entry.get("is_new", false)) \
+				else Rarity.resolve(String(entry.get("rarity", "")), luck, floor_index)
 		if String(entry.get("kind", "stat")) == "new_weapon":
 			offer.append({
 				"entry": entry,
@@ -462,31 +469,13 @@ static func _weapon_side(player: Node) -> Array[Dictionary]:
 	if mount == null:
 		return pool
 	var owned := 0
+	var stats := PlayerStats.find_in(player)
+	var luck := stats.luck if stats != null else 0.0
 	for weapon: Dictionary in WeaponCatalog.WEAPON_LIBRARY:
 		if mount.has_node(String(weapon.node_name)):
 			owned += 1
 			var weapon_node := mount.get_node(String(weapon.node_name))
-			var weapon_entries := _entries_for_weapon(weapon, weapon_node)
-			# DEPURACIÓN: borrar cuando las tablas estén corregidas. Lista las
-			# variables reales del script del arma, para escribir bien las
-			# propiedades de WEAPON_UPGRADE_STATS.
-			var var_names: PackedStringArray = []
-			for info: Dictionary in weapon_node.get_property_list():
-				if int(info.usage) & PROPERTY_USAGE_SCRIPT_VARIABLE:
-					var_names.append(String(info.name))
-			var stat_status: PackedStringArray = []
-			var table: Dictionary = WEAPON_UPGRADE_STATS.get(String(weapon.id), {})
-			for stat_id: String in table:
-				var prop := String((table[stat_id] as Dictionary).get("property", ""))
-				var status := "OK"
-				if weapon_node.get(prop) == null:
-					status = "FALTA"
-					var maybe := _candidate_vars(stat_id, var_names)
-					if not maybe.is_empty():
-						status += " -> quizá: " + maybe
-				stat_status.append("%s(%s)=%s" % [stat_id, prop, status])
-			print("[UpgradePool] ", weapon.id, " -> ", ", ".join(stat_status))
-			print("[UpgradePool]   vars reales: ", ", ".join(var_names))
+			var weapon_entries := _entries_for_weapon(weapon, weapon_node, luck)
 			pool.append_array(weapon_entries)
 	if owned < _player_cap(player, "max_weapons"):
 		for weapon: Dictionary in WeaponCatalog.WEAPON_LIBRARY:
@@ -495,30 +484,12 @@ static func _weapon_side(player: Node) -> Array[Dictionary]:
 	return pool
 
 
-## DEPURACIÓN (junto con los print de _weapon_side): palabras que suelen llevar
-## los nombres reales de cada stat, para sugerir cuál variable del arma usar.
-const STAT_NAME_HINTS: Dictionary = {
-	"damage": ["damage", "dmg"],
-	"size": ["size", "radius", "width", "area", "scale"],
-	"count": ["count", "amount", "num"],
-	"crit": ["crit"],
-	"crit_damage": ["crit"],
-	"bounces": ["bounce", "ricochet", "chain"],
-	"projectile_speed": ["speed"],
-	"duration": ["duration", "life", "time", "tick"],
-	"lifesteal": ["steal", "leech"],
-	"knockback": ["knock", "push"],
-}
-
-
-static func _candidate_vars(stat_id: String, var_names: PackedStringArray) -> String:
-	var found: PackedStringArray = []
-	var hints: Array = STAT_NAME_HINTS.get(stat_id, [])
-	for hint: String in hints:
-		for var_name: String in var_names:
-			if var_name.to_lower().contains(hint) and not found.has(var_name):
-				found.append(var_name)
-	return ", ".join(found)
+## Un paso "mul_percent": suma `amount` puntos porcentuales del valor ORIGINAL
+## (el 100% guardado por _base_value), así el crecimiento es parejo y no se
+## dispara mejora tras mejora.
+static func _percent_step(target: Object, property: String, current: float,
+		amount: float) -> float:
+	return current + _base_value(target, property, current) * amount / 100.0
 
 
 ## Valor de la propiedad antes de la primera mejora; sirve de 100% para mostrar
@@ -548,7 +519,7 @@ static func _apply_property(target: Object, property: String, op: String,
 	_base_value(target, property, current)
 	match op:
 		"mul_percent":
-			target.set(property, current * (1.0 + amount / 100.0))
+			target.set(property, _percent_step(target, property, current, amount))
 		"add":
 			target.set(property, current + amount)
 		_:
@@ -561,7 +532,8 @@ static func _apply_property(target: Object, property: String, op: String,
 ## distintas elegidas al azar entre las de WEAPON_UPGRADE_STATS cuya propiedad
 ## exista en el nodo y que tengan sus valores. Todas las stats válidas tienen
 ## la misma opción de salir. Un arma sin tabla usa FALLBACK_WEAPON_STATS.
-static func _entries_for_weapon(weapon: Dictionary, node: Node) -> Array[Dictionary]:
+static func _entries_for_weapon(weapon: Dictionary, node: Node,
+		luck: float = 0.0) -> Array[Dictionary]:
 	var configured: Dictionary = WEAPON_UPGRADE_STATS.get(String(weapon.id), {})
 	if configured.is_empty():
 		push_warning("UpgradePool: weapon id '%s' has no WEAPON_UPGRADE_STATS entry, using fallback"
@@ -586,25 +558,30 @@ static func _entries_for_weapon(weapon: Dictionary, node: Node) -> Array[Diction
 	var target := "weapon/" + String(weapon.node_name)
 	var ids: Array = props.keys()
 	ids.shuffle()
-	var n := _roll_stat_count(ids.size())
+	var n := _roll_stat_count(ids.size(), luck)
 	entries.append(_weapon_stat_entry(weapon, target, ids.slice(0, n), props, 1.0))
 	return entries
 
 
 ## Cuántas stats lleva la carta (1 a STAT_COUNT_WEIGHTS.size()), limitado por
-## las stats que el arma tiene disponibles.
-static func _roll_stat_count(available: int) -> int:
+## las stats que el arma tiene disponibles. La suerte inclina un poco hacia
+## más stats (LUCK_EXTRA_STAT_PER_POINT).
+static func _roll_stat_count(available: int, luck: float = 0.0) -> int:
 	# Se sortea con TODOS los pesos y después se limita a lo disponible: si sale
 	# "3 stats" pero el arma solo tiene 2 válidas, lleva esas 2.
+	var weights: Array[float] = []
+	var luck_scale := 1.0 + LUCK_EXTRA_STAT_PER_POINT * Rarity.effective_luck(luck)
+	for i in STAT_COUNT_WEIGHTS.size():
+		weights.append(STAT_COUNT_WEIGHTS[i] * (luck_scale if i > 0 else 1.0))
 	var total := 0.0
-	for weight: float in STAT_COUNT_WEIGHTS:
+	for weight: float in weights:
 		total += weight
 	var wanted := 1
 	if total > 0.0:
 		var roll := randf() * total
-		wanted = STAT_COUNT_WEIGHTS.size()
-		for i in STAT_COUNT_WEIGHTS.size():
-			roll -= STAT_COUNT_WEIGHTS[i]
+		wanted = weights.size()
+		for i in weights.size():
+			roll -= weights[i]
 			if roll <= 0.0:
 				wanted = i + 1
 				break
@@ -657,7 +634,7 @@ static func _weapon_preview(entry: Dictionary, amounts: Array[float],
 			continue
 		var current := float(raw)
 		var amount := amounts[i] if i < amounts.size() else float(effect.amount)
-		var next := current * (1.0 + amount / 100.0) \
+		var next := _percent_step(weapon, String(effect.property), current, amount) \
 				if String(effect.op) == "mul_percent" else current + amount
 		if bool(def.get("percent", false)):
 			var base := _base_value(weapon, String(effect.property), current)
@@ -679,7 +656,7 @@ static func _fmt_weapon_value(value: float, def: Dictionary) -> String:
 
 
 ## Una carta por tomo disponible, que ofrece el SIGUIENTE stack (el título
-## lleva el numeral, p. ej. «Tomo de Furia II»; Tome.stack_label lo arma para
+## lleva el numeral, p. ej. «Tomo de Furia 2»; Tome.stack_label lo arma para
 ## cualquier número). Si el efecto principal trae `values`, la carta muestra
 ## ese valor fijo por rareza; si no, la potencia escala la cantidad.
 static func _tome_entries(player: Node) -> Array[Dictionary]:
@@ -702,6 +679,8 @@ static func _tome_entries(player: Node) -> Array[Dictionary]:
 		entries.append({
 			"id": tome_id,
 			"kind": "tome",
+			# El primer stack es NUEVO: carta base, sin rareza.
+			"is_new": owned_stacks == 0,
 			"tome_id": tome_id,
 			"title": Tome.display_title(tome, next_stack),
 			"description": String(tome.description),
@@ -725,7 +704,7 @@ static func _new_weapon_entry(weapon: Dictionary) -> Dictionary:
 		"scene": String(weapon.scene),
 		"weapon_name": String(weapon.node_name),
 		"weapon_id": String(weapon.id),
-		"rarity": NEW_WEAPON_RARITY,
+		"is_new": true,
 		"offer_weight": NEW_WEAPON_OFFER_WEIGHT,
 	}
 
@@ -821,7 +800,7 @@ static func _generic_preview(entry: Dictionary, amount: float, player: Node) -> 
 	if raw == null:
 		return fallback
 	var current := float(raw)
-	var next := current * (1.0 + amount / 100.0) \
+	var next := _percent_step(target, String(entry.property), current, amount) \
 			if String(entry.op) == "mul_percent" else current + amount
 	var scale := float(entry.get("display_scale", 1.0))
 	var def := {"suffix": String(entry.get("suffix", ""))}

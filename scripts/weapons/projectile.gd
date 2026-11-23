@@ -27,7 +27,8 @@ const TRACER_RELAX_TIME: float = 0.12
 ## Vida máxima de una bala en segundos. Pasado esto se libera sola: una bala
 ## que se queda quieta en el aire o en el suelo nunca dura más que esto.
 const MAX_LIFETIME: float = 4.0
-## Distancia máxima, en metros, a la que un rebote busca el siguiente enemigo.
+## Distancia máxima, en metros, a la que un rebote busca el siguiente enemigo
+## (si el arma no tiene su propio bounce_range).
 const BOUNCE_RANGE: float = 15.0
 ## Giro (rad/s) mínimo tras un rebote: la bala va directa al nuevo blanco.
 const BOUNCE_TURN_SPEED: float = 40.0
@@ -89,6 +90,10 @@ var _stretch_left: float = 0.0
 ## DESPUÉS del daño (las arañas de objetos ponen aquí su veneno). Se limpia al
 ## reiniciar el pool.
 var extra_on_hit: Callable = Callable()
+## Callback opcional por disparo, on_impact(posición, cuerpo): si está, el primer
+## golpe NO daña directo; llama a esto (la Vara de brasas explota ahí) y la
+## bala se termina. Se limpia al reiniciar el pool.
+var on_impact: Callable = Callable()
 var _tint_material: StandardMaterial3D = null
 
 
@@ -116,6 +121,7 @@ func pool_reset() -> void:
 	assisted = false
 	_retarget_left = 0.0
 	extra_on_hit = Callable()
+	on_impact = Callable()
 	if _tint_material != null:
 		_tracer.material_override = null
 	# También la orientación: launch() nunca la escribe, y las arañas de
@@ -231,6 +237,12 @@ func _hit(body: Node3D) -> void:
 	if _hit_ids.has(body_id):
 		return
 	_hit_ids[body_id] = true
+	if on_impact.is_valid():
+		# El arma reparte el daño de la explosión, incluido este cuerpo.
+		var impact := on_impact
+		_finish()
+		impact.call(global_position, body)
+		return
 	var health := Health.find_in(body)
 	# Un dardo cuya arma se liberó en pleno vuelo se apaga sin daño.
 	if health != null and _source != null and is_instance_valid(_source):
@@ -260,7 +272,7 @@ func _assist_hit(from: Vector3, to: Vector3) -> void:
 
 
 ## Si el blanco murió (o nunca hubo), busca el enemigo más cercano que aún no
-## golpeó, a lo sumo cada RETARGET_INTERVAL segundos.
+## golpeó, a lo sumo cada RETARGET_INTERVAL segundos, y se redirige hacia él.
 func _retarget_if_lost(delta: float) -> void:
 	if _has_live_target():
 		return
@@ -268,7 +280,16 @@ func _retarget_if_lost(delta: float) -> void:
 	if _retarget_left > 0.0:
 		return
 	_retarget_left = RETARGET_INTERVAL
-	_target = _nearest_unhit(RETARGET_RANGE)
+	var next := _nearest_unhit(RETARGET_RANGE)
+	if next == null:
+		return
+	# Redirección: gira de golpe hacia el nuevo blanco y le da un tramo nuevo
+	# para que llegue aunque la bala ya hubiera gastado casi todo su alcance.
+	_target = next
+	homing_turn_speed = maxf(homing_turn_speed, BOUNCE_TURN_SPEED)
+	_point_at(next)
+	_travelled = 0.0
+	_max_distance = RETARGET_RANGE * BOUNCE_LEG_FACTOR
 
 
 func _has_live_target() -> bool:
@@ -299,7 +320,8 @@ func _nearest_unhit(max_range: float) -> Node3D:
 ## contra el nuevo blanco lo cuenta _assist_hit(), así funciona aunque ya
 ## esté pegado a la bala.
 func _bounce_to_next() -> bool:
-	var best := _nearest_unhit(BOUNCE_RANGE)
+	var reach := _bounce_range()
+	var best := _nearest_unhit(reach)
 	if best == null:
 		return false
 	bounces_left = maxi(bounces_left - 1, 0)
@@ -307,15 +329,32 @@ func _bounce_to_next() -> bool:
 	pierce_remaining = _default_pierce
 	_target = best
 	_travelled = 0.0
-	_max_distance = BOUNCE_RANGE * BOUNCE_LEG_FACTOR
+	_max_distance = reach * BOUNCE_LEG_FACTOR
 	# Directo: gira de golpe hacia el nuevo blanco y lo persigue con giro alto,
 	# sin curvas lentas.
 	homing_turn_speed = maxf(homing_turn_speed, BOUNCE_TURN_SPEED)
-	var to_next := WeaponBase.body_aim_point(best) - global_position
-	if to_next.length_squared() > WeaponBase.DEGENERATE_LENGTH_SQ:
-		var direction := to_next.normalized()
-		look_at(global_position + direction, WeaponBase.safe_up(direction))
+	_point_at(best)
+	if _source != null and is_instance_valid(_source) and _source.has_method(&"on_dart_bounce"):
+		_source.call(&"on_dart_bounce", global_position)
 	return true
+
+
+## Gira la bala de golpe hacia el centro del cuerpo de `body`.
+func _point_at(body: Node3D) -> void:
+	var to_body := WeaponBase.body_aim_point(body) - global_position
+	if to_body.length_squared() > WeaponBase.DEGENERATE_LENGTH_SQ:
+		var direction := to_body.normalized()
+		look_at(global_position + direction, WeaponBase.safe_up(direction))
+
+
+## Alcance del salto de un rebote: el `bounce_range` del arma si lo tiene (la
+## Pistola de dardos), si no BOUNCE_RANGE.
+func _bounce_range() -> float:
+	if _source != null and is_instance_valid(_source):
+		var from_weapon: Variant = _source.get(&"bounce_range")
+		if from_weapon != null:
+			return float(from_weapon)
+	return BOUNCE_RANGE
 
 
 ## Rebotes que aún puede dar esta bala. Si el arma tiene la propiedad `bounces`
@@ -328,7 +367,8 @@ func _bounces_available() -> int:
 	if _source != null and is_instance_valid(_source):
 		var from_weapon: Variant = _source.get(&"bounces")
 		if from_weapon != null:
-			return maxi(int(from_weapon) - _bounces_done, 0)
+			# Las armas guardan los rebotes con decimales: cuenta la parte entera.
+			return maxi(floori(float(from_weapon) + 0.0001) - _bounces_done, 0)
 	return bounces_left
 
 

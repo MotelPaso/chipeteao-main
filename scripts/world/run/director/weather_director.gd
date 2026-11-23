@@ -1,14 +1,17 @@
 class_name WeatherDirector
 extends Node
-## Clima de la partida: lunas, lluvias y desastres en UN solo canal
-## (`active_weather` guarda como mucho una fila, así nunca se solapan).
+## Clima de la partida: lunas, lluvias y desastres, con UN canal por grupo
+## (moon, rain, disaster): pueden coincidir una luna, una lluvia y un
+## desastre, pero nunca dos del mismo grupo. Cada canal guarda su fila y sus
+## datos en _channels; mientras corre el start/tick/stop de un clima,
+## active_weather y _weather_state apuntan a los de SU canal.
 ## Es el nodo RunSystems.tscn > WorldDirector > Weather: sus números se
 ## editan en el Inspector de ese nodo, y el aspecto y el texto de cada
 ## clima en su fila de WeatherCatalog (weather_catalog.gd). El tinte del
 ## cielo lo hace SkyTint (sky_tint.gd).
-## No tiene _physics_process propio: el WorldDirector llama a tick() y a
-## maybe_roll() en su cadencia de eventos, y ese orden es parte del sorteo
-## (el RNG de la partida es uno solo).
+## No tiene _physics_process propio: el WorldDirector llama a tick() cada
+## frame y, en cada pulso por minuto, a start_random() y roll_extra(); ese
+## orden es parte del sorteo (el RNG de la partida es uno solo).
 ## En el código esto es WEATHER, nunca "event": EVENT_LIBRARY es la tabla
 ## de eventos de POI. Para el jugador la palabra sigue siendo «evento».
 
@@ -22,9 +25,6 @@ const ACID_POOL_SPACING: float = 3.0
 ## Tope de avisos de meteorito vivos, por lo mismo (el pool de discos es
 ## de 32 y lo usa todo el juego).
 const MAX_LIVE_TELEGRAPHS: int = 16
-## Enemigos que el tsunami vierte por frame de física: cuarenta en un solo
-## frame dan un tirón visible.
-const TSUNAMI_PER_FRAME: int = 6
 ## Etiqueta de las dos ventajas de la luna llena: una segunda luna dentro
 ## de la primera las reemplaza en vez de sumarlas (solo clear_timed_boons
 ## quita por etiqueta).
@@ -43,8 +43,6 @@ const ENEMY_WEATHERS: Array[String] = ["enemy_rain", "enemy_tsunami"]
 @export var sky_event_chance: float = 0.18
 ## Probabilidad extra de luna por cada altar demoníaco usado.
 @export var sky_event_chance_per_demonic: float = 0.08
-## Segundos sin clima tras terminar uno; vale para lunas, lluvias y desastres.
-@export var sky_event_min_gap: float = 150.0
 ## Duraciones (segundos) que reemplazan las de WeatherCatalog, por id de
 ## clima. Vale para todas las arenas: este nodo es uno por partida.
 @export var weather_duration_overrides: Dictionary[String, float] = {}
@@ -52,20 +50,38 @@ const ENEMY_WEATHERS: Array[String] = ["enemy_rain", "enemy_tsunami"]
 @export_group("Luna llena")
 ## XP extra (porcentaje) que da la luna llena a todo el grupo.
 @export var full_moon_xp_bonus: float = 50.0
-## Suerte extra (puntos de suerte) que da la luna llena a todo el grupo.
+## Suerte extra (porcentaje: multiplica la suerte que ya tiene cada uno; 30 =
+## suerte ×1,3) que da la luna llena a todo el grupo. Sin suerte no suma nada.
+@export var full_moon_luck_percent: float = 30.0
+## Suerte extra en puntos que da la luna llena, ANTES del porcentaje de arriba.
 @export var full_moon_luck_bonus: float = 30.0
+## Niveles que alcanza a dar la lluvia de XP de la luna llena (ya descontados
+## los bonos de XP, así son los niveles que se ven; 2.5 = entre 2 y 3).
+@export var full_moon_xp_rain_levels: float = 2.5
+## Tope de gemas de la lluvia de XP (al principio salen menos y cada una vale 1).
+@export var full_moon_xp_rain_gems: int = 30
+## Segundos, desde que empieza la luna, en los que cae la lluvia de XP.
+@export var full_moon_xp_rain_seconds: float = 20.0
+## Distancia mínima (metros) de cada gema al jugador.
+@export var full_moon_xp_rain_min_distance: float = 3.0
+## Distancia máxima (metros) de cada gema al jugador.
+@export var full_moon_xp_rain_max_distance: float = 12.0
+## Altura (metros) del destello sobre cada gema que cae.
+@export var full_moon_xp_rain_burst_height: float = 3.0
+## Partículas del destello de cada gema.
+@export var full_moon_xp_rain_burst_count: int = 5
 
 @export_group("Lluvia de enemigos")
 ## Segundos entre tandas.
 @export var enemy_rain_interval: float = 1.5
 ## Enemigos mínimos por tanda.
-@export var enemy_rain_min_drops: int = 3
+@export var enemy_rain_min_drops: int = 2
 ## Enemigos máximos por tanda.
-@export var enemy_rain_max_drops: int = 6
+@export var enemy_rain_max_drops: int = 5
 ## Distancia mínima (metros) de cada caída al jugador.
-@export var enemy_rain_min_distance: float = 12.0
+@export var enemy_rain_min_distance: float = 18.0
 ## Distancia máxima (metros) de cada caída al jugador.
-@export var enemy_rain_max_distance: float = 25.0
+@export var enemy_rain_max_distance: float = 32.0
 ## Radio (metros) del aviso en el suelo de cada caída.
 @export var enemy_rain_telegraph_radius: float = 1.4
 ## Segundos que dura ese aviso.
@@ -77,7 +93,7 @@ const ENEMY_WEATHERS: Array[String] = ["enemy_rain", "enemy_tsunami"]
 
 @export_group("Lluvia radiactiva")
 ## Segundos entre charcos de ácido.
-@export var acid_pool_interval: float = 2.0
+@export var acid_pool_interval: float = 1.4
 ## Radio (metros) de cada charco.
 @export var acid_pool_radius: float = 2.0
 ## Segundos que dura cada charco.
@@ -87,7 +103,7 @@ const ENEMY_WEATHERS: Array[String] = ["enemy_rain", "enemy_tsunami"]
 ## Distancia MÁXIMA (metros) de un charco al jugador.
 @export var acid_pool_spawn_range: float = 20.0
 ## Daño por segundo del ácido a un jugador dentro de un charco.
-@export var acid_pool_damage_per_second: float = 4.0
+@export var acid_pool_damage_per_second: float = 6.0
 
 @export_group("Lluvia dorada")
 ## Multiplicador de puntos mientras cae.
@@ -97,16 +113,43 @@ const ENEMY_WEATHERS: Array[String] = ["enemy_rain", "enemy_tsunami"]
 
 @export_group("Tsunami")
 ## Enemigos de la ola al empezar la etapa.
-@export var tsunami_base: int = 40
+@export var tsunami_base: int = 55
 ## Enemigos extra de la ola por minuto de etapa.
-@export var tsunami_per_minute: int = 4
-## Distancia mínima (metros) de la ola al jugador.
-@export var tsunami_arc_min: float = 40.0
-## Distancia máxima (metros) de la ola al jugador.
-@export var tsunami_arc_max: float = 60.0
-## Medio ancho del arco del que viene la ola (radianes; 0.52 son unos 30
-## grados a cada lado).
-@export var tsunami_arc_spread: float = 0.52
+@export var tsunami_per_minute: int = 6
+## Distancia (metros) del jugador a la que nace la ola.
+@export var tsunami_start_distance: float = 40.0
+## Metros que sigue la ola después de arrollar al jugador, antes de soltar a los enemigos.
+@export var tsunami_pass_distance: float = 14.0
+## Cuánto puede girar la ola por segundo para perseguir al jugador, en radianes (1.2 son unos 70 grados).
+@export var tsunami_turn_speed: float = 1.2
+## Metros máximos que recorre la ola si nunca alcanza al jugador.
+@export var tsunami_max_travel: float = 130.0
+## Velocidad de la ola, en m/s (el jugador corre a unos 8).
+@export var tsunami_speed: float = 13.0
+## Ancho de la ola, en metros.
+@export var tsunami_width: float = 46.0
+## Filas de enemigos de la ola, de adelante hacia atrás.
+@export var tsunami_rows: int = 4
+## Metros entre una fila y la siguiente.
+@export var tsunami_row_gap: float = 1.8
+## Altura (metros) del dibujo de la fila de adelante: la base de la ola.
+@export var tsunami_crest_low: float = 0.3
+## Altura (metros) del dibujo de la fila de atrás: la cresta.
+@export var tsunami_crest_high: float = 4.5
+## Cuánto sube y baja cada enemigo sobre la ola, en metros.
+@export var tsunami_bob: float = 0.5
+## Rapidez de ese vaivén (radianes por segundo).
+@export var tsunami_bob_speed: float = 7.0
+## Empujón horizontal de la ola al jugador que arrolla, en m/s, en el sentido en que va la ola (no hace daño).
+@export var tsunami_push_speed: float = 24.0
+## Impulso hacia arriba de la ola al jugador, en m/s (el salto normal es 8.7).
+@export var tsunami_push_lift: float = 13.0
+## Sacudida de cámara al ser alcanzado por la ola (0-1).
+@export var tsunami_hit_shake: float = 0.4
+## Segundos entre chispas de espuma sobre la ola.
+@export var tsunami_foam_interval: float = 0.08
+## Chispas por cada salpicón de espuma.
+@export var tsunami_foam_count: int = 10
 
 @export_group("Terremoto")
 ## Segundos entre sacudidas de cámara.
@@ -124,9 +167,9 @@ const ENEMY_WEATHERS: Array[String] = ["enemy_rain", "enemy_tsunami"]
 
 @export_group("Meteoritos")
 ## Segundos entre meteoritos.
-@export var meteor_interval: float = 0.8
+@export var meteor_interval: float = 0.6
 ## Distancia mínima (metros) de un meteorito al jugador.
-@export var meteor_min_distance: float = 3.0
+@export var meteor_min_distance: float = 0.0
 ## Distancia MÁXIMA (metros) de un meteorito al jugador.
 @export var meteor_range: float = 20.0
 ## Radio (metros) de cada impacto.
@@ -134,7 +177,7 @@ const ENEMY_WEATHERS: Array[String] = ["enemy_rain", "enemy_tsunami"]
 ## Segundos de aviso en el suelo antes del impacto.
 @export var meteor_telegraph: float = 1.2
 ## Daño de cada impacto a los jugadores.
-@export var meteor_damage: float = 40.0
+@export var meteor_damage: float = 50.0
 ## Cuánto crece ese daño por minuto de partida (0.05 = +5 % por minuto).
 @export var meteor_damage_per_minute: float = 0.05
 ## Multiplicador del daño del impacto a los enemigos.
@@ -143,21 +186,35 @@ const ENEMY_WEATHERS: Array[String] = ["enemy_rain", "enemy_tsunami"]
 @export var meteor_impact_shake: float = 0.35
 ## Partículas de la explosión de cada impacto.
 @export var meteor_impact_burst_count: int = 26
+## Empujón horizontal al jugador que golpea un meteorito, en m/s, hacia afuera del impacto.
+@export var meteor_push_speed: float = 11.0
+## Impulso hacia arriba del golpe de meteorito, en m/s (el salto normal es 8.7).
+@export var meteor_push_lift: float = 9.0
 ## Tamaño de la marca del impacto, relativo a meteor_radius.
 @export var meteor_scorch_scale: float = 0.8
 ## Segundos que dura la marca del impacto.
 @export var meteor_scorch_time: float = 0.5
 
-## El clima activo, o vacío: {id, group, time_left}. El HUD, el altar de
-## evento y el probe lo leen a través del WorldDirector.
+## El clima activo más reciente, o vacío: {id, group, time_left}. El probe
+## lo lee a través del WorldDirector. Mientras
+## corre el código de un clima apunta al de SU canal.
 var active_weather: Dictionary = {}
+## Todos los climas vivos a la vez, uno por canal (luna, lluvia, desastre),
+## cada uno {id, group, time_left}. El chip del HUD los muestra todos.
+var active_weathers: Array[Dictionary]:
+	get:
+		var all: Array[Dictionary] = []
+		for channel: Dictionary in _channels.values():
+			all.append(channel.weather)
+		return all
+## Canales vivos: grupo -> {"weather": {...}, "state": {...}}.
+var _channels: Dictionary = {}
 ## Reparto de la etapa (máscara y muestreos); lo pone el WorldDirector.
 var layout: StageLayout = null
 
 ## Datos propios del clima activo (start/tick/stop); se vacía al empezar
 ## uno, así ningún clima lee lo que dejó el anterior.
 var _weather_state: Dictionary = {}
-var _sky_gap_left: float = 0.0
 var _sky: SkyTint = null
 
 
@@ -187,7 +244,7 @@ func begin_stage(stage_layout: StageLayout) -> void:
 	_sky.forget()
 	active_weather = {}
 	_weather_state = {}
-	_sky_gap_left = 0.0
+	_channels = {}
 
 
 ## Fin de etapa o de partida: detiene el clima sin encadenar el siguiente
@@ -200,12 +257,24 @@ func end_stage() -> void:
 ## Detiene el clima activo sin encadenar el siguiente ni devolver el cielo
 ## (fin de partida: la pantalla final deja la arena tal cual).
 func stop_weather() -> void:
-	_stop_weather(false)
+	for group: String in _channels.keys():
+		_use(group)
+		_stop_weather(false)
+		_store(group)
+	_publish()
 
 
 ## Un frame de física del canal: descuenta la pausa y el clima activo.
 func tick(delta: float) -> void:
-	_sky_gap_left = maxf(_sky_gap_left - delta, 0.0)
+	for group: String in _channels.keys():
+		_use(group)
+		_tick_channel(delta)
+		_store(group)
+	_publish()
+
+
+## Un frame del clima del canal en uso.
+func _tick_channel(delta: float) -> void:
 	if active_weather.is_empty():
 		return
 	var row := weather_row(String(active_weather.id))
@@ -222,41 +291,53 @@ func tick(delta: float) -> void:
 	_stop_weather(true)
 
 
-## La tirada de clima de cada evento: primero el grupo más raro, para que
-## las lluvias y lunas no tapen a los desastres.
-func maybe_roll() -> void:
-	if not active_weather.is_empty() or _sky_gap_left > 0.0:
-		return
-	# Con probabilidad 0 un grupo NO tira dado: el RNG de la partida es uno
-	# solo y un dado de más cambia todo lo que se sortea después.
-	var disaster_odds := disaster_chance + RunState.disaster_chance_bonus
-	if disaster_odds > 0.0 and randf() < disaster_odds:
-		_start_weather(WeatherCatalog.roll_group("disaster"))
-		return
-	var rain_odds := rain_chance + RunState.event_chance_bonus
-	if rain_odds > 0.0 and randf() < rain_odds:
-		_start_weather(WeatherCatalog.roll_group("rain"))
-		return
+## La tirada extra de cada pulso, aparte del clima asegurado: cada grupo
+## (desastre, lluvia, luna) tira su probabilidad por separado y, si sale y
+## su canal está libre, empieza.
+func roll_extra() -> void:
+	_try_group("disaster", disaster_chance + RunState.disaster_chance_bonus)
+	_try_group("rain", rain_chance + RunState.event_chance_bonus)
 	# Los pactos demoníacos venden probabilidad de luna, además del extra
 	# que suma cada altar demoníaco usado.
-	var chance := sky_event_chance + RunState.event_chance_bonus \
-			+ sky_event_chance_per_demonic * float(RunState.demonic_uses)
-	if randf() >= chance:
+	_try_group("moon", sky_event_chance + RunState.event_chance_bonus
+			+ sky_event_chance_per_demonic * float(RunState.demonic_uses))
+
+
+## Con probabilidad 0 o el canal ocupado no se tira dado: el RNG de la
+## partida es uno solo y un dado de más cambia todo lo que se sortea después.
+func _try_group(group: String, odds: float) -> void:
+	if odds <= 0.0 or _channels.has(group) or randf() >= odds:
 		return
-	_start_weather(WeatherCatalog.roll_group("moon"))
+	_start_weather(WeatherCatalog.roll_group(group))
+	_publish()
 
 
-## FUERZA un clima (el probe, BONK_WEATHER_NOW, el altar de evento): detiene
-## el que haya y empieza aunque no haya pasado la pausa. Si no hiciera
-## nada, el altar parecería roto y fallaría la puerta CIELO_TRAS_AVANCE de
-## verificar.sh.
+## FUERZA un clima (el pulso por minuto con los tres canales llenos, la
+## ruleta, el bloque de la suerte, el probe, BONK_WEATHER_NOW): detiene el
+## de su grupo y empieza aunque no haya pasado la pausa (la puerta
+## CIELO_TRAS_AVANCE de verificar.sh lo prueba).
 func start_sky_event(kind: String) -> void:
 	_start_weather(kind, true)
+	_publish()
 
 
-## La tirada del altar de evento (el WorldDirector la reenvía).
-func random_altar_weather() -> String:
-	return WeatherCatalog.roll_altar()
+## Empieza un clima cualquiera (luna, lluvia o desastre) si no hay otro
+## corriendo; lo pide el pulso por minuto del WorldDirector. Devuelve el id
+## que empezó, o "" si el canal estaba ocupado.
+func start_random() -> String:
+	if _channels.size() >= 3:
+		return ""
+	# Se reintenta si sale un grupo ocupado; con los tres llenos no hay sitio.
+	for attempt in 8:
+		var id := WeatherCatalog.roll_any()
+		if id.is_empty():
+			return ""
+		if _channels.has(String(weather_row(id).group)):
+			continue
+		_start_weather(id)
+		_publish()
+		return id if is_weather_active(id) else ""
+	return ""
 
 
 ## Un charco de ácido (EnemyBase lo pide al morir durante la lluvia
@@ -300,7 +381,35 @@ func sky_base() -> Dictionary:
 
 ## Verdadero mientras `id` sea el clima activo.
 func is_weather_active(id: String) -> bool:
-	return not active_weather.is_empty() and String(active_weather.id) == id
+	for channel: Dictionary in _channels.values():
+		if String(channel.weather.get("id", "")) == id:
+			return true
+	return false
+
+
+## Apunta active_weather y _weather_state al canal de `group` (vacíos si no
+## hay clima en ese grupo).
+func _use(group: String) -> void:
+	var channel: Dictionary = _channels.get(group, {})
+	active_weather = channel.get("weather", {})
+	_weather_state = channel.get("state", {})
+
+
+## Guarda en `group` lo que dejó el código del clima (o lo borra si terminó).
+func _store(group: String) -> void:
+	if active_weather.is_empty():
+		_channels.erase(group)
+	else:
+		_channels[group] = {"weather": active_weather, "state": _weather_state}
+
+
+## Deja active_weather en el clima vivo más reciente, para los lectores.
+func _publish() -> void:
+	active_weather = {}
+	_weather_state = {}
+	for channel: Dictionary in _channels.values():
+		active_weather = channel.weather
+		_weather_state = channel.state
 
 
 ## --- canal ------------------------------------------------------------------
@@ -325,18 +434,23 @@ func _start_weather(id: String, forced: bool = false) -> void:
 	if row.is_empty():
 		push_warning("WorldDirector: unknown weather '%s'" % id)
 		return
+	var group := String(row.group)
+	_use(group)
 	if not active_weather.is_empty():
 		if not forced:
 			return
-		# Forzado: el clima activo se detiene bien, con su stop(), que es lo
-		# que suelta el tinte, la fuente de puntos y el desplazamiento del HUD.
+		# Forzado: el clima de ese grupo se detiene bien, con su stop(), que es
+		# lo que suelta el tinte, la fuente de puntos y el desplazamiento del HUD.
 		_stop_weather(false)
 	_sky.cache(layout)
 	_weather_state = {}
 	var seconds := _weather_duration(row)
-	active_weather = {"id": id, "group": String(row.group), "time_left": seconds}
+	active_weather = {"id": id, "group": group, "time_left": seconds}
 	call(row.start)
 	_present(row)
+	# Queda apuntando a su canal: quien llamó (tick, roll_extra, las
+	# funciones públicas) publica al final.
+	_store(group)
 	if String(row.group) == "disaster":
 		# Línea aparte para que un soak distinga los desastres del resto.
 		print("Disaster: %s" % id)
@@ -379,8 +493,20 @@ func _stop_weather(chain: bool) -> void:
 		# 2 s competiría con el de 1.5 s del siguiente y ganaría el más largo.
 		_start_weather(follow_up)
 		return
+	_restore_sky_after(String(row.group))
+
+
+## Al terminar el clima de `group`: si otro canal tiñe el cielo, el cielo
+## vuelve a su tinte; si no, vuelve al del mapa.
+func _restore_sky_after(group: String) -> void:
+	for other: String in _channels.keys():
+		if other == group:
+			continue
+		var row := weather_row(String(_channels[other].weather.get("id", "")))
+		if row.has("sun_color"):
+			_sky.tint(row["sun_color"], float(row["sun_energy"]), row["ambient_color"])
+			return
 	_sky.restore()
-	_sky_gap_left = sky_event_min_gap
 
 
 ## Las lunas imprimen esta línea TAL CUAL: la puerta CIELO_TRAS_AVANCE de
@@ -399,8 +525,9 @@ func _weather_start_dark_moon() -> void:
 	get_tree().call_group("enemy_spawner", "set_sky_event", String(active_weather.id), seconds)
 
 
-## Luna llena: ventajas de XP y suerte a todo el grupo, de pie o caído; la
-## etiqueta hace que una luna forzada las reemplace en vez de sumarlas.
+## Luna llena: ventajas de XP y suerte (puntos y %) a todo el grupo, de pie o
+## caído, y una lluvia de XP; la etiqueta hace que una luna forzada reemplace
+## las ventajas en vez de sumarlas.
 func _weather_start_full_moon() -> void:
 	var seconds := float(active_weather.time_left)
 	for body: Node3D in _all_raiders():
@@ -409,6 +536,30 @@ func _weather_start_full_moon() -> void:
 			stats.clear_timed_boons(FULL_MOON_TAG)
 			stats.add_timed_boon("xp_gain", full_moon_xp_bonus, seconds, FULL_MOON_TAG)
 			stats.add_timed_boon("luck", full_moon_luck_bonus, seconds, FULL_MOON_TAG)
+			stats.add_timed_boon("luck_percent", full_moon_luck_percent, seconds, FULL_MOON_TAG)
+	# El plan va después de las ventajas: descuenta el bono de XP de la luna.
+	var rain := XpRain.plan(full_moon_xp_rain_levels, full_moon_xp_rain_gems,
+			full_moon_xp_rain_seconds, _all_raiders())
+	_weather_state["xp_gems_left"] = int(rain.gems)
+	_weather_state["xp_gem_value"] = int(rain.value)
+	_weather_state["xp_gem_every"] = float(rain.every)
+	_weather_state["xp_drop_left"] = 0.0
+
+
+## Suelta las gemas de la lluvia de XP de a una, repartidas en
+## full_moon_xp_rain_seconds.
+func _weather_tick_full_moon(delta: float) -> void:
+	var left := int(_weather_state.get("xp_gems_left", 0))
+	var wait := float(_weather_state.get("xp_drop_left", 0.0)) - delta
+	var color: Color = _active_row()["fx_color"]
+	while left > 0 and wait <= 0.0:
+		wait += float(_weather_state["xp_gem_every"])
+		left -= 1
+		XpRain.drop_gem(get_tree(), layout, int(_weather_state["xp_gem_value"]),
+				full_moon_xp_rain_min_distance, full_moon_xp_rain_max_distance, color,
+				full_moon_xp_rain_burst_height, full_moon_xp_rain_burst_count)
+	_weather_state["xp_gems_left"] = left
+	_weather_state["xp_drop_left"] = wait
 
 
 ## --- lluvias ----------------------------------------------------------------
@@ -417,10 +568,9 @@ func _weather_start_enemy_rain() -> void:
 	_weather_state["drop_left"] = 0.0
 
 
-## Los enemigos "caen" como un aviso en el suelo más un destello, y después
-## aparecen en el suelo. NO se sueltan desde arriba: un cuerpo cayendo es lo
-## que el detector de cuerpos en el aire del harness atrapa, y ese detector
-## no se amplía por decorado.
+## Los enemigos caen del cielo sobre un aviso en el suelo: el cuerpo nace
+## en el suelo y solo su dibujo cae (EnemyBase.drop_from_sky), así ningún
+## cuerpo queda en el aire para el detector del harness.
 func _weather_tick_enemy_rain(delta: float) -> void:
 	_weather_state["drop_left"] = float(_weather_state.get("drop_left", 0.0)) - delta
 	if float(_weather_state["drop_left"]) > 0.0:
@@ -443,10 +593,10 @@ func _weather_tick_enemy_rain(delta: float) -> void:
 		Juice.burst(point + Vector3.UP * enemy_rain_burst_height, color,
 				enemy_rain_burst_count)
 	if not points.is_empty():
-		# Sin el cupo de horda (false): la lluvia es clima de 35 s, y con
+		# Sin el cupo de horda (false): la lluvia es clima de 40 s, y con
 		# ese cupo la arena se quedaba en su tope toda la ventana, un muro
 		# que no deja pasar. El tsunami sí es una ola.
-		get_tree().call_group("enemy_spawner", "spawn_at_points", points, false)
+		get_tree().call_group("enemy_spawner", "spawn_at_points", points, false, true)
 
 
 func _weather_start_radioactive_rain() -> void:
@@ -496,30 +646,24 @@ func _weather_start_tsunami() -> void:
 	# mapa tiene su propio tramo, y con el reloj de la partida la ola de
 	# una tercera etapa saldría enorme.
 	var wanted := tsunami_base + tsunami_per_minute * int(RunState.stage_time / 60.0)
-	_weather_state["left"] = wanted
+	var wave := TsunamiWave.new(self, layout)
+	wave.start(anchor_body, angle, wanted, _active_row()["fx_color"])
+	_weather_state["wave"] = wave
 	_weather_state["announce_arg"] = WeatherCatalog.compass_word(angle)
 
 
-## Vierte la ola durante los tres segundos de la fila, por tandas de
-## TSUNAMI_PER_FRAME; el tope de horda de spawn_at_points limita el total.
-func _weather_tick_tsunami(_delta: float) -> void:
-	var left := int(_weather_state.get("left", 0))
-	if left <= 0:
-		return
-	var chunk := mini(left, TSUNAMI_PER_FRAME)
-	var origin: Vector3 = _weather_state.get("origin", Vector3.ZERO)
-	var angle := float(_weather_state.get("angle", 0.0))
-	var points: Array[Vector3] = []
-	for i in chunk:
-		# Un arco de un solo lado: un tsunami es un muro que viene de un
-		# lugar, no un anillo que se cierra (eso es una horda).
-		var spread := angle + randf_range(-tsunami_arc_spread, tsunami_arc_spread)
-		var pos := layout.ring_sample(origin, spread, tsunami_arc_min, tsunami_arc_max)
-		if layout.walkable(pos):
-			points.append(pos)
-	if not points.is_empty():
-		get_tree().call_group("enemy_spawner", "spawn_at_points", points, true)
-	_weather_state["left"] = left - chunk
+## La ola avanza hasta soltar a sus enemigos; la duración de la fila le alcanza.
+func _weather_tick_tsunami(delta: float) -> void:
+	var wave := _weather_state.get("wave") as TsunamiWave
+	if wave != null:
+		wave.tick(delta)
+
+
+## Si el desastre se corta antes, la ola suelta a los que lleva.
+func _weather_stop_tsunami() -> void:
+	var wave := _weather_state.get("wave") as TsunamiWave
+	if wave != null:
+		wave.release_all()
 
 
 func _weather_start_earthquake() -> void:
@@ -560,7 +704,8 @@ func _weather_start_meteors() -> void:
 
 
 ## Descuenta los avisos pendientes (los que llegan a 0 impactan) y, cada
-## meteor_interval, marca un impacto nuevo cerca de un jugador al azar.
+## meteor_interval, marca un impacto nuevo cerca de un jugador al azar y
+## suelta su meteorito (MeteorFall).
 func _weather_tick_meteors(delta: float) -> void:
 	var pending: Array = _weather_state.get("pending", [])
 	for i in range(pending.size() - 1, -1, -1):
@@ -586,6 +731,8 @@ func _weather_tick_meteors(delta: float) -> void:
 		return
 	Telegraph.spawn_disc(self, at, meteor_radius, meteor_telegraph,
 			_active_row()["fx_color"])
+	# La roca cae del cielo durante el aviso y toca el suelo al impactar.
+	MeteorFall.spawn(self, at, meteor_telegraph)
 	pending.append({"at": at, "left": meteor_telegraph})
 	_weather_state["pending"] = pending
 
@@ -605,6 +752,7 @@ func _meteor_impact(at: Vector3) -> void:
 			var health := Health.find_in(body)
 			if health != null and not health.is_dead:
 				health.take_damage(damage)
+				_launch_raider(body, at)
 	for node: Node in get_tree().get_nodes_in_group("enemies"):
 		var enemy := node as Node3D
 		if enemy == null or not enemy.is_inside_tree():
@@ -614,6 +762,13 @@ func _meteor_impact(at: Vector3) -> void:
 		var enemy_health := Health.find_in(enemy)
 		if enemy_health != null and not enemy_health.is_dead:
 			enemy_health.take_damage(damage * meteor_enemy_scale)
+
+
+## Lanza por el aire al raider que golpeó el meteorito, hacia afuera del impacto.
+func _launch_raider(body: Node3D, at: Vector3) -> void:
+	var knockback := body.get_node_or_null(^"Knockback") as PlayerKnockback
+	if knockback != null:
+		knockback.launch_from(at, meteor_push_speed, meteor_push_lift)
 
 
 ## --- utilidades -------------------------------------------------------------

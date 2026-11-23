@@ -42,6 +42,14 @@ const HIDDEN_NODE_NAME := "SUELO"
 ## Estiramiento máximo de la escala Y en el aire (0.12 = +12 %; el ancho se achica a la par).
 @export var stretch_max: float = 0.12
 
+@export_group("Pendiente")
+## Cuánto sigue el cuerpo la inclinación del terreno al estar en el suelo (0 = siempre derecho, 1 = pegado a la ladera).
+@export_range(0.0, 1.0) var slope_follow: float = 1.0
+## Inclinación máxima por pendiente, en grados (en un muro no se acuesta).
+@export var slope_max_degrees: float = 35.0
+## Qué tan rápido se acomoda a una pendiente nueva (fracción cerrada por segundo; menos = más suave).
+@export var slope_damp_rate: float = 5.0
+
 @export_group("Derrape")
 ## Escala Y durante el derrape (más plana que la cápsula: se lee mejor en la foca ancha).
 @export var slide_squash: float = 0.55
@@ -81,6 +89,8 @@ var _phase: float = 0.0
 var _dead: bool = false
 ## Estado de movimiento suavizado (se acerca a su objetivo cada frame).
 var _lean: Vector2 = Vector2.ZERO
+## Inclinación por pendiente (x = nariz, y = costado), en radianes.
+var _slope: Vector2 = Vector2.ZERO
 var _bob: float = 0.0
 var _stretch: float = 0.0
 var _squash_blend: float = 0.0
@@ -189,6 +199,7 @@ func _process(delta: float) -> void:
 					* stretch_max
 			speed_factor = 0.0  # sin rebote en el aire
 	_lean = _lean.lerp(target_lean, smoothing)
+	_slope = _slope.lerp(_slope_target(), _damp(slope_damp_rate, delta))
 	_stretch = lerpf(_stretch, target_stretch, smoothing)
 	_bob = lerpf(_bob, bob_amount * speed_factor, smoothing)
 	# Ratio 0.5 (la cápsula agachada) da el aplastado completo.
@@ -207,9 +218,22 @@ func _process(delta: float) -> void:
 	# Signos: la nariz apunta a -Z, así que una inclinación NEGATIVA la baja
 	# (igual que el derrape), y avanzar da local_velocity.z < 0: _lean.y va
 	# directo. Moverse a la derecha da _lean.x > 0 y pide un giro negativo.
-	_model.rotation.x = _lean.y - slide_pitch * _squash_blend
-	_model.rotation.z = -_lean.x
+	_model.rotation.x = _lean.y - slide_pitch * _squash_blend + _slope.x
+	_model.rotation.z = -_lean.x + _slope.y
 	_model.position.y = absf(sin(_phase * bob_speed)) * _bob
+
+
+## Giro que deja el eje arriba del modelo sobre la normal del suelo (en el
+## espacio de este rig, que ya trae el giro de hacia dónde mira), por
+## slope_follow y con tope slope_max_degrees. En el aire, derecho.
+func _slope_target() -> Vector2:
+	if _body == null or not _body.is_on_floor() or slope_follow <= 0.0:
+		return Vector2.ZERO
+	var normal := global_basis.orthonormalized().inverse() * _body.get_floor_normal()
+	var limit := deg_to_rad(slope_max_degrees)
+	var pitch := clampf(atan2(normal.z, normal.y), -limit, limit)
+	var roll := clampf(atan2(-normal.x, normal.y), -limit, limit)
+	return Vector2(pitch, roll) * slope_follow
 
 
 ## Caída de cara al morir: el modelo pivota en su origen a ras del suelo,

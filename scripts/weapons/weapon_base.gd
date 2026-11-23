@@ -52,6 +52,22 @@ const ASCEND_PROJECTILE_ADD: int = 1
 ## Daño crítico extra del arma, en PUNTOS porcentuales (10 = +0.10 al multiplicador de crítico). La suben las mejoras de arma.
 @export var crit_damage_bonus: float = 0.0
 
+@export_group("Impacto")
+## Empujón que da cada golpe, en m/s (0 = no empuja). Cada arma fija el suyo en su escena.
+@export var hit_push: float = 0.0
+## Velocidad que le queda al enemigo durante el frenazo del golpe (1 = sin frenazo, 0.3 = casi parado). Cada arma fija el suyo en su escena.
+@export_range(0.05, 1.0) var hit_slow: float = 1.0
+## Segundos que dura ese frenazo. Cada arma fija el suyo en su escena.
+@export var hit_slow_seconds: float = 0.0
+
+@export_group("Área")
+## Escala base del tamaño de área de TODAS las armas (0.8 = 80%): radios, tajos, rayos y charcos. Cámbiala aquí en el script, no en cada escena.
+@export var base_area_scale: float = 0.8
+
+@export_group("Robo de vida")
+## Cuánto rinde el robo de vida del portador con TODAS las armas (0.5 = cura la mitad de lo que diría su %). Cámbiala aquí en el script, no en cada escena.
+@export var lifesteal_scale: float = 0.5
+
 ## Cartas de mejora que recibió el arma en la partida (las suma
 ## UpgradePool.apply); es la puerta de evolución y ascenso (EvolutionCatalog).
 var upgrade_level: int = 0
@@ -64,6 +80,8 @@ var evolved_name: String = ""
 var ascension_tier: int = 0
 
 var _cooldown_left: float = 0.0
+## Blanco del disparo de ráfaga que está saliendo (ver volley_target()).
+var _volley_target: Node3D = null
 
 ## Capa de stats del jugador que lleva el arma; null = multiplicadores
 ## neutros (un arma probada fuera de un jugador). Léela siempre con
@@ -87,14 +105,14 @@ func carrier_player() -> Node3D:
 	return get_tree().get_first_node_in_group("player") as Node3D
 
 
-## El montaje que lleva el arma: la mascota si la lleva una, si no el raider.
+## El montaje que lleva el arma: el raider.
 ## Los efectos anclados al portador (el punto de caída de la baba, el centro
 ## del anillo de orbes) siguen a ESTE; stats, robo de vida y objetos siguen
 ## leyendo carrier_player().
 func carrier_node() -> Node3D:
 	var node: Node = self
 	while node != null:
-		if node is Pet or node is Player:
+		if node is Player:
 			return node as Node3D
 		node = node.get_parent()
 	return carrier_player()
@@ -142,17 +160,18 @@ func effective_cooldown() -> float:
 ## salvo en las armas que ensanchan la búsqueda para igualarlo (targeting_range()).
 func area_scale() -> float:
 	var stats := _stats_or_null()
-	return stats.area_multiplier if stats != null else 1.0
+	return base_area_scale * (stats.area_multiplier if stats != null else 1.0)
 
 
 ## Disparos, orbes o flechas por ráfaga: el conteo propio del arma más el
-## bono plano del portador (Tomo de Multitud). Las armas leen esto, no
+## bono del portador (Tomo de Multitud), los dos con decimales; el total se
+## redondea hacia abajo (1.3 + 1.7 = 3). Las armas leen esto, no
 ## projectile_count.
 func effective_projectile_count() -> int:
 	var stats := _stats_or_null()
 	# El 0.0001 evita que 2.9999999 (error de float) se quede en 2.
-	return floori(projectile_count + 0.0001) \
-			+ (stats.projectile_bonus if stats != null else 0)
+	return floori(projectile_count + (stats.projectile_bonus if stats != null else 0.0)
+			+ 0.0001)
 
 
 ## Multiplicador de los efectos con duración que deja un arma (ralentización,
@@ -172,6 +191,11 @@ func targeting_range() -> float:
 
 ## Cuerpo del grupo "enemies" más cercano dentro de targeting_range(), o null.
 func acquire_target() -> Node3D:
+	return _nearest_enemy({})
+
+
+## Como acquire_target(), saltando los cuerpos cuyo instance id está en `skip`.
+func _nearest_enemy(skip: Dictionary) -> Node3D:
 	# Atajo con la horda vacía: esto corre cada frame de física mientras no
 	# hay nadie vivo, así se evita el Array de get_nodes_in_group.
 	if get_tree().get_first_node_in_group("enemies") == null:
@@ -185,6 +209,8 @@ func acquire_target() -> Node3D:
 	for enemy in get_tree().get_nodes_in_group("enemies"):
 		var body := enemy as Node3D
 		if body == null or not body.is_inside_tree():
+			continue
+		if not skip.is_empty() and skip.has(body.get_instance_id()):
 			continue
 		var dist_sq := origin.distance_squared_to(body.global_position)
 		if dist_sq <= nearest_dist_sq:
@@ -200,23 +226,66 @@ func fire(_target: Node3D) -> void:
 
 # --- ráfagas del Tomo de Multitud ------------------------------------------
 
-## Ráfaga en abanico: `count` disparos, el del medio hacia `center_dir` y los
-## demás girados `fan_deg` grados entre vecinos alrededor de UP. El primero
-## sale ya y los demás escalonados (ver volley_step()); `shot` recibe la
-## dirección de cada disparo, calculada al disparar.
-func fire_volley(count: int, center_dir: Vector3, shot: Callable, stagger: float,
-		fan_deg: float) -> void:
+## Ráfaga a un solo blanco: `count` disparos hacia `first_target`. El
+## primero sale ya por `center_dir`; los extras salen escalonados (ver
+## volley_step()) y vuelven a apuntar al mismo blanco al salir, por si se
+## movió. Si un disparo anterior lo mató, los que quedan se redirigen al
+## enemigo más cercano; sin enemigos al alcance no salen. `shot` recibe la dirección; las
+## armas que persiguen leen el blanco de cada disparo con volley_target().
+func fire_volley(count: int, first_target: Node3D, center_dir: Vector3, shot: Callable,
+		stagger: float) -> void:
 	var step := volley_step(count, stagger)
-	for i: int in count:
-		var yaw := deg_to_rad(fan_deg) * (float(i) - float(count - 1) * 0.5)
-		var direction := center_dir.rotated(Vector3.UP, yaw)
-		if i == 0:
-			shot.call(direction)
-		else:
-			_schedule_shot(step * float(i), shot.bind(direction))
+	_volley_target = first_target
+	shot.call(center_dir)
+	for order: int in range(1, count):
+		_schedule_shot(step * float(order), _volley_extra.bind(shot, center_dir, first_target))
 
 
-## Ráfaga sin abanico: `first` sale ya y cada extra llama a `extra`, que
+## Blanco del disparo de ráfaga que está saliendo, o null si no hubo ninguno.
+func volley_target() -> Node3D:
+	return _volley_target if is_instance_valid(_volley_target) else null
+
+
+## Reparto de una ráfaga entre enemigos (lo usa el Arco de caza): el enemigo
+## más cercano que no está en `chosen`; con todos elegidos, empieza otra
+## vuelta. Lo anota en `chosen`.
+func next_volley_target(chosen: Dictionary) -> Node3D:
+	var target := _nearest_enemy(chosen)
+	if target == null and not chosen.is_empty():
+		chosen.clear()
+		target = _nearest_enemy(chosen)
+	if target != null:
+		chosen[target.get_instance_id()] = true
+	return target
+
+
+## `center_dir` rehecho hacia `target`, del mismo tipo: un desplazamiento
+## (largo distinto de 1, el Vial de sangre) llega a su posición; una dirección
+## plana sigue plana; las demás apuntan al centro de su cuerpo.
+func redirect_to(center_dir: Vector3, target: Node3D) -> Vector3:
+	if not is_equal_approx(center_dir.length(), 1.0):
+		return target.global_position - global_position
+	if absf(center_dir.y) < 0.0001:
+		return flat_dir_or(target.global_position - global_position, center_dir)
+	return aim_dir_or(body_aim_point(target) - global_position, center_dir)
+
+
+## Un disparo extra de fire_volley(). `target` es Variant: el Callable guarda
+## al enemigo y, si se liberó antes de que salga el disparo, un parámetro
+## tipado fallaría ANTES de poder comprobar is_instance_valid.
+func _volley_extra(shot: Callable, center_dir: Vector3, target: Variant) -> void:
+	var live: Node3D = null
+	if is_instance_valid(target) and (target as Node3D).is_in_group("enemies"):
+		live = target as Node3D
+	else:
+		live = acquire_target()
+	if live == null:
+		return
+	_volley_target = live
+	shot.call(redirect_to(center_dir, live))
+
+
+## Ráfaga con dos callbacks: `first` sale ya y cada extra llama a `extra`, que
 ## elige su propio blanco (el primer disparo pudo haber matado al suyo). Con
 ## `fit_window` en false el escalonado es `stagger` tal cual, sin comprimir.
 func fire_volley_retarget(count: int, first: Callable, extra: Callable, stagger: float,
@@ -285,8 +354,9 @@ func deal_damage(target_health: Health, allow_kill_hooks: bool = true) -> float:
 	# El medidor de la party anota lo que el golpe quitó y su tirada entera.
 	PartyPower.record_weapon_damage(self, target_health, applied, amount)
 	if stats != null and stats.lifesteal > 0.0:
-		_lifesteal_heal(applied * stats.lifesteal)
+		_lifesteal_heal(applied * stats.lifesteal * lifesteal_scale)
 	# Ganchos de objetos: veneno al golpear, arañas al matar.
+	_hit_impact(target_health)
 	if _bag != null and is_instance_valid(_bag):
 		var body := target_health.get_parent() as Node3D
 		if body != null:
@@ -294,6 +364,22 @@ func deal_damage(target_health: Health, allow_kill_hooks: bool = true) -> float:
 			if allow_kill_hooks and target_health.is_dead:
 				_bag.on_weapon_kill(body.global_position, self)
 	return applied
+
+
+## Empuja al enemigo golpeado lejos del portador y lo frena un instante
+## (hit_push, hit_slow, hit_slow_seconds de esta arma).
+func _hit_impact(target_health: Health) -> void:
+	if target_health.is_dead or (hit_push <= 0.0 and hit_slow_seconds <= 0.0):
+		return
+	var enemy := target_health.get_parent() as EnemyBase
+	var carrier := carrier_node()
+	if enemy == null or carrier == null:
+		return
+	var away := enemy.global_position - carrier.global_position
+	away.y = 0.0
+	if away.length_squared() < DEGENERATE_LENGTH_SQ:
+		away = -carrier.global_basis.z
+	enemy.apply_hit_impact(away.normalized() * hit_push, hit_slow, hit_slow_seconds)
 
 
 func _lifesteal_heal(amount: float) -> void:
@@ -328,13 +414,21 @@ func damage_all(bodies: Array[Node3D]) -> float:
 # Un solo lugar para "recorre el grupo enemies, quédate con los cuerpos vivos
 # y prueba una forma". Cada helper devuelve los cuerpos encontrados; quien
 # llama los pasa a damage_all() y suma sus efectos propios (veneno, chispas).
+# Todas las formas cuentan el CUERPO entero, no solo su centro: el alcance se
+# agranda con body_hit_radius(), así lo que el visual toca, golpea.
 
-## Enemigos vivos dentro de un disco plano: a `radius` o menos de `center` en
-## el plano XZ y a no más de `height_window` por encima o por debajo. El filtro
-## de altura evita que un charco en el suelo alcance cuerpos sobre una cornisa.
+## Radio del cuerpo de un enemigo en el plano (EnemyBase.hit_radius), 0 para
+## cualquier otra cosa.
+static func body_hit_radius(body: Node3D) -> float:
+	var enemy := body as EnemyBase
+	return enemy.hit_radius() if enemy != null else 0.0
+
+## Enemigos vivos que tocan un disco plano: su cuerpo a `radius` o menos de
+## `center` en el plano XZ y a no más de `height_window` por encima o por
+## debajo. El filtro de altura evita que un charco en el suelo alcance cuerpos
+## sobre una cornisa.
 func enemies_in_disc(center: Vector3, radius: float, height_window: float) -> Array[Node3D]:
 	var found: Array[Node3D] = []
-	var radius_sq := radius * radius
 	for node: Node in get_tree().get_nodes_in_group("enemies"):
 		var body := node as Node3D
 		if body == null or not body.is_inside_tree():
@@ -343,7 +437,8 @@ func enemies_in_disc(center: Vector3, radius: float, height_window: float) -> Ar
 		if absf(to_body.y) > height_window:
 			continue
 		to_body.y = 0.0
-		if to_body.length_squared() <= radius_sq:
+		var reach := radius + body_hit_radius(body)
+		if to_body.length_squared() <= reach * reach:
 			found.append(body)
 	return found
 
@@ -352,12 +447,12 @@ func enemies_in_disc(center: Vector3, radius: float, height_window: float) -> Ar
 ## estallidos que también deben alcanzar cuerpos por encima o por debajo.
 func enemies_in_sphere(center: Vector3, radius: float) -> Array[Node3D]:
 	var found: Array[Node3D] = []
-	var radius_sq := radius * radius
 	for node: Node in get_tree().get_nodes_in_group("enemies"):
 		var body := node as Node3D
 		if body == null or not body.is_inside_tree():
 			continue
-		if center.distance_squared_to(body.global_position) <= radius_sq:
+		var reach := radius + body_hit_radius(body)
+		if center.distance_squared_to(body.global_position) <= reach * reach:
 			found.append(body)
 	return found
 
@@ -374,33 +469,40 @@ func enemies_in_lane(origin: Vector3, direction: Vector3, length: float,
 			continue
 		var to_body := body.global_position - origin
 		to_body.y = 0.0
+		var body_radius := body_hit_radius(body)
 		var along := to_body.dot(direction)
-		if along < 0.0 or along > length:
+		if along < -body_radius or along > length + body_radius:
 			continue
-		if (to_body - direction * along).length() <= half_width:
+		if (to_body - direction * along).length() <= half_width + body_radius:
 			found.append(body)
 	return found
 
 
-## Enemigos vivos dentro de un cono plano de `arc_deg` alrededor de
-## `center_dir`, hasta `reach` (medido en 3D desde `center`). Un cuerpo encima
-## del atacante no tiene dirección usable, así que siempre cuenta como dentro.
+## Enemigos vivos que tocan un cono plano de `arc_deg` alrededor de
+## `center_dir`, hasta `reach` en el plano XZ desde `center` y a no más de
+## `height_window` por encima o por debajo (así un tajo a la altura del pecho
+## llega igual a los pies). Un cuerpo encima del atacante no tiene dirección
+## usable, así que siempre cuenta como dentro.
 func enemies_in_arc(center: Vector3, center_dir: Vector3, reach: float,
-		arc_deg: float) -> Array[Node3D]:
+		arc_deg: float, height_window: float = 2.2) -> Array[Node3D]:
 	var found: Array[Node3D] = []
-	var reach_sq := reach * reach
 	var half_arc := deg_to_rad(arc_deg * 0.5)
 	for node: Node in get_tree().get_nodes_in_group("enemies"):
 		var body := node as Node3D
 		if body == null or not body.is_inside_tree():
 			continue
-		var body_position := body.global_position
-		if center.distance_squared_to(body_position) > reach_sq:
+		var to_body := body.global_position - center
+		if absf(to_body.y) > height_window:
 			continue
-		var to_body := body_position - center
 		to_body.y = 0.0
-		if to_body.length_squared() > DEGENERATE_LENGTH_SQ \
-				and center_dir.angle_to(to_body) > half_arc:
+		var body_radius := body_hit_radius(body)
+		var distance := to_body.length()
+		if distance > reach + body_radius:
+			continue
+		# El borde del cono también cuenta el cuerpo: se abre lo que el radio
+		# del cuerpo ocupa visto desde el atacante.
+		if distance * distance > DEGENERATE_LENGTH_SQ \
+				and center_dir.angle_to(to_body) > half_arc + atan2(body_radius, distance):
 			continue
 		found.append(body)
 	return found
@@ -509,7 +611,7 @@ func _apply_stat_tables(mults: Dictionary, adds: Dictionary, what: String) -> vo
 		if current == null:
 			push_warning("%s: %s mult on unknown property '%s'" % [name, what, property])
 			continue
-		# Los ajustes enteros (projectile_count, pierce_count, chain_count) se
+		# Los ajustes enteros (como pierce_count) se
 		# redondean al entero más cercano en vez de truncar: "x1.5" sobre 3
 		# da los 5 que promete la carta, no 4.
 		if current is int:

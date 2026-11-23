@@ -38,6 +38,9 @@ const WEAPON_TARGET_PREFIX := "weapon/"
 @export var press_squash: float = 0.97
 
 @onready var _rarity_label: Label = %RarityLabel
+## Título y descripción juntos: arriba en una carta sorteada, centrados en
+## una carta de elección (altares).
+@onready var _body: VBoxContainer = %Body
 @onready var _title_label: Label = %TitleLabel
 @onready var _desc_label: Label = %DescLabel
 @onready var _weapon_label: Label = %WeapLabel
@@ -63,8 +66,10 @@ func show_rolled(item: Dictionary) -> void:
 	# min_rarity dependen de él): solo se traduce aquí, camino a la pantalla.
 	_rarity_label.text = UpgradePool.rarity_display(String(rarity.name)).to_upper()
 	_style_ribbon(rarity_color)
+	_center_body(false)
 	_title_label.text = item.title
 	_desc_label.text = item.description
+	_desc_label.visible = true
 	# Toda carta que invierte en un arma (target "weapon/<NodeName>": cartas de
 	# stat por arma y extras del catálogo) nombra aquí el arma que mejora. Las
 	# cartas de arma nueva, tomo y stat genérica no tienen ese target.
@@ -90,8 +95,11 @@ func show_choice(option: Dictionary, tag: String) -> void:
 	_rarity_label.text = tag.to_upper()
 	_rarity_label.visible = not tag.is_empty()
 	_style_ribbon(color)
+	_center_body(true)
 	_title_label.text = String(option.get("title", ""))
 	_desc_label.text = String(option.get("description", ""))
+	# Sin descripción (altar de carga) el título queda solo, en el centro.
+	_desc_label.visible = not _desc_label.text.is_empty()
 	# Las opciones no apuntan a un arma: así el nombre de arma de una carta
 	# sorteada nunca queda en una de elección.
 	_weapon_label.visible = false
@@ -106,6 +114,15 @@ func stop_shine() -> void:
 	if _shine != null and _shine.is_valid():
 		_shine.kill()
 	_shine = null
+
+
+## Centrado: título y descripción como un bloque en el medio de la carta.
+## Si no, el título va arriba y la descripción llena el resto.
+func _center_body(centered: bool) -> void:
+	_body.alignment = BoxContainer.ALIGNMENT_CENTER if centered \
+			else BoxContainer.ALIGNMENT_BEGIN
+	_desc_label.size_flags_vertical = Control.SIZE_SHRINK_CENTER if centered \
+			else Control.SIZE_EXPAND_FILL
 
 
 ## Píldora del color dado con texto oscuro, espaciada como un sello.

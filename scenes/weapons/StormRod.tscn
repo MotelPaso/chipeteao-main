@@ -6,4 +6,7 @@
 script = ExtResource("1_stormrod")
 damage = 12.0
 cooldown = 1.6
+hit_push = 0.0
+hit_slow = 0.3
+hit_slow_seconds = 0.2
 attack_range = 12.0

@@ -12,7 +12,7 @@ extends RefCounted
 ##   display_name, description: texto para el jugador (HUD, avisos, cofres).
 ##   glyph:    1-2 letras de la casilla del HUD mientras no hay sprite. Se
 ##             DECLARA (no sale del nombre). No debe repetirse entre armas,
-##             evoluciones, tomos, objetos, power-ups ni mascotas (el lint
+##             evoluciones, tomos, objetos ni power-ups (el lint
 ##             glyphs_unique lo revisa).
 ##   icon:     OPCIONAL, ruta res:// de una textura; si está, el HUD la
 ##             muestra en vez del glifo.
@@ -30,16 +30,13 @@ extends RefCounted
 ##   rarity:   "Common" | "Rare" | "Epic" | "Legendary" (los name de
 ##             Rarity.TIERS); la pantalla lo traduce con
 ##             Rarity.display_name().
-##   kind:     OPCIONAL, comportamiento: "magnet", "poison_on_hit", "titan",
-##             "spiders", "shock_dash", "saiyan", "zenkai" (los maneja
+##   kind:     OPCIONAL, comportamiento: "magnet", "poison_on_hit",
+##             "spiders", "saiyan" (los maneja
 ##             ItemBag) y "demonic_boost", "charge_boost", "portal_recharge"
 ##             (contadores que leen los santuarios). Un kind por fila y un
 ##             objeto por kind: el comportamiento se busca por kind, no por
 ##             id, y sus números salen de esa única fila (el lint
 ##             item_kinds_unique lo revisa).
-## No hay kind "pet": la mascota es un espacio único del Player que solo
-## llenan la caja de mascota y el traficante, así que un cofre o la ruleta
-## nunca pueden repartir una (tirarían la que el jugador eligió).
 
 const ITEM_LIBRARY: Array[Dictionary] = [
 	# --- Common ---------------------------------------------------------
@@ -73,7 +70,7 @@ const ITEM_LIBRARY: Array[Dictionary] = [
 		"effects": [{"stat": "jumps", "amount": 1.0}],
 	},
 	{
-		"id": "magnet", "display_name": "Imán", "rarity": "Rare",
+		"id": "magnet", "display_name": "Imán", "rarity": "Legendary",
 		"glyph": "IM", "kind": "magnet",
 		"description": "Cada tanto atrae todas las gemas de XP del mapa; cada copia lo hace antes y suma +%d%% de XP",
 		"text_values": ["amount"],
@@ -91,20 +88,17 @@ const ITEM_LIBRARY: Array[Dictionary] = [
 		"poison_dps_per_copy": 3.0, "poison_duration": 3.0,
 	},
 	{
-		"id": "keen_eye", "display_name": "Ojo agudo", "rarity": "Rare",
+		"id": "keen_eye", "display_name": "Ojo agudo", "rarity": "Common",
 		"glyph": "OA", "description": "Prob. de crítico +%d%% por copia", "text_values": ["amount"],
 		"effects": [{"stat": "crit_chance", "amount": 5.0}],
 	},
 	# --- Epic -----------------------------------------------------------
 	{
-		"id": "titan_blood", "display_name": "Sangre de titán", "rarity": "Epic",
-		"glyph": "ST", "kind": "titan",
-		"description": "Creces un %d%% y tus ataques cubren +%d%% de área por copia",
-		"text_values": ["growth_percent", "amount"],
+		"id": "titan_blood", "display_name": "Sangre de titán", "rarity": "Rare",
+		"glyph": "ST", "icon": "res://assets/ui/icons/items/kind_titan.svg",
+		"description": "Tus ataques cubren +%d%% de área por copia",
+		"text_values": ["amount"],
 		"effects": [{"stat": "area", "amount": 8.0}],
-		# Crecimiento del sello por copia (%) y escala máxima (el brazo de
-		# cámara deja de funcionar si el sello crece sin techo).
-		"growth_percent": 8.0, "max_scale": 2.2,
 	},
 	{
 		"id": "demon_blood", "display_name": "Sangre de demonio", "rarity": "Epic",
@@ -112,16 +106,16 @@ const ITEM_LIBRARY: Array[Dictionary] = [
 		"description": "Los altares demoníacos dan +%d%% más por copia",
 		"text_values": ["boost_percent"],
 		# Lo lee curse_shrine.gd (por kind): % extra al don y al costo por copia.
-		"boost_percent": 25.0,
+		"boost_percent": 5.0,
 	},
 	{
 		"id": "master_key", "display_name": "Llave maestra", "rarity": "Epic",
 		"glyph": "LM", "kind": "charge_boost",
-		"description": "Los altares de carga se llenan %d%% más rápido y dan +%d%% más por copia",
-		"text_values": ["charge_speed_percent", "boon_percent"],
-		# Los lee charge_shrine.gd (por kind): % más de velocidad de carga y
-		# de tamaño del don, por copia.
-		"charge_speed_percent": 20.0, "boon_percent": 20.0,
+		"description": "Las stats que dan los altares de carga suben un %d%% por copia",
+		"text_values": ["boon_percent"],
+		# Lo lee charge_shrine.gd (por kind): % más de tamaño del don, por
+		# copia, contando a quien lleve más llaves en la party.
+		"boon_percent": 5.0,
 	},
 	# --- Legendary ------------------------------------------------------
 	{
@@ -137,13 +131,6 @@ const ITEM_LIBRARY: Array[Dictionary] = [
 		"spider_color": Color(0.55, 0.2, 0.75), "max_spiders_per_frame": 12,
 	},
 	{
-		"id": "electric_belt", "display_name": "Cinturón eléctrico", "rarity": "Legendary",
-		"glyph": "CL", "kind": "shock_dash",
-		# El 4 sale de BeltBolt (belt_bolt.gd): el primer blanco más
-		# BASE_BOUNCES (2) más 1 por la copia. Mantén el texto igual a eso.
-		"description": "Al derrapar, un rayo salta entre 4 enemigos (uno más por copia)",
-	},
-	{
 		"id": "saiyan_blood", "display_name": "Sangre sayayin", "rarity": "Legendary",
 		"glyph": "SS", "kind": "saiyan",
 		"description": "Cada %d bajas te envuelve un aura: daño, velocidad de ataque y velocidad",
@@ -152,8 +139,8 @@ const ITEM_LIBRARY: Array[Dictionary] = [
 		# cuenta por kills_scale_per_extra_copy, sin bajar de kills_floor
 		# (si no, el aura sería permanente).
 		"kills_per_aura": 40, "kills_scale_per_extra_copy": 0.85, "kills_floor": 15,
-		# Segundos del aura y sus bonos por copia, en %: daño, velocidad de
-		# ataque y velocidad de movimiento.
+		# Segundos del aura (los alarga la duración de efectos del raider) y
+		# sus bonos por copia, en %: daño, velocidad de ataque y velocidad.
 		"aura_duration": 12.0, "aura_damage": 40.0, "aura_attack_speed": 25.0,
 		"aura_move_speed": 20.0,
 		# Aspecto del aura: aura_color tiñe la cáscara y el estallido,
@@ -163,20 +150,26 @@ const ITEM_LIBRARY: Array[Dictionary] = [
 	},
 	{
 		"id": "zenkai", "display_name": "Zenkai", "rarity": "Legendary",
-		"glyph": "ZK", "kind": "zenkai",
-		"description": "Sobrevivir por debajo del %d%% de HP sube todo un %d%% para siempre",
-		"text_values": ["arm_below_hp_percent", "percent_per_stack"],
-		# Se arma bajo arm_below_hp_percent del HP máx. y se dispara al volver
-		# sobre trigger_above_hp_percent (dos umbrales: hay que salir de
-		# verdad). Cada disparo suma una acumulación por copia, y cada
-		# acumulación sube percent_per_stack a cada stat de `stats` (en
-		# max_hp y luck son puntos fijos, no %).
-		"arm_below_hp_percent": 10.0, "trigger_above_hp_percent": 50.0,
-		"percent_per_stack": 8.0,
-		"stats": ["damage", "cooldown", "area", "move_speed", "crit_chance", "max_hp", "luck"],
+		"glyph": "ZK", "icon": "res://assets/ui/icons/items/kind_zenkai.svg",
+		# Suma +amount PLANO a cada stat, no multiplica lo que tienes: con 0%
+		# de evasión quedas en 10%. En las stats de puntos (vida máx.,
+		# suerte, armadura, espinas) son 10 puntos. Saltos y proyectiles no.
+		"description": "Todas las stats +%d%% por copia",
+		"text_values": ["amount"],
+		"amount": 10.0,
+		"effects": [
+			{"stat": "damage", "amount": 10.0}, {"stat": "cooldown", "amount": 10.0},
+			{"stat": "area", "amount": 10.0}, {"stat": "move_speed", "amount": 10.0},
+			{"stat": "crit_chance", "amount": 10.0}, {"stat": "crit_damage", "amount": 10.0},
+			{"stat": "lifesteal", "amount": 10.0}, {"stat": "evasion", "amount": 10.0},
+			{"stat": "duration", "amount": 10.0}, {"stat": "xp_gain", "amount": 10.0},
+			{"stat": "pickup_radius", "amount": 10.0}, {"stat": "powerup_chance", "amount": 10.0},
+			{"stat": "max_hp", "amount": 10.0}, {"stat": "luck", "amount": 10.0},
+			{"stat": "armor", "amount": 10.0}, {"stat": "thorns", "amount": 10.0},
+		],
 	},
 	{
-		"id": "cosmic_worm", "display_name": "Gusano cósmico", "rarity": "Legendary",
+		"id": "cosmic_worm", "display_name": "Gusano cósmico", "rarity": "Common",
 		"glyph": "GC", "kind": "portal_recharge",
 		"description": "Los portales se recargan %d%% más rápido por copia",
 		"text_values": ["recharge_percent"],

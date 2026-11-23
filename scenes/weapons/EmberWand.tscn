@@ -1,8 +1,14 @@
 [gd_scene format=3 uid="uid://d3rrmvr1knfw0"]
 
 [ext_resource type="Script" uid="uid://mi0pyrr2vv46" path="res://scripts/weapons/ember_wand.gd" id="1_wand"]
+[ext_resource type="PackedScene" path="res://scenes/weapons/EmberBall.tscn" id="2_projectile"]
 
 [node name="EmberWand" type="Node3D" unique_id=619022906]
 script = ExtResource("1_wand")
+projectile_scene = ExtResource("2_projectile")
+burst_radius = 2.0
 cooldown = 1.6
 attack_range = 10.0
+hit_push = 3.5
+hit_slow = 0.6
+hit_slow_seconds = 0.12

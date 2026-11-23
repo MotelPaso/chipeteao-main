@@ -1,0 +1,11 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scripts/enemies/enemy/zombie_rig.gd" id="1_rig"]
+[ext_resource type="PackedScene" path="res://assets/models/enemies/zombie/office_worker_basic_zombie.glb" id="2_model"]
+
+[node name="Zombie" type="Node3D"]
+transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, 0, 0, 0)
+script = ExtResource("1_rig")
+
+[node name="Model" parent="." instance=ExtResource("2_model")]
+transform = Transform3D(100, 0, 0, 0, 100, 0, 0, 0, 100, 7, 0, 0.0558)

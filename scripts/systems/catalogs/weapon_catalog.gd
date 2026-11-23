@@ -12,8 +12,7 @@ extends RefCounted
 ##   node_name: nombre del nodo del arma bajo el montaje Weapons del jugador.
 ##       Lo nombran el target "weapon/<node_name>" de las cartas, el
 ##       weapon_node_name de CharacterCatalog y el weapon_node de
-##       EvolutionCatalog, y debe ser el nombre del archivo de `scene` (las
-##       mascotas resuelven su arma por el nombre del archivo).
+##       EvolutionCatalog, y debe ser el nombre del archivo de `scene`.
 ## La `property` de cada carta de extra_entries debe existir en la escena del
 ## arma.
 ##
@@ -25,7 +24,7 @@ extends RefCounted
 ##       DECLARA, no se deriva de display_name: casi todos los nombres en
 ##       español son «Sustantivo de Complemento» y las iniciales chocan («Vara
 ##       de brasas» y «Vial de sangre» darían «VD»). No debe repetirse entre
-##       armas, evoluciones, tomos, objetos, power-ups ni mascotas: la tira los
+##       armas, evoluciones, tomos, objetos ni power-ups: la tira los
 ##       mezcla (el lint glyphs_unique lo revisa).
 ##   scene: escena del arma que se instancia al ganarla.
 ##   flavor: texto de la carta de arma nueva y de Colección.
@@ -57,7 +56,7 @@ const WEAPON_LIBRARY: Array[Dictionary] = [
 	{
 		"id": "ember_wand", "display_name": "Vara de brasas", "glyph": "VB",
 		"node_name": "EmberWand", "scene": "res://scenes/weapons/EmberWand.tscn",
-		"flavor": "detona estallidos de fuego sobre grupos lejanos",
+		"flavor": "lanza bolas de fuego que explotan y dejan quemando",
 	},
 	{
 		"id": "hunting_bow", "display_name": "Arco de caza", "glyph": "AR",
@@ -69,19 +68,6 @@ const WEAPON_LIBRARY: Array[Dictionary] = [
 				"description": "Las flechas del Arco de caza perforan %d enemigos más",
 				"target": "weapon/HuntingBow", "property": "pierce_count",
 				"op": "add", "amount": 1.0,
-			},
-		],
-	},
-	{
-		"id": "thorn_whip", "display_name": "Látigo de espinas", "glyph": "LE",
-		"node_name": "ThornWhip", "scene": "res://scenes/weapons/ThornWhip.tscn",
-		"flavor": "traza una línea de zarzas que engancha y ralentiza",
-		"extra_entries": [
-			{
-				"id": "thorn_whip_slow", "title": "Espinas aferradas",
-				"description": "La ralentización del Látigo de espinas es %d%% más fuerte",
-				"target": "weapon/ThornWhip", "property": "slow_percent",
-				"op": "add", "amount": 8.0,
 			},
 		],
 	},
@@ -123,25 +109,6 @@ const WEAPON_LIBRARY: Array[Dictionary] = [
 				"description": "Los Orbes espirituales suman %d orbe(s) más",
 				"target": "weapon/SpiritOrbs", "property": "projectile_count",
 				"op": "add", "amount": 1.0,
-			},
-		],
-	},
-	{
-		"id": "necro_staff", "display_name": "Báculo de nigromante", "glyph": "BN",
-		"node_name": "NecroStaff", "scene": "res://scenes/weapons/NecroStaff.tscn",
-		"flavor": "lo que mata se levanta de tu lado",
-		"extra_entries": [
-			{
-				"id": "necro_staff_duration", "title": "Posesión más larga",
-				"description": "Tus siervos duran %d%% más",
-				"target": "weapon/NecroStaff", "property": "possess_duration",
-				"op": "mul_percent", "amount": 25.0,
-			},
-			{
-				"id": "necro_staff_cap", "title": "Más siervos",
-				"description": "Puedes tener %d siervos más a la vez",
-				"target": "weapon/NecroStaff", "property": "max_possessed",
-				"op": "add", "amount": 3.0,
 			},
 		],
 	},

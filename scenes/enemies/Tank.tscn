@@ -46,12 +46,12 @@ height = 1.7
 
 [node name="Tank" type="CharacterBody3D" groups=["enemies"]]
 collision_layer = 2
-collision_mask = 3
+collision_mask = 1
 script = ExtResource("1_tank")
 contact_damage = 12.0
 attack_cooldown = 1.4
 attack_range = 1.8
-move_speed = 2.2
+move_speed = 1.8
 turn_speed = 6.0
 separation_strength = 0.15
 xp_gem_scene = ExtResource("3_gem")

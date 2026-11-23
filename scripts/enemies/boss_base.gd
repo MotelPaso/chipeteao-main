@@ -8,6 +8,11 @@ extends EnemyBase
 ## Sarcognath...) tiene su propia máquina de estados y moveset. Un jefe
 ## nunca se vuelve shiny (make_elite no hace nada).
 
+## Lo que suelta al morir. Se carga al usarse (no con preload): el bloque
+## habla con el spawner, que conoce a los jefes, y un preload aquí cerraría
+## un ciclo de carga.
+const LUCKY_BLOCK_PATH: String = "res://scenes/world/chests/LuckyBlock.tscn"
+
 @export_group("Jefe")
 ## Nombre del jefe en la barra de vida del HUD y en el log; el calendario de jefes puede reemplazarlo.
 @export var boss_title: String = "Jefe"
@@ -15,6 +20,14 @@ extends EnemyBase
 @export var arena_clamp_margin: float = 4.0
 ## Distancia en metros que el jefe guarda de un corte, una rampa o un puente del relieve por zonas al elegir dónde ponerse (en una arena sin relieve no cuenta).
 @export var relief_margin: float = 5.0
+
+@export_group("Impacto de jefe")
+## Cuánto empujan las armas a un jefe (en vez de push_taken de la horda): 0 = nada, 1 = como la horda.
+@export var boss_push_taken: float = 0.0
+## Si es true, las ralentizaciones (armas, Hedor, baba) no frenan a los jefes.
+@export var boss_ignores_slow: bool = true
+## Si el jefe lleva el borde negro de silueta (en vez de outline_enabled de la horda).
+@export var boss_outline_enabled: bool = false
 
 @export_group("Llegada compartida")
 ## Segundos que dura el anillo de destello de la llegada.
@@ -56,15 +69,11 @@ extends EnemyBase
 ## Escala extra del cuerpo por cada llamada a apply_tier() (Elder y más); 1.15 = +15%.
 @export var tier_body_scale: float = 1.15
 
-@export_group("Cofres")
-## Cofres al morir: siempre esta cantidad, más uno por altar demoníaco usado en la partida.
-@export var base_chest_drops: int = 1
-## Rareza mínima del anillo de cofres ("" = sin piso, para que tiren su rareza con la suerte demoníaca).
-@export var chest_min_rarity: String = ""
-## Radio en metros del anillo donde caen los cofres al morir.
-@export var chest_ring_radius: float = 3.5
-## Suerte extra que suma cada altar demoníaco usado en la partida a la tirada de rareza de cada cofre.
-@export var chest_luck_per_demonic: float = 20.0
+@export_group("Bloques de la suerte")
+## Bloques de la suerte que suelta al morir (en vez de cofres).
+@export var lucky_block_drops: int = 2
+## Radio en metros del anillo donde caen los bloques al morir.
+@export var drop_ring_radius: float = 3.5
 
 ## Media arena menos arena_clamp_margin: la posición se recorta para que el
 ## jefe (y sus ataques de suelo) nunca salgan del campo. _ready la recalcula
@@ -101,6 +110,27 @@ func _physics_process(delta: float) -> void:
 	# Límite duro de la arena (también frena cualquier empujón futuro).
 	global_position.x = clampf(global_position.x, -arena_half_extent, arena_half_extent)
 	global_position.z = clampf(global_position.z, -arena_half_extent, arena_half_extent)
+
+
+func _push_scale() -> float:
+	return boss_push_taken
+
+
+func _wants_outline() -> bool:
+	return boss_outline_enabled
+
+
+## Los jefes no se inclinan con el terreno: su rig ya anima su propio cuerpo.
+func _follows_slope() -> bool:
+	return false
+
+
+## Los jefes no se frenan (boss_ignores_slow): una pelea de jefe no se gana
+## dejándolo clavado.
+func apply_slow(speed_multiplier: float, duration: float) -> void:
+	if boss_ignores_slow:
+		return
+	super(speed_multiplier, duration)
 
 
 ## La tirada de shiny del spawner nunca toca a un jefe; los grados pasan
@@ -151,7 +181,7 @@ func _on_boss_base_died() -> void:
 	# manejador base corrió primero y su tween ya es el vivo.
 	_kill_cue()
 	remove_from_group("boss")
-	_drop_chests()
+	_drop_lucky_blocks()
 
 
 # --- señales compartidas -------------------------------------------------------
@@ -306,11 +336,10 @@ func _above_ground(point: Vector3) -> Vector3:
 	return point
 
 
-## Cofres de recompensa del jefe: repartidos en un anillo; cada altar
-## demoníaco usado en la partida suma uno. Cuelgan de la raíz de la escena
-## para sobrevivir al cadáver.
-func _drop_chests() -> void:
-	var count := base_chest_drops + RunState.demonic_uses
+## Pago del jefe: bloques de la suerte repartidos en un anillo. Cuelgan de
+## la raíz de la escena para sobrevivir al cadáver.
+func _drop_lucky_blocks() -> void:
+	var count := lucky_block_drops
 	var parent := RunRoot.stage_parent(get_tree())
 	if parent == null:
 		parent = get_parent()
@@ -319,20 +348,24 @@ func _drop_chests() -> void:
 	# de muerte (las gemas y el crédito ya salieron).
 	if parent == null or count <= 0:
 		return
+	var block_scene := load(LUCKY_BLOCK_PATH) as PackedScene
+	if block_scene == null:
+		return
 	var dropped := 0
 	for i in count:
 		var angle := TAU * float(i) / float(count)
 		var at := global_position \
-				+ Vector3(cos(angle), 0.0, sin(angle)) * chest_ring_radius
-		# Cada cofre del anillo cae sobre el relieve bajo SU propio punto, así
+				+ Vector3(cos(angle), 0.0, sin(angle)) * drop_ring_radius
+		# Cada bloque del anillo cae sobre el relieve bajo SU propio punto, así
 		# un jefe que muere en una pendiente no entierra la mitad del pago.
 		var terrain := Terrain.find(get_tree())
 		if terrain != null:
 			at.y = terrain.height_at(at.x, at.z)
-		if spawn_chest(at, chest_luck_per_demonic * float(RunState.demonic_uses),
-				chest_min_rarity) != null:
-			dropped += 1
-	print("Boss chests dropped: %d" % dropped)
+		var block := block_scene.instantiate() as Node3D
+		parent.add_child(block)
+		block.global_position = at
+		dropped += 1
+	print("Boss lucky blocks dropped: %d" % dropped)
 
 
 ## Momento de muerte de jefe: gran sacudida, cámara lenta breve y un

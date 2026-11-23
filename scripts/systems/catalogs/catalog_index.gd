@@ -1,7 +1,7 @@
 class_name CatalogIndex
 extends RefCounted
 ## Índice id -> fila que comparten los catálogos estáticos (tomos, objetos,
-## reliquias, personajes, mascotas, misiones, mapas, evoluciones, armas).
+## reliquias, personajes, misiones, mapas, evoluciones, armas).
 ##
 ## Las búsquedas por id están en un camino caliente: PlayerStats.recompute()
 ## resuelve una fila por cada stack de tomo, por cada stack de objeto y por

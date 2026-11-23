@@ -2,7 +2,7 @@ class_name MapOverlay
 extends Control
 ## El mapa de Tab (MapOverlay.tscn): una superposición del tamaño de la celda
 ## del jugador con toda la etapa a la izquierda (encabezado, mapa y leyenda) y
-## sus paneles a la derecha: estadísticas, grupo, power-ups, mascota y equipo.
+## sus paneles a la derecha: estadísticas, grupo, power-ups y equipo.
 ## Usa el diseño de la primera pantalla del menú (MainMenu.tscn): su velo
 ## petróleo con viñeta, su título amarillo y, por panel, una tarjeta de color
 ## como las de MenuTile (MapSection). El layout, las tarjetas y los colores
@@ -41,6 +41,8 @@ const MapSideScroll := preload("res://scripts/ui/maps/map_side_scroll.gd")
 ##   "multiplier"    multiplicador que parte en 1.0, como +N%   (1.25 -> +25%)
 ##   "fraction"      fracción que parte en 0, como +N%          (0.1 -> +10%)
 ##   "flat"          número entero con signo                    (3 -> +3)
+##   "luck"          la suerte que de verdad usan los sorteos, ya agrandada
+##                   por la dificultad (Rarity.effective_luck): 14 -> +25
 ##   "attack_speed"  el multiplicador de enfriamiento leído como velocidad de
 ##                   ataque y en POSITIVO (GLOSARIO regla 7): 0.8 -> +25%.
 ## Opcionales: `short` es el nombre para las celdas chicas de co-op, donde el
@@ -60,7 +62,7 @@ const STAT_ROWS: Array[Dictionary] = [
 	{"label": "Armadura", "property": "armor", "show": "flat"},
 	{"label": "Evasión", "property": "evasion", "show": "fraction"},
 	{"label": "Espinas", "property": "thorns", "show": "flat"},
-	{"label": "Suerte", "property": "luck", "show": "flat"},
+	{"label": "Suerte", "property": "luck", "show": "luck"},
 	{"label": "HP máx.", "property": "bonus_max_hp", "show": "flat"},
 	{"label": "Proyectiles", "property": "projectile_bonus", "show": "flat"},
 	{"label": "Duración", "property": "duration_multiplier", "show": "multiplier"},
@@ -120,10 +122,6 @@ const STAT_ROWS: Array[Dictionary] = [
 @export var explored_format: String = "Explorado %d%%"
 ## Etiqueta de un power-up activo: los segundos que le quedan.
 @export var powerup_seconds_format: String = "%ds"
-## Panel de mascota cuando no lleva ninguna.
-@export var no_pet_text: String = "Sin mascota"
-## Panel de mascota: nombre, su arma y, abajo, la estadística que da.
-@export var pet_format: String = "%s · %s\n%s"
 ## Indicación del botón que cierra el mapa, al pie de los paneles.
 @export var close_hint: String = "Cerrar"
 
@@ -168,15 +166,13 @@ var _fade: Tween = null
 @onready var _players: MapPlayers = %Players
 @onready var _powerups_panel: MapSection = %PowerUpsPanel
 @onready var _powerups: MapChips = %PowerUps
-@onready var _pet_panel: MapSection = %PetPanel
-@onready var _pet: Label = %Pet
 @onready var _items_panel: MapSection = %ItemsPanel
 @onready var _items: MapChips = %Items
 
 
 func _ready() -> void:
 	add_to_group(&"map_overlay")
-	_sections = [_stats_panel, _players_panel, _powerups_panel, _pet_panel, _items_panel]
+	_sections = [_stats_panel, _players_panel, _powerups_panel, _items_panel]
 	_stats.setup(STAT_ROWS)
 	# La tecla o el botón de ESTE jugador, como las indicaciones del menú.
 	_hint_slot.add_child(InputHints.build(
@@ -349,13 +345,9 @@ func _refresh_panels() -> void:
 		_players.show_party(maxi(Coop.player_count, 1))
 	var powerups := MapEntries.powerups(raider, powerup_seconds_format)
 	_powerups.show_entries(powerups)
-	# En una celda chica un panel vacío solo ocupa lugar, y la mascota pasa a
-	# ser una ficha más del equipo, como en la franja del HUD.
+	# En una celda chica un panel vacío solo ocupa lugar.
 	_powerups_panel.visible = not (compact and powerups.is_empty())
-	_pet_panel.visible = not compact
-	if not compact:
-		_pet.text = MapEntries.pet_text(raider, pet_format, no_pet_text)
-	_items.show_entries(MapEntries.loadout(raider, build_strip, bag_strip, compact))
+	_items.show_entries(MapEntries.loadout(raider, build_strip, bag_strip))
 
 
 ## `PartySlots.raider_at(slot) != null`, preguntado cada cuadro aunque el mapa

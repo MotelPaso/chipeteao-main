@@ -7,19 +7,14 @@ extends Node
 ##   magnet        — aspiradora de XP de todo el mapa cada cierto tiempo, por
 ##                   el grupo "run_systems"
 ##   poison_on_hit — cada golpe de arma envenena al blanco (on_weapon_hit)
-##   titan         — el sello crece por copia (escala del rig visual)
 ##   spiders       — las bajas lanzan arañas venenosas teledirigidas
 ##                   (on_weapon_kill)
-##   shock_dash    — al derrapar, un rayo encadenado (BeltBolt)
 ##   saiyan        — cada N bajas, un aura temporal de stats
-##   zenkai        — sobrevivir con poco HP sube todo para siempre
 ## Los demás kinds (demonic_boost, charge_boost, portal_recharge) son
 ## contadores que leen los santuarios con count_kind().
 ## Los números de cada comportamiento viven en la fila del objeto en
 ## ItemCatalog (ItemCatalog.kind_row), junto al texto que los muestra.
 ## Las armas reportan golpes y bajas por WeaponBase.deal_damage.
-## Las mascotas NO van aquí: el raider tiene una sola mascota, en
-## Player.set_pet(), y solo la dan la caja de mascota y el traficante.
 ## El comportamiento se resuelve por el `kind` de la fila, nunca por un id
 ## fijo: renombrar una fila no debe apagar su comportamiento en silencio
 ## mientras el objeto sigue en el HUD.
@@ -34,38 +29,15 @@ const SAIYAN_TAG: String = "saiyan"
 @export_group("Textos")
 ## Aviso del HUD cuando la Sangre sayayin enciende el aura.
 @export var saiyan_aura_text: String = "¡Aura sayayin!"
-## Aviso del HUD cuando se dispara Zenkai; %d = el bono total en %.
-@export var zenkai_text: String = "¡Zenkai! Todo +%d%%"
 
-## Acumulaciones de Zenkai, que PlayerStats lee como un canal permanente de
-## todas las stats. Pública porque es justo lo que la capa de stats necesita.
-var zenkai_stacks: int = 0
-
-var _belt: BeltBolt = null
 var _saiyan_kills: int = 0
 var _aura_left: float = 0.0
 var _aura_overlays: Array[MeshInstance3D] = []
-var _zenkai_armed: bool = false
 var _counts: Dictionary[String, int] = {}
 var _magnet_timer: float = 0.0
 ## Presupuesto de arañas: la cuenta y el frame de física al que pertenece.
 var _spiders_this_frame: int = 0
 var _spider_frame: int = -1
-
-
-func _ready() -> void:
-	var body := get_parent()
-	if body == null:
-		return
-	if body.has_signal("slide_started"):
-		body.connect("slide_started", _on_slide_started)
-	var health := Health.find_in(body)
-	if health != null:
-		# damaged() es la ÚNICA señal de una baja de HP en combate:
-		# take_damage nunca emite hp_changed. Armar con una y disparar con la
-		# otra es lo que separa "bajé" de "me recuperé".
-		health.damaged.connect(_on_health_damaged)
-		health.hp_changed.connect(_on_health_hp_changed)
 
 
 func _physics_process(delta: float) -> void:
@@ -130,8 +102,6 @@ func add_item(item_id: String) -> void:
 		"magnet":
 			if count_kind("magnet") == 1:
 				_magnet_timer = _magnet_interval()
-		"titan":
-			_apply_titan_scale()
 	# Los efectos de stats viven en el recompute de PlayerStats (lee esta bolsa).
 	var stats := PlayerStats.find_in(get_parent())
 	if stats != null:
@@ -160,10 +130,7 @@ func remove_item(item_id: String) -> bool:
 		_counts.erase(item_id)
 	else:
 		_counts[item_id] = held - 1
-	# Los mismos tres pasos que add_item, en el mismo orden: la escala visual
-	# sale de la cuenta y la capa de stats lee esta bolsa.
-	if String(ItemCatalog.by_id(item_id).get("kind", "")) == "titan":
-		_apply_titan_scale()
+	# Los mismos pasos que add_item: la capa de stats lee esta bolsa.
 	var stats := PlayerStats.find_in(get_parent())
 	if stats != null:
 		stats.recompute()
@@ -187,15 +154,9 @@ func on_weapon_hit(target: Node3D) -> void:
 
 
 ## Gancho de WeaponBase: un arma de este raider acaba de matar algo en `at`.
-## Reenvía la baja a los power-ups, cuenta para la Sangre sayayin y, con
+## Cuenta para la Sangre sayayin y, con
 ## Máscara de superhéroe, lanza arañas desde el cadáver hacia otros enemigos.
 func on_weapon_kill(at: Vector3, weapon: WeaponBase) -> void:
-	# Los power-ups usan el mismo gancho: este ya es EL aviso de "un arma mía
-	# mató algo", y darle uno propio a «Modo vampiro» sería un segundo cableado
-	# en WeaponBase.
-	var powerups := PowerUps.find_in(get_parent())
-	if powerups != null:
-		powerups.on_kill()
 	_tick_saiyan_kill()
 	var stacks := count_kind("spiders")
 	if stacks <= 0 or weapon == null:
@@ -235,45 +196,6 @@ func _magnet_interval() -> float:
 			* pow(float(row.interval_per_extra_copy), float(count_kind("magnet") - 1))
 
 
-## El sello crece con cada Sangre de titán, con techo max_scale para que el
-## brazo de cámara siga funcionando.
-func _apply_titan_scale() -> void:
-	var rig := get_parent().get_node_or_null("SealRig") as Node3D
-	if rig == null:
-		return
-	var row := ItemCatalog.kind_row("titan")
-	var growth := float(row.growth_percent) / 100.0
-	var factor := minf(1.0 + growth * float(count_kind("titan")), float(row.max_scale))
-	rig.scale = Vector3.ONE * factor
-
-
-## --- Cinturón eléctrico -----------------------------------------------------
-
-## El derrape ES el disparador. La cadena parte de la posición del RAIDER,
-## nunca de este nodo: ItemBag extiende Node y no tiene transform, así que un
-## hijo Node3D suyo quedaría en el origen del mundo. El daño, los rebotes y
-## los alcances del rayo viven en BeltBolt.
-func _on_slide_started(_direction: Vector3) -> void:
-	var copies := count_kind("shock_dash")
-	if copies <= 0:
-		return
-	var body := get_parent() as Node3D
-	if body == null:
-		return
-	if _belt == null or not is_instance_valid(_belt):
-		_belt = BeltBolt.new()
-		_belt.name = "BeltBolt"
-		# Bajo la BOLSA, no bajo el montaje Weapons: todo lo que enumera armas
-		# recorre ese montaje, y un rayo ahí aparecería en la franja del HUD,
-		# contaría contra el tope de armas y entraría al pool de mejoras.
-		add_child(_belt)
-	var hits := _belt.zap_chain(body.global_position, copies)
-	if hits > 0:
-		# Una línea por derrape; los derrapes son lo bastante raros para que
-		# el soak siga legible.
-		print("Belt bolt: hits=%d" % hits)
-
-
 ## --- Sangre sayayin ---------------------------------------------------------
 
 ## Bajas necesarias para la próxima aura con estas copias.
@@ -301,7 +223,8 @@ func _start_aura(copies: int) -> void:
 		return
 	var row := ItemCatalog.kind_row("saiyan")
 	var scale := float(copies)
-	var duration := float(row.aura_duration)
+	# La duración de efectos del raider alarga el aura, como al veneno.
+	var duration := float(row.aura_duration) * stats.duration_multiplier
 	# CON ETIQUETA, y limpiada primero: add_timed_boon AGREGA y solo
 	# clear_timed_boons quita por etiqueta. Sin esta línea una segunda aura
 	# dentro de la primera se sumaría a ella y la primera expiración
@@ -348,48 +271,6 @@ func _apply_aura_shell(on: bool) -> void:
 		if mesh != null:
 			mesh.material_overlay = shell
 			_aura_overlays.append(mesh)
-
-
-## --- Zenkai -----------------------------------------------------------------
-
-## Se arma con una baja real de combate. take_damage nunca emite hp_changed,
-## así que esta señal es la única que significa "algo me dolió".
-func _on_health_damaged(_amount: float, current: float) -> void:
-	if count_kind("zenkai") <= 0:
-		return
-	var health := Health.find_in(get_parent())
-	var arm_ratio := float(ItemCatalog.kind_row("zenkai").arm_below_hp_percent) / 100.0
-	if health != null and current <= health.max_hp * arm_ratio:
-		_zenkai_armed = true
-
-
-## Se dispara cuando el raider vuelve a estar en pie. Las señales emitidas
-## DURANTE un recompute se ignoran: _push_bonus_max_hp_to_health escribe
-## max_hp y cura dentro de ese cuerpo, lo que parecería "me curé" y haría que
-## Zenkai se disparara con su propia reconstrucción de stats, para siempre.
-func _on_health_hp_changed(current: float, max_hp: float) -> void:
-	if not _zenkai_armed or count_kind("zenkai") <= 0:
-		return
-	var stats := PlayerStats.find_in(get_parent())
-	if stats != null and stats.is_recomputing():
-		return
-	var row := ItemCatalog.kind_row("zenkai")
-	if current < max_hp * (float(row.trigger_above_hp_percent) / 100.0):
-		return
-	_zenkai_armed = false
-	zenkai_stacks += count_kind("zenkai")
-	# Diferido: esto corre dentro de una señal que la capa de stats puede
-	# estar por leer, y recomputar en el acto volvería a entrar en ella.
-	_request_recompute.call_deferred()
-	get_tree().call_group("hud", "announce",
-			zenkai_text % roundi(float(zenkai_stacks) * float(row.percent_per_stack)))
-	print("Zenkai triggered: stacks=%d" % zenkai_stacks)
-
-
-func _request_recompute() -> void:
-	var stats := PlayerStats.find_in(get_parent())
-	if stats != null:
-		stats.recompute()
 
 
 ## --- Máscara de superhéroe --------------------------------------------------

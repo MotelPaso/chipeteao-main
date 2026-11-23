@@ -379,4 +379,3 @@ func _set_ascend(amount: float) -> void:
 		part.scale = Vector3.ONE * maxf(amount, 0.001)
 	_aura.emitting = amount > 0.5
 	_halo.set_ascend(amount)
-

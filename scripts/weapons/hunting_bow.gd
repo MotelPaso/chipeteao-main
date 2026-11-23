@@ -1,8 +1,8 @@
 extends WeaponBase
 ## Arco de caza: suelta flechas rápidas y rectas que atraviesan hasta
 ## pierce_count enemigos cada una (la escena Arrow apaga la persecución del
-## Projectile). Con más de un proyectil, la ráfaga sale en abanico alrededor
-## de la puntería. Sin modelo en la mano: el disparo se lee por el trazador
+## Projectile). Con más de un proyectil, las flechas salen a la vez, cada una
+## hacia un enemigo distinto. Sin modelo en la mano: el disparo se lee por el trazador
 ## grueso de la flecha y un destello de carga en el Nock que crece y estalla
 ## al soltar (su aspecto está en MuzzleFlash.tscn, grupo «Destello de carga»).
 
@@ -11,8 +11,6 @@ extends WeaponBase
 @export var projectile_scene: PackedScene
 ## Máximo de enemigos que daña una flecha antes de desaparecer; reemplaza el pierce_remaining de Arrow.tscn ("Puntas con púas" lo sube).
 @export var pierce_count: int = 3
-## Grados entre flechas vecinas cuando hay más de una.
-@export var fan_spread_deg: float = 7.0
 ## Las flechas vuelan este múltiplo de attack_range, así los blancos al borde del alcance igual reciben.
 @export var range_grace: float = 1.15
 
@@ -28,9 +26,13 @@ func fire(target: Node3D) -> void:
 			body_aim_point(target) - _nock.global_position,
 			-global_transform.basis.z)
 	var count := maxi(effective_projectile_count(), 1)
-	for i: int in count:
-		var yaw := deg_to_rad(fan_spread_deg) * (float(i) - float(count - 1) * 0.5)
-		_spawn_arrow(base_dir.rotated(Vector3.UP, yaw), target)
+	_spawn_arrow(base_dir, target)
+	# Las flechas extra salen a la vez, cada una hacia otro enemigo cercano.
+	var chosen := {target.get_instance_id(): true}
+	for i: int in range(1, count):
+		var next := next_volley_target(chosen)
+		if next != null:
+			_spawn_arrow(aim_dir_or(body_aim_point(next) - _nock.global_position, base_dir), next)
 	# Destello de tensar y soltar: crece como una cuerda tensa que atrapa luz y
 	# estalla cuando salen las flechas.
 	var glint := Pools.acquire_scene(Pools.MUZZLE_FLASH_SCENE) as MuzzleFlash

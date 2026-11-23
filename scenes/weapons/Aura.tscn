@@ -18,9 +18,12 @@ rings = 1
 
 [node name="Aura" type="Node3D" unique_id=15986770]
 script = ExtResource("1_aura")
-damage = 3.005
+damage = 7.0
 cooldown = 0.3
-attack_range = 4.0
+hit_push = 0.0
+hit_slow = 0.65
+hit_slow_seconds = 0.18
+attack_range = 3.3
 
 [node name="Disc" type="MeshInstance3D" parent="."]
 cast_shadow = 0

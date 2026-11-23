@@ -9,9 +9,11 @@ script = ExtResource("1_pistol")
 projectile_scene = ExtResource("2_projectile")
 projectile_speed = 120.0
 homing_turn_speed = 0.0
-bounces = 0
 damage = 4.0
 cooldown = 1.5
+hit_push = 1.5
+hit_slow = 0.7
+hit_slow_seconds = 0.08
 attack_range = 14.0
 projectile_count = 4
 

@@ -59,7 +59,7 @@ const TILE_BG := Color("0d2227")
 ## Destello (modulate) de "no alcanza" (ver reject).
 const REJECT_FLASH := Color(1.0, 0.5, 0.4)
 ## Verde de la experiencia: barra de XP del HUD, anillo de subida de nivel
-## (juice.gd) y baliza de essence_rift (world_director.gd). El material de las
+## (juice.gd). El material de las
 ## gemas (XpGem.tscn) guarda el mismo verde en su escena: cámbialo ahí también.
 const XP_GREEN := ACCENT_MINT
 

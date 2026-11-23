@@ -1,9 +1,9 @@
 extends WeaponBase
 ## Vial de sangre: lanza un frasco carmesí al grupo de enemigos más denso en
 ## alcance; al caer se rompe en un charco de sangre que pulsa daño (`damage`
-## es por pulso, por el embudo compartido) y devuelve al jugador como
-## curación heal_fraction del daño que hizo el charco: un drenaje propio,
-## aparte del robo de vida normal.
+## es por pulso, por el embudo compartido). No cura: cada enemigo que MUERE
+## sobre un charco, lo mate quien lo mate, tiene max_hp_chance de darle al
+## portador +max_hp_gain de vida máxima para el resto de la partida.
 ## Los charcos son registros BloodPoolEntry que esta arma avanza cada frame
 ## de física; un charco dura pool_ticks * tick_interval segundos. Su visual es
 ## la escena BloodPool del pool; el frasco en vuelo usa flask_mesh.
@@ -29,12 +29,18 @@ const MIN_FLASK_SPEED: float = 0.1
 @export var pool_ticks: int = 6
 ## Segundos entre pulsos de daño del charco.
 @export var tick_interval: float = 0.5
-## Fracción del daño del charco que vuelve al jugador como curación (0-1). Es el «robo de vida» propio del vial; las mejoras de arma lo suben.
-@export var heal_fraction: float = 0.15
 ## Altura máxima, en metros, por encima o por debajo del plano del charco a la que alcanza.
 @export var pool_height_window: float = 1.6
 ## Cuánto sobre el punto de impacto se dibuja el charco, en metros; lo justo para no enterrarlo en el piso.
 @export var pool_ground_offset: float = 0.03
+
+@export_group("Vida máxima")
+## Probabilidad, en %, de que un enemigo que muere sobre un charco dé vida máxima (0.5 = uno de cada 200).
+@export var max_hp_chance: float = 0.5
+## Vida máxima que suma cada premio, para el resto de la partida.
+@export var max_hp_gain: float = 1.0
+## Color de las chispas sobre el raider cuando gana vida máxima.
+@export var max_hp_burst_color: Color = Color(1.0, 0.25, 0.3)
 
 @export_group("Frasco")
 ## Segundos de vuelo del frasco desde la mano hasta el impacto (a velocidad 1).
@@ -51,8 +57,6 @@ const MIN_FLASK_SPEED: float = 0.1
 @export_group("Multitud")
 ## Segundos entre los frascos extra del Tomo de Multitud; lanzados juntos caerían en el mismo charco.
 @export var extra_stagger: float = 0.12
-## Grados entre frascos vecinos, girados alrededor de QUIEN LANZA para que los charcos extra caigan junto al grupo.
-@export var extra_fan_deg: float = 22.0
 
 
 ## Un charco vivo. Un registro en vez de un Dictionary suelto porque su
@@ -73,6 +77,7 @@ var _flasks_in_flight: Array[MeshInstance3D] = []
 
 
 func _ready() -> void:
+	add_to_group(EnemyBase.DEATH_LISTENERS_GROUP)
 	# Mismo motivo que en SlimeTrail: los visuales de los charcos son de la
 	# etapa y estos registros no, así que el cambio de mapa los suelta.
 	RunState.stage_changed.connect(
@@ -139,16 +144,15 @@ func acquire_target() -> Node3D:
 
 
 func fire(target: Node3D) -> void:
-	# Abanico alrededor de quien lanza: se gira el tramo lanzador -> impacto, así
-	# la separación lateral crece con la distancia y los charcos quedan en fila.
-	var origin := global_position
-	fire_volley(maxi(effective_projectile_count(), 1), target.global_position - origin,
-			_throw_from.bind(origin), extra_stagger, extra_fan_deg)
+	# Los frascos extra caen sobre el mismo blanco (ver fire_volley()); el
+	# tramo lanzador -> impacto se mide desde donde está el lanzador al soltarlo.
+	fire_volley(maxi(effective_projectile_count(), 1), target,
+			target.global_position - global_position, _throw_from, extra_stagger)
 
 
-## Lanza un frasco a `origin + offset`; ambos se fijan al disparar la ráfaga.
-func _throw_from(offset: Vector3, origin: Vector3) -> void:
-	_lob_flask(origin + offset)
+## Lanza un frasco a `global_position + offset`.
+func _throw_from(offset: Vector3) -> void:
+	_lob_flask(global_position + offset)
 
 
 ## Lanza el visual del frasco en un arco parabólico; el charco aparece donde
@@ -215,6 +219,7 @@ func _spawn_pool(center: Vector3) -> void:
 		# Apenas sobre el suelo: el origen del cuerpo golpeado ya está EN el
 		# suelo, y cualquier cosa debajo se dibuja dentro de la losa opaca.
 		visual.play(center + Vector3.UP * pool_ground_offset, radius)
+		GroundAlign.align_to_ground(visual, radius)
 	var pool := BloodPoolEntry.new()
 	pool.center = center
 	pool.radius = radius
@@ -243,14 +248,25 @@ func _tick_pools(delta: float) -> void:
 
 
 ## Un pulso de daño: cada enemigo parado en el charco recibe un golpe por el
-## embudo compartido, y el jugador bebe una fracción del total.
+## embudo compartido.
 func _pulse_pool(pool: BloodPoolEntry) -> void:
-	var dealt_total := damage_all(
-			enemies_in_disc(pool.center, pool.radius, pool_height_window))
-	if dealt_total > 0.0:
-		# Drenaje propio: la misma curación que usa el robo de vida, pagada
-		# sobre el daño que entró de verdad.
-		_lifesteal_heal(dealt_total * heal_fraction)
+	damage_all(enemies_in_disc(pool.center, pool.radius, pool_height_window))
+
+
+## EnemyBase avisa cada muerte (grupo DEATH_LISTENERS_GROUP). Si el cuerpo
+## estaba tocando un charco vivo, max_hp_chance de sumar max_hp_gain de vida
+## máxima al portador, como un don permanente.
+func on_enemy_died(at: Vector3, body_radius: float) -> void:
+	if not _on_a_pool(at, body_radius) or randf() * 100.0 >= max_hp_chance:
+		return
+	var stats := _stats_or_null()
+	if stats == null:
+		return
+	stats.add_altar_boon("max_hp", max_hp_gain)
+	var player := carrier_player()
+	if player != null:
+		Juice.burst(player.global_position + Vector3.UP * 1.2, max_hp_burst_color, 8)
+	print("Blood vial max hp +%.0f" % max_hp_gain)
 
 
 func _expire_pool(pool: BloodPoolEntry) -> void:
@@ -259,3 +275,17 @@ func _expire_pool(pool: BloodPoolEntry) -> void:
 	# Se desvanece y vuelve solo al pool.
 	pool.visual.expire()
 	pool.visual = null
+
+
+## Verdadero si un cuerpo en `at` con ese radio toca algún charco vivo (como
+## enemies_in_disc: el cuerpo entero, con la ventana de altura del charco).
+func _on_a_pool(at: Vector3, body_radius: float) -> bool:
+	for pool: BloodPoolEntry in _pools:
+		var to_body := at - pool.center
+		if absf(to_body.y) > pool_height_window:
+			continue
+		to_body.y = 0.0
+		var reach := pool.radius + body_radius
+		if to_body.length_squared() <= reach * reach:
+			return true
+	return false

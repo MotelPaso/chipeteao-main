@@ -29,18 +29,16 @@ const XP_PER_LEVEL: int = 3
 const XP_PER_LEVEL_SQUARED: float = 0.15
 ## Fracción del bono de dificultad que se vuelve XP extra en cada gema.
 const DIFFICULTY_XP_SHARE: float = 0.75
-## Precios de cofres: precio base en puntos por rareza.
-const CHEST_BASE_PRICES: Dictionary[String, int] = {
-	"Common": 20, "Rare": 40, "Epic": 80, "Legendary": 160}
-## Multiplicador GLOBAL que cada cofre abierto aplica al precio de todos los demás.
-const CHEST_PRICE_GROWTH: float = 1.25
-## Precio de la ruleta: cada giro lo multiplica por esto para los siguientes
-## de la partida. Más empinado que el de cofres a propósito: un giro puede dar
-## un objeto Legendario.
-const ROULETTE_PRICE_GROWTH: float = 2.0
-## Lo que pide el vendedor de power-ups por su primera venta de la partida.
-## Cuánto sube tras cada venta: Vendor.powerup_price_growth (Vendor.tscn).
-const POWERUP_VENDOR_BASE_PRICE: int = 100
+## Precio base de un cofre de pago, en puntos (todos los cofres son iguales;
+## la rareza del objeto se tira al abrirlo).
+const CHEST_BASE_PRICE: int = 30
+## Multiplicador GLOBAL que cada cofre de pago abierto aplica al precio de todos los cofres (y con él, al de los vendedores).
+const CHEST_PRICE_GROWTH: float = 1.15
+## Multiplicador que cada compra a un vendedor aplica al precio de TODOS los vendedores (los cofres no cambian).
+const VENDOR_PRICE_GROWTH: float = 1.15
+## Precio de la ruleta, edita aquí: cada giro lo sube este porcentaje para los
+## siguientes de la partida, sobre el precio que ya tenía (1.25 = +25%).
+const ROULETTE_PRICE_GROWTH: float = 1.25
 # --- fin de edita aquí ------------------------------------------------------
 
 ## Variable de entorno que hace reproducible toda una partida (ver reset()).
@@ -65,6 +63,9 @@ var lap: int = 0
 ## este es el que leen la puerta de etapa, el horario de jefes y las hordas,
 ## así una etapa se juega igual llegue cuando llegue.
 var stage_time: float = 0.0
+## True mientras hay un jefe en pie: el reloj (run_time y stage_time) se
+## detiene y el pulso por minuto del WorldDirector espera.
+var boss_fight_active: bool = false
 ## True cuando murió el Ancestral de esta etapa (lo marca EnemySpawner).
 var stage_boss_dead: bool = false
 ## True cuando se abrió la puerta de esta etapa (tiempo Y jefe): el portal de
@@ -107,28 +108,28 @@ var _difficulty_sources: Dictionary[String, float] = {}
 ##   event_chance_bonus      -> probabilidad de evento de cielo (WeatherDirector)
 ##   disaster_chance_bonus   -> tirada de desastre del WorldDirector (lo
 ##                              primero que se tira en un tick de evento).
+##   bad_weather_bonus       -> peso extra de los climas `bad` (WeatherCatalog)
+##   enemy_speed_multiplier  -> velocidad de los spawns nuevos (SpawnScaling)
 var elite_chance_bonus: float = 0.0
 var sky_duration_multiplier: float = 1.0
 var event_chance_bonus: float = 0.0
 var disaster_chance_bonus: float = 0.0
+var bad_weather_bonus: float = 0.0
+var enemy_speed_multiplier: float = 1.0
 ## Multiplicador de precio de cofres de la party, un paso de
 ## CHEST_PRICE_GROWTH por cofre abierto. Es el ÚNICO registro de cofres de la
 ## partida: el contador "chests_opened" de las misiones vive en SaveData (lo
 ## suma Interactable.consume).
 var chest_price_multiplier: float = 1.0
+## Multiplicador de los vendedores, un paso de VENDOR_PRICE_GROWTH por compra;
+## va encima del precio del cofre.
+var vendor_price_multiplier: float = 1.0
 ## Multiplicador de precio de la ruleta, un paso de ROULETTE_PRICE_GROWTH
 ## por giro.
 var roulette_price_multiplier: float = 1.0
-## Lo que cobra a continuación el vendedor de power-ups, en puntos. Un precio
-## ABSOLUTO de la partida y no un multiplicador: el puesto vende un power-up
-## sacado sea cual sea, así que el número mismo es la escalera, y sube solo
-## cuando hay una venta.
-var powerup_vendor_price: int = POWERUP_VENDOR_BASE_PRICE
 ## Multiplicador de todo lo que la party COMPRA con puntos mientras cae la
-## lluvia dorada (1.0 normal, 0.5 durante). Lo leen cofres, ruleta y
-## manantial — y con ellos el vendedor de objetos, que pone precio con
-## chest_price. El vendedor de power-ups y los precios de mascota quedan
-## fuera a propósito: son la economía de largo plazo de la partida.
+## lluvia dorada (1.0 normal, 0.5 durante). Lo leen cofres, ruleta y el
+## vendedor de objetos.
 var price_discount: float = 1.0
 
 
@@ -141,7 +142,10 @@ func _physics_process(delta: float) -> void:
 	# terminada (o antes de empezar), nada que lea run_time — nota de
 	# victoria, boons temporales, puntaje diario — debe verlo avanzar en los
 	# frames en que algo despausa el árbol.
-	if run_active:
+	# El reloj también se detiene mientras hay un jefe en pie (grupo "boss"):
+	# la pelea no gasta minutos de etapa ni sube la dificultad por minuto.
+	boss_fight_active = run_active and get_tree().get_first_node_in_group(&"boss") != null
+	if run_active and not boss_fight_active:
 		run_time += delta
 		stage_time += delta
 		if stage_cleared:
@@ -170,11 +174,13 @@ func reset() -> void:
 	sky_duration_multiplier = 1.0
 	event_chance_bonus = 0.0
 	disaster_chance_bonus = 0.0
+	bad_weather_bonus = 0.0
+	enemy_speed_multiplier = 1.0
 	difficulty_bonus = 0.0
 	_difficulty_sources.clear()
 	chest_price_multiplier = 1.0
+	vendor_price_multiplier = 1.0
 	roulette_price_multiplier = 1.0
-	powerup_vendor_price = POWERUP_VENDOR_BASE_PRICE
 	price_discount = 1.0
 	# Los contadores acreditados durante una partida viven en un buffer de
 	# SaveData que solo el FIN de una partida pasa al registro guardado;
@@ -210,6 +216,7 @@ func reset() -> void:
 ## etapa; los contadores de toda la partida de arriba NO van aquí, a propósito.
 func begin_stage() -> void:
 	stage_time = 0.0
+	boss_fight_active = false
 	stage_boss_dead = false
 	stage_cleared = false
 	pseudo_infinite_time = 0.0
@@ -224,6 +231,22 @@ func mark_stage_cleared(map_id: String) -> void:
 	stages_cleared_total += 1
 	if not cleared_map_ids.has(map_id):
 		cleared_map_ids.append(map_id)
+
+
+## XP que hace falta, desde ahora, para subir `levels` niveles: lo que le
+## falta al nivel actual cuenta como el primero; los decimales son una parte
+## del último (la lluvia de XP de la luna llena lo usa).
+func xp_for_levels(levels: float) -> int:
+	var total := 0.0
+	var left := levels
+	var next_level := level
+	var need := float(xp_to_next - xp)
+	while left > 0.0:
+		total += need * minf(left, 1.0)
+		left -= 1.0
+		next_level += 1
+		need = float(_xp_required(next_level))
+	return roundi(total)
 
 
 func add_xp(amount: int) -> void:
@@ -273,15 +296,19 @@ func _resum_difficulty() -> void:
 	difficulty_changed.emit(difficulty_bonus)
 
 
-## Precio actual de un cofre de la rareza dada, en puntos.
-func chest_price(rarity_name: String) -> int:
-	var base := int(CHEST_BASE_PRICES.get(rarity_name, CHEST_BASE_PRICES["Common"]))
-	return ceili(float(base) * chest_price_multiplier * price_discount)
+## Precio actual de un cofre de pago, en puntos.
+func chest_price() -> int:
+	return ceili(float(CHEST_BASE_PRICE) * chest_price_multiplier * price_discount)
 
 
 ## Cada cofre abierto encarece todos los demás (multiplicador global).
 func register_chest_opened() -> void:
 	chest_price_multiplier *= CHEST_PRICE_GROWTH
+
+
+## Cada compra a un vendedor encarece todos los vendedores, no los cofres.
+func register_vendor_sale() -> void:
+	vendor_price_multiplier *= VENDOR_PRICE_GROWTH
 
 
 ## Precio actual de un giro de ruleta, en puntos: el precio base del

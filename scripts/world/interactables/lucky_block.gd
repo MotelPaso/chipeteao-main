@@ -1,30 +1,25 @@
 class_name LuckyBlock
 extends Interactable
-## Bloque de la suerte: parece un cofre y no lo es. Gratis, raro, y siempre
-## paga ALGO. No hay precio ni rareza: el premio entero es la sorpresa, por
-## eso todos los premios son buenos y cambian de tipo, no de tamaño.
+## Bloque de la suerte: parece un cofre y no lo es. Gratis y siempre paga
+## ALGO, pero no siempre bueno: puede dar gemas, puntos o un objeto, o
+## traer un jefe, una horda o más dificultad. Los jefes
+## sueltan dos al morir (BossBase).
 ##
 ## Los premios son una tabla con pesos y una rama por premio: uno nuevo es
 ## una fila más una rama, nunca un caso especial en otro sitio.
 
-## La tabla. Los pesos son relativos; el pozo es el más raro porque es el
-## único que le hace una pregunta al jugador.
+## La tabla, edita aquí. Los pesos son relativos.
 const LUCKY_REWARDS: Array[Dictionary] = [
-	{"id": "enemy_explosion", "weight": 1.0},
 	{"id": "gem_rain", "weight": 1.0},
 	{"id": "points", "weight": 1.0},
-	{"id": "free_chest", "weight": 1.0},
-	{"id": "powerup", "weight": 1.0},
-	{"id": "well", "weight": 0.7},
+	{"id": "random_item", "weight": 1.0},
+	{"id": "horde", "weight": 0.8},
+	{"id": "boss", "weight": 0.5},
+	{"id": "difficulty", "weight": 0.8},
 ]
 
-## Objetos que ofrece el pozo, más la carta de "quedarse con todo". DOS, no
-## tres: la UI de cartas tiene tres huecos y descarta el sobrante sin avisar,
-## y el que caería sería justo la opción de rechazar.
-const WELL_OFFERS: int = 2
-
 @export_group("Bloque")
-## Color del bloque: tiñe su material (Visual/Block), su luz (Visual/Glow) y las chispas de la explosión.
+## Color del bloque: tiñe su material (Visual/Block), su luz (Visual/Glow) y las chispas al abrirlo.
 @export var block_color: Color = Color(1.0, 0.85, 0.2)
 ## Velocidad del vaivén del bloque, en radianes por segundo.
 @export var bob_speed: float = 2.0
@@ -33,35 +28,28 @@ const WELL_OFFERS: int = 2
 ## Giro del bloque, en radianes por segundo.
 @export var spin_speed: float = 0.9
 @export_group("Premios")
-## Alcance de enemy_explosion, en metros.
-@export var explosion_radius: float = 12.0
-## Fracción de la vida máxima (0-1) que pierde un jefe en enemy_explosion, en vez de morir.
-@export var boss_hp_fraction: float = 0.15
-## Cantidad de chispas (con block_color) sobre cada enemigo que alcanza enemy_explosion.
-@export var explosion_burst_count: int = 10
-## Sacudida de cámara de enemy_explosion, en trauma (0-1).
-@export var explosion_shake: float = 0.3
 ## Gemas de XP que suelta gem_rain.
 @export var gem_count: int = 25
+## XP de cada gema de gem_rain (una gema normal vale 1).
+@export var gem_value: int = 2
 ## Distancia mínima a la que caen las gemas de gem_rain, en metros.
 @export var gem_min_spread: float = 1.0
 ## Distancia máxima a la que caen las gemas de gem_rain, en metros.
 @export var gem_spread: float = 6.0
 ## Puntos de partida que da el premio points.
-@export var points_reward: int = 80
-## Dónde cae el cofre de free_chest respecto del bloque, en metros.
-@export var free_chest_offset: Vector3 = Vector3(1.6, 0.0, 0.0)
-## Probabilidad (0-1) de que el pozo pague un power-up en vez del objeto mejor.
-@export_range(0.0, 1.0) var well_powerup_chance: float = 0.3
-@export_group("Textos del pozo")
-## Título de la elección del pozo.
-@export var well_title: String = "El pozo pide una ofrenda"
-## Descripción de cada carta de objeto que se puede entregar.
-@export var well_give_line: String = "Lo cambias por algo mejor"
-## Título de la carta de rechazo.
-@export var well_keep_title: String = "Nada"
-## Descripción de la carta de rechazo.
-@export var well_keep_line: String = "Te quedas con todo"
+@export var points_reward: int = 300
+## Dificultad, en %, que suma el premio difficulty.
+@export var difficulty_reward: float = 10.0
+@export_group("Textos")
+## Aviso del HUD de cada premio (por id); %s = nombre del objeto en random_item, %d = número en points y difficulty.
+@export var reward_texts: Dictionary[String, String] = {
+	"gem_rain": "¡Lluvia de gemas!",
+	"points": "¡+%d pts!",
+	"random_item": "Objeto: %s",
+	"horde": "¡El bloque llama a una horda!",
+	"boss": "¡El bloque despierta a un jefe!",
+	"difficulty": "Dificultad +%d%%",
+}
 
 ## Cola del harness (ArenaProbe, BONK_LUCKY_REWARD): ids de premio que pagan
 ## los próximos bloques en vez de tirar. ESTÁTICA porque la tirada es
@@ -115,25 +103,39 @@ func _interact(player: Node) -> void:
 	_emit_started()
 	consume()
 	var reward := _roll_reward()
+	_pay(reward, player)
+	print("Lucky block: %s" % reward)
+	_finish()
+
+
+## Una rama por premio. Si un premio no puede salir (sin spawner, o un jefe
+## que pelea solo no deja entrar hordas ni jefes), paga gemas en su lugar.
+func _pay(reward: String, player: Node) -> void:
+	var spawner := get_tree().get_first_node_in_group(&"enemy_spawner") as EnemySpawner
 	match reward:
-		"enemy_explosion":
-			_reward_explosion()
 		"gem_rain":
 			_reward_gems()
 		"points":
-			_reward_points(player)
-		"free_chest":
-			_reward_chest()
-		"powerup":
-			_reward_powerup(player)
-		"well":
-			# El ÚNICO premio que pregunta. Imprime su propia línea al
-			# resolverse, y siempre se resuelve (también sin objetos).
-			_reward_well(player)
-			_finish()
+			if player.has_method("add_points"):
+				player.call("add_points", points_reward)
+			_say(reward, points_reward)
 			return
-	print("Lucky block: %s" % reward)
-	_finish()
+		"random_item":
+			_reward_item(player)
+			return
+		"horde":
+			if spawner == null or not spawner.start_horde():
+				_reward_gems()
+				reward = "gem_rain"
+		"boss":
+			if spawner == null or not spawner.spawn_bonus_boss():
+				_reward_gems()
+				reward = "gem_rain"
+		"difficulty":
+			RunState.add_difficulty(difficulty_reward / 100.0, "lucky_block")
+			_say(reward, roundi(difficulty_reward))
+			return
+	_say(reward)
 
 
 ## Pinta el material del bloque y su luz con block_color.
@@ -170,111 +172,40 @@ static func _roll_reward() -> String:
 	return String(LUCKY_REWARDS[0].id)
 
 
-## Muere todo lo cercano. Los jefes no: matarlos de golpe convertiría un
-## bloque gratis en la respuesta a su pelea.
-func _reward_explosion() -> void:
-	var radius_sq := explosion_radius * explosion_radius
-	for node: Node in get_tree().get_nodes_in_group("enemies"):
-		var body := node as Node3D
-		if body == null or not body.is_inside_tree():
-			continue
-		if body.global_position.distance_squared_to(global_position) > radius_sq:
-			continue
-		var health := Health.find_in(body)
-		if health == null or health.is_dead:
-			continue
-		Juice.burst(body.global_position + Vector3.UP * 0.6, block_color, explosion_burst_count)
-		if body.is_in_group("boss"):
-			health.take_damage(health.max_hp * boss_hp_fraction)
-		else:
-			health.take_damage(health.current_hp + health.armor)
-	Juice.shake(explosion_shake)
-
-
 func _reward_gems() -> void:
 	for i in gem_count:
 		var gem := Pools.acquire_scene(Pools.XP_GEM_SCENE) as XpGem
 		if gem == null:
 			return
+		gem.xp_value = gem_value
 		var angle := randf() * TAU
 		var distance := randf_range(gem_min_spread, gem_spread)
 		gem.global_position = global_position \
 				+ Vector3(cos(angle), 0.0, sin(angle)) * distance + Vector3.UP * 0.6
 
 
-func _reward_points(player: Node) -> void:
-	if player.has_method("add_points"):
-		player.call("add_points", points_reward)
-
-
-## Un cofre gratis junto al bloque.
-func _reward_chest() -> void:
-	Chest.spawn_free(get_tree(), global_position + free_chest_offset)
-
-
-func _reward_powerup(player: Node) -> void:
-	var powerups := PowerUps.find_in(player)
-	if powerups != null:
-		# Nunca la estrella: esa se encuentra rondando el mapa.
-		powerups.apply(PowerUpCatalog.roll_id(true))
-
-
-## El pozo: das un objeto y recibes uno mejor. Sin nada que dar paga un
-## power-up directo en vez de abrir un menú con una sola carta muerta
-## (open_choice no hace nada con una lista vacía y el bloque se leería roto).
-func _reward_well(player: Node) -> void:
+## Un objeto al azar, con la rareza sorteada por la suerte de quien abre.
+func _reward_item(player: Node) -> void:
 	var bag := ItemBag.find_in(player)
-	var carried: Array[String] = bag.carried_ids() if bag != null else []
-	if carried.is_empty():
-		_reward_powerup(player)
-		print("Lucky block: well (sin objetos -> power-up)")
+	var stats := PlayerStats.find_in(player)
+	var luck := stats.luck if stats != null else 0.0
+	var item_id := ItemCatalog.roll_id(String(UpgradePool.roll_rarity(luck).name))
+	if bag == null or item_id.is_empty():
+		_reward_gems()
+		_say("gem_rain")
 		return
-	carried.shuffle()
-	var options: Array[Dictionary] = []
-	for i in mini(WELL_OFFERS, carried.size()):
-		var row := ItemCatalog.by_id(carried[i])
-		options.append({
-			"title": String(row.get("display_name", carried[i])),
-			"description": well_give_line,
-			"color": ItemCatalog.rarity_color(String(row.get("rarity", "Common"))),
-			"item_id": carried[i],
-		})
-	# El rechazo siempre está, así que con un solo objeto hay elección real.
-	options.append({
-		"title": well_keep_title,
-		"description": well_keep_line,
-		"color": UiTheme.TEXT_DIM,
-		"item_id": "",
-	})
-	get_tree().call_group("upgrade_ui", "open_choice", well_title, options,
-			player, _on_well_pick.bind(player), "lucky_well")
+	bag.add_item(item_id)
+	_say("random_item", 0, String(ItemCatalog.by_id(item_id).get("display_name", item_id)))
 
 
-func _on_well_pick(option: Dictionary, player: Node) -> void:
-	var given := String(option.get("item_id", ""))
-	if given.is_empty():
-		print("Lucky block: well (nada)")
+## Aviso del HUD del premio, desde reward_texts.
+func _say(reward: String, number: int = 0, name_text: String = "") -> void:
+	var template := String(reward_texts.get(reward, ""))
+	if template.is_empty():
 		return
-	var bag := ItemBag.find_in(player)
-	if bag == null or not bag.remove_item(given):
-		print("Lucky block: well (nada)")
-		return
-	if randf() < well_powerup_chance:
-		_reward_powerup(player)
-		print("Lucky block: well (%s -> power-up)" % given)
-		return
-	var paid := _next_rarity_item(String(ItemCatalog.by_id(given).get("rarity", "Common")))
-	if paid.is_empty():
-		_reward_powerup(player)
-		print("Lucky block: well (%s -> power-up)" % given)
-		return
-	bag.add_item(paid)
-	print("Lucky block: well (%s -> %s)" % [given, paid])
-
-
-## Un objeto de la rareza siguiente a `rarity_name`; Legendario no tiene
-## siguiente, así que se cambia por otro Legendario.
-static func _next_rarity_item(rarity_name: String) -> String:
-	var index := UpgradePool.rarity_index(rarity_name)
-	var better := mini(index + 1, UpgradePool.RARITIES.size() - 1)
-	return ItemCatalog.roll_id(String(UpgradePool.RARITIES[better].name))
+	var text := template
+	if template.contains("%s"):
+		text = template % name_text
+	elif template.contains("%d"):
+		text = template % number
+	get_tree().call_group("hud", "announce", text)

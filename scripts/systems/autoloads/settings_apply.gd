@@ -1,7 +1,7 @@
 extends Node
 ## Autoload "Settings": el único que APLICA los ajustes guardados en
 ## SaveData (volumen de efectos, ambiente y música, sensibilidad del mouse,
-## pantalla completa, contador de FPS, calidad gráfica).
+## pantalla completa, contador de FPS, vegetación del suelo, calidad gráfica).
 ## Va después de Sfx para que existan los buses de código, y antes de
 ## cargar cualquier escena para que buses y modo de ventana estén bien desde
 ## el primer frame. El panel de ajustes escribe por la API set_* de aquí, que
@@ -117,6 +117,15 @@ func set_fullscreen(on: bool) -> void:
 ## partes a la vez, incluso en un HUD que aún no existe (menú -> partida).
 func set_show_fps(on: bool) -> void:
 	SaveData.show_fps = on
+	_request_save()
+
+
+## Muestra u oculta la vegetación baja de la arena actual; las arenas
+## siguientes la leen de SaveData al nacer (GroundCover._ready).
+func set_show_ground_cover(on: bool) -> void:
+	SaveData.show_ground_cover = on
+	for node: Node in get_tree().get_nodes_in_group(GroundCover.GROUP):
+		(node as Node3D).visible = on
 	_request_save()
 
 

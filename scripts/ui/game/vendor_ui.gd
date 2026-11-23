@@ -1,9 +1,9 @@
 class_name VendorUi
 extends ModalPanel
 ## Tienda del vendedor (VendorPanel.tscn), abierta por un Vendor con el estante
-## ya sorteado (Vendor.roll_offers). Dibuja las ofertas como cartas y le devuelve
-## UNA compra al puesto, que es dueño de la economía: cobra, registra y cierra el
-## puesto tras la venta. La pausa, el cierre y el juego sin pantalla los maneja
+## ya sorteado (Vendor.roll_offers). Dibuja las ofertas como cartas y le pasa
+## cada compra al puesto, que es dueño de la economía: cobra, registra, encarece
+## lo que queda y cierra el puesto cuando vende todo. La pausa, el cierre y el juego sin pantalla los maneja
 ## ModalPanel; sin pantalla compra la primera carta que alcance.
 
 @export_group("Cartas")
@@ -23,7 +23,7 @@ extends ModalPanel
 @export var price_border_alpha: float = 0.55
 
 @export_group("Venta")
-## Segundos entre la línea de agradecimiento y el cierre del panel.
+## Segundos entre la última venta del puesto y el cierre del panel.
 @export var sold_close_delay: float = 1.1
 ## Escala del golpe de la línea de agradecimiento.
 @export var sold_pop_scale: float = 1.3
@@ -39,6 +39,8 @@ extends ModalPanel
 @export var sold_template: String = "¡Trato hecho! %s"
 ## Precio en cada carta; %d son los puntos.
 @export var price_template: String = UiTheme.POINTS_AMOUNT
+## Precio de una carta ya vendida.
+@export var sold_price_text: String = "Vendido"
 ## Línea en lugar del estante cuando no hay nada que vender.
 @export var empty_shelf_line: String = "El vendedor no tiene nada para ti."
 ## Indicación del botón de aceptar.
@@ -52,8 +54,7 @@ var _vendor: Vendor = null
 var _offers: Array[Dictionary] = []
 var _cards: Array[Button] = []
 var _price_labels: Array[Label] = []
-## Una venta por puesto: se marca cuando el vendedor acepta, y todas las cartas
-## quedan inactivas.
+## True cuando el puesto vendió todo: todas las cartas quedan inactivas.
 var _sold: bool = false
 
 
@@ -70,8 +71,7 @@ func _build() -> void:
 	var accent: Color = row.get("color", UiTheme.ACCENT_AMBER)
 	_style_frame(String(row.display_name).to_upper(), accent)
 	if _offers.is_empty():
-		# Nada que vender (todas las mascotas ya acompañan al raider, catálogo
-		# vacío): se dice, en vez de dibujar una fila vacía y dejar al raider
+		# Nada que vender (catálogo vacío): se dice, en vez de dibujar una fila vacía y dejar al raider
 		# preguntándose qué se rompió.
 		_shelf.visible = false
 		_empty_label.text = empty_shelf_line
@@ -132,8 +132,7 @@ func _build_card(offer: Dictionary, index: int) -> Button:
 	spacer.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	spacer.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	box.add_child(spacer)
-	var price := CardFactory.label(price_template % int(offer.price), card_price_font_size,
-			UiTheme.TEXT_BRIGHT)
+	var price := CardFactory.label("", card_price_font_size, UiTheme.TEXT_BRIGHT)
 	UiTheme.style_badge(price, UiTheme.TEXT_BRIGHT, UiTheme.CARD_BG_PRESSED,
 			Color(tint, price_border_alpha))
 	box.add_child(_centered(price))
@@ -162,15 +161,21 @@ func _focus_first_offer() -> void:
 	_close_button.grab_focus()
 
 
-## Una carta que el raider no puede pagar queda en gris: un botón que parece
-## presionable y se traga el clic en silencio es peor que uno muerto.
+## Una carta que el raider no puede pagar, o ya vendida, queda en gris: un
+## botón que parece presionable y se traga el clic en silencio es peor que uno
+## muerto. Los precios se reescriben aquí porque cada compra los sube.
 func _refresh_points() -> void:
+	if is_instance_valid(_vendor):
+		_vendor.refresh_prices()
 	var purse := _show_points()
 	for i in _cards.size():
-		var affordable := purse >= int(_offers[i].price)
-		_cards[i].disabled = _sold or not affordable
+		var offer := _offers[i]
+		var sold := bool(offer.get("sold", false))
+		var affordable := purse >= int(offer.price)
+		_cards[i].disabled = _sold or sold or not affordable
+		_price_labels[i].text = sold_price_text if sold else price_template % int(offer.price)
 		_price_labels[i].add_theme_color_override("font_color",
-				UiTheme.TEXT_BRIGHT if affordable else UiTheme.ACCENT_RED)
+				UiTheme.TEXT_BRIGHT if affordable or sold else UiTheme.ACCENT_RED)
 
 
 func _on_buy(index: int) -> void:
@@ -183,6 +188,8 @@ func _on_buy(index: int) -> void:
 			or index >= _offers.size():
 		return
 	var offer := _offers[index]
+	if bool(offer.get("sold", false)):
+		return
 	if not _vendor.buy(offer, _player):
 		# El vendedor es dueño de la comprobación de puntos, así que un rechazo
 		# solo significa una cosa. El puesto sigue abierto: puede haber una carta
@@ -195,16 +202,19 @@ func _on_buy(index: int) -> void:
 	_finish_sale(offer)
 
 
-## Una venta por puesto (la regla del vendedor; esta es su cara): todas las
-## cartas quedan inactivas, el panel agradece y devuelve el árbol un momento
-## después.
+## Una venta: el panel agradece y redibuja los precios que subieron. Si el
+## puesto ya vendió todo, todas las cartas quedan inactivas y el panel
+## devuelve el árbol un momento después.
 func _finish_sale(offer: Dictionary) -> void:
-	_sold = true
+	_sold = _vendor.sold_out()
 	_result.text = sold_template % String(offer.title)
 	_result.add_theme_color_override("font_color", UiTheme.TEXT_BRIGHT)
 	UiTheme.pop(_result, sold_pop_scale, sold_pop_time)
 	Sfx.play(&"card_pick")
 	_refresh_points()
+	if not _sold:
+		_focus_first_offer()
+		return
 	_close_button.grab_focus()
 	await get_tree().create_timer(sold_close_delay, true, false, true).timeout
 	if is_inside_tree():
@@ -218,6 +228,6 @@ func _first_affordable() -> int:
 		return -1
 	var purse := int(_player.get("points"))
 	for i in _offers.size():
-		if purse >= int(_offers[i].price):
+		if not bool(_offers[i].get("sold", false)) and purse >= int(_offers[i].price):
 			return i
 	return -1

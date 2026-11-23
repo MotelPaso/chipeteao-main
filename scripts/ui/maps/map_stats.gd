@@ -123,17 +123,20 @@ func show_stats(stats: PlayerStats) -> void:
 ##   "attack_speed"  el multiplicador de enfriamiento leído como velocidad de
 ##                   ataque y en POSITIVO (GLOSARIO regla 7): 0.8 -> 0.25
 ##   "flat"          número entero                    (3 -> 3)
+##   "luck"          la suerte con la parte de la dificultad (Rarity.effective_luck)
 func _bonus(value: float, shown: String) -> float:
 	match shown:
 		"multiplier":
 			return value - 1.0
 		"attack_speed":
 			return 1.0 / maxf(value, 0.01) - 1.0
+		"luck":
+			return Rarity.effective_luck(value)
 	return value
 
 
 func _bonus_text(bonus: float, shown: String) -> String:
-	if shown == "flat":
+	if shown == "flat" or shown == "luck":
 		return "%+d" % roundi(bonus)
 	return "%+d%%" % roundi(bonus * 100.0)
 

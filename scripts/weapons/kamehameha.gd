@@ -44,16 +44,14 @@ const BEAM_VOLUME_DB: float = -12.0
 @export_group("Multitud")
 ## Segundos entre los rayos extra del Tomo de Multitud; dos solapados en el mismo carril serían un solo rayo más grueso.
 @export var extra_stagger: float = 0.12
-## Grados entre rayos vecinos; el carril es largo, así que un abanico estrecho ya separa varios metros las puntas.
-@export var extra_fan_deg: float = 14.0
 
 
 func fire(target: Node3D) -> void:
 	var origin := global_position + Vector3.UP * muzzle_height
 	var center_dir := flat_dir_or(body_aim_point(target) - origin,
 			-global_transform.basis.z)
-	fire_volley(maxi(effective_projectile_count(), 1), center_dir, _blast,
-			extra_stagger, extra_fan_deg)
+	fire_volley(maxi(effective_projectile_count(), 1), target, center_dir, _blast,
+			extra_stagger)
 	# Un rugido y una sacudida por ráfaga, salgan los rayos que salgan; van
 	# aquí, con el disparo, y no en el helper visual.
 	Sfx.play(&"boss_roar_2", BEAM_VOLUME_DB)

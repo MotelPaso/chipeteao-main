@@ -1,8 +1,10 @@
 class_name HordeSchedule
 extends RefCounted
-## Hordas y ráfagas de presión. Una horda llega en los horde_minutes de la
-## etapa (RunState.stage_time) y luego cada horde_repeat_minutes, repartida
-## en horde_waves oleadas alrededor de un raider al azar. Las ráfagas de
+## Hordas y ráfagas de presión. Una horda llega cuando el director del mundo
+## la pide (start_now, su ritmo por minuto) o, con timed_hordes del spawner,
+## en los horde_minutes de la etapa (RunState.stage_time) y luego cada
+## horde_repeat_minutes. Se reparte en horde_waves oleadas alrededor de un
+## raider al azar. Las ráfagas de
 ## presión (oleadas de horda, jauría shiny del WorldDirector) y los puntos de
 ## lluvia y tsunami del nodo Weather caen encima de la cadencia normal, con
 ## su propio presupuesto sobre max_active.
@@ -45,9 +47,21 @@ func tick(delta: float) -> void:
 			_horde_waves_left -= 1
 			pressure_burst(anchor.global_position, _horde_wave_size, false, true)
 		return
-	if RunState.stage_time < next_horde_time():
+	if not spawner.timed_hordes or RunState.stage_time < next_horde_time():
 		return
 	_hordes_fired += 1
+	start_now()
+
+
+## True mientras una horda todavía está soltando oleadas.
+func busy() -> bool:
+	return _horde_waves_left > 0
+
+
+## Arranca una horda ahora: calcula su tamaño, avisa en el HUD y deja sus
+## oleadas en cola para tick().
+func start_now() -> void:
+	var spawner := _spawner
 	var size := int((float(spawner.horde_base_size)
 			+ spawner.horde_size_per_minute * spawner.run_minutes())
 			* (1.0 + RunState.difficulty_bonus)
@@ -71,7 +85,7 @@ func tick(delta: float) -> void:
 ## El spawner lo llama en cada tick mientras dura la espera.
 func hold() -> void:
 	_horde_waves_left = 0
-	if RunState.stage_time >= next_horde_time():
+	if _spawner.timed_hordes and RunState.stage_time >= next_horde_time():
 		_hordes_fired += 1
 
 
@@ -111,16 +125,24 @@ func pressure_burst(center: Vector3, count: int, force_elites: bool, horde: bool
 
 ## Un enemigo en cada uno de `points`, a ras de suelo. Ver
 ## EnemySpawner.spawn_at_points.
-func spawn_at_points(points: Array[Vector3], horde: bool) -> int:
+func spawn_at_points(points: Array[Vector3], horde: bool, from_sky: bool = false) -> int:
+	var made := spawn_bodies_at(points, horde)
+	if from_sky:
+		for enemy: EnemyBase in made:
+			enemy.drop_from_sky()
+	return made.size()
+
+
+## Igual que spawn_at_points, pero devuelve los enemigos creados.
+func spawn_bodies_at(points: Array[Vector3], horde: bool) -> Array[EnemyBase]:
+	var made: Array[EnemyBase] = []
 	var budget := _cap(horde) - _spawner.live_enemy_count()
-	if budget <= 0:
-		return 0
-	var made := 0
 	for point: Vector3 in points:
-		if made >= budget:
+		if made.size() >= budget:
 			break
-		if _spawner.make_enemy_at(_points.on_ground(point)) != null:
-			made += 1
+		var enemy := _spawner.make_enemy_at(_points.on_ground(point))
+		if enemy != null:
+			made.append(enemy)
 	return made
 
 

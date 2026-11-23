@@ -60,7 +60,6 @@ var is_dead: bool = false
 ## invariante que cuidar.
 var _initialized: bool = false
 
-
 func _ready() -> void:
 	current_hp = max_hp
 	_initialized = true

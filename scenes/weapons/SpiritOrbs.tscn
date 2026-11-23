@@ -15,8 +15,11 @@ rings = 6
 
 [node name="SpiritOrbs" type="Node3D"]
 script = ExtResource("1_spiritorbs")
-damage = 8.0
+damage = 10.0
 cooldown = 0.8
+hit_push = 3.0
+hit_slow = 0.7
+hit_slow_seconds = 0.1
 attack_range = 2.6
 projectile_count = 2
 orb_mesh = SubResource("SphereMesh_orb")

@@ -2,7 +2,7 @@ class_name WorldFreeze
 extends RefCounted
 ## Congela el MUNDO de una partida sin pausar el árbol: la arena entera
 ## (enemigos, proyectiles, todo lo del pool, interactuables), cada raider con
-## sus armas y su mascota, el director de eventos y clima, y el reloj de la
+## sus armas, el director de eventos y clima, y el reloj de la
 ## partida. Lo usa la cinemática de un jefe.
 ##
 ## No es get_tree().paused a propósito:

@@ -58,6 +58,9 @@ var crit_damage: float = 2.0
 var lifesteal: float = 0.0
 var armor: float = 0.0
 var luck: float = 0.0
+## Multiplicador de la suerte total (stat "luck_percent": +30 = ×1,3). Se
+## aplica después de sumar todos los puntos de suerte.
+var luck_multiplier: float = 1.0
 ## Probabilidad (0-1, con techo max_evasion) de esquivar por completo un
 ## golpe; la tira el Health hermano en cada golpe.
 var evasion: float = 0.0
@@ -67,9 +70,9 @@ var thorns: float = 0.0
 ## HP máx. por encima del max_hp propio del Health (que las cartas genéricas
 ## de Corazón robusto también suben); se empuja al Health como DELTA.
 var bonus_max_hp: float = 0.0
-## Proyectiles extra en toda arma de andanada
-## (WeaponBase.effective_projectile_count).
-var projectile_bonus: int = 0
+## Proyectiles extra en toda arma de andanada, con decimales: se suman y el
+## arma redondea hacia abajo el total (WeaponBase.effective_projectile_count).
+var projectile_bonus: float = 0.0
 ## Multiplicador de los efectos temporizados de las armas — ralentizaciones,
 ## charcos, veneno (WeaponBase.duration_scale).
 var duration_multiplier: float = 1.0
@@ -216,23 +219,23 @@ func add_tome(tome_id: String, potency: float) -> Array[Dictionary]:
 	return rolled
 
 
-## Tirada del Tomo del Azar: potencia 1 (Común) da un boon de tamaño base;
-## cada rareza mayor suma un boon y escala todos por la potencia (Raro
-## 1.5x/2 boons, Épico 2x/3, Legendario 3x/4). Stats distintas por tirada.
+## Tirada del Tomo del Azar: la rareza decide cuántas stats salen y cuánto
+## de cada una (Tome.GAMBLE_MULTIPLIERS: Poco común 1 x1.5 ... Legendario 2 a x1.5 y
+## 1 normal). Las stats son las de los altares (ChargeShrine.ALTAR_BOONS), sin
+## repetir en una tirada, sobre el primer valor de su lista, redondeado.
 ## Estática y pura, para que un harness pueda verificar la distribución.
 ## Orden del RNG: un shuffle por tirada, en el momento de tomar el tomo.
 static func roll_gamble_boons(potency: float) -> Array[Dictionary]:
-	var count := Tome.gamble_boon_count(potency)
-	var pool := Tome.GAMBLE_BOONS.duplicate()
+	var multipliers := Tome.gamble_multipliers(potency)
+	var pool := ChargeShrine.ALTAR_BOONS.duplicate()
 	pool.shuffle()
 	var boons: Array[Dictionary] = []
-	for i in mini(count, pool.size()):
+	for i in mini(multipliers.size(), pool.size()):
 		var boon: Dictionary = pool[i]
+		var base := float(ChargeShrine.boon_values(boon)[0])
 		boons.append({
 			"stat": String(boon.stat),
-			"amount": roundf(float(boon.amount) * potency),
-			# Viaja con el boon para que el aviso del HUD lea la tirada.
-			"label": String(boon.get("label", "")),
+			"amount": maxf(roundf(base * float(multipliers[i])), 1.0),
 		})
 	return boons
 
@@ -328,7 +331,7 @@ func set_character_passive(stat: String, amount: float, kind: String = "per_leve
 
 ## True mientras corre recompute(). _push_bonus_max_hp_to_health escribe
 ## max_hp y cura DENTRO de esa llamada, y ambas cosas emiten hp_changed: un
-## oyente que puede pedir otro recompute (Zenkai) tiene que distinguir "el
+## oyente que puede pedir otro recompute tiene que distinguir "el
 ## raider se curó" de "la capa de stats se reconstruyó".
 func is_recomputing() -> bool:
 	return _recomputing
@@ -358,10 +361,11 @@ func _reset_derived() -> void:
 	lifesteal = 0.0
 	armor = 0.0
 	luck = base_luck
+	luck_multiplier = 1.0
 	evasion = 0.0
 	thorns = 0.0
 	bonus_max_hp = 0.0
-	projectile_bonus = 0
+	projectile_bonus = 0.0
 	duration_multiplier = 1.0
 	xp_multiplier = 1.0
 	difficulty_share = 0.0
@@ -381,19 +385,9 @@ func _apply_sources() -> void:
 	# Objetos: cada copia de un objeto de stats aporta los efectos de su fila
 	# por el mismo canal.
 	_apply_items()
-	# La stat de la mascota: un espacio, una fila, escalada por nivel.
-	_apply_pet_stat()
 	# Boons de altar y boons temporales vivos.
 	_apply_boons(_altar_boons)
 	_apply_boons(_timed_boons)
-	# Zenkai: un canal permanente de todas las stats, leído de las
-	# acumulaciones que guardó la bolsa. Igual que los power-ups de abajo: una
-	# cuenta guardada que se vuelve a aplicar en cada reconstrucción, nunca
-	# acumulada sobre un valor derivado que _reset_derived borraría.
-	_apply_zenkai()
-	# Power-ups: el HP máx. permanente del vampiro es un TOTAL GUARDADO en el
-	# componente, que se vuelve a sumar aquí en cada recompute.
-	_apply_powerups()
 	# Reliquias de la Armería: rangos meta permanentes, por el mismo canal de
 	# efectos que los tomos para que la acumulación sea idéntica.
 	_apply_relics()
@@ -433,10 +427,11 @@ func _clamp_derived() -> void:
 	move_speed_multiplier = maxf(move_speed_multiplier, MIN_MOVE_MULTIPLIER)
 	crit_chance = maxf(crit_chance, 0.0)
 	evasion = clampf(evasion, 0.0, max_evasion)
-	luck = maxf(luck, 0.0)
+	# La suerte en % multiplica los puntos de todas las fuentes juntas.
+	luck = maxf(luck * maxf(luck_multiplier, 0.0), 0.0)
 	duration_multiplier = maxf(duration_multiplier, MIN_DURATION_MULTIPLIER)
 	xp_multiplier = maxf(xp_multiplier, MIN_XP_MULTIPLIER)
-	projectile_bonus = maxi(projectile_bonus, 0)
+	projectile_bonus = maxf(projectile_bonus, 0.0)
 	pickup_radius_bonus = maxf(pickup_radius_bonus, MIN_PICKUP_RADIUS_BONUS)
 
 
@@ -469,52 +464,6 @@ func _apply_items() -> void:
 		var copies := bag.count(item_id)
 		for effect: Dictionary in row.get("effects", [] as Array):
 			_apply_effect(String(effect.stat), float(effect.amount) * float(copies))
-
-
-## La stat de la mascota, que escala con el nivel de la partida como una
-## pasiva. Se lee del espacio único de mascota del raider: tiene un id o
-## ninguno, y no hay copias por las que escalar.
-func _apply_pet_stat() -> void:
-	var body := get_parent()
-	if body == null:
-		return
-	var pet_id: Variant = body.get("pet_id")
-	if pet_id == null or String(pet_id).is_empty():
-		return
-	var pet := PetCatalog.by_id(String(pet_id))
-	var stat := String(pet.get("stat", ""))
-	if stat.is_empty():
-		return
-	_apply_effect(stat, float(pet.get("amount_per_level", 0.0)) * float(RunState.level))
-
-
-## Las acumulaciones de Zenkai suben TODAS las stats que importan un % fijo
-## cada una. Amplio a propósito: el objeto es Legendario, solo paga cuando el
-## raider volvió desde muy poco HP, y un bono estrecho no se notaría junto a
-## los tomos ya acumulados para entonces.
-func _apply_zenkai() -> void:
-	var bag := ItemBag.find_in(get_parent())
-	if bag == null:
-		return
-	var stacks := bag.zenkai_stacks
-	if stacks <= 0:
-		return
-	# El % por acumulación y las stats viven en la fila de Zenkai
-	# (ItemCatalog). max_hp y luck son canales fijos: ahí el mismo número se
-	# lee como puntos, no como %.
-	var row := ItemCatalog.kind_row("zenkai")
-	var percent := float(stacks) * float(row.percent_per_stack)
-	for stat: Variant in (row.stats as Array):
-		_apply_effect(String(stat), percent)
-
-
-## Totales permanentes que guardan los power-ups («Modo vampiro» sube el HP
-## máx. por baja). El componente es dueño del número; esto solo lo aplica.
-func _apply_powerups() -> void:
-	var powerups := PowerUps.find_in(get_parent())
-	if powerups == null or is_zero_approx(powerups.permanent_max_hp):
-		return
-	_apply_effect("max_hp", powerups.permanent_max_hp)
 
 
 ## Cada rango de la Armería aporta el efecto de su fila (SaveData guarda los
@@ -589,12 +538,14 @@ func _apply_effect(stat: String, amount: float) -> void:
 			armor += amount
 		"luck":
 			luck += amount
+		"luck_percent":
+			luck_multiplier += amount / 100.0
 		"thorns":
 			thorns += amount
 		"max_hp":
 			bonus_max_hp += amount
 		"projectiles":
-			projectile_bonus += roundi(amount)
+			projectile_bonus += amount
 		"duration":
 			duration_multiplier += amount / 100.0
 		"xp_gain":

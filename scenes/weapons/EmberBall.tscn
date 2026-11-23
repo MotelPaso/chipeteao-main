@@ -1,0 +1,48 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" uid="uid://bcs1vddsnr6rt" path="res://scripts/weapons/projectile.gd" id="1_ball"]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_flame"]
+shading_mode = 0
+transparency = 1
+albedo_color = Color(1, 0.42, 0.08, 0.85)
+
+[sub_resource type="SphereMesh" id="SphereMesh_flame"]
+material = SubResource("StandardMaterial3D_flame")
+radius = 0.28
+height = 0.56
+radial_segments = 16
+rings = 8
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_core"]
+shading_mode = 0
+albedo_color = Color(1, 0.9, 0.45, 1)
+
+[sub_resource type="SphereMesh" id="SphereMesh_core"]
+material = SubResource("StandardMaterial3D_core")
+radius = 0.16
+height = 0.32
+radial_segments = 12
+rings = 6
+
+[sub_resource type="SphereShape3D" id="SphereShape3D_hit"]
+radius = 0.3
+
+[node name="EmberBall" type="Area3D" groups=["player_shots"]]
+collision_layer = 0
+collision_mask = 2
+monitorable = false
+script = ExtResource("1_ball")
+speed = 22.0
+spawn_stretch = 1.6
+
+[node name="Tracer" type="MeshInstance3D" parent="."]
+cast_shadow = 0
+mesh = SubResource("SphereMesh_flame")
+
+[node name="Core" type="MeshInstance3D" parent="Tracer"]
+cast_shadow = 0
+mesh = SubResource("SphereMesh_core")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+shape = SubResource("SphereShape3D_hit")

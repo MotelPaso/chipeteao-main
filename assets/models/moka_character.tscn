@@ -1,0 +1,14 @@
+[gd_scene format=3]
+
+[ext_resource type="PackedScene" uid="uid://b3jsmj3hfxtud" path="res://assets/models/foca.glb" id="1_foca"]
+
+[node name="MokaCharacter" type="Node3D"]
+
+[node name="Foca" parent="." instance=ExtResource("1_foca")]
+transform = Transform3D(-0.5070, 0, 0, 0, 0.6033, 0, 0, 0, -0.8315, 0, 0, 0)
+
+[node name="COLMILLO_DER" parent="Foca" index="6"]
+transform = Transform3D(0.9926, -0.1217, 0, -0.1023, -0.8341, 0, 0, 0, -0.6097, 0.4200, 0.9600, 1.1050)
+
+[node name="COLMILLO_IZQ" parent="Foca" index="7"]
+transform = Transform3D(0.9926, 0.1217, 0, 0.1023, -0.8341, 0, 0, 0, -0.6097, -0.4500, 0.9800, 1.1050)

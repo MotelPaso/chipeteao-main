@@ -121,6 +121,9 @@ var fullscreen: bool = false
 ## Contador de FPS del HUD para el jugador. Es independiente de la sonda de
 ## rendimiento de depuración, que tiene su propio interruptor.
 var show_fps: bool = false
+## Vegetación baja del suelo (pasto, flores, hongos, piedras chicas). Apagarla
+## despeja la vista y alivia la GPU.
+var show_ground_cover: bool = true
 ## Índice del preset gráfico, 0..MAX_GRAPHICS_QUALITY (ver la const de arriba).
 var graphics_quality: int = DEFAULT_GRAPHICS_QUALITY
 
@@ -533,6 +536,7 @@ func _apply_defaults() -> void:
 	mouse_sensitivity = DEFAULT_MOUSE_SENSITIVITY
 	fullscreen = false
 	show_fps = false
+	show_ground_cover = true
 	graphics_quality = DEFAULT_GRAPHICS_QUALITY
 
 
@@ -552,6 +556,7 @@ func _load_settings(value: Variant) -> void:
 			MIN_MOUSE_SENSITIVITY, MAX_MOUSE_SENSITIVITY)
 	fullscreen = _as_bool(settings.get("fullscreen"), false)
 	show_fps = _as_bool(settings.get("show_fps"), false)
+	show_ground_cover = _as_bool(settings.get("show_ground_cover"), true)
 	graphics_quality = clampi(
 			_as_int(settings.get("graphics_quality"), DEFAULT_GRAPHICS_QUALITY),
 			0, MAX_GRAPHICS_QUALITY)
@@ -576,6 +581,7 @@ func _to_save_dict() -> Dictionary[String, Variant]:
 			"mouse_sensitivity": mouse_sensitivity,
 			"fullscreen": fullscreen,
 			"show_fps": show_fps,
+			"show_ground_cover": show_ground_cover,
 			"graphics_quality": graphics_quality,
 		},
 	}

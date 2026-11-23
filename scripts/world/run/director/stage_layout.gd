@@ -42,6 +42,9 @@ var bounds_margin: float
 var min_distance_from_spawn: float
 var min_distance_between: float
 var min_distance_from_keepouts: float
+## Reparto parejo (claim_spread_point), copiados también del director.
+var spread_tries: int = 32
+var same_kind_spread: float = 0.4
 
 ## Arena de la etapa; null entre etapas.
 var arena: Node3D = null
@@ -60,6 +63,8 @@ var _placed_points: Array[Vector2] = []
 var _anchor_points: Array[Vector2] = []
 ## Los POI movidos, para liberar el punto de los que el inicio irregular quita.
 var _placed_pois: Array[Node3D] = []
+## Puntos ocupados por tipo de POI (su escena), para alejar a los iguales.
+var _kind_points: Dictionary[String, Array] = {}
 
 
 ## `stage_arena` null crea un layout vacío (entre etapas).
@@ -213,12 +218,11 @@ func shuffle_ground_interactables() -> void:
 			movable.append(spot)
 		else:
 			anchors.append(Vector2(spot.global_position.x, spot.global_position.z))
-	var placed: Array[Vector2] = []
-	var limit := _arena_half_extent - bounds_margin
+	_placed_points = []
+	_anchor_points = anchors
+	_kind_points.clear()
 	for poi: Node3D in movable:
-		var spot_xz := _find_clear_point(limit, placed, anchors,
-				(poi as Interactable).footprint_reach())
-		placed.append(spot_xz)
+		var spot_xz := _claim_spread_xz(poi, (poi as Interactable).footprint_reach())
 		# Los POI de suelo se apoyan en el relieve del punto nuevo; los que
 		# están sobre una plataforma (y > POI_PLATFORM_Y) conservan su
 		# altura, porque la plataforma no se mueve y el terreno bajo ella
@@ -226,18 +230,19 @@ func shuffle_ground_interactables() -> void:
 		var authored_y := poi.global_position.y
 		var new_y := authored_y if authored_y > POI_PLATFORM_Y else terrain_height(spot_xz)
 		poi.global_position = Vector3(spot_xz.x, new_y, spot_xz.y)
-	_placed_points = placed
 	_placed_pois = movable
-	_anchor_points = anchors
 
 
 ## Rehace los puntos ocupados con los POI que siguen en pie, para que un
 ## punto liberado por el inicio irregular no reserve espacio alrededor de nada.
 func refresh_placed_points() -> void:
 	var points: Array[Vector2] = []
+	_kind_points.clear()
 	for poi: Node3D in _placed_pois:
 		if is_instance_valid(poi) and not poi.is_queued_for_deletion():
-			points.append(Vector2(poi.global_position.x, poi.global_position.z))
+			var xz := Vector2(poi.global_position.x, poi.global_position.z)
+			points.append(xz)
+			_kind_points.get_or_add(_kind_of(poi), []).append(xz)
 	_placed_points = points
 
 
@@ -249,6 +254,75 @@ func claim_clear_point(reach: float = 0.0) -> Vector3:
 			_anchor_points, reach)
 	_placed_points.append(spot)
 	return Vector3(spot.x, terrain_height(spot), spot.y)
+
+
+## Pone `node` repartido por todo el mapa (ver _claim_spread_xz) y lo
+## devuelve apoyado en el terreno.
+func claim_spread_point(node: Node3D, reach: float) -> Vector3:
+	var spot := _claim_spread_xz(node, reach)
+	return Vector3(spot.x, terrain_height(spot), spot.y)
+
+
+## De spread_tries puntos al azar que respetan la máscara, el punto de
+## aparición y los anclajes, elige el más lejano a lo ya puesto; la distancia
+## a los del MISMO tipo cuenta x same_kind_spread, así los iguales no se
+## amontonan en una zona. No hay distancia mínima: es solo un reparto. Lo
+## anota en los puntos ocupados. Si ningún punto sirve, usa el muestreo de
+## siempre.
+func _claim_spread_xz(node: Node3D, reach: float) -> Vector2:
+	var limit := _arena_half_extent - bounds_margin
+	var kind := _kind_of(node)
+	var same: Array = _kind_points.get(kind, [])
+	var best := Vector2.INF
+	var best_gap := -INF
+	for attempt in maxi(spread_tries, 1):
+		var candidate := Vector2(randf_range(-limit, limit), randf_range(-limit, limit))
+		if not walkable_xz(candidate, reach) \
+				or candidate.length() < min_distance_from_spawn + reach:
+			continue
+		var gap := INF
+		for anchor: Vector2 in _anchor_points:
+			gap = minf(gap, candidate.distance_to(anchor) - min_distance_from_keepouts)
+		if gap < 0.0:
+			continue
+		for other: Vector2 in _placed_points:
+			gap = minf(gap, candidate.distance_to(other))
+		for other: Vector2 in same:
+			gap = minf(gap, candidate.distance_to(other) * same_kind_spread)
+		if gap > best_gap:
+			best_gap = gap
+			best = candidate
+	if best == Vector2.INF:
+		best = _find_clear_point(limit, _placed_points, _anchor_points, reach)
+	_placed_points.append(best)
+	_kind_points.get_or_add(kind, []).append(best)
+	return best
+
+
+## Tipo de un POI para el reparto: su escena (o su script si no tiene).
+static func _kind_of(node: Node) -> String:
+	if not node.scene_file_path.is_empty():
+		return node.scene_file_path
+	var script := node.get_script() as Script
+	return script.resource_path if script != null else node.get_class()
+
+
+## Como claim_clear_point, pero prueba `tries` puntos libres y se queda con
+## el más lejano a `others` (posiciones XZ). Reparte cosas por todo el mapa.
+func claim_far_point(reach: float, others: Array[Vector2], tries: int) -> Vector3:
+	var limit := _arena_half_extent - bounds_margin
+	var best := Vector2.ZERO
+	var best_gap := -INF
+	for attempt in maxi(tries, 1):
+		var candidate := _find_clear_point(limit, _placed_points, _anchor_points, reach)
+		var gap := INF
+		for other: Vector2 in others:
+			gap = minf(gap, candidate.distance_to(other))
+		if gap > best_gap:
+			best_gap = gap
+			best = candidate
+	_placed_points.append(best)
+	return Vector3(best.x, terrain_height(best), best.y)
 
 
 ## --- muestreos --------------------------------------------------------------

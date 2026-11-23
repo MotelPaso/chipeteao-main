@@ -57,18 +57,14 @@ const MARKER_STYLES: Dictionary[StringName, Dictionary] = {
 	# map_marker_color(), para distinguir una estrella de una Furia.
 	&"powerup": {"color": Color(0.95, 0.95, 0.4), "shape": "dot",
 		"size": 3.0, "always_visible": false},
-	# Puestos y caja de mascota. Un puesto se dibuja con el color de su tipo
+	# Puestos. Un puesto se dibuja con el color de su tipo
 	# vía map_marker_color(), pero solo cuando la niebla ya lo reveló: el mapa
 	# no adelanta qué puesto llegó.
 	&"vendor": {"color": Color(0.9, 0.75, 0.5), "shape": "square",
 		"size": 3.5, "always_visible": false},
-	&"pet_box": {"color": Color(0.7, 0.95, 0.6), "shape": "square",
-		"size": 3.5, "always_visible": false},
-	# Bloque de la suerte y altar de eventos.
+	# Bloque de la suerte.
 	&"lucky_block": {"color": Color(1.0, 0.6, 0.85), "shape": "square",
 		"size": 3.0, "always_visible": false},
-	&"event_altar": {"color": Color(0.8, 0.85, 1.0), "shape": "dot",
-		"size": 3.5, "always_visible": false},
 }
 
 ## Nombre para el jugador por tipo, para la leyenda del mapa de Tab.
@@ -83,8 +79,6 @@ const MARKER_LABELS: Dictionary[StringName, String] = {
 	&"exit": "Salida",
 	&"powerup": "Power-ups",
 	&"vendor": "Vendedores",
-	&"pet_box": "Cajas de mascotas",
-	&"event_altar": "Altares de eventos",
 	&"lucky_block": "Bloques de la suerte",
 }
 

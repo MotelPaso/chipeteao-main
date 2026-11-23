@@ -129,17 +129,21 @@ func temp_buff() -> float:
 ## Orden del RNG: la tirada de variante de cielo va al final.
 func scale_fresh_spawn(enemy: EnemyBase) -> void:
 	var difficulty := (1.0 + RunState.difficulty_bonus) * temp_buff()
+	# El daño sube solo con una parte de la dificultad y tiene techo: con
+	# todo multiplicado un enemigo tardío borraba la vida entera de un golpe.
+	var damage_difficulty := (1.0 + RunState.difficulty_bonus
+			* _spawner.enemy_damage_difficulty_share) * temp_buff()
+	var damage := minf(lap_damage_factor() * endless_damage_factor() * late_damage_factor()
+			* damage_difficulty * _sky_damage_factor(), _spawner.enemy_damage_multiplier_cap)
 	enemy.apply_tier_scaling(
 			lap_hp_factor() * endless_hp_factor() * late_hp_factor() * difficulty
 					* _sky_hp_factor()
 					* (1.0 + _spawner.coop_hp_per_extra_player
 							* coop_extra_alive(_spawner.get_tree())),
-			lap_damage_factor() * endless_damage_factor() * late_damage_factor()
-					* difficulty * _sky_damage_factor(),
-			lap_xp_factor() * late_xp_factor())
-	# La velocidad es el canal propio de la rampa pseudo-infinita:
-	# apply_tier_scaling solo cubre HP, daño y pago.
-	enemy.move_speed *= endless_speed_factor()
+			damage, lap_xp_factor() * late_xp_factor())
+	# La velocidad es el canal propio de la rampa pseudo-infinita y de los
+	# pactos demoníacos: apply_tier_scaling solo cubre HP, daño y pago.
+	enemy.move_speed *= endless_speed_factor() * RunState.enemy_speed_multiplier
 	_apply_sky_variant(enemy)
 
 

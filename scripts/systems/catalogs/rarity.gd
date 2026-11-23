@@ -5,39 +5,57 @@ extends RefCounted
 ## del juego (cartas, cofres, vendedor y objetos la usan).
 ##
 ## Se puede cambiar libremente: weight, potency y color de cada fila de TIERS,
-## los textos de DISPLAY_NAMES y la curva de suerte (LUCK_TILT_PER_POINT,
-## MAX_LUCK_TILT).
+## los textos de DISPLAY_NAMES y la fuerza de la suerte (LUCK_REFERENCE y compañía).
 ## Llave interna, NUNCA la cambies: name (Common, Rare, Epic, Legendary). Es un
-## IDENTIFICADOR, no texto: llavea los precios de cofre
-## (RunState.CHEST_BASE_PRICES), el campo `rarity` de cada fila de
+## IDENTIFICADOR, no texto: llavea los precios del vendedor
+## (Vendor.item_price_factors), el campo `rarity` de cada fila de
 ## ItemCatalog, las cartas con rareza fija y los pisos min_rarity que pasan
 ## cofres, altares y el director del mundo. Queda en inglés; las pantallas lo
 ## muestran con display_name().
 ## El orden de TIERS va de menor a mayor: los pisos y potency_rank cuentan con
 ## ese orden.
 
-## Pendiente de la suerte en cero: cada punto de suerte mueve esta fracción
-## del peso de Common hacia arriba. La curva de _weights se aleja de esta
-## pendiente al crecer la suerte, pero nunca se aplana.
-const LUCK_TILT_PER_POINT: float = 0.01
-## Asíntota de esa curva: como máximo se mueve esta fracción del peso de
-## Common. Se acerca sin llegar nunca, así cada punto de suerte extra aporta.
-const MAX_LUCK_TILT: float = 0.5
-
+## Suerte, edita aquí. La suerte arma un multiplicador
+##   m = 1 + LUCK_BOOST_AT_REFERENCE x (suerte / LUCK_REFERENCE) ^ LUCK_CURVE
+## y el peso de cada rareza se multiplica por m elevado a su escalón
+## (Poco común x1, Raro x m, Épico x m², Legendario x m³).
+## Con 800 / 3.92 / 1.5: Legendario 3% sin suerte, ~4.5% con 100, ~8% con 200,
+## ~20% con 400 y 50% con 800.
+## Suerte a la que el multiplicador vale 1 + LUCK_BOOST_AT_REFERENCE.
+const LUCK_REFERENCE: float = 800.0
+## Cuánto sube el multiplicador a LUCK_REFERENCE de suerte. 3.92 = Legendario
+## al 50% justo en LUCK_REFERENCE (con los pesos de TIERS de hoy).
+const LUCK_BOOST_AT_REFERENCE: float = 3.92
+## Curva de la suerte: 1 = cada punto vale lo mismo; más de 1 = la poca suerte
+## influye poco y la mucha, mucho.
+const LUCK_CURVE: float = 1.5
+## La dificultad de la partida agranda la suerte en porcentaje: suerte x
+## (1 + dificultad x esto). Con 0.5, +50% de dificultad = suerte x1.25 (sin
+## suerte no hay nada que agrandar). 0 = la dificultad no toca la suerte.
+const DIFFICULTY_LUCK_SHARE: float = 0.5
 ## Niveles de rareza, de menor a mayor. weight: peso relativo del sorteo.
-## potency: multiplicador de la cantidad de la carta. color: color de la
-## rareza en pantalla.
+## potency: multiplicador de la cantidad de una carta sin lista `values`
+## (x1, x1.3, x1.7, x2). color: color de la rareza en pantalla. La primera
+## se llama "Common" por dentro (llave de objetos y precios) y se ve como
+## «Poco común», en verde.
 const TIERS: Array[Dictionary] = [
-	{"name": "Common", "color": Color(0.62, 0.65, 0.68), "weight": 60.0, "potency": 1.0},
-	{"name": "Rare", "color": Color(0.3, 0.55, 1.0), "weight": 25.0, "potency": 1.5},
-	{"name": "Epic", "color": Color(0.68, 0.32, 0.95), "weight": 12.0, "potency": 2.0},
-	{"name": "Legendary", "color": Color(1.0, 0.78, 0.2), "weight": 3.0, "potency": 3.0},
+	{"name": "Common", "color": Color(0.35, 0.8, 0.4), "weight": 70.0, "potency": 1.0},
+	{"name": "Rare", "color": Color(0.3, 0.55, 1.0), "weight": 19.0, "potency": 1.3},
+	{"name": "Epic", "color": Color(0.68, 0.32, 0.95), "weight": 8.0, "potency": 1.7},
+	{"name": "Legendary", "color": Color(1.0, 0.78, 0.2), "weight": 3.0, "potency": 2.0},
 ]
+
+## Lo que llevan las cartas de algo NUEVO (el primer tomo, un arma que no
+## tienes): no es una rareza ni se sortea, solo el aspecto «base» en gris.
+## Da lo mismo que la primera rareza.
+const BASE: Dictionary = {"name": "Base", "color": Color(0.62, 0.65, 0.68),
+		"weight": 0.0, "potency": 1.0}
 
 ## Nombre que ve el jugador por cada name de TIERS. Es el único lugar donde se
 ## traduce una rareza.
 const DISPLAY_NAMES: Dictionary[String, String] = {
-	"Common": "Común",
+	"Common": "Poco común",
+	"Base": "Nuevo",
 	"Rare": "Raro",
 	"Epic": "Épico",
 	"Legendary": "Legendario",
@@ -60,7 +78,7 @@ static func index_of(rarity_name: String) -> int:
 
 
 ## Índice de rareza para un valor de potencia (Common 1.0 -> 0 ...
-## Legendary 3.0 -> 3); para valores fuera de la tabla gana la más cercana.
+## Legendary 2.0 -> 3); para valores fuera de la tabla gana la más cercana.
 static func potency_rank(potency: float) -> int:
 	var best := 0
 	var best_gap := INF
@@ -88,7 +106,11 @@ static func resolve(fixed_name: String, luck: float, floor_index: int = 0) -> Di
 ## Hace una sola tirada de randf() (el orden de tiradas importa en los soaks
 ## con semilla).
 static func roll(luck: float, floor_index: int = 0) -> Dictionary:
-	var weights := _weights(luck)
+	return _pick(_weights(luck), floor_index)
+
+
+## Una tirada sobre `weights` (uno por fila de TIERS), con piso.
+static func _pick(weights: PackedFloat32Array, floor_index: int) -> Dictionary:
 	var total := 0.0
 	for weight: float in weights:
 		total += weight
@@ -102,23 +124,20 @@ static func roll(luck: float, floor_index: int = 0) -> Dictionary:
 	return TIERS[maxi(index, floor_index)]
 
 
-## Pesos de rareza al sortear: la suerte mueve una fracción del peso de la
-## rareza base (TIERS[0], Common) a las superiores, repartida en proporción a
-## sus pesos base. La fracción se acerca a MAX_LUCK_TILT sin cortarse en seco,
-## así la suerte sigue sirviendo por encima de 50 (el Tomo de Fortuna solo
-## puede llegar a 150).
+## La suerte que cuenta en los sorteos: la del jugador agrandada por la
+## dificultad de la partida (DIFFICULTY_LUCK_SHARE). Nunca negativa.
+static func effective_luck(luck: float) -> float:
+	return maxf(luck, 0.0) * (1.0 + RunState.difficulty_bonus * DIFFICULTY_LUCK_SHARE)
+
+
+## Pesos de rareza al sortear: la suerte multiplica directamente el peso de
+## cada rareza según su escalón (ver LUCK_REFERENCE), así cuanto más alta la
+## rareza, más la empuja la suerte. Todo sorteo de rareza del juego (cartas,
+## cofres, vendedor, ruleta, bloque de la suerte) pasa por aquí.
 static func _weights(luck: float) -> PackedFloat32Array:
 	var weights := PackedFloat32Array()
-	var upper_total := 0.0
+	var ratio := effective_luck(luck) / maxf(LUCK_REFERENCE, 1.0)
+	var boost := 1.0 + LUCK_BOOST_AT_REFERENCE * pow(ratio, LUCK_CURVE)
 	for i: int in TIERS.size():
-		weights.append(float(TIERS[i].weight))
-		if i > 0:
-			upper_total += float(TIERS[i].weight)
-	var tilt := MAX_LUCK_TILT * (1.0 - exp(-maxf(luck, 0.0) * LUCK_TILT_PER_POINT / MAX_LUCK_TILT))
-	if tilt <= 0.0 or upper_total <= 0.0:
-		return weights
-	var moved := weights[0] * tilt
-	weights[0] -= moved
-	for i: int in range(1, weights.size()):
-		weights[i] += moved * float(TIERS[i].weight) / upper_total
+		weights.append(float(TIERS[i].weight) * pow(boost, float(i)))
 	return weights

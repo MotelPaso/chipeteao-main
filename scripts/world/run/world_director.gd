@@ -8,116 +8,48 @@ extends Node
 ##    cofre de suelo, los secretos) se mueve a un punto al azar, para que
 ##    el mapa no se pueda memorizar. Lo que está sobre una plataforma
 ##    conserva su altura. Después el hijo StageFixtures pone los objetos
-##    de inicio (portales, ruletas, cofres extra...).
+##    de inicio (portales, ruletas, cofres extra, manantiales, vendedores...).
 ##
-## 2. Eventos con aviso en el HUD desde first_event_at hasta el final: cada
-##    cierto tiempo sale una fila de EVENT_LIBRARY y puede empezar un clima
-##    (el hijo Weather, con su WEATHER_CATALOG).
+## 2. Ritmo por minuto: en cada pulso (cada beat_seconds) salen
+##    - un clima asegurado al azar: luna, lluvia o desastre (el hijo Weather,
+##      con su WEATHER_CATALOG; si ya hay de los tres, se corta uno);
+##    - la tirada independiente de otro clima extra (Weather.roll_extra);
+##    - y en horde_and_weather_minutes (2, 4, 6, 8), además, una horda.
+##    EVENT_LIBRARY (jauría shiny, estrella) queda guardada y no sale sola.
 ##
 ## 3. El portal de salida al superar la etapa, y las balizas de luz.
 ## Todo punto pasa por la máscara caminable de la arena y una sonda de
 ## suelo: lo anunciado siempre se puede alcanzar y pisar.
 ## Modo de proceso pausable: los eventos se congelan con la pausa y las cartas.
 
-const XP_GEM_SCENE := preload("res://scenes/systems/XpGem.tscn")
-const CHARGE_SHRINE_SCENE := preload("res://scenes/world/shrines/ChargeShrine.tscn")
-const CURSE_SHRINE_SCENE := preload("res://scenes/world/shrines/CurseShrine.tscn")
-const SPRING_SHRINE_SCENE := preload("res://scenes/world/shrines/SpringShrine.tscn")
-const EVENT_ALTAR_SCENE := preload("res://scenes/world/shrines/EventAltar.tscn")
-const LUCKY_BLOCK_SCENE := preload("res://scenes/world/chests/LuckyBlock.tscn")
-const PET_BOX_SCENE := preload("res://scenes/world/PetBox.tscn")
-const VENDOR_SCENE := preload("res://scenes/world/Vendor.tscn")
-const SUPPLY_CHEST_SCENE := preload("res://scenes/world/director/SupplyChest.tscn")
 const EXIT_PORTAL_SCENE := preload("res://scenes/world/director/ExitPortal.tscn")
 const BEACON_SCENE := preload("res://scenes/world/director/Beacon.tscn")
 const Beacon := preload("res://scripts/world/run/director/beacon.gd")
 
-## Eventos del mundo, una fila por evento: edita aquí el peso, el aviso y
+## Eventos del mundo guardados para más adelante: hoy no salen solos (peso
+## 0 y el pulso por minuto ya no los sortea). Edita aquí el peso, el aviso y
 ## la baliza de cada uno. Campos:
 ##   id:           identificador; event_weight_overrides lo usa como clave.
 ##   weight:       peso relativo del sorteo.
-##   scene:        POI que aparece lejos de un jugador al azar.
-##   method:       solo en los eventos que no se resuelven con
-##                 _event_spawn_poi (sortear el punto y poner `scene` ahí);
-##                 se llama con call(row) y catalog_lint.gd revisa que exista.
+##   method:       se llama con call(row); catalog_lint.gd revisa que exista.
 ##   announce:     aviso en el HUD (texto del jugador); obligatorio.
 ##   beacon_color: color de la baliza sobre el evento; sin él no hay baliza.
-##                 En los altares es aparte de su accent_color (la escena):
-##                 cambia los dos. El vendedor no lo usa: su baliza toma el
-##                 `color` de su fila en Vendor.VENDOR_LIBRARY.
 ##   beacon_time:  segundos que arde la baliza; sin él o INF = hasta que el
 ##                 POI se usa (o hasta el cambio de etapa si no hay POI).
-##   altar:        cadencia de altares: el peso sube con el minuto y vale 0
-##                 mientras haya demasiados altares sin usar.
 ##   cap_group/cap: van juntos: con `cap` o más nodos en el grupo
 ##                 `cap_group`, el evento pesa 0 y sale otro.
 ##   log:          línea de log al aparecer, para los soaks (no traducir).
 const EVENT_LIBRARY: Array[Dictionary] = [
 	{
-		# Mínimo Raro y con suerte extra (SupplyChest.tscn). Se hunde si nadie
-		# lo abre antes de que se apague su baliza.
-		"id": "supply_chest", "weight": 1.0, "method": &"_event_supply_chest",
-		"scene": SUPPLY_CHEST_SCENE,
-		"announce": "Un cofre de suministros zumba en algún lugar del campo...",
-		"beacon_color": Color(1.0, 0.82, 0.3), "beacon_time": 40.0,
-	},
-	{
-		"id": "elite_pack", "weight": 1.0, "method": &"_event_elite_pack",
+		"id": "elite_pack", "weight": 0.0, "method": &"_event_elite_pack",
 		"announce": "¡Una jauría shiny te huele el rastro!",
-	},
-	{
-		# Las gemas tienen su propia duración; la baliza se apaga antes. Verde de XP, como las gemas.
-		"id": "essence_rift", "weight": 1.0, "method": &"_event_essence_rift",
-		"announce": "Se abre una grieta de esencia...",
-		"beacon_color": UiTheme.XP_GREEN, "beacon_time": 30.0,
-	},
-	{
-		"id": "charge_altar", "weight": 1.6, "altar": true, "method": &"_event_shrine",
-		"scene": CHARGE_SHRINE_SCENE,
-		"announce": "Se alza un altar de carga — párate en su anillo",
-		"beacon_color": Color(0.45, 0.85, 1.0), "beacon_time": INF,
-		"log": "Altar placed: charge",
-	},
-	{
-		"id": "demonic_altar", "weight": 0.5, "altar": true, "method": &"_event_shrine",
-		"scene": CURSE_SHRINE_SCENE,
-		"announce": "Un obelisco demoníaco sale del suelo a zarpazos...",
-		"beacon_color": Color(1.0, 0.35, 0.3), "beacon_time": INF,
-		"log": "Altar placed: demonic",
-	},
-	{
-		# Un solo manantial a la vez; se queda hasta que alguien bebe.
-		"id": "spring", "weight": 0.7, "method": &"_event_shrine",
-		"scene": SPRING_SHRINE_SCENE,
-		"announce": "Un manantial brota en algún lugar del campo...",
-		"beacon_color": Color(0.4, 0.8, 1.0), "beacon_time": INF,
-		"cap_group": &"springs", "cap": 1,
 	},
 	{
 		# La estrella solo aparece con este evento: no cae de enemigos ni se
 		# vende. La baliza marca dónde se vio, no dónde está: se mueve.
-		"id": "star_sighting", "weight": 0.15, "method": &"_event_star",
+		"id": "star_sighting", "weight": 0.0, "method": &"_event_star",
 		"announce": "Algo brillante cruza el campo...",
 		"beacon_color": Color(1.0, 0.9, 0.35), "beacon_time": 12.0,
-	},
-	{
-		# El tipo de puesto se sortea en secreto; el color de la baliza es el
-		# de su fila en Vendor.VENDOR_LIBRARY.
-		"id": "vendor", "weight": 0.8, "method": &"_event_vendor", "scene": VENDOR_SCENE,
-		"announce": "¡Llega un vendedor!", "beacon_time": INF,
-		"cap_group": &"vendors", "cap": 2,
-	},
-	{
-		"id": "pet_box", "weight": 0.35, "scene": PET_BOX_SCENE,
-		"announce": "Una caja con una huella aparece en el campo...",
-	},
-	{
-		"id": "event_altar", "weight": 0.4, "scene": EVENT_ALTAR_SCENE,
-		"announce": "Un cristal de tormenta se alza en el campo...",
-	},
-	{
-		"id": "lucky_block", "weight": 0.25, "scene": LUCKY_BLOCK_SCENE,
-		"announce": "Un bloque dorado aparece en algún lugar...",
 	},
 ]
 
@@ -128,8 +60,7 @@ const EVENT_LIBRARY: Array[Dictionary] = [
 ## altar ya usado llama a cruzar el mapa por nada.
 class TimedBeacon:
 	var node: Node3D
-	## POI que señala; null en la grieta de esencia, cuyas gemas tienen su
-	## propia duración y no dejan nada que vigilar.
+	## POI que señala; null si no hay nada que vigilar (la estrella se mueve).
 	var poi: Node = null
 	var time_left: float = 0.0
 	## Solo el cofre de suministros se hunde al apagarse la luz: se puede
@@ -165,47 +96,31 @@ class TimedBeacon:
 @export var min_distance_from_keepouts: float = 12.0
 ## Margen (metros) con el borde de la arena para todo lo que pone el director: POI, eventos, clima (lluvia, tsunami, meteoritos) y el portal de salida.
 @export var bounds_margin: float = 14.0
+## Puntos que se prueban para cada altar, ruleta y cofre al empezar la etapa; se queda con el más lejano a lo ya puesto (más = reparto más parejo, carga un poco más lenta).
+@export var spread_tries: int = 32
+## Cuánto más se separan dos POI del MISMO tipo que dos distintos: la distancia entre iguales cuenta x esto (0.4 = los iguales quedan ~2.5 veces más lejos).
+@export_range(0.05, 1.0) var same_kind_spread: float = 0.4
+
+@export_group("Ritmo por minuto")
+## Si hay un pulso por minuto (clima asegurado, clima extra, una fila de EVENT_LIBRARY y, en sus minutos, horda). Apagado: no sale nada de eso.
+@export var beat_enabled: bool = true
+## Segundos entre pulsos (el primero sale a estos segundos de empezar la etapa).
+@export var beat_seconds: float = 60.0
+## Minutos de la etapa en que el pulso trae además una horda (en los demás no hay horda).
+@export var horde_and_weather_minutes: Array[int] = [2, 4, 6, 8]
 
 @export_group("Eventos")
 ## Activa los eventos del mundo y el clima.
 @export var events_enabled: bool = true
-## Segundos desde el inicio de la etapa hasta el primer evento.
-@export var first_event_at: float = 60.0
-## Pausa mínima entre eventos (segundos), antes de acortarse con el minuto.
-@export var event_gap_min: float = 50.0
-## Pausa máxima entre eventos (segundos), antes de acortarse con el minuto.
-@export var event_gap_max: float = 75.0
-## Pausa más corta posible entre eventos (segundos), aunque la partida avance.
-@export var event_gap_floor: float = 20.0
-## Cuánto se acorta la pausa por minuto de partida: pausa / (1 + esto x minutos).
-@export var event_gap_decay_per_minute: float = 0.18
 ## Distancia mínima (metros) de un evento a un jugador vivo al azar.
 @export var event_min_distance: float = 25.0
 ## Distancia máxima (metros) de un evento a un jugador vivo al azar.
 @export var event_max_distance: float = 45.0
 ## Enemigos shiny de la jauría de élite.
 @export var elite_pack_size: int = 3
-## Gemas de XP que suelta la grieta de esencia.
-@export var rift_gem_count: int = 10
-## XP de cada gema de la grieta (una gema normal vale 1).
-@export var rift_gem_value: int = 3
-## Distancia mínima (metros) de cada gema de la grieta a su centro.
-@export var rift_gem_min_spread: float = 0.6
-## Distancia máxima (metros) de cada gema de la grieta a su centro.
-@export var rift_gem_max_spread: float = 2.6
 ## Pesos que reemplazan los de EVENT_LIBRARY, por id de evento; 0 quita el
 ## evento. Vale para todas las arenas: el director es uno por partida.
 @export var event_weight_overrides: Dictionary[String, float] = {}
-
-@export_group("Altares")
-## Cuánto sube el peso de los altares por minuto: peso x (1 + esto x minutos).
-@export var altar_weight_per_minute: float = 0.25
-## Tope de ese multiplicador del peso de los altares.
-@export var altar_weight_max_scale: float = 3.0
-## Altares sin usar permitidos a la vez al empezar, contando los de la escena.
-@export var altar_cap_base: int = 3
-## Cada tantos minutos se permite un altar sin usar más.
-@export var altar_cap_minutes: float = 3.0
 
 @export_group("Portal de salida")
 ## Distancia mínima (metros) del portal de salida al jugador más cercano.
@@ -214,19 +129,27 @@ class TimedBeacon:
 @export var exit_portal_announce: String = "Se abrió el portal de salida — crúzalo cuando quieras"
 
 ## El clima activo, o vacío: {id, group, time_left}. Vive en el nodo
-## Weather; scripts/ui/game/hud/weather_badge.gd, event_altar.gd y el probe
+## Weather; scripts/ui/game/hud/weather_badge.gd y el probe
 ## lo leen aquí con get("active_weather").
 var active_weather: Dictionary:
 	get:
 		return _weather.active_weather if _weather != null else {}
+## Todos los climas vivos a la vez (luna, lluvia y desastre pueden coincidir);
+## el chip del HUD los lee con get("active_weathers").
+var active_weathers: Array[Dictionary]:
+	get:
+		var none: Array[Dictionary] = []
+		return _weather.active_weathers if _weather != null else none
 
 ## Reparto de la etapa actual: arena, máscara, puntos ocupados y
 ## muestreos. Uno nuevo por etapa; entre etapas, uno vacío.
 var _layout: StageLayout = null
 ## Un portal de salida por etapa.
 var _exit_portal_spawned: bool = false
-var _event_timer: float = 0.0
-## Balizas vivas (cofres de suministros, altares, manantiales, grietas...).
+## Segundos hasta el próximo pulso por minuto, y pulsos ya dados en la etapa.
+var _beat_timer: float = 0.0
+var _beats_fired: int = 0
+## Balizas vivas (portal de salida, estrella...).
 var _beacons: Array[TimedBeacon] = []
 
 ## El clima (RunSystems.tscn > WorldDirector > Weather).
@@ -251,13 +174,39 @@ func _physics_process(delta: float) -> void:
 	if not events_enabled:
 		return
 	_weather.tick(delta)
-	_event_timer -= delta
-	if _event_timer > 0.0:
+	_tick_beat(delta)
+
+
+## Pulso por minuto: horda o clima al azar; el primero nunca es horda.
+func _tick_beat(delta: float) -> void:
+	# Con un jefe en pie el reloj de la partida se detiene, y el pulso también.
+	if not beat_enabled or RunState.boss_fight_active:
 		return
-	_event_timer = _next_event_gap()
-	# El clima tira DESPUÉS del evento: ese orden es parte del sorteo.
-	_fire_random_event()
-	_weather.maybe_roll()
+	_beat_timer -= delta
+	if _beat_timer > 0.0:
+		return
+	_beat_timer = beat_seconds
+	_beats_fired += 1
+	print("Beat %d at %.1fs" % [_beats_fired, RunState.stage_time])
+	# El HUD junta los avisos de este pulso y los muestra en una sola lista.
+	var tree := get_tree()
+	tree.call_group("hud", "begin_event_batch")
+	tree.call_group("hud", "event_batch_kind", "weather")
+	# Clima asegurado: si los tres canales están ocupados, se corta uno y
+	# empieza otro.
+	if _weather.start_random().is_empty():
+		_weather.start_sky_event(WeatherCatalog.roll_any())
+	# Aparte, la tirada independiente de otro clima en un canal libre.
+	_weather.roll_extra()
+	if horde_and_weather_minutes.has(_beats_fired):
+		tree.call_group("hud", "event_batch_kind", "horde")
+		_start_horde()
+	tree.call_group("hud", "end_event_batch")
+
+
+func _start_horde() -> bool:
+	var spawner := get_tree().get_first_node_in_group(&"enemy_spawner") as EnemySpawner
+	return spawner != null and spawner.start_horde()
 
 
 ## Inicio de etapa: Arena._ready lo llama por el grupo "world_director".
@@ -273,7 +222,8 @@ func on_stage_started(arena: Node3D) -> void:
 	# El clima olvida las luces de la arena anterior y vuelve a buscarlas.
 	_weather.begin_stage(_layout)
 	_beacons.clear()
-	_event_timer = first_event_at
+	_beat_timer = beat_seconds
+	_beats_fired = 0
 	# La niebla y el mapa son por etapa. Se reinician aquí y no con la
 	# señal stage_changed: la etapa 0 también pasa por aquí.
 	var fog := FogOfWar.find(get_tree())
@@ -313,7 +263,7 @@ func beacon_count() -> int:
 
 ## --- puertas del clima -----------------------------------------------------
 ## El clima vive en el nodo Weather; estas puertas siguen aquí porque otros
-## nodos llegan por el grupo "world_director": event_altar.gd, enemy_loot.gd,
+## nodos llegan por el grupo "world_director": enemy_loot.gd,
 ## arena_probe.gd, scripts/ui/game/hud/weather_badge.gd y
 ## scripts/enemies/mythos/hell_transformation.gd.
 
@@ -323,14 +273,9 @@ static func weather_row(id: String) -> Dictionary:
 
 
 ## FUERZA un clima: detiene el que haya y empieza aunque no haya pasado la
-## pausa (el altar de evento, el probe, BONK_WEATHER_NOW).
+## pausa (el probe, BONK_WEATHER_NOW).
 func start_sky_event(kind: String) -> void:
 	_weather.start_sky_event(kind)
-
-
-## Un clima al azar que el altar de evento puede invocar.
-func random_altar_weather() -> String:
-	return _weather.random_altar_weather()
 
 
 ## Un charco de ácido durante la lluvia radiactiva (EnemyBase al morir).
@@ -364,6 +309,8 @@ func _new_layout(arena: Node3D) -> StageLayout:
 	layout.min_distance_from_spawn = min_distance_from_spawn
 	layout.min_distance_between = min_distance_between
 	layout.min_distance_from_keepouts = min_distance_from_keepouts
+	layout.spread_tries = spread_tries
+	layout.same_kind_spread = same_kind_spread
 	return layout
 
 
@@ -392,54 +339,20 @@ func _tick_exit_portal() -> void:
 	print("Exit portal opened at %.1fs" % RunState.run_time)
 
 
-## Minutos de partida; los usan la cadencia de altares y la pausa entre eventos.
-func _minutes() -> float:
-	return RunState.run_time / 60.0
-
-
-## Segundos hasta el próximo evento: la ventana base, acortada con el
-## minuto, nunca por debajo de event_gap_floor.
-func _next_event_gap() -> float:
-	var raw := randf_range(event_gap_min, event_gap_max)
-	return maxf(raw / (1.0 + event_gap_decay_per_minute * _minutes()), event_gap_floor)
-
-
-## Altares sin usar que hay ahora, vengan de la escena o del director
-## (los dos están en el grupo "altars").
-func _unspent_altars() -> int:
-	var count := 0
-	for node: Node in get_tree().get_nodes_in_group("altars"):
-		var available: Variant = node.get("available")
-		if (available is bool and bool(available)) and not node.is_queued_for_deletion():
-			count += 1
-	return count
-
-
-## Tope de altares sin usar: altar_cap_base + minutos / altar_cap_minutes.
-func _altar_cap() -> int:
-	return altar_cap_base + floori(_minutes() / maxf(altar_cap_minutes, 0.001))
-
-
 ## --- eventos ----------------------------------------------------------------
 
 ## Peso de una fila de EVENT_LIBRARY ahora mismo. Un peso 0 saca el evento
 ## del sorteo (sale otro): así un evento que no puede ocurrir no gasta la
-## ventana. Los altares pesan más con el minuto y valen 0 mientras haya
-## demasiados sin usar.
+## ventana.
 func _event_weight(row: Dictionary) -> float:
-	var weight := float(event_weight_overrides.get(row["id"], row["weight"]))
 	if row.has("cap_group") \
 			and get_tree().get_node_count_in_group(row["cap_group"]) >= int(row["cap"]):
 		return 0.0
-	if not bool(row.get("altar", false)) or weight <= 0.0:
-		return weight
-	if _unspent_altars() >= _altar_cap():
-		return 0.0
-	return weight * minf(1.0 + altar_weight_per_minute * _minutes(), altar_weight_max_scale)
+	return float(event_weight_overrides.get(row["id"], row["weight"]))
 
 
-## Sortea una fila de EVENT_LIBRARY por peso y la ejecuta: su `method` si
-## lo tiene, si no pone su `scene`.
+## Sortea una fila de EVENT_LIBRARY por peso y llama a su `method`. Hoy
+## nadie la llama: las filas están guardadas para más adelante.
 func _fire_random_event() -> void:
 	var total := 0.0
 	for row: Dictionary in EVENT_LIBRARY:
@@ -460,51 +373,8 @@ func _fire_random_event() -> void:
 			break
 	if chosen.is_empty():
 		return
-	if chosen.has("method"):
-		call(chosen["method"], chosen)
-	else:
-		_event_spawn_poi(chosen)
-
-
-## Evento simple: el POI de la fila lejos de un jugador. El punto se sortea
-## antes de crear el nodo.
-func _event_spawn_poi(row: Dictionary) -> void:
-	_present_poi(row, _layout.spawn_at(row["scene"], _event_point()))
-
-
-## Altar de carga, altar demoníaco y manantial: el nodo entra al árbol
-## ANTES de sortear su punto, así su cuerpo ya está en la arena (en su
-## origen) mientras la sonda de suelo mide el punto.
-func _event_shrine(row: Dictionary) -> void:
-	var shrine := (row["scene"] as PackedScene).instantiate() as Node3D
-	_layout.stage_parent().add_child(shrine)
-	shrine.global_position = _event_point()
-	_present_poi(row, shrine)
-
-
-## Lo que sigue a poner un POI de evento: su baliza (si la fila tiene
-## beacon_color), su aviso y su línea de log.
-func _present_poi(row: Dictionary, poi: Node3D) -> void:
-	_raise_row_beacon(row, poi.global_position, poi)
-	_announce(String(row["announce"]))
-	if row.has("log"):
-		print(String(row["log"]))
-
-
-## Llega un puesto. El TIPO se sortea aquí y no se nombra en el aviso ni
-## en la baliza: ir a ver cuál es, es el evento.
-func _event_vendor(row: Dictionary) -> void:
-	var vendor := (row["scene"] as PackedScene).instantiate() as Node3D
-	var kind: Dictionary = Vendor.VENDOR_LIBRARY[randi() % Vendor.VENDOR_LIBRARY.size()]
-	# ANTES de entrar al árbol: Vendor._ready lo lee para elegir su texto,
-	# su color y la figura tras el mostrador.
-	vendor.set("kind", String(kind.id))
-	_layout.stage_parent().add_child(vendor)
-	vendor.global_position = _event_point()
-	_raise_row_beacon(row, vendor.global_position, vendor, false,
-			kind.get("color", Color.WHITE))
-	_announce(String(row["announce"]))
-	print("Vendor arrived: %s" % String(kind.id))
+	print("World event: %s at %.1fs" % [String(chosen["id"]), RunState.stage_time])
+	call(chosen["method"], chosen)
 
 
 ## Avistamiento de estrella: lo más raro del mapa cruza el campo. Sale por
@@ -518,18 +388,6 @@ func _event_star(row: Dictionary) -> void:
 	if spawner.call("spawn_powerup_pickup", at + Vector3.UP * 0.6, "star") == null:
 		return
 	_raise_row_beacon(row, at, null)
-	_announce(String(row["announce"]))
-
-
-## Cofre de suministros (SupplyChest.tscn): se hunde si nadie lo abre
-## antes de que se apague su baliza.
-func _event_supply_chest(row: Dictionary) -> void:
-	var chest := (row["scene"] as PackedScene).instantiate() as Chest
-	# add_child ANTES de buscar el punto: Chest._ready sortea la rareza con
-	# el RNG de la partida, y ese orden es parte del sorteo.
-	_layout.stage_parent().add_child(chest)
-	chest.global_position = _event_point()
-	_raise_row_beacon(row, chest.global_position, chest, true)
 	_announce(String(row["announce"]))
 
 
@@ -547,25 +405,6 @@ func _event_elite_pack(row: Dictionary) -> void:
 			"spawn_pressure_burst", anchor.global_position, elite_pack_size, true)
 	if spawned <= 0:
 		return
-	_announce(String(row["announce"]))
-
-
-## Grieta de esencia: un círculo de gemas de XP y un orbe de vida.
-func _event_essence_rift(row: Dictionary) -> void:
-	var center := _event_point()
-	for i in rift_gem_count:
-		var gem := Pools.acquire_scene(XP_GEM_SCENE) as XpGem
-		if gem == null:
-			break
-		gem.xp_value = rift_gem_value
-		var angle := TAU * float(i) / float(rift_gem_count)
-		gem.global_position = center + Vector3(cos(angle), 0.0, sin(angle)) \
-				* randf_range(rift_gem_min_spread, rift_gem_max_spread) + Vector3.UP * 0.6
-	if not HealthOrb.at_soft_cap(get_tree()):
-		var orb := Pools.acquire_scene(Pools.HEALTH_ORB_SCENE) as HealthOrb
-		if orb != null:
-			orb.global_position = center + Vector3.UP * 0.6
-	_raise_row_beacon(row, center, null)
 	_announce(String(row["announce"]))
 
 

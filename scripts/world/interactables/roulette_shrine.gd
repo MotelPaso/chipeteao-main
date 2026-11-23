@@ -1,11 +1,11 @@
 class_name RouletteShrine
 extends Interactable
-## Altar de la ruleta: una ruleta de la fortuna que cobra puntos de partida por
-## giro y abre un menú (RouletteUi) donde el raider gira por uno de los
-## resultados de OUTCOMES, desde un objeto legendario hasta una maldición
-## temporal. La ruleta se puede reusar, pero cada giro DUPLICA el precio para el
-## resto de la partida (RunState.roulette_price_multiplier, de toda la partida
-## como los precios de cofre), así que `price` es la base, nunca lo que se paga.
+## Altar de la ruleta: una ruleta de la fortuna que cobra puntos de partida y
+## abre un menú (RouletteUi) donde el raider gira por uno de los resultados de
+## OUTCOMES. Se usa UNA vez: al girar se gasta y se hunde cuando se cierra el
+## menú (el director puede volver a sacar otra como evento). Cada giro sube
+## el precio un porcentaje (RunState.ROULETTE_PRICE_GROWTH) para el resto de
+## la partida, así que `price` es la base, nunca lo que se paga.
 
 ## Resultados de la ruleta, edita aquí. Campos de cada fila:
 ##   id      llave LÓGICA: apply_outcome decide por ella; no la cambies.
@@ -14,28 +14,28 @@ extends Interactable
 ##           sin esos campos se muestra tal cual.
 ##   weight  peso relativo en el sorteo.
 ##   color   color de la fila; las filas de objeto usan el de su `rarity`.
-##   rarity  (objetos) id de rareza de UpgradePool.RARITIES que se sortea.
 ## Los demás campos son los números del efecto (ver apply_outcome).
 const OUTCOMES: Array[Dictionary] = [
-	{"id": "item_legendary", "label": "Objeto legendario", "weight": 3.0, "rarity": "Legendary"},
-	{"id": "item_epic", "label": "Objeto épico", "weight": 7.0, "rarity": "Epic"},
-	{"id": "item_rare", "label": "Objeto raro", "weight": 14.0, "rarity": "Rare"},
-	{"id": "item_common", "label": "Objeto común", "weight": 18.0, "rarity": "Common"},
-	{"id": "all_stats", "label": "Todas las stats +%d%%", "weight": 9.0,
-			"color": Color(0.3, 0.82, 0.76), "amount": 10.0,
-			"stats": ["damage", "cooldown", "area", "move_speed", "max_hp"]},
-	{"id": "all_weapons", "label": "Todas las armas +%d nivel", "weight": 9.0,
-			"color": Color(0.3, 0.82, 0.76), "levels": 1, "damage_multiplier": 1.15},
-	{"id": "jackpot", "label": "Premio mayor: +%d pts", "weight": 6.0,
-			"color": Color(1.0, 0.78, 0.2), "amount": 120},
-	{"id": "heal", "label": "Curación total", "weight": 8.0, "color": Color(0.36, 0.8, 0.42)},
-	{"id": "debuff", "label": "Maldición: lento y débil %d s", "weight": 12.0,
-			"color": Color(0.92, 0.28, 0.24), "seconds": 20.0,
-			"move_speed": -30.0, "damage": -25.0},
-	{"id": "difficulty", "label": "Dificultad +%d%%", "weight": 8.0,
+	{"id": "difficulty", "label": "Dificultad +%d%%", "weight": 1.0,
 			"color": Color(0.92, 0.28, 0.24), "amount": 15.0},
-	{"id": "enemy_frenzy", "label": "Enemigos más fuertes %d s", "weight": 6.0,
-			"color": Color(0.92, 0.28, 0.24), "seconds": 30.0, "multiplier": 1.5},
+	# amount = % de lo que costó ESTE giro (150 = devuelve 1.5 veces lo pagado).
+	{"id": "jackpot", "label": "Puntos: %d%% de lo que pagaste", "weight": 1.0,
+			"color": Color(1.0, 0.78, 0.2), "amount": 150},
+	# amount = gemas; gem_value = XP de cada una; radios en metros alrededor del raider.
+	{"id": "xp_rain", "label": "Lluvia de XP: %d gemas", "weight": 1.0,
+			"color": Color(0.45, 0.9, 0.6), "amount": 18, "gem_value": 3,
+			"min_spread": 1.5, "max_spread": 6.0},
+	# La rareza se sortea con la suerte del raider, como en un cofre.
+	{"id": "random_item", "label": "Objeto al azar", "weight": 1.0,
+			"color": Color(0.68, 0.32, 0.95)},
+	{"id": "all_stats", "label": "Todas las stats +%d%%", "weight": 1.0,
+			"color": Color(0.3, 0.82, 0.76), "amount": 8.0,
+			# Suma plana: +amount% en las stats de porcentaje y +amount puntos
+			# en vida máx., suerte, armadura y espinas. Saltos y proyectiles no.
+			"stats": ["damage", "cooldown", "area", "move_speed", "crit_chance",
+					"crit_damage", "lifesteal", "evasion", "duration", "xp_gain",
+					"pickup_radius", "powerup_chance", "max_hp", "luck", "armor",
+					"thorns"]},
 ]
 
 ## Campos que pueden llenar el %d de un `label`, en orden de búsqueda.
@@ -47,7 +47,7 @@ const ROULETTE_PANEL_PATH: String = "res://scenes/ui/modal/RoulettePanel.tscn"
 
 @export_group("Precio")
 ## Precio base de un giro, en puntos, antes del multiplicador de la partida.
-@export var price: int = 60
+@export var price: int = 40
 
 @export_group("Rueda")
 ## Giro de la rueda del altar en reposo, en radianes por segundo.
@@ -61,10 +61,14 @@ const ROULETTE_PANEL_PATH: String = "res://scenes/ui/modal/RoulettePanel.tscn"
 
 var _wheel: MeshInstance3D = null
 var _ui: RouletteUi = null
+## Puntos que costó el último giro (el premio «Puntos» paga un % de esto).
+var _last_paid: int = 0
 
 
 func _ready() -> void:
 	super()
+	# El director limita las ruletas en el mapa por este grupo.
+	add_to_group(&"roulettes")
 	_wheel = get_node_or_null("Visual/Wheel") as MeshInstance3D
 	_refresh_prompt_text()
 
@@ -111,23 +115,24 @@ static func outcome_label(outcome: Dictionary) -> String:
 	return label
 
 
-## Color de un resultado: el de su rareza en las filas de objeto (el mismo de
-## las cartas y los cofres), si no el `color` de la fila.
+## Color de un resultado: el `color` de su fila.
 static func outcome_color(outcome: Dictionary) -> Color:
-	if outcome.has("rarity"):
-		return ItemCatalog.rarity_color(String(outcome.rarity))
 	return outcome.get("color", Color.WHITE)
 
 
 ## Cobra el precio y tira; devuelve el resultado (vacío si no alcanza).
 func spin(player: Node) -> Dictionary:
-	if not player.has_method("spend_points") or not bool(player.call("spend_points", current_price())):
+	var paid := current_price()
+	if not player.has_method("spend_points") or not bool(player.call("spend_points", paid)):
 		return {}
+	_last_paid = paid
 	# Primero se cobra y DESPUÉS sube el precio: el siguiente giro (en este altar
-	# o en cualquier otro) cuesta el doble, y el prompt lo vuelve a leer al
+	# o en cualquier otro) cuesta más, y el prompt lo vuelve a leer al
 	# refrescarse.
 	RunState.register_roulette_spin()
-	_refresh_prompt_text()
+	# Un solo uso: se gasta ya y se hunde cuando el menú suelta la pausa.
+	consume()
+	sink_away()
 	SaveData.bump("shrines_used")
 	SaveData.bump("roulette_spins")
 	var outcome := outcome_for(randf())
@@ -143,11 +148,12 @@ func apply_outcome(outcome_id: String, player: Node) -> void:
 	var stats := PlayerStats.find_in(player)
 	var bag := ItemBag.find_in(player)
 	match outcome_id:
-		"item_legendary", "item_epic", "item_rare", "item_common":
+		"random_item":
 			# La rareza es un id (ItemCatalog.roll_id y los precios de cofre se
 			# indexan por ella, por eso queda en inglés); solo el aviso pasa por
 			# rarity_display.
-			var rarity := String(outcome.rarity)
+			var luck := stats.luck if stats != null else 0.0
+			var rarity := String(UpgradePool.roll_rarity(luck).name)
 			var item_id := ItemCatalog.roll_id(rarity)
 			if bag != null and not item_id.is_empty():
 				bag.add_item(item_id)
@@ -158,34 +164,31 @@ func apply_outcome(outcome_id: String, player: Node) -> void:
 			if stats != null:
 				for stat: String in outcome.stats:
 					stats.add_altar_boon(stat, float(outcome.amount))
-		"all_weapons":
-			var mount := player.get_node_or_null("Weapons")
-			if mount != null:
-				for child: Node in mount.get_children():
-					var weapon := child as WeaponBase
-					if weapon != null:
-						weapon.damage *= float(outcome.damage_multiplier)
-						weapon.upgrade_level += int(outcome.levels)
-						EvolutionCatalog.try_advance_by_level(weapon, player)
 		"jackpot":
-			player.call("add_points", int(outcome.amount))
-		"heal":
-			var health := Health.find_in(player)
-			if health != null:
-				health.heal_full()
-		"debuff":
-			if stats != null:
-				stats.add_timed_boon("move_speed", float(outcome.move_speed),
-						float(outcome.seconds))
-				stats.add_timed_boon("damage", float(outcome.damage), float(outcome.seconds))
+			player.call("add_points", roundi(float(_last_paid) * float(outcome.amount) / 100.0))
+		"xp_rain":
+			_rain_xp(outcome, player as Node3D)
 		"difficulty":
 			# `amount` está en por ciento, como en su texto.
 			RunState.add_difficulty(float(outcome.amount) / 100.0, "roulette")
-		"enemy_frenzy":
-			get_tree().call_group("enemy_spawner", "apply_temp_enemy_buff",
-					float(outcome.multiplier), float(outcome.seconds))
 		_:
 			push_warning("RouletteShrine: unknown outcome '%s'" % outcome_id)
+
+
+## Un anillo de gemas de XP alrededor del raider.
+func _rain_xp(outcome: Dictionary, player: Node3D) -> void:
+	if player == null:
+		return
+	var count := int(outcome.amount)
+	for i in count:
+		var gem := Pools.acquire_scene(Pools.XP_GEM_SCENE) as XpGem
+		if gem == null:
+			break
+		gem.xp_value = int(outcome.gem_value)
+		var angle := TAU * float(i) / float(count)
+		gem.global_position = player.global_position + Vector3.UP * 0.6 \
+				+ Vector3(cos(angle), 0.0, sin(angle)) \
+				* randf_range(float(outcome.min_spread), float(outcome.max_spread))
 
 
 func _refresh_prompt_text() -> void:

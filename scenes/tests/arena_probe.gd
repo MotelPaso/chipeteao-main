@@ -47,9 +47,8 @@ extends Node
 ##   BONK_POWERUP_BOOST=1   multiplica la probabilidad de drop por muerte (lo lee
 ##                          EnemySpawner), para que aparezcan drops en un soak
 ##   BONK_POI_NOW=a,b,c     crea esos POI a 8 m del raider a los 20 s
-##                          (vendor_items, vendor_powerups, vendor_animals,
-##                          pet_box, event_altar, lucky_block); el ritmo del
-##                          director tardaría muchos minutos en ofrecer los seis.
+##                          (vendor_items, spring,
+##                          lucky_block).
 ##                          Los repetidos cuentan: seis lucky_block crean seis bloques
 ##   BONK_LUCKY_REWARD=a,b  cola de ids de recompensa que pagan los lucky blocks
 ##                          sucesivos en vez de sortear (la última entrada se
@@ -214,8 +213,6 @@ var _down_now_at: float = -1.0
 var _down_next: float = 0.0
 var _party_downs: int = 0
 var _party_revives: int = 0
-## Última lectura de mascotas tomada con la partida viva (ver _party_pets_text).
-var _party_pets_seen: String = "none"
 ## instance ids que están en "downed_players", para contar una transición
 ## una vez y no en cada frame.
 var _down_seen: Dictionary[int, bool] = {}
@@ -303,7 +300,7 @@ var _perf: PerfMeter = null
 ## Máximo de cofres de recompensa de élite sin abrir vistos a la vez en el
 ## mapa, muestreado con la línea de frame. Se compara con EnemyBase.BOUNTY_CHEST_CAP.
 var _bounty_chests_max: int = 0
-## instance ids ya contados en los grupos de vendedor / caja de mascota /
+## instance ids ya contados en los grupos de vendedor /
 ## lucky block, para que un nodo dé una sola foto aunque siga ahí.
 var _shot_seen: Dictionary[int, bool] = {}
 ## Ids de power-up que llevaba el líder en la última muestra; uno nuevo es un pickup.
@@ -439,18 +436,12 @@ const TIME_STOP_SAMPLE: int = 3
 ## Nada debería moverse; esto es ruido de punto flotante, no algo que ajustar.
 const TIME_STOP_EPSILON: float = 0.01
 
-## Soak de vuelo: mantener salto tanto tiempo, cada tanto (segundos). Lo
-## bastante para subir al techo y pasar sobre las celdas bloqueadas para las
-## que existe la regla de aterrizaje.
-const FLIGHT_HOLD_PERIOD: float = 15.0
-const FLIGHT_HOLD_TIME: float = 5.0
-var _flight_holding: bool = false
 
-## El tope de sirvientes actual, sumado sobre TODO el grupo, o 0 si nadie
-## lleva el báculo. Se lee del arma para que una carta de mejora o la
-## evolución lo muevan, y para que el possessed=a/b del soak pruebe que a
-## nunca supera a b. Es del grupo y no del líder porque possessed= cuenta
-## cada sirviente del grupo.
+## El tope de sirvientes actual, sumado sobre TODO el grupo, o 0 si ninguna
+## arma lleva `max_possessed` (hoy ninguna levanta siervos). Se lee por
+## nombre del arma, para que el possessed=a/b del soak pruebe que a nunca
+## supera a b. Es del grupo y no del líder porque possessed= cuenta cada
+## sirviente del grupo.
 func _possession_cap() -> int:
 	var cap := 0
 	for body: Node3D in _party_bodies():
@@ -458,16 +449,16 @@ func _possession_cap() -> int:
 		if mount == null:
 			continue
 		for child: Node in mount.get_children():
-			var staff := child as NecroStaff
-			if staff != null:
-				cap += staff.max_possessed
+			var weapon_cap: Variant = child.get(&"max_possessed")
+			if weapon_cap != null:
+				cap += int(weapon_cap)
 	return cap
 
 
 ## BONK_ITEM_NOW: ítems que se dan al slot 0 una vez, en este tiempo de partida.
 const ITEM_NOW_AT: float = 10.0
-## Con esa variable el recorrido hace DASH a este ritmo (segundos). El cinturón
-## eléctrico no tiene otro disparador, y la caminata normal nunca hace dash (el
+## Con esa variable el recorrido hace DASH a este ritmo (segundos), para los
+## objetos que reaccionan al derrape; la caminata normal nunca hace dash (el
 ## dash es sprint mantenido más un deseo de movimiento).
 const ITEM_DASH_PERIOD: float = 3.0
 ## Sprint debe mantenerse a través de un borde de frame (segundos) para que
@@ -885,7 +876,6 @@ func _exit_tree() -> void:
 	# Cuenta co-op. Cero/cero en un soak solo, que es la lectura honesta: nada
 	# cayó y nada se levantó.
 	print("Party: downs=%d revives=%d" % [_party_downs, _party_revives])
-	print("Party pets: %s" % _party_pets_seen)
 	_boss_probe.summary()
 	_relief.report()
 	_mini_probe.summary()
@@ -919,25 +909,7 @@ func _exit_tree() -> void:
 
 
 
-## Un campo por slot: la mascota que lleva cada raider. Se muestrea CON LA
-## PARTIDA VIVA, como la fracción de niebla, porque _exit_tree corre en el
-## cierre cuando los raiders ya no están.
-## El vendedor y la caja de mascota le dan la mascota a quien pagó, y en
-## co-op es la única forma de ver que el pago llegó al comprador.
-func _party_pets_text() -> String:
-	var text := ""
-	for body: Node3D in _party_bodies():
-		var pet: Variant = body.get("pet_id")
-		var id := String(pet) if pet != null else ""
-		text += "p%d=%s " % [int(body.get("player_index")),
-				id if not id.is_empty() else "none"]
-	return text.strip_edges() if not text.is_empty() else "none"
-
-
 func _sample_blocked_hits() -> void:
-	var pets := _party_pets_text()
-	if pets != "none":
-		_party_pets_seen = pets
 	var lead := _lead_player()
 	if lead == null:
 		return
@@ -1009,8 +981,8 @@ func _periodic_shot_stem() -> String:
 
 ## Los eventos de la partida que valen un frame cada uno, leídos del ÁRBOL y
 ## no de los print de los sistemas (un print no es algo a lo que otro nodo se
-## pueda suscribir). Un vendedor es un miembro nuevo de su grupo; la caja de
-## mascota y el lucky block se anuncian con la señal de Interactable que ya
+## pueda suscribir). Un vendedor es un miembro nuevo de su grupo; el lucky
+## block se anuncia con la señal de Interactable que ya
 ## emiten; un power-up es un id que el líder no llevaba en la muestra anterior.
 func _watch_shot_events() -> void:
 	if not _camera.enabled():
@@ -1021,7 +993,6 @@ func _watch_shot_events() -> void:
 			continue
 		_shot_seen[id] = true
 		_request_shot("vendor_%s" % String(node.get("kind")))
-	_watch_shot_interactables(&"pet_boxes", "petbox")
 	_watch_shot_interactables(&"lucky_blocks", "lucky")
 	var lead := _lead_player()
 	var powerups := PowerUps.find_in(lead) if lead != null else null
@@ -1148,7 +1119,6 @@ func _tick_powerup_switches() -> void:
 		var powerups := PowerUps.find_in(lead)
 		if powerups != null and not powerups.is_active(_powerup_now):
 			powerups.apply(_powerup_now)
-	_tick_flight_hold()
 	_tick_poi_now()
 	_tick_weather_now()
 	_watch_weather_end()
@@ -1165,23 +1135,8 @@ func _tick_powerup_switches() -> void:
 				star.set("roaming", false)
 
 
-## Vuelo hay que VOLARLO para probarlo: el power-up solo hace algo mientras
-## se mantiene la acción de salto. Depende de la variable que lo entregó:
-## los demás soaks conservan la caminata normal, porque un recorrido que
-## salta cada quince segundos sería otro recorrido.
-func _tick_flight_hold() -> void:
-	if _powerup_now != "flight":
-		return
-	var cycle := fmod(RunState.run_time, FLIGHT_HOLD_PERIOD)
-	var want_hold := cycle < FLIGHT_HOLD_TIME
-	if want_hold == _flight_holding:
-		return
-	_flight_holding = want_hold
-	_send_action(0, &"jump", want_hold)
-
-
 ## BONK_ITEM_NOW: da los ítems de la lista una vez y luego mantiene al
-## recorrido haciendo dash para que el cinturón eléctrico tenga con qué disparar.
+## recorrido haciendo dash para los objetos que reaccionan al derrape.
 func _tick_item_now(delta: float) -> void:
 	if _item_now.is_empty():
 		return
@@ -1342,13 +1297,11 @@ func _tick_poi_now() -> void:
 ## Un POI por nombre, o null si el nombre no es uno que esta variable conozca.
 func _build_poi(poi: String) -> Node3D:
 	match poi:
-		"pet_box":
-			return load("res://scenes/world/PetBox.tscn").instantiate() as Node3D
-		"event_altar":
-			return load("res://scenes/world/shrines/EventAltar.tscn").instantiate() as Node3D
+		"spring":
+			return load("res://scenes/world/shrines/SpringShrine.tscn").instantiate() as Node3D
 		"lucky_block":
 			return load("res://scenes/world/chests/LuckyBlock.tscn").instantiate() as Node3D
-		"vendor_items", "vendor_powerups", "vendor_animals":
+		"vendor_items":
 			var vendor := load("res://scenes/world/Vendor.tscn").instantiate() as Node3D
 			# Se define antes de entrar al árbol: Vendor._ready lo lee.
 			vendor.set("kind", poi.trim_prefix("vendor_"))

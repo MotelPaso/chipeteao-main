@@ -7,17 +7,17 @@ extends WeaponBase
 ## Escena del bumerán que se lanza (BoomerangProjectile.tscn).
 @export var projectile_scene: PackedScene
 ## Multiplicador de la distancia de vuelo antes de dar la vuelta ("Vuelo lejano" y los tomos de área lo estiran).
-@export var travel_scale: float = 1.0
+@export var travel_scale: float = 1.25
 ## Altura sobre este montaje desde la que se lanza la hoja, en metros.
 @export var throw_height: float = 0.0
 ## Escala de la hoja, visual y área de corte (1 = tamaño de la escena). Las mejoras de arma la suben.
 @export var blade_scale: float = 1.0
+## Cuánto se nota cada punto de blade_scale sobre 1. Con 2.5, un blade_scale de 2.0 (200%) hace la hoja 3.5 veces más grande (350%); con 1 crece tal cual.
+@export var size_growth: float = 2.5
 
 @export_group("Multitud")
 ## Segundos entre las hojas extra del Tomo de Multitud; lanzadas juntas volarían la misma línea y solo la primera tocaría algo.
 @export var extra_stagger: float = 0.11
-## Grados entre hojas vecinas de una ráfaga, para que cada extra barra su propio pasillo.
-@export var extra_fan_deg: float = 20.0
 
 
 func fire(target: Node3D) -> void:
@@ -28,8 +28,8 @@ func fire(target: Node3D) -> void:
 	# miramos, y hacia FORWARD si nuestro frente también es vertical.
 	var center_dir := flat_dir_or(target.global_position - global_position,
 			flat_dir_or(-global_transform.basis.z, Vector3.FORWARD))
-	fire_volley(maxi(effective_projectile_count(), 1), center_dir, _throw_blade,
-			extra_stagger, extra_fan_deg)
+	fire_volley(maxi(effective_projectile_count(), 1), target, center_dir, _throw_blade,
+			extra_stagger)
 
 
 ## Lanza una hoja por `throw_dir`.
@@ -40,6 +40,12 @@ func _throw_blade(throw_dir: Vector3) -> void:
 		return
 	# Se escribe en cada lanzamiento: la hoja viene del pool y conserva la
 	# escala de su uso anterior.
-	blade.scale = Vector3.ONE * blade_scale
+	blade.scale = Vector3.ONE * blade_size()
 	blade.launch(self, global_position + Vector3.UP * throw_height, throw_dir,
 			attack_range * travel_scale * area_scale())
+
+
+## Tamaño real de la hoja: blade_scale con su crecimiento amplificado por
+## size_growth, así cada mejora de tamaño se nota más.
+func blade_size() -> float:
+	return maxf(1.0 + (blade_scale - 1.0) * size_growth, 0.1)

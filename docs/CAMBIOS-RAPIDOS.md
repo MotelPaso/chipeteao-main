@@ -14,7 +14,7 @@ quieres cambiar, abre el archivo o la escena que indica y cambia el valor.
    su propio valor. Ese es el que vale en el juego, no el que trae el script.
    Si cambiaste un script y no pasó nada, busca esa flechita.
 3. **Los catálogos** (`scripts/systems/catalogs/`) son listas de filas:
-   personajes, armas, cartas, objetos, misiones, mascotas, reliquias, mapas.
+   personajes, armas, cartas, objetos, misiones, reliquias, mapas.
    Al comienzo de cada archivo dice qué campos puedes cambiar sin miedo y
    cuáles son llaves internas. **Nunca cambies un `id`**: es la llave del
    guardado y de las misiones. Para el nombre que ve el jugador está
@@ -44,8 +44,9 @@ golpe fue normal, crítico o una esquiva.
 | Velocidad al caminar | `scenes/player/Player.tscn` > Player (grupo «Movimiento») | `move_speed` (m/s) |
 | Aceleración en el suelo y en el aire | Player.tscn > Player («Movimiento») | `acceleration`, `air_acceleration` |
 | Altura del salto | Player.tscn > Player («Movimiento») | `jump_velocity` |
-| Velocidad, duración y espera del derrape | Player.tscn > Player (grupo «Derrape») | `slide_speed_multiplier`, `slide_duration`, `slide_cooldown` |
+| Derrape (deslizarse agachado mientras se mantiene la tecla; acelera en bajada y frena en plano): arranque, fricción, pendiente, tope, giro, espera | Player.tscn > Player (grupo «Derrape») | `slide_start_speed_multiplier`, `slide_friction`, `slide_gravity_scale`, `slide_max_speed_multiplier`, `slide_steer_rate`, `slide_snap_length`, `slide_cooldown` |
 | Cuántas armas o tomos distintos puede llevar | Player.tscn > Player (grupo «Inventario») | `max_weapons`, `max_tomes` |
+| Empujón al jugador cuando le pegan | Player.tscn > Knockback (grupo «Empujón al recibir golpe») | `push_speed`, `push_lift`, `min_interval` |
 | Vida del raider | Player.tscn > nodo `Health` | `max_hp` |
 | Daño crítico base | Player.tscn > nodo `Stats` | `base_crit_damage` |
 | Sensibilidad del mouse y ángulos de cámara | Player.tscn > CameraRig | `mouse_sensitivity`, `initial_pitch_deg`, `min_pitch_deg`, `max_pitch_deg`, `spring_length` |
@@ -53,9 +54,8 @@ golpe fue normal, crítico o una esquiva.
 | Cámara en primera persona y órbita libre | Player.tscn > CameraRig (grupos «Primera persona», «Órbita libre») | `first_person_*`, `free_orbit_*` |
 | Radio y tiempo para revivir a un compañero (co-op) | Player.tscn > Revive | `revive_radius`, `revive_time`, `revive_heal_fraction` |
 | Texto, color y tamaño del cartel «CAÍDO» | Player.tscn > Revive > RevivePrompt | `down_text`, `reviving_text`, `down_color`, `reviving_color`, `font_size` |
-| Power-up Vuelo (subida, techo, planeo) | Player.tscn > Flight | `flight_rise_speed`, `flight_ceiling`, `flight_fall_speed` |
-| Aviso cuando llega o se va una mascota | Player.tscn > PetSlot | `joins_text`, `leaves_text` |
 | Respiración, inclinación y rebote de la foca | `scenes/player/SealRig.tscn` > SealRig | `breathe_*`, `lean_max`, `bob_amount`, `bob_speed`, `reference_speed` |
+| Cuánto se inclina el personaje siguiendo la pendiente del terreno (los charcos, ondas y discos de las armas también la siguen, `GroundAlign`) | `scenes/player/SealRig.tscn` > SealRig (grupo «Pendiente») | `slope_follow` (1 = pegado a la ladera, 0 = siempre derecho), `slope_max_degrees` (35), `slope_damp_rate` (5: menos = más suave) |
 | Estiramiento al saltar y aplastado al derrapar | SealRig.tscn > SealRig | `stretch_max`, `slide_squash`, `slide_spread` |
 | Caída de cara al morir | SealRig.tscn > SealRig (grupo «Muerte») | `death_lift`, `death_duration`, `death_tilt`, `death_squash` |
 
@@ -68,28 +68,35 @@ grupos con su nombre.
 | Qué quieres cambiar | Dónde | Qué propiedad |
 | --- | --- | --- |
 | Daño, enfriamiento y alcance de un arma | `scenes/weapons/<Arma>.tscn` > raíz (grupo «Estadísticas») | `damage`, `cooldown`, `attack_range`, `projectile_count` |
-| Cómo se reparten los disparos extra del Tomo de Multitud | `<Arma>.tscn` > raíz (grupo «Multitud»); Pistola de dardos y Arco de caza: grupos «Dardos» / «Flechas» | `extra_stagger` (segundos entre extras), `extra_fan_deg`; `fan_spread_deg` |
-| Color o forma del efecto de un arma | `<Arma>.tscn` > raíz, la malla del grupo (`flask_mesh`, `beam_mesh`, `orb_mesh`, `cloud_mesh`, `puddle_mesh`, `bolt_mesh`); el Aura: `Aura.tscn` > `Disc` > `mesh` > material | su material: `albedo_color` (color y opacidad); son sin sombreado (la emisión no se ve), salvo `flask_mesh`: sombreado, su color es `albedo_color` más `emission`. En `bolt_mesh` solo cuenta la opacidad: el color sale de `assets/enemies/enemy_look.tres` > `possessed_color` |
+| Cuánto empuja y frena a los enemigos cada golpe de un arma (la espada empuja, el pararrayos solo frena, la baba frena mientras la pisan) | `scenes/weapons/<Arma>.tscn` > raíz (grupo «Impacto») | `hit_push` (m/s), `hit_slow` (velocidad que les queda), `hit_slow_seconds` |
+| Cuánto se dejan empujar los enemigos y los jefes | `scripts/enemies/enemy_base.gd` (grupo «Impacto») y `boss_base.gd` («Impacto de jefe») | `push_taken` (1), `push_decay`, `boss_push_taken` (0: los jefes no se empujan), `boss_ignores_slow` (los jefes no se frenan) |
+| Cuánto se inclinan los enemigos con la pendiente que pisan (los jefes no) | `scripts/enemies/enemy_base.gd` (grupo «Pendiente») | `slope_follow`, `slope_max_degrees`, `slope_damp_rate` |
+| Resistencia de los enemigos a frenazos seguidos (cuanto más tiempo frenados, menos los frenan; se les pasa al soltarlos) | `scripts/enemies/enemy_base.gd` (grupo «Impacto») | `slow_resist_build` (0.4 por segundo), `slow_resist_max` (0.75), `slow_resist_recovery` (0.25 por segundo) |
+| Cuánto rinde el robo de vida con todas las armas | `scripts/weapons/weapon_base.gd` (grupo «Robo de vida») | `lifesteal_scale` (0.5 = la mitad) |
+| Cómo se reparten los disparos extra del Tomo de Multitud | `<Arma>.tscn` > raíz (grupo «Multitud»); Pistola de dardos y Arco de caza: grupos «Dardos» / «Flechas» | `extra_stagger` (segundos entre extras); los extras van al mismo blanco (si muere, al más cercano), salvo el Arco de caza, que reparte sus flechas entre enemigos |
+| Rebotes de la Pistola de dardos (cuántos, alcance del salto, destello) | `scripts/weapons/dart_pistol.gd` (grupo «Dardos») | `bounces` (1 de base), `bounce_range` (metros), `bounce_flash` |
+| Cuánto se agranda el Bumerán con cada mejora de tamaño | `scripts/weapons/boomerang.gd` (grupo «Lanzamiento») | `size_growth` (2.5: un 200% de tamaño se ve como 350%; 1 = sin amplificar) |
+| Color o forma del efecto de un arma | `<Arma>.tscn` > raíz, la malla del grupo (`flask_mesh`, `beam_mesh`, `orb_mesh`, `wave_mesh`, `puddle_mesh`, `bolt_mesh`); el Aura: `Aura.tscn` > `Disc` > `mesh` > material | su material: `albedo_color` (color y opacidad); son sin sombreado (la emisión no se ve), salvo `flask_mesh`: sombreado, su color es `albedo_color` más `emission`. En `bolt_mesh` solo cuenta la opacidad: el color sale de `assets/enemies/enemy_look.tres` > `possessed_color` |
 | Espada corta | `Shortsword.tscn` > Shortsword | `arc_angle_deg`, `swing_time`, `slash_color`, `spark_color` |
 | Dagas gemelas | `TwinDaggers.tscn` > TwinDaggers | `slash_time`, `slash_radius`, `slash_color`, `slash_sweep_deg` |
 | Orbes espirituales (tamaño visual, tamaño de golpe, velocidad) | `SpiritOrbs.tscn` > SpiritOrbs (grupo «Orbes») | `orb_radius`, `hit_radius`, `orbit_speed`, `orb_height` |
 | Kamehameha (largo, ancho, sacudida, cámara lenta) | `Kamehameha.tscn` > Kamehameha (grupos «Rayo», «Sensación») | `beam_length`, `beam_width`, `shake_strength`, `hit_stop_time` |
-| Báculo de nigromante (siervos y rayo) | `NecroStaff.tscn` > NecroStaff (grupos «Siervos», «Rayo de alma») | `possess_duration`, `max_possessed`, `bolt_speed`, `bolt_lifetime` |
-| Vial de sangre (lanzamiento y charco) | `BloodVial.tscn` > BloodVial (grupos «Frasco», «Charco») | `lob_time`, `arc_height`, `pool_radius`, `pool_ticks`, `heal_fraction` |
+| Vial de sangre (lanzamiento y charco) | `BloodVial.tscn` > BloodVial (grupos «Frasco», «Charco») | `lob_time`, `arc_height`, `pool_radius`, `pool_ticks` |
+| Vial de sangre: probabilidad de ganar vida máxima cuando un enemigo muere sobre un charco (lo mate quien lo mate) y cuánta | `BloodVial.tscn` > BloodVial (grupo «Vida máxima») | `max_hp_chance` (0.5 = 0,5%), `max_hp_gain` (1) |
 | Latido del charco del Vial de sangre | `scenes/fx/BloodPool.tscn` > raíz (grupo «Animación») | `throb_time`, `throb_spread`, `throb_height` |
 | Rastro de baba | `SlimeTrail.tscn` > SlimeTrail (grupos «Charco», «Visual») | `puddle_radius`, `puddle_life`, `tick_interval` |
-| Hedor (veneno, ralentización, nube) | `Stench.tscn` > Stench | `poison_damage_fraction`, `slow_multiplier`, `cloud_*` |
+| Hedor (veneno, ralentización, onda) | `Stench.tscn` > Stench | `poison_damage_fraction`, `slow_multiplier`, `wave_*` |
+| Tamaño de área de todas las armas a la vez | `scripts/weapons/weapon_base.gd` (grupo «Área») | `base_area_scale` (0.8 = 80%) |
 | Aura y Hedor: cuánto crece el campo con Multitud | `Aura.tscn` / `Stench.tscn` > raíz (grupo «Multitud») | `radius_per_extra`, `pulse_per_extra` |
 | Pararrayos (cadena) | `StormRod.tscn` > StormRod (grupo «Cadena») | `chain_count`, `chain_range` |
-| Látigo de espinas | `ThornWhip.tscn` > ThornWhip | `strip_width`, `slow_percent`, `slow_duration` |
-| Vara de brasas | `EmberWand.tscn` > EmberWand | `burst_radius` |
+| Vara de brasas (bola de fuego, explosión y quemadura) | `EmberWand.tscn` > EmberWand | `projectile_speed`, `burst_radius`, `burn_damage_fraction`, `burn_duration` |
+| Tamaño y color de la bola de fuego de la Vara de brasas | `EmberBall.tscn` > `Tracer` (bola) y `Tracer/Core` (núcleo), y `CollisionShape3D` (tamaño del choque) | `radius`/`height` de cada malla, `albedo_color` de su material |
 | Bumerán | `Boomerang.tscn` y `BoomerangProjectile.tscn` | `travel_scale`; `speed`, `spin_speed` |
 | Velocidad, rastreo y perforación de los dardos | `Projectile.tscn` > raíz | `speed`, `homing_enabled`, `pierce_remaining` |
 | Velocidad y rastreo de las flechas | `Arrow.tscn` > raíz | `speed`, `homing_enabled` |
 | Perforación de las flechas | `HuntingBow.tscn` > raíz | `pierce_count` (reemplaza el `pierce_remaining` de cada flecha) |
-| Destello del disparo, tajos y latigazo | `scenes/fx/MuzzleFlash.tscn`, `SlashArc.tscn`, `WhipCrack.tscn` > raíz | sus grupos de forma y tiempo |
-| Daño, rebotes y alcance del rayo del Cinturón eléctrico | `scripts/weapons/belt_bolt.gd` (bloque «Edita aquí») | `BELT_DAMAGE`, `DAMAGE_PER_EXTRA_COPY`, `BASE_BOUNCES`, `FIRST_RANGE`, `BOUNCE_RANGE` (si cambias `BASE_BOUNCES`, cambia también el «4» de la descripción de la fila `electric_belt` en `item_catalog.gd`) |
-| Rayo del Pararrayos y del Cinturón eléctrico | `scenes/fx/LightningBeam.tscn` > raíz (grupos «Pararrayos», «Cinturón eléctrico») | `storm_mesh` / `belt_mesh` (radio, y color en `albedo_color` de su material), `*_fade_time`, `*_fade_scale` |
+| Destello del disparo y tajos | `scenes/fx/MuzzleFlash.tscn`, `SlashArc.tscn` > raíz | sus grupos de forma y tiempo |
+| Rayo del Pararrayos | `scenes/fx/LightningBeam.tscn` > raíz (grupo «Pararrayos») | `storm_mesh` (radio, y color en `albedo_color` de su material), `storm_fade_time`, `storm_fade_scale` |
 | Nombre, sigla, carta propia, evolución | ver «Personajes, armas, cartas y progreso» | |
 
 ## Enemigos y jefes
@@ -100,16 +107,24 @@ grupos con su nombre.
 | Velocidad, giro y empuje entre enemigos | `<Enemigo>.tscn` > raíz (grupo «Movimiento») | `move_speed`, `turn_speed`, `separation_strength` |
 | Puntos que paga | `<Enemigo>.tscn` > raíz (grupo «Recompensa») | `points_value` |
 | Daño de contacto | `<Enemigo>.tscn` > raíz | `contact_damage` |
+| Cuerpo del enemigo básico (Grunt = zombi oficinista): tamaño, giro y caminata | `assets/models/enemies/zombie/zombie.tscn` (raíz: `walk_animation`, `walk_speed_scale`, `desync_start`; nodo `Model`: escala 100 = 1,6 m de alto) | el modelo y sus texturas viven todos en `assets/models/enemies/zombie/` |
+| Suavizado de bordes (antialiasing) de todo lo 3D | Proyecto > Configuración del proyecto > Rendering > Anti Aliasing (`project.godot`) | `msaa_3d` (2 = 4x; 0 = apagado, 1 = 2x, 3 = 8x) |
+| Borde negro de los enemigos (no los jefes ni los personajes jugables): color y grosor; para dárselo a los jefes, `boss_outline_enabled` en `boss_base.gd` | `assets/materials/outline.tres` (Shader Parameters) | `outline_color`, `width` (en metros) |
+| Quitarle el borde a un enemigo puntual (por ejemplo uno hecho de planos finos) | `<Enemigo>.tscn` > raíz (grupo «Borde») | `outline_enabled` |
 | Si un enemigo se puede poseer o trepar | `<Enemigo>.tscn` > raíz (grupos «Posesión», «Trepar») | `possessable`, `can_climb`, `max_climb_height` |
 | Fuerza de los shiny (vida, velocidad, daño, XP) | `scripts/enemies/enemy_base.gd` (grupo «Shiny») o la escena del enemigo | `elite_*` |
-| Colores del shiny, del veneno, de los poseídos y la animación de muerte | `assets/enemies/enemy_look.tres` (ábrelo en el Inspector) | grupos Shiny, Veneno, Poseído, Muerte; `possessed_color` tiñe también el rayo del Báculo de nigromante |
+| Probabilidad de que un shiny suelte un cofre o un orbe de vida | `scripts/enemies/enemy_base.gd` (grupo «Shiny») | `elite_chest_chance` (0.01 = 1%, fija), `elite_health_orb_chance` |
+| Cuántos enemigos salen shiny (al empezar y al minuto lleno; la dificultad no lo sube) | `scripts/systems/enemy_spawner.gd` | `elite_start_chance` (0.04), `elite_full_chance` (0.1), `ELITE_CHANCE_CAP` (0.25) |
+| Cuánto sube el daño de los jefes con la dificultad (su vida sube completa) | `scripts/systems/enemy_spawner.gd` (grupo «Co-op», junto a la vida de jefe por jugador; ningún mapa lo pisa) | `boss_damage_difficulty_share` (0.3) |
+| Cuánto sube el daño de los enemigos normales con la dificultad, y su daño máximo | `scripts/systems/enemy_spawner.gd` (grupo «Daño de enemigos») | `enemy_damage_difficulty_share` (0.4), `enemy_damage_multiplier_cap` (3 = pegan como mucho x3; el shiny x1.5 aparte) |
+| Colores del shiny, del veneno, de la quemadura, de los poseídos y la animación de muerte | `assets/enemies/enemy_look.tres` (ábrelo en el Inspector) | grupos Shiny, Veneno, Quemadura, Poseído, Muerte; `possessed_color` tiñe también el rayo del Báculo de nigromante |
 | Luna de sangre y eclipse (velocidad, daño, vida, color) | `scripts/enemies/enemy_base.gd`, tabla `VARIANTS` al comienzo | filas `berserker` y `shade` |
 | Altura a la que apuntan las armas | `scripts/enemies/enemy_base.gd` (grupo «Puntería») o la escena del enemigo | `aim_height` |
 | Colores de los avisos y del impacto de un jefe, temblor y destello | `scenes/enemies/<Jefe>.tscn` > raíz (grupo «Telegrafía») | `telegraph_color`, `impact_color`, `impact_shake_strength`, `impact_shake_duration`, `impact_flash_time` (los ataúdes del Sarcognato usan `coffin_telegraph_color` y `coffin_shake_*`; el parpadeo del Espectro de la Ciénaga, `blink_shake_*`; el escupitajo del Larvón, `glob_flash_time`; el mordisco del Cofre Mímico, `snap_flash_time`) |
 | Avisos, impacto y arena del Excavadunas | `scenes/enemies/Duneburrower.tscn` > raíz (grupo «Telegrafía») | `telegraph_color`, `impact_color`, `impact_flash_time`, `impact_shake_*`, `sand_burst_*` |
 | Llegada de un jefe (anillo y aparición) | `scripts/enemies/boss_base.gd` (grupo «Llegada compartida») o `<Jefe>.tscn` > raíz | `entrance_ring_time`, `entrance_pop_time`, `entrance_start_scale`; `entrance_ring_radius` (Sarcognato, Larvón, Cofre Mímico) |
-| Lo que paga un jefe al morir | `<Jefe>.tscn` > raíz | `boss_gem_count`, `boss_gem_value`, `health_orb_count`, `base_chest_drops` |
-| Dónde caen las gemas, los orbes y los cofres de un jefe, y la suerte de cofre por altar demoníaco | `scripts/enemies/boss_base.gd` (grupos «Pago» y «Cofres»; vale para todos los jefes) o `<Jefe>.tscn` > raíz para uno solo | `gem_ring_radius`, `orb_ring_radius`, `chest_ring_radius`, `chest_luck_per_demonic` |
+| Lo que paga un jefe al morir | `<Jefe>.tscn` > raíz | `boss_gem_count`, `boss_gem_value`, `health_orb_count`, `lucky_block_drops` (2 bloques de la suerte) |
+| Dónde caen las gemas, los orbes y los bloques de la suerte de un jefe | `scripts/enemies/boss_base.gd` (grupos «Pago» y «Bloques de la suerte»; vale para todos los jefes) o `<Jefe>.tscn` > raíz para uno solo | `gem_ring_radius`, `orb_ring_radius`, `drop_ring_radius` |
 | Púas de corteza (Rey Pútrido) y de arenisca (Sarcognato) | `scenes/enemies/BarkSpikes.tscn` / `SandSpikes.tscn` | la malla y el material de `Spike1`; tiempos en la raíz |
 | Animación del Rey Pútrido (inclinación del Aplastón, inflado del rugido) | `scenes/enemies/Rotking.tscn` > raíz (grupos «Aplastón», «Invocación») | `smash_lean_angle`, `smash_straighten_time`, `summon_roar_scale`, `summon_swell_fraction` |
 | Aplastado del Espectro de la Ciénaga al hundirse | `scenes/enemies/Fenwraith.tscn` > raíz (grupo «Hundirse y emerger») | `blink_sink_squash`, `blink_sink_fraction` |
@@ -117,7 +132,7 @@ grupos con su nombre.
 | Tapa y entierro del Cofre Mímico | `scenes/enemies/CofferMimic.tscn` > raíz (grupos «Mordisco», «Enterrarse») | `lid_gape_angle`, `snap_lid_close_time`, `bury_lid_close_time`, `bury_rise_time`, `bury_lid_open_time` |
 | Estirón del Excavadunas al salir del suelo | `scenes/enemies/Duneburrower.tscn` > raíz (grupo «Erupción») | `erupt_pop_scale`, `erupt_pop_time` |
 | Espera del muñeco de práctica antes de reaparecer | `scenes/enemies/TargetDummy.tscn` > raíz (grupo «Reaparición») | `respawn_delay` |
-| Cada cuánto pega el veneno a un enemigo | `scripts/enemies/enemy/enemy_status.gd` (bloque «Edita aquí») | `POISON_TICK` (segundos) |
+| Cada cuánto pegan el veneno y la quemadura a un enemigo | `scripts/enemies/enemy/enemy_status.gd` (bloque «Edita aquí») | `POISON_TICK`, `BURN_TICK` (segundos) |
 | Láseres (color y grosor) | `Sunspitter.tscn` / `Sarcognath.tscn` | color: `color` en AimLine / WarnLine (aviso) y Beam (disparo); grosor del aviso: `aim_width_start` / `aim_width_end` (raíz del Sunspitter) o `warn_width_start` / `warn_width_end` (raíz del Sarcognath); grosor del disparo: Beam > `default_thickness` |
 | Discos de aviso en el suelo | `scenes/fx/TelegraphDisc.tscn` > raíz | `start_scale`, `fade_time`; opacidad en `albedo_color` de su material (el color lo pasa quien avisa) |
 | Velocidad de los proyectiles enemigos | `scenes/enemies/EnemyBolt.tscn` > raíz | `speed`, `max_distance` (el daño lo pone quien dispara) |
@@ -153,7 +168,7 @@ otra cosa.
 | Daño extra por el poder de la party | Mythos.tscn > Scaling («Daño») | `damage_per_power`, `damage_power_cap` |
 | Que la pelea no se atasque: cuándo Mythos empieza a consumirse solo y cuánto tarda | Mythos.tscn > Scaling («Desgaste») | `burnout_after` (veces el tiempo previsto de la vida; 0 = nunca), `burnout_seconds` |
 | Desgaste: cada cuánto pierde vida y el aviso del HUD | Mythos.tscn > Burnout («Desgaste») | `tick_seconds`, `announce_text` (`%s` = nombre del jefe) |
-| Cuánto pesa cada «poder» (armas, niveles, evoluciones, tomos, objetos, power-ups, mascota) | `scenes/world/RunSystems.tscn` > PartyPower (grupos «Peso de las armas» y «Peso del resto») | `weapon_weight`, `weapon_level_weight`, `weapon_evolved_weight`, `weapon_ascension_weight`, `tome_weight`, `tome_stack_weight`, `item_weight`, `powerup_weight`, `pet_weight` |
+| Cuánto pesa cada «poder» (armas, niveles, evoluciones, tomos, objetos, power-ups) | `scenes/world/RunSystems.tscn` > PartyPower (grupos «Peso de las armas» y «Peso del resto») | `weapon_weight`, `weapon_level_weight`, `weapon_evolved_weight`, `weapon_ascension_weight`, `tome_weight`, `tome_stack_weight`, `item_weight`, `powerup_weight` |
 | Cada cuánto sale en el log el poder de la party | RunSystems.tscn > PartyPower («Registro») | `log_interval`, `log_window` |
 | Velocidad de vuelo y giro | Mythos.tscn > raíz («Movimiento») | `move_speed`, `turn_speed` |
 | En vuelo: a qué distancia y qué tan rápido gira, cuánto se acerca y se aleja, cuánto sube y baja, si retrocede cuando se le acercan y cada cuánto cambia de raider | Mythos.tscn > Flight («En vuelo», «Objetivo») | `air_distance`, `air_band`, `orbit_speed_factor`, `retreat_speed_factor`, `orbit_flip_seconds`, `breath_metres`, `breath_seconds`, `lift_metres`, `lift_seconds`, `focus_seconds` |
@@ -228,7 +243,7 @@ otra cosa.
 | Cómo se mecen las plumas | los materiales de las plumas (Shader Parameters, grupo «Movimiento») | `sway_amount`, `sway_speed`, `flutter_amount`, `flutter_speed` |
 | La bola de luz del Amanecer y de los fogonazos | Mythos.tscn > Visual/Hover/Nova («Tamaño») y su material (Shader Parameters) | `start_radius`, `full_radius`; `core_color`, `edge_color`, `strength`, `softness` |
 | Chispas del fénix: estela, ráfaga y aura de la forma renacida | Mythos.tscn > Visual/Hover/Body/`Trail`, `Burst`, `Aura` | `amount`, `lifetime`, `scale_amount_min`, `scale_amount_max`, `color` |
-| Lo que paga al morir y sus colores de aviso | Mythos.tscn > raíz («Pago», «Cofres», «Telegrafía») | `boss_gem_count`, `boss_gem_value`, `health_orb_count`, `base_chest_drops`, `telegraph_color`, `impact_color` |
+| Lo que paga al morir y sus colores de aviso | Mythos.tscn > raíz («Pago», «Bloques de la suerte», «Telegrafía») | `boss_gem_count`, `boss_gem_value`, `health_orb_count`, `lucky_block_drops`, `telegraph_color`, `impact_color` |
 | Cuánto dura cada cinemática: la llegada y el renacer | `scripts/enemies/mythos/mythos_cinematic.gd` (grupo «Calma») | `calm_seconds` (lo que dura la calma con que empieza la canción de la primera fase), `rebirth_seconds` (la de la canción de la segunda fase) |
 | Canciones del jefe (una por fase), su volumen y cuánto tardan en apagarse | `scenes/enemies/mythos/MythosCinematic.tscn` > `Music` (primera fase) y `MusicReborn` (segunda fase) | `song` (arrastra ahí el archivo), `song_volume_db` (0 = el volumen del archivo; las dos de Mythos están en 0, porque sus archivos ya llegan al máximo y más arriba saturan), `fade_seconds`, `handover_seconds` (cuánto tarda en apagarse al cambiar de fase), `resync_threshold` |
 | Que una canción empiece antes: cuántos segundos va adelantada a su cinemática (así su parte fuerte cae esos segundos antes de que la cinemática termine) | MythosCinematic.tscn > `MusicReborn` (o `Music`) | `lead_seconds` (0 = lo fuerte cae justo cuando vuelve la pelea). La de la segunda fase trae 1.94: arranca mientras Mythos parece muerto y lo fuerte cae en el estallido con que renace (`burst_fraction` del nodo Rebirth × `rebirth_seconds`). No puede adelantarse más que `fakeout_seconds` sin perder el principio de la canción |
@@ -326,10 +341,17 @@ La lógica vive en ayudantes de `scripts/systems/spawner/` (`SpawnScaling`, `Spa
 | Ritmo del flujo de enemigos | `enemy_spawner.gd` («Ritmo y dificultad») | `start_interval`, `min_interval`, `interval_shrink_per_minute`, `base_count_per_tick`, `extra_count_per_minute` |
 | Máximo de enemigos vivos | `enemy_spawner.gd` (grupo «Cupo de enemigos») | `max_active`, `horde_overflow`, `pressure_overflow` (si subes el multiplicador, súbelos juntos) |
 | Hordas en co-op | `enemy_spawner.gd` (grupo «Co-op») | `coop_horde_per_extra_player` |
+| Hordas a minutos fijos (en vez de que las mande el ritmo por minuto) | `enemy_spawner.gd` (grupo «Hordas») | `timed_hordes`, `horde_minutes`, `horde_repeat_minutes` |
+| Hordas: en cuántos pulsos llegan, cada cuánto, y a qué distancia del jugador aparecen | `enemy_spawner.gd` (grupos «Hordas» y «Oleadas de presión») | `horde_waves` (7), `horde_wave_gap` (2.2 s), `surge_min_radius` / `surge_max_radius` (14-20 m; también los packs de élite) |
+| Cuánto dura una etapa (el jefe de etapa llega a ese tiempo y la etapa se supera al matarlo) | `scripts/systems/run_manager.gd` (grupo «Puerta de etapa») + `enemy_spawner.gd` (grupo «Jefes») | `stage_goal` (600 s) y `elder_spawn_minute` (10): cámbialos juntos |
+| Cuánto sube la dificultad cada minuto de partida | `scripts/systems/run_manager.gd` (grupo «Dificultad por minuto») | `difficulty_per_minute` (15 = +15% por minuto) |
+| Cuánta vida y daño ganan los enemigos nuevos por minuto (aparte de la dificultad) | `scripts/systems/enemy_spawner.gd` (grupo «Rampa tardía») | `late_ramp_start_minute` (2), `late_hp_per_minute` (0.12 = +12%/min), `late_damage_per_minute` (0.08 = +8%/min) |
 | Minuto del jefe, jefe ancestral (o jefe de etapa) y su aviso | `scenes/world/<Arena>.tscn` > EnemySpawner (grupo «Jefes») | `boss_spawn_minute`, `elder_spawn_minute`, `boss_warning_text`, `elder_title`, `stage_boss_scene` |
 | Minijefe de una arena (el que llega antes del jefe del bioma) y su minuto | `scenes/world/<Arena>.tscn` > EnemySpawner (grupo «Jefes») | `mini_boss_scene` (vacío = sin minijefe), `mini_boss_spawn_minute`; solo el Bosque Hueco lo usa (la Langosta Azul) |
 | Qué enemigos salen en cada minuto | `enemy_spawner.gd`, tablas al comienzo | `FOREST_PHASES`, `DUNES_PHASES`, `MARSH_PHASES` (un bioma nuevo va al FINAL del enum `PhasePreset`) |
-| Probabilidad de que caiga un power-up | `enemy_spawner.gd` (grupo «Power-ups») | `base_powerup_drop_chance`, `shiny_powerup_drop_scale` |
+| Probabilidad de que caiga un power-up | `enemy_spawner.gd` (grupo «Power-ups») | `base_powerup_drop_chance` (0.001 = 0.1% por baja), `shiny_powerup_drop_scale` (×3 en un shiny) |
+| Qué stats y cuánto dan los altares de carga (3 distintas al azar; la cantidad es un valor al azar de la lista del tomo de esa stat) | `scripts/world/interactables/charge_shrine.gd` > `ALTAR_BOONS`; las cantidades, en `values` de cada tomo en `tome.gd` (o en la fila, si la stat no tiene tomo). Las cartas no llevan nombre propio: el título es `label` | `label`, `values` |
+| Cuánto agranda la Llave maestra los dones del altar de carga | `item_catalog.gd` > fila `master_key` | `boon_percent` (5 = +5% por copia) |
 | Textos de «¡TIEMPO DETENIDO!» | `enemy_spawner.gd` (grupo «Tiempo detenido») | `time_stop_start_text`, `time_stop_end_text` |
 | Altura a la que nace un enemigo sobre el suelo e intentos para hallar un punto libre | `scripts/systems/spawner/spawn_points.gd`, constantes al comienzo | `SPAWN_GROUND_OFFSET`, `RING_ATTEMPTS` |
 | Cuánto se desordena el cerco de una oleada de horda | `scripts/systems/spawner/horde_schedule.gd`, constante al comienzo | `BURST_ANGLE_JITTER` (radianes) |
@@ -342,6 +364,7 @@ La lógica vive en ayudantes de `scripts/systems/spawner/` (`SpawnScaling`, `Spa
 | Arma inicial de un personaje | `character_catalog.gd` > `CHARACTER_ROWS` | `weapon_node_name` (el `node_name` de una fila de `weapon_catalog.gd`) |
 | Precio de un personaje | `character_catalog.gd` > `CHARACTER_ROWS` | `unlock_cost` (ojo: con 0 queda gratis para siempre en los guardados que ya existen) |
 | Color o modelo de un personaje | `character_catalog.gd` > `CHARACTER_ROWS` | `tint`, `model_scene`, `model_scale` |
+| Tamaño, giro o altura del modelo de un personaje con carpeta propia (caballerita, ninja, meowl, chupacabra, bolsa de basura, boxeador) | `assets/models/characters/<personaje>/<personaje>_character.tscn` > nodo `Model` | su `transform`: escala (1.7 = 1,7 m de alto; el boxeador 0.85 porque su modelo mide 2) y giro (miran a -Z); el .glb y sus texturas viven en esa misma carpeta |
 | Renombrar el `id` de un personaje (mejor no) | `character_catalog.gd` > `id` **y** `scripts/systems/autoloads/save_data.gd` > `ID_ALIASES` | el `id` nuevo, más una fila `"id_viejo": "id_nuevo"` para no romper guardados |
 | Nombre, sigla o texto de un arma | `scripts/systems/catalogs/weapon_catalog.gd` > `WEAPON_LIBRARY` | `display_name`, `glyph`, `flavor` |
 | Carta propia de un arma | `weapon_catalog.gd` > `WEAPON_LIBRARY` > `extra_entries` | `title`, `description`, `amount` |
@@ -350,12 +373,15 @@ La lógica vive en ayudantes de `scripts/systems/spawner/` (`SpawnScaling`, `Spa
 | Qué tan seguido salen cartas de arma nueva, de dos stats o de tomo | `upgrade_pool.gd` (bloque «Edita aquí») | `NEW_WEAPON_OFFER_WEIGHT`, `MULTI_STAT_OFFER_WEIGHT`, `TOME_OFFER_WEIGHT` |
 | Probabilidad, potencia o color de una rareza | `scripts/systems/catalogs/rarity.gd` > `TIERS` | `weight`, `potency`, `color` |
 | Nombre en pantalla de una rareza | `rarity.gd` > `DISPLAY_NAMES` | el texto («Común», «Raro»…) |
-| Cuánto mejora la suerte las rarezas | `rarity.gd` | `LUCK_TILT_PER_POINT`, `MAX_LUCK_TILT` |
+| Rarezas: nombre, color, probabilidad y potencia (Poco común verde —«Common» por dentro—, Raro azul, Épico morado, Legendario amarillo; el gris es solo la carta base de algo nuevo) | `scripts/systems/catalogs/rarity.gd` > `TIERS`, `BASE` y `DISPLAY_NAMES` | `color`, `weight` (70/19/8/3), `potency` (x1, x1.3, x1.7, x2); cada lista `values` de cartas y tomos lleva 4 números en ese orden |
+| Cartas de algo NUEVO (primer tomo, arma nueva): salen grises, sin rareza (dan lo mismo que Poco común); toda mejora de lo que ya tienes sortea su rareza | `scripts/systems/catalogs/rarity.gd` > `BASE`; `upgrade_pool.gd` (campo `is_new` de la carta) | `BASE.color` |
+| Cuánto dan los tomos por rareza (regla: Poco común = base, Raro x1.3, Épico x1.7, Legendario x2, redondeado arriba) | `scripts/systems/catalogs/tome.gd` > `values` de cada tomo | los 4 números de cada lista |
+| Tomo del Azar: cuántas stats y cuánto de cada una por rareza (las stats posibles son las mismas de los altares) | `scripts/systems/catalogs/tome.gd` > `GAMBLE_MULTIPLIERS`; las stats y su valor normal (el primero de `values`) en `scripts/world/interactables/charge_shrine.gd` > `ALTAR_BOONS` | un número por stat (1.0 normal, 1.5 = 50% más) |
+| Cuánto mejora la suerte las rarezas (cartas, cofres, objetos de la ruleta y del vendedor) | `rarity.gd` | `LUCK_REFERENCE` (800), `LUCK_BOOST_AT_REFERENCE` (3.92: Legendario 50% con 800 de suerte), `LUCK_CURVE` (1.5: la poca suerte influye poco) |
+| Cuántas stats trae una carta de arma, y cuánto la suerte inclina hacia cartas de 2-3 stats | `upgrade_pool.gd` (bloque «MEJORAS MÚLTIPLES») | `STAT_COUNT_WEIGHTS`, `LUCK_EXTRA_STAT_PER_POINT` (0.004) |
 | Evolución de un arma | `scripts/systems/catalogs/evolution_catalog.gd` > `EVOLUTION_LIBRARY` | `evolved_name`, `glyph`, `mults`, `adds`, `flavor` |
 | Cada cuántos niveles evoluciona o asciende un arma | `evolution_catalog.gd` | `EVOLVE_AT_LEVEL` |
 | Cartel, fanfarria y sacudida de la evolución | `scripts/systems/catalogs/evolution_ceremony.gd` | `EVOLVED_BANNER`, `ASCENDED_BANNER`, `FANFARE_SFX`, `SHAKE_STRENGTH` |
-| Mascotas | `scripts/systems/catalogs/pet_catalog.gd` > `PET_LIBRARY` | `display_name`, `weapon_scene`, `weapon_damage_scale`, `stat`, `amount_per_level`, `color` |
-| Cómo sigue y se ve toda mascota (velocidad, distancia al raider, brillo, ojos, vaivén) | `scripts/systems/pet.gd` (bloque «Edita aquí») | `FOLLOW_SPEED`, `TURN_SPEED`, `FOLLOW_OFFSET`, `BODY_GLOW`, `EYE_COLOR`, `HOVER_BOB_HEIGHT`, `HOVER_BOB_SPEED` |
 | Misiones (texto, meta, premio) | `scripts/systems/catalogs/quest_catalog.gd` > `QUEST_LIBRARY` | `display_name`, `description`, `target`, `reward` |
 | Reliquias de la Armería | `scripts/systems/catalogs/relic_catalog.gd` > `RELIC_LIBRARY` | `display_name`, `amount`, `max_ranks`, `base_cost`, `cost_growth` |
 | Orden y textos de los mapas | `scripts/systems/catalogs/map_catalog.gd` > `MAP_LIBRARY` | orden de las filas, `display_name`, `blurb` |
@@ -364,17 +390,17 @@ La lógica vive en ayudantes de `scripts/systems/spawner/` (`SpawnScaling`, `Spa
 
 | Qué quieres cambiar | Dónde | Qué propiedad |
 | --- | --- | --- |
-| Números de un objeto (imán, veneno, titán, arañas, aura sayayin, zenkai…) | `scripts/systems/catalogs/item_catalog.gd` > su fila en `ITEM_LIBRARY` | sus campos numéricos (la descripción se arma sola con ellos) |
+| Números de un objeto (imán, veneno, titán, arañas, aura sayayin, Zenkai: +10 a todas las stats…); la rareza de cada objeto es su campo `rarity` (Common, Uncommon, Rare, Epic, Legendary) | `scripts/systems/catalogs/item_catalog.gd` > su fila en `ITEM_LIBRARY` | sus campos numéricos (la descripción se arma sola con ellos) |
 | Aspecto del aura sayayin (color, opacidad, partículas) | `scripts/systems/catalogs/item_catalog.gd` > fila `saiyan_blood` | `aura_color`, `aura_alpha`, `aura_burst` |
 | Duración, peso, color o texto de un power-up | `scripts/systems/catalogs/powerup_catalog.gd` > su fila en `POWERUP_LIBRARY` | `duration`, `weight`, `color`, `display_name` |
-| Fiebre del oro, reflejo, vida por baja del vampiro | `powerup_catalog.gd` > fila gold / reflect / vampire | `points_multiplier`, `reflect_fraction`, `max_hp_per_kill` (si cambias el número, ajusta el texto) |
-| Textos «¡Aura sayayin!» y «¡Zenkai!» | Player.tscn > ItemBag (grupo «Textos») | `saiyan_aura_text`, `zenkai_text` |
+| Fiebre del oro | `powerup_catalog.gd` > fila gold | `points_multiplier` (si cambias el número, ajusta el texto) |
+| Texto «¡Aura sayayin!» | Player.tscn > ItemBag (grupo «Textos») | `saiyan_aura_text` |
 | Texto bajo el nombre en el aviso de un power-up («… (10 s)») | Player.tscn > PowerUps (grupo «Textos») | `toast_template` (%s = descripción, %d = segundos) |
 | Power-up en el suelo (tamaño, brillo, luz, duración, desvanecimiento, arcoíris de la estrella) | `scenes/systems/PowerUpPickup.tscn` > sus nodos y la raíz | la malla de `Gem`, `light_energy`; `lifetime`, `fade_time`, `spin_speed`, `star_hue_hz` en la raíz |
 | Ronda de la estrella (velocidad, saltos, a qué distancia mira un muro, cuánto desnivel la hace rebotar al pie de un acantilado) | `scripts/systems/pickups/powerup_pickup.gd` → grupo «Ronda de la estrella» | `roam_speed`, `hop_height`, `hop_hz`, `roam_probe`, `roam_max_rise` |
 | Orbe de vida (imán, curación, duración) | `scenes/systems/HealthOrb.tscn` > HealthOrb | `magnet_radius`, `heal_fraction`, `lifetime` |
 | Sacudida de cámara | `scenes/systems/Juice.tscn` > Juice (grupo «Sacudida de cámara») | `kill_shake_*`, `hurt_shake_*`, `boss_death_shake_*`, `crit_shake_*` |
-| Cámara lenta al crítico o al matar un jefe | Juice.tscn > Juice («Hit-stop») | `crit_stop_scale`, `crit_stop_duration`, `boss_death_stop_*` |
+| Cámara lenta al crítico o al matar un jefe | Juice.tscn > Juice («Hit-stop») | `crit_stop_scale`, `crit_stop_duration` (0 = sin pausa al crítico), `boss_death_stop_*` |
 | Destello blanco al golpear | Juice.tscn > Juice («Destello de golpe») | `flash_duration`, `flash_color` |
 | Viñeta al recibir daño (color, fuerza, cuánto dura) | Juice.tscn > Juice («Viñeta de daño») | `vignette_color`, `vignette_strength`, `vignette_hold_time`, `vignette_fade_time` |
 | Anillo al subir de nivel (color, duración, tamaño, altura) | Juice.tscn > Juice («Anillo de subida de nivel») | `level_pulse_color`, `level_pulse_duration`, `level_ring_alpha`, `level_ring_inner_radius`, `level_ring_outer_radius`, `level_ring_height`, `level_ring_start_scale`, `level_ring_end_scale` |
@@ -382,31 +408,32 @@ La lógica vive en ayudantes de `scripts/systems/spawner/` (`SpawnScaling`, `Spa
 | Voces simultáneas de sonido | `scenes/systems/Sfx.tscn` > Sfx | `pool_size`, `default_pitch_jitter` |
 | Volumen de la música antes de que el jugador mueva el slider | `scripts/systems/autoloads/save_data.gd` (constantes al comienzo) | `DEFAULT_MUSIC_VOLUME` (0-100; el slider «Volumen de música» de Ajustes lo guarda) |
 | Texto de la fila de música en Ajustes | `scenes/ui/SettingsPanel.tscn` > Center/Panel/VBox/MusicRow/MusicLabel | `text` |
-| Precio de los cofres y cuánto suben | `scripts/systems/autoloads/run_state.gd` (bloque «Edita aquí») | `CHEST_BASE_PRICES`, `CHEST_PRICE_GROWTH` |
+| Precio de los cofres (todos iguales, sin rareza) y cuánto suben con cada cofre de pago (también sube a los vendedores) | `scripts/systems/autoloads/run_state.gd` (bloque «Edita aquí») | `CHEST_BASE_PRICE` (30), `CHEST_PRICE_GROWTH` (1.15) |
 | Curva de experiencia por nivel | `scripts/systems/autoloads/run_state.gd` (bloque «Edita aquí») | `XP_BASE`, `XP_PER_LEVEL`, `XP_PER_LEVEL_SQUARED` |
 
 ## Eventos del mapa, clima y portales
 
 | Qué quieres cambiar | Dónde | Qué propiedad |
 | --- | --- | --- |
-| Cuándo sale el primer evento y la pausa entre eventos | `scenes/world/RunSystems.tscn` > WorldDirector (grupo «Eventos») | `first_event_at`, `event_gap_min`, `event_gap_max`, `event_gap_floor` |
-| Qué tan seguido sale cada evento, su aviso y su baliza | `scripts/world/run/world_director.gd` > su fila en `EVENT_LIBRARY` | `weight`, `announce`, `beacon_color` (quítalo y no hay baliza; el vendedor usa el `color` de su fila en `VENDOR_LIBRARY` de `vendor.gd`), `beacon_time` (sin él, hasta que se use) |
-| Gemas de la grieta de esencia (cuántas, XP, qué tan repartidas) | RunSystems.tscn > WorldDirector (grupo «Eventos») | `rift_gem_count`, `rift_gem_value`, `rift_gem_min_spread`, `rift_gem_max_spread` |
-| Máximo de vendedores o manantiales a la vez | `world_director.gd` > fila `vendor` / `spring` | `cap` |
-| Tope y ritmo de los altares | RunSystems.tscn > WorldDirector (grupo «Altares») | `altar_cap_base`, `altar_cap_minutes` |
+| Ritmo por minuto: cada minuto 1 evento asegurado (luna, lluvia o desastre al azar), la tirada de otro evento extra independiente y, en los minutos de horda, una horda | RunSystems.tscn > WorldDirector (grupo «Ritmo por minuto») y su hijo Weather | `beat_seconds` (60), `horde_and_weather_minutes` (2, 4, 6, 8); probabilidades del evento extra: Weather > `disaster_chance`, `rain_chance`, `sky_event_chance` |
+| Aviso en lista cuando en un minuto salen varios eventos juntos (tamaño, colores por tipo, tiempos) | `scenes/ui/HUD.tscn` > EventBurst (`scripts/ui/game/hud/event_burst.gd`) | `row_font_size`, `weather_color`, `horde_color`, `row_stagger`, `hold_time` |
+| Eventos guardados para más adelante (jauría shiny, estrella): peso, aviso y baliza | `scripts/world/run/world_director.gd` > su fila en `EVENT_LIBRARY` (hoy con peso 0: no salen) | `weight`, `announce`, `beacon_color`, `beacon_time` |
 | Aspecto del pilar de baliza | `scenes/world/director/Beacon.tscn` > Pillar (su malla y su material) / Light / raíz | `height` y radios de la malla (el pilar se apoya solo en el suelo), la opacidad (alfa de `albedo_color` del material de Pillar), `light_energy`, `pulse_half_time`; el color sale de la fila del evento (`beacon_color`), no del material |
-| Cofre de suministros (rareza mínima, suerte) | `scenes/world/director/SupplyChest.tscn` > SupplyChest | `min_rarity`, `luck_bonus` |
-| Cuánto tarda en encogerse el cofre de suministros que nadie abrió | `scenes/world/director/SupplyChest.tscn` > SupplyChest (grupo «Cofre perdido») | `lost_sink_duration`, `lost_sink_depth` |
 | Aviso, tinte del cielo, nombre en el HUD y partículas de un clima | `scripts/world/run/director/weather_catalog.gd` > su fila en `WEATHER_CATALOG` | `announce`, `sun_color`, `sun_energy`, `ambient_color`, `fx_color`, `display_name` |
-| Peso, duración base y si el altar de evento puede invocar un clima | `scripts/world/run/director/weather_catalog.gd` > su fila en `WEATHER_CATALOG` | `weight`, `duration`, `altar_ok` |
+| Peso y duración base de cada evento (luna, lluvia, desastre) | `scripts/world/run/director/weather_catalog.gd` > su fila en `WEATHER_CATALOG` | `weight`, `duration` |
 | De dónde viene el tsunami (texto del aviso) | `scripts/world/run/director/weather_catalog.gd` | `COMPASS_WORDS` |
 | Segundos del paso al tinte del cielo y de la vuelta | `scripts/world/run/director/sky_tint.gd` | `TINT_SECONDS`, `RESTORE_SECONDS` |
 | Duración de un clima y probabilidades de desastre, lluvia y luna | RunSystems.tscn > WorldDirector > Weather | `weather_duration_overrides`, `disaster_chance`, `rain_chance`, `sky_event_chance` |
-| Ácido, meteoritos y tsunami (daño, radio, frecuencia) | RunSystems.tscn > WorldDirector > Weather (grupos por clima) | `acid_pool_*`, `meteor_*`, `tsunami_*` |
+| Ácido, meteoritos y tsunami (daño, radio, frecuencia, y cuánto lanza por el aire un meteorito al jugador) | RunSystems.tscn > WorldDirector > Weather (grupos por clima) | `acid_pool_*`, `meteor_*` (lanzamiento: `meteor_push_speed`, `meteor_push_lift`), `tsunami_*` |
+| Cómo se ve y empuja la ola del tsunami (velocidad, giro para perseguir, ancho, filas, altura de la cresta y lanzamiento al jugador; no hace daño) | RunSystems.tscn > WorldDirector > Weather (grupo «Tsunami»); el movimiento está en `scripts/world/run/director/weather/tsunami_wave.gd` | `tsunami_speed`, `tsunami_turn_speed`, `tsunami_max_travel`, `tsunami_width`, `tsunami_rows`, `tsunami_row_gap`, `tsunami_crest_low/high`, `tsunami_bob`, `tsunami_push_speed/lift`, `tsunami_foam_*` |
+| Cuántos enemigos trae la lluvia de enemigos y a qué distancia del jugador caen (hoy ~95 en sus 40 s, a 18-32 m) | RunSystems.tscn > WorldDirector > Weather (grupo «Lluvia de enemigos») | `enemy_rain_interval` (1,5 s entre tandas), `enemy_rain_min_drops` (2), `enemy_rain_max_drops` (5), `enemy_rain_min_distance` (18 m), `enemy_rain_max_distance` (32 m) |
 | Partículas de la lluvia de enemigos, del terremoto y de los meteoritos | RunSystems.tscn > WorldDirector > Weather (grupos «Lluvia de enemigos», «Terremoto», «Meteoritos») | `enemy_rain_burst_height`, `enemy_rain_burst_count`, `earthquake_dust_count`, `meteor_impact_burst_count`; el color sale de `fx_color` / `impact_color` de su fila en `WEATHER_CATALOG` |
-| Bonos de la luna llena y de la lluvia dorada | RunSystems.tscn > WorldDirector > Weather | `full_moon_xp_bonus`, `full_moon_luck_bonus`, `golden_points_multiplier` |
-| Portales, ruletas, cofres y cajas al inicio de cada etapa | RunSystems.tscn > WorldDirector > StageFixtures | `portal_count`, `roulette_count`, `extra_start_chests_min/max`, `start_pet_box_chance` |
-| Colores, recarga y avisos de los pares de portales | `scenes/world/director/PortalShrine.tscn` > PortalShrine | `pair_colors`, `cooldown`, `prompt_text`, `recharging_prompt` |
+| Cómo se ve el meteorito que cae del cielo (altura, diagonal, tamaño, colores, estela); el tiempo de caída es `meteor_telegraph` del nodo Weather | `scripts/world/run/director/weather/meteor_fall.gd` (bloque «Edita aquí») | `START_HEIGHT`, `START_SIDE_OFFSET`, `ROCK_RADIUS`, `ROCK_COLOR`, `ROCK_GLOW`, `TAIL_LENGTH`, `TAIL_COLOR` |
+| Desde qué altura y en cuánto tiempo caen del cielo los enemigos de la lluvia de enemigos | `scripts/enemies/enemy_base.gd` (grupo «Caída del cielo»; cada enemigo puede cambiarlo en su escena) | `sky_drop_height` (18 m), `sky_drop_seconds` (0,8 s) |
+| Bonos de la luna llena y de la lluvia dorada | RunSystems.tscn > WorldDirector > Weather | `full_moon_xp_bonus`, `full_moon_luck_bonus` (30 puntos de suerte), `full_moon_luck_percent` (en %: multiplica la suerte), `golden_points_multiplier` |
+| Lluvia de XP de la luna llena (cuántos niveles da, cuántas gemas, en cuántos segundos, a qué distancia caen) | RunSystems.tscn > WorldDirector > Weather (grupo «Luna llena») | `full_moon_xp_rain_levels` (2,5), `full_moon_xp_rain_gems` (30), `full_moon_xp_rain_seconds` (20), `full_moon_xp_rain_min_distance`/`max_distance` (3-12 m), `full_moon_xp_rain_burst_*`; el color del destello es `fx_color` de su fila en `weather_catalog.gd` |
+| Portales, ruletas, cofres (los únicos de la etapa), altares, manantiales y vendedores al inicio de cada etapa | RunSystems.tscn > WorldDirector > StageFixtures | `portal_count` (10), `portal_spread_tries`, `roulette_count` (20), `start_chests_min/max` (45-50 cofres en total, contando los del mapa), `start_charge_altars` (20), `start_demonic_altars` (20), `start_springs` (15 manantiales), `start_vendors_min/max` (15-20 vendedores), `free_start_chests_min/max` (7-8 cofres gratis; el reparto parejo se ajusta en WorldDirector > `spread_tries` y `same_kind_spread`) |
+| Color, recarga y avisos de los portales (no van en pares: cada uno lleva a otro portal al azar y se recargan los dos) | `scenes/world/director/PortalShrine.tscn` > PortalShrine | `portal_color`, `cooldown`, `exit_margin`, `prompt_text`, `recharging_prompt` |
 | Color y tamaño del portal de salida | `scenes/world/director/ExitPortal.tscn` > ExitPortal | `portal_color`, `ring_radius` |
 | Aspecto de los portales (anillo, pilar, latido, luz y círculo de piedras: grupo «Marco de piedra», `frame_stones`, `frame_gap`, `frame_height_min/max`, `frame_width`, `frame_lintels`, colores) | `scenes/world/director/ExitPortal.tscn` > Visual; los pares de portales usan los valores de `scripts/world/run/director/portal_visual.gd` (`PortalShrine.tscn` > Visual no guarda ninguno) | `ring_*`, `pillar_*`, `idle_pulse_*`, `recharge_min_width` (solo pares), `light_*`; el color es `portal_color` / `pair_colors` |
 
@@ -420,17 +447,17 @@ lo que cambies ahí vale para todos los que no tengan su propio valor en la esce
 | Tamaño y color del aviso «[E] …» | `interactable.gd` (grupo «Aviso flotante») | `prompt_font_size`, `prompt_outline_size`, `prompt_color` |
 | Altura del aviso «[E] …» de un interactuable | la escena del interactuable > raíz (grupo «Aviso flotante») | `prompt_height` (cada escena guarda el suyo) |
 | Cuánto tarda en hundirse algo gastado | la escena del interactuable > raíz (grupo «Gastado») | `sink_duration`, `sink_depth`, `spent_color` |
-| Brillo de los cofres según la rareza | `scenes/world/chests/Chest.tscn` > Chest (grupo «Brillo por rareza») | `glow_energy_by_rarity`, `free_glow_energy`, `free_tint` |
+| Color y brillo de los cofres (de pago y gratis) | `scenes/world/chests/Chest.tscn` > Chest (grupo «Brillo») | `paid_tint`, `paid_glow_energy`, `free_tint`, `free_glow_energy` |
 | Salto de apertura y textos del cofre | `Chest.tscn` > Chest (grupos «Apertura», «Textos») | `open_duration`, `open_hop_height`, `paid_prompt`, `opened_announce` |
 | Aspecto de los altares (zócalo, columna, cristal, obelisco, garras, monedas, rueda, fuente, círculo de piedras) | `scenes/world/shrines/<Altar>.tscn` > Visual > Look (grupos de cada uno: «Zócalo y columna», «Cristal», «Círculo de piedras», «Obelisco», «Medidas», «Colores») | medidas y colores de cada pieza; la colisión es el nodo `Body` de la escena (cambiarla si cambia el ancho de la base) |
 | Color del anillo de un altar de carga o del altar demoníaco | `scenes/world/shrines/ChargeShrine.tscn` / `CurseShrine.tscn` > raíz (grupo «Anillo») | `accent_color`; el color de su baliza es aparte: `beacon_color` de la fila `charge_altar` / `demonic_altar` en `EVENT_LIBRARY` (`world_director.gd`) |
 | Tiempo de carga y tamaño del don | `ChargeShrine.tscn` / `CurseShrine.tscn` > raíz (grupo «Carga») | `channel_time`, `boon_scale` |
-| Costo de dificultad de los pactos | `CurseShrine.tscn` > CurseShrine (grupo «Pactos») | `difficulty_scale` (1 = lo que dice `PACT_LIBRARY` en `curse_shrine.gd`) |
-| Premios y aspecto del bloque de la suerte | `scenes/world/chests/LuckyBlock.tscn` > LuckyBlock | `points_reward`, `gem_count`, `gem_min_spread`/`gem_spread`, `explosion_radius`, `explosion_burst_count`, `explosion_shake`, `block_color` |
-| Caja de mascota | `scenes/world/PetBox.tscn` > PetBox | `paw_color`, grupo «Textos» |
-| Precio y textos del manantial | `scenes/world/shrines/SpringShrine.tscn` > SpringShrine | `price`, `price_prompt` |
+| Altar demoníaco: cuánto vale la stat (máximo de su lista ×) y la escala de los costos de dificultad | `CurseShrine.tscn` > CurseShrine (grupo «Pactos») | `max_multiplier` (1.0 = el máximo de la lista), `difficulty_scale` |
+| Dificultad que suma SIEMPRE cada uso de un altar | carga: `charge_shrine.gd`; demoníaco: `CurseShrine.tscn` > raíz (grupo «Carga») | `difficulty_per_use` (carga 5 = +5%, demoníaco 15 = +15%) |
+| Costos de los pactos demoníacos y su rango (dificultad, lunas más largas, eventos malos, enemigos más rápidos, perder puntos) | `scripts/world/interactables/curse_shrine.gd` > `COST_LIBRARY` | `min`, `max`, `label` |
+| Premios y aspecto del bloque de la suerte (gemas, puntos, objeto, evento, horda, jefe, dificultad) | `scripts/world/interactables/lucky_block.gd` (`LUCKY_REWARDS`: peso de cada premio) y `LuckyBlock.tscn` > LuckyBlock | `points_reward`, `gem_count`, `gem_value`, `gem_min_spread`/`gem_spread`, `difficulty_reward`, `reward_texts`, `block_color` |
+| Zona de curación y textos del manantial (gratis) | `scenes/world/shrines/SpringShrine.tscn` > SpringShrine | `heal_zone_seconds` (5), `heal_zone_radius` (5 m), `heal_per_second_fraction` (0.1 = 10% de la vida máx. por segundo), `zone_color`, `activate_prompt` |
 | Peaje y premio del altar de la codicia | `scenes/world/shrines/GreedShrine.tscn` > GreedShrine | `hp_cost_fraction`, `gem_chance`, `card_chance`, `gem_count`, `gem_ring_min_radius`/`gem_ring_max_radius` |
-| Altar de eventos | `scenes/world/shrines/EventAltar.tscn` > EventAltar | `glass_color`, `busy_prompt` |
 | Minijefe secreto y sus frases | `scenes/world/secrets/HummingSkull.tscn` / `OddStump.tscn` > raíz | `miniboss_scene`, `spawn_offset` (el minijefe aparece en el suelo libre más cercano a ese punto donde cabe su cuerpo), `awaken_text`, `held_text` (aviso si lo despiertan mientras el jefe de etapa pelea solo) |
 
 ## Terreno y reparto del mapa
@@ -502,9 +529,9 @@ de reparto se llama `ForestScatter`, `DuneScatter` o `MarshScatter`.
 | Posición o tamaño de cualquier elemento del HUD | `scenes/ui/HUD.tscn` > el nodo (RunInfo, KillsLabel, LoadoutDock, FpsBadge, PowerUpRow, MatePanel…) | Layout (anclas y márgenes) |
 | Fila de arriba a la izquierda (reloj, etapa y dificultad) | HUD.tscn > RunInfo | Layout; Theme Overrides > Constants > `separation` (espacio entre fichas) |
 | Ficha de dificultad (texto, colores, golpe al subir) | `scenes/ui/hud/DifficultyChip.tscn` > raíz (icono y tamaño de letra: sus hijos Icon y Label) | `text_format`, `tip_format`, `body_color`, `border_color`, `text_color`, `pop_scale`, `pop_time` |
-| Dónde va el equipo (armas, tomos, mascota y objetos) | HUD.tscn > LoadoutDock (abajo a la izquierda; crece hacia arriba) | Layout |
+| Dónde va el equipo (armas, tomos y objetos) | HUD.tscn > LoadoutDock (abajo a la izquierda; crece hacia arriba) | Layout |
 | Cuántos objetos caben antes de la ficha «+N» | HUD.tscn > LoadoutDock/BagStrip | `columns` (fichas por fila) y `max_tiles` (columnas x filas) |
-| Línea entre armas, tomos y mascota | HUD.tscn > LoadoutDock/BuildStrip | `divider_size`, `divider_color` |
+| Línea entre armas y tomos | HUD.tscn > LoadoutDock/BuildStrip | `divider_size`, `divider_color` |
 | Golpe de una ficha al ganarla o subirla | HUD.tscn > LoadoutDock/BuildStrip y BagStrip | `gain_pop_scale`, `gain_pop_time` |
 | Tamaño de las fichas chicas de objetos | `scenes/ui/hud/LoadoutTile.tscn` > raíz (grupo «Casilla chica») | `compact_size`, `compact_glyph_font_size`, `compact_corner_font_size` |
 | Icono de un tomo o un objeto en su ficha | el mismo de la Colección: `scripts/ui/stat_icons.gd` (`ICON_FILES`) y `scripts/ui/item_icons.gd` (`KIND_FILES`); para un dibujo propio, un PNG en `assets/icons/<tomes o items>/<id>.png` | la fila del stat o del `kind` |
@@ -525,7 +552,7 @@ de reparto se llama `ForestScatter`, `DuneScatter` o `MarshScatter`.
 | Tarjeta de botín | `scenes/ui/hud/LootToast.tscn` > raíz | `hold_time`, `fade_time`, `background_color` |
 | Filas de compañeros en co-op | `scenes/ui/hud/MateRow.tscn` > raíz | `knocked_out_format`, `knocked_out_tint`, `points_format` |
 | Panel de relleno del cuarto vacío con 3 jugadores (fondo, texto, color, tamaño) | `scripts/systems/split_screen.gd` (bloque «Edita aquí») | `FILLER_BG`, `FILLER_TEXT`, `FILLER_TEXT_COLOR`, `FILLER_FONT_SIZE` |
-| Color del chip de clima bajo el reloj | HUD.tscn > RunInfo/TimerLabel/WeatherBadge | `group_colors`, `text_format` (el nombre sale de `display_name` en `weather_catalog.gd`) |
+| Color de los chips de clima bajo el reloj (uno por clima activo, apilados) | HUD.tscn > RunInfo/TimerLabel/WeatherBadge | `group_colors`, `text_format`, `stack_gap` (el nombre sale de `display_name` en `weather_catalog.gd`) |
 | Insignia de FPS | HUD.tscn > FpsBadge | `text_format`, `background_color`, `refresh_seconds` |
 | Minimapa: que gire con la cámara o deje el norte arriba; colores y grosor del aro, sombra | `scenes/ui/maps/Minimap.tscn` > raíz | `rotate_with_view`, `ring_color`, `band_color`, `outline_width`, `inner_outline_width`, `shadow_color`, `shadow_offset`, `north_inset` (la chapa «N» es el nodo North) |
 | Minimapa: cuánto terreno muestra, tamaño de los marcadores y grosor total del aro | `Minimap.tscn` > View | `view_radius` (metros), `marker_scale`, `own_arrow_scale`, `own_halo_alpha`, `pinned_scale`, `pin_margin`; el aro es el margen del nodo (Layout) |
@@ -631,9 +658,9 @@ de reparto se llama `ForestScatter`, `DuneScatter` o `MarshScatter`.
 | Menú de pausa (título, animación, textos de ayuda) | `scenes/ui/PauseMenu.tscn` > TitleLabel y raíz | Theme Overrides; `panel_fade_time`, `accept_hint_text` |
 | Marco común de la tienda y la ruleta («Tienes N pts», «Salir») | `scripts/ui/game/modal/modal_panel.gd` (vale para los dos paneles; para uno solo, la raíz de `RoulettePanel.tscn` o `VendorPanel.tscn`); aspecto de cada nodo en `scenes/ui/modal/ModalPanel.tscn` | grupos «Textos» (`points_template`, `close_text`) y «Panel» (`panel_margin`, `title_letter_spacing`); propiedades de cada nodo |
 | Textos y barrido de la ruleta | `scenes/ui/modal/RoulettePanel.tscn` > raíz | `title_text`, `spin_template`, `sweep_time`, `sweep_steps` |
-| Premios de la ruleta (cuánto da cada resultado y su peso) | `scripts/world/interactables/roulette_shrine.gd` > `OUTCOMES` | `amount`, `seconds`, `weight` (el número de la etiqueta sale del campo) |
-| Precio del altar de la ruleta | `scenes/world/shrines/RouletteShrine.tscn` > raíz | `price` |
+| Premios de la ruleta (dificultad, puntos, lluvia de XP, objeto al azar, todas las stats: cuánto da cada uno y su peso). La ruleta se gasta al girarla una vez | `scripts/world/interactables/roulette_shrine.gd` > `OUTCOMES` | `amount`, `gem_value`, `stats`, `weight` (el número de la etiqueta sale de `amount`) |
+| Precio del altar de la ruleta, y cuánto sube con cada giro | `scenes/world/shrines/RouletteShrine.tscn` > raíz; `scripts/systems/autoloads/run_state.gd` | `price`; `ROULETTE_PRICE_GROWTH` (1.25 = +25% por giro) |
 | Cartas y textos de la tienda | `scenes/ui/modal/VendorPanel.tscn` > raíz | `card_size`, `card_title_font_size`, `sold_template` |
 | Margen y separación del contenido de las cartas de la tienda | `scripts/ui/card_factory.gd` (bloque «Edita aquí») | `CARD_BOX_MARGIN`, `CARD_BOX_SEPARATION` |
-| Precios y oferta del vendedor | `scenes/world/Vendor.tscn` > Vendor | `pet_price`, `powerup_price_growth`, `pet_offers`, `item_offers` (precio inicial del power-up: `POWERUP_VENDOR_BASE_PRICE` en `run_state.gd`) |
+| Precios y oferta del vendedor de objetos | `scenes/world/Vendor.tscn` > Vendor | `item_price_factors` (precio = precio actual del cofre × factor de la rareza: 1.2/2.5/5/9), `item_offers` (4). Cada compra sube todos los vendedores con `VENDOR_PRICE_GROWTH` de `run_state.gd` (los cofres no) |
 | Aspecto del puesto del vendedor (mostrador, postes, toldo, repisa, sacos, farol, alfombra, sombrero) | `Vendor.tscn` > Look («Medidas», «Colores»); la figura, el toldo (nodo Sign) y la luz son nodos de Vendor.tscn | `counter_size`, `canopy_width`, `canopy_back_height`, `canopy_front_height`, `scallops`, colores; el color de la figura, el toldo y la luz sale del campo `color` de su fila en `VENDOR_LIBRARY` (`scripts/world/interactables/vendor.gd`) |

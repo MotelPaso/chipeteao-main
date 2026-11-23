@@ -186,12 +186,14 @@ func spawn_boss(stat_multiplier: float, title_override: String = "",
 	# queda exactamente base. Los tres canales son distintos a propósito:
 	#   HP     — revancha x vuelta x dificultad x tamaño de party. Un jefe es
 	#            una pelea larga, para la party que lo esperó.
-	#   daño   — lo mismo SIN la party: cuatro cuerpos ya reparten golpes.
+	#   daño   — revancha x vuelta x solo una parte de la dificultad
+	#            (boss_damage_difficulty_share), sin la party: un jefe con
+	#            toda la dificultad mataría de un golpe.
 	#   pago   — revancha x vuelta: RunState.difficulty_xp_multiplier() ya
 	#            paga la parte de dificultad al recoger las gemas.
 	var payout_multiplier := stat_multiplier * spawner.lap_xp_factor()
 	var damage_multiplier := stat_multiplier * spawner.lap_damage_factor() \
-			* (1.0 + RunState.difficulty_bonus)
+			* (1.0 + RunState.difficulty_bonus * spawner.boss_damage_difficulty_share)
 	var hp_multiplier := stat_multiplier * spawner.lap_hp_factor() \
 			* (1.0 + RunState.difficulty_bonus) \
 			* (1.0 + spawner.coop_boss_hp_per_extra_player * spawner.coop_extra())

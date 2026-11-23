@@ -24,6 +24,10 @@ var _variant: Material = null
 var _status: Material = null
 ## Material de veneno: se crea la primera vez y se reusa.
 var _poison: StandardMaterial3D = null
+## Material de quemadura: se crea la primera vez y se reusa.
+var _burn: StandardMaterial3D = null
+var _poisoned: bool = false
+var _burning: bool = false
 ## Dónde está el cuerpo en el ciclo de matiz shiny (0-1).
 var _shiny_phase: float = 0.0
 ## Valores del brillo copiados de EnemyBase.LOOK al encenderlo: tick_shiny
@@ -78,12 +82,36 @@ func set_variant(albedo: Color) -> void:
 ## su tinte y muestran el veneno solo en los números de daño.
 func set_poisoned(on: bool) -> void:
 	if on and _poison == null:
-		_poison = StandardMaterial3D.new()
-		_poison.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-		_poison.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-		_poison.albedo_color = EnemyBase.LOOK.poison_tint
-	_status = _poison if on else null
+		_poison = _status_material(EnemyBase.LOOK.poison_tint)
+	_poisoned = on
+	_refresh_status()
+
+
+## Capa de quemadura, en la misma capa de estado que el veneno: con los dos
+## activos se ve la quemadura, y al apagarse vuelve el veneno.
+func set_burning(on: bool) -> void:
+	if on and _burn == null:
+		_burn = _status_material(EnemyBase.LOOK.burn_tint)
+	_burning = on
+	_refresh_status()
+
+
+func _refresh_status() -> void:
+	if _burning:
+		_status = _burn
+	elif _poisoned:
+		_status = _poison
+	else:
+		_status = null
 	refresh()
+
+
+static func _status_material(color: Color) -> StandardMaterial3D:
+	var material := StandardMaterial3D.new()
+	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	material.albedo_color = color
+	return material
 
 
 ## El aspecto SHINY: un overlay sin sombreado cuyo matiz cicla, para que un shiny se lea de un vistazo aun dentro de una horda

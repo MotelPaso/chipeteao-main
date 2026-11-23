@@ -1,44 +1,35 @@
-[gd_scene load_steps=35 format=3 uid="uid://dqv5m2x8rk1fj"]
+[gd_scene format=3 uid="uid://dqv5m2x8rk1fj"]
 
-[ext_resource type="Script" path="res://scripts/world/run/arena.gd" id="1_arena"]
-[ext_resource type="Script" path="res://scripts/world/run/backdrop.gd" id="90_backdrop"]
-[ext_resource type="Script" path="res://scripts/systems/enemy_spawner.gd" id="3_spawner"]
+[ext_resource type="Script" uid="uid://cg5u76h8w6ba2" path="res://scripts/world/run/arena.gd" id="1_arena"]
+[ext_resource type="Script" uid="uid://bdr2b6ikdxm3f" path="res://scripts/systems/enemy_spawner.gd" id="3_spawner"]
 [ext_resource type="PackedScene" uid="uid://bqgr4nt0h3v2e" path="res://scenes/enemies/Grunt.tscn" id="4_grunt"]
-[ext_resource type="PackedScene" path="res://scenes/enemies/Skirmisher.tscn" id="15_skirmisher"]
-[ext_resource type="PackedScene" path="res://scenes/enemies/Tank.tscn" id="16_tank"]
-[ext_resource type="PackedScene" path="res://scenes/enemies/Rotking.tscn" id="17_boss"]
-[ext_resource type="PackedScene" path="res://scenes/enemies/BlueLobster.tscn" id="94_lobster"]
-[ext_resource type="Script" path="res://scripts/world/run/scatter.gd" id="9_scatter"]
+[ext_resource type="Script" uid="uid://c48bpkeldi82b" path="res://scripts/world/run/scatter.gd" id="9_scatter"]
 [ext_resource type="PackedScene" uid="uid://ctree3hw7ka2f" path="res://scenes/world/props/Tree.tscn" id="10_tree"]
 [ext_resource type="PackedScene" uid="uid://brock5hw2mv8d" path="res://scenes/world/props/Rock.tscn" id="11_rock"]
 [ext_resource type="PackedScene" uid="uid://bstum8hw1tj5e" path="res://scenes/world/props/Stump.tscn" id="12_stump"]
 [ext_resource type="PackedScene" path="res://scenes/world/props/RuinStairs.tscn" id="13_ramp"]
 [ext_resource type="PackedScene" path="res://scenes/world/props/RuinDais.tscn" id="14_platform"]
+[ext_resource type="PackedScene" path="res://scenes/enemies/Skirmisher.tscn" id="15_skirmisher"]
+[ext_resource type="PackedScene" path="res://scenes/enemies/Tank.tscn" id="16_tank"]
+[ext_resource type="PackedScene" path="res://scenes/enemies/Rotking.tscn" id="17_boss"]
 [ext_resource type="PackedScene" uid="uid://cshrn1chrg4ka" path="res://scenes/world/shrines/ChargeShrine.tscn" id="18_chargeshrine"]
 [ext_resource type="PackedScene" uid="uid://bshrn2grd5me1" path="res://scenes/world/shrines/GreedShrine.tscn" id="19_greedshrine"]
 [ext_resource type="PackedScene" uid="uid://dshrn3crs6pa2" path="res://scenes/world/shrines/CurseShrine.tscn" id="20_curseshrine"]
 [ext_resource type="PackedScene" uid="uid://cchst4lut7qb3" path="res://scenes/world/chests/Chest.tscn" id="21_chest"]
-[ext_resource type="Script" path="res://scripts/systems/ambient_bed.gd" id="22_ambient"]
-[ext_resource type="AudioStream" path="res://assets/audio/ambient/forest_wind.wav" id="23_wind"]
+[ext_resource type="Script" uid="uid://b5sjulhjux5m2" path="res://scripts/systems/ambient_bed.gd" id="22_ambient"]
+[ext_resource type="AudioStream" uid="uid://dgwukommillnk" path="res://assets/audio/ambient/forest_wind.wav" id="23_wind"]
 [ext_resource type="PackedScene" path="res://scenes/world/secrets/OddStump.tscn" id="24_oddstump"]
-[ext_resource type="Script" path="res://scripts/world/run/terrain.gd" id="90_terrain"]
+[ext_resource type="PackedScene" path="res://scenes/world/props/GiantMushroom.tscn" id="40_mushroom"]
+[ext_resource type="Script" uid="uid://xc3oiv5fgsat" path="res://scripts/fx/falling_leaves.gd" id="41_leaves"]
+[ext_resource type="Script" uid="uid://cux0ggowt72f1" path="res://scripts/world/run/backdrop.gd" id="90_backdrop"]
+[ext_resource type="Script" uid="uid://dodcxoqkqg8a5" path="res://scripts/world/run/terrain.gd" id="90_terrain"]
 [ext_resource type="Resource" path="res://assets/world/rock_style_hollow_woods.tres" id="91_rockstyle"]
 [ext_resource type="PackedScene" path="res://scenes/enemies/Mythos.tscn" id="92_mythos"]
-[ext_resource type="Shader" path="res://assets/shaders/forest_ground.gdshader" id="93_ground"]
+[ext_resource type="Shader" uid="uid://1jch8n2su8s1" path="res://assets/shaders/forest_ground.gdshader" id="93_ground"]
+[ext_resource type="PackedScene" path="res://scenes/enemies/BlueLobster.tscn" id="94_lobster"]
 [ext_resource type="Resource" path="res://assets/world/relief_hollow_woods.tres" id="94_relief"]
 [ext_resource type="PackedScene" path="res://scenes/world/props/AncientTree.tscn" id="95_ancient"]
-[ext_resource type="PackedScene" path="res://scenes/world/props/GiantMushroom.tscn" id="40_mushroom"]
-[ext_resource type="Script" path="res://scripts/fx/falling_leaves.gd" id="41_leaves"]
 [ext_resource type="PackedScene" path="res://scenes/world/props/GroundCover.tscn" id="96_cover"]
-
-[sub_resource type="ShaderMaterial" id="ShaderMaterial_grass"]
-shader = ExtResource("93_ground")
-
-[sub_resource type="BoxShape3D" id="BoxShape3D_wall_x"]
-size = Vector3(1, 17, 322)
-
-[sub_resource type="BoxShape3D" id="BoxShape3D_wall_z"]
-size = Vector3(322, 17, 1)
 
 [sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_1"]
 sky_top_color = Color(0.35, 0.55, 0.78, 1)
@@ -61,119 +52,141 @@ fog_light_color = Color(0.73, 0.81, 0.74, 1)
 fog_density = 0.0055
 fog_sky_affect = 0.2
 
-[node name="HollowWoods" type="Node3D"]
-script = ExtResource("1_arena")
-map_id = "hollow_woods"
+[sub_resource type="BoxShape3D" id="BoxShape3D_wall_x"]
+size = Vector3(1, 17, 322)
 
-[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+[sub_resource type="BoxShape3D" id="BoxShape3D_wall_z"]
+size = Vector3(322, 17, 1)
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_grass"]
+render_priority = 0
+shader = ExtResource("93_ground")
+shader_parameter/grass_dark = Color(0.4236, 0.618, 0.4731, 1)
+shader_parameter/grass_light = Color(0.5371, 0.7354, 0.5469, 1)
+shader_parameter/grass_scale = 0.35
+shader_parameter/scorch_dark = Color(0.1, 0.07, 0.06, 1)
+shader_parameter/scorch_light = Color(0.22, 0.14, 0.11, 1)
+shader_parameter/lava_color = Color(1, 0.28, 0.03, 1)
+shader_parameter/lava_core = Color(1, 0.7, 0.25, 1)
+shader_parameter/ash_color = Color(0.3, 0.29, 0.28, 1)
+shader_parameter/crack_scale = 0.3
+shader_parameter/crack_width = 0.055
+shader_parameter/lava_glow = 1.6
+shader_parameter/ascended_lava_color = Color(0.04, 0.34, 1, 1)
+shader_parameter/ascended_lava_core = Color(0.55, 0.9, 1, 1)
+shader_parameter/ascend_origin = Vector3(0, 0, 0)
+shader_parameter/ascend_radius = 0.0
+shader_parameter/burn_origin = Vector3(0, 0, 0)
+shader_parameter/burn_radius = 0.0
+shader_parameter/burn_edge = 9.0
+shader_parameter/heat = 1.0
+shader_parameter/ash = 0.0
+
+[node name="HollowWoods" type="Node3D" unique_id=1748556462]
+script = ExtResource("1_arena")
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="." unique_id=1620037420]
 environment = SubResource("Environment_1")
 
-[node name="Backdrop" type="Node3D" parent="."]
+[node name="Backdrop" type="Node3D" parent="." unique_id=2059722048]
 script = ExtResource("90_backdrop")
 ground_color = Color(0.2, 0.31, 0.19, 1)
-hill_color = Color(0.16, 0.26, 0.17, 1)
-far_hill_color = Color(0.13, 0.21, 0.15, 1)
-hill_height_max = 20.0
 peak_count = 22
 giant_count = 8
 
-[node name="Sun" type="DirectionalLight3D" parent="."]
+[node name="Sun" type="DirectionalLight3D" parent="." unique_id=1265506685]
 transform = Transform3D(0.866025, 0.383022, -0.321394, 0, 0.642788, 0.766044, 0.5, -0.663414, 0.55667, 0, 12, 0)
 light_color = Color(1, 0.94, 0.83, 1)
 light_energy = 1.25
 shadow_enabled = true
 
-[node name="Perimeter" type="StaticBody3D" parent="."]
+[node name="Perimeter" type="StaticBody3D" parent="." unique_id=541785282]
 
-[node name="WallEast" type="CollisionShape3D" parent="Perimeter"]
+[node name="WallEast" type="CollisionShape3D" parent="Perimeter" unique_id=298492780]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 160.5, 3.5, 0)
 shape = SubResource("BoxShape3D_wall_x")
 
-[node name="WallWest" type="CollisionShape3D" parent="Perimeter"]
+[node name="WallWest" type="CollisionShape3D" parent="Perimeter" unique_id=2035777824]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -160.5, 3.5, 0)
 shape = SubResource("BoxShape3D_wall_x")
 
-[node name="WallNorth" type="CollisionShape3D" parent="Perimeter"]
+[node name="WallNorth" type="CollisionShape3D" parent="Perimeter" unique_id=671222143]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 3.5, -160.5)
 shape = SubResource("BoxShape3D_wall_z")
 
-[node name="WallSouth" type="CollisionShape3D" parent="Perimeter"]
+[node name="WallSouth" type="CollisionShape3D" parent="Perimeter" unique_id=391114269]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 3.5, 160.5)
 shape = SubResource("BoxShape3D_wall_z")
 
-[node name="Interactables" type="Node3D" parent="."]
+[node name="Interactables" type="Node3D" parent="." unique_id=630430778]
 
-[node name="ChargeShrine" parent="Interactables" groups=["scatter_keepout"] instance=ExtResource("18_chargeshrine")]
+[node name="ChargeShrine" parent="Interactables" unique_id=1353286018 groups=["scatter_keepout"] instance=ExtResource("18_chargeshrine")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -48, 0, -44)
 
-[node name="ChargeShrineFar" parent="Interactables" groups=["scatter_keepout"] instance=ExtResource("18_chargeshrine")]
+[node name="ChargeShrineFar" parent="Interactables" unique_id=768200870 groups=["scatter_keepout"] instance=ExtResource("18_chargeshrine")]
 transform = Transform3D(0.707107, 0, -0.707107, 0, 1, 0, 0.707107, 0, 0.707107, 44, 0, -52)
 
-[node name="GreedShrine" parent="Interactables" groups=["scatter_keepout"] instance=ExtResource("19_greedshrine")]
+[node name="GreedShrine" parent="Interactables" unique_id=1364234580 groups=["scatter_keepout"] instance=ExtResource("19_greedshrine")]
 transform = Transform3D(-0.5, 0, -0.866025, 0, 1, 0, 0.866025, 0, -0.5, 52, 0, 30)
 
-[node name="CurseShrine" parent="Interactables" groups=["scatter_keepout"] instance=ExtResource("20_curseshrine")]
+[node name="CurseShrine" parent="Interactables" unique_id=1005341703 groups=["scatter_keepout"] instance=ExtResource("20_curseshrine")]
 transform = Transform3D(0.866025, 0, 0.5, 0, 1, 0, -0.5, 0, 0.866025, -4, 0, 58)
 
-[node name="ChestGround" parent="Interactables" groups=["scatter_keepout"] instance=ExtResource("21_chest")]
+[node name="ChestGround" parent="Interactables" unique_id=1291671067 groups=["scatter_keepout"] instance=ExtResource("21_chest")]
 transform = Transform3D(0.707107, 0, 0.707107, 0, 1, 0, -0.707107, 0, 0.707107, -26, 0, 34)
 
-[node name="OddStump" parent="Interactables" groups=["scatter_keepout"] instance=ExtResource("24_oddstump")]
+[node name="OddStump" parent="Interactables" unique_id=1021523415 groups=["scatter_keepout"] instance=ExtResource("24_oddstump")]
 transform = Transform3D(-0.801144, 0, 0.598472, 0, 1, 0, -0.598472, 0, -0.801144, 66, 0, 66)
 
-[node name="ExtraChest1" parent="Interactables" groups=["scatter_keepout"] instance=ExtResource("21_chest")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 48.0, 0, 0.0)
+[node name="ExtraChest1" parent="Interactables" unique_id=510647721 groups=["scatter_keepout"] instance=ExtResource("21_chest")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 48, 0, 0)
 
-[node name="ExtraCharge2" parent="Interactables" groups=["scatter_keepout"] instance=ExtResource("18_chargeshrine")]
+[node name="ExtraCharge2" parent="Interactables" unique_id=475567654 groups=["scatter_keepout"] instance=ExtResource("18_chargeshrine")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 35.5, 0, 44.6)
 
-[node name="ExtraChest3" parent="Interactables" groups=["scatter_keepout"] instance=ExtResource("21_chest")]
+[node name="ExtraChest3" parent="Interactables" unique_id=1315688658 groups=["scatter_keepout"] instance=ExtResource("21_chest")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -14.7, 0, 64.3)
 
-[node name="ExtraGreed4" parent="Interactables" groups=["scatter_keepout"] instance=ExtResource("19_greedshrine")]
+[node name="ExtraGreed4" parent="Interactables" unique_id=2106148481 groups=["scatter_keepout"] instance=ExtResource("19_greedshrine")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -43.2, 0, 20.8)
 
-[node name="ExtraCharge5" parent="Interactables" groups=["scatter_keepout"] instance=ExtResource("18_chargeshrine")]
+[node name="ExtraCharge5" parent="Interactables" unique_id=757701975 groups=["scatter_keepout"] instance=ExtResource("18_chargeshrine")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -51.4, 0, -24.7)
 
-[node name="ExtraChest6" parent="Interactables" groups=["scatter_keepout"] instance=ExtResource("21_chest")]
+[node name="ExtraChest6" parent="Interactables" unique_id=1771106982 groups=["scatter_keepout"] instance=ExtResource("21_chest")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -14.7, 0, -64.3)
 
-[node name="ExtraCurse7" parent="Interactables" groups=["scatter_keepout"] instance=ExtResource("20_curseshrine")]
+[node name="ExtraCurse7" parent="Interactables" unique_id=394406902 groups=["scatter_keepout"] instance=ExtResource("20_curseshrine")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 29.9, 0, -37.5)
 
-[node name="ExtraChest8" parent="Interactables" groups=["scatter_keepout"] instance=ExtResource("21_chest")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 96.0, 0, -88.0)
+[node name="ExtraChest8" parent="Interactables" unique_id=1633050801 groups=["scatter_keepout"] instance=ExtResource("21_chest")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 96, 0, -88)
 
-[node name="ExtraCharge9" parent="Interactables" groups=["scatter_keepout"] instance=ExtResource("18_chargeshrine")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -102.0, 0, 76.0)
+[node name="ExtraCharge9" parent="Interactables" unique_id=488353579 groups=["scatter_keepout"] instance=ExtResource("18_chargeshrine")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -102, 0, 76)
 
-[node name="ExtraChest10" parent="Interactables" groups=["scatter_keepout"] instance=ExtResource("21_chest")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -96.0, 0, -104.0)
+[node name="ExtraChest10" parent="Interactables" unique_id=322229215 groups=["scatter_keepout"] instance=ExtResource("21_chest")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -96, 0, -104)
 
-[node name="ExtraGreed11" parent="Interactables" groups=["scatter_keepout"] instance=ExtResource("19_greedshrine")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 110.0, 0, 92.0)
+[node name="ExtraGreed11" parent="Interactables" unique_id=1892770376 groups=["scatter_keepout"] instance=ExtResource("19_greedshrine")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 110, 0, 92)
 
-[node name="ForestScatter" type="Node3D" parent="."]
+[node name="ForestScatter" type="Node3D" parent="." unique_id=1922901619]
 script = ExtResource("9_scatter")
 arena_half_extent = 160.0
 tree_scene = ExtResource("10_tree")
 rock_scene = ExtResource("11_rock")
 stump_scene = ExtResource("12_stump")
 ancient_tree_scene = ExtResource("95_ancient")
-ancient_tree_count = 38
 mushroom_scene = ExtResource("40_mushroom")
-mushroom_count = 44
 tree_count = 230
 rock_count = 96
 stump_count = 60
-min_prop_spacing = 5.0
+ancient_tree_count = 38
+mushroom_count = 44
 perimeter_scene = ExtResource("10_tree")
 perimeter_accent_scene = ExtResource("11_rock")
-perimeter_step = 9.0
-perimeter_rock_every = 5
 perimeter_corner_gap = 9.0
-mesa_count = 5
 mesa_platform_scene = ExtResource("14_platform")
 mesa_ramp_scene = ExtResource("13_ramp")
 mesa_scale_min = 1.25
@@ -181,21 +194,21 @@ mesa_scale_max = 1.75
 mesa_ramp_attached = true
 mesa_chest_scene = ExtResource("21_chest")
 mesa_chest_count = 4
-formation_clearance = 4.5
 formation_style = ExtResource("91_rockstyle")
+formation_clearance = 4.5
 mask_blobs_min = 8
 mask_blobs_max = 12
 
-[node name="GroundCover" parent="ForestScatter" instance=ExtResource("96_cover")]
+[node name="GroundCover" parent="ForestScatter" unique_id=1341280021 instance=ExtResource("96_cover")]
 
-[node name="Terrain" type="StaticBody3D" parent="."]
+[node name="Terrain" type="StaticBody3D" parent="." unique_id=1069068356]
 script = ExtResource("90_terrain")
-amplitude = 2.4
+amplitude = 0.0
 feature_size = 55.0
 relief = ExtResource("94_relief")
 surface_material = SubResource("ShaderMaterial_grass")
 
-[node name="EnemySpawner" type="Node3D" parent="."]
+[node name="EnemySpawner" type="Node3D" parent="." unique_id=564781428]
 script = ExtResource("3_spawner")
 grunt_scene = ExtResource("4_grunt")
 skirmisher_scene = ExtResource("15_skirmisher")
@@ -203,18 +216,17 @@ tank_scene = ExtResource("16_tank")
 boss_scene = ExtResource("17_boss")
 boss_spawn_minute = 8.0
 mini_boss_scene = ExtResource("94_lobster")
-mini_boss_spawn_minute = 5.0
 elder_title = "Rey Pútrido Ancestral"
 stage_boss_scene = ExtResource("92_mythos")
 boss_warning_text = "Una presencia monstruosa se acerca..."
 
-[node name="AmbientBed" type="AudioStreamPlayer" parent="."]
+[node name="AmbientBed" type="AudioStreamPlayer" parent="." unique_id=14681597]
 stream = ExtResource("23_wind")
 volume_db = -26.0
 autoplay = true
 script = ExtResource("22_ambient")
 
-[node name="SpawnPoint" type="Marker3D" parent="."]
+[node name="SpawnPoint" type="Marker3D" parent="." unique_id=785758191]
 
-[node name="FallingLeaves" type="GPUParticles3D" parent="."]
+[node name="FallingLeaves" type="GPUParticles3D" parent="." unique_id=1894468882]
 script = ExtResource("41_leaves")

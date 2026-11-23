@@ -5,7 +5,7 @@ extends CanvasLayer
 ## mezclan ambos lados. Procesa siempre (process_mode ALWAYS) para que sus
 ## botones funcionen con todo lo demás en pausa.
 ##
-## Los altares, la caja de mascota y el bloque de la suerte lo abren por el grupo "upgrade_ui":
+## Los altares y el bloque de la suerte lo abren por el grupo "upgrade_ui":
 ## open_bonus_pick() da una elección gratis (con suerte extra o rareza mínima) y
 ## open_choice() muestra opciones que armó quien llama. Lo que llega con el
 ## selector abierto se encola (primero los niveles pendientes, después el resto)
@@ -324,7 +324,6 @@ func _pick_choice(index: int) -> void:
 	_animate_pick(index)
 
 
-## Muestra la tirada del Tomo del Azar en el aviso de botín del HUD.
 ## Muestra la tirada del Tomo del Azar en el aviso de botín del HUD.
 func _toast_gamble(boons: Array[Dictionary], player: Node) -> void:
 	var index: Variant = player.get("player_index")

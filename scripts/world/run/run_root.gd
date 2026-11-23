@@ -7,7 +7,7 @@ extends Node3D
 ## equipo sale por el portal: una partida es una secuencia de ETAPAS.
 ##
 ## Qué cruza una etapa: los raiders mismos y por tanto su nivel, armas,
-## tomos, objetos, mascotas, puntos, bendiciones de altar y temporales, la
+## tomos, objetos, puntos, bendiciones de altar y temporales, la
 ## dificultad de la partida y la inflación de cofres y ruleta; nada se copia
 ## porque nada se recrea. Qué se reinicia: el mapa y todo lo que cuelga de
 ## él (cofres, altares, portales, ruletas, balizas, enemigos, props), el
@@ -29,7 +29,7 @@ const SWAP_SETTLE_FRAMES: int = 1
 ## lucky_blocks: ese formato es fijo (tools/verificar.sh compara la línea
 ## entera), así que un grupo nuevo se libera aquí sin tocar la línea.
 const STAGE_PROP_GROUPS: Array[StringName] = [&"altars", XpGem.LIVE_GROUP,
-		HealthOrb.LIVE_GROUP, &"powerup_pickups", &"pet_boxes", &"vendors", &"possessed",
+		HealthOrb.LIVE_GROUP, &"powerup_pickups", &"vendors", &"possessed",
 		&"lucky_blocks"]
 
 @onready var _arena_host: Node3D = get_node(ARENA_HOST_NAME)
@@ -319,7 +319,7 @@ func _print_sweep() -> void:
 				chests += 1
 	var beacons := _live_beacons()
 	print(("Stage sweep: enemies=%d gems=%d orbs=%d chests=%d altars=%d beacons=%d"
-			+ " pickups=%d boxes=%d vendors=%d possessed=%d") % [
+			+ " pickups=%d vendors=%d possessed=%d") % [
 			get_tree().get_node_count_in_group(&"enemies"),
 			get_tree().get_node_count_in_group(XpGem.LIVE_GROUP),
 			get_tree().get_node_count_in_group(HealthOrb.LIVE_GROUP),
@@ -327,7 +327,6 @@ func _print_sweep() -> void:
 			get_tree().get_node_count_in_group(&"altars"),
 			beacons,
 			get_tree().get_node_count_in_group(&"powerup_pickups"),
-			get_tree().get_node_count_in_group(&"pet_boxes"),
 			get_tree().get_node_count_in_group(&"vendors"),
 			get_tree().get_node_count_in_group(&"possessed")])
 

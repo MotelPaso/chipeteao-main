@@ -55,9 +55,9 @@ const MARSH_PHASES: Array[Dictionary] = [
 			"weights": {"grunt": 0.25, "skirmisher": 0.3, "burrower": 0.25, "tank": 0.2}},
 ]
 
-## Techo duro de la probabilidad de élite, suba lo que suba la dificultad:
-## pasado esto una élite deja de ser un evento.
-const ELITE_CHANCE_CAP: float = 0.6
+## Techo duro de la probabilidad de élite (aunque sumen los pactos): pasado
+## esto una élite deja de ser un evento.
+const ELITE_CHANCE_CAP: float = 0.25
 
 @export_group("Escenas y fases")
 ## Tabla de fases de spawn de esta arena (ver PhasePreset).
@@ -77,7 +77,7 @@ const ELITE_CHANCE_CAP: float = 0.6
 @export_group("Ritmo y dificultad")
 ## Multiplicador global de cantidad: escala los enemigos de cada tick del
 ## flujo Y el tamaño de cada horda. No toca el cupo (ver «Cupo de enemigos»).
-@export var spawn_count_multiplier: float = 4.0
+@export var spawn_count_multiplier: float = 1.0
 ## Segundos entre ticks del flujo al empezar la partida.
 @export var start_interval: float = 3.0
 ## Piso del intervalo entre ticks, en segundos (también de los factores de
@@ -118,17 +118,25 @@ const ELITE_CHANCE_CAP: float = 0.6
 
 @export_group("Rampa tardía")
 ## Minuto de partida desde el que los spawns regulares escalan sin techo.
-@export var late_ramp_start_minute: float = 6.0
-## HP extra por minuto pasado el inicio de la rampa (fracción: 0.08 = +8%).
-@export var late_hp_per_minute: float = 0.08
+@export var late_ramp_start_minute: float = 2.0
+## HP extra por minuto pasado el inicio de la rampa (fracción: 0.12 = +12%).
+@export var late_hp_per_minute: float = 0.12
 ## Daño extra por minuto pasado el inicio de la rampa (fracción).
-@export var late_damage_per_minute: float = 0.05
+@export var late_damage_per_minute: float = 0.08
 ## XP extra por minuto pasado el inicio de la rampa (fracción).
 @export var late_xp_per_minute: float = 0.065
 
+@export_group("Daño de enemigos")
+## Cuánto de la dificultad sube el DAÑO de los enemigos normales: 0.4 = con +300% de dificultad pegan x2.2 y no x4. Su vida sí sube con toda la dificultad.
+@export var enemy_damage_difficulty_share: float = 0.4
+## Tope del multiplicador de daño de un enemigo normal al aparecer (dificultad, rampa, vueltas y luna de sangre juntos). 3 = un zombie de 15 pega como mucho 45; el shiny multiplica aparte (x1.5).
+@export var enemy_damage_multiplier_cap: float = 3.0
+
 @export_group("Hordas")
-## Minutos de etapa en que llega una horda; tras la última se repite cada
-## horde_repeat_minutes.
+## Si las hordas llegan solas en horde_minutes. Apagado (lo normal): las pide el director del mundo en su ritmo por minuto (WorldDirector, grupo «Ritmo por minuto»).
+@export var timed_hordes: bool = false
+## Minutos de etapa en que llega una horda (solo con timed_hordes); tras la
+## última se repite cada horde_repeat_minutes.
 @export var horde_minutes: Array[float] = [3.0, 7.0, 10.0, 13.0]
 ## Minutos entre hordas después de la última de horde_minutes.
 @export var horde_repeat_minutes: float = 3.0
@@ -137,18 +145,18 @@ const ELITE_CHANCE_CAP: float = 0.6
 ## Enemigos que suma la horda por minuto de partida.
 @export var horde_size_per_minute: float = 2.0
 ## Oleadas en que llega cada horda, alrededor de un raider al azar.
-@export var horde_waves: int = 4
+@export var horde_waves: int = 7
 ## Segundos entre oleadas de una horda.
-@export var horde_wave_gap: float = 1.6
+@export var horde_wave_gap: float = 2.2
 ## Aviso del HUD cuando se acerca una horda.
 @export var horde_warning_text: String = "¡Se acerca una horda!"
 
 @export_group("Oleadas de presión")
 ## Radio mínimo de la banda donde caen hordas y packs de élite alrededor de
 ## su centro, en metros.
-@export var surge_min_radius: float = 7.0
+@export var surge_min_radius: float = 14.0
 ## Radio máximo de esa banda, en metros.
-@export var surge_max_radius: float = 10.0
+@export var surge_max_radius: float = 20.0
 
 @export_group("Co-op")
 ## HP extra de los spawns por cada jugador en pie además del primero
@@ -162,6 +170,8 @@ const ELITE_CHANCE_CAP: float = 0.6
 ## HP extra de los jefes por cada jugador de la party además del primero
 ## (fracción; cuenta la party del lobby, no solo los que están en pie).
 @export var coop_boss_hp_per_extra_player: float = 0.5
+## Cuánto de la dificultad sube el DAÑO de los jefes (Mythos incluido): 0.3 = con +500% de dificultad pegan x2.5 y no x6. Su vida sí sube con toda la dificultad.
+@export var boss_damage_difficulty_share: float = 0.3
 
 @export_group("Élites")
 ## Minuto de partida en que empiezan a salir élites.
@@ -169,10 +179,10 @@ const ELITE_CHANCE_CAP: float = 0.6
 ## Minuto en que la probabilidad de élite llega a elite_full_chance.
 @export var elite_full_minute: float = 12.0
 ## Probabilidad de élite (0-1) en elite_start_minute; sube lineal hasta la
-## de abajo. La dificultad la multiplica y ELITE_CHANCE_CAP le pone techo.
-@export var elite_start_chance: float = 0.08
+## de abajo. ELITE_CHANCE_CAP le pone techo.
+@export var elite_start_chance: float = 0.04
 ## Probabilidad de élite (0-1) desde elite_full_minute.
-@export var elite_full_chance: float = 0.21
+@export var elite_full_chance: float = 0.1
 
 @export_group("Vueltas y pseudo-infinito")
 ## Multiplicador de HP por vuelta completa a la lista de mapas (spawns y jefes).
@@ -209,8 +219,8 @@ const ELITE_CHANCE_CAP: float = 0.6
 @export var mini_boss_spawn_minute: float = 5.0
 ## Si el minijefe pelea SOLO: desde que llega no aparece ningún enemigo normal (ni flujo, ni hordas, ni jaurías, ni lluvia de enemigos) y el respiro tras su muerte es total. La horda que ya estaba en la arena se la lleva él al empezar la pelea.
 @export var mini_boss_fights_alone: bool = true
-## Minuto de etapa en que llega su revancha Ancestral (el jefe de etapa).
-@export var elder_spawn_minute: float = 11.0
+## Minuto de etapa en que llega su revancha Ancestral (el jefe de etapa). Al matarlo se supera la etapa (ver RunManager.stage_goal).
+@export var elder_spawn_minute: float = 10.0
 ## Multiplicador de stats del Ancestral (y base de los jefes recurrentes).
 @export var elder_stat_multiplier: float = 1.8
 ## Título del Ancestral en el HUD; cada arena pone el suyo (este vale solo
@@ -240,22 +250,22 @@ const ELITE_CHANCE_CAP: float = 0.6
 
 @export_group("Eventos de cielo")
 ## Eclipse: cuántas veces más rápido llega el flujo (divide el intervalo).
-@export var eclipse_rate_multiplier: float = 1.8
+@export var eclipse_rate_multiplier: float = 2.2
 ## Eclipse: multiplicador de HP de los spawns.
-@export var eclipse_hp_multiplier: float = 1.25
+@export var eclipse_hp_multiplier: float = 1.4
 ## Luna de sangre: multiplicador de daño de los spawns.
-@export var blood_moon_damage_multiplier: float = 1.4
+@export var blood_moon_damage_multiplier: float = 1.6
 ## Luna de sangre: fracción (0-1) de spawns que llegan como berserker.
-@export var blood_moon_berserker_chance: float = 0.5
+@export var blood_moon_berserker_chance: float = 0.65
 ## Eclipse: fracción (0-1) de spawns que llegan como sombra.
-@export var eclipse_shade_chance: float = 0.4
+@export var eclipse_shade_chance: float = 0.5
 
 @export_group("Power-ups")
 ## Probabilidad (0-1) de que UNA baja suelte un power-up, antes de la stat
 ## de drop del raider (en %). Diminuta a propósito: tiene que ser un evento.
-@export var base_powerup_drop_chance: float = 0.004
+@export var base_powerup_drop_chance: float = 0.001
 ## Multiplicador de esa probabilidad si la baja es un enemigo shiny.
-@export var shiny_powerup_drop_scale: float = 5.0
+@export var shiny_powerup_drop_scale: float = 3.0
 ## Escena del power-up que cae al suelo.
 @export var powerup_pickup_scene: PackedScene = preload("res://scenes/systems/PowerUpPickup.tscn")
 
@@ -509,9 +519,9 @@ func temp_enemy_buff() -> float:
 
 
 ## Probabilidad de que un spawn nuevo salga élite: cero antes de
-## elite_start_minute, luego una rampa lineal hasta elite_full_minute. La
-## dificultad de la partida la multiplica: más élites es amenaza y
-## recompensa a la vez.
+## elite_start_minute, luego una rampa lineal hasta elite_full_minute. Solo
+## depende del minuto: la dificultad NO la sube, así los shinies siguen
+## siendo un evento aunque la dificultad se dispare.
 func elite_chance() -> float:
 	var minutes := run_minutes()
 	if minutes < elite_start_minute:
@@ -520,11 +530,9 @@ func elite_chance() -> float:
 	# dividiría por cero y envenenaría la rampa con NAN.
 	var span := maxf(elite_full_minute - elite_start_minute, 0.001)
 	var ramp := clampf((minutes - elite_start_minute) / span, 0.0, 1.0)
-	# Los pactos demoníacos venden probabilidad de élite directa, encima de
-	# la inclinación por dificultad.
+	# Los pactos demoníacos pueden vender probabilidad de élite directa.
 	return minf(lerpf(elite_start_chance, elite_full_chance, ramp)
-			* (1.0 + RunState.difficulty_bonus) + RunState.elite_chance_bonus,
-			ELITE_CHANCE_CAP)
+			+ RunState.elite_chance_bonus, ELITE_CHANCE_CAP)
 
 
 ## Gancho de invocación: coloca una `scene` en cada una de `positions` y pasa
@@ -546,9 +554,16 @@ func spawn_minions(scene: PackedScene, positions: Array[Vector3],
 ## Un enemigo en cada uno de `points`, a ras de suelo (lluvia de enemigos y
 ## tsunami del nodo Weather). Con presupuesto, como spawn_pressure_burst:
 ## max_active más horde_overflow si `horde`, o pressure_overflow si no.
-## Devuelve cuántos cayeron, para que el llamador pueda dosificarse.
-func spawn_at_points(points: Array[Vector3], horde: bool = true) -> int:
-	return _hordes.spawn_at_points(points, horde)
+## Devuelve cuántos cayeron, para que el llamador pueda dosificarse. Con
+## `from_sky` cada enemigo entra cayendo desde arriba (EnemyBase.drop_from_sky).
+func spawn_at_points(points: Array[Vector3], horde: bool = true, from_sky: bool = false) -> int:
+	return _hordes.spawn_at_points(points, horde, from_sky)
+
+
+## Como spawn_at_points, pero devuelve los enemigos creados (la ola del
+## tsunami los lleva ella misma).
+func spawn_bodies_at(points: Array[Vector3], horde: bool = true) -> Array[EnemyBase]:
+	return _hordes.spawn_bodies_at(points, horde)
 
 
 ## Ráfaga de presión (hordas propias y jauría shiny del WorldDirector): `count`
@@ -563,6 +578,24 @@ func spawn_pressure_burst(center: Vector3, count: int, force_elites: bool = fals
 
 
 ## --- Ubicación (fachadas sobre SpawnPoints; también las usa BossSchedule) ---
+
+## Arranca una horda ya (el ritmo por minuto del WorldDirector). Devuelve
+## false si no puede: un jefe pelea solo o otra horda sigue llegando.
+func start_horde() -> bool:
+	if _bosses.spawns_held() or _hordes.busy():
+		return false
+	_hordes.start_now()
+	return true
+
+
+## Un jefe extra del bioma ya (el premio «jefe» del bloque de la suerte), con
+## su aviso. Devuelve false si no puede: sin escena de jefe, un jefe pelea
+## solo, o no hubo punto libre para él.
+func spawn_bonus_boss() -> bool:
+	if boss_scene == null or _bosses.spawns_held():
+		return false
+	return _bosses.spawn_boss(1.0) != null
+
 
 ## True mientras el jefe de etapa propio pelea solo: nada aparece.
 func spawns_held() -> bool:

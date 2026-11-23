@@ -10,9 +10,11 @@ extends CharacterBody3D
 ## EnemyOverlays (capas de color), EnemyStatus (ralentización y veneno),
 ## EnemyPossession (siervos) y EnemyLoot (pagos al morir).
 
-## Grupo de los siervos poseídos. También lo leen el bastón nigromante,
-## RunRoot y ArenaProbe.
+## Grupo de los siervos poseídos. También lo leen RunRoot y ArenaProbe.
 const POSSESSED_GROUP: StringName = &"possessed"
+## Grupo de quien quiere saber DÓNDE muere cada enemigo: se le llama
+## on_enemy_died(posición, radio del cuerpo). Hoy, el Vial de sangre.
+const DEATH_LISTENERS_GROUP: StringName = &"enemy_death_listeners"
 ## Tope de cofres shiny sin abrir; el valor se edita en EnemyLoot. ArenaProbe
 ## lo lee aquí.
 const BOUNTY_CHEST_CAP: int = EnemyLoot.BOUNTY_CHEST_CAP
@@ -73,9 +75,8 @@ const ARENA_CLAMP_MARGIN: float = 1.5
 ## Probabilidad (0-1) de que un shiny suelte un orbe de vida al morir (los
 ## comunes nunca sueltan; los jefes tienen su propio pago).
 @export var elite_health_orb_chance: float = 0.4
-## Probabilidad (0-1) de que un shiny suelte un cofre al morir; la dificultad
-## de la partida la escala.
-@export var elite_chest_chance: float = 0.3
+## Probabilidad (0-1) de que un shiny suelte un cofre al morir (fija: la dificultad no la sube).
+@export var elite_chest_chance: float = 0.01
 
 @export_group("Trepar")
 ## Si trepa paredes y props al empujar contra ellos, así el relieve nunca
@@ -90,16 +91,46 @@ const ARENA_CLAMP_MARGIN: float = 1.5
 @export var max_climb_height: float = 10.0
 
 @export_group("Posesión")
-## Si el bastón nigromante puede levantarlo como siervo. Solo los que pelean
+## Si un arma de posesión (hoy ninguna) puede levantarlo como siervo. Solo los que pelean
 ## por contacto (su _combat_tick daña cualquier Health que reciba); los que
 ## disparan o golpean en área lo tienen apagado en su escena, porque poseídos
 ## seguirían atacando al equipo.
 @export var possessable: bool = true
 
+@export_group("Impacto")
+## Cuánto lo empujan los golpes de las armas (1 = el empuje completo del arma, 0 = nada). Igual para toda la horda.
+@export var push_taken: float = 1.0
+## Qué tan rápido se frena el empuje, en m/s por segundo (más = el empujón dura menos).
+@export var push_decay: float = 30.0
+## Resistencia a ralentizaciones que gana por cada segundo que pasa frenado (0.4 = tras 1 s frenado, los frenazos le quitan un 40% menos). Igual para toda la horda.
+@export var slow_resist_build: float = 0.4
+## Tope de esa resistencia (0.75 = un frenazo nunca le pega menos que a un cuarto de su fuerza).
+@export_range(0.0, 1.0) var slow_resist_max: float = 0.75
+## Cuánta resistencia pierde por segundo cuando NO está frenado.
+@export var slow_resist_recovery: float = 0.25
+
+@export_group("Pendiente")
+## Cuánto sigue el cuerpo la inclinación del terreno al pisarlo (0 = siempre derecho, 1 = pegado a la ladera). Igual para toda la horda.
+@export_range(0.0, 1.0) var slope_follow: float = 1.0
+## Inclinación máxima por pendiente, en grados.
+@export var slope_max_degrees: float = 35.0
+## Qué tan rápido se acomoda a una pendiente nueva (fracción cerrada por segundo; menos = más suave).
+@export var slope_damp_rate: float = 5.0
+
+@export_group("Borde")
+## Si lleva el borde negro de silueta (assets/materials/outline.tres). Apágalo en un cuerpo hecho de planos finos, donde el borde se vería como una sombra corrida.
+@export var outline_enabled: bool = true
+
 @export_group("Puntería")
 ## Altura en metros sobre los pies a la que apuntan las armas del raider (ver
 ## aim_point()).
 @export var aim_height: float = 0.8
+
+@export_group("Caída del cielo")
+## Altura (metros) desde la que cae el dibujo del enemigo en la lluvia de enemigos.
+@export var sky_drop_height: float = 18.0
+## Segundos que tarda en caer hasta el suelo (mientras cae no ataca ni recibe golpes).
+@export var sky_drop_seconds: float = 0.8
 
 ## True desde make_elite(): este cuerpo es shiny.
 var is_elite: bool = false
@@ -112,6 +143,8 @@ var separation_key_frame: int = -1
 
 var _gravity: float = ProjectSettings.get_setting("physics/3d/default_gravity", 9.8)
 var _xp_multiplier: int = 1
+## Posición original del dibujo, guardada la primera vez que se levanta.
+var _visual_rest: Vector3 = Vector3.INF
 ## Factor del valor de la gema por grado del mapa (ver apply_tier_scaling); 1.0 = base.
 var _tier_xp_multiplier: float = 1.0
 ## Límite de la arena para los trepadores (del nodo "arena_bounds"; INF = sin límite).
@@ -142,6 +175,8 @@ func _ready() -> void:
 	_health.died.connect(_on_died)
 	_health.damaged.connect(_on_damaged_flash)
 	_overlays.cache_meshes(_visual)
+	if _wants_outline():
+		Outline.apply(_visual)
 	var bounds := get_tree().get_first_node_in_group("arena_bounds") as Node3D
 	if bounds != null:
 		# Con guarda: un nodo de límites sin la propiedad devuelve null, y
@@ -209,9 +244,11 @@ func _physics_process(delta: float) -> void:
 		steer = steer.normalized()
 	var slow := 1.0 if _status == null else _status.slow_multiplier()
 	var slowed_speed := move_speed * slow
+	var push := Vector3.ZERO if _status == null else _status.push_velocity()
 	# Una sola escritura de la propiedad en vez de dos get/set: `velocity.x =`
 	# lee el vector entero y lo vuelve a escribir. Mismos valores float32.
-	velocity = Vector3(steer.x * slowed_speed, velocity.y, steer.z * slowed_speed)
+	velocity = Vector3(steer.x * slowed_speed + push.x, velocity.y,
+			steer.z * slowed_speed + push.z)
 
 	var face := _facing_direction(steer, seek)
 	if face.length_squared() > 0.0001:
@@ -221,6 +258,7 @@ func _physics_process(delta: float) -> void:
 
 	_tick_climb(steer)
 	move_and_slide()
+	_tick_slope_tilt(delta)
 	_clamp_solver_launch()
 	if _arena_limit != INF:
 		# Se escribe solo cuando el recorte actúa (rara vez: un trepador en el
@@ -256,11 +294,54 @@ func death_burst_color() -> Color:
 ## velocidad durante `duration` segundos. Reaplicar REFRESCA en vez de
 ## acumular, así latigazos repetidos nunca la llevan a cero; como en
 ## apply_poison, ganan la ralentización MÁS FUERTE y el reloj MÁS LARGO.
-## Lo llaman el Látigo de espinas y el Hedor.
+## Lo llama el Hedor.
 func apply_slow(speed_multiplier: float, duration: float) -> void:
 	if duration <= 0.0:
 		return
 	_ensure_status().apply_slow(speed_multiplier, duration)
+
+
+## Radio del cuerpo en el plano, en metros (el de su forma de choque, ya
+## agrandada si es shiny o de grado): las armas de área lo suman a su
+## alcance, así un golpe que toca el borde del cuerpo cuenta.
+func hit_radius() -> float:
+	var shape := _collision.shape if _collision != null else null
+	if shape is CapsuleShape3D:
+		return (shape as CapsuleShape3D).radius
+	if shape is SphereShape3D:
+		return (shape as SphereShape3D).radius
+	if shape is CylinderShape3D:
+		return (shape as CylinderShape3D).radius
+	if shape is BoxShape3D:
+		var size := (shape as BoxShape3D).size
+		return maxf(size.x, size.z) * 0.5
+	return 0.0
+
+
+## Golpe de un arma (WeaponBase.deal_damage): un empujón `push` (m/s, con
+## dirección) escalado por _push_scale(), que se frena con push_decay, y un
+## frenazo corto con apply_slow. Así el golpe se siente.
+## Lluvia de enemigos: el dibujo cae desde arriba hasta el cuerpo, que
+## espera en el suelo quieto y sin colisión hasta que aterriza.
+func drop_from_sky() -> void:
+	EnemySkyDrop.play(self, _visual, sky_drop_height, sky_drop_seconds)
+
+
+## Levanta el dibujo `lift` metros sobre el cuerpo (0 = en su sitio). La
+## ola del tsunami lo usa para formar la cresta.
+func set_visual_lift(lift: float) -> void:
+	if _visual_rest == Vector3.INF:
+		_visual_rest = _visual.position
+	_visual.position = _visual_rest + Vector3.UP * lift
+
+
+func apply_hit_impact(push: Vector3, slow_multiplier: float, slow_seconds: float) -> void:
+	push.y = 0.0
+	var scaled := push * _push_scale()
+	if scaled.length_squared() > 0.0001:
+		_ensure_status().apply_push(scaled, push_decay)
+	if slow_seconds > 0.0 and slow_multiplier < 1.0:
+		apply_slow(slow_multiplier, slow_seconds)
 
 
 ## Multiplicador de velocidad externo actual: 1.0 sin ralentización activa.
@@ -275,6 +356,15 @@ func apply_poison(dps: float, duration: float) -> void:
 	if dps <= 0.0 or duration <= 0.0 or _health.is_dead:
 		return
 	_ensure_status().apply_poison(dps, duration)
+
+
+## Aplica una quemadura de `dps` durante `duration` segundos (Vara de brasas).
+## Es un efecto aparte del veneno: los dos pueden correr a la vez. Al
+## refrescar ganan el dps más fuerte y el reloj más largo.
+func apply_burn(dps: float, duration: float) -> void:
+	if dps <= 0.0 or duration <= 0.0 or _health.is_dead:
+		return
+	_ensure_status().apply_burn(dps, duration)
 
 
 # --- shiny, grados y variantes ---------------------------------------------------
@@ -349,7 +439,7 @@ func apply_variant(kind: String) -> void:
 # --- posesión --------------------------------------------------------------------
 
 ## Vuelve a este cuerpo siervo de `carrier` por `duration` segundos (ver
-## EnemyPossession). Lo llama el bastón nigromante.
+## EnemyPossession). Hoy ningún arma lo llama; queda para un arma de posesión.
 func make_possessed(carrier: Node3D, duration: float) -> void:
 	_possession = EnemyPossession.new(carrier, duration)
 	EnemyPossession.switch_sides(self)
@@ -456,6 +546,38 @@ func _combat_tick(_player: Node3D, _distance: float) -> void:
 	pass
 
 
+## Inclina el Visual hacia la pendiente que pisa, suave; en el aire vuelve a
+## derecho. El cuerpo ya gira en Y hacia donde va, así que la normal se lee en
+## su espacio local.
+func _tick_slope_tilt(delta: float) -> void:
+	if not _follows_slope():
+		return
+	var target := Vector2.ZERO
+	if is_on_floor() and slope_follow > 0.0:
+		var normal := global_basis.orthonormalized().inverse() * get_floor_normal()
+		var limit := deg_to_rad(slope_max_degrees)
+		target = Vector2(clampf(atan2(normal.z, normal.y), -limit, limit),
+				clampf(atan2(-normal.x, normal.y), -limit, limit)) * slope_follow
+	var weight := 1.0 - exp(-slope_damp_rate * delta)
+	_visual.rotation.x = lerpf(_visual.rotation.x, target.x, weight)
+	_visual.rotation.z = lerpf(_visual.rotation.z, target.y, weight)
+
+
+## Virtual: si el Visual sigue la pendiente; los jefes mueven su propio rig.
+func _follows_slope() -> bool:
+	return true
+
+
+## Virtual: si este cuerpo lleva el borde de silueta; el jefe usa el suyo.
+func _wants_outline() -> bool:
+	return outline_enabled
+
+
+## Virtual: cuánto empuje recibe este cuerpo; el jefe lo cambia por el suyo.
+func _push_scale() -> float:
+	return push_taken
+
+
 ## Virtual: dirección hacia la que gira el cuerpo. Por defecto mira hacia
 ## donde se mueve.
 func _facing_direction(steer: Vector3, _seek: Vector3) -> Vector3:
@@ -469,8 +591,8 @@ func _apply_elite_damage(_multiplier: float) -> void:
 
 
 ## Virtual: copia a `servant` (el siervo que se levanta del cadáver de este
-## cuerpo, de su misma escena) lo que lo hace pegar como él. Pensado para el
-## bastón nigromante; Grunt suma su contact_damage.
+## cuerpo, de su misma escena) lo que lo hace pegar como él (ver
+## make_possessed); Grunt suma su contact_damage.
 func _copy_combat_stats_to(servant: EnemyBase) -> void:
 	servant.move_speed = move_speed
 
@@ -503,7 +625,7 @@ func _drop_xp_gem() -> void:
 func _drop_health_orbs() -> void:
 	if is_elite and randf() < elite_health_orb_chance:
 		EnemyLoot.spawn_health_orb(get_tree(), global_position + Vector3.UP * 0.6)
-	if is_elite and randf() < elite_chest_chance * (1.0 + RunState.difficulty_bonus):
+	if is_elite and randf() < elite_chest_chance:
 		EnemyLoot.drop_bounty_chest(self)
 
 
@@ -521,6 +643,8 @@ func _pick_target() -> Node3D:
 func _ensure_status() -> EnemyStatus:
 	if _status == null:
 		_status = EnemyStatus.new(_health, _overlays)
+		_status.configure_slow_resist(slow_resist_build, slow_resist_max,
+				slow_resist_recovery)
 	return _status
 
 
@@ -676,6 +800,10 @@ func _on_died() -> void:
 		_death_tween()
 		return
 	RunState.add_kill()
+	# Aviso por grupo a quien reacciona a muertes por LUGAR, la mate quien la
+	# mate (el charco del Vial de sangre). Grupo vacío = no cuesta nada.
+	get_tree().call_group(DEATH_LISTENERS_GROUP, "on_enemy_died", global_position,
+			hit_radius())
 	# Contador del bestiario (pantalla Colección): la clave sale del nombre
 	# del archivo del script ("kills_grunt", "kills_rotking", ...). No
 	# renombres los scripts de enemigos.

@@ -22,8 +22,12 @@ extends Resource
 ## Color de la capa de veneno; el alfa es su opacidad.
 @export var poison_tint: Color = Color(0.35, 0.9, 0.3, 0.35)
 
+@export_group("Quemadura")
+## Color de la capa de quemadura; el alfa es su opacidad. Se ve encima del veneno.
+@export var burn_tint: Color = Color(1.0, 0.45, 0.1, 0.4)
+
 @export_group("Poseído")
-## Color de los siervos poseídos: su capa, el estallido al expirar y el rayo del Báculo de nigromante.
+## Color de los siervos poseídos: su capa y el estallido al expirar.
 @export var possessed_color: Color = Color(0.65, 0.35, 0.95)
 ## Opacidad de la capa de poseído, 0-1.
 @export_range(0.0, 1.0) var possessed_alpha: float = 0.35

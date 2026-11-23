@@ -236,23 +236,6 @@ theme_override_constants/h_separation = 10
 theme_override_constants/v_separation = 4
 script = ExtResource("7_chips")
 
-[node name="PetPanel" parent="Layout/Columns/SideColumn/Side/Panels/Extras" unique_id=1332296838 instance=ExtResource("2_section")]
-unique_name_in_owner = true
-layout_mode = 2
-size_flags_horizontal = 3
-title = "Mascota"
-tile_color = Color(0.357, 0.839, 0.627, 1)
-tilt_degrees = -1.0
-
-[node name="Pet" type="Label" parent="Layout/Columns/SideColumn/Side/Panels/Extras/PetPanel/Content/Box" unique_id=1045238819]
-unique_name_in_owner = true
-layout_mode = 2
-theme_override_colors/font_color = Color(0.082, 0.075, 0.102, 1)
-theme_override_font_sizes/font_size = 15
-text = "Sin mascota"
-clip_text = true
-text_overrun_behavior = 3
-
 [node name="ItemsPanel" parent="Layout/Columns/SideColumn/Side/Panels" unique_id=1426141947 instance=ExtResource("2_section")]
 unique_name_in_owner = true
 layout_mode = 2
@@ -287,5 +270,4 @@ alignment = 2
 [editable path="Layout/Columns/SideColumn/Side/Panels/StatsPanel"]
 [editable path="Layout/Columns/SideColumn/Side/Panels/PlayersPanel"]
 [editable path="Layout/Columns/SideColumn/Side/Panels/Extras/PowerUpsPanel"]
-[editable path="Layout/Columns/SideColumn/Side/Panels/Extras/PetPanel"]
 [editable path="Layout/Columns/SideColumn/Side/Panels/ItemsPanel"]

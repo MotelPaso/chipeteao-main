@@ -383,7 +383,6 @@ boss_gem_count = 12
 boss_gem_value = 9
 health_orb_count = 3
 tier_body_scale = 1.0
-base_chest_drops = 2
 move_speed = 14.0
 turn_speed = 7.0
 separation_strength = 0.0

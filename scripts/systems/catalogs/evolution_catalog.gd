@@ -24,7 +24,7 @@ extends RefCounted
 ##       hay ícono. Se DECLARA, no se deriva de evolved_name: las iniciales de
 ##       los nombres en español chocan («Cáliz de peste» y «Corona de
 ##       tempestad» darían «CD»). No debe repetirse entre armas, evoluciones,
-##       tomos, objetos, power-ups ni mascotas (el lint glyphs_unique lo revisa).
+##       tomos, objetos ni power-ups (el lint glyphs_unique lo revisa).
 ##   mults: {propiedad: factor} que se multiplica sobre el nodo del arma al
 ##       evolucionar. La propiedad debe existir en la escena del arma.
 ##   adds: {propiedad: cantidad} que se suma sobre el nodo del arma al
@@ -70,13 +70,6 @@ const EVOLUTION_LIBRARY: Array[Dictionary] = [
 		"flavor": "flechas que enhebran columnas enteras de enemigos",
 	},
 	{
-		"weapon_id": "thorn_whip", "weapon_node": "ThornWhip",
-		"evolved_name": "Guirnalda sepulcral", "glyph": "GS",
-		"mults": {"damage": 1.7},
-		"adds": {"slow_percent": 25.0},
-		"flavor": "un zarzal que estrangula y casi detiene a la horda",
-	},
-	{
 		"weapon_id": "boomerang", "weapon_node": "Boomerang",
 		"evolved_name": "Sierra orbital", "glyph": "SO",
 		"mults": {"damage": 1.8, "travel_scale": 1.3},
@@ -103,13 +96,6 @@ const EVOLUTION_LIBRARY: Array[Dictionary] = [
 		"mults": {"damage": 1.8, "cooldown": 0.6},
 		"adds": {"projectile_count": 1},
 		"flavor": "un halo ardiente que nadie cruza y vive",
-	},
-	{
-		"weapon_id": "necro_staff", "weapon_node": "NecroStaff",
-		"evolved_name": "Corona del Rey Lich", "glyph": "CN",
-		"mults": {"damage": 1.6},
-		"adds": {"possess_duration": 4.0, "max_possessed": 6},
-		"flavor": "un ejército que ya no cabe en el campo",
 	},
 	{
 		"weapon_id": "storm_rod", "weapon_node": "StormRod",

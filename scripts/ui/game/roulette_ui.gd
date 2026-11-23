@@ -115,11 +115,12 @@ func _log_tag() -> String:
 ## presionable y se traga el clic en silencio es peor que uno en gris.
 func _refresh_points() -> void:
 	var purse := _show_points()
-	# El precio se duplica con cada giro, así que la etiqueta se vuelve a leer
+	# El precio sube con cada giro, así que la etiqueta se vuelve a leer
 	# aquí en vez de fijarse una vez al armar el panel.
 	var cost := _shrine.current_price()
 	_spin_button.text = spin_template % cost
-	_spin_button.disabled = _spinning or purse < cost
+	# La ruleta se gasta al primer giro: después solo queda cerrar.
+	_spin_button.disabled = _spinning or purse < cost or not _shrine.available
 
 
 func _on_spin() -> void:
@@ -130,9 +131,7 @@ func _on_spin() -> void:
 		_result.text = broke_line
 		return
 	_spinning = true
-	# Limpia el giro anterior antes de empezar: la ruleta se reusa, y una línea
-	# de resultado y un resaltado viejos seguirían en pantalla durante el nuevo
-	# barrido.
+	# Limpia lo que haya en pantalla antes de empezar el barrido.
 	_result.text = ""
 	for row: Label in _rows:
 		row.modulate = Color.WHITE

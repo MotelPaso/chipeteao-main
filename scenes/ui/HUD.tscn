@@ -14,6 +14,7 @@
 [ext_resource type="Script" uid="uid://ry5jc7hbci8u" path="res://scripts/ui/game/hud/powerup_row.gd" id="12_powerups"]
 [ext_resource type="Script" uid="uid://dbqt1k5sw738v" path="res://scripts/ui/game/hud/view_widgets.gd" id="13_views"]
 [ext_resource type="PackedScene" path="res://scenes/ui/hud/DifficultyChip.tscn" id="14_difficulty"]
+[ext_resource type="Script" path="res://scripts/ui/game/hud/event_burst.gd" id="15_eventburst"]
 
 [node name="HUD" type="CanvasLayer" unique_id=214834967]
 layer = 5
@@ -193,6 +194,20 @@ vertical_alignment = 1
 text_overrun_behavior = 3
 script = ExtResource("6_announce")
 
+[node name="EventBurst" type="PanelContainer" parent="."]
+unique_name_in_owner = true
+visible = false
+anchors_preset = 5
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -260.0
+offset_top = 100.0
+offset_right = 260.0
+offset_bottom = 160.0
+grow_horizontal = 2
+mouse_filter = 2
+script = ExtResource("15_eventburst")
+
 [node name="HpBar" type="ProgressBar" parent="." unique_id=1742065830]
 unique_name_in_owner = true
 anchors_preset = 7
@@ -260,7 +275,7 @@ horizontal_alignment = 2
 script = ExtResource("7_probe")
 
 [node name="LoadoutDock" type="VBoxContainer" parent="."]
-editor_description = "Muelle de equipo del jugador 1: la bolsa arriba y armas, tomos y mascota abajo. Anclado abajo a la izquierda y crece hacia arriba; su ancho lo fijan las columnas de BagStrip, así nunca llega a la barra de vida."
+editor_description = "Muelle de equipo del jugador 1: la bolsa arriba y armas y tomos abajo. Anclado abajo a la izquierda y crece hacia arriba; su ancho lo fijan las columnas de BagStrip, así nunca llega a la barra de vida."
 anchors_preset = 2
 anchor_top = 1.0
 anchor_bottom = 1.0

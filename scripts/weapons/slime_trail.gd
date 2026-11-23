@@ -1,9 +1,11 @@
 extends WeaponBase
-## Rastro de baba: el portador deja una fila de charcos cáusticos al moverse;
-## cada enemigo parado en un charco recibe un golpe cada tick_interval. No
+## Rastro de baba: el portador deja una fila de charcos cáusticos al moverse.
+## Como el Aura, un enemigo recibe el golpe en cuanto su cuerpo toca un
+## charco y otra vez cada tick_interval mientras siga encima (uno por enemigo,
+## aunque pise varios charcos), y va frenado todo el rato que está encima. No
 ## necesita blanco: el arma "dispara" a su ritmo siempre que el portador se movió.
 ## Cómo usa los ajustes de WeaponBase:
-##   damage        — daño por pulso (por deal_damage)
+##   damage        — daño de cada golpe (por deal_damage)
 ##   cooldown      — segundos entre charcos mientras se mueve
 ##   attack_range  — sin uso (Largo alcance igual ensancha los charcos por el área)
 ## Los charcos son registros SlimePuddle que avanza esta arma (sin escena de
@@ -16,8 +18,10 @@ extends WeaponBase
 @export var puddle_radius: float = 1.4
 ## Segundos que dura un charco; la carta «Baba más espesa», la evolución y el Tomo de Persistencia lo alargan.
 @export var puddle_life: float = 3.0
-## Segundos entre pulsos de daño de cada charco.
+## Segundos entre dos golpes al MISMO enemigo mientras sigue en la baba.
 @export var tick_interval: float = 0.5
+## Segundos que le dura el frenazo de la baba (hit_slow) al salir de ella; encima, va frenado siempre.
+@export var slow_linger: float = 0.2
 ## Distancia mínima, en metros, que el portador debe moverse desde el último charco.
 @export var min_drop_distance: float = 0.8
 ## Altura máxima, en metros, por encima o por debajo del charco a la que alcanza.
@@ -51,13 +55,14 @@ class SlimePuddle extends RefCounted:
 	var center: Vector3 = Vector3.ZERO
 	var radius: float = 0.0
 	var life_left: float = 0.0
-	var tick_timer: float = 0.0
 	var visual: MeshInstance3D = null
 
 
 var _puddles: Array[SlimePuddle] = []
 var _last_drop: Vector3 = Vector3.INF
 var _drop_timer: float = 0.0
+## id de instancia del enemigo -> segundos hasta que puede volver a recibir golpe.
+var _rehit: Dictionary[int, float] = {}
 
 
 func _ready() -> void:
@@ -79,6 +84,7 @@ func _physics_process(delta: float) -> void:
 			_last_drop = feet
 			_drop_cluster(feet, maxi(effective_projectile_count(), 1))
 	_tick_puddles(delta)
+	_touch_enemies(delta)
 
 ## El punto del suelo justo bajo el portador. Un rayo hacia abajo desde sus
 ## pies: si salta, el charco se queda en el piso y no flota en el aire. Si el
@@ -132,6 +138,8 @@ func _spawn_puddle(center: Vector3) -> void:
 	var radius := puddle_radius * area_scale()
 	var visual := spawn_fx_mesh(puddle_mesh)
 	visual.global_position = center + Vector3.UP * puddle_ground_offset
+	# Sigue la pendiente: en una ladera el charco no queda medio enterrado.
+	GroundAlign.align_to_ground(visual, radius)
 	visual.scale = Vector3(radius * grow_from, 1.0, radius * grow_from)
 	var grow := visual.create_tween()
 	grow.tween_property(visual, "scale", Vector3(radius, 1.0, radius), grow_time) \
@@ -140,7 +148,6 @@ func _spawn_puddle(center: Vector3) -> void:
 	puddle.center = center
 	puddle.radius = radius
 	puddle.life_left = puddle_life * duration_scale()
-	puddle.tick_timer = tick_interval * 0.5
 	puddle.visual = visual
 	_puddles.append(puddle)
 
@@ -149,17 +156,49 @@ func _tick_puddles(delta: float) -> void:
 	for i in range(_puddles.size() - 1, -1, -1):
 		var puddle := _puddles[i]
 		puddle.life_left -= delta
-		puddle.tick_timer -= delta
-		if puddle.tick_timer <= 0.0:
-			puddle.tick_timer = tick_interval
-			_pulse(puddle)
 		if puddle.life_left <= 0.0:
 			_expire(puddle)
 			_puddles.remove_at(i)
 
 
-func _pulse(puddle: SlimePuddle) -> void:
-	damage_all(enemies_in_disc(puddle.center, puddle.radius, height_window))
+## Cada enemigo que toca algún charco va frenado (hit_slow, con slow_linger al
+## salir) y, si su espera terminó, recibe el golpe al instante.
+func _touch_enemies(delta: float) -> void:
+	for id: int in _rehit.keys():
+		_rehit[id] -= delta
+		if _rehit[id] <= 0.0:
+			_rehit.erase(id)
+	if _puddles.is_empty():
+		return
+	for node: Node in get_tree().get_nodes_in_group("enemies"):
+		var enemy := node as EnemyBase
+		if enemy == null or not enemy.is_inside_tree() or not _on_slime(enemy):
+			continue
+		enemy.apply_slow(hit_slow, slow_linger)
+		var id := enemy.get_instance_id()
+		if _rehit.has(id):
+			continue
+		var health := Health.find_in(enemy)
+		if health == null or health.is_dead:
+			continue
+		deal_damage(health)
+		_rehit[id] = tick_interval
+
+
+## Verdadero si el cuerpo de `enemy` toca algún charco vivo (mismo criterio
+## que WeaponBase.enemies_in_disc: el cuerpo entero, con ventana de altura).
+func _on_slime(enemy: EnemyBase) -> bool:
+	var at := enemy.global_position
+	var body_radius := enemy.hit_radius()
+	for puddle: SlimePuddle in _puddles:
+		var to_body := at - puddle.center
+		if absf(to_body.y) > height_window:
+			continue
+		to_body.y = 0.0
+		var reach := puddle.radius + body_radius
+		if to_body.length_squared() <= reach * reach:
+			return true
+	return false
 
 
 func _expire(puddle: SlimePuddle) -> void:

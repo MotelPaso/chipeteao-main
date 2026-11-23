@@ -7,11 +7,11 @@ extends CharacterBody3D
 ##
 ## Cada parte vive en su nodo hijo de Player.tscn, con sus propios valores:
 ## SealRig (cuerpo visible), CameraRig (cámara y vista), Revive (caído y
-## rescate en co-op, con el cartel RevivePrompt), Flight (power-up Vuelo),
-## PetSlot (mascota), Wallet (puntos), además de Health, Stats, ItemBag,
+## rescate en co-op, con el cartel RevivePrompt), Knockback (empujón al
+## recibir golpe), Wallet (puntos), además de Health, Stats, ItemBag,
 ## PowerUps y el montaje Weapons. Player decide el orden de cada tick y
-## conserva los nombres que otros scripts llaman (add_points, set_pet,
-## view_camera, end_flight…).
+## conserva los nombres que otros scripts llaman (add_points,
+## view_camera…).
 ##
 ## Contrato de escena: la CapsuleShape3D de CollisionShape3D lleva
 ## `resource_local_to_scene` en Player.tscn porque _set_body_height() la
@@ -21,8 +21,8 @@ extends CharacterBody3D
 ## Cambiaron los puntos de la partida (reemite la del nodo Wallet); el HUD
 ## la conecta por nombre.
 signal points_changed(total: int)
-## Se emite al EMPEZAR un derrape, con su dirección; lo escucha el
-## Cinturón eléctrico (ItemBag).
+## Se emite al EMPEZAR un derrape, con su dirección (hoy nadie lo escucha;
+## queda para objetos que reaccionen al derrape).
 signal slide_started(direction: Vector3)
 
 ## Dónde queda un caído rescatado del vacío respecto de su compañero: al
@@ -40,12 +40,22 @@ const RESCUE_MATE_OFFSET := Vector3(1.5, 0.5, 0.0)
 @export var jump_velocity: float = 8.7
 
 @export_group("Derrape")
-## Multiplicador de la velocidad efectiva durante el derrape.
-@export var slide_speed_multiplier: float = 2.21
-## Duración del derrape, en segundos.
-@export var slide_duration: float = 0.3
+## Derrape = deslizarse agachado mientras se mantiene la tecla: no se levanta solo. Toma velocidad en bajada, la pierde en subida y en plano (fricción).
+## Saltar durante el derrape conserva su impulso, y al caer con la tecla apretada vuelve a derrapar: así se encadena el bunny hop.
+## Velocidad con que arranca, como multiplicador de la de caminar (si ya iba más rápido, conserva la suya).
+@export var slide_start_speed_multiplier: float = 2.21
+## Frenado en plano, en m/s por segundo.
+@export var slide_friction: float = 3.0
+## Cuánto lo acelera la pendiente (1 = la gravedad real a lo largo de la ladera; más = bajadas más rápidas).
+@export var slide_gravity_scale: float = 1.6
+## Tope de velocidad, como multiplicador de la de caminar.
+@export var slide_max_speed_multiplier: float = 3.5
+## Cuánto se puede girar mientras se desliza, en radianes por segundo.
+@export var slide_steer_rate: float = 2.0
+## Cuánto se pega al suelo al deslizarse por una bajada, en metros (más = sigue mejor el relieve).
+@export var slide_snap_length: float = 0.8
 ## Espera entre un derrape y el siguiente, en segundos.
-@export var slide_cooldown: float = 0.8
+@export var slide_cooldown: float = 0.4
 ## Altura de la cápsula durante el derrape, en metros.
 @export var slide_collision_height: float = 0.9
 ## Fracción de la velocidad efectiva que ya debe llevar el cuerpo para derrapar (0-1; no se derrapa desde quieto).
@@ -55,7 +65,7 @@ const RESCUE_MATE_OFFSET := Vector3(1.5, 0.5, 0.0)
 ## Tope de armas simultáneas; al llegar, el pool deja de ofrecer armas nuevas (upgrade_pool.gd lo lee por nombre).
 @export var max_weapons: int = 4
 ## Tope de tomos distintos; al llegar, el pool solo ofrece más niveles de los que ya tiene (upgrade_pool.gd lo lee por nombre).
-@export var max_tomes: int = 3
+@export var max_tomes: int = 4
 
 @export_group("Seguridad")
 ## Altura del mundo (Y, en metros) bajo la cual el raider vuelve a suelo seguro sin daño.
@@ -75,11 +85,6 @@ static var starting_weapon_override: String = ""
 var points: int:
 	get:
 		return _wallet.points if _wallet != null else 0
-## Mascota que sigue al raider ("" = ninguna; la guarda el nodo PetSlot).
-## Antes del _ready de Player vale "": PlayerStats ya la lee en el suyo.
-var pet_id: String:
-	get:
-		return _pet_slot.pet_id if _pet_slot != null else ""
 ## Radio de rescate en metros (solo lectura; se edita en el nodo Revive).
 var revive_radius: float:
 	get:
@@ -96,8 +101,6 @@ var revive_time: float:
 @onready var _stats: PlayerStats = $Stats
 @onready var _camera: PlayerCamera = $CameraRig
 @onready var _revive: PlayerRevive = $Revive
-@onready var _flight: PlayerFlight = $Flight
-@onready var _pet_slot: PetSlot = $PetSlot
 @onready var _wallet: PlayerWallet = $Wallet
 
 var _gravity: float = ProjectSettings.get_setting("physics/3d/default_gravity", 9.8)
@@ -110,9 +113,9 @@ var _default_collision_radius: float = 0.4
 var _actions: Dictionary[StringName, StringName] = {}
 
 var _is_sliding: bool = false
-var _slide_timer: float = 0.0
 var _slide_cooldown_timer: float = 0.0
-var _slide_direction: Vector3 = Vector3.ZERO
+## floor_snap_length de la escena, que el derrape agranda mientras dura.
+var _default_snap_length: float = 0.1
 
 ## Tiempo restante de un enraizamiento externo (Entomb): sin moverse, saltar ni derrapar.
 var _root_timer: float = 0.0
@@ -139,6 +142,7 @@ func _ready() -> void:
 	# Después de _apply_character: la cámara pasa el modelo nuevo del rig a
 	# la capa visual del slot.
 	_camera.setup()
+	_default_snap_length = floor_snap_length
 	var capsule := collision_shape.shape as CapsuleShape3D
 	if capsule != null:
 		_default_collision_height = capsule.height
@@ -158,14 +162,11 @@ func _physics_process(delta: float) -> void:
 	_tick_timers(delta)
 	_rescue_from_void()
 
-	# Vuelo manda en el eje vertical mientras dura: con gravedad, la subida y
-	# la caída se equilibrarían a una altura cualquiera.
-	var flying := _flight.tick()
 	if is_on_floor():
-		# Pisar suelo recarga los saltos, también volando. Se recarga aquí y
-		# no en _try_jump para que quien cae de un borde conserve sus saltos.
+		# Pisar suelo recarga los saltos. Se recarga aquí y no en _try_jump
+		# para que quien cae de un borde conserve sus saltos.
 		_jumps_left = _max_jumps()
-	elif not flying:
+	else:
 		velocity.y -= _gravity * delta
 
 	_camera.apply_stick_look(delta)
@@ -242,17 +243,6 @@ func view_camera() -> Camera3D:
 ## Capa visual del cuerpo propio de este slot (ver PlayerCamera.RIG_LAYER_BASE).
 func rig_visual_layer() -> int:
 	return _camera.rig_visual_layer()
-
-
-## Cambia la mascota (la caja de mascotas y el vendedor la llaman por
-## nombre; ver PetSlot.set_pet).
-func set_pet(new_pet_id: String) -> void:
-	_pet_slot.set_pet(new_pet_id)
-
-
-## PowerUps la llama por nombre cuando termina Vuelo (ver PlayerFlight.end_flight).
-func end_flight() -> void:
-	_flight.end_flight()
 
 
 # --- Puntos (nodo Wallet) ---------------------------------------------------
@@ -334,11 +324,11 @@ func _read_wish_dir() -> Vector3:
 
 func _update_slide(delta: float, wish_dir: Vector3, effective_speed: float) -> void:
 	if _is_sliding:
-		_slide_timer -= delta
-		if _slide_timer <= 0.0 or not is_on_floor():
+		# No se levanta solo: el derrape dura mientras se mantenga la tecla.
+		if not Input.is_action_pressed(slot_action(&"sprint")):
 			_end_slide()
 	elif _can_start_slide(wish_dir, effective_speed):
-		_start_slide(wish_dir)
+		_start_slide(wish_dir, effective_speed)
 
 
 func _apply_horizontal_velocity(delta: float, wish_dir: Vector3,
@@ -348,9 +338,7 @@ func _apply_horizontal_velocity(delta: float, wish_dir: Vector3,
 		velocity.x = 0.0
 		velocity.z = 0.0
 	elif _is_sliding:
-		var slide_velocity: Vector3 = _slide_direction * effective_speed * slide_speed_multiplier
-		velocity.x = slide_velocity.x
-		velocity.z = slide_velocity.z
+		_apply_slide_velocity(delta, wish_dir, effective_speed)
 	else:
 		var target: Vector3 = wish_dir * effective_speed
 		var accel: float = acceleration if is_on_floor() else air_acceleration
@@ -459,10 +447,13 @@ func _can_start_slide(wish_dir: Vector3, effective_speed: float) -> bool:
 	return horizontal_speed > effective_speed * slide_min_speed_ratio
 
 
-func _start_slide(direction: Vector3) -> void:
+func _start_slide(direction: Vector3, effective_speed: float) -> void:
 	_is_sliding = true
-	_slide_timer = slide_duration
-	_slide_direction = direction
+	var speed := maxf(Vector2(velocity.x, velocity.z).length(),
+			effective_speed * slide_start_speed_multiplier)
+	velocity.x = direction.x * speed
+	velocity.z = direction.z * speed
+	floor_snap_length = slide_snap_length
 	_set_body_height(slide_collision_height)
 	Juice.fov_kick_begin(view_camera())
 	Sfx.play(&"slide")
@@ -471,9 +462,33 @@ func _start_slide(direction: Vector3) -> void:
 
 func _end_slide() -> void:
 	_is_sliding = false
+	floor_snap_length = _default_snap_length
 	_slide_cooldown_timer = slide_cooldown
 	_set_body_height(_default_collision_height)
 	Juice.fov_kick_end(view_camera())
+
+
+## Un frame de derrape: en el suelo, la pendiente empuja hacia abajo
+## (la parte de la gravedad a lo largo de la ladera) y la fricción frena; el
+## jugador solo puede torcer un poco el rumbo. En el aire conserva su impulso.
+func _apply_slide_velocity(delta: float, wish_dir: Vector3, effective_speed: float) -> void:
+	var horizontal := Vector3(velocity.x, 0.0, velocity.z)
+	if is_on_floor():
+		var normal := get_floor_normal()
+		# Gravedad proyectada en la ladera, su parte horizontal: g * n.y * (n.x, n.z).
+		horizontal += Vector3(normal.x, 0.0, normal.z) * normal.y * _gravity \
+				* slide_gravity_scale * delta
+		horizontal = horizontal.move_toward(Vector3.ZERO, slide_friction * delta)
+	var speed := horizontal.length()
+	if speed > 0.01 and wish_dir != Vector3.ZERO:
+		var heading := horizontal / speed
+		var turn := heading.signed_angle_to(wish_dir, Vector3.UP)
+		heading = heading.rotated(Vector3.UP,
+				clampf(turn, -slide_steer_rate * delta, slide_steer_rate * delta))
+		horizontal = heading * speed
+	horizontal = horizontal.limit_length(effective_speed * slide_max_speed_multiplier)
+	velocity.x = horizontal.x
+	velocity.z = horizontal.z
 
 
 func _set_body_height(height: float) -> void:

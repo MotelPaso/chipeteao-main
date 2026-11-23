@@ -1,10 +1,11 @@
 extends FieldWeapon
 ## Hedor: pulsos flatulentos. En cada enfriamiento estalla una ráfaga de nubes
-## de gas desde el portador (una por proyectil, escalonadas). Cada nube daña,
-## envenena y ralentiza todo lo que hay en su radio. Cómo usa los ajustes de WeaponBase:
+## de gas desde el portador (una por proyectil, escalonadas): una onda plana que
+## se abre en el suelo donde estaba el portador. Cada pulso daña, envenena y
+## ralentiza todo lo que hay en su radio. Cómo usa los ajustes de WeaponBase:
 ##   damage            — golpe de cada pulso (por deal_damage); el veneno por segundo sale de él
 ##   cooldown          — segundos entre ráfagas
-##   attack_range      — radio de la nube (los tomos de área lo escalan)
+##   attack_range      — radio de la onda (los tomos de área lo escalan)
 ##   projectile_count  — pulsos por ráfaga (el Tomo de Multitud suma)
 ## Cada golpe suma un stack de veneno (más daño por segundo) y más tiempo,
 ## hasta un tope de stacks y de duración.
@@ -30,17 +31,17 @@ extends FieldWeapon
 ## Segundos entre pulsos de una misma ráfaga. Fijo: no se comprime con el enfriamiento.
 @export var burst_stagger: float = 0.15
 
-@export_group("Nube")
-## Malla y material de la nube (color y opacidad en albedo_color); radio 1, se escala al radio del pulso.
-@export var cloud_mesh: Mesh
-## Cuánto debajo del montaje del arma nace la nube, en metros.
-@export var cloud_drop: float = 0.3
-## Escala con que nace la nube antes de crecer, en metros de radio.
-@export var cloud_start_scale: float = 0.3
-## Segundos que tarda la nube en crecer hasta el radio del pulso.
-@export var cloud_grow_time: float = 0.45
-## Segundos que tarda la nube en desvanecerse.
-@export var cloud_fade_time: float = 0.6
+@export_group("Onda")
+## Malla y material de la onda (un anillo plano de radio exterior 1; color y opacidad en albedo_color). Se escala al radio del pulso.
+@export var wave_mesh: Mesh
+## Cuánto debajo del montaje del arma se dibuja la onda, en metros (cerca del suelo).
+@export var wave_drop: float = 1.0
+## Radio con que nace la onda antes de abrirse, en metros.
+@export var wave_start_scale: float = 0.2
+## Segundos que tarda la onda en abrirse hasta el radio del pulso.
+@export var wave_grow_time: float = 0.35
+## Segundos que tarda la onda en desvanecerse.
+@export var wave_fade_time: float = 0.5
 
 ## id de instancia del enemigo -> {"stacks": int, "until": float} (run_time en que acaba su veneno).
 var _poison_state: Dictionary[int, Dictionary] = {}
@@ -67,7 +68,7 @@ func _pulse() -> void:
 			_stack_poison(enemy, now)
 			enemy.apply_slow(slow_multiplier, slow_duration * duration_scale())
 	_prune_poison(now)
-	_play_cloud(radius)
+	_play_wave(radius)
 
 
 ## Cada golpe suma un stack (más daño por segundo) y más duración al veneno vigente.
@@ -93,16 +94,18 @@ func _prune_poison(now: float) -> void:
 			_poison_state.erase(id)
 
 
-## Esfera translúcida que se expande y se adelgaza: el "pfff". Se anima la
+## Anillo plano que se abre desde donde estaba el portador y se apaga: el
+## "pfff". Se queda en su lugar aunque el portador se mueva. Se anima la
 ## transparencia del nodo, no el material compartido de la escena.
-func _play_cloud(radius: float) -> void:
-	var shell := spawn_fx_mesh(cloud_mesh)
-	shell.global_position = global_position + Vector3.DOWN * cloud_drop
-	shell.scale = Vector3.ONE * cloud_start_scale
-	var tween := shell.create_tween()
+func _play_wave(radius: float) -> void:
+	var ring := spawn_fx_mesh(wave_mesh)
+	ring.global_position = global_position + Vector3.DOWN * wave_drop
+	GroundAlign.align_to_ground(ring, radius)
+	ring.scale = Vector3(wave_start_scale, 1.0, wave_start_scale)
+	var tween := ring.create_tween()
 	tween.set_parallel(true)
-	tween.tween_property(shell, "scale", Vector3.ONE * radius, cloud_grow_time) \
+	tween.tween_property(ring, "scale", Vector3(radius, 1.0, radius), wave_grow_time) \
 			.set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
-	tween.tween_property(shell, "transparency", 1.0, cloud_fade_time) \
+	tween.tween_property(ring, "transparency", 1.0, wave_fade_time) \
 			.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
-	tween.chain().tween_callback(shell.queue_free)
+	tween.chain().tween_callback(ring.queue_free)

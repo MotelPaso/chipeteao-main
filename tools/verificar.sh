@@ -389,7 +389,7 @@ if grep -qE "$PATRON_ERROR" "$STAGE_LOG"; then
 	FALLOS=$((FALLOS + 1))
 else
 	AVANCES=$(grep -c '^Stage advanced: ' "$STAGE_LOG")
-	SWEEPS_SUCIOS=$(grep '^Stage sweep: ' "$STAGE_LOG" | grep -cv 'enemies=0 gems=0 orbs=0 chests=0 altars=0 beacons=0 pickups=0 boxes=0 vendors=0 possessed=0')
+	SWEEPS_SUCIOS=$(grep '^Stage sweep: ' "$STAGE_LOG" | grep -cv 'enemies=0 gems=0 orbs=0 chests=0 altars=0 beacons=0 pickups=0 vendors=0 possessed=0')
 	CARRIES=$(grep -c '^Stage carry: ' "$STAGE_LOG")
 	# Las líneas van en PARES (una antes del cruce y otra después). Cada
 	# par tiene que coincidir consigo mismo; entre un cruce y el siguiente
@@ -466,7 +466,7 @@ else
 	COOP_ESPERADO=$(( FRAMES / 120 ))
 	COOP_AVANCES=$(grep -c '^Stage advanced: ' "$COOP_LOG")
 	COOP_REVIVES=$(grep -c '^Player revived: ' "$COOP_LOG")
-	COOP_SUCIOS=$(grep '^Stage sweep: ' "$COOP_LOG" | grep -cv 'enemies=0 gems=0 orbs=0 chests=0 altars=0 beacons=0 pickups=0 boxes=0 vendors=0 possessed=0')
+	COOP_SUCIOS=$(grep '^Stage sweep: ' "$COOP_LOG" | grep -cv 'enemies=0 gems=0 orbs=0 chests=0 altars=0 beacons=0 pickups=0 vendors=0 possessed=0')
 	echo "  avances=$COOP_AVANCES reanimaciones=$COOP_REVIVES sweeps_sucios=$COOP_SUCIOS"
 	fase_fin
 	if [ "$COOP_REPORTES" -lt "$COOP_ESPERADO" ]; then
@@ -541,7 +541,7 @@ else
 	MYTHOS_ESPERADO=$(( MYTHOS_FRAMES / 120 ))
 	MYTHOS_VIDAS=$(grep -c '^Mythos scaling: life=' "$MYTHOS_LOG")
 	MYTHOS_MUERTES=$(grep -c '^Stage boss slain: Mythos at ' "$MYTHOS_LOG")
-	MYTHOS_SUCIOS=$(grep '^Stage sweep: ' "$MYTHOS_LOG" | grep -cv 'enemies=0 gems=0 orbs=0 chests=0 altars=0 beacons=0 pickups=0 boxes=0 vendors=0 possessed=0')
+	MYTHOS_SUCIOS=$(grep '^Stage sweep: ' "$MYTHOS_LOG" | grep -cv 'enemies=0 gems=0 orbs=0 chests=0 altars=0 beacons=0 pickups=0 vendors=0 possessed=0')
 	MYTHOS_PELEA=$(sed -n 's/^Mythos fight over: took=\([0-9.]*\)s.*/\1/p' "$MYTHOS_LOG" | head -1)
 	echo "  vidas=$MYTHOS_VIDAS muertes=$MYTHOS_MUERTES pelea=${MYTHOS_PELEA:-?}s sweeps_sucios=$MYTHOS_SUCIOS"
 	fase_fin

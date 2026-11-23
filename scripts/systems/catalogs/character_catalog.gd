@@ -87,6 +87,7 @@ const CHARACTER_ROWS: Array[Dictionary] = [
 		"passive_description": "+0.5 de armadura por nivel",
 		"passive_stat": "armor", "passive_amount": 0.5,
 		"unlock_cost": 0,
+		"model_scene": "res://assets/models/characters/caballerita/caballerita_character.tscn",
 		"tint": Color(0.35, 0.51, 0.74),
 	},
 	{
@@ -107,7 +108,7 @@ const CHARACTER_ROWS: Array[Dictionary] = [
 		"weapon_node_name": "HuntingBow",
 		"passive_description": "+1.0% de velocidad de ataque por nivel",
 		"passive_stat": "cooldown", "passive_amount": 1.0,
-		"model_scene": "res://assets/models/yandere_character.tscn",
+		"model_scene": "res://assets/models/characters/ninja/ninja_character.tscn",
 		"unlock_cost": 0,
 		"tint": Color(0.24, 0.55, 0.32),
 	},
@@ -118,6 +119,7 @@ const CHARACTER_ROWS: Array[Dictionary] = [
 		"passive_description": "+1.0% de xp por nivel",
 		"passive_stat": "xp_gain", "passive_amount": 1.0,
 		"unlock_cost": 0,
+		"model_scene": "res://assets/models/characters/meowl/meowl_character.tscn",
 		"tint": Color(0.55, 0.85, 0.95),
 	},
 	{
@@ -137,6 +139,7 @@ const CHARACTER_ROWS: Array[Dictionary] = [
 		"passive_description": "+0.5% de robo de vida por nivel",
 		"passive_stat": "lifesteal", "passive_amount": 0.5,
 		"unlock_cost": 0,
+		"model_scene": "res://assets/models/characters/chupacabra/chupacabra_character.tscn",
 		"tint": Color(0.72, 0.16, 0.2),
 	},
 	{
@@ -146,7 +149,10 @@ const CHARACTER_ROWS: Array[Dictionary] = [
 		"passive_description": "+2% de duración de efectos por nivel",
 		"passive_stat": "duration", "passive_amount": 2.0,
 		"unlock_cost": 0,
-		"tint": Color(0.35, 0.45, 0.85),
+		# Foca redonda (más alta y más gruesa de frente a atrás) con los
+		# colmillos hacia abajo; ver moka_character.tscn.
+		"model_scene": "res://assets/models/moka_character.tscn",
+		"tint": Color(0.35, 0.51, 0.74),
 	},
 	{
 		"id": "barco_basurero", "display_name": "Bolsa de basura",
@@ -156,6 +162,7 @@ const CHARACTER_ROWS: Array[Dictionary] = [
 		"passive_stat": "area", "passive_amount": 0.5,
 		"passive_stat2": "duration", "passive_amount2": 0.5,
 		"unlock_cost": 0,
+		"model_scene": "res://assets/models/characters/bolsa_de_basura/bolsa_de_basura_character.tscn",
 		"tint": Color(0.6, 0.7, 0.3),
 	},
 	{
@@ -179,8 +186,8 @@ const CHARACTER_ROWS: Array[Dictionary] = [
 		# de crítico rinde más por nivel.
 		"passive_description": "+1.0% de prob. de crítico por nivel",
 		"passive_stat": "crit_chance", "passive_amount": 1.0,
-		"passive_base": 50.0,
 		"unlock_cost": 0,
+		"model_scene": "res://assets/models/characters/boxeador/boxeador_character.tscn",
 		"tint": Color(0.726, 0.299, 0.166, 1.0),
 	},
 	{

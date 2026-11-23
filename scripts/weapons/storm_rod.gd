@@ -14,7 +14,8 @@ const LIGHTNING_BEAM_SCENE: PackedScene = preload("res://scenes/fx/LightningBeam
 
 @export_group("Cadena")
 ## Saltos extra tras el primer golpe; la carta «Cielo bifurcado» suma 1 y la evolución Corona de tempestad suma 3.
-@export var chain_count: int = 2
+## Con decimales: las cartas suman de a 1.3, 1.7…; se usa redondeado hacia abajo.
+@export var chain_count: float = 2.0
 ## Un eslabón salta como máximo a esta distancia del anterior, en metros.
 @export var chain_range: float = 6.5
 ## Por debajo de este largo, en metros, un eslabón no se dibuja (dos cuerpos en el mismo punto).
@@ -44,7 +45,7 @@ func _zap(target: Node3D) -> void:
 	var previous_point := global_position + Vector3.UP * 1.1
 	var current := target
 	var hit_ids: Dictionary[int, bool] = {}
-	var links := 1 + chain_count
+	var links := 1 + floori(chain_count + 0.0001)
 	var fork_range := chain_range * area_scale()
 	for link in links:
 		if current == null:

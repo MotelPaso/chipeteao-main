@@ -14,11 +14,8 @@ const ICON_DIR := "res://assets/ui/icons/items/"
 const KIND_FILES: Dictionary[String, String] = {
 	"magnet": "kind_magnet.svg",
 	"poison_on_hit": "kind_poison_on_hit.svg",
-	"titan": "kind_titan.svg",
 	"spiders": "kind_spiders.svg",
-	"shock_dash": "kind_shock_dash.svg",
 	"saiyan": "kind_saiyan.svg",
-	"zenkai": "kind_zenkai.svg",
 	"demonic_boost": "kind_demonic_boost.svg",
 	"charge_boost": "kind_charge_boost.svg",
 	"portal_recharge": "kind_portal_recharge.svg",
@@ -30,6 +27,10 @@ static var _cache: Dictionary[String, Texture2D] = {}
 
 ## El icono de esa fila de ItemCatalog o de Tome.TOME_LIBRARY.
 static func texture(row: Dictionary) -> Texture2D:
+	# Un `icon` en la fila (ruta res:// del SVG) manda sobre todo.
+	var icon_path := String(row.get("icon", ""))
+	if not icon_path.is_empty() and ResourceLoader.exists(icon_path, "Texture2D"):
+		return load(icon_path) as Texture2D
 	var kind := String(row.get("kind", ""))
 	if KIND_FILES.has(kind):
 		var own := _load(KIND_FILES[kind])

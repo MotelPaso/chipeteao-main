@@ -91,6 +91,8 @@ var _spent_usec: int = 0
 
 func _ready() -> void:
 	add_to_group(GROUP)
+	# Ajuste del jugador (Ajustes > Pasto y piedras).
+	visible = SaveData.show_ground_cover
 	set_process(false)
 	# El scatter coloca sus props y las estructuras del relieve en
 	# Arena._ready, después de este _ready: se empieza un frame más tarde.

@@ -211,6 +211,19 @@ text = "Mostrar FPS"
 unique_name_in_owner = true
 size_flags_horizontal = 10
 
+[node name="GroundRow" type="HBoxContainer" parent="Center/Panel/VBox"]
+theme_override_constants/separation = 16
+
+[node name="GroundLabel" type="Label" parent="Center/Panel/VBox/GroundRow"]
+custom_minimum_size = Vector2(200, 0)
+theme_override_colors/font_color = Color(0.925, 0.886, 0.792, 1)
+theme_override_font_sizes/font_size = 16
+text = "Pasto y piedras"
+
+[node name="GroundCheck" type="CheckButton" parent="Center/Panel/VBox/GroundRow"]
+unique_name_in_owner = true
+size_flags_horizontal = 10
+
 [node name="QualityRow" type="HBoxContainer" parent="Center/Panel/VBox"]
 theme_override_constants/separation = 16
 
