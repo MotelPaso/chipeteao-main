@@ -37,7 +37,7 @@ const ALTAR_BOONS: Array[Dictionary] = [
 	{"stat": "lifesteal", "label": "Robo de vida +%d%%"},
 	{"stat": "duration", "label": "Duración de efectos +%d%%"},
 	{"stat": "max_hp", "label": "HP máx. +%d"},
-	{"stat": "armor", "label": "Armadura +%d"},
+	{"stat": "armor", "label": "Armadura +%d%%"},
 	{"stat": "evasion", "label": "Evasión +%d%%"},
 	{"stat": "thorns", "label": "Espinas +%d",
 		"values": [3, 5, 7, 10]},
@@ -110,6 +110,9 @@ var channeling: bool = false
 var progress: float = 0.0
 var _time: float = 0.0
 var _leaving: bool = false
+## Suerte de quien recibe la elección en curso: inclina la rareza de las
+## cantidades (_reward_options la lee).
+var _offer_luck: float = 0.0
 var _crystal_rest_y: float = 0.0
 ## Radio de la zona de este altar; de él sale la banda de acercamiento.
 var _zone_radius: float = DEFAULT_ZONE_RADIUS
@@ -346,6 +349,8 @@ func _complete() -> void:
 ## bloqueante es otra forma de trabar la partida, y el harness solo sabe
 ## responder esta.
 func _offer_reward(keys: int, recipient: Node) -> void:
+	var stats := PlayerStats.find_in(recipient) if recipient != null else null
+	_offer_luck = stats.luck if stats != null else 0.0
 	var options := _reward_options(keys)
 	if options.is_empty():
 		return
@@ -362,14 +367,21 @@ func _reward_options(keys: int) -> Array[Dictionary]:
 	var options: Array[Dictionary] = []
 	for i in mini(ALTAR_CHOICE_COUNT, pool.size()):
 		var boon: Dictionary = pool[i]
-		var amount := boon_amount(_boon_value(boon), keys)
+		# La rareza se sortea con la curva de suerte de todo el juego (la suerte
+		# de quien recibe); la cantidad es el valor de esa rareza en la lista
+		# `values` (una por rareza, en el orden de Rarity.TIERS).
+		var values := boon_values(boon)
+		var rarity := Rarity.roll(_offer_luck)
+		var index := mini(Rarity.index_of(String(rarity.name)), values.size() - 1)
+		var amount := boon_amount(float(values[index]), keys)
 		var label := String(boon.label) % roundi(amount)
 		options.append({
 			# Solo la stat y su cantidad: ni nombre propio, ni la party, ni la
 			# dificultad que suma el altar (se aplican igual).
 			"title": label,
 			"description": "",
-			"color": accent_color,
+			"color": rarity.color as Color,
+			"ribbon": Rarity.display_name(String(rarity.name)),
 			"label": label,
 			"stat": String(boon.stat),
 			"amount": amount,
@@ -390,11 +402,6 @@ static func boon_values(boon: Dictionary) -> Array:
 			if String(effect.get("stat", "")) == stat and effect.has("values"):
 				return effect.values
 	return [1]
-
-
-## Cantidad de un don del altar: un valor al azar de boon_values.
-static func _boon_value(boon: Dictionary) -> float:
-	return float(boon_values(boon).pick_random())
 
 
 ## El selector de cartas devuelve aquí la opción elegida.

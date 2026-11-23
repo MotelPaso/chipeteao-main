@@ -35,15 +35,22 @@ const PASSIVE_KINDS: Array[String] = ["per_level", "evasion_execute", "speed_to_
 
 @export_group("Topes")
 ## Por mucha velocidad de ataque acumulada, el multiplicador global de
-## enfriamiento nunca baja de esto.
-@export var min_cooldown_multiplier: float = 0.25
-## La evasión nunca supera esta probabilidad de esquivar (0-1), sumen lo que
-## sumen las fuentes.
-@export var max_evasion: float = 0.6
+## enfriamiento nunca baja de esto (0.1 = como mucho 10 veces más rápido, +900%).
+@export var min_cooldown_multiplier: float = 0.1
+## Techo de la evasión (0-1): la curva se acerca a esto sin llegar nunca.
+@export var max_evasion: float = 0.8
+## Curva de la evasión: con esta evasión sumada (fracción) se llega a ~63% del techo. Igual al techo = al principio cada punto vale casi lo mismo.
+@export var evasion_curve: float = 0.8
+## Techo de la reducción de daño por armadura (0-1): la curva se acerca a esto sin llegar nunca.
+@export var max_armor_reduction: float = 0.8
+## Curva de la armadura: con esta armadura sumada (fracción) la reducción llega a ~63% del techo. 0.8 = igual que la evasión: +10% reduce ~9%, +30% ~25%, +60% ~42%.
+@export var armor_curve: float = 0.8
 ## Las pasivas de esquivar-ejecutar matan a un atacante no jefe cuya
 ## fracción de HP sea menor que esto al esquivar. Hoy ningún personaje usa
 ## el tipo "evasion_execute", así que no ajusta nada.
 @export var execute_threshold: float = 0.25
+## Lo máximo que cura el robo de vida por segundo, como fracción de la vida máxima (0.05 = 5%), golpeen las armas a cuantos enemigos golpeen.
+@export var lifesteal_max_heal_per_second: float = 0.05
 @export_group("")
 
 # Valores derivados: cámbialos con add_tome()/recompute(), nunca a mano.
@@ -56,14 +63,23 @@ var crit_chance: float = 0.0
 ## aquí diga 2.0 antes del primer recompute en _ready).
 var crit_damage: float = 2.0
 var lifesteal: float = 0.0
+## Puntos de armadura sumados de todas las fuentes.
+## Armadura sumada de todas las fuentes (fracción: 0.12 = +12%), antes de la
+## curva; las cartas muestran esto.
 var armor: float = 0.0
+## Fracción del daño que la armadura le quita a cada golpe (curva de
+## max_armor_reduction y armor_curve); se empuja al Health hermano.
+var damage_reduction: float = 0.0
 var luck: float = 0.0
 ## Multiplicador de la suerte total (stat "luck_percent": +30 = ×1,3). Se
 ## aplica después de sumar todos los puntos de suerte.
 var luck_multiplier: float = 1.0
-## Probabilidad (0-1, con techo max_evasion) de esquivar por completo un
+## Probabilidad (0-1, curva hacia max_evasion) de esquivar por completo un
 ## golpe; la tira el Health hermano en cada golpe.
 var evasion: float = 0.0
+## Velocidad de ataque sumada de todas las fuentes (0.2 = +20%); en
+## _clamp_derived se vuelve cooldown_multiplier = 1 / (1 + esto).
+var _attack_speed_bonus: float = 0.0
 ## Daño fijo que se devuelve a un atacante de contacto cada vez que golpean
 ## al jugador.
 var thorns: float = 0.0
@@ -109,6 +125,10 @@ var _altar_boons: Array[Dictionary] = []
 ## quitan (con un recompute) al expirar. El harness lo lee por nombre
 ## (arena_probe.gd: stats.get("_timed_boons")).
 var _timed_boons: Array[Dictionary] = []
+## Ventana de un segundo del tope de robo de vida: cuándo empezó (segundos de
+## RunState.run_time) y cuánto se curó ya en ella.
+var _lifesteal_window_start: float = -1.0
+var _lifesteal_healed: float = 0.0
 
 ## Pasiva del personaje (datos de la fila de CharacterCatalog). Tipos:
 ##   "per_level":       _passive_stat gana _passive_base más _passive_amount
@@ -274,6 +294,25 @@ func add_timed_boon(stat: String, amount: float, duration: float, tag: String = 
 ## Quita todo boon vivo con `tag` (una etiqueta vacía no coincide con nada,
 ## así los boons sin etiqueta nunca se borran por error). Devuelve true si
 ## quitó algo.
+## Cuánto de `amount` puede curar el robo de vida ahora, bajo el tope de
+## lifesteal_max_heal_per_second × `max_hp` por segundo, y lo anota.
+## Curva con techo: `cap` × (1 - e^(-value / scale)). Sube casi lineal al
+## principio y se acerca a `cap` sin llegar nunca.
+static func soft_cap(value: float, cap: float, scale: float) -> float:
+	return cap * (1.0 - exp(-value / maxf(scale, 0.001)))
+
+
+func claim_lifesteal(amount: float, max_hp: float) -> float:
+	if RunState.run_time - _lifesteal_window_start >= 1.0 \
+			or RunState.run_time < _lifesteal_window_start:
+		_lifesteal_window_start = RunState.run_time
+		_lifesteal_healed = 0.0
+	var allowed := clampf(lifesteal_max_heal_per_second * max_hp - _lifesteal_healed,
+			0.0, amount)
+	_lifesteal_healed += allowed
+	return allowed
+
+
 func clear_timed_boons(tag: String) -> bool:
 	if tag.is_empty():
 		return false
@@ -354,6 +393,8 @@ func recompute() -> void:
 func _reset_derived() -> void:
 	damage_multiplier = 1.0
 	cooldown_multiplier = 1.0
+	_attack_speed_bonus = 0.0
+	damage_reduction = 0.0
 	area_multiplier = 1.0
 	move_speed_multiplier = 1.0
 	crit_chance = 0.0
@@ -422,11 +463,17 @@ func _apply_boons(boons: Array[Dictionary]) -> void:
 ## Los techos, después de todas las fuentes: la acumulación es aditiva, y sin
 ## esto una build profunda llegaría a cero enfriamiento o 100% de esquive.
 func _clamp_derived() -> void:
-	cooldown_multiplier = maxf(cooldown_multiplier, min_cooldown_multiplier)
+	# +100% de velocidad de ataque = el doble de rápido (enfriamiento x0.5):
+	# restar el % directo al enfriamiento llegaba al piso con solo +75%.
+	cooldown_multiplier = maxf(1.0 / maxf(1.0 + _attack_speed_bonus, 0.1),
+			min_cooldown_multiplier)
 	damage_multiplier = maxf(damage_multiplier, MIN_DAMAGE_MULTIPLIER)
 	move_speed_multiplier = maxf(move_speed_multiplier, MIN_MOVE_MULTIPLIER)
 	crit_chance = maxf(crit_chance, 0.0)
-	evasion = clampf(evasion, 0.0, max_evasion)
+	# Evasión y armadura van en curva: suben rápido al principio y se acercan
+	# a su techo sin llegar nunca.
+	evasion = soft_cap(maxf(evasion, 0.0), max_evasion, evasion_curve)
+	damage_reduction = soft_cap(maxf(armor, 0.0), max_armor_reduction, armor_curve)
 	# La suerte en % multiplica los puntos de todas las fuentes juntas.
 	luck = maxf(luck * maxf(luck_multiplier, 0.0), 0.0)
 	duration_multiplier = maxf(duration_multiplier, MIN_DURATION_MULTIPLIER)
@@ -521,7 +568,7 @@ func _apply_effect(stat: String, amount: float) -> void:
 		"damage":
 			damage_multiplier += amount / 100.0
 		"cooldown":
-			cooldown_multiplier -= amount / 100.0
+			_attack_speed_bonus += amount / 100.0
 		"area":
 			area_multiplier += amount / 100.0
 		"move_speed":
@@ -535,7 +582,7 @@ func _apply_effect(stat: String, amount: float) -> void:
 		"evasion":
 			evasion += amount / 100.0
 		"armor":
-			armor += amount
+			armor += amount / 100.0
 		"luck":
 			luck += amount
 		"luck_percent":
@@ -573,11 +620,13 @@ func _on_leveled_up(_new_level: int) -> void:
 
 
 ## Health aplica la armadura él mismo en take_damage, así la reducción cubre
-## también daño que no viene de un arma (golpes de contacto).
+## también daño que no viene de un arma (golpes de contacto). En el jugador
+## es porcentual (damage_reduction), no puntos restados.
 func _push_armor_to_health() -> void:
 	var health := _sibling_health()
 	if health != null:
-		health.armor = armor
+		health.armor = 0.0
+		health.damage_reduction = damage_reduction
 
 
 ## Health.max_hp es estado compartido (las cartas de Corazón robusto le suman

@@ -16,6 +16,10 @@ static func play(enemy: Node3D, visual: Node3D, height: float, seconds: float) -
 	var tween := enemy.get_tree().create_tween()
 	tween.tween_property(visual, "position", rest, seconds) \
 			.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	# Referencia débil: el enemigo puede liberarse mientras cae, y una lambda
+	# que lo captura directo falla al llamarse.
+	var enemy_ref: WeakRef = weakref(enemy)
 	tween.tween_callback(func() -> void:
-		if is_instance_valid(enemy):
-			enemy.process_mode = Node.PROCESS_MODE_INHERIT)
+		var body := enemy_ref.get_ref() as Node
+		if body != null:
+			body.process_mode = Node.PROCESS_MODE_INHERIT)

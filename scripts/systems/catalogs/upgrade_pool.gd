@@ -120,18 +120,18 @@ const WEAPON_STAT_DEFS: Dictionary = {
 const WEAPON_UPGRADE_STATS: Dictionary = {
 	"aura": {
 		"damage": {"property": "damage", "values": [1, 2, 3, 4]},
-		"size": {"property": "attack_range", "op": "mul_percent", "values": [5, 8, 14, 20]},
+		"size": {"property": "attack_range", "op": "mul_percent", "values": [10, 12, 14, 16]},
 	},
 	"blood_vial": {
 		"damage": {"property": "damage", "values": [1, 2, 3, 4]},
-		"size": {"property": "pool_radius", "op": "mul_percent", "values": [6, 10, 14, 20]},
+		"size": {"property": "pool_radius", "op": "mul_percent", "values": [10, 12, 14, 16]},
 		"duration": {"property": "pool_ticks", "values": [1, 1, 2, 2]},
 		"projectile_speed": {"property": "projectile_speed", "values": [0.1, 0.15, 0.2, 0.3]},
 		"count": {"property": "projectile_count", "values": [1, 1.3, 1.7, 2]},
 	},
 	"boomerang": {
 		"damage": {"property": "damage", "values": [1, 2, 3, 4]},
-		"size": {"property": "blade_scale", "op": "mul_percent", "values": [6, 10, 14, 20]},
+		"size": {"property": "blade_scale", "op": "mul_percent", "values": [10, 12, 14, 16]},
 		"count": {"property": "projectile_count", "values": [1, 1.3, 1.7, 2]},
 	},
 	"dart_pistol": {
@@ -141,30 +141,36 @@ const WEAPON_UPGRADE_STATS: Dictionary = {
 		"crit_damage": {"property": "crit_damage_bonus", "values": [5, 7, 15, 20]},
 		"bounces": {"property": "bounces", "values": [1, 1.3, 1.7, 2]},
 	},
+	"hunting_bow": {
+		"damage": {"property": "damage", "values": [1, 2, 3, 4]},
+		"count": {"property": "projectile_count", "values": [1, 1.3, 1.7, 2]},
+		"crit": {"property": "crit_chance_bonus", "values": [2, 3, 5, 7]},
+		"crit_damage": {"property": "crit_damage_bonus", "values": [5, 7, 15, 20]},
+	},
 	"ember_wand": {
 		"damage": {"property": "damage", "values": [1, 2, 3, 4]},
-		"size": {"property": "burst_radius", "op": "mul_percent", "values": [6, 10, 14, 20]},
+		"size": {"property": "burst_radius", "op": "mul_percent", "values": [10, 12, 14, 16]},
 		"count": {"property": "projectile_count", "values": [1, 1.3, 1.7, 2]},
 	},
 	"kamehameha": {
 		"damage": {"property": "damage", "values": [1, 2, 3, 4]},
-		"size": {"property": "beam_width", "op": "mul_percent", "values": [6, 10, 14, 20]},
+		"size": {"property": "beam_width", "op": "mul_percent", "values": [10, 12, 14, 16]},
 		"count": {"property": "projectile_count", "values": [1, 1.3, 1.7, 2]},
 	},
 	"shortsword": {
 		"damage": {"property": "damage", "values": [1, 2, 3, 4]},
-		"size": {"property": "attack_range", "op": "mul_percent", "values": [6, 10, 14, 20]},
+		"size": {"property": "attack_range", "op": "mul_percent", "values": [10, 12, 14, 16]},
 		"count": {"property": "projectile_count", "values": [1, 1.3, 1.7, 2]},
 	},
 	"slime_trail": {
 		"damage": {"property": "damage", "values": [1, 2, 3, 4]},
 		"duration": {"property": "puddle_life", "values": [0.1, 0.2, 0.3, 0.4]},
 		"count": {"property": "projectile_count", "values": [1, 1.3, 1.7, 2]},
-		"size": {"property": "puddle_radius", "op": "mul_percent", "values": [6, 10, 14, 20]},
+		"size": {"property": "puddle_radius", "op": "mul_percent", "values": [10, 12, 14, 16]},
 	},
 	"spirit_orbs": {
 		"damage": {"property": "damage", "values": [1, 2, 3, 4]},
-		"size": {"property": "hit_radius", "op": "mul_percent", "values": [6, 10, 14, 20]},
+		"size": {"property": "hit_radius", "op": "mul_percent", "values": [10, 12, 14, 16]},
 		"count": {"property": "projectile_count", "values": [1, 1.3, 1.7, 2]},
 	},
 	"storm_rod": {
@@ -174,14 +180,14 @@ const WEAPON_UPGRADE_STATS: Dictionary = {
 	},
 	"twin_daggers": {
 		"damage": {"property": "damage", "values": [1, 2, 3, 4]},
-		"size": {"property": "slash_radius", "op": "mul_percent", "values": [6, 10, 14, 20]},
+		"size": {"property": "slash_radius", "op": "mul_percent", "values": [10, 12, 14, 16]},
 		"count": {"property": "projectile_count", "values": [1, 1.3, 1.7, 2]},
 		"crit": {"property": "crit_chance_bonus", "values": [2, 3, 5, 7]},
 		"crit_damage": {"property": "crit_damage_bonus", "values": [5, 7, 15, 20]},
 	},
 	"stench": {
 		"damage": {"property": "damage", "values": [1, 2, 3, 4]},
-		"size": {"property": "attack_range", "op": "mul_percent", "values": [2, 5, 8, 14]},
+		"size": {"property": "attack_range", "op": "mul_percent", "values": [10, 12, 14, 16]},
 		"count": {"property": "projectile_count", "values": [1, 1.3, 1.7, 2]},
 		"duration": {"property": "poison_duration", "values": [0.1, 0.2, 0.3, 0.4]},
 	},

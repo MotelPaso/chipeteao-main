@@ -102,12 +102,14 @@ const ARENA_CLAMP_MARGIN: float = 1.5
 @export var push_taken: float = 1.0
 ## Qué tan rápido se frena el empuje, en m/s por segundo (más = el empujón dura menos).
 @export var push_decay: float = 30.0
-## Resistencia a ralentizaciones que gana por cada segundo que pasa frenado (0.4 = tras 1 s frenado, los frenazos le quitan un 40% menos). Igual para toda la horda.
+## Resistencia a empujes y frenazos que gana por cada golpe de arma que lo empuja o frena (0.2 = cada golpe le quita un 20% más de fuerza a los siguientes). Igual para toda la horda.
+@export var slow_resist_per_hit: float = 0.2
+## Resistencia extra que gana por cada segundo que pasa frenado (baba, hedor: frenan seguido sin golpear).
 @export var slow_resist_build: float = 0.4
-## Tope de esa resistencia (0.75 = un frenazo nunca le pega menos que a un cuarto de su fuerza).
+## Tope de esa resistencia (0.75 = un empuje o frenazo nunca le pega menos que a un cuarto de su fuerza).
 @export_range(0.0, 1.0) var slow_resist_max: float = 0.75
-## Cuánta resistencia pierde por segundo cuando NO está frenado.
-@export var slow_resist_recovery: float = 0.25
+## Cuánta resistencia pierde por segundo cuando NO está frenado (0 = no la pierde nunca).
+@export var slow_resist_recovery: float = 0.0
 
 @export_group("Pendiente")
 ## Cuánto sigue el cuerpo la inclinación del terreno al pisarlo (0 = siempre derecho, 1 = pegado a la ladera). Igual para toda la horda.
@@ -337,11 +339,17 @@ func set_visual_lift(lift: float) -> void:
 
 func apply_hit_impact(push: Vector3, slow_multiplier: float, slow_seconds: float) -> void:
 	push.y = 0.0
-	var scaled := push * _push_scale()
+	var status := _ensure_status()
+	# La resistencia que ya tiene le quita fuerza al empuje (al frenazo se la
+	# quita EnemyStatus.slow_multiplier); después este golpe suma la suya.
+	var scaled := push * _push_scale() * (1.0 - status.resistance())
+	var slows := slow_seconds > 0.0 and slow_multiplier < 1.0
 	if scaled.length_squared() > 0.0001:
-		_ensure_status().apply_push(scaled, push_decay)
-	if slow_seconds > 0.0 and slow_multiplier < 1.0:
+		status.apply_push(scaled, push_decay)
+	if slows:
 		apply_slow(slow_multiplier, slow_seconds)
+	if slows or push.length_squared() > 0.0001:
+		status.register_impact()
 
 
 ## Multiplicador de velocidad externo actual: 1.0 sin ralentización activa.
@@ -643,8 +651,8 @@ func _pick_target() -> Node3D:
 func _ensure_status() -> EnemyStatus:
 	if _status == null:
 		_status = EnemyStatus.new(_health, _overlays)
-		_status.configure_slow_resist(slow_resist_build, slow_resist_max,
-				slow_resist_recovery)
+		_status.configure_slow_resist(slow_resist_per_hit, slow_resist_build,
+				slow_resist_max, slow_resist_recovery)
 	return _status
 
 

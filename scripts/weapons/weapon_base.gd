@@ -63,6 +63,12 @@ const ASCEND_PROJECTILE_ADD: int = 1
 @export_group("Área")
 ## Escala base del tamaño de área de TODAS las armas (0.8 = 80%): radios, tajos, rayos y charcos. Cámbiala aquí en el script, no en cada escena.
 @export var base_area_scale: float = 0.8
+## Cuánto del bono de área del jugador llega a las armas (0.4 = con +40% de área las armas crecen +16%). Cámbiala aquí en el script, no en cada escena.
+@export var area_stat_weight: float = 0.4
+
+@export_group("Velocidad de ataque")
+## Escala base del enfriamiento de TODAS las armas (1.15 = disparan un 15% más lento que lo que dice su escena). Cámbiala aquí en el script, no en cada escena.
+@export var base_cooldown_scale: float = 1.15
 
 @export_group("Robo de vida")
 ## Cuánto rinde el robo de vida del portador con TODAS las armas (0.5 = cura la mitad de lo que diría su %). Cámbiala aquí en el script, no en cada escena.
@@ -152,7 +158,7 @@ func effective_damage() -> float:
 func effective_cooldown() -> float:
 	var stats := _stats_or_null()
 	var multiplier := stats.cooldown_multiplier if stats != null else 1.0
-	return maxf(cooldown * multiplier * cooldown_scale, MIN_COOLDOWN)
+	return maxf(cooldown * multiplier * cooldown_scale * base_cooldown_scale, MIN_COOLDOWN)
 
 
 ## Multiplicador que cada subclase aplica a su alcance de área (radio de
@@ -160,7 +166,8 @@ func effective_cooldown() -> float:
 ## salvo en las armas que ensanchan la búsqueda para igualarlo (targeting_range()).
 func area_scale() -> float:
 	var stats := _stats_or_null()
-	return base_area_scale * (stats.area_multiplier if stats != null else 1.0)
+	var bonus := (stats.area_multiplier - 1.0) if stats != null else 0.0
+	return base_area_scale * (1.0 + bonus * area_stat_weight)
 
 
 ## Disparos, orbes o flechas por ráfaga: el conteo propio del arma más el
@@ -387,8 +394,14 @@ func _lifesteal_heal(amount: float) -> void:
 	if player == null:
 		return
 	var player_health := Health.find_in(player)
-	if player_health != null:
-		player_health.heal(amount)
+	if player_health == null:
+		return
+	# El portador tiene tope por segundo: con armas de área el robo de vida
+	# sumaría cada enemigo golpeado sin límite.
+	var stats := _stats_or_null()
+	var allowed := stats.claim_lifesteal(amount, player_health.max_hp) if stats != null else amount
+	if allowed > 0.0:
+		player_health.heal(allowed)
 
 ## Nivel de crítico de un golpe: cada 100% de probabilidad es un nivel seguro,
 ## y el resto es la probabilidad de un nivel extra. 0.45 -> 0 o 1;

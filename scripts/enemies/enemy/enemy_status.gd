@@ -16,9 +16,11 @@ var _overlays: EnemyOverlays
 ## Multiplicador de velocidad activo mientras corre su reloj.
 var _slow_multiplier: float = 1.0
 var _slow_time_left: float = 0.0
-## Resistencia a ralentizaciones (0-1): sube mientras está frenado y baja
-## cuando no, así un enemigo frenado sin parar deja de quedar clavado.
+## Resistencia a empujes y ralentizaciones (0-1): sube con cada golpe que lo
+## empuja o frena y mientras está frenado, y baja cuando no, así un enemigo
+## golpeado sin parar deja de quedar clavado.
 var _slow_resist: float = 0.0
+var _resist_per_hit: float = 0.0
 var _resist_build: float = 0.0
 var _resist_max: float = 0.0
 var _resist_recovery: float = 0.0
@@ -63,11 +65,24 @@ func push_velocity() -> Vector3:
 	return _push
 
 
-## Ver EnemyBase (grupo «Impacto»): cuánto resiste a los frenazos seguidos.
-func configure_slow_resist(build: float, max_resist: float, recovery: float) -> void:
+## Ver EnemyBase (grupo «Impacto»): cuánto resiste a los empujes y frenazos
+## seguidos.
+func configure_slow_resist(per_hit: float, build: float, max_resist: float,
+		recovery: float) -> void:
+	_resist_per_hit = maxf(per_hit, 0.0)
 	_resist_build = maxf(build, 0.0)
 	_resist_max = clampf(max_resist, 0.0, 1.0)
 	_resist_recovery = maxf(recovery, 0.0)
+
+
+## Resistencia actual (0-1): cuánta fuerza les quita a empujes y frenazos.
+func resistance() -> float:
+	return _slow_resist
+
+
+## Un golpe de arma que empuja o frena: suma resistencia hasta el tope.
+func register_impact() -> void:
+	_slow_resist = minf(_slow_resist + _resist_per_hit, _resist_max)
 
 
 ## Multiplicador de velocidad actual: 1.0 sin ralentización activa. La

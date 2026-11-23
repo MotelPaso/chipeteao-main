@@ -866,7 +866,7 @@ evolución.
 | `Crit chance +%d%%` | Prob. de crítico +%d%% |
 | `Crit damage +%d%%` | Daño crítico +%d%% |
 | `Lifesteal: heal %d%% of damage dealt` | Robo de vida: te curas el %d%% del daño hecho |
-| `Armor +%d (flat damage reduction)` | Armadura +%d (reducción fija de daño) |
+| `Armor +%d%%` | Armadura +%d%% |
 | `Evasion: %d%% chance to dodge hits` | Evasión: %d%% de probabilidad de esquivar golpes |
 | `Luck +%d (better card and item rarities)` | Suerte +%d (mejores rarezas de cartas y objetos) |
 | `+%d projectile(s) on every volley weapon` | +%d proyectil(es) en cada arma de andanada |
@@ -895,7 +895,7 @@ evolución.
 | `Weapon cooldowns %s per rank.` | Velocidad de ataque %s por rango. (texto del rango: «+1.5%») |
 | `Luck %s per rank (rarer upgrade cards).` | Suerte %s por rango (cartas de mejora más raras). |
 | `Move speed %s per rank.` | Velocidad de movimiento %s por rango. |
-| `Armor %s per rank (flat damage reduction).` | Armadura %s por rango (reducción fija de daño). |
+| `Armor %s per rank.` | Armadura %s por rango. |
 | `luck +1 per level` | suerte +1 por nivel |
 | `max HP +2 per level` | HP máx. +2 por nivel |
 | `crit +0.3% per level` | crítico +0.3% por nivel |
@@ -905,7 +905,7 @@ evolución.
 | `area +%d%%` | área +%d%% |
 | `move speed +%d%%` | velocidad +%d%% |
 | `max HP +%d` | HP máx. +%d |
-| `armor +%d` | armadura +%d |
+| `armor +%d%%` | armadura +%d%% |
 | `luck +%d` | suerte +%d |
 | `crit chance +%d%%` | prob. de crítico +%d%% |
 | `XP gain +%d%%` | ganancia de XP +%d%% |

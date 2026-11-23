@@ -24,18 +24,18 @@ const TOME_LIBRARY: Array[Dictionary] = [
 	{
 		"id": "tome_fury", "short": "FU", "title": "Tomo de Furia",
 		"description": "Daño +%d%%",
-		"effects": [{"stat": "damage", "amount": 10.0, "values": [10, 13, 17, 20]}],
+		"effects": [{"stat": "damage", "amount": 7.0, "values": [7, 10, 12, 15]}],
 	},
 	{
 		"id": "tome_haste", "short": "CE", "title": "Tomo de Celeridad",
 		"description": "Vel. de ataque +%d%%",
-		# "cooldown" resta amount/100 al multiplicador de enfriamiento.
+		# "cooldown" suma amount/100 a la velocidad de ataque (+100% = el doble de rápido).
 		"effects": [{"stat": "cooldown", "amount": 8.0, "values": [10, 13, 17, 20]}],
 	},
 	{
 		"id": "tome_reach", "short": "AL", "title": "Tomo de Alcance",
 		"description": "Área +%d%%",
-		"effects": [{"stat": "area", "amount": 7.0, "values": [10, 13, 17, 20]}],
+		"effects": [{"stat": "area", "amount": 8.0, "values": [8, 10, 13, 15]}],
 	},
 	{
 		"id": "tome_swiftness", "short": "LI", "title": "Tomo de Ligereza",
@@ -54,8 +54,8 @@ const TOME_LIBRARY: Array[Dictionary] = [
 	},
 	{
 		"id": "tome_stone", "short": "PI", "title": "Tomo de Piedra",
-		"description": "Armadura +%d",
-		"effects": [{"stat": "armor", "amount": 2.0, "values": [2, 3, 4, 6]}],
+		"description": "Armadura +%d%%",
+		"effects": [{"stat": "armor", "amount": 5.0, "values": [5, 7, 9, 12]}],
 	},
 	{
 		"id": "tome_mist", "short": "BR", "title": "Tomo de Bruma",
@@ -107,8 +107,8 @@ const TOME_LIBRARY: Array[Dictionary] = [
 ## Stats cuyo valor se muestra como porcentaje; el resto, como número plano.
 const PERCENT_STATS: Array[String] = [
 	"damage", "cooldown", "area", "move_speed", "crit_chance", "crit_damage",
-	"lifesteal", "evasion", "duration", "xp_gain", "difficulty", "pickup_radius",
-	"powerup_chance",
+	"lifesteal", "evasion", "armor", "duration", "xp_gain", "difficulty",
+	"pickup_radius", "powerup_chance",
 ]
 
 ## Nombre que ve el jugador por cada id de stat.

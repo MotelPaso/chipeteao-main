@@ -94,7 +94,9 @@ func endless_interval_factor() -> float:
 ## Factores de la rampa tardía para un spawn que cae ahora (1.0 antes de la
 ## rampa).
 func late_hp_factor() -> float:
-	return 1.0 + _spawner.late_hp_per_minute * _late_minutes()
+	var minutes := _late_minutes()
+	return 1.0 + _spawner.late_hp_per_minute * minutes \
+			+ _spawner.late_hp_per_minute_squared * minutes * minutes
 
 
 func late_damage_factor() -> float:

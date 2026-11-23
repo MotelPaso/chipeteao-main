@@ -87,13 +87,15 @@ func show_rolled(item: Dictionary) -> void:
 		self_modulate = Color.WHITE
 
 
-## Una opción armada por quien abrió la elección ({title, description, color}):
-## la cinta lleva `tag` en vez de una rareza (se oculta si viene vacía) y el
-## color de la opción pinta el borde y el brillo.
+## Una opción armada por quien abrió la elección ({title, description, color}
+## y, opcional, ribbon): la cinta lleva `ribbon` (la rareza del altar de
+## carga) o si no `tag`, y se oculta si queda vacía; el color de la opción
+## pinta el borde y el brillo.
 func show_choice(option: Dictionary, tag: String) -> void:
 	var color: Color = option.get("color", default_choice_color)
-	_rarity_label.text = tag.to_upper()
-	_rarity_label.visible = not tag.is_empty()
+	var ribbon := String(option.get("ribbon", tag))
+	_rarity_label.text = ribbon.to_upper()
+	_rarity_label.visible = not ribbon.is_empty()
 	_style_ribbon(color)
 	_center_body(true)
 	_title_label.text = String(option.get("title", ""))

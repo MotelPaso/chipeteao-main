@@ -16,22 +16,23 @@ extends Interactable
 ##   color   color de la fila; las filas de objeto usan el de su `rarity`.
 ## Los demás campos son los números del efecto (ver apply_outcome).
 const OUTCOMES: Array[Dictionary] = [
-	{"id": "difficulty", "label": "Dificultad +%d%%", "weight": 1.0,
+	{"id": "difficulty", "label": "Dificultad +%d%%", "weight": 0.2,
 			"color": Color(0.92, 0.28, 0.24), "amount": 15.0},
 	# amount = % de lo que costó ESTE giro (150 = devuelve 1.5 veces lo pagado).
-	{"id": "jackpot", "label": "Puntos: %d%% de lo que pagaste", "weight": 1.0,
+	{"id": "jackpot", "label": "Puntos: %d%% de lo que pagaste", "weight": 0.2,
 			"color": Color(1.0, 0.78, 0.2), "amount": 150},
 	# amount = gemas; gem_value = XP de cada una; radios en metros alrededor del raider.
-	{"id": "xp_rain", "label": "Lluvia de XP: %d gemas", "weight": 1.0,
+	{"id": "xp_rain", "label": "Lluvia de XP: %d gemas", "weight": 0.2,
 			"color": Color(0.45, 0.9, 0.6), "amount": 18, "gem_value": 3,
 			"min_spread": 1.5, "max_spread": 6.0},
 	# La rareza se sortea con la suerte del raider, como en un cofre.
-	{"id": "random_item", "label": "Objeto al azar", "weight": 1.0,
+	{"id": "random_item", "label": "Objeto al azar", "weight": 0.2,
 			"color": Color(0.68, 0.32, 0.95)},
-	{"id": "all_stats", "label": "Todas las stats +%d%%", "weight": 1.0,
+	{"id": "all_stats", "label": "Todas las stats +%d%%", "weight": 0.2,
 			"color": Color(0.3, 0.82, 0.76), "amount": 8.0,
-			# Suma plana: +amount% en las stats de porcentaje y +amount puntos
-			# en vida máx., suerte, armadura y espinas. Saltos y proyectiles no.
+			# Suma plana: +amount% en las stats de porcentaje (la armadura
+			# también) y +amount puntos en vida máx., suerte y espinas. Saltos
+			# y proyectiles no.
 			"stats": ["damage", "cooldown", "area", "move_speed", "crit_chance",
 					"crit_damage", "lifesteal", "evasion", "duration", "xp_gain",
 					"pickup_radius", "powerup_chance", "max_hp", "luck", "armor",

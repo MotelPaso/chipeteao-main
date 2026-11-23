@@ -39,8 +39,10 @@ const MIN_CHIP_DAMAGE: float = 1.0
 		hp_changed.emit(current_hp, max_hp)
 ## Muestra los números de daño flotantes sobre este cuerpo (su aspecto está en DamagePopup.tscn).
 @export var show_damage_popups: bool = true
-## Reducción plana de daño por golpe; en el jugador la escribe PlayerStats (Tomo de Piedra).
+## Reducción plana de daño por golpe (enemigos). En el jugador la armadura es porcentual: PlayerStats escribe damage_reduction y deja esto en 0.
 @export var armor: float = 0.0
+## Lo máximo que quita UN golpe, como fracción de la vida máxima (0.5 = la mitad), después de la armadura. 0 = sin tope. El jugador lo usa para que nada lo mate de un golpe.
+@export var max_hit_fraction: float = 0.0
 
 ## Lo activa PowerUps durante Inmortalidad: rechaza todo golpe (antes de la
 ## armadura y de la evasión) y lo cuenta. El godmode del soak no lo usa: sube
@@ -53,6 +55,9 @@ var blocked_hits: int = 0
 ## Reflejo). Se evalúa ANTES del rechazo por invulnerable: inmortal y
 ## reflejando a la vez devuelve todo sin recibir nada.
 var reflect_fraction: float = 0.0
+## Fracción del daño que se quita a cada golpe, después de la armadura plana
+## (0-1). En el jugador la escribe PlayerStats desde su armadura.
+var damage_reduction: float = 0.0
 var current_hp: float
 var is_dead: bool = false
 
@@ -97,6 +102,9 @@ func take_damage(amount: float, is_crit: bool = false, attacker: Node3D = null) 
 		dodged.emit(attacker)
 		return 0.0
 	var final_amount := minf(amount, maxf(amount - armor, MIN_CHIP_DAMAGE))
+	final_amount *= 1.0 - clampf(damage_reduction, 0.0, 1.0)
+	if max_hit_fraction > 0.0:
+		final_amount = minf(final_amount, max_hp * max_hit_fraction)
 	# Lo que el cuerpo aún puede perder: un golpe letal cuenta solo la vida que
 	# quitó, nunca la tirada entera.
 	var applied := minf(final_amount, current_hp)

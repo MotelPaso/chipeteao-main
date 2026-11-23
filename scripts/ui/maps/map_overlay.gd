@@ -59,7 +59,7 @@ const STAT_ROWS: Array[Dictionary] = [
 	{"label": "Daño crítico", "property": "crit_damage", "show": "multiplier",
 		"base_property": "base_crit_damage"},
 	{"label": "Robo de vida", "property": "lifesteal", "show": "fraction"},
-	{"label": "Armadura", "property": "armor", "show": "flat"},
+	{"label": "Armadura", "property": "damage_reduction", "show": "fraction"},
 	{"label": "Evasión", "property": "evasion", "show": "fraction"},
 	{"label": "Espinas", "property": "thorns", "show": "flat"},
 	{"label": "Suerte", "property": "luck", "show": "luck"},

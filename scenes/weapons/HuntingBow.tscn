@@ -10,7 +10,7 @@ cooldown = 1.1
 hit_push = 4.0
 hit_slow = 0.6
 hit_slow_seconds = 0.12
-attack_range = 16.0
+attack_range = 20.0
 projectile_scene = ExtResource("2_arrow")
 
 [node name="Nock" type="Node3D" parent="."]

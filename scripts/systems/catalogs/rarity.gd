@@ -19,12 +19,12 @@ extends RefCounted
 ##   m = 1 + LUCK_BOOST_AT_REFERENCE x (suerte / LUCK_REFERENCE) ^ LUCK_CURVE
 ## y el peso de cada rareza se multiplica por m elevado a su escalón
 ## (Poco común x1, Raro x m, Épico x m², Legendario x m³).
-## Con 800 / 3.92 / 1.5: Legendario 3% sin suerte, ~4.5% con 100, ~8% con 200,
-## ~20% con 400 y 50% con 800.
+## Con 500 / 3.92 / 1.5 y los pesos de TIERS: Legendario 0.5% sin suerte,
+## ~1% con 100, ~3% con 200, ~10% con 400, ~14% con 500 y ~29% con 800.
 ## Suerte a la que el multiplicador vale 1 + LUCK_BOOST_AT_REFERENCE.
-const LUCK_REFERENCE: float = 800.0
-## Cuánto sube el multiplicador a LUCK_REFERENCE de suerte. 3.92 = Legendario
-## al 50% justo en LUCK_REFERENCE (con los pesos de TIERS de hoy).
+const LUCK_REFERENCE: float = 500.0
+## Cuánto sube el multiplicador a LUCK_REFERENCE de suerte (3.92 = x4.92 a
+## esa suerte).
 const LUCK_BOOST_AT_REFERENCE: float = 3.92
 ## Curva de la suerte: 1 = cada punto vale lo mismo; más de 1 = la poca suerte
 ## influye poco y la mucha, mucho.
@@ -42,7 +42,7 @@ const TIERS: Array[Dictionary] = [
 	{"name": "Common", "color": Color(0.35, 0.8, 0.4), "weight": 70.0, "potency": 1.0},
 	{"name": "Rare", "color": Color(0.3, 0.55, 1.0), "weight": 19.0, "potency": 1.3},
 	{"name": "Epic", "color": Color(0.68, 0.32, 0.95), "weight": 8.0, "potency": 1.7},
-	{"name": "Legendary", "color": Color(1.0, 0.78, 0.2), "weight": 3.0, "potency": 2.0},
+	{"name": "Legendary", "color": Color(1.0, 0.78, 0.2), "weight": 0.5, "potency": 2.0},
 ]
 
 ## Lo que llevan las cartas de algo NUEVO (el primer tomo, un arma que no

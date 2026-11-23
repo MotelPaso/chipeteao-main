@@ -121,6 +121,8 @@ const ELITE_CHANCE_CAP: float = 0.25
 @export var late_ramp_start_minute: float = 2.0
 ## HP extra por minuto pasado el inicio de la rampa (fracción: 0.12 = +12%).
 @export var late_hp_per_minute: float = 0.12
+## HP extra que crece con el CUADRADO de los minutos de rampa: la vida se dispara al final de la partida. Con 0.117, en el minuto 9 la vida es x7.6 (un zombie con +450% de dificultad tiene ~500).
+@export var late_hp_per_minute_squared: float = 0.117
 ## Daño extra por minuto pasado el inicio de la rampa (fracción).
 @export var late_damage_per_minute: float = 0.08
 ## XP extra por minuto pasado el inicio de la rampa (fracción).

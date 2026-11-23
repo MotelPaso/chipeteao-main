@@ -46,6 +46,7 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.1, 0)
 [node name="Health" type="Node" parent="." unique_id=1341696357]
 script = ExtResource("3_health")
 max_hp = 100.0
+max_hit_fraction = 0.5
 
 [node name="Stats" type="Node" parent="." unique_id=1783081145]
 script = ExtResource("4_stats")

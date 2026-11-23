@@ -17,8 +17,8 @@ extends RefCounted
 ##       llena con amount_text.
 ##   stat: efecto de PlayerStats; se aplica en cada recompute como
 ##       amount * rangos comprados.
-##   amount: efecto por rango (porcentaje en los stats multiplicadores; plano
-##       en armor, luck y max_hp).
+##   amount: efecto por rango (porcentaje en los stats multiplicadores y en
+##       armor; plano en luck y max_hp).
 ##   amount_text: cómo se lee un rango en la fila ("+2%"); su número debe
 ##       coincidir con amount.
 ##   max_ranks, base_cost, cost_growth: tope de rangos y escalera de precios en
@@ -59,8 +59,8 @@ const RELIC_LIBRARY: Array[Dictionary] = [
 	},
 	{
 		"id": "relic_hide", "display_name": "Coraza de percebes",
-		"description": "Armadura %s por rango (reducción fija de daño).",
-		"stat": "armor", "amount": 1.0, "amount_text": "+1",
+		"description": "Armadura %s por rango.",
+		"stat": "armor", "amount": 3.0, "amount_text": "+3%",
 		"max_ranks": 4, "base_cost": 50, "cost_growth": 1.7,
 	},
 ]
