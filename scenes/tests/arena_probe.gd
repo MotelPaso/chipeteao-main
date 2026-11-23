@@ -1074,6 +1074,8 @@ func _request_settled_shot(delay: float, tag: String) -> void:
 ## Frames dibujados, no ticks de física: el medidor cronometra lo que espera un jugador.
 func _process(_delta: float) -> void:
 	_perf.tick()
+	if _mini_probe != null:
+		_mini_probe.frame()
 
 
 func _physics_process(delta: float) -> void:

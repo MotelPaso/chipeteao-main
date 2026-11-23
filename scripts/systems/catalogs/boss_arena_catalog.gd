@@ -42,6 +42,8 @@ const ARENA_LIBRARY: Array[Dictionary] = [
 
 ## Valor de `exit`: volver al mapa de la etapa.
 const EXIT_RETURN: String = "return"
+## Meta de una instancia donde viaja la escena de la que salió (ver instance_of).
+const SCENE_META: StringName = &"boss_arena_scene"
 
 
 ## La fila del jefe cuya escena es `scene`, o vacío si ese jefe no tiene
@@ -73,6 +75,21 @@ static func scene_of(row: Dictionary, key: String) -> PackedScene:
 	if scene == null:
 		push_error("BossArenaCatalog: cannot load %s '%s'" % [key, path])
 	return scene
+
+
+## Una instancia de la escena del campo `key` de `row`, o null si la fila no
+## la trae. La instancia LLEVA CONSIGO su escena. En un mapa, la escena de un
+## jefe la tiene el spawner, que muere después que él; aquí quien la carga la
+## suelta enseguida, y si la escena muriera antes que su instancia (al cerrar
+## la partida a mitad de un viaje) sus materiales morirían con las mallas
+## todavía vivas.
+static func instance_of(row: Dictionary, key: String) -> Node:
+	var scene := scene_of(row, key)
+	if scene == null:
+		return null
+	var node := scene.instantiate()
+	node.set_meta(SCENE_META, scene)
+	return node
 
 
 ## El título del jefe de `row`, leído de su escena sin instanciarla (el

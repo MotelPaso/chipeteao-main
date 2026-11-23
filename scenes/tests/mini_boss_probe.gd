@@ -10,10 +10,16 @@ extends RefCounted
 ## "boss_cinematic".
 ## Imprime:
 ##   Probe mini calm:    vidas y cuerpos en el primer y en el último frame de
-##                       la entrada: con el mundo congelado nada cambia ni
-##                       aparece (lo mide MiniBossCalm)
-##   Probe mini stage:   HUD, pantalla dividida, cámara, canción y mundo, dos
-##                       frames después de la entrada y un rato después de morir
+##                       la cinemática (del rapto al principio de la pelea):
+##                       con el mundo congelado nada cambia ni aparece (lo
+##                       mide MiniBossCalm)
+##   Probe mini frames:  los frames de más de 33 ms durante la cinemática y
+##                       cuántos cayeron con la pantalla tapada y sin canción
+##                       (tienen que ser todos: ahí va el cambio de mundo)
+##   Probe mini stage:   HUD, pantalla dividida, cámara, canción y mundo: en
+##                       pleno rapto (entrance), en el fondo del mar (seabed),
+##                       dos frames después de la cinemática (entrance_end) y
+##                       un rato después de morir (aftermath)
 ##   Probe mini fight:   al morir, cuánto duró la pelea según el reloj del probe
 ##   Probe mini alone:   al morir, si los spawns estaban cortados y cuántos
 ##                       enemigos más hubo como mucho durante la pelea
@@ -35,8 +41,10 @@ const HAZARD_GROUPS: Array[StringName] = [&"shock_rings", &"telegraph_lanes", &"
 ## Frames tras el evento antes de imprimir "Probe mini stage:", para que el
 ## desmontaje de la entrada ya haya corrido.
 const STAGE_REPORT_FRAMES: int = 2
-## Frames desde que llega hasta la línea que muestra la pantalla en plena entrada.
+## Frames desde que empieza la cinemática hasta la línea que muestra la pantalla en pleno rapto.
 const ENTRANCE_REPORT_FRAMES: int = 120
+## Frames desde que el equipo llega al fondo del mar hasta la línea de esa parte.
+const SEABED_REPORT_FRAMES: int = 120
 ## Segundos de pelea desde los que se cuentan otros enemigos: el minijefe que
 ## pelea solo se lleva a la horda en el instante en que empieza.
 const ALONE_AFTER: float = 0.5
@@ -57,8 +65,11 @@ var _bound: bool = false
 var _state: StringName = &""
 var _now: float = 0.0
 var _frames: int = 0
-var _arrival_from_frame: int = 0
 var _fight_from: float = -1.0
+## True mientras hay una cinemática de minijefe en curso, y si su parte del
+## fondo del mar ya pidió su línea.
+var _calm_on: bool = false
+var _seabed_reported: bool = false
 var _stage_reports: Array[Dictionary] = []
 var _calm: MiniBossCalm = null
 ## Segundos del probe en cada estado y daño de cada arma por estado.
@@ -100,13 +111,39 @@ func tick(delta: float, frames: int) -> void:
 		_state_seconds[key] = float(_state_seconds.get(key, 0.0)) + delta
 		if state != &"dead" and state != &"arrival":
 			_last_fight_detail = key
-	if state == &"arrival":
-		_calm.sample()
-		_tick_entrance_shots()
-	elif _fight_from >= 0.0:
+	_tick_calm()
+	if _fight_from >= 0.0:
 		_tick_fight_shots()
 		_tick_alone(boss)
 	_tick_stage_reports()
+
+
+## Un frame dibujado (lo llama el _process de ArenaProbe): MiniBossCalm mide
+## con el reloj real los frames de la cinemática.
+func frame() -> void:
+	_calm.frame(_cinematic(), _song_playing())
+
+
+## La calma es lo que dura la cinemática: empieza con su primer frame y
+## termina cuando deja de estar en curso.
+func _tick_calm() -> void:
+	var cinematic := _cinematic()
+	if cinematic != null and not _calm_on:
+		_calm_on = true
+		_seabed_reported = false
+		_shots_done.clear()
+		_calm.begin()
+		_stage_reports.append({"left": ENTRANCE_REPORT_FRAMES, "reason": "entrance"})
+	if cinematic != null:
+		_calm.sample(float(cinematic.call(&"calm_elapsed")))
+		if not _seabed_reported and String(cinematic.call(&"act_name")) == "seabed":
+			_seabed_reported = true
+			_stage_reports.append({"left": SEABED_REPORT_FRAMES, "reason": "seabed"})
+		_tick_entrance_shots()
+	elif _calm_on:
+		_calm_on = false
+		_calm.report()
+		_stage_reports.append({"left": STAGE_REPORT_FRAMES, "reason": "entrance_end"})
 
 
 ## Cuenta a los otros enemigos vivos mientras el minijefe pelea.
@@ -194,20 +231,10 @@ func _detail_of(boss: Node3D, state: StringName) -> StringName:
 func _on_state_changed(from: StringName, to: StringName, boss: Node3D) -> void:
 	if from == &"" and boss != null:
 		_watch_death(boss)
-	if to == &"arrival":
-		_arrival_from_frame = _frames
-		_shots_done.clear()
-		_calm.begin(boss)
-		_stage_reports.append({"left": ENTRANCE_REPORT_FRAMES, "reason": "entrance"})
-	elif from == &"arrival" and to == &"":
-		print("Probe mini calm: aborted after %d frames (mini boss gone)" % (
-				_frames - _arrival_from_frame))
-	elif from == &"arrival":
-		_calm.report(_frames - _arrival_from_frame)
+	if from == &"arrival" and to != &"" and to != &"dead":
 		_fight_from = _now
 		_alone_held = EnemySpawner.is_holding(_tree)
 		_others_max = 0
-		_stage_reports.append({"left": STAGE_REPORT_FRAMES, "reason": "entrance_end"})
 	if to == &"dead" and _fight_from >= 0.0:
 		print("Probe mini fight: took=%.1fs at %.1fs" % [_now - _fight_from, _now])
 		# El minijefe pelea solo: durante la pelea no hubo ningún otro enemigo.
@@ -265,9 +292,9 @@ func _tick_stage_reports() -> void:
 
 ## Cómo quedó la pantalla: lo que la entrada toca y tiene que devolver.
 func _print_stage(reason: String) -> void:
-	# La foto de "en plena entrada" solo vale si hay una entrada en curso (la
-	# llegada simple ya terminó para entonces).
-	if reason == "entrance" and _cinematic() == null:
+	# Las líneas de "en plena cinemática" solo valen con una en curso (alguien
+	# la saltó, o la partida terminó antes).
+	if (reason == "entrance" or reason == "seabed") and _cinematic() == null:
 		return
 	var hud := "n/a"
 	for node: Node in _tree.get_nodes_in_group(&"hud"):

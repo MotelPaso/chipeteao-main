@@ -20,6 +20,7 @@
 [ext_resource type="Script" path="res://scripts/world/boss_arenas/ship_graveyard/fish_school.gd" id="18_fish"]
 [ext_resource type="Script" path="res://scripts/world/boss_arenas/ship_graveyard/jellyfish_bloom.gd" id="19_jelly"]
 [ext_resource type="Script" path="res://scripts/world/boss_arenas/ship_graveyard/light_shafts.gd" id="20_shafts"]
+[ext_resource type="Shader" path="res://assets/shaders/sea_surface.gdshader" id="21_surface"]
 
 [sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_sea"]
 sky_top_color = Color(0.2, 0.62, 0.86, 1)
@@ -56,6 +57,13 @@ shader_parameter/ripple_scale = null
 shader_parameter/ripple_strength = null
 shader_parameter/ripple_warp = null
 shader_parameter/current_degrees = null
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_surface"]
+shader = ExtResource("21_surface")
+
+[sub_resource type="PlaneMesh" id="PlaneMesh_surface"]
+material = SubResource("ShaderMaterial_surface")
+size = Vector2(400, 400)
 
 [node name="ShipGraveyard" type="Node3D" unique_id=1197221764]
 script = ExtResource("1_arena")
@@ -221,6 +229,11 @@ shape_seed = 4
 
 [node name="LightShafts" type="Node3D" parent="." unique_id=1764116567]
 script = ExtResource("20_shafts")
+
+[node name="Surface" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 46, 0)
+cast_shadow = 0
+mesh = SubResource("PlaneMesh_surface")
 
 [node name="Tide" parent="." unique_id=793199004 instance=ExtResource("9_tide")]
 

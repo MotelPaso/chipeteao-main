@@ -51,6 +51,8 @@ const ABANDON_EXTRACT: String = "extract"
 ## Razones de la vuelta.
 const RETURN_PORTAL: String = "portal"
 const RETURN_TIMEOUT: String = "timeout"
+## Frames entre prepare_departure() y el cambio de mundo en la ida con fundido.
+const DEPARTURE_FRAMES: int = 2
 ## Nombre de cada fase para el harness, en el orden de Phase.
 const PHASE_NAMES: Array[StringName] = [&"idle", &"leaving", &"away", &"returning"]
 
@@ -173,10 +175,9 @@ func begin_omen(encounter: Dictionary, seconds: float) -> void:
 	if is_instance_valid(_omen) or is_busy():
 		return
 	omen_beginning.emit()
-	var scene := BossArenaCatalog.scene_of(encounter, "omen_scene")
-	if scene == null:
+	_omen = BossArenaCatalog.instance_of(encounter, "omen_scene")
+	if _omen == null:
 		return
-	_omen = scene.instantiate()
 	add_child(_omen)
 	if _omen.has_method(&"begin"):
 		_omen.call(&"begin", BossArenaCatalog.boss_title(encounter), seconds)
@@ -208,9 +209,8 @@ func begin_trip(encounter: Dictionary, schedule: RefCounted) -> bool:
 	_party.remember()
 	trip_began.emit()
 	_rivals_slain = SuspendedStage.slay_rival_bosses(get_tree())
-	var scene := BossArenaCatalog.scene_of(encounter, "cinematic_scene")
-	if scene != null:
-		_cinematic = scene.instantiate()
+	_cinematic = BossArenaCatalog.instance_of(encounter, "cinematic_scene")
+	if _cinematic != null:
 		add_child(_cinematic)
 		_cinematic.call(&"play", self)
 	else:
@@ -218,22 +218,36 @@ func begin_trip(encounter: Dictionary, schedule: RefCounted) -> bool:
 	return true
 
 
-## EL CAMBIO DE MUNDO. Lo pide la cinemática en el instante en que la
-## pantalla queda tapada (o el fundido, sin cinemática). Todo pasa en este
-## frame: la arena de la etapa sale del árbol, entra la del jefe, el equipo
-## aterriza y nace el jefe. Devuelve el jefe, o null si no hubo cambio.
+## Deja el mapa listo para salir del árbol, UNOS FRAMES ANTES del cambio de
+## mundo y con la pantalla ya tapada: el presagio le devuelve su cielo y los
+## enemigos que estaban cayendo terminan de irse. Lo que esto toca tiene que
+## asentarse con el mapa todavía en el árbol. Lo pide la cinemática; sin
+## ella, el fundido.
+func prepare_departure() -> void:
+	if _phase != Phase.LEAVING:
+		return
+	_end_omen()
+	var root := _run_root()
+	if root != null:
+		SuspendedStage.finish_dying(root.arena_root())
+
+
+## EL CAMBIO DE MUNDO. Lo pide la cinemática con la pantalla tapada, unos
+## frames después de prepare_departure() (o el fundido, sin cinemática). Todo
+## pasa en este frame: la arena de la etapa sale del árbol, entra la del jefe,
+## el equipo aterriza y nace el jefe. Devuelve el jefe, o null si no hubo cambio.
 func enter_arena() -> BossBase:
 	var root := _run_root()
 	if _phase != Phase.LEAVING or root == null or not RunState.run_active:
 		return null
 	var stage := root.arena_root()
-	var arena := BossArenaCatalog.scene_of(_encounter, "arena_scene").instantiate() as BossArena
+	var arena := BossArenaCatalog.instance_of(_encounter, "arena_scene") as BossArena
 	if stage == null or arena == null:
 		push_error("BossArenaHost: the arena scene root is not a BossArena.")
 		return null
 	get_tree().call_group(BlockingUi.CLOSABLE_GROUP, "dismiss")
 	_party.clear_weapon_fields()
-	# El presagio termina aquí: el mapa se guarda con su cielo de siempre.
+	# Por si nadie lo pidió antes: el mapa se guarda con su cielo de siempre.
 	_end_omen()
 	stage_suspending.emit(stage)
 	_left_at = RunState.stage_time
@@ -309,12 +323,20 @@ func abandon_trip(reason: String) -> void:
 
 ## La ida sin cinemática: el cambio de mundo dentro de un fundido.
 func _leave_through_fade() -> void:
-	await ScreenFade.transition_async(enter_arena)
+	await ScreenFade.transition_async(_swap_under_fade)
 	if _phase == Phase.LEAVING:
 		# El cambio no pasó (otro fundido ganó la carrera o la partida terminó
 		# en el camino): el horario de jefes puede pedirlo de nuevo.
 		_close_trip("")
 		_forget_trip()
+
+
+## Con la pantalla en negro: prepara el mapa, espera a que se asiente y cambia.
+func _swap_under_fade() -> void:
+	prepare_departure()
+	for _frame: int in DEPARTURE_FRAMES:
+		await get_tree().process_frame
+	enter_arena()
 
 
 func _return_through_fade() -> void:
@@ -426,10 +448,9 @@ func _on_run_ended(_victory: bool) -> void:
 ## Crea el jefe de la fila en su punto de la arena, mirando al equipo, y se lo
 ## presenta al horario de jefes que pidió el viaje (grado, contadores y log).
 func _spawn_boss(arena: BossArena) -> BossBase:
-	var scene := BossArenaCatalog.scene_of(_encounter, "boss_scene")
-	if scene == null:
+	var node := BossArenaCatalog.instance_of(_encounter, "boss_scene")
+	if node == null:
 		return null
-	var node := scene.instantiate()
 	var body := node as BossBase
 	if body == null:
 		node.free()
@@ -461,12 +482,9 @@ func _on_boss_died() -> void:
 ## vuelta directa. False si todavía no se puede (se reintenta).
 func _open_exit() -> bool:
 	var arena := boss_arena()
-	var scene := BossArenaCatalog.scene_of(_encounter, "portal_scene")
 	if arena == null:
 		return true
-	if scene == null:
-		return request_return(RETURN_TIMEOUT)
-	_portal = scene.instantiate() as Node3D
+	_portal = BossArenaCatalog.instance_of(_encounter, "portal_scene") as Node3D
 	if _portal == null:
 		return request_return(RETURN_TIMEOUT)
 	arena.add_child(_portal)

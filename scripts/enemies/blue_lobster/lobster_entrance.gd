@@ -59,6 +59,8 @@ const Act := LobsterEntranceShot.Act
 @export var intro_seconds: float = 12.76
 ## Plano del fondo del mar con el que entra el cartel con su nombre (1 = el primero de ese acto).
 @export var title_shot: int = 7
+## Frames con la pantalla ya tapada y el equipo todavía en el mapa, antes del cambio de mundo. Ahí vuelve a verse lo que los planos del rapto escondieron, el mapa recupera su cielo y terminan de irse los enemigos que estaban cayendo: todo eso tiene que asentarse antes de que el mapa salga del árbol.
+@export var cover_frames: int = 2
 ## Frames con la pantalla tapada, ya en el fondo del mar, antes de que arranquen la canción y el reloj. Lo que se dibuja por primera vez ahí (la arena entera) cuesta un tirón: con la canción ya sonando, los cortes quedarían atrasados respecto de sus golpes.
 @export var warmup_frames: int = 6
 ## Segundos que tarda el agua de la pantalla en irse en burbujas con el primer plano del fondo.
@@ -69,7 +71,7 @@ const Act := LobsterEntranceShot.Act
 @export var eruption_seconds: float = 0.6
 @export var eruption_height: float = 5.2
 ## Metros que espera enterrada antes de salir.
-@export var buried_depth: float = 1.9
+@export var buried_depth: float = 2.8
 
 @export_group("Saltar")
 ## Acción que cada raider mantiene para saltar la cinemática.
@@ -87,6 +89,8 @@ var _active: bool = false
 ## Segundos del acto en curso y de toda la cinemática (tiempo de juego).
 var _clock: float = 0.0
 var _elapsed: float = 0.0
+## Frames que faltan con la pantalla tapada: antes del cambio de mundo y después.
+var _cover_left: int = 0
 var _warmup_left: int = 0
 ## El plano en curso (-1 = ninguno todavía).
 var _shot_index: int = -1
@@ -251,13 +255,22 @@ func _tick_abduction(delta: float) -> void:
 		_begin_swap()
 
 
-## El cambio de mundo, con la pantalla tapada: el mapa se va, entra la arena y
-## nace la langosta, que espera escondida.
+## El agua tapó la pantalla: el rapto se apaga y, unos frames después, va el
+## cambio de mundo.
 func _begin_swap() -> void:
 	_step = Step.SWAP
 	_overlay.show_flood(1.0, 0.0)
 	_fx.end_abduction()
 	_camera.show_hidden()
+	if _host != null:
+		_host.prepare_departure()
+	_cover_left = maxi(cover_frames, 1)
+	_warmup_left = 0
+
+
+## El cambio de mundo, con la pantalla tapada: el mapa se va, entra la arena y
+## nace la langosta, que espera escondida.
+func _enter_world() -> void:
 	var boss := _host.enter_arena() as BlueLobster if _host != null else null
 	if boss == null:
 		_teardown("no_arena")
@@ -278,6 +291,11 @@ func _begin_swap() -> void:
 
 
 func _tick_swap() -> void:
+	if _cover_left > 0:
+		_cover_left -= 1
+		if _cover_left == 0:
+			_enter_world()
+		return
 	_warmup_left -= 1
 	if _warmup_left > 0:
 		return

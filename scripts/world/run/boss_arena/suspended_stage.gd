@@ -82,6 +82,22 @@ func discard() -> void:
 	stage.free()
 
 
+## Termina YA la caída de cada enemigo que está muriendo en `stage`, que
+## todavía está en el árbol: su cuerpo se libera al final de este frame, como
+## al terminar su caída. Un cuerpo a medio caer no puede quedarse en un mapa
+## que sale del árbol: su caída se detendría con él.
+static func finish_dying(stage: Node) -> void:
+	if stage == null:
+		return
+	for node: Node in descendants(stage):
+		var body := node as EnemyBase
+		if body == null or body.is_queued_for_deletion():
+			continue
+		var health := Health.find_in(body)
+		if health != null and health.is_dead:
+			body.queue_free()
+
+
 ## Saca de la arena guardada a la horda normal que quedó en ella (sin pagar
 ## nada) y las saetas que venían en vuelo. Los siervos poseídos y los jefes
 ## se quedan. Devuelve cuántos enemigos se llevó.
@@ -100,8 +116,9 @@ func sweep_horde() -> int:
 		var body := node as EnemyBase
 		if body == null or body is BossBase or body.is_in_group(&"possessed"):
 			continue
-		if body.is_in_group(&"enemies") or body.is_in_group(Duneburrower.BURROWED_GROUP):
-			horde.append(body)
+		# También los que el viaje sorprendió cayendo: ya salieron del grupo
+		# "enemies" y su caída quedó detenida con el mapa.
+		horde.append(body)
 	for bolt: Node3D in bolts:
 		Pools.release(bolt)
 	for body: EnemyBase in horde:

@@ -75,8 +75,8 @@ void fragment() {
 	water = mix(water, foam_color, bubble * 0.7);
 	float foam = (1.0 - smoothstep(0.0, foam_width, line - up)) * under;
 	water = mix(water, foam_color, foam * 0.85);
-	// Se va en burbujas: primero donde el ruido es bajo.
-	float grain = noise2(vec2(UV.x * aspect, up) * 9.0 + TIME * 0.6) * 0.7 + bubble * 0.3;
-	float gone = smoothstep(grain - 0.12, grain + 0.12, dissolve * 1.25 - 0.1);
+	// Se va en burbujas: el agua se aclara entera y cada burbuja aguanta un poco más.
+	float grain = noise2(vec2(UV.x * aspect, up - TIME * bubble_speed) * 46.0);
+	float gone = smoothstep(0.0, 1.0, dissolve * 1.5 - grain * 0.3 - bubble * 0.25);
 	COLOR = vec4(water, under * (1.0 - gone));
 }
