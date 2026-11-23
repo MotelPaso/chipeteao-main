@@ -586,12 +586,12 @@ ejecuta nada de esto y no saca ni una tirada distinta del RNG.
 una pieza propia que ninguna otra arma; las demás piezas pueden estar o
 faltar:
 
-| Receta (`id`) | Pieza propia | Qué más puede llevar |
+| Receta (`id`) | Pieza propia | Qué más lleva («a veces» = pieza que se sortea) |
 | --- | --- | --- |
-| **La Montaña Escalonada** (`massif`) | Macizo, segundo nivel y cumbre con el Árbol Hueco (tabla de abajo) | El cañón con su río al pie del macizo, un puente, la cascada que baja del macizo al río y el camino del spawn al puente. |
-| **El Gran Río** (`river`) | Un río que cruza el mapa de punta a punta por un cañón serpenteante, a 46-64 m del spawn, con 2-3 puentes y un vado entre cada dos | Una meseta-manantial río arriba de la que cae la cascada donde nace (`springhead_chance`), el camino al puente más cercano y cerros en las dos orillas. Sin Árbol Hueco. |
+| **La Montaña Escalonada** (`massif`) | Macizo, segundo nivel y cumbre con el Árbol Hueco (tabla de abajo) | El cañón con su río al pie del macizo, un puente y la cascada que baja del macizo al río; a veces, el camino del spawn al puente. |
+| **El Gran Río** (`river`) | Un río que cruza el mapa de punta a punta por un cañón serpenteante, a 46-64 m del spawn, con 2-3 puentes y un vado entre cada dos | Cerros en las dos orillas; a veces, una meseta-manantial río arriba de la que cae la cascada donde nace (`springhead_chance`) y el camino al puente más cercano. Sin Árbol Hueco. |
 | **El Paso de los Dos Montes** (`twin`) | Dos montañas de dos niveles enfrentadas, el equipo en el valle entre ellas y el camino antiguo que cruza el paso de punta a punta, con un portal de piedra en cada boca y un círculo de piedras en cada cima | Algún cerro suelto. Sin cañón, río, puentes ni Árbol Hueco. |
-| **El Lago de la Isla** (`lake`) | Un lago hundido frente al spawn, alimentado por un brazo de río que entra por una punta y sale por la otra, con una isla en el medio que lleva el Árbol Hueco y un puente-muelle de la orilla a la isla | Una cascada que cae al brazo de río de arriba (`lake_falls_chance`), el camino al muelle (y en la isla, hacia el Árbol) y cerros. |
+| **El Lago de la Isla** (`lake`) | Un lago hundido frente al spawn, alimentado por un brazo de río que entra por una punta y sale por la otra, con una isla en el medio que lleva el Árbol Hueco y un puente-muelle de la orilla a la isla | Cerros; a veces, una cascada que cae al brazo de río de arriba (`lake_falls_chance`) y el camino al muelle (y en la isla, hacia el Árbol). |
 
 - **Cómo se sortea.** `ReliefRecipes.choose` saca la receta de la semilla de
   partida con su propio RNG (sal `SEED_SALT`) y los pesos del grupo
