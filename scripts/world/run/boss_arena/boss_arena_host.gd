@@ -161,6 +161,12 @@ func rivals_slain() -> int:
 	return _rivals_slain
 
 
+## El nombre del jefe del viaje en curso (la cinemática lo pone en su cartel
+## antes de que el jefe exista).
+func boss_title() -> String:
+	return BossArenaCatalog.boss_title(_encounter)
+
+
 ## Empieza el presagio de `encounter`, que dura `seconds` hasta el viaje.
 ## Sin escena de presagio en la fila no hace nada.
 func begin_omen(encounter: Dictionary, seconds: float) -> void:
@@ -227,6 +233,8 @@ func enter_arena() -> BossBase:
 		return null
 	get_tree().call_group(BlockingUi.CLOSABLE_GROUP, "dismiss")
 	_party.clear_weapon_fields()
+	# El presagio termina aquí: el mapa se guarda con su cielo de siempre.
+	_end_omen()
 	stage_suspending.emit(stage)
 	_left_at = RunState.stage_time
 	_stage.suspend(root, stage)

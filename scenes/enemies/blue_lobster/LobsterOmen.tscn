@@ -1,0 +1,66 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scripts/world/run/boss_arena/boss_omen.gd" id="1_omen"]
+
+[node name="LobsterOmen" type="Node"]
+script = ExtResource("1_omen")
+
+[node name="Notice" type="CanvasLayer" parent="."]
+layer = 6
+visible = false
+
+[node name="Card" type="Control" parent="Notice"]
+unique_name_in_owner = true
+layout_mode = 3
+anchors_preset = -1
+anchor_left = 0.5
+anchor_top = 0.12
+anchor_right = 0.5
+anchor_bottom = 0.12
+offset_left = -270.0
+offset_top = -46.0
+offset_right = 270.0
+offset_bottom = 46.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="CardFrame" type="Panel" parent="Notice/Card"]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="Title" type="Label" parent="Notice/Card"]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = -1
+anchor_right = 1.0
+anchor_bottom = 0.62
+offset_top = 6.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_font_sizes/font_size = 34
+text = "Se acerca la Langosta Azul"
+horizontal_alignment = 1
+vertical_alignment = 1
+uppercase = true
+
+[node name="Countdown" type="Label" parent="Notice/Card"]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = -1
+anchor_top = 0.58
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_bottom = -8.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_font_sizes/font_size = 20
+text = "La marea sube · 30 s"
+horizontal_alignment = 1
+vertical_alignment = 1

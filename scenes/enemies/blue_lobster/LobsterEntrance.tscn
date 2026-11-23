@@ -8,6 +8,9 @@
 [ext_resource type="Script" path="res://scripts/enemies/blue_lobster/lobster_song_yield.gd" id="6_lobster_song_yield"]
 [ext_resource type="Script" path="res://scripts/enemies/blue_lobster/lobster_entrance_overlay.gd" id="7_lobster_entrance_overlay"]
 [ext_resource type="AudioStream" path="res://assets/audio/music/infestation.mp3" id="8_infestation"]
+[ext_resource type="Shader" path="res://assets/shaders/flood_cover.gdshader" id="9_flood"]
+[ext_resource type="Script" path="res://scripts/enemies/blue_lobster/lobster_abduction_fx.gd" id="10_fx"]
+[ext_resource type="Shader" path="res://assets/shaders/water_column.gdshader" id="11_column"]
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_backdrop"]
 shader = ExtResource("1_lobster_backdrop")
@@ -19,19 +22,75 @@ height = 140.0
 radial_segments = 24
 rings = 12
 
-[node name="LobsterEntrance" type="Node3D" unique_id=58619551]
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_flood"]
+shader = ExtResource("9_flood")
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_column"]
+shader = ExtResource("11_column")
+
+[sub_resource type="QuadMesh" id="QuadMesh_segment"]
+material = SubResource("ShaderMaterial_column")
+
+[sub_resource type="MultiMesh" id="MultiMesh_water"]
+transform_format = 1
+mesh = SubResource("QuadMesh_segment")
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_drop"]
+shading_mode = 0
+albedo_color = Color(0.86, 0.97, 1, 1)
+
+[sub_resource type="SphereMesh" id="SphereMesh_drop"]
+material = SubResource("StandardMaterial3D_drop")
+radius = 0.09
+height = 0.18
+radial_segments = 6
+rings = 3
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_bubble"]
+transparency = 1
+shading_mode = 0
+albedo_color = Color(0.74, 0.94, 1, 0.6)
+
+[sub_resource type="SphereMesh" id="SphereMesh_bubble"]
+material = SubResource("StandardMaterial3D_bubble")
+radius = 0.12
+height = 0.24
+radial_segments = 6
+rings = 3
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_sand"]
+transparency = 1
+shading_mode = 0
+albedo_color = Color(0.93, 0.89, 0.74, 0.8)
+
+[sub_resource type="SphereMesh" id="SphereMesh_sand"]
+material = SubResource("StandardMaterial3D_sand")
+radius = 0.3
+height = 0.6
+radial_segments = 6
+rings = 3
+
+[sub_resource type="Curve" id="Curve_shrink"]
+_data = [Vector2(0, 1), 0.0, 0.0, 0, 0, Vector2(0.6, 0.9), 0.0, 0.0, 0, 0, Vector2(1, 0), 0.0, 0.0, 0, 0]
+point_count = 3
+
+[sub_resource type="Curve" id="Curve_swell"]
+_data = [Vector2(0, 0.3), 0.0, 0.0, 0, 0, Vector2(0.35, 1), 0.0, 0.0, 0, 0, Vector2(1, 0), 0.0, 0.0, 0, 0]
+point_count = 3
+
+[node name="LobsterEntrance" type="Node3D"]
 script = ExtResource("2_lobster_entrance")
 
-[node name="Camera" type="Camera3D" parent="." unique_id=1172525806]
+[node name="Camera" type="Camera3D" parent="."]
 far = 400.0
 script = ExtResource("3_lobster_entrance_camera")
 
-[node name="Backdrop" type="MeshInstance3D" parent="Camera" unique_id=264915772]
+[node name="Backdrop" type="MeshInstance3D" parent="Camera"]
 layers = 524288
 cast_shadow = 0
 mesh = SubResource("SphereMesh_backdrop")
 
-[node name="Light" type="SpotLight3D" parent="Camera" unique_id=497587721]
+[node name="Light" type="SpotLight3D" parent="Camera"]
 transform = Transform3D(0.90631, -0.19841, -0.37315, 0, 0.88295, -0.46947, 0.42262, 0.42549, 0.80022, -1.3, -1.5, 0.2)
 layers = 524288
 light_color = Color(0.62, 0.9, 1, 1)
@@ -41,125 +100,274 @@ spot_range = 26.0
 spot_attenuation = 0.7
 spot_angle = 58.0
 
-[node name="Shot1" type="Node" parent="Camera" unique_id=837408794]
+[node name="Abduction1" type="Node" parent="Camera"]
 script = ExtResource("4_lobster_entrance_shot")
-at_seconds = 0.08
-distance = 3.8
-height = 0.45
-look_lift = 0.4
-fov = 34.0
-hit_shake = 1.0
-pose = &"STALK"
-
-[node name="Shot2" type="Node" parent="Camera" unique_id=9289154]
-script = ExtResource("4_lobster_entrance_shot")
-at_seconds = 1.27
-distance = 2.4
-height = 0.55
-look_lift = 0.5
-fov = 30.0
-push_in = 0.15
-roll_degrees = -4.0
+act = 0
+subject = 1
+distance = 9.5
+around_degrees = 28.0
+height = 2.2
+look_lift = 0.6
+fov = 58.0
+push_in = 1.8
 hit_shake = 0.7
 
-[node name="Shot3" type="Node" parent="Camera" unique_id=949182780]
+[node name="Abduction2" type="Node" parent="Camera"]
+script = ExtResource("4_lobster_entrance_shot")
+act = 0
+at_seconds = 1.75
+subject = 1
+distance = 5.0
+height = 15.0
+fov = 62.0
+rise = 2.0
+orbit_degrees = 50.0
+hit_shake = 0.4
+
+[node name="Abduction3" type="Node" parent="Camera"]
+script = ExtResource("4_lobster_entrance_shot")
+act = 0
+at_seconds = 3.4
+subject = 1
+distance = 6.5
+around_degrees = -35.0
+height = 0.3
+look_lift = 1.6
+fov = 64.0
+push_in = 1.2
+roll_degrees = -5.0
+hit_shake = 0.5
+
+[node name="Seabed1" type="Node" parent="Camera"]
+script = ExtResource("4_lobster_entrance_shot")
+at_seconds = 0.08
+subject = 2
+distance = 10.0
+height = 38.0
+fov = 70.0
+rise = -17.0
+hit_shake = 0.5
+event = &"bury"
+
+[node name="Seabed2" type="Node" parent="Camera"]
+script = ExtResource("4_lobster_entrance_shot")
+at_seconds = 1.27
+subject = 2
+distance = 30.0
+height = 17.0
+look_lift = 3.0
+fov = 66.0
+rise = -13.5
+hit_shake = 0.3
+
+[node name="Seabed3" type="Node" parent="Camera"]
 script = ExtResource("4_lobster_entrance_shot")
 at_seconds = 2.36
-focus = 1
-distance = 4.2
-around_degrees = -55.0
-height = 0.3
-look_lift = -0.2
-fov = 38.0
-push_in = 0.3
-roll_degrees = 6.0
+subject = 1
+distance = 7.0
+around_degrees = 180.0
+height = 1.6
+look_lift = 0.8
+fov = 60.0
+push_in = 0.8
 hit_shake = 0.6
-gesture = &"clack"
-sfx = &"lobster_snap"
+event = &"land"
 
-[node name="Shot4" type="Node" parent="Camera" unique_id=730083335]
+[node name="Seabed4" type="Node" parent="Camera"]
 script = ExtResource("4_lobster_entrance_shot")
 at_seconds = 4.43
 focus = 2
-distance = 8.0
-around_degrees = 18.0
-height = -1.2
-look_lift = 1.4
-fov = 58.0
-push_in = 0.8
-hit_shake = 0.6
-pose = &"THREAT"
+distance = 12.0
+around_degrees = 22.0
+height = 0.2
+look_lift = 1.5
+fov = 56.0
+push_in = 1.5
+hit_shake = 1.0
+event = &"erupt"
+pose = &"ERUPT"
+sfx = &"lobster_slam"
 
-[node name="Shot5" type="Node" parent="Camera" unique_id=1460546111]
+[node name="Seabed5" type="Node" parent="Camera"]
 script = ExtResource("4_lobster_entrance_shot")
 at_seconds = 5.52
-focus = 2
-distance = 9.0
-around_degrees = 155.0
-height = 4.0
-fov = 62.0
-push_in = 1.0
-isolated = false
-hit_shake = 0.4
+focus = 1
+distance = 4.4
+around_degrees = -50.0
+height = 0.4
+look_lift = -0.1
+fov = 40.0
+push_in = 0.4
+roll_degrees = 6.0
+hit_shake = 0.6
+pose = &"STALK"
+gesture = &"clack"
+sfx = &"lobster_snap"
 
-[node name="Shot6" type="Node" parent="Camera" unique_id=961702239]
+[node name="Seabed6" type="Node" parent="Camera"]
 script = ExtResource("4_lobster_entrance_shot")
 at_seconds = 7.58
-distance = 8.5
-around_degrees = -14.0
-height = 1.2
-look_lift = 0.3
-fov = 44.0
-push_in = 1.2
+distance = 3.6
+around_degrees = 10.0
+height = 0.5
+look_lift = 0.4
+fov = 34.0
+push_in = 0.3
 roll_degrees = -3.0
-isolated = false
 hit_shake = 0.5
 
-[node name="Shot7" type="Node" parent="Camera" unique_id=273060113]
+[node name="Seabed7" type="Node" parent="Camera"]
 script = ExtResource("4_lobster_entrance_shot")
 at_seconds = 8.69
 focus = 2
-distance = 10.5
-around_degrees = 24.0
-height = 1.6
-look_lift = -0.9
-fov = 44.0
-push_in = 0.9
-isolated = false
+distance = 12.5
+around_degrees = 20.0
+height = 1.4
+look_lift = -0.6
+fov = 46.0
+push_in = 1.0
 hit_shake = 0.8
 pose = &"THREAT"
 gesture = &"roar"
 sfx = &"lobster_roar"
 
-[node name="Shot8" type="Node" parent="Camera" unique_id=973578155]
+[node name="Seabed8" type="Node" parent="Camera"]
 script = ExtResource("4_lobster_entrance_shot")
 at_seconds = 10.72
-distance = 4.4
-around_degrees = 8.0
-height = 0.9
-look_lift = -0.1
-fov = 36.0
+subject = 1
+distance = 8.0
+around_degrees = 168.0
+height = 2.4
+look_lift = 0.6
+fov = 58.0
 push_in = 1.2
-roll_degrees = 3.0
-isolated = false
 hit_shake = 0.5
 pose = &"CROUCH"
 sfx = &"lobster_hiss"
 
-[node name="Music" type="AudioStreamPlayer" parent="." unique_id=1998361302]
+[node name="Music" type="AudioStreamPlayer" parent="."]
 script = ExtResource("5_boss_song")
 song = ExtResource("8_infestation")
 fade_seconds = 4.0
 
-[node name="Yield" type="Node" parent="Music" unique_id=1456871739]
+[node name="Yield" type="Node" parent="Music"]
 script = ExtResource("6_lobster_song_yield")
 
-[node name="Overlay" type="CanvasLayer" parent="." unique_id=587385116]
+[node name="Fx" type="Node3D" parent="."]
+script = ExtResource("10_fx")
+
+[node name="Water" type="MultiMeshInstance3D" parent="Fx"]
+visible = false
+cast_shadow = 0
+multimesh = SubResource("MultiMesh_water")
+
+[node name="Drops" type="CPUParticles3D" parent="Fx"]
+cast_shadow = 0
+emitting = false
+amount = 48
+lifetime = 1.2
+mesh = SubResource("SphereMesh_drop")
+emission_shape = 6
+emission_ring_axis = Vector3(0, 1, 0)
+emission_ring_height = 0.5
+emission_ring_radius = 7.0
+emission_ring_inner_radius = 2.5
+direction = Vector3(0, 1, 0)
+spread = 22.0
+gravity = Vector3(0, -20, 0)
+initial_velocity_min = 7.0
+initial_velocity_max = 15.0
+scale_amount_min = 0.6
+scale_amount_max = 1.8
+scale_amount_curve = SubResource("Curve_shrink")
+
+[node name="Bubbles" type="CPUParticles3D" parent="Fx"]
+cast_shadow = 0
+emitting = false
+amount = 110
+lifetime = 1.3
+mesh = SubResource("SphereMesh_bubble")
+emission_shape = 3
+emission_box_extents = Vector3(10, 7, 10)
+direction = Vector3(0, 1, 0)
+spread = 6.0
+gravity = Vector3(0, 0, 0)
+initial_velocity_min = 12.0
+initial_velocity_max = 20.0
+scale_amount_min = 0.5
+scale_amount_max = 1.6
+scale_amount_curve = SubResource("Curve_swell")
+
+[node name="SandPuff" type="CPUParticles3D" parent="Fx"]
+cast_shadow = 0
+emitting = false
+amount = 60
+lifetime = 1.8
+one_shot = true
+explosiveness = 0.9
+mesh = SubResource("SphereMesh_sand")
+emission_shape = 6
+emission_ring_axis = Vector3(0, 1, 0)
+emission_ring_height = 0.3
+emission_ring_radius = 2.2
+emission_ring_inner_radius = 0.4
+direction = Vector3(0, 1, 0)
+spread = 75.0
+gravity = Vector3(0, -2.5, 0)
+initial_velocity_min = 2.5
+initial_velocity_max = 6.5
+damping_min = 1.5
+damping_max = 2.5
+scale_amount_min = 0.6
+scale_amount_max = 2.2
+scale_amount_curve = SubResource("Curve_swell")
+
+[node name="SandBurst" type="CPUParticles3D" parent="Fx"]
+cast_shadow = 0
+emitting = false
+amount = 110
+lifetime = 2.0
+one_shot = true
+explosiveness = 0.95
+mesh = SubResource("SphereMesh_sand")
+emission_shape = 1
+emission_sphere_radius = 3.0
+direction = Vector3(0, 1, 0)
+spread = 55.0
+gravity = Vector3(0, -6, 0)
+initial_velocity_min = 6.0
+initial_velocity_max = 17.0
+damping_min = 1.0
+damping_max = 2.0
+scale_amount_min = 0.8
+scale_amount_max = 2.8
+scale_amount_curve = SubResource("Curve_swell")
+
+[node name="BubbleBurst" type="CPUParticles3D" parent="Fx"]
+cast_shadow = 0
+emitting = false
+amount = 90
+lifetime = 1.6
+one_shot = true
+explosiveness = 0.85
+mesh = SubResource("SphereMesh_bubble")
+emission_shape = 1
+emission_sphere_radius = 3.5
+direction = Vector3(0, 1, 0)
+spread = 35.0
+gravity = Vector3(0, 3, 0)
+initial_velocity_min = 5.0
+initial_velocity_max = 12.0
+scale_amount_min = 0.6
+scale_amount_max = 2.0
+scale_amount_curve = SubResource("Curve_swell")
+
+[node name="Overlay" type="CanvasLayer" parent="."]
 layer = 9
 visible = false
 script = ExtResource("7_lobster_entrance_overlay")
 
-[node name="Root" type="Control" parent="Overlay" unique_id=213517321]
+[node name="Root" type="Control" parent="Overlay"]
 layout_mode = 3
 anchors_preset = 15
 anchor_right = 1.0
@@ -168,7 +376,19 @@ grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
 
-[node name="Card" type="Control" parent="Overlay/Root" unique_id=1479441435]
+[node name="Flood" type="ColorRect" parent="Overlay/Root"]
+unique_name_in_owner = true
+visible = false
+material = SubResource("ShaderMaterial_flood")
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="Card" type="Control" parent="Overlay/Root"]
 unique_name_in_owner = true
 layout_mode = 1
 anchor_left = 0.5
@@ -183,7 +403,7 @@ grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
 
-[node name="CardFrame" type="Panel" parent="Overlay/Root/Card" unique_id=756698374]
+[node name="CardFrame" type="Panel" parent="Overlay/Root/Card"]
 unique_name_in_owner = true
 layout_mode = 1
 anchors_preset = 15
@@ -193,7 +413,7 @@ grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
 
-[node name="Title" type="Label" parent="Overlay/Root/Card" unique_id=1167319583]
+[node name="Title" type="Label" parent="Overlay/Root/Card"]
 unique_name_in_owner = true
 layout_mode = 1
 anchors_preset = -1
@@ -209,7 +429,7 @@ horizontal_alignment = 1
 vertical_alignment = 1
 uppercase = true
 
-[node name="SkipHint" type="VBoxContainer" parent="Overlay/Root" unique_id=63247728]
+[node name="SkipHint" type="VBoxContainer" parent="Overlay/Root"]
 unique_name_in_owner = true
 layout_mode = 1
 anchors_preset = -1
@@ -226,7 +446,7 @@ grow_vertical = 0
 mouse_filter = 2
 alignment = 2
 
-[node name="SkipBar" type="ProgressBar" parent="Overlay/Root/SkipHint" unique_id=1277690861]
+[node name="SkipBar" type="ProgressBar" parent="Overlay/Root/SkipHint"]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(0, 6)
 layout_mode = 2
@@ -234,7 +454,7 @@ mouse_filter = 2
 max_value = 1.0
 show_percentage = false
 
-[node name="Flash" type="ColorRect" parent="Overlay/Root" unique_id=1788425696]
+[node name="Flash" type="ColorRect" parent="Overlay/Root"]
 unique_name_in_owner = true
 layout_mode = 1
 anchors_preset = 15

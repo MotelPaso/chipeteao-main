@@ -88,12 +88,9 @@ func _check(row: Dictionary) -> bool:
 	return ok
 
 
-## El jefe de la fila, parado en su punto de la arena y sin su entrada.
+## El jefe de la fila, parado en su punto de la arena (sin viaje no hay cinemática).
 func _add_boss(row: Dictionary) -> Node3D:
 	var boss := BossArenaCatalog.scene_of(row, "boss_scene").instantiate() as Node3D
-	var arrival := boss.get_node_or_null("Arrival")
-	if arrival != null and arrival.get("entrance_scene") != null:
-		arrival.set("entrance_scene", null)
 	_arena.boss_parent().add_child(boss)
 	boss.global_position = _arena.boss_origin()
 	return boss

@@ -1,9 +1,10 @@
 class_name LobsterEntranceOverlay
 extends CanvasLayer
-## Lo que la entrada de la Langosta Azul dibuja encima de la imagen (nodo
-## Overlay de LobsterEntrance.tscn): el destello del corte, el CARTEL con su
-## nombre y la indicación de saltar. La entrada dice qué mostrar y cuándo;
-## cómo se ve vive aquí y en los nodos de la escena.
+## Lo que la cinemática de la Langosta Azul dibuja encima de la imagen (nodo
+## Overlay de LobsterEntrance.tscn): el destello del corte, el AGUA que
+## inunda la pantalla en el rapto (nodo Flood, con flood_cover.gdshader), el
+## CARTEL con su nombre y la indicación de saltar. La cinemática dice qué
+## mostrar y cuándo; cómo se ve vive aquí y en los nodos de la escena.
 ## El cartel es una tarjeta como las del menú principal: un marco de color
 ## con contorno de tinta y sombra dura, apenas girado. Solo gira el MARCO
 ## (nodo CardFrame): el texto no es hijo suyo y queda siempre recto.
@@ -25,7 +26,7 @@ extends CanvasLayer
 @export var card_pop_from: float = 0.55
 
 @export_group("Saltar")
-## Segundos desde el corte hasta que aparece la indicación de saltar: el susto va primero.
+## Segundos desde el corte hasta que aparece la indicación de saltar: el rapto va primero.
 @export var skip_hint_delay: float = 1.2
 
 @export_group("Destello")
@@ -48,6 +49,8 @@ var _card_shown: bool = false
 var _opened_at: float = -1.0
 var _flash_tween: Tween = null
 var _card_tween: Tween = null
+## True mientras el agua tapa la pantalla entera.
+var _covered: bool = false
 
 @onready var _card: Control = %Card
 @onready var _card_frame: Panel = %CardFrame
@@ -55,6 +58,7 @@ var _card_tween: Tween = null
 @onready var _skip_hint: BoxContainer = %SkipHint
 @onready var _skip_bar: ProgressBar = %SkipBar
 @onready var _flash: ColorRect = %Flash
+@onready var _flood: ColorRect = %Flood
 
 
 func _ready() -> void:
@@ -67,6 +71,7 @@ func _ready() -> void:
 	_title.add_theme_font_override("font", UiTheme.display_font())
 	_title.add_theme_color_override("font_color", UiTheme.INK)
 	_card.visible = false
+	_flood.visible = false
 	_card.resized.connect(_center_pivots)
 	_center_pivots()
 
@@ -104,9 +109,28 @@ func show_progress(elapsed: float, title_at: float, skip: float) -> void:
 		_pop_card()
 
 
-## Termina la entrada: se van el cartel y la indicación, con un destello.
+## El agua sobre la pantalla. `level` es cuánto subió (0 = nada, 1 = la tapa
+## entera) y `dissolve` cuánto se fue ya en burbujas (0 = entera, 1 = nada).
+func show_flood(level: float, dissolve: float) -> void:
+	var shown := level > 0.0 and dissolve < 1.0
+	_covered = level >= 1.0 and dissolve <= 0.0
+	_flood.visible = shown
+	if not shown:
+		return
+	var material := _flood.material as ShaderMaterial
+	material.set_shader_parameter(&"level", clampf(level, 0.0, 1.0))
+	material.set_shader_parameter(&"dissolve", clampf(dissolve, 0.0, 1.0))
+
+
+## True mientras el agua tapa la pantalla entera.
+func is_covered() -> bool:
+	return _covered and visible
+
+
+## Termina la cinemática: se van el cartel, el agua y la indicación, con un destello.
 func close() -> void:
 	_set_staged(false)
+	show_flood(0.0, 1.0)
 	_flash_to(end_flash_alpha, end_flash_seconds)
 
 
@@ -114,6 +138,7 @@ func close() -> void:
 func clear() -> void:
 	_kill(_flash_tween)
 	_set_staged(false)
+	show_flood(0.0, 1.0)
 	_flash.color.a = 0.0
 	visible = false
 

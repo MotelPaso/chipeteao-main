@@ -4,8 +4,9 @@ extends SceneTree
 ## DSP básicos (osciladores, ruido blanco, filtros, envolventes, barridos de
 ## tono). No se samplea audio externo. Determinista: cada capa de ruido usa
 ## su propia semilla fija, así volver a correrlo escribe bytes idénticos. Los
-## bloques viven en SfxDsp y las recetas de los ataques de Mythos en SfxMythos
-## (los dos en scripts/tools/generate_sfx/); las demás recetas están aquí.
+## bloques viven en SfxDsp, las recetas de los ataques de Mythos en SfxMythos
+## y las del viaje a la arena de la langosta en SfxAbduction (los tres en
+## scripts/tools/generate_sfx/); las demás recetas están aquí.
 ## Córrelo desde la raíz del proyecto cada vez que cambies una receta:
 ##
 ##     godot --headless --path . -s res://scripts/tools/generate_sfx.gd
@@ -60,6 +61,12 @@ func _init() -> void:
 	_save_wav(SFX_DIR, "lobster_lock", _gen_lobster_lock())
 	_save_wav(SFX_DIR, "lobster_death", _gen_lobster_death())
 	_save_wav(SFX_DIR, "lobster_scare", _gen_lobster_scare())
+	_save_wav(SFX_DIR, "omen_swell", SfxAbduction.omen_swell())
+	_save_wav(SFX_DIR, "abduction_geyser", SfxAbduction.geyser())
+	_save_wav(SFX_DIR, "abduction_whirlpool", SfxAbduction.whirlpool())
+	_save_wav(SFX_DIR, "abduction_flood", SfxAbduction.flood())
+	_save_wav(SFX_DIR, "seabed_landing", SfxAbduction.seabed_landing())
+	_save_wav(SFX_DIR, "return_portal", SfxAbduction.return_portal())
 	_save_wav(SFX_DIR, "boss_die", _gen_boss_die())
 	_save_wav(SFX_DIR, "streak", _gen_streak())
 	_save_wav(SFX_DIR, "laser_hum", _gen_laser_hum())
