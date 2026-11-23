@@ -483,7 +483,7 @@ El Bosque Hueco tiene un **minijefe**: llega a mitad de la etapa, antes del jefe
 - Qué es: una fila de catálogo + una escena de arena. **El orden de `MAP_LIBRARY` es el orden de la partida**: una fila nueva insertada en medio cambia la progresión de todos inmediatamente. No hay desbloqueos de mapa ni grados; a un bioma se llega jugando.
 - Archivos: `scripts/systems/catalogs/map_catalog.gd` (`MAP_LIBRARY`), `scripts/world/run/run_root.gd`, `scripts/world/run/arena.gd`, `scripts/world/run/scatter.gd`, arenas existentes como plantilla.
 - Fila: `id`, `display_name` (topónimo, mayúscula en las dos partes), `blurb`, `scene_path`, `palette`. Nada más.
-- Escena de arena (copiar `AshDunes.tscn`): raíz `Node3D` **con `scripts/world/run/arena.gd` y su `map_id`**, `WorldEnvironment` + luz (`Sun`), `Perimeter` (muros, capa 1), `Backdrop` (`scripts/world/run/backdrop.gd`, sus anillos de colinas se derivan de `arena_half_extent`), spots de verticalidad y props a mano (en grupo `scatter_keepout`), nodo de scatter con `scatter.gd` (seed determinista; su `arena_half_extent` es la **fuente única del tamaño de arena** — 120.0 = 240x240 — publicada por el grupo `arena_bounds`: la leen `BossBase` y `EnemySpawner` restando su margen, el `Terrain` (su lado es `2 × arena_half_extent`, leído al construirse) y el propio scatter, que deriva de ahí las zonas de mesetas, interior y perímetro con los márgenes `mesa_edge_margin`, `interior_edge_margin` y `perimeter_edge_margin_min/max`; el scatter además necesita su `formation_style`, un `RockFormationStyle` en `assets/world/rock_style_<mapa>.tres`), `Interactables`, `EnemySpawner` (con `phase_preset` y sus escenas/horario), `AmbientBed`, un nodo **`Terrain`** con `scripts/world/run/terrain.gd`, su `amplitude` del bioma, el `ShaderMaterial` del suelo en `surface_material`, un `backdrop_path` válido (por defecto `../Backdrop`, de donde saca el tinte del minimapa) y, si el mapa lleva montaña, cañón y puentes, un `relief` (un `ReliefSettings` en `assets/world/relief_<mapa>.tres`; ver «Terreno → Relieve por zonas»: con él no se ponen spots de verticalidad a mano, que clavarían el trazado en el mismo sitio en todas las semillas; ahí mismo se eligen sus estructuras, y la vegetación del suelo es una `GroundCover.tscn` hija del scatter) (colocado **después** del scatter en orden de árbol), y un `Marker3D` llamado `SpawnPoint` (dónde aterriza el equipo). Los muros del `Perimeter` se escriben **estáticos** en la escena: formas `(1, 17, 242)` / `(242, 17, 1)` centradas en ±120.5 y y = 3.5. Unos **13 POI barajables** bajo `Interactables`. **NO** instancia `RunSystems.tscn`: eso vive una sola vez en `Run.tscn`.
+- Escena de arena (copiar `AshDunes.tscn`): raíz `Node3D` **con `scripts/world/run/arena.gd` y su `map_id`**, `WorldEnvironment` + luz (`Sun`), `Perimeter` (muros, capa 1), `Backdrop` (`scripts/world/run/backdrop.gd`, sus anillos de colinas se derivan de `arena_half_extent`), spots de verticalidad y props a mano (en grupo `scatter_keepout`), nodo de scatter con `scatter.gd` (seed determinista; su `arena_half_extent` es la **fuente única del tamaño de arena** — 120.0 = 240x240 — publicada por el grupo `arena_bounds`: la leen `BossBase` y `EnemySpawner` restando su margen, el `Terrain` (su lado es `2 × arena_half_extent`, leído al construirse) y el propio scatter, que deriva de ahí las zonas de mesetas, interior y perímetro con los márgenes `mesa_edge_margin`, `interior_edge_margin` y `perimeter_edge_margin_min/max`; el scatter además necesita su `formation_style`, un `RockFormationStyle` en `assets/world/rock_style_<mapa>.tres`), `Interactables`, `EnemySpawner` (con `phase_preset` y sus escenas/horario), `AmbientBed`, un nodo **`Terrain`** con `scripts/world/run/terrain.gd`, su `amplitude` del bioma, el `ShaderMaterial` del suelo en `surface_material`, un `backdrop_path` válido (por defecto `../Backdrop`, de donde saca el tinte del minimapa) y, si el mapa lleva relieve por zonas (montañas, cañones, ríos, lagos, puentes), un `relief` (un `ReliefSettings` en `assets/world/relief_<mapa>.tres`; ver «Terreno → Relieve por zonas»: el relieve sortea una **receta** por partida con los pesos de su grupo «Recetas», y con él no se ponen spots de verticalidad a mano, que clavarían el trazado en el mismo sitio en todas las semillas; ahí mismo se eligen sus estructuras, la vegetación del suelo es una `GroundCover.tscn` hija del scatter y, para que pasado el muro el suelo siga en bosque, van una `ForestEdge.tscn` también hija del scatter y `outside_reach` mayor que cero en el `.tres`: ver «El borde: el bosque sigue afuera») (colocado **después** del scatter en orden de árbol), y un `Marker3D` llamado `SpawnPoint` (dónde aterriza el equipo). Los muros del `Perimeter` se escriben **estáticos** en la escena: formas `(1, 17, 242)` / `(242, 17, 1)` centradas en ±120.5 y y = 3.5. Unos **13 POI barajables** bajo `Interactables`. **NO** instancia `RunSystems.tscn`: eso vive una sola vez en `Run.tscn`.
 - Las tres arenas guardan en su `.tscn` algunos `@export` del `EnemySpawner` (las escenas de enemigos, `phase_preset`, `boss_scene`, `elder_title` y `boss_warning_text`), y cualquiera puede guardar otro: si un export se muda a un colaborador, el valor que una escena guarda con ese nombre se pierde sin aviso. Por eso `SpawnScaling`, `SpawnPoints`, `HordeSchedule`, `BossSchedule`, `PowerUpDrops` y `EnemyFreeze` (`scripts/systems/spawner/`) tienen la lógica pero leen los exports del spawner. Son `RefCounted` sin proceso propio: el `_physics_process` del spawner los avanza, así que parar el spawner los para a todos.
 
 ## Partida por etapas
@@ -558,10 +558,15 @@ Desde la iteración 51 el suelo de una arena **no es una placa plana**: es
 - **Sin `relief`** (Dunas de Ceniza, Ciénaga Lóbrega): un heightmap suave de
   amplitud baja (dunas 3.0, ciénaga 1.5) con mesetas encima.
 - **Con `relief`** (Bosque Hueco): **relieve por zonas**. Sobre un suelo
-  ondulado (amplitud 2.4) va una montaña escalonada de tres niveles —el
-  macizo donde aparece el equipo, un segundo nivel y la cumbre—, un cañón
-  con río a su pie que cruza el Gran Puente, cerros sueltos y las rampas
-  que entran a cada zona. Ver «Relieve por zonas» abajo.
+  ondulado (amplitud 2.4) va la composición de una **receta** que se sortea
+  en cada partida: la Montaña Escalonada (un macizo de tres niveles donde
+  aparece el equipo, con un cañón y su río al pie que cruza el Gran
+  Puente), el Gran Río (un río de punta a punta con dos o tres puentes), el
+  Paso de los Dos Montes (dos montañas y el equipo en el valle entre ellas)
+  o el Lago de la Isla (un lago hundido con el Árbol Hueco en su isla), más
+  cerros sueltos y las rampas que entran a cada zona. Pasado el muro el
+  suelo sigue con el mismo pasto y sube en lomas boscosas. Ver «Relieve por
+  zonas» abajo.
 
 **La regla que manda sobre todo relieve.** Esto es un bullet-heaven: la horda no
 tiene navmesh, persigue en línea recta, camina hasta 45 grados y trepa lo que
@@ -607,7 +612,8 @@ altura con ventanas de 1.6 a 2.2 m.
   `add_surface_from_arrays` sobre arrays empaquetados, no con `SurfaceTool`:
   un vértice por llamada sobre 241×241 son cientos de miles de llamadas de
   GDScript y tarda segundos. Presupuesto: **400 ms**; medido 97-134 ms sin
-  relieve por zonas y 87-104 ms con él. La malla clásica vive en
+  relieve por zonas y 119-215 ms con él (las cuatro recetas en cinco
+  semillas, con la franja de afuera). La malla clásica vive en
   `scripts/world/run/terrain/terrain_mesh.gd` (`TerrainMesh`).
 - **El sentido de los triángulos (iteración 60).** Godot considera **frontal
   la cara horaria vista desde delante**, así que un suelo que se pisa se
@@ -627,7 +633,9 @@ altura con ventanas de 1.6 a 2.2 m.
   mezcla de `pad_blend` (6 m). **Nunca bajo los POI barajables**, cuyo XZ cambia después: a
   esos se los apoya en el relieve. Una banda de `rim_flat_band` 10 m aplana el
   borde para que los muros estáticos y el disco del backdrop encuentren suelo
-  llano. Sin relieve por zonas un claro se aplana **hacia 0**; con él, **al
+  llano. Con relieve por zonas el relieve vuelve en los `rim_blend` metros
+  siguientes y, pasado el muro, la misma malla sigue `outside_reach` metros
+  (ver «El borde: el bosque sigue afuera»). Sin relieve por zonas un claro se aplana **hacia 0**; con él, **al
   nivel de su propio suelo** (la altura que el suelo base tiene en su
   centro), y las dos cabeceras de un puente al nivel de su tablero.
 - **Regla de nulos**: quien corre desde `on_stage_started` en adelante trata un
@@ -642,8 +650,55 @@ Opt-in por arena: el nodo `Terrain` lleva en `relief` un `ReliefSettings`
 de `scripts/world/run/terrain/relief_settings.gd`). Una arena sin él no
 ejecuta nada de esto y no saca ni una tirada distinta del RNG.
 
-**Qué arma.** Todo gira alrededor de un rumbo al azar, hacia donde queda la
-montaña vista desde el punto de aparición:
+**Qué arma: una receta por partida.** El planificador sortea primero la
+**receta**, la composición del mapa, y después sus piezas. Cada receta tiene
+una pieza propia que ninguna otra arma; las demás piezas pueden estar o
+faltar:
+
+| Receta (`id`) | Pieza propia | Qué más puede llevar |
+| --- | --- | --- |
+| **La Montaña Escalonada** (`massif`) | Macizo, segundo nivel y cumbre con el Árbol Hueco (tabla de abajo) | El cañón con su río al pie del macizo, un puente, la cascada que baja del macizo al río y el camino del spawn al puente. |
+| **El Gran Río** (`river`) | Un río que cruza el mapa de punta a punta por un cañón serpenteante, a 46-64 m del spawn, con 2-3 puentes y un vado entre cada dos | Una meseta-manantial río arriba de la que cae la cascada donde nace (`springhead_chance`), el camino al puente más cercano y cerros en las dos orillas. Sin Árbol Hueco. |
+| **El Paso de los Dos Montes** (`twin`) | Dos montañas de dos niveles enfrentadas, el equipo en el valle entre ellas y el camino antiguo que cruza el paso de punta a punta, con un portal de piedra en cada boca y un círculo de piedras en cada cima | Algún cerro suelto. Sin cañón, río, puentes ni Árbol Hueco. |
+| **El Lago de la Isla** (`lake`) | Un lago hundido frente al spawn, alimentado por un brazo de río que entra por una punta y sale por la otra, con una isla en el medio que lleva el Árbol Hueco y un puente-muelle de la orilla a la isla | Una cascada que cae al brazo de río de arriba (`lake_falls_chance`), el camino al muelle (y en la isla, hacia el Árbol) y cerros. |
+
+- **Cómo se sortea.** `ReliefRecipes.choose` saca la receta de la semilla de
+  partida con su propio RNG (sal `SEED_SALT`) y los pesos del grupo
+  «Recetas» de `ReliefSettings` (`massif_weight`, `river_weight`,
+  `twin_weight`, `lake_weight`; 0 = nunca); `ReliefRecipes.options`, con
+  otro RNG y otra sal, sortea las piezas opcionales: el manantial del río,
+  la cascada del lago y el camino (`road_chance`; el Paso de los Dos Montes
+  lo lleva siempre). Ninguno saca números del RNG de la partida ni del
+  scatter. Medido en las semillas 1-40 con los pesos en 1: 12 lagos, 7
+  montañas, 6 ríos y 15 pasos, ningún trazado de reserva, 40 trazados
+  distintos, y cada pieza (montaña escalonada, Árbol Hueco, cañón, río,
+  puente, cascada, camino) falta en alguna semilla.
+- **Cómo se fuerza.** `BONK_RELIEF_RECIPE=<id>` arma esa receta en toda
+  etapa del bosque, y `<id>:reserve` su trazado de reserva; un `id` que no
+  existe es un `push_error` (rojo en el gate). Para jugar siempre la misma
+  sin el interruptor, deja su peso y pon los otros en 0.
+- **Cómo se agrega una receta.** (1) Un script `recipe_<nombre>.gd` en
+  `scripts/world/run/terrain/recipes/` con `static func try_plan(layout,
+  rng, calm) -> bool`, que arma sus zonas (`ReliefPlanner.new_zone`,
+  `ReliefRamps.place`, `ReliefPlanner.loose_fits`), su cañón si lo lleva
+  (`ReliefRavine.set_axis`, `split`, `add_crossing`), sus tramos de camino
+  (`layout.road_legs`) y, si tiene cascada, `layout.cascade_zone`. Devuelve
+  false si una pieza obligatoria no cupo; con `calm` arma el trazado de
+  reserva (cada medida al medio de su rango). (2) Su `id` al final de
+  `ReliefRecipes.IDS` (es una llave interna: no se renombra), su rama en
+  `try_plan` y en `weight`, y sus opcionales en `options`. (3) Su peso y sus
+  medidas como exports de `ReliefSettings`, en un grupo «Receta: …», con su
+  fila en `docs/CAMBIOS-RAPIDOS.md`. (4) Si lleva una estructura propia, su
+  rama en `ReliefStructures.raise`, y su pieza en `ReliefPieces` si el
+  harness tiene que verla. El paso «recetas» de `tools/verificar.sh` la
+  prueba sola (lee `IDS`); antes de abrir el PR, fuérzala en las cinco
+  semillas y en su reserva, con un paseo de 150 s y los soaks de Mythos y la
+  langosta (`VERIFICAR_PASOS=mythos,minijefe`). Las reglas de abajo valen
+  para toda receta: ningún corte sobre 8 m, nada entre 45 y 60 grados,
+  rampas a toda zona y el claro del spawn llano.
+
+**La Montaña Escalonada.** Todo gira alrededor de un rumbo al azar, hacia
+donde queda la montaña vista desde el punto de aparición:
 
 | Pieza | Qué es |
 | --- | --- |
@@ -660,9 +715,13 @@ entera sobre la meseta de otra, y así tres cortes de 6 m hacen una montaña de
 
 | Archivo (`scripts/world/run/terrain/` salvo que diga otra cosa) | Qué hace |
 | --- | --- |
-| `relief_planner.gd` (`ReliefPlanner`) | Sortea el trazado con un **RNG propio** sembrado con `run_seed` (no toca el flujo de la partida): macizo, segundo nivel, cumbre, cañón, rampas del macizo, cerros y lomas, en ese orden. Cada pieza se sortea por rechazo; si una obligatoria no cabe, se tira el trazado y se sortea otro (hasta 60; medido: 9 como mucho en 300 semillas). Si ninguno cabe usa el de reserva (`fallback=true` en el log): la montaña mira a una esquina y cada medida toma el medio de su rango. |
+| `relief_planner.gd` (`ReliefPlanner`) | Arma el trazado con un **RNG propio** sembrado con `run_seed` (no toca el flujo de la partida): pide la receta y sus piezas opcionales a `ReliefRecipes` y su trazado a la receta. La Montaña Escalonada es su `try_massif`: macizo, segundo nivel, cumbre, cañón, rampas del macizo, cerros y lomas, en ese orden. Cada pieza se sortea por rechazo; si una obligatoria no cabe, se tira el trazado y se sortea otro (hasta 60). Si ninguno cabe usa el de reserva de esa receta (`fallback=true` en el log): cada medida toma el medio de su rango (la montaña mira a una esquina). |
+| `relief_recipes.gd` (`ReliefRecipes`) | Las recetas: sus `id` (`IDS`), el sorteo de la receta y de sus piezas opcionales, y el interruptor `BONK_RELIEF_RECIPE`. |
+| `recipes/recipe_river.gd` (`RecipeRiver`), `recipe_twin.gd` (`RecipeTwin`), `recipe_lake.gd` (`RecipeLake`) | El trazado de cada receta que no es la Montaña Escalonada. |
+| `recipes/recipe_kit.gd` (`RecipeKit`) | Lo que comparten esas recetas: el camino que dejan en `ReliefLayout.road_legs`, los cerros que lo respetan y la meseta-manantial, que se queda solo si su cascada cabe (`ReliefWaters.cascade_spot`): nunca hay meseta sin agua. |
+| `outside_relief.gd` (`OutsideRelief`), `outside_apron.gd` (`OutsideApron`) | El suelo de afuera del muro y la franja de la malla del `Terrain` que lo dibuja (ver «El borde: el bosque sigue afuera»). |
 | `relief_ramps.gd` (`ReliefRamps`) | Las rampas de una zona: dónde caben alrededor de su contorno (dentro de la arena, fuera del claro del spawn, sobre la meseta del padre si la zona está apilada, lejos de otras zonas, de sus rampas y del cañón, y con meseta libre detrás de la boca). |
-| `relief_ravine.gd` (`ReliefRavine`) | El cañón: su eje (una Bézier que abraza al macizo), en cuántos tramos se parte su fondo, los collados y los puentes. |
+| `relief_ravine.gd` (`ReliefRavine`) | El cañón: su eje (una Bézier que abraza al macizo, cruza el mapa o pasa por el lago), en cuántos tramos se parte su fondo, los collados, los puentes y el muelle de la isla. El lago es un cañón que se ensancha (`Ravine.half_at`). |
 | `relief_layout.gd` (`ReliefLayout`) | El trazado y sus preguntas de geometría en planta: `offset_at`, `level_at`, `on_plateau`, `raised_offset`, `ravine_coords`, `ravine_drop`, `digest`. |
 | `relief_cuts.gd` (`ReliefCuts`) | Las **líneas de corte** (`CutPath`): por dónde pasa cada acantilado y cuánto mide en cada punto. Una zona con N rampas da N líneas; el cañón, sus dos paredes, partidas en cada puente y en cada collado. El lado alto queda a la izquierda al recorrerlas. |
 | `relief_field.gd` (`ReliefField`) | Las alturas: suelo base (ruido + lomas + la vaguada del cañón), borde plano, claros y, encima, las zonas (el padre antes que la hija). |
@@ -675,7 +734,9 @@ entera sobre la meseta de otra, y así tres cortes de 6 m hacen una montaña de
 | `relief_lanes.gd` (`ReliefLanes`) | Los puentes como los ve la horda: hacia dónde camina un enemigo cuando su objetivo está sobre un tablero o él quedó debajo. Lo lee `EnemyBase`. |
 | `scripts/world/run/scatter/relief_dressing.gd` (`ReliefDressing`) | Lo que hace el scatter con el relieve: levanta las `CliffWall` y los puentes **como hijos suyos** (así arden con el bosque en el infierno de Mythos) y responde `can_place` / `nearest_place`. |
 | `scripts/world/run/scatter/relief_structures.gd` (`ReliefStructures`) | Las estructuras que visten el relieve (ver «Estructuras y vegetación» abajo). |
-| `scripts/world/run/scatter/relief_road.gd` (`ReliefRoad`) | El camino antiguo: losas del punto de aparición al puente y un trecho más allá, con faroles de piedra. |
+| `scripts/world/run/scatter/relief_road.gd` (`ReliefRoad`) | El camino antiguo: losas que salen del punto de aparición por los tramos de la receta (al puente, al muelle, por el paso), con faroles de piedra. Puede faltar (`road_chance`). |
+| `scripts/world/run/scatter/relief_pieces.gd` (`ReliefPieces`) | La línea `Relief pieces:`: qué armó de verdad cada consumidor del trazado. |
+| `scripts/world/props/forest_edge.gd` + `scenes/world/props/ForestEdge.tscn` (`ForestEdge`), `forest_edge/edge_flora.gd` (`EdgeFlora`), `forest_edge/edge_canopy.gd` (`EdgeCanopy`) | El bosque de afuera del muro (ver «El borde: el bosque sigue afuera»). |
 | `scripts/world/run/scatter/relief_waters.gd` (`ReliefWaters`), `scripts/world/props/cascade_flow.gd` (`CascadeFlow`) | El agua: el río del cañón, sus nenúfares y juncos, y la cascada que lo alimenta, con la espuma que baja por cada caída. |
 | `scripts/world/run/backdrop/giant_trees.gd` (`GiantTrees`) | Los árboles colosales del horizonte, una malla hija del `Backdrop`. |
 | `scripts/world/props/giant_mushroom.gd` + `scenes/world/props/GiantMushroom.tscn` (`GiantMushroom`) | El hongo gigante que reparte el scatter (`mushroom_scene`). |
@@ -705,11 +766,12 @@ entera sobre la meseta de otra, y así tres cortes de 6 m hacen una montaña de
   en −6. Medido en doce semillas: `min` entre −6.4 y −6.6 (no baja de −7:
   el rescate del vacío del raider está en −10), `max` entre 19.3 y 20.9, o
   sea 26-27 m de cima a fondo.
-- **Un puente, y si son más, un collado entre cada dos.** El Bosque Hueco
-  lleva un solo puente (`bridge_count_min/max` = 1) y su río corre de punta
-  a punta. Con más de uno, entre cada dos el fondo **sube por una rampa
-  hasta el borde, sigue plano 10 m y vuelve a bajar** (`Ravine.saddles`,
-  `ReliefRavine.SADDLE_HALF`), así cada tramo tiene su salida.
+- **Un puente, y si son más, un collado entre cada dos.** La Montaña
+  Escalonada lleva un solo puente (`bridge_count_min/max` = 1) y su río
+  corre de punta a punta. El Gran Río lleva 2-3 (`river_bridges_min/max`):
+  entre cada dos el fondo **sube por una rampa hasta el borde, sigue plano
+  10 m y vuelve a bajar** (`Ravine.saddles`, `ReliefRavine.SADDLE_HALF`),
+  un vado que se cruza a pie, así cada tramo tiene su salida.
 - **Las salidas del río.** Un raider salta 1.5 m y las paredes miden 6: del
   fondo se sale por las rampas de las dos puntas o por las **cuatro
   escaleras del puente**, dos por orilla, una hacia cada lado. Cada escalera
@@ -717,7 +779,9 @@ entera sobre la meseta de otra, y así tres cortes de 6 m hacen una montaña de
   la trepa); su colisión es una rampa lisa de unos 35 grados y los peldaños
   son dibujo. `bridge_stair_reach` es lo que ocupa cada una a lo largo del
   cañón: de ahí sale su pendiente. El trazado de reserva acorta su cañón
-  hasta que cabe (`ReliefRavine.CALM_SHRINK`).
+  hasta que cabe (`ReliefRavine.CALM_SHRINK`). En el lago, el muelle a la
+  isla es un puente con sus escaleras, y la isla baja al fondo por sus
+  rampas.
 - **El orden.** El scatter llama a `Terrain.plan_relief(run_seed, medio_lado)`
   en su `_enter_tree`, **antes** de armar su máscara y elegir sus mesetas (el
   `Terrain` todavía no entró al árbol: es puro cálculo). La máscara recibe del
@@ -783,17 +847,71 @@ entera sobre la meseta de otra, y así tres cortes de 6 m hacen una montaña de
   borde (`rim_drop`). Un plano entero bajo el fondo del cañón dejaría un
   escalón de 6 m en el borde, y al nivel del borde taparía el cañón.
   `PlaneMesh` a propósito: `HellSky` reconoce el suelo lejano por ese tipo.
+  En el Bosque Hueco ese marco queda debajo del bosque de afuera: la franja
+  de pasto del `Terrain` y el manto de copas de `ForestEdge` lo tapan, y
+  desde la arena no se ve (ver «El borde: el bosque sigue afuera»).
   Con `peak_count` mayor que cero levanta además una **cordillera**: picos
   facetados de 55-130 m en un anillo lejano (2.1-3 veces la mitad de la
   arena), en una sola malla con color de vértice y su propio RNG. Es lo que
   le da horizonte al mapa desde cualquier punto.
 - **Logs.** `Relief layout: <mapa> zones=N raised=N ravines=N cuts=N tallest=M
-  peak=M bridges=N ramps=N fallback=B digest=H` (junto a `Terrain built:`;
-  `tallest` es el corte más alto, `peak` la cumbre sobre el llano; el digest
-  se repite con la misma semilla y cambia con otra), `Relief dressing: N
-  cuts, N faces, N shapes, tallest=M, N bridges in N ms` (un `WARNING` si
-  alguna cara de roca queda entre 45 y 60 grados) y `Ground cover: N chunks,
-  N faces in N ms`.
+  peak=M bridges=N ramps=N fallback=B digest=H recipe=<id>` (junto a
+  `Terrain built:`; `tallest` es el corte más alto, `peak` la cima sobre el
+  llano; el digest se repite con la misma semilla y cambia con otra),
+  `Relief dressing: N cuts, N faces, N shapes, tallest=M, N bridges in N ms`
+  (un `WARNING` si alguna cara de roca queda entre 45 y 60 grados, con sus
+  `Relief dressing detail:`), `Relief pieces: <mapa> recipe=<id>
+  stepped_mountain=N hollow_tree=N ravine=N river=N bridges=N waterfall=N
+  road=N twin_mounts=N lake=N island=N springhead=N buttes=N wanted=…` (lo
+  que armó de verdad cada consumidor, después del scatter; `wanted` son las
+  piezas opcionales que pidió el sorteo, o `none`: una pedida que no aparece
+  no cupo), `Relief waters: no room for the cascade off zone N` si la
+  cascada de la montaña no cabe, `Forest edge: …` (ver abajo) y `Ground
+  cover: N chunks, N faces in N ms`.
+
+#### El borde: el bosque sigue afuera
+
+Desde adentro de la arena, un borde o una esquina se lee como el bosque que
+sigue, no como el fin de una placa. Tres piezas, todas de la arena con
+relieve por zonas (grupo «Borde del mapa» de `ReliefSettings`;
+`outside_reach = 0` las apaga):
+
+- **El suelo de afuera (`OutsideRelief`).** Una sola función de altura: sale
+  del nivel del borde en el muro, sube `outside_rise` en la franja y sigue
+  en lomas boscosas (`outside_far_rise`, `outside_hills`) hasta el
+  horizonte. Concuerda con el trazado: detrás de una zona elevada pegada a
+  un muro sube más (`outside_follow`: la montaña sigue del otro lado) y
+  donde un cañón apunta a un muro se abre un valle que lo continúa
+  (`outside_valley`). La distancia al cuadrado de la arena se redondea en
+  las esquinas: las curvas de nivel son arcos y nada se lee como la esquina
+  de un cuadrado. Sale de la semilla de partida con su sal, sin RNG.
+- **La franja (`OutsideApron`).** La malla del `Terrain` sigue
+  `outside_reach` (22 m) pasado el muro en una retícula de 2 m que comparte
+  los vértices del borde: el mismo pasto (`forest_ground.gdshader`), sin
+  costura, que arde con el frente de Mythos (`HellDressing` quema lo que
+  cuelga del `Terrain` con ese shader) y lleva los reflejos de la marea de la
+  langosta (`LobsterTide` copia `Terrain/MeshInstance3D`). No tiene
+  colisión: el `HeightMapShape3D` termina en el muro.
+- **El bosque (`ForestEdge`, hijo del scatter).** Sobre la franja, los
+  árboles y rocas de la arena (`tree.glb`, `tree-tall.glb`, `rock-a.glb`) en
+  mallas unidas por trozo de 20 m, con matas y troncos caídos (`EdgeFlora`);
+  del fondo de la franja al horizonte, un manto de copas sobre las lomas en
+  trozos de 80 m colgados del `Backdrop` con su propio `StandardMaterial3D`
+  (`EdgeCanopy`), que `HellSky` tiñe con el horizonte. Se arma por frames
+  desde que empieza la etapa sin pasar de `slice_ms` (3 ms) por frame; al
+  terminar avisa (`is_built`, señal `built`, grupo `forest_edge`) e imprime
+  `Forest edge: near=N far=N trees=N rocks=N faces=N in N ms slice_max=M
+  ms`. Sin colisión: lo único que frena son los muros del `Perimeter`.
+  Cada trozo se siembra con la semilla de partida, su sal y su lugar.
+- **La regla del borde.** Adentro del muro, el suelo que un cuerpo alcanza a
+  menos de `rim_flat_band` (10 m) de él queda a menos de 1 m del nivel del
+  borde: los muros (y = −5 a 12) siempre alcanzan. El relieve vuelve en los
+  `rim_blend` metros siguientes (`ReliefField`), y lo que se acerca al borde
+  sigue solo afuera. Lo miden los barridos `rim` y `edge` (ver «El harness
+  del relieve por zonas»).
+- **Medido** en las cuatro recetas y cinco semillas: entre 285 000 y 300 000
+  caras de bosque armadas en 84-94 ms en total, con la porción más larga de
+  3.5-3.9 ms.
 
 #### Estructuras y vegetación
 
@@ -804,13 +922,13 @@ números del RNG de la partida.
 
 | Pieza | Dónde va | Con qué |
 | --- | --- | --- |
-| **Árbol Hueco** | Al borde de la cumbre que queda más lejos de su rampa, con la boca del hueco hacia el centro. 30 m: se ve desde todo el mapa. | `scenes/world/props/HollowTree.tscn` (`hollow_tree.gd`) |
-| **Portales** | En la boca de cada rampa de los niveles altos: un pilar detrás de cada esquina de la rampa y el dintel encima. | `StandingStones.tscn`, `layout = GATE` |
+| **Árbol Hueco** | Al borde de la cumbre que queda más lejos de su rampa, con la boca del hueco hacia el centro; en el Lago de la Isla, en el medio de la isla, de frente al muelle. El Gran Río y el Paso de los Dos Montes no lo llevan. 30 m: se ve desde todo el mapa. | `scenes/world/props/HollowTree.tscn` (`hollow_tree.gd`) |
+| **Portales** | En la boca de cada rampa de los niveles altos y de la isla: un pilar detrás de cada esquina de la rampa y el dintel encima. En el Paso de los Dos Montes, además, uno sobre el camino en cada boca del paso (`PASS_GATE_DISTANCE`, 44 m del spawn). | `StandingStones.tscn`, `layout = GATE` |
 | **Menhires** | Una pareja al pie de cada rampa que baja al llano. | `layout = MENHIR` |
-| **Círculo de piedras** | En un claro del macizo, a unos 36 m del spawn. | `layout = CIRCLE` |
-| **Ruinas** | Hasta `ruin_count` columnatas rotas en claros del llano. | `layout = RUIN` |
+| **Círculo de piedras** | En un claro al nivel donde aparece el equipo, a unos 36 m del spawn; en el Paso de los Dos Montes, uno en cada cima. | `layout = CIRCLE` |
+| **Ruinas** | Hasta `ruin_count` columnatas rotas en claros del llano, a 18 m o más del borde (`RUIN_EDGE_GAP`) y con sus piedras a 4.5 m o más de la roca de la máscara (`RUIN_ROCK_GAP`): pegada a una roca o al anillo de árboles del borde, una ruina encierra un rincón al que no se entra. | `layout = RUIN` |
 | **Monolitos** | Hasta `monolith_count` piedras de 6.5-9.5 m, sueltas por el mapa. | `layout = MENHIR`, con otras medidas |
-| **Agua** | Una cinta a nivel en cada tramo de fondo del cañón. | `water_material` |
+| **Agua** | Una cinta a nivel en cada tramo de fondo del cañón, del río o del lago. | `water_material` |
 | **Árboles antiguos** | 38 por etapa, 2.5 veces más altos que los demás; los planta el scatter (`ancient_tree_scene`, `ancient_tree_count`). | `scenes/world/props/AncientTree.tscn` |
 | **Vegetación del suelo** | Arbustos, matas, flores, hongos y piedras chicas en todo el mapa. | `scenes/world/props/GroundCover.tscn` (`ground_cover.gd`), hija del scatter en la escena de la arena |
 
@@ -832,10 +950,14 @@ números del RNG de la partida.
   piedras y helechos. No tiene colisión. No planta sobre roca, cortes,
   rampas, puentes, el fondo del cañón ni el claro de una estructura
   (`arena_bounds.can_grow`).
-- **El camino antiguo (`ReliefRoad`)** sale del punto de aparición, baja por
-  la rampa del macizo que queda más cerca del puente, llega a su cabecera
-  por el llano (nunca sobre un corte) y sigue 28 m por la otra orilla
-  hasta perderse. Las losas se apoyan en el suelo por sus cuatro esquinas
+- **El camino antiguo (`ReliefRoad`)** sale del punto de aparición y sigue
+  los tramos que dejó la receta (`ReliefLayout.road_legs`): al puente más
+  cercano y un trecho por la otra orilla (Gran Río), al muelle y en la isla
+  hacia el Árbol (Lago de la Isla), o el paso de punta a punta (Dos Montes).
+  En la Montaña Escalonada baja por la rampa del macizo que queda más cerca
+  del puente, llega a su cabecera por el llano (nunca sobre un corte) y
+  sigue 28 m por la otra orilla hasta perderse. Puede faltar: sale con
+  `road_chance` (0.7) en todas las recetas menos el paso. Las losas se apoyan en el suelo por sus cuatro esquinas
   y no tienen colisión; cada 15 m va un farol de piedra (un solo cuerpo,
   `RoadLamps`, con un poste por farol). Devuelve su franja como claros, así
   ni un prop ni el pasto ni un círculo de piedras caen encima.
@@ -846,7 +968,11 @@ números del RNG de la partida.
   el macizo queda cerca y no hay una rampa, y si no cabe en ningún lado no
   se pone. El agua que cae deja la cornisa antes de caer (la roca del corte
   asoma) y `CascadeFlow` hace bajar unos copos de espuma para que se vea
-  correr. Se apaga con `ReliefSettings.cascade`.
+  correr. En el Gran Río y el Lago de la Isla la cascada cae de una
+  meseta-manantial junto al cañón (`RecipeKit.place_springhead`), que el
+  planificador deja solo si su cascada cabe (`ReliefWaters.cascade_spot`):
+  nunca queda una meseta sin agua. Se apagan todas con
+  `ReliefSettings.cascade`.
 - **Los árboles colosales (`GiantTrees`)** son del `Backdrop` (grupo
   «Árboles colosales», `giant_count`): troncos de 125 a 190 m alrededor de
   la arena, con la copa sobre la niebla. Una malla, sin colisión.
@@ -942,7 +1068,7 @@ y muros siguen contando); el vigilante de celda bloqueada compara
   - Los props interiores (`InteriorProps._is_clear`) guardan `formation_clearance` (2.5 m) a cualquier celda bloqueada, y la huella de cada meseta (plataforma y rampa, a su escala y con su giro) guarda `mesa_clearance` (4 m) a toda celda de roca (`ArenaMask.box_clear`, exacta: la roca asoma hasta ~3 m más allá de sus celdas), para que ni un árbol ni una rampa salgan de un acantilado.
   - Las rocas sueltas (`Rock.tscn`, `DuneRock.tscn`) siguen llevando **un `ConvexPolygonShape3D` por blob visible**, con los puntos horneados en la transformación del blob para que `spawn_prop` pueda escalar **uniformemente** (Godot no soporta escalar una forma de colisión de forma no uniforme). `DuneRock.tscn` se pinta con `assets/shaders/faceted_rock.gdshader` (`boulder_red.tres`): normal de cara por derivadas, para que no parezca un canto rodado junto a las formaciones. `Rock.tscn` es el modelo `rock-a.glb`, con el color de su textura `colormap.png`; `boulder.tres` no lo usa ninguna escena. `rock.tres` y `red_rock.tres` siguen en plataformas y santuarios, sin cambios.
 - API: `is_walkable(Vector2)`, `random_walkable_point()`, `blocked_cell_count()`, `open_cell_count()`, `blocked_cells()`, `cell_center(Vector2i)`, `cell_of(Vector2)` (las tres últimas las usa el barrido de máscara del harness), más `can_place(Vector2, margen)` y `nearest_place(Vector2, margen)`. Son métodos de `scatter.gd` que reenvían a su `ArenaMask` y, las dos últimas, a `PlacementRules` (`scripts/world/run/scatter/placement_rules.gd`), que también responde `can_build` y `can_grow` y le pregunta al relieve con `ReliefDressing`. **Dos preguntas distintas:** `is_walkable` es solo la máscara (lo que la roca bloquea; la leen los vigilantes del harness); `can_place` es la de quien **coloca** algo, y en una arena con relieve por zonas suma «lejos de cortes, rampas, puentes, faldones de formación y mesetas» (en las demás es idéntica a `is_walkable`). Consumidores de `can_place`: `SpawnPoints.ring_position` / `band_position` (`scripts/systems/spawner/spawn_points.gd`, detrás de `EnemySpawner.ring_position` y `spawn_pressure_burst`) (reintentan hasta hallar un punto que sirva, no clampean), el `StageLayout` del director (un **único** camino, `walkable_xz`, para portales, ruleta, altares, cofres de evento, lluvias y el portal de salida) y `BossBase._safe_arena_point`; `nearest_place` lo usa `EnemyLoot.drop_point`. `InteriorProps._is_clear` y `MesaBuilder.plan` preguntan lo mismo con sus propios márgenes.
-- Con relieve por zonas la máscara recibe dos cosas más en `ArenaMask.build(protected_seeds, keep_open, barriers)`: las celdas que el relieve necesita sin roca y las aristas entre celdas que un corte separa. El flood fill desde el spawn no cruza esas aristas, así que sella (o abre un pasillo hasta) cualquier bolsa que quedara encerrada entre una formación y un acantilado. Y **no deja pasillos de una celda**: una celda abierta con roca a los dos lados opuestos se rellena (`MaskPasses.fill_slots`), y si es una de las que el relieve mantiene abiertas, se abre la roca que la aprieta (`MaskPasses.free_squeezed`). El faldón de dos brazos de roca cierra la boca de un pasillo así y deja adentro un rincón al que no se entra caminando pero donde sí aterriza un raider que vuela. En el Bosque Hueco, además, los props guardan `formation_clearance` 4.5 m con la roca (entre un tronco y un faldón siempre cabe un cuerpo), el borde no planta en las esquinas (`perimeter_corner_gap`) ni sobre el faldón de una formación. La máscara se construye en `_enter_tree` (antes del barajado del director) con el mismo RNG. Log `Arena mask:`, que **imprime la fracción abierta** (la puerta que persigue el bucle de reconstrucción).
+- Con relieve por zonas la máscara recibe dos cosas más en `ArenaMask.build(protected_seeds, keep_open, barriers)`: las celdas que el relieve necesita sin roca y las aristas entre celdas que un corte separa. El flood fill desde el spawn no cruza esas aristas, así que sella (o abre un pasillo hasta) cualquier bolsa que quedara encerrada entre una formación y un acantilado. Y **no deja pasillos de una celda**: una celda abierta con roca a los dos lados opuestos se rellena (`MaskPasses.fill_slots`), y si es una de las que el relieve mantiene abiertas, se abre la roca que la aprieta (`MaskPasses.free_squeezed`). Al final, `MaskPasses.seal_pinched` repite el relleno sin cruzar los bordes **apretados** (dos celdas abiertas cuyo borde común tiene roca en sus dos puntas, en rendija o en Z: el faldón de 1-2 m tapa los 5 m) y sella lo abierto que así no alcanza; antes devuelve a suelo toda celda protegida que quedó con roca y le abre a cada una que quedó aislada un pasillo de tres celdas que no cruza un corte. Sin esto la roca encerraba bolsillos de suelo que la máscara contaba como alcanzables. El faldón de dos brazos de roca cierra la boca de un pasillo así y deja adentro un rincón al que no se entra caminando pero donde sí aterriza un raider que vuela. En el Bosque Hueco, además, los props guardan `formation_clearance` 4.5 m con la roca (entre un tronco y un faldón siempre cabe un cuerpo), el borde no planta en las esquinas (`perimeter_corner_gap`) ni sobre el faldón de una formación. La máscara se construye en `_enter_tree` (antes del barajado del director) con el mismo RNG. Log `Arena mask:`, que **imprime la fracción abierta** (la puerta que persigue el bucle de reconstrucción).
 - Inicio irregular: `StageFixtures._randomize_starting_pois` (`scripts/world/run/director/stage_fixtures.gd`) elimina cofres/altares colocados con `poi_skip_chance` (conserva al menos el primer cofre) y añade `extra_start_chests_min..max` cofres en puntos libres. Log `Start layout:`.
 
 ## Minimapa y mapa (Tab)
@@ -1874,12 +2000,15 @@ Hace `godot --headless --import`, el **lint de catálogos** y el **harness de UI
 - **minijefe**: al séptimo soak le falta `Boss spawned: Langosta Azul at`, la línea `Probe mini calm:` no termina en `changed=0 born=0` (algo cambió de vida o apareció durante la entrada), falta `Probe mini stage: reason=entrance hud_visible=false … cinematic_camera=true … world_frozen=true clock_running=false tide=…` (en plena entrada la pantalla no era suya) o `reason=entrance_end hud_visible=true … cinematic_camera=false … world_frozen=false clock_running=true tide=…` (no devolvió algo), `Langosta Azul scaling: life=1` o `Langosta Azul fight over:` no salen exactamente una vez, usó menos de tres ataques distintos (`Langosta Azul move:`), pelea sola (`Spawns held: mini boss fights alone`) pero falta `Langosta Azul purge:`, `Probe mini alone:` no dice `held=true others_max_after_purge=0` (hubo otro enemigo durante la pelea) o falta `Spawns resumed`, trae su marea (`Lobster tide: rising`) pero al terminar la entrada no dice `tide=high` o al final del soak falta `Lobster tide: gone` o `Probe mini tide: left=none`, o `Probe mini hazards:` no termina en `total=0 body=false song_playing=false died_signals=1` (5 s después de morir quedó un efecto, el cuerpo o la canción, o `Health.died` salió más de una vez).
 - **tope de cofres** (iteración 64): a cualquiera de los siete soaks le falta `Probe bounty chests: max=N cap=M`, o `N` pasa de `M`. El conteo cuenta los cofres que hay, no pasa por el tope, así que quitar el tope se ve en cuanto un soak deja caer más de 30 — cosa que no pasa siempre: de las dos corridas que cerraron la iteración 64, el soak de etapa llegó a 30 en una y a 6 en la otra.
 - **lint / UI**: falta cualquiera de las dieciséis líneas `Catalog lint: check <nombre> ok rows=N` (con `rows` > 0) o de los trece `UiProbe: step <nombre> ok`. Las listas de nombres viven en `tools/verificar.sh` y se greppean **una por una**: una comprobación que deja de ejecutarse desaparece del log sin ruido, y un conteo la daría por buena mientras otra se repite.
-- **relieve por zonas**: a un soak que pasa por una arena con relieve por zonas (los cuatro que arrancan en el Bosque Hueco) le falta una línea `Relief sweep:`, alguna no da cero, la pendiente pasa de `RELIEVE_PENDIENTE_MAX` (17.76 grados: la p95 de antes del relieve, 12.76, más 5), o —solo en el soak del bosque— falta `Relief sweep: placement at=120`, `Probe relief: stood on raised zone` o `Probe relief: crossed bridge`. La función es `chequear_relieve` y revisa **todas** las líneas del log: el soak de etapa vuelve al bosque con otro trazado. Ver «El harness del relieve por zonas».
+- **relieve por zonas**: a un soak que pasa por una arena con relieve por zonas (los cuatro que arrancan en el Bosque Hueco) le falta una línea `Relief sweep:` (`rim` y `edge` incluidas), alguna no da cero, la pendiente pasa de `RELIEVE_PENDIENTE_MAX` (17.76 grados: la p95 de antes del relieve, 12.76, más 5), o —solo en el soak del bosque— falta `Relief sweep: placement at=120`, `Probe relief: stood on raised zone` o `Probe relief: crossed bridge`. La función es `chequear_relieve` y revisa **todas** las líneas del log: el soak de etapa vuelve al bosque con otro trazado. El soak del bosque fija su receta con `BONK_RELIEF_RECIPE=massif` (la Montaña Escalonada trae zona elevada y puente en toda semilla) y falla si su `Relief layout:` no muestra esa receta con `bridges=` de 1 o más; sus chequeos del relieve corren antes que los de conteo, así que se miran aunque esos fallen. Ver «El harness del relieve por zonas».
+- **recetas**: el paso que arranca **cada** receta de `ReliefRecipes.IDS` en las semillas 4242 y 7, con `BONK_STAGE_FAST=1` y 300 frames, encuentra errores, no arma la receta pedida (`recipe=` en `Relief layout:` y en `Relief pieces:`) o ensucia un barrido (`chequear_relieve`). Una receta nueva entra sola.
 - **partida godmode terminada**: cualquier soak inmortal que imprima `Probe fog: skipped` (ver la regla de fin de partida abajo). Un raider con 10M de HP no tiene por qué morirse.
 
 La corrida completa (import + lint + harness de UI + 3×360 s + 1×720 s + 1×360 s de co-op + 1×450 s del jefe de etapa) tarda **entre ~16 y ~75 minutos**, más que el timeout de una llamada de shell: lánzala en segundo plano. El reloj de una corrida lo manda el TAMAÑO DE LA HORDA, no el número de frames: medido en dos corridas de la misma cabeza y las mismas semillas, **16 min** y **75 min**. El soak de co-op es el que más se mueve (la horda escala +50% de HP y +30% de ritmo de spawn por raider extra, y un cuerpo vivo cuesta física cada frame): 78 s en una corrida y 32 min en la otra. Por eso `verificar.sh` imprime los segundos de cada fase y el total — una estimación fija envejece mal. **Desde Jolt (iteración 64)** la corrida completa tardó 3-5 min en las tres medidas de esa iteración: el costo por cuerpo que estiraba el reloj es lo que Jolt se llevó.
 
 Logs en `$TMPDIR/bonkraiders-verify/`. Cada arena imprime su resumen `nivel=… cofres=… altares=… portales=…`.
+
+**Correr solo algunos pasos: `VERIFICAR_PASOS`.** `VERIFICAR_PASOS=mythos,minijefe tools/verificar.sh` corre solo esos pasos, en el orden de siempre (los nombres: `import lint ui selector bosque dunas cienaga recetas etapa coop mythos minijefe`). Sin la variable corre todos. Un nombre que no existe, o un paso vacío (`mythos,`), sale con exit 2 antes de correr nada, y una corrida parcial termina en `VERIFICACIÓN PARCIAL (pasos: …)`, nunca en `VERIFICACIÓN OK`: un PR se cierra con la corrida completa. La cobertura sumada de interactuables se mide solo si corrieron las tres arenas. Con `BONK_RELIEF_RECIPE=<id>` delante, los soaks que pasan por el bosque (salvo el de arena, que fija la suya) arman esa receta: así se prueban los jefes en cada una.
 
 ### Guardado por corrida (iteración 57)
 
@@ -2247,10 +2376,12 @@ En una arena con relieve por zonas trabaja además `ReliefProbe`
 | Archivo | Qué hace |
 | --- | --- |
 | `relief_graph.gd` (`ReliefGraph`) | El mapa como lo ve la física: una celda por metro cuadrado con el piso que encuentra un rayo desde arriba (el `Terrain`, la cornisa de un corte, un puente, una meseta y su rampa; lo demás es obstáculo) y adónde lleva cada una de las ocho direcciones para un raider y para la horda. |
-| `relief_search.gd` (`ReliefSearch`) | Los recorridos sobre el grafo: qué celdas se alcanzan desde una, desde cuáles se llega a una, y el camino de un raider entre dos (una búsqueda repartida en frames). |
-| `relief_sweeps.gd` (`ReliefSweeps`) | Los barridos: una línea `Relief sweep:` cada uno (hueco 45-60, alcance, pendiente, infierno). |
+| `relief_search.gd` (`ReliefSearch`) | Los recorridos sobre el grafo: qué celdas se alcanzan desde una, desde cuáles se llega a una, y el camino de un raider entre dos (una búsqueda repartida en frames; con `walk_only`, sin saltos). |
+| `relief_sweeps.gd` (`ReliefSweeps`) | Los barridos: una línea `Relief sweep:` cada uno (hueco 45-60, alcance, pendiente, borde, infierno). |
+| `relief_edge_sweeps.gd` (`ReliefEdgeSweeps`) | Los barridos del borde: `rim` (el suelo alcanzable junto al muro, a nivel del borde) y `edge` (el suelo de afuera: material y costura). |
+| `relief_hell_sweep.gd` (`ReliefHellSweep`) | El barrido del infierno: lo que `HellDressing` y `HellSky` dejarían verde. |
 | `relief_placement.gd` (`ReliefPlacement`) | El barrido de colocación (`Relief sweep: placement …`): props, POIs, spawns y formaciones contra los cortes, con sus tolerancias. |
-| `relief_nav.gd` (`ReliefNav`) | El ruteo del bot: el próximo punto del camino a su destino por rampas y puentes, y cuándo saltar. La celda de un cuerpo es la más cercana **a su altura** (al pie de un corte, la más cercana a secas es una de arriba). La búsqueda del camino (`ReliefSearch.begin` / `advance`) se reparte en frames (`SEARCH_BUDGET` celdas por frame): recorrer el mapa de una vez es un tirón de más de 100 ms en las líneas `Perf`. Sin grafo devuelve el destino tal cual. |
+| `relief_nav.gd` (`ReliefNav`) | El ruteo del bot: el próximo punto del camino a su destino por rampas y puentes, y cuándo saltar. Busca primero un camino solo a pie y, si no hay, uno con saltos: al pie del muro lateral de una rampa, un salto de 1.5 m que el grafo da por bueno puede no alcanzar la cornisa, y el bot se quedaba intentándolo. La celda de un cuerpo es la más cercana **a su altura** (al pie de un corte, la más cercana a secas es una de arriba). La búsqueda del camino (`ReliefSearch.begin` / `advance`) se reparte en frames (`SEARCH_BUDGET` celdas por frame): recorrer el mapa de una vez es un tirón de más de 100 ms en las líneas `Perf`. Sin grafo devuelve el destino tal cual. |
 | `relief_probe.gd` (`ReliefProbe`) | Agenda los barridos (10 frames tras el cambio de etapa y la colocación otra vez a los 120 s), el paseo y `BONK_HOLD_AT`. El frame de un barrido (unos 0.7 s el de comienzo de etapa) no entra en las líneas `Perf`: `PerfMeter.skip_frame()`. |
 
 - **Celda abierta**: su piso tiene menos de 45 grados, no cae en una
@@ -2281,30 +2412,49 @@ En una arena con relieve por zonas trabaja además `ReliefProbe`
   un corte, un puente, una formación, las estructuras del grupo
   `relief_structures` ni la vegetación del suelo, que no tiene colisión: que
   ninguna tape un paso lo dicen los barridos de alcance), `slope p95=G`
-  (la medida congelada de `WorldDigest`, lejos de cortes y rampas) y
+  (la medida congelada de `WorldDigest`, lejos de cortes y rampas), `rim
+  band=10.0 cells=N off_level=N max_off=M` (celdas que el raider o la horda
+  alcanzan a menos de `rim_flat_band` de un muro; `off_level` cuenta las que
+  se apartan más de 1 m del nivel del borde), `edge material=terrain
+  reach=M seam_max=M mesh_max=M samples=N bad=N` (el suelo de afuera tiene
+  que ser la malla del `Terrain` con su material y encontrar a `height_at`
+  sobre los cuatro muros a 0.1 m o menos; `outside=none` si la arena
+  termina en el muro) y
   `hell skipped=N interactable=N backdrop=N bodies=N pooled=N fx=N unburnt=N`
   (las mallas que el infierno no quemaría, por tipo: bajo un interactuable,
-  bajo el `Backdrop`, de un cuerpo vivo, de algo que salió del pool —un
+  bajo el `Backdrop` con un `StandardMaterial3D` —con otro material
+  quedarían verdes y cuentan como resto—, de un cuerpo vivo, de algo que salió del pool —un
   dardo en vuelo lleva la marca `NodePool.META_OWNER`—, un efecto de un solo
   uso —una malla sin nombre ni dueño colgada directo de la arena, como las de
   `WeaponBase.spawn_fx_mesh` o el anillo de nivel de `Juice`— y el resto, que
-  es lo que tiene que dar cero). Cada conteo distinto de cero imprime hasta cuatro
+  es lo que tiene que dar cero; la geometría que no es `MeshInstance3D` bajo
+  el `Backdrop` o el bosque de afuera también cuenta como resto). El de
+  infierno corre cuando el bosque de afuera avisa que terminó de armarse.
+  Cada conteo distinto de cero imprime hasta cuatro
   `Relief sweep detail:` con el lugar. Un interactuable ya gastado no entra
   en la colocación (se está hundiendo), y si a los 120 s una cinemática
   tiene el mundo congelado (`WorldFreeze` saca la arena de la física) la
   colocación espera a que vuelva. **Jamás se afloja una tolerancia para
   hacerlos pasar**: cede el relieve o quien coloca.
-- **El paseo**: antes del recorrido de siempre, el bot va a la cumbre y de
-  una cabecera del puente más largo a la otra (`Probe relief: stood on raised
-  zone …`, `Probe relief: crossed bridge …`; un salto sobre el tablero sigue
-  contando como estar en el puente, caer bajo él no); la carrera a la salida
-  y un rescate pasan por delante.
+- **El paseo**: antes del recorrido de siempre, el bot va a la zona más alta
+  (la que la receta marca `top`, o la de cima más alta) y, si la receta
+  tiene puentes, de una cabecera del más largo a la otra (`Probe relief:
+  stood on raised zone …`, `Probe relief: crossed bridge …`; un salto sobre
+  el tablero sigue contando como estar en el puente, caer bajo él no); la
+  carrera a la salida y un rescate pasan por delante. En el Paso de los Dos
+  Montes no hay puente: su paseo se mide sin esa línea.
+- **Las recetas en el harness.** `BONK_RELIEF_RECIPE=<id>` (o `<id>:reserve`)
+  fuerza la receta de toda etapa del bosque; `Relief layout:` termina en
+  `recipe=<id>` y `Relief pieces:` dice qué se armó. El gate fija la del
+  soak de arena y prueba todas en su paso «recetas».
 - **`BONK_HOLD_AT=high|ravine|bridge`**: pone al raider en su punto y lo deja
   quieto; una **llegada** es un enemigo que apareció 3 m o más arriba o abajo
   de ese nivel y se le acercó a 3 m (y a no más de 1.5 m de altura). `Probe
   hold: at=… window=A-Bs arrivals=N` por ventana de 20 s desde el segundo 10
   y `Probe hold summary: … empty_after_30=N reached=N` al salir (`reached`:
   todos los enemigos que lo alcanzaron, hayan aparecido en su nivel o no).
+  Si la receta de la etapa no tiene ese lugar (un mapa sin cañón ni
+  puente), lo dice en `Probe hold: at=… missing (recipe=…)` y no lo retiene.
   En `bridge` es la prueba de `ReliefLanes`: casi toda la horda nace en el
   cañón, 6 m más abajo, y tiene que subir y entrar por una cabecera. Es un soak aparte, no
   del gate; con el raider quieto, el aviso de niebla poco explorada sale y
