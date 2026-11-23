@@ -47,7 +47,7 @@ func build(layout: ReliefLayout, terrain: Terrain, noise_seed: int, samples: int
 	_blocks = (samples - 1) / BLOCK
 	fine.resize(_blocks * _blocks)
 	_build_base(terrain, noise_seed)
-	_flatten_rim(terrain.rim_flat_band)
+	_flatten_rim(terrain.rim_flat_band, layout.settings.rim_blend)
 	_apply_pads(pads, terrain.pad_blend)
 	heights = base.duplicate()
 	surface = base.duplicate()
@@ -103,26 +103,27 @@ func _upsample(coarse: PackedFloat32Array, lattice: int, step: float) -> void:
 					lerpf(coarse[at + lattice], coarse[at + lattice + 1], tx), tz)
 
 
-## El suelo baja a 0 dentro de `band` metros del borde, para que los muros
-## del perímetro y el suelo lejano del Backdrop encuentren un borde plano.
-func _flatten_rim(band: float) -> void:
-	var reach := mini(ceili(band), _samples / 2)
+## Los últimos `band` metros quedan a nivel del borde (0) y el relieve vuelve
+## en `blend` metros más: los muros del perímetro siempre alcanzan, y el suelo
+## de afuera (OutsideRelief) sale de ese mismo nivel.
+func _flatten_rim(band: float, blend: float) -> void:
+	var reach := mini(ceili(band + blend), _samples / 2)
 	var last := _samples - 1
 	for iz in _samples:
 		var row := iz * _samples
 		var edge_z := mini(iz, last - iz)
 		if edge_z < reach:
 			for ix in _samples:
-				_fade(row + ix, mini(edge_z, mini(ix, last - ix)), band)
+				_fade(row + ix, mini(edge_z, mini(ix, last - ix)), band, blend)
 			continue
 		# Fila interior: solo sus dos franjas laterales.
 		for ix in reach:
-			_fade(row + ix, ix, band)
-			_fade(row + last - ix, ix, band)
+			_fade(row + ix, ix, band, blend)
+			_fade(row + last - ix, ix, band, blend)
 
 
-func _fade(index: int, edge: int, band: float) -> void:
-	base[index] *= smoothstep(0.0, 1.0, float(edge) / maxf(band, 0.001))
+func _fade(index: int, edge: int, band: float, blend: float) -> void:
+	base[index] *= smoothstep(band, band + maxf(blend, 0.001), float(edge))
 
 
 ## Aplana cada claro a su nivel y lo devuelve al relieve en `blend` metros.

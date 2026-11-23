@@ -221,3 +221,27 @@ extends Resource
 @export var edge_margin: float = 24.0
 ## Metros de suelo libre entre dos zonas sueltas, o entre un cerro y el cañón.
 @export var feature_gap: float = 12.0
+
+@export_group("Borde del mapa")
+## Metros que tarda el relieve en volver pasado el borde plano: los últimos
+## rim_flat_band metros del Terrain quedan a nivel del borde (así los muros
+## siempre alcanzan) y en estos metros más el suelo vuelve a ondular.
+@export var rim_blend: float = 16.0
+## Metros que el suelo sigue AFUERA del muro, en la misma malla del Terrain:
+## el mismo pasto, que arde con el bosque y lleva los reflejos de la marea.
+## 0 = la arena termina en el muro (sin suelo ni bosque afuera).
+@export var outside_reach: float = 22.0
+## Metros que sube el suelo de afuera en esa franja, desde el muro.
+@export var outside_rise: float = 3.5
+## Metros de ondulación del suelo de afuera (solo hacia arriba).
+@export var outside_detail: float = 1.4
+## Metros que suben las lomas del bosque lejano pasada la franja.
+@export var outside_far_rise: float = 22.0
+## Metros que suben y bajan esas lomas sobre su subida.
+@export var outside_hills: float = 14.0
+## Cuánto más sube el afuera detrás de una zona elevada pegada al muro, por
+## cada 6 m de zona (0 = nada): la montaña sigue del otro lado.
+@export var outside_follow: float = 0.45
+## Fracción del afuera que se hunde donde un cañón apunta al muro (0-1): su
+## valle sigue fuera del mapa.
+@export_range(0.0, 1.0) var outside_valley: float = 0.7

@@ -12,10 +12,13 @@ extends RefCounted
 ##              no alcanza, mesetas y formaciones pegadas a un corte (lo
 ##              hace ReliefPlacement)
 ##   slope      pendiente p95 del suelo abierto lejos de cortes y rampas
+##   rim, edge  el borde de la arena y el suelo de afuera del muro (los
+##              arma ReliefEdgeSweeps, relief_edge_sweeps.gd)
 ##   hell       mallas que el infierno de Mythos dejaría sin quemar, por tipo
-##              (interactuables, que no arden a propósito; el Backdrop, que
-##              tiñe HellSky; cuerpos vivos; lo que salió del pool; y el
-##              resto, que quedaría verde)
+##              (interactuables, que no arden a propósito; el Backdrop con
+##              StandardMaterial3D, que tiñe HellSky; cuerpos vivos; lo que
+##              salió del pool; y el resto, que quedaría verde). Corre cuando
+##              el bosque de afuera (grupo forest_edge) avisa que terminó.
 ##
 ## Todos los conteos tienen que dar cero (slope y hell tienen cota en el
 ## gate). NUNCA se afloja una tolerancia de aquí para hacerlos pasar: lo que
@@ -49,8 +52,15 @@ var _raiders: Array[RID] = []
 ## las que vuelve a él.
 var _raider_ok := PackedByteArray()
 var _horde_ok := PackedByteArray()
+## 1 en las celdas que el raider (o la horda) alcanza desde el spawn, vuelva o no.
+var _raider_seen := PackedByteArray()
+var _horde_seen := PackedByteArray()
+## True cuando el barrido del infierno ya corrió en esta etapa.
+var _hell_done: bool = true
 var _heights := PackedFloat32Array()
 var _samples: int = 0
+## El alcance de ida del último _sweep_reach.
+var _last_seen := PackedByteArray()
 
 
 ## Arma el grafo y corre todos los barridos de comienzo de etapa. False si
@@ -82,13 +92,36 @@ func run(tree: SceneTree, arena: Node3D, raiders: Array[RID]) -> bool:
 	_sweep_gap()
 	var home := graph.nearest_open(_spawn_xz(), 4.0)
 	_raider_ok = _sweep_reach("raider", home, graph.raider_next)
+	_raider_seen = _last_seen
 	_horde_ok = _sweep_reach("horde", home, graph.horde_next)
+	_horde_seen = _last_seen
 	_placement.setup(_tree, _arena, _terrain, _bounds, _raiders, graph, _raider_ok, _horde_ok)
 	placement("start")
 	_sweep_slope()
-	_sweep_hell()
+	_sweep_rim()
+	_sweep_edge()
+	_hell_done = false
+	try_hell()
 	print("Relief sweep: done in %d ms" % (Time.get_ticks_msec() - started))
 	return true
+
+
+## True mientras el barrido del infierno espera al bosque de afuera.
+func hell_pending() -> bool:
+	return graph != null and not _hell_done
+
+
+## Corre el barrido del infierno si el bosque de afuera (grupo forest_edge)
+## ya terminó de armarse: lo que todavía no existe no se puede contar.
+func try_hell() -> void:
+	if _hell_done:
+		return
+	for node: Node in _tree.get_nodes_in_group(&"forest_edge"):
+		if _arena.is_ancestor_of(node) and node.has_method(&"is_built") \
+				and not bool(node.call(&"is_built")):
+			return
+	_hell_done = true
+	ReliefHellSweep.run(_tree, _arena, _terrain)
 
 
 ## El barrido de colocación, con la etiqueta `tag` (start, 120…).
@@ -262,6 +295,7 @@ func _spawn_xz() -> Vector2:
 ## abiertas que no vuelven a `home`. Devuelve las que cumplen las dos cosas.
 func _sweep_reach(who: String, home: int, next: PackedInt32Array) -> PackedByteArray:
 	var forward := ReliefSearch.reach(graph, home, next)
+	_last_seen = forward
 	var back := ReliefSearch.reach_back(graph, home, next)
 	var open := 0
 	var unreachable := 0
@@ -295,7 +329,15 @@ func _cell_text(index: int) -> String:
 	return "(%.1f, %.1f, %.1f)" % [at.x, at.y, at.z]
 
 
-# --- pendiente e infierno ----------------------------------------------------------
+# --- borde, pendiente e infierno ----------------------------------------------------
+
+func _sweep_rim() -> void:
+	ReliefEdgeSweeps.rim(graph, _terrain, _raider_seen, _horde_seen)
+
+
+func _sweep_edge() -> void:
+	ReliefEdgeSweeps.edge(_terrain, WorldDigest.GROUND_SHADER_PATH)
+
 
 ## La pendiente p95 del suelo caminable, con la misma medida congelada de
 ## WorldDigest, dejando fuera los cortes, las rampas y los puentes.
@@ -304,69 +346,3 @@ func _sweep_slope() -> void:
 		return _terrain.relief_distance(center, SLOPE_KEEPOUT) < SLOPE_KEEPOUT)
 	print("Relief sweep: slope p95=%.2f max=%.2f cells=%d" % [
 			slope["p95"], slope["max"], slope["cells"]])
-
-
-## Las mallas que HellDressing no quemaría, por tipo: bajo un Interactable
-## (no arden a propósito), bajo el Backdrop (las tiñe HellSky), las de un
-## cuerpo vivo, las de algo que salió del pool (un dardo en vuelo, una gema:
-## Pools los cuelga de la arena), los efectos de un solo uso y el resto, que
-## es lo que quedaría verde en el infierno.
-func _sweep_hell() -> void:
-	var burning: Dictionary[int, bool] = {}
-	for child: Node in _terrain.find_children("*", "MeshInstance3D", true, false):
-		var view := child as MeshInstance3D
-		var material := view.material_override as ShaderMaterial
-		if material != null and material.shader != null \
-				and material.shader.resource_path == WorldDigest.GROUND_SHADER_PATH:
-			burning[view.get_instance_id()] = true
-	for group: StringName in WorldDigest.PROP_GROUPS:
-		for node: Node in _tree.get_nodes_in_group(group):
-			if not _arena.is_ancestor_of(node) or node is Interactable:
-				continue
-			for child: Node in node.find_children("*", "MeshInstance3D", true, false):
-				if WorldDigest._prop_burns(child as MeshInstance3D):
-					burning[child.get_instance_id()] = true
-	var backdrop := _terrain.get_node_or_null(_terrain.backdrop_path)
-	var counts := {"interactable": 0, "backdrop": 0, "body": 0, "pooled": 0, "fx": 0, "other": 0}
-	var skipped := 0
-	var notes: Array[String] = []
-	for child: Node in _arena.find_children("*", "MeshInstance3D", true, false):
-		if burning.has(child.get_instance_id()):
-			continue
-		skipped += 1
-		var kind := _hell_kind(child, backdrop)
-		counts[kind] = int(counts[kind]) + 1
-		if kind == "other" and notes.size() < DETAIL_LIMIT:
-			notes.append(String(_arena.get_path_to(child)))
-	print(("Relief sweep: hell skipped=%d interactable=%d backdrop=%d bodies=%d pooled=%d"
-			+ " fx=%d unburnt=%d") % [skipped, counts["interactable"], counts["backdrop"],
-			counts["body"], counts["pooled"], counts["fx"], counts["other"]])
-	for note: String in notes:
-		print("Relief sweep detail: hell unburnt %s" % note)
-
-
-## El tipo de una malla que no arde (ver _sweep_hell): "other" si es parte del
-## mapa y quedaría verde en el infierno.
-func _hell_kind(mesh: Node, backdrop: Node) -> String:
-	# Un efecto de un solo uso (WeaponBase.spawn_fx_mesh, el anillo de nivel de
-	# Juice) es una malla sin nombre ni dueño colgada directo de la arena: dura
-	# un instante y no es parte del mapa.
-	if mesh.get_parent() == _arena and mesh.owner == null \
-			and String(mesh.name).begins_with("@"):
-		return "fx"
-	# Desde la malla misma: un destello del pool ES un MeshInstance3D y lleva
-	# la marca del pool en él, no en un padre.
-	var up: Node = mesh
-	while up != null and up != _arena:
-		if up is Interactable:
-			return "interactable"
-		if up == backdrop:
-			return "backdrop"
-		# Un cuerpo vivo (la horda que ya apareció) no es parte del mapa.
-		if up is CharacterBody3D:
-			return "body"
-		# Tampoco lo que NodePool creó: lleva su marca desde que nace.
-		if up.has_meta(NodePool.META_OWNER):
-			return "pooled"
-		up = up.get_parent()
-	return "other"

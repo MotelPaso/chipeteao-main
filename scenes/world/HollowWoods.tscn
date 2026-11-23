@@ -1,4 +1,4 @@
-[gd_scene load_steps=35 format=3 uid="uid://dqv5m2x8rk1fj"]
+[gd_scene load_steps=38 format=3 uid="uid://dqv5m2x8rk1fj"]
 
 [ext_resource type="Script" path="res://scripts/world/run/arena.gd" id="1_arena"]
 [ext_resource type="Script" path="res://scripts/world/run/backdrop.gd" id="90_backdrop"]
@@ -30,6 +30,7 @@
 [ext_resource type="PackedScene" path="res://scenes/world/props/GiantMushroom.tscn" id="40_mushroom"]
 [ext_resource type="Script" path="res://scripts/fx/falling_leaves.gd" id="41_leaves"]
 [ext_resource type="PackedScene" path="res://scenes/world/props/GroundCover.tscn" id="96_cover"]
+[ext_resource type="PackedScene" path="res://scenes/world/props/ForestEdge.tscn" id="97_edge"]
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_grass"]
 shader = ExtResource("93_ground")
@@ -187,6 +188,8 @@ mask_blobs_min = 8
 mask_blobs_max = 12
 
 [node name="GroundCover" parent="ForestScatter" instance=ExtResource("96_cover")]
+
+[node name="ForestEdge" parent="ForestScatter" instance=ExtResource("97_edge")]
 
 [node name="Terrain" type="StaticBody3D" parent="."]
 script = ExtResource("90_terrain")

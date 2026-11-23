@@ -108,15 +108,17 @@ chequear_tope_cofres() {
 # imprime los barridos `Relief sweep:` de relief_sweeps.gd. Falla si falta
 # alguno, si un conteo no da cero en CUALQUIERA de sus líneas (el soak de
 # etapa vuelve al bosque con otro trazado), si la pendiente p95 del suelo
-# abierto pasa de su cota o si queda una malla que el infierno no quemaría.
-# Con "paseo" exige además la colocación a los 120 s y que el bot haya
-# pisado una zona elevada y cruzado un puente.
+# abierto pasa de su cota, si una celda alcanzable junto al muro se aparta
+# del nivel del borde (rim), si el suelo de afuera del muro no es la malla
+# del Terrain o deja costura (edge) o si queda una malla que el infierno no
+# quemaría. Con "paseo" exige además la colocación a los 120 s y que el bot
+# haya pisado una zona elevada y cruzado un puente.
 #
 # La cota de pendiente es la p95 del suelo de antes del relieve (12.76
 # grados, semilla 4242) más 5. No se sube para hacer pasar un cambio.
 RELIEVE_PENDIENTE_MAX="17.76"
 RELIEVE_BARRIDOS=("gap faces=" "raider open=" "horde open=" "placement at=start"
-	"slope p95=" "hell skipped=")
+	"slope p95=" "rim band=" "edge " "hell skipped=")
 chequear_relieve() {
 	local log="$1"
 	local paseo="${2:-}"
@@ -142,6 +144,19 @@ chequear_relieve() {
 		| grep -qv ' on_relief=0 misplaced=0 raider_unreachable=0 horde_unreachable=0 crowding=0$'; then
 		echo "  FALLO (relieve): algo quedó mal colocado"
 		grep -n '^Relief sweep\( detail\)\{0,1\}: placement ' "$log" | head -10
+		mal=1
+	fi
+	if grep '^Relief sweep: rim ' "$log" | grep -qv ' off_level=0 '; then
+		echo "  FALLO (relieve): hay suelo alcanzable junto al muro fuera del nivel del borde"
+		grep -n '^Relief sweep\( detail\)\{0,1\}: rim ' "$log" | head -6
+		mal=1
+	fi
+	# Sin suelo de afuera (outside=none) la arena termina en el muro y no hay
+	# nada que medir; con él, tiene que ser la malla del Terrain y sin costura.
+	if grep '^Relief sweep: edge ' "$log" | grep -v ' outside=none$' \
+		| grep -qv ' material=terrain .* bad=0$'; then
+		echo "  FALLO (relieve): el suelo de afuera del muro no es el del Terrain o deja costura"
+		grep -n '^Relief sweep\( detail\)\{0,1\}: edge ' "$log" | head -6
 		mal=1
 	fi
 	if grep '^Relief sweep: hell ' "$log" | grep -qv ' unburnt=0$'; then
