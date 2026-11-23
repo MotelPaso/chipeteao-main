@@ -60,7 +60,6 @@ func build(terrain: Terrain, noise_seed: int) -> void:
 	noise.frequency = 1.0 / maxf(terrain.feature_size, 1.0)
 	noise.fractal_octaves = maxi(terrain.octaves, 1)
 	var settings := _layout.settings
-	var edge := _layout.ravine.half_width if _layout.ravine != null else 0.0
 	var coarse := PackedFloat32Array()
 	coarse.resize(lattice * lattice)
 	for lz in lattice:
@@ -70,15 +69,15 @@ func build(terrain: Terrain, noise_seed: int) -> void:
 			var x := -_half + float(lx) * step
 			var detail := noise.get_noise_2d(x, z) * terrain.amplitude \
 					* _edge_detail(Vector2(x, z))
-			var across := side[index]
-			if across == INF:
+			# Metros pasada la pared del cañón (negativo adentro), o INF lejos.
+			var beyond := side[index]
+			if beyond == INF:
 				coarse[index] = detail + lift[index]
 				continue
 			# Junto al cañón: la vaguada tira del suelo hacia abajo y la
 			# ondulación se amansa sobre el fondo.
-			var valley := 1.0 - smoothstep(edge + VALLEY_SHELF,
-					edge + VALLEY_SHELF + settings.swell_reach, across)
-			var calm := 1.0 - smoothstep(edge, edge + DETAIL_BLEND, across)
+			var valley := 1.0 - smoothstep(VALLEY_SHELF, VALLEY_SHELF + settings.swell_reach, beyond)
+			var calm := 1.0 - smoothstep(0.0, DETAIL_BLEND, beyond)
 			coarse[index] = detail * lerpf(1.0, settings.ravine_floor_detail, calm) \
 					+ lerpf(lift[index], -settings.ravine_valley, valley)
 	count = lattice
@@ -127,8 +126,9 @@ func _stamp_dome(lift: PackedFloat32Array, lattice: int, step: float, center: Ve
 			lift[index] = maxf(lift[index], height * (1.0 - smoothstep(shelf, rim, distance)))
 
 
-## Anota en `side` la distancia al eje del cañón de cada punto de la
-## retícula que cae en su vaguada: barre cada tramo del eje a lo ancho y
+## Anota en `side` cuántos metros pasada la pared del cañón (negativo
+## adentro) queda cada punto de la retícula que cae en su vaguada, con el
+## ancho que tiene el cañón ahí: barre cada tramo del eje a lo ancho y
 ## redondea los dos extremos.
 func _stamp_valley(side: PackedFloat32Array, lattice: int, step: float) -> void:
 	var ravine := _layout.ravine
@@ -141,6 +141,7 @@ func _stamp_valley(side: PackedFloat32Array, lattice: int, step: float) -> void:
 		var across := Vector2(-along.y, along.x)
 		var a := 0.0
 		while a <= span:
+			var wide := ravine.half_at(ravine.along[index] + a)
 			var v := -reach
 			while v <= reach:
 				var at := from + along * a + across * v
@@ -148,10 +149,13 @@ func _stamp_valley(side: PackedFloat32Array, lattice: int, step: float) -> void:
 				var lz := roundi((at.y + _half) / step)
 				if lx >= 0 and lz >= 0 and lx < lattice and lz < lattice:
 					var cell := lz * lattice + lx
-					side[cell] = minf(side[cell], absf(v))
+					side[cell] = minf(side[cell], absf(v) - wide)
 				v += VALLEY_STEP_ACROSS
 			a += VALLEY_STEP_ALONG
-	for tip: Vector2 in [ravine.points[0], ravine.points[ravine.points.size() - 1]]:
+	var tips: Array[Vector2] = [ravine.points[0], ravine.points[ravine.points.size() - 1]]
+	var tip_wide: Array[float] = [ravine.half_at(0.0), ravine.half_at(ravine.length)]
+	for which in 2:
+		var tip := tips[which]
 		var from_x := clampi(floori((tip.x - reach + _half) / step), 0, lattice - 1)
 		var to_x := clampi(ceili((tip.x + reach + _half) / step), 0, lattice - 1)
 		var from_z := clampi(floori((tip.y - reach + _half) / step), 0, lattice - 1)
@@ -160,4 +164,4 @@ func _stamp_valley(side: PackedFloat32Array, lattice: int, step: float) -> void:
 			for lx in range(from_x, to_x + 1):
 				var at := Vector2(-_half + float(lx) * step, -_half + float(lz) * step)
 				var cell := lz * lattice + lx
-				side[cell] = minf(side[cell], at.distance_to(tip))
+				side[cell] = minf(side[cell], at.distance_to(tip) - tip_wide[which])

@@ -1,15 +1,21 @@
 #!/usr/bin/env bash
 # Verificación headless del proyecto: import limpio + lint de catálogos +
-# harness de UI + harness del selector + soak por arena + soak de etapa +
-# soak de co-op + soak del jefe de etapa (Mythos) + soak del minijefe (la
-# Langosta Azul).
+# harness de UI + harness del selector + soak por arena + arranques de cada
+# receta del relieve + soak de etapa + soak de co-op + soak del jefe de etapa
+# (Mythos) + soak del minijefe (la Langosta Azul).
 # Uso: tools/verificar.sh [segundos_por_arena]   (por defecto 360)
+#
+# PASOS: VERIFICAR_PASOS=mythos,minijefe corre solo esos pasos, en el orden
+# de siempre; sin la variable corre todos. Los nombres: import lint ui
+# selector bosque dunas cienaga recetas etapa coop mythos minijefe. Un nombre
+# que no existe sale con exit 2 antes de correr nada, y una corrida parcial
+# termina en «VERIFICACIÓN PARCIAL (pasos: …)», nunca en «VERIFICACIÓN OK».
 #
 # 360 s no es arbitrario: por debajo, el recorrido del harness no da tiempo a
 # cruzar una arena de 240x240 y la puerta de cobertura no puede exigir nada.
-# La corrida completa tarda ~45 min (3 x 360 s + 1 x 720 s + 1 x 360 s de
-# co-op + 1 x 450 s del jefe de etapa + 1 x 270 s del minijefe + el lint + el
-# harness de UI + import).
+# La corrida completa tarda ~50 min (3 x 360 s + 1 x 720 s + 1 x 360 s de
+# co-op + 1 x 450 s del jefe de etapa + 1 x 270 s del minijefe + los
+# arranques de las recetas + el lint + el harness de UI + import).
 #
 # BONK_GAME_SEED fija el RNG del juego (cartas, spawns, scatter y por tanto
 # el relieve). Sin él cada soak es un mundo distinto y cualquier comparación
@@ -45,6 +51,9 @@
 #   - una etapa con RELIEVE POR ZONAS (el Bosque Hueco) no imprime sus
 #     barridos, alguno no da cero, la pendiente pasa de su cota, o el bot
 #     del soak del bosque no pisa una zona elevada ni cruza un puente.
+#   - el soak del bosque no arma la receta que fija (RECETA_PASEO) con al
+#     menos un puente, o un arranque del paso de RECETAS no arma la receta
+#     que pide, reporta errores o ensucia un barrido del relieve.
 #   - el soak del MINIJEFE no ve llegar a la Langosta Azul, su entrada no
 #     congela el mundo o no devuelve la pantalla, la pelea no empieza y
 #     termina exactamente una vez, o 5 s después de morir queda algo suyo.
@@ -58,6 +67,29 @@ LOGDIR="${TMPDIR:-/tmp}/bonkraiders-verify"
 mkdir -p "$LOGDIR"
 FALLOS=0
 INTERACCIONES=0
+
+# --- Selector de pasos ------------------------------------------------------
+PASOS_TODOS=(import lint ui selector bosque dunas cienaga recetas etapa coop mythos minijefe)
+PASOS="${VERIFICAR_PASOS:-}"
+PASOS="${PASOS// /}"
+if [ -n "$PASOS" ]; then
+	if [[ "$PASOS" == ,* || "$PASOS" == *, || "$PASOS" == *,,* ]]; then
+		echo "VERIFICAR_PASOS: hay un paso vacío en '$PASOS'. Los pasos son: ${PASOS_TODOS[*]}" >&2
+		exit 2
+	fi
+	IFS=',' read -r -a PASOS_PEDIDOS <<< "$PASOS"
+	for PASO in ${PASOS_PEDIDOS[@]+"${PASOS_PEDIDOS[@]}"}; do
+		if [[ " ${PASOS_TODOS[*]} " != *" $PASO "* ]]; then
+			echo "VERIFICAR_PASOS: paso desconocido '$PASO'. Los pasos son: ${PASOS_TODOS[*]}" >&2
+			exit 2
+		fi
+	done
+fi
+# Éxito si el paso $1 corre en esta verificación.
+corre() {
+	[ -z "$PASOS" ] && return 0
+	[[ ",$PASOS," == *",$1,"* ]]
+}
 
 PATRON_ERROR='SCRIPT ERROR|ERROR:|WARNING:|Parse Error|Invalid call|Invalid get index|Invalid set index|Invalid access|null instance|Cannot call method|Trying to assign|USER ERROR|USER WARNING|Attempt to call|previously freed|nonexistent|Resource file not found|Failed to load'
 
@@ -189,6 +221,22 @@ chequear_relieve() {
 	fi
 }
 
+# El soak del Bosque Hueco fija su receta: el bot tiene que pisar una zona
+# elevada y cruzar un puente, y la Montaña Escalonada trae las dos cosas en
+# toda semilla. Las demás recetas se prueban en el paso «recetas». Falla si
+# el log no muestra esa receta con al menos un puente: si el interruptor
+# dejara de forzarla, el paseo mediría otro mapa sin avisar.
+RECETA_PASEO="massif"
+chequear_receta_fija() {
+	local log="$1"
+	local receta="$2"
+	if ! grep -qE "^Relief layout: hollow_woods .* bridges=[1-9][0-9]* .* recipe=$receta\$" "$log"; then
+		echo "  FALLO (relieve): el soak no armó la receta '$receta' con al menos un puente"
+		grep -n '^Relief layout: ' "$log" | head -3
+		FALLOS=$((FALLOS + 1))
+	fi
+}
+
 # --- Listas fijas de líneas esperadas ---------------------------------------
 # Se greppean UNA POR UNA, no por conteo: una comprobación que deja de
 # ejecutarse desaparece del log sin ruido, y un conteo la daría por buena
@@ -202,6 +250,7 @@ UI_STEPS=(collection quests relics hunt_back hunt coop_count_reject unlock_confi
 # Lienzos que resultan de las ventanas de select_probe.gd (WINDOWS).
 SELECT_SIZES=(1280x720 1280x831 1280x960 1706x720)
 
+if corre import; then
 echo "== import =="
 fase
 IMPORT_LOG="$LOGDIR/import.log"
@@ -214,10 +263,12 @@ else
 	echo "  ok"
 fi
 fase_fin
+fi  # import
 
 # --- Lint de catálogos ------------------------------------------------------
 # Las referencias cruzadas que ningún soak puede comprobar: una rota no
 # revienta, simplemente no hace nada.
+if corre lint; then
 echo "== lint de catálogos =="
 fase
 LINT_LOG="$LOGDIR/catalog_lint.log"
@@ -243,10 +294,12 @@ else
 	fi
 fi
 fase_fin
+fi  # lint
 
 # --- Harness de UI ----------------------------------------------------------
 # Abre las escenas de UI que ningún soak visita. --quit-after es un
 # techo de dos minutos: el harness se va solo mucho antes.
+if corre ui; then
 echo "== harness de UI =="
 fase
 UI_LOG="$LOGDIR/ui_probe.log"
@@ -276,10 +329,12 @@ else
 	fi
 fi
 fase_fin
+fi  # ui
 
 # --- Harness del selector de personaje ---------------------------------------
 # El layout y la navegación con control del selector en cada forma de
 # ventana: lo que el harness de UI no mide.
+if corre selector; then
 echo "== harness del selector =="
 fase
 SELECT_LOG="$LOGDIR/select_probe.log"
@@ -309,15 +364,34 @@ else
 	fi
 fi
 fase_fin
+fi  # selector
 
 for ARENA in HollowWoods AshDunes Gloomfen; do
+	case "$ARENA" in
+		HollowWoods) PASO=bosque ;;
+		AshDunes) PASO=dunas ;;
+		*) PASO=cienaga ;;
+	esac
+	corre "$PASO" || continue
 	echo "== soak $ARENA (${SECS}s de partida) =="
 	fase
 	LOG="$LOGDIR/soak_$ARENA.log"
+	RECETA_ARENA=""
+	if [ "$ARENA" = "HollowWoods" ]; then
+		RECETA_ARENA="$RECETA_PASEO"
+	fi
 	BONK_ARENA="res://scenes/world/$ARENA.tscn" BONK_GODMODE=1 BONK_SEED=4242 \
 		BONK_GAME_SEED=4242 BONK_SAVE_PATH="$(save_path_for "$ARENA")" \
+		env ${RECETA_ARENA:+BONK_RELIEF_RECIPE=$RECETA_ARENA} \
 		godot --headless --fixed-fps 60 --quit-after "$FRAMES" \
 		res://scenes/tests/ArenaProbe.tscn >"$LOG" 2>&1
+
+	# El relieve primero: sus barridos se miran aunque un chequeo de abajo
+	# corte la vuelta con `continue`.
+	if [ "$ARENA" = "HollowWoods" ]; then
+		chequear_receta_fija "$LOG" "$RECETA_PASEO"
+		chequear_relieve "$LOG" paseo
+	fi
 
 	if grep -qE "$PATRON_ERROR" "$LOG"; then
 		echo "  FALLO: errores en tiempo de ejecución"
@@ -363,9 +437,6 @@ for ARENA in HollowWoods AshDunes Gloomfen; do
 	fase_fin
 
 	chequear_tope_cofres "$LOG"
-	if [ "$ARENA" = "HollowWoods" ]; then
-		chequear_relieve "$LOG" paseo
-	fi
 
 	# Cobertura: un soak que no sube de nivel ni toca un interactuable no
 	# probó gran cosa, aunque no haya reventado.
@@ -375,6 +446,53 @@ for ARENA in HollowWoods AshDunes Gloomfen; do
 	fi
 	INTERACCIONES=$(( INTERACCIONES + CHESTS + ALTARES + PORTALES ))
 done
+
+# --- Recetas del relieve ------------------------------------------------------
+# El Bosque Hueco arma una receta distinta según la semilla (ReliefRecipes):
+# los soaks de arriba y de abajo ven una o dos. Este paso arranca CADA receta,
+# forzada con BONK_RELIEF_RECIPE, en dos semillas y le pasa el grep de errores
+# y los barridos del relieve, así ninguna receta queda sin probar porque la
+# semilla de los soaks no la sortea. La lista sale de ReliefRecipes.IDS: una
+# receta nueva entra sola. BONK_STAGE_FAST=1 apaga el aviso de niebla de una
+# corrida corta (en 5 s nadie explora nada).
+RECETAS_SEMILLAS=(4242 7)
+RECETAS_FRAMES=300
+if corre recetas; then
+echo "== recetas del relieve (HollowWoods, ${#RECETAS_SEMILLAS[@]} semillas por receta) =="
+fase
+RECETAS=()
+read -r -a RECETAS <<< "$(grep -m1 '^const IDS: ' scripts/world/run/terrain/relief_recipes.gd \
+	| grep -o '"[a-z_]*"' | tr -d '"' | tr '\n' ' ')"
+if [ "${#RECETAS[@]}" -eq 0 ]; then
+	echo "  FALLO: no se pudo leer la lista de recetas (IDS en relief_recipes.gd)"
+	FALLOS=$((FALLOS + 1))
+fi
+for RECETA in ${RECETAS[@]+"${RECETAS[@]}"}; do
+	for SEMILLA in "${RECETAS_SEMILLAS[@]}"; do
+		RECETA_LOG="$LOGDIR/receta_${RECETA}_$SEMILLA.log"
+		BONK_ARENA="res://scenes/world/HollowWoods.tscn" BONK_GODMODE=1 BONK_SEED="$SEMILLA" \
+			BONK_GAME_SEED="$SEMILLA" BONK_STAGE_FAST=1 BONK_RELIEF_RECIPE="$RECETA" \
+			BONK_SAVE_PATH="$(save_path_for "receta_${RECETA}_$SEMILLA")" \
+			godot --headless --fixed-fps 60 --quit-after "$RECETAS_FRAMES" \
+			res://scenes/tests/ArenaProbe.tscn >"$RECETA_LOG" 2>&1
+		echo "  $RECETA semilla=$SEMILLA: $(grep -m1 '^Relief pieces: ' "$RECETA_LOG" \
+			| sed 's/^Relief pieces: hollow_woods recipe=[a-z_]* //')"
+		if grep -qE "$PATRON_ERROR" "$RECETA_LOG"; then
+			echo "  FALLO: errores en tiempo de ejecución ($RECETA, semilla $SEMILLA)"
+			grep -nE "$PATRON_ERROR" "$RECETA_LOG" | head -30
+			FALLOS=$((FALLOS + 1))
+		fi
+		if ! grep -qE "^Relief layout: hollow_woods .* recipe=$RECETA\$" "$RECETA_LOG" \
+				|| ! grep -q "^Relief pieces: hollow_woods recipe=$RECETA " "$RECETA_LOG"; then
+			echo "  FALLO: el arranque no armó la receta '$RECETA' (semilla $SEMILLA)"
+			grep -n '^Relief layout: \|^Relief pieces: ' "$RECETA_LOG" | head -3
+			FALLOS=$((FALLOS + 1))
+		fi
+		chequear_relieve "$RECETA_LOG"
+	done
+done
+fase_fin
+fi  # recetas
 
 # --- Soak de etapa ------------------------------------------------------
 # El cuarto soak es el único que cruza de mapa: con BONK_STAGE_FAST=1 la
@@ -388,6 +506,7 @@ done
 # Con 240 s el recorrido llega justo y falla por varianza: el mundo SÍ es
 # reproducible (BONK_GAME_SEED fija cartas, spawns, scatter y relieve),
 # pero el orden de contactos de la física diverge y la partida con él.
+if corre etapa; then
 STAGE_SECS=$(( SECS * 2 ))
 STAGE_FRAMES=$(( STAGE_SECS * 60 ))
 echo "== soak etapa (HollowWoods, BONK_STAGE_FAST, ${STAGE_SECS}s de partida) =="
@@ -452,6 +571,7 @@ else
 		FALLOS=$((FALLOS + 1))
 	fi
 fi
+fi  # etapa
 
 # --- Soak de co-op ------------------------------------------------------
 # El quinto soak es el único con DOS raiders: prueba el reparto de party
@@ -460,6 +580,7 @@ fi
 # puede alcanzar— el ciclo derribo/reanimación. BONK_DOWN_NOW derriba al
 # slot 1 a propósito: esperar a que la horda lo elija no es una prueba.
 # Fuera de la cuenta de interactuables, como el de etapa.
+if corre coop; then
 echo "== soak co-op (HollowWoods, 2 raiders, ${SECS}s de partida) =="
 fase
 COOP_LOG="$LOGDIR/soak_coop.log"
@@ -523,6 +644,7 @@ else
 		FALLOS=$((FALLOS + 1))
 	fi
 fi
+fi  # coop
 
 # --- Soak del jefe de etapa ------------------------------------------------
 # El sexto soak es el único que llega a un JEFE DE ETAPA y lo mata. Ningún
@@ -536,6 +658,7 @@ fi
 # tiene que cruzar el portal ANTES del jefe del minuto 5. Con ese jefe y su
 # horda encima, el raider del soak (casi sin daño a esa altura) queda
 # rodeado y no llega.
+if corre mythos; then
 MYTHOS_SECS=450
 MYTHOS_FRAMES=$(( MYTHOS_SECS * 60 ))
 echo "== soak jefe de etapa (HollowWoods, Mythos, ${MYTHOS_SECS}s de partida) =="
@@ -623,6 +746,7 @@ else
 	chequear_tope_cofres "$MYTHOS_LOG"
 	chequear_relieve "$MYTHOS_LOG"
 fi
+fi  # mythos
 
 # --- Soak del minijefe ------------------------------------------------------
 # El séptimo soak es el único que ve al MINIJEFE del Bosque Hueco (la Langosta
@@ -635,6 +759,7 @@ fi
 # (LobsterArrival.tide_scene), que esté alta al terminar la entrada y se haya
 # ido tras su muerte. Fuera de la cuenta de interactuables, como el del jefe
 # de etapa. Pasa igual con la canción puesta o con su hueco vacío.
+if corre minijefe; then
 LOBSTER_SECS=270
 LOBSTER_FRAMES=$(( LOBSTER_SECS * 60 ))
 echo "== soak minijefe (HollowWoods, Langosta Azul, ${LOBSTER_SECS}s de partida) =="
@@ -746,19 +871,31 @@ else
 	fi
 	chequear_tope_cofres "$LOBSTER_LOG"
 fi
+fi  # minijefe
 
 # La cobertura de interactuables se mide SUMANDO las tres arenas, no por
 # arena: el recorrido es aleatorio y la máscara irregular puede dejar una
 # arena concreta muy fragmentada (hasta mask_min_open_fraction), así que
 # exigirlo arena por arena falla por varianza legítima y entrena a ignorar
 # la puerta de calidad. Que ninguna de las tres resuelva nada sí es señal.
-if [ "$SECS" -ge 240 ] && [ "$INTERACCIONES" -eq 0 ]; then
+# Por eso se mide solo cuando corrieron las tres.
+if [ "$SECS" -ge 240 ] && corre bosque && corre dunas && corre cienaga \
+		&& [ "$INTERACCIONES" -eq 0 ]; then
 	echo "FALLO (cobertura): ningún interactuable se resolvió en NINGUNA arena"
 	FALLOS=$((FALLOS + 1))
 fi
 
 echo
 echo "Tiempo total: $(( SECONDS / 60 )) min $(( SECONDS % 60 )) s"
+# Una corrida con VERIFICAR_PASOS no probó todo: nunca dice OK.
+if [ -n "$PASOS" ]; then
+	if [ "$FALLOS" -eq 0 ]; then
+		echo "VERIFICACIÓN PARCIAL (pasos: $PASOS) — logs en $LOGDIR"
+		exit 0
+	fi
+	echo "VERIFICACIÓN FALLIDA: $FALLOS problema(s) (pasos: $PASOS) — logs en $LOGDIR"
+	exit 1
+fi
 if [ "$FALLOS" -eq 0 ]; then
 	echo "VERIFICACIÓN OK — logs en $LOGDIR"
 	exit 0

@@ -52,9 +52,14 @@ func build(layout: ReliefLayout, terrain: Terrain, noise_seed: int, samples: int
 	heights = base.duplicate()
 	surface = base.duplicate()
 	for zone: ReliefLayout.Zone in layout.zones:
-		_raise_zone(zone)
+		if zone.floor >= 0.0:
+			_raise_zone(zone)
 	if layout.ravine != null:
 		_sink_ravine()
+	# Una isla se apoya en el fondo del lago: se levanta después de hundirlo.
+	for zone: ReliefLayout.Zone in layout.zones:
+		if zone.floor < 0.0:
+			_raise_zone(zone)
 	_measure()
 
 
@@ -231,10 +236,10 @@ func _raise_ramp(zone: ReliefLayout.Zone, ramp: ReliefLayout.Ramp) -> void:
 				heights[index] = maxf(heights[index], lifted)
 
 
-## Hunde el pasillo del cañón, tramo por tramo de su eje.
+## Hunde el pasillo del cañón, tramo por tramo de su eje, con el ancho que
+## tiene en cada punto (un lago es un cañón que se ensancha).
 func _sink_ravine() -> void:
 	var ravine := _layout.ravine
-	var grown := ravine.half_width + ReliefLayout.LEDGE_INSET
 	var reach := ravine.half_width + FINE_REACH
 	for index in ravine.points.size() - 1:
 		var from := ravine.points[index]
@@ -257,14 +262,15 @@ func _sink_ravine() -> void:
 				var across := point.distance_to(from + chord * clampf(t, 0.0, 1.0))
 				if across > reach:
 					continue
-				if absf(across - ravine.half_width) <= FINE_REACH:
+				var wide := ravine.half_at(s)
+				if absf(across - wide) <= FINE_REACH:
 					_mark_fine(ix, iz)
-				if across > grown:
+				if across > wide + ReliefLayout.LEDGE_INSET:
 					continue
 				var cell := iz * _samples + ix
 				var sunk := base[cell] - _layout.ravine_drop(s)
 				heights[cell] = minf(heights[cell], sunk)
-				if across <= ravine.half_width:
+				if across <= wide:
 					surface[cell] = minf(surface[cell], sunk)
 
 

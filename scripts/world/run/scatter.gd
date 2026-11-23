@@ -293,14 +293,18 @@ func mesa_sites() -> PackedVector2Array:
 func place_props() -> void:
 	if mask_enabled:
 		ScatterMask.raise_formations(self, _mask, _run_seed)
-	_lanes = ReliefDressing.raise(self, _arena_terrain(), formation_style, _run_seed)
+	# Lo que cada consumidor del relieve arma, para la línea `Relief pieces:`.
+	var pieces := {}
+	_lanes = ReliefDressing.raise(self, _arena_terrain(), formation_style, _run_seed, pieces)
 	var interior := InteriorProps.new(self, _rng, _mask, _mesas, _rules)
 	interior.collect_keepouts(MesaBuilder.build(self, _mesas))
 	# Las estructuras del relieve van después de los POIs y las mesetas (los
 	# esquivan) y antes de los props (que las esquivan a ellas).
 	var taken := interior.keepouts()
 	taken.append_array(_mesa_sites)
-	_rules.structure_sites = ReliefStructures.raise(self, _arena_terrain(), _run_seed, taken)
+	_rules.structure_sites = ReliefStructures.raise(self, _arena_terrain(), _run_seed, taken,
+			pieces)
+	ReliefPieces.report(_arena_terrain(), pieces)
 	var relief := _arena_terrain() != null and _arena_terrain().has_relief()
 	if relief:
 		_rules.footprints.setup(arena_half_extent)

@@ -14,6 +14,8 @@ const NONE: int = ReliefGraph.NONE
 ## un tirón en las medidas de rendimiento del soak.
 class Path:
 	var to: int = ReliefGraph.NONE
+	## Solo pasos a pie (subidas de hasta ReliefGraph.WALK_RISE), sin saltos.
+	var walk_only: bool = false
 	var parent := PackedInt32Array()
 	var frontier := PackedInt32Array()
 	var cursor: int = 0
@@ -78,10 +80,12 @@ static func reach_back(graph: ReliefGraph, to: int, next: PackedInt32Array) -> P
 
 
 ## Empieza la búsqueda a lo ancho de un camino de `from` a `to` con los
-## pasos de un raider. No recorre nada todavía: eso lo hace advance.
-static func begin(graph: ReliefGraph, from: int, to: int) -> Path:
+## pasos de un raider; con `walk_only`, sin saltos. No recorre nada todavía:
+## eso lo hace advance.
+static func begin(graph: ReliefGraph, from: int, to: int, walk_only: bool = false) -> Path:
 	var search := Path.new()
 	search.to = to
+	search.walk_only = walk_only
 	if from == NONE or to == NONE:
 		search.done = true
 		return search
@@ -98,6 +102,8 @@ static func advance(graph: ReliefGraph, search: Path, budget: int) -> bool:
 	if search.done:
 		return true
 	var steps := graph.raider_next
+	var floor_y := graph.floor_y
+	var walk := search.walk_only
 	var parent := search.parent
 	var frontier := search.frontier
 	var cursor := search.cursor
@@ -108,9 +114,12 @@ static func advance(graph: ReliefGraph, search: Path, budget: int) -> bool:
 		cursor += 1
 		for step in WAYS:
 			var next := steps[at * WAYS + step]
-			if next != NONE and parent[next] == NONE:
-				parent[next] = at
-				frontier.append(next)
+			if next == NONE or parent[next] != NONE:
+				continue
+			if walk and floor_y[next] - floor_y[at] > ReliefGraph.WALK_RISE:
+				continue
+			parent[next] = at
+			frontier.append(next)
 	search.parent = parent
 	search.frontier = frontier
 	search.cursor = cursor

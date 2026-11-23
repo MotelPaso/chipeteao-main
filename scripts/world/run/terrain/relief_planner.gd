@@ -1,8 +1,11 @@
 class_name ReliefPlanner
 extends RefCounted
 ## Sortea el trazado del relieve de una etapa (ReliefLayout) desde la
-## semilla de partida. Todo gira alrededor de un rumbo al azar, hacia donde
-## queda la montaña vista desde el punto de aparición:
+## semilla de partida. Primero la RECETA (ReliefRecipes: qué composición
+## tiene el mapa) y después su trazado; aquí vive el de la receta de la
+## Montaña Escalonada (try_massif) y las piezas que comparten todas (zonas,
+## cerros, lomas). En ella todo gira alrededor de un rumbo al azar, hacia
+## donde queda la montaña vista desde el punto de aparición:
 ##
 ##   1. el MACIZO, un nivel ancho que contiene el punto de aparición;
 ##   2. el SEGUNDO NIVEL, sobre el macizo, pegado a su lado lejano;
@@ -40,27 +43,41 @@ const RIM_STEP: float = 0.5
 
 ## El trazado de la etapa para `seed_value`, con sus líneas de corte ya armadas.
 static func plan(settings: ReliefSettings, seed_value: int, half: float) -> ReliefLayout:
+	var choice := ReliefRecipes.choose(settings, seed_value)
+	var recipe: StringName = choice["id"]
+	var options := ReliefRecipes.options(settings, recipe, seed_value)
 	var rng := RandomNumberGenerator.new()
 	rng.seed = seed_value ^ SEED_SALT
 	var layout: ReliefLayout = null
-	for attempt in PLAN_ATTEMPTS:
-		layout = ReliefLayout.new(settings, half)
-		if _try_plan(layout, rng, false):
-			break
-		layout = null
+	if not bool(choice["reserve"]):
+		for attempt in PLAN_ATTEMPTS:
+			layout = _fresh(settings, half, recipe, options)
+			if ReliefRecipes.try_plan(layout, rng, false):
+				break
+			layout = null
 	if layout == null:
-		layout = ReliefLayout.new(settings, half)
+		layout = _fresh(settings, half, recipe, options)
 		layout.fallback = true
-		if not _try_plan(layout, rng, true):
-			push_warning("ReliefPlanner: the reserve layout is missing a piece")
+		if not ReliefRecipes.try_plan(layout, rng, true):
+			push_warning("ReliefPlanner: the reserve layout of '%s' is missing a piece" % recipe)
 	ReliefCuts.build(layout)
 	return layout
 
 
-## Un trazado entero; false si alguna pieza obligatoria no cupo. Con `calm`
-## es el de reserva: la montaña mira a una esquina (donde sobra lugar), cada
-## medida toma el medio de su rango y los contornos son óvalos lisos.
-static func _try_plan(layout: ReliefLayout, rng: RandomNumberGenerator, calm: bool) -> bool:
+static func _fresh(settings: ReliefSettings, half: float, recipe: StringName,
+		options: Dictionary) -> ReliefLayout:
+	var layout := ReliefLayout.new(settings, half)
+	layout.recipe = recipe
+	layout.options = options
+	return layout
+
+
+## El trazado de la Montaña Escalonada; false si alguna pieza obligatoria no
+## cupo. Con `calm` es el de reserva: la montaña mira a una esquina (donde
+## sobra lugar), cada medida toma el medio de su rango y los contornos son
+## óvalos lisos. La cascada baja del macizo (zona 0) y el camino lo arma
+## ReliefRoad desde el macizo.
+static func try_massif(layout: ReliefLayout, rng: RandomNumberGenerator, calm: bool) -> bool:
 	var bearing := rng.randf() * TAU
 	if calm:
 		bearing = PI * 0.25 + PI * 0.5 * float(rng.randi_range(0, 3))
@@ -75,16 +92,17 @@ static func _try_plan(layout: ReliefLayout, rng: RandomNumberGenerator, calm: bo
 	var massif := layout.zones[0]
 	var s := layout.settings
 	if not ReliefRamps.place(layout, massif, bearing + PI + rng.randf_range(0.5, 0.9),
-			_jitters(rng, s.massif_ways_max, calm), s.massif_ways_min, s.massif_ways_max):
+			jitters(rng, s.massif_ways_max, calm), s.massif_ways_min, s.massif_ways_max):
 		return false
 	var wanted := roll_int(rng, s.butte_count_min, s.butte_count_max, calm)
 	var placed := 0
 	for index in wanted:
-		if _place_butte(layout, rng, calm):
+		if place_butte(layout, rng, calm):
 			placed += 1
 	if placed < s.butte_count_min and not calm:
 		return false
-	_place_hills(layout, rng)
+	place_hills(layout, rng)
+	layout.cascade_zone = 0
 	return true
 
 
@@ -100,7 +118,7 @@ static func roll_int(rng: RandomNumberGenerator, low: int, high: int, calm: bool
 
 
 ## Un desvío por rampa, para que no queden a intervalos exactos.
-static func _jitters(rng: RandomNumberGenerator, count: int, calm: bool) -> PackedFloat32Array:
+static func jitters(rng: RandomNumberGenerator, count: int, calm: bool) -> PackedFloat32Array:
 	var jitters := PackedFloat32Array()
 	for way in count:
 		jitters.append(0.0 if calm else rng.randf_range(-ReliefRamps.RAMP_SPACING, ReliefRamps.RAMP_SPACING))
@@ -110,7 +128,7 @@ static func _jitters(rng: RandomNumberGenerator, count: int, calm: bool) -> Pack
 ## Una zona nueva con su contorno sorteado: radio medio entre los dos dados,
 ## alargada entre `stretch.x` y `stretch.y` veces y con lóbulos de fuerza
 ## `lobes`. `turn` es hacia dónde apunta su eje largo (NAN = al azar).
-static func _new_zone(rng: RandomNumberGenerator, calm: bool, kind: StringName,
+static func new_zone(rng: RandomNumberGenerator, calm: bool, kind: StringName,
 		radius_min: float, radius_max: float, stretch: Vector2, lobes: float,
 		turn: float = NAN) -> ReliefLayout.Zone:
 	var zone := ReliefLayout.Zone.new()
@@ -134,7 +152,7 @@ static func _place_massif(layout: ReliefLayout, rng: RandomNumberGenerator, bear
 		calm: bool) -> bool:
 	var s := layout.settings
 	for attempt in PLACE_ATTEMPTS:
-		var zone := _new_zone(rng, calm, &"massif", s.massif_radius_min, s.massif_radius_max,
+		var zone := new_zone(rng, calm, &"massif", s.massif_radius_min, s.massif_radius_max,
 				Vector2(s.massif_stretch_min, s.massif_stretch_max), s.massif_lobes,
 				bearing + (0.0 if calm else rng.randf_range(-MASSIF_SWAY, MASSIF_SWAY)))
 		zone.ramp_slope = s.ramp_slope_degrees
@@ -142,7 +160,7 @@ static func _place_massif(layout: ReliefLayout, rng: RandomNumberGenerator, bear
 		zone.swell = roll(rng, s.massif_swell_min, s.massif_swell_max, calm)
 		zone.center = Vector2.from_angle(bearing) \
 				* roll(rng, s.massif_offset_min, s.massif_offset_max, calm)
-		if not _inside_arena(layout, zone):
+		if not inside_arena(layout, zone):
 			continue
 		if not layout.on_plateau(zone, Vector2.ZERO, s.spawn_clearance + 2.0):
 			continue
@@ -158,7 +176,7 @@ static func _place_tier(layout: ReliefLayout, rng: RandomNumberGenerator, bearin
 	var s := layout.settings
 	var massif := layout.zones[0]
 	for attempt in PLACE_ATTEMPTS:
-		var zone := _new_zone(rng, calm, &"tier", s.tier_radius_min, s.tier_radius_max,
+		var zone := new_zone(rng, calm, &"tier", s.tier_radius_min, s.tier_radius_max,
 				Vector2(1.0, s.tier_stretch_max), s.tier_lobes)
 		zone.parent = 0
 		zone.floor = massif.floor + massif.height
@@ -172,11 +190,11 @@ static func _place_tier(layout: ReliefLayout, rng: RandomNumberGenerator, bearin
 		if distance < s.tier_distance_min:
 			continue
 		zone.center = out * distance
-		if not _child_fits(layout, zone):
+		if not child_fits(layout, zone):
 			continue
 		var side := 1.0 if calm or rng.randf() < 0.5 else -1.0
 		if not ReliefRamps.place(layout, zone, (-zone.center).angle() + TIER_FIRST_WAY * side,
-				_jitters(rng, s.tier_ways_max, calm), s.tier_ways_min, s.tier_ways_max):
+				jitters(rng, s.tier_ways_max, calm), s.tier_ways_min, s.tier_ways_max):
 			continue
 		layout.zones.append(zone)
 		return true
@@ -190,7 +208,7 @@ static func _place_summit(layout: ReliefLayout, rng: RandomNumberGenerator, bear
 	var s := layout.settings
 	var tier := layout.zones[1]
 	for attempt in PLACE_ATTEMPTS:
-		var zone := _new_zone(rng, calm, &"summit", s.summit_radius_min, s.summit_radius_max,
+		var zone := new_zone(rng, calm, &"summit", s.summit_radius_min, s.summit_radius_max,
 				Vector2(1.0, 1.15), s.tier_lobes * 0.6)
 		zone.parent = 1
 		zone.top = true
@@ -200,11 +218,11 @@ static func _place_summit(layout: ReliefLayout, rng: RandomNumberGenerator, bear
 		var aim := bearing + (0.0 if calm else rng.randf_range(-0.5, 0.5))
 		zone.center = tier.center + Vector2.from_angle(aim) \
 				* (s.summit_shift + (0.0 if calm else rng.randf_range(-2.0, 2.0)))
-		if not _child_fits(layout, zone):
+		if not child_fits(layout, zone):
 			continue
 		var way := (tier.center - zone.center).angle() \
 				+ (0.0 if calm else rng.randf_range(-0.4, 0.4))
-		if not ReliefRamps.place(layout, zone, way, _jitters(rng, s.summit_ways_max, calm),
+		if not ReliefRamps.place(layout, zone, way, jitters(rng, s.summit_ways_max, calm),
 				s.summit_ways_min, s.summit_ways_max):
 			continue
 		layout.zones.append(zone)
@@ -214,20 +232,20 @@ static func _place_summit(layout: ReliefLayout, rng: RandomNumberGenerator, bear
 
 ## Un cerro suelto del llano: lejos de la montaña, del cañón, de las rampas
 ## del macizo y de los otros cerros.
-static func _place_butte(layout: ReliefLayout, rng: RandomNumberGenerator, calm: bool) -> bool:
+static func place_butte(layout: ReliefLayout, rng: RandomNumberGenerator, calm: bool) -> bool:
 	var s := layout.settings
 	for attempt in PLACE_ATTEMPTS:
-		var zone := _new_zone(rng, false, &"butte", s.butte_radius_min, s.butte_radius_max,
+		var zone := new_zone(rng, false, &"butte", s.butte_radius_min, s.butte_radius_max,
 				Vector2(1.0, s.butte_stretch_max), s.butte_lobes)
 		zone.ramp_slope = s.ramp_slope_degrees
 		zone.height = roll(rng, s.butte_height_min, s.butte_height_max, calm)
 		zone.swell = roll(rng, s.butte_swell_min, s.butte_swell_max, calm)
 		var limit := layout.half - s.edge_margin - zone.r_max
 		zone.center = Vector2(rng.randf_range(-limit, limit), rng.randf_range(-limit, limit))
-		if not _loose_fits(layout, zone):
+		if not loose_fits(layout, zone):
 			continue
 		if not ReliefRamps.place(layout, zone, rng.randf() * TAU,
-				_jitters(rng, s.butte_ways_max, calm), s.butte_ways_min, s.butte_ways_max):
+				jitters(rng, s.butte_ways_max, calm), s.butte_ways_min, s.butte_ways_max):
 			continue
 		layout.zones.append(zone)
 		return true
@@ -266,7 +284,7 @@ static func _shape_zone(zone: ReliefLayout.Zone, radius: float, stretch: float, 
 # --- dónde cabe una zona ---------------------------------------------------------
 
 ## Puntos del contorno de `zone`, uno cada 12 grados.
-static func _rim_points(zone: ReliefLayout.Zone) -> PackedVector2Array:
+static func rim_points(zone: ReliefLayout.Zone) -> PackedVector2Array:
 	var points := PackedVector2Array()
 	for index in range(0, ReliefLayout.TABLE, 6):
 		points.append(zone.center + Vector2.from_angle(TAU * float(index)
@@ -275,9 +293,9 @@ static func _rim_points(zone: ReliefLayout.Zone) -> PackedVector2Array:
 
 
 ## True si el contorno entero de `zone` queda dentro de la arena con su margen.
-static func _inside_arena(layout: ReliefLayout, zone: ReliefLayout.Zone) -> bool:
+static func inside_arena(layout: ReliefLayout, zone: ReliefLayout.Zone) -> bool:
 	var limit := layout.half - layout.settings.edge_margin
-	for rim: Vector2 in _rim_points(zone):
+	for rim: Vector2 in rim_points(zone):
 		if absf(rim.x) > limit or absf(rim.y) > limit:
 			return false
 	return true
@@ -295,10 +313,10 @@ static func rim_from_origin(layout: ReliefLayout, zone: ReliefLayout.Zone,
 
 ## True si `zone` cabe sobre la meseta de su padre: todo su contorno a
 ## tier_margin del borde del padre y lejos del claro del punto de aparición.
-static func _child_fits(layout: ReliefLayout, zone: ReliefLayout.Zone) -> bool:
+static func child_fits(layout: ReliefLayout, zone: ReliefLayout.Zone) -> bool:
 	var s := layout.settings
 	var parent := layout.zones[zone.parent]
-	for rim: Vector2 in _rim_points(zone):
+	for rim: Vector2 in rim_points(zone):
 		if not layout.on_plateau(parent, rim, s.tier_margin):
 			return false
 		if rim.length() < s.spawn_clearance:
@@ -308,11 +326,11 @@ static func _child_fits(layout: ReliefLayout, zone: ReliefLayout.Zone) -> bool:
 
 ## True si una zona suelta cabe: dentro de la arena, a feature_gap de las
 ## otras zonas del llano, del cañón y de las rampas ya puestas.
-static func _loose_fits(layout: ReliefLayout, zone: ReliefLayout.Zone) -> bool:
+static func loose_fits(layout: ReliefLayout, zone: ReliefLayout.Zone) -> bool:
 	var s := layout.settings
-	if not _inside_arena(layout, zone):
+	if not inside_arena(layout, zone):
 		return false
-	var rim := _rim_points(zone)
+	var rim := rim_points(zone)
 	rim.append(zone.center)
 	for point: Vector2 in rim:
 		for other: ReliefLayout.Zone in layout.zones:
@@ -330,7 +348,7 @@ static func _loose_fits(layout: ReliefLayout, zone: ReliefLayout.Zone) -> bool:
 
 # --- lomas sueltas ---------------------------------------------------------------
 
-static func _place_hills(layout: ReliefLayout, rng: RandomNumberGenerator) -> void:
+static func place_hills(layout: ReliefLayout, rng: RandomNumberGenerator) -> void:
 	var s := layout.settings
 	var limit := layout.half - s.edge_margin
 	for index in s.hill_count:

@@ -52,7 +52,8 @@ var _cells_per_side: int = 0
 var _barriers: Dictionary[Vector3i, bool] = {}
 ## Encendido (lo enciende build() cuando recibe `keep_open`, o sea con
 ## relieve por zonas), los pasillos de una sola celda entre dos brazos de
-## roca también se rellenan (ver MaskPasses.fill_slots).
+## roca también se rellenan (ver MaskPasses.fill_slots) y lo que solo se
+## alcanza por un borde que la roca aprieta se sella (MaskPasses.seal_pinched).
 var _seal_slots: bool = false
 
 
@@ -95,6 +96,8 @@ func build(protected_seeds: Array[Vector2], keep_open: Dictionary[Vector2i, bool
 				protected, _barriers)
 		if _seal_slots:
 			MaskPasses.free_squeezed(_blocked, _cells_per_side, protected)
+			MaskPasses.seal_pinched(_blocked, _cells_per_side, cell_of(Vector2.ZERO),
+					protected, _barriers)
 		if float(open_cell_count()) / float(_cells_per_side * _cells_per_side) \
 				>= min_open_fraction:
 			break

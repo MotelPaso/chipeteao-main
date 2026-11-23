@@ -70,7 +70,10 @@ class Ramp extends RefCounted:
 ## Una zona elevada: un contorno polar alrededor de su centro.
 class Zone extends RefCounted:
 	## Qué es: &"massif" (el nivel ancho donde aparece el equipo), &"tier"
-	## (el segundo nivel), &"summit" (la cumbre) o &"butte" (un cerro suelto).
+	## (un nivel apilado), &"summit" (la cumbre), &"butte" (un cerro suelto),
+	## &"mount" (la base de uno de los dos montes del paso), &"spring" (la
+	## meseta del manantial del gran río) o &"island" (la isla del lago: se
+	## apoya en el fondo del lago y llega al nivel del llano).
 	var kind: StringName = &"butte"
 	## Índice de la zona sobre cuya meseta está, o -1 si está sobre el llano.
 	var parent: int = -1
@@ -106,7 +109,18 @@ class Ravine extends RefCounted:
 	## Distancia acumulada a lo largo del eje hasta cada punto.
 	var along: PackedFloat32Array = PackedFloat32Array()
 	var length: float
+	## Medio ancho de borde a borde, en metros: el mayor si el ancho cambia
+	## (ver half_at).
 	var half_width: float
+	## Un lago: entre lake_from y lake_to (metros a lo largo del eje) el cañón
+	## se ensancha hasta half_width, en lake_flare metros desde cada punta de
+	## ese tramo; fuera de él (los brazos) mide arm_half. Sin lago (lake_to <=
+	## lake_from) el ancho es parejo.
+	var arm_half: float = 0.0
+	var lake_from: float = 0.0
+	var lake_to: float = 0.0
+	## Metros que tarda el cañón en pasar del brazo al ancho del lago.
+	var lake_flare: float = 1.0
 	var depth: float
 	## Largo de la rampa de cada extremo (y de cada lado de un collado), en metros.
 	var ramp: float
@@ -116,6 +130,14 @@ class Ravine extends RefCounted:
 	var saddle_half: float = 0.0
 	## Caja del eje, para descartar rápido los puntos lejanos.
 	var bounds: Rect2
+
+	## Medio ancho del cañón a `s` metros de su inicio.
+	func half_at(s: float) -> float:
+		if lake_to <= lake_from:
+			return half_width
+		var grow := minf(smoothstep(lake_from, lake_from + lake_flare, s),
+				1.0 - smoothstep(lake_to - lake_flare, lake_to, s))
+		return lerpf(arm_half, half_width, grow)
 
 
 ## Un cruce del cañón: dónde va un puente.
@@ -133,6 +155,11 @@ class Crossing extends RefCounted:
 	var head_b: Vector2
 	## Altura del tablero; la fija ReliefField al aplanar las cabeceras.
 	var level: float
+	## 0 si cruza el cañón de pared a pared. +1 o -1 si va de esa pared del
+	## cañón (+1 = la izquierda del eje) a una isla: un muelle.
+	var side: int = 0
+	## Índice de la isla donde aterriza un muelle, o -1.
+	var island: int = -1
 
 
 ## Una loma ancha del nivel del bosque.
@@ -161,6 +188,16 @@ class CutPath extends RefCounted:
 
 
 var settings: ReliefSettings
+## La receta del trazado (ReliefRecipes): &"massif", &"river", &"twin" o &"lake".
+var recipe: StringName = &"massif"
+## Piezas opcionales que se sortearon para esta etapa (las lee la receta).
+var options: Dictionary = {}
+## Los tramos del camino antiguo que deja la receta: cada uno {points:
+## PackedVector2Array, fading: bool}. Vacío en la montaña escalonada, cuyo
+## camino arma ReliefRoad desde el macizo.
+var road_legs: Array[Dictionary] = []
+## Índice de la zona de cuyo acantilado cae la cascada al cañón, o -1.
+var cascade_zone: int = -1
 ## Mitad del lado de la arena, en metros.
 var half: float
 var zones: Array[Zone] = []
@@ -262,7 +299,9 @@ func ravine_frame(s: float) -> PackedVector2Array:
 ## respecto del suelo base; 0 en el llano. Sobre zonas apiladas gana la más
 ## alta. `inset`: ver la cabecera.
 func offset_at(point: Vector2, inset: float = 0.0) -> float:
-	var highest := 0.0
+	# Una isla y sus rampas quedan a nivel del llano o por debajo, dentro del
+	# cañón: gana la zona más alta que pise el punto, sea cual sea su signo.
+	var highest := -INF
 	for zone: Zone in zones:
 		if absf(point.x - zone.center.x) > zone.r_max + 40.0 \
 				or absf(point.y - zone.center.y) > zone.r_max + 40.0:
@@ -270,10 +309,10 @@ func offset_at(point: Vector2, inset: float = 0.0) -> float:
 		var lift := raised_offset(zone, point, inset)
 		if lift >= 0.0:
 			highest = maxf(highest, zone.floor + lift)
-	if highest > 0.0:
+	if highest > -INF:
 		return highest
 	var coords := ravine_coords(point)
-	if coords.x >= 0.0 and coords.y <= ravine.half_width + inset:
+	if coords.x >= 0.0 and coords.y <= ravine.half_at(coords.x) + inset:
 		return -ravine_drop(coords.x)
 	return 0.0
 
@@ -288,7 +327,7 @@ func level_at(point: Vector2) -> int:
 	if level != 0:
 		return level
 	var coords := ravine_coords(point)
-	if coords.x >= 0.0 and coords.y <= ravine.half_width:
+	if coords.x >= 0.0 and coords.y <= ravine.half_at(coords.x):
 		return -1
 	return 0
 
@@ -325,12 +364,17 @@ func digest() -> String:
 			parts.append("r %d %d" % [roundi(ramp.angle * 1000.0), roundi(ramp.length * 100.0)])
 	if ravine != null:
 		parts.append("v %d %d" % [roundi(ravine.half_width * 100.0), roundi(ravine.depth * 100.0)])
+		if ravine.lake_to > ravine.lake_from:
+			parts.append("l %d %d %d" % [roundi(ravine.arm_half * 100.0),
+					roundi(ravine.lake_from * 100.0), roundi(ravine.lake_to * 100.0)])
 		for saddle: float in ravine.saddles:
 			parts.append("s %d" % roundi(saddle * 100.0))
 		for point: Vector2 in ravine.points:
 			parts.append("%d %d" % [roundi(point.x * 100.0), roundi(point.y * 100.0)])
 	for crossing: Crossing in crossings:
 		parts.append("c %d" % roundi(crossing.s * 100.0))
+		if crossing.side != 0:
+			parts.append("p %d %d" % [crossing.side, crossing.island])
 	for hill: Hill in hills:
 		parts.append("h %d %d %d" % [roundi(hill.center.x * 100.0),
 				roundi(hill.center.y * 100.0), roundi(hill.height * 100.0)])

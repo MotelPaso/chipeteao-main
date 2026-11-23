@@ -17,7 +17,9 @@ extends RefCounted
 ##      Probe relief: crossed bridge …
 ## 4. RETIENE, solo con BONK_HOLD_AT=high|ravine|bridge: deja al raider
 ##    quieto a 8 m del corte más alto de la zona más alta, en el medio del
-##    fondo del cañón o en el medio del puente más largo, y cuenta las
+##    fondo del cañón o en el medio del puente más largo (si la receta de
+##    la etapa no tiene ese lugar, lo dice en una línea `Probe hold: at=…
+##    missing` y no lo retiene), y cuenta las
 ##    LLEGADAS: enemigos que aparecieron 3 m o más arriba o abajo de su nivel
 ##    y se le acercaron a 3 m (y a no más de 1.5 m de altura). Imprime una
 ##    línea `Probe hold:` por ventana de 20 s y un resumen al salir; el
@@ -223,11 +225,18 @@ func _world_frozen() -> bool:
 
 
 ## El punto a HOLD_INSET metros hacia dentro del corte más alto de la zona
-## más alta; el centro de esa zona si ese punto no se alcanza.
+## más alta (la que la receta marca `top`, o la de cima más alta); el centro
+## de esa zona si ese punto no se alcanza.
 func _high_point() -> Vector3:
 	var top := 0
+	var highest := -INF
 	for index in _layout.zones.size():
-		if _layout.zones[index].top:
+		var zone := _layout.zones[index]
+		if zone.top:
+			top = index
+			break
+		if zone.floor + zone.height > highest:
+			highest = zone.floor + zone.height
 			top = index
 	var best: ReliefLayout.CutPath = null
 	for cut: ReliefLayout.CutPath in _layout.cuts:
@@ -343,7 +352,10 @@ func _start_hold(lead: CharacterBody3D) -> void:
 			if crossing != null:
 				_hold_point = Vector3(crossing.center.x, crossing.level, crossing.center.y)
 	if _hold_point == Vector3.INF:
-		push_error("ArenaProbe: %s=%s but this stage has no such place" % [HOLD_ENV, _hold_at])
+		# La receta de esta etapa no tiene ese lugar (un mapa sin cañón ni
+		# puente): se dice en su línea y el raider no se retiene.
+		print("Probe hold: at=%s missing (recipe=%s has no such place)" % [_hold_at,
+				_layout.recipe])
 		return
 	_holding = true
 	_candidates.clear()

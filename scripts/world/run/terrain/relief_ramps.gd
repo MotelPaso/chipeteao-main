@@ -126,6 +126,8 @@ static func _scan_corner(layout: ReliefLayout, zone: ReliefLayout.Zone,
 ## arriba ni el pie de una de sus rampas.
 static func _ramp_fits(layout: ReliefLayout, zone: ReliefLayout.Zone,
 		ramp: ReliefLayout.Ramp) -> bool:
+	if zone.kind == &"island":
+		return _island_ramp_fits(layout, zone, ramp)
 	var s := layout.settings
 	var limit := layout.half - RAMP_EDGE_MARGIN
 	var probes := PackedVector2Array()
@@ -165,6 +167,34 @@ static func _ramp_fits(layout: ReliefLayout, zone: ReliefLayout.Zone,
 	return true
 
 
+## True si `ramp` de una isla cabe: baja al fondo hondo del lago, lejos de
+## sus paredes, de los puentes (escaleras incluidas) y de las otras rampas
+## de la isla.
+static func _island_ramp_fits(layout: ReliefLayout, zone: ReliefLayout.Zone,
+		ramp: ReliefLayout.Ramp) -> bool:
+	var ravine := layout.ravine
+	if ravine == null:
+		return false
+	for along: float in [ramp.length * 0.5, ramp.length + ReliefLayout.RAMP_LANDING]:
+		for side: float in [-1.0, 1.0]:
+			var probe := ramp.origin + ramp.dir * along + ramp.perp * (ramp.half_width * side)
+			var coords := layout.ravine_coords(probe)
+			if coords.x < 0.0 or coords.y > ravine.half_at(coords.x) - RAMP_GAP:
+				return false
+			if layout.ravine_drop(coords.x) < ravine.depth - 0.01:
+				return false
+			for crossing: ReliefLayout.Crossing in layout.crossings:
+				var local := probe - crossing.center
+				if absf(local.dot(crossing.axis)) <= crossing.span * 0.5 + RAMP_GAP \
+						and absf(local.dot(Vector2(-crossing.axis.y, crossing.axis.x))) \
+						<= crossing.width * 0.5 + layout.settings.bridge_stair_reach + RAMP_GAP:
+					return false
+	for other: ReliefLayout.Ramp in zone.ramps:
+		if _arc_gap(ramp, other) < RAMP_SPACING:
+			return false
+	return true
+
+
 ## True si la zona de índice `index` es un ancestro de `zone`.
 static func _is_ancestor(layout: ReliefLayout, zone: ReliefLayout.Zone, index: int) -> bool:
 	var up := zone.parent
@@ -182,13 +212,14 @@ static func _arc_gap(a: ReliefLayout.Ramp, b: ReliefLayout.Ramp) -> float:
 			- absf(angle_difference(b.corner_lo, b.corner_hi)) * 0.5
 
 
-## True si `point` queda a menos de `gap` metros del pasillo del cañón.
+## True si `point` queda a menos de `gap` metros del pasillo del cañón (con
+## el ancho que tiene en cada tramo).
 static func near_ravine(layout: ReliefLayout, point: Vector2, gap: float) -> bool:
-	if layout.ravine == null:
+	var ravine := layout.ravine
+	if ravine == null:
 		return false
-	var clear := layout.ravine.half_width + gap
-	for axis: Vector2 in layout.ravine.points:
-		if point.distance_to(axis) < clear:
+	for index in ravine.points.size():
+		if point.distance_to(ravine.points[index]) < ravine.half_at(ravine.along[index]) + gap:
 			return true
 	return false
 
