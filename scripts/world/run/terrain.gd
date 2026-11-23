@@ -116,6 +116,9 @@ var _surface: PackedFloat32Array = PackedFloat32Array()
 ## Trazado y rejillas del relieve por zonas; null sin `relief`.
 var _layout: ReliefLayout = null
 var _field: ReliefField = null
+## El suelo de afuera del muro (OutsideRelief); null sin relieve por zonas o
+## con relief.outside_reach en 0.
+var _outside: OutsideRelief = null
 var _built: bool = false
 ## Discos planos aplicados tras el ruido: {center, radius}. Vienen del
 ## spawn, de los keepouts de autor y de los sitios de meseta del scatter.
@@ -203,6 +206,20 @@ func relief_features() -> Dictionary:
 		return {}
 	ensure_built()
 	return ReliefQueries.features(_layout, self)
+
+
+## El suelo de afuera del muro, o null si la arena termina en el muro.
+func outside_relief() -> OutsideRelief:
+	return _outside
+
+
+## Altura del suelo en un XZ de mundo, adentro o AFUERA del muro: adentro es
+## height_at; afuera, el suelo que sigue pasado el muro (OutsideRelief).
+func outside_height_at(x: float, z: float) -> float:
+	var half := size * 0.5
+	if _outside == null or (absf(x) <= half and absf(z) <= half):
+		return height_at(x, z)
+	return _outside.height_at(x, z)
 
 
 ## Altura del suelo SIN zonas en un XZ: lo que habría bajo una zona elevada
@@ -341,6 +358,8 @@ func _build_relief() -> void:
 	_surface = _field.surface
 	min_height = _field.min_height
 	max_height = _field.max_height
+	if relief.outside_reach > 0.0:
+		_outside = OutsideRelief.new(_layout, _run_seed())
 
 
 func _build_heights() -> void:
@@ -429,6 +448,9 @@ func _build_mesh() -> void:
 	var arrays: Array
 	if _field != null:
 		arrays = ReliefMesh.arrays(_field, _samples, size)
+		if _outside != null:
+			OutsideApron.append(arrays, (_samples - 1) / ReliefField.BLOCK + 1,
+					float(ReliefField.BLOCK) * SAMPLE_METERS, size * 0.5, _outside)
 	else:
 		arrays = TerrainMesh.grid(self)
 	TerrainMesh.assert_winding(arrays[Mesh.ARRAY_VERTEX], arrays[Mesh.ARRAY_INDEX])

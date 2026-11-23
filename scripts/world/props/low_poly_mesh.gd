@@ -187,14 +187,20 @@ func face_count() -> int:
 
 ## La malla con todo lo agregado hasta ahora.
 func commit() -> ArrayMesh:
-	var arrays := []
-	arrays.resize(Mesh.ARRAY_MAX)
-	arrays[Mesh.ARRAY_VERTEX] = _vertices
-	arrays[Mesh.ARRAY_NORMAL] = _normals
-	arrays[Mesh.ARRAY_COLOR] = _colors
 	var mesh := ArrayMesh.new()
-	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
+	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays())
 	return mesh
+
+
+## Los arreglos de superficie con todo lo agregado hasta ahora, para quien
+## arma una malla de varias superficies.
+func arrays() -> Array:
+	var out := []
+	out.resize(Mesh.ARRAY_MAX)
+	out[Mesh.ARRAY_VERTEX] = _vertices
+	out[Mesh.ARRAY_NORMAL] = _normals
+	out[Mesh.ARRAY_COLOR] = _colors
+	return out
 
 
 ## Un MeshInstance3D con la malla y el material compartido, listo para colgar.

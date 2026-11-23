@@ -1,4 +1,4 @@
-[gd_scene format=3 uid="uid://dqv5m2x8rk1fj"]
+[gd_scene load_steps=38 format=3 uid="uid://dqv5m2x8rk1fj"]
 
 [ext_resource type="Script" uid="uid://cg5u76h8w6ba2" path="res://scripts/world/run/arena.gd" id="1_arena"]
 [ext_resource type="Script" uid="uid://bdr2b6ikdxm3f" path="res://scripts/systems/enemy_spawner.gd" id="3_spawner"]
@@ -30,6 +30,16 @@
 [ext_resource type="Resource" path="res://assets/world/relief_hollow_woods.tres" id="94_relief"]
 [ext_resource type="PackedScene" path="res://scenes/world/props/AncientTree.tscn" id="95_ancient"]
 [ext_resource type="PackedScene" path="res://scenes/world/props/GroundCover.tscn" id="96_cover"]
+[ext_resource type="PackedScene" path="res://scenes/world/props/ForestEdge.tscn" id="97_edge"]
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_grass"]
+shader = ExtResource("93_ground")
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_wall_x"]
+size = Vector3(1, 17, 322)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_wall_z"]
+size = Vector3(322, 17, 1)
 
 [sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_1"]
 sky_top_color = Color(0.35, 0.55, 0.78, 1)
@@ -199,7 +209,9 @@ formation_clearance = 4.5
 mask_blobs_min = 8
 mask_blobs_max = 12
 
-[node name="GroundCover" parent="ForestScatter" unique_id=1341280021 instance=ExtResource("96_cover")]
+[node name="GroundCover" parent="ForestScatter" instance=ExtResource("96_cover")]
+
+[node name="ForestEdge" parent="ForestScatter" instance=ExtResource("97_edge")]
 
 [node name="Terrain" type="StaticBody3D" parent="." unique_id=1069068356]
 script = ExtResource("90_terrain")

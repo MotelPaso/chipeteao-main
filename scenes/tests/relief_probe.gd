@@ -7,7 +7,8 @@ extends RefCounted
 ##
 ## 1. BARRE, al empezar cada etapa y otra vez a los 120 s (ReliefSweeps):
 ##    las líneas `Relief graph:` y `Relief sweep:` que lee tools/verificar.sh.
-##    Si a los 120 s el mundo está congelado por una cinemática, espera.
+##    Si a los 120 s el mundo está congelado por una cinemática, espera. El
+##    barrido del infierno espera, además, a que el bosque de afuera termine.
 ## 2. RUTEA: route() le da al bot el próximo punto del camino a su destino
 ##    por rampas y puentes (ReliefNav), en vez de la línea recta.
 ## 3. PASEA: antes del recorrido de siempre, lleva al raider a la zona más
@@ -122,6 +123,10 @@ func tick(delta: float, frames: int, lead: CharacterBody3D, raiders: Array[RID])
 		swept = _active
 	if not _active:
 		return swept
+	# El barrido del infierno espera al bosque de afuera (ReliefSweeps.try_hell).
+	if sweeps.hell_pending():
+		sweeps.try_hell()
+		swept = swept or not sweeps.hell_pending()
 	_clock += delta
 	if not _placement_again and _clock >= PLACEMENT_AGAIN_AT:
 		# Con el mundo congelado (la cinemática de un jefe: WorldFreeze saca la

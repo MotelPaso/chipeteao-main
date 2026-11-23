@@ -53,5 +53,8 @@ static func build(rng: RandomNumberGenerator, count: int, ring: Vector2, height:
 			mesh.blob(center, Vector3(size, size * 0.42, size),
 					leaf_dark.lerp(leaf_bright, rng.randf()), 7, 4, 0.18)
 	var view := mesh.instance("Giants")
+	# Material propio: HellSky tiñe los materiales del Backdrop, y el
+	# compartido de LowPolyMesh es el de todo lo que se arma en código.
+	view.material_override = LowPolyMesh.MATERIAL.duplicate()
 	view.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	return view
