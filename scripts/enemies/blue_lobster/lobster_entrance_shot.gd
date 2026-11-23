@@ -32,6 +32,8 @@ enum Focus { FACE, CLAW, BODY, TAIL }
 @export var around_degrees: float = 0.0
 ## Altura de la cámara sobre lo que mira, en metros (negativo = desde abajo).
 @export var height: float = 0.0
+## Encendido, esa altura se mide desde el suelo y no desde lo que mira: la cámara se queda abajo aunque la langosta salte, y la sigue con la mirada.
+@export var from_ground: bool = false
 ## Metros que sube (o baja) el punto al que apunta la cámara.
 @export var look_lift: float = 0.0
 ## Apertura de la cámara, en grados (menos = más teleobjetivo).

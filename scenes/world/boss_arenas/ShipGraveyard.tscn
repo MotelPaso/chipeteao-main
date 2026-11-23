@@ -49,14 +49,6 @@ fog_sky_affect = 0.35
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_sand"]
 render_priority = 0
 shader = ExtResource("6_sand")
-shader_parameter/sand_light = null
-shader_parameter/sand_dark = null
-shader_parameter/patch_scale = null
-shader_parameter/ripple_shade = null
-shader_parameter/ripple_scale = null
-shader_parameter/ripple_strength = null
-shader_parameter/ripple_warp = null
-shader_parameter/current_degrees = null
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_surface"]
 shader = ExtResource("21_surface")

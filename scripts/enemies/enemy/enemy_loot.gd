@@ -14,7 +14,8 @@ extends RefCounted
 const BOUNTY_CHEST_CAP: int = 30
 const BOUNTY_CHEST_GROUP: StringName = &"bounty_chests"
 ## Metros que un cofre soltado guarda con un corte, una rampa o un puente
-## del relieve por zonas (ver drop_point). En una arena sin relieve no cuenta.
+## del relieve por zonas, o con una cobertura del campo de un jefe (ver
+## drop_point). En las demás arenas no cuenta.
 const DROP_RELIEF_MARGIN: float = 5.0
 ## Suerte extra del cofre shiny por punto de dificultad de la partida. Edita aquí.
 const ELITE_CHEST_LUCK_PER_DIFFICULTY: float = 15.0
@@ -112,16 +113,35 @@ static func spawn_chest(body: Node, at: Vector3, luck_bonus: float,
 ## rampas, puentes, mesetas y estructuras: quien muere trepando un
 ## acantilado no deja su cofre colgado de la roca) y lo apoya SIEMPRE en el
 ## suelo: quien muere encima de una piedra o de un tronco tampoco lo deja
-## flotando. En las demás arenas devuelve `at` tal cual. No saca números de
-## ningún RNG.
+## flotando. En el campo de batalla de un jefe hace lo mismo con sus
+## coberturas y su borde. En las demás arenas devuelve `at` tal cual. No saca
+## números de ningún RNG.
 static func drop_point(tree: SceneTree, at: Vector3) -> Vector3:
 	var terrain := Terrain.find(tree)
 	var bounds := tree.get_first_node_in_group("arena_bounds")
-	if terrain == null or bounds == null or not terrain.has_relief() \
-			or not bounds.has_method("nearest_place"):
+	if terrain == null or bounds == null or not bounds.has_method("nearest_place") \
+			or not (terrain.has_relief() or _clears_drops(bounds)):
 		return at
 	var spot: Vector2 = bounds.call("nearest_place", Vector2(at.x, at.z), DROP_RELIEF_MARGIN)
 	return Vector3(spot.x, terrain.height_at(spot.x, spot.y), spot.y)
+
+
+## Como drop_point, para lo que se suelta flotando (las gemas y los orbes del
+## pago de un jefe): en el campo de batalla de un jefe lo corre, en planta, al
+## lugar libre más cercano y le deja su altura. En un mapa devuelve `at` tal
+## cual. No saca números de ningún RNG.
+static func pickup_point(tree: SceneTree, at: Vector3) -> Vector3:
+	var bounds := tree.get_first_node_in_group("arena_bounds")
+	if bounds == null or not _clears_drops(bounds) or not bounds.has_method("nearest_place"):
+		return at
+	var spot: Vector2 = bounds.call("nearest_place", Vector2(at.x, at.z))
+	return Vector3(spot.x, at.y, spot.y)
+
+
+## True si los límites de la arena piden que lo soltado no quede dentro de
+## una cobertura (BossField.clears_drops).
+static func _clears_drops(bounds: Node) -> bool:
+	return bounds.has_method("clears_drops") and bool(bounds.call("clears_drops"))
 
 
 ## Un orbe de vida del pool en `at`, salvo en el tope global de orbes vivos.

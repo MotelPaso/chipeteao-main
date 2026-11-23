@@ -102,6 +102,12 @@ func shot_at(act: LobsterEntranceShot.Act, seconds: float) -> int:
 	return index
 
 
+## El primer plano de `act` (-1 si no tiene ninguno).
+func first_shot(act: LobsterEntranceShot.Act) -> int:
+	var times := shot_times(act)
+	return shot_at(act, times[0]) if not times.is_empty() else -1
+
+
 func shot(index: int) -> LobsterEntranceShot:
 	return _shots[index] if index >= 0 and index < _shots.size() else null
 
@@ -238,8 +244,11 @@ func _camera_point(index: int, progress: float) -> Vector3:
 		# Que entren todos pesa más que la vista libre: lo que tape se esconde.
 		reach = maxf(reach, _party_fit(of.fov))
 	reach = maxf(reach - of.push_in * progress, minf(min_distance, of.distance))
-	return _focus_point(of) + _direction(of, progress) * reach \
-			+ Vector3.UP * (of.height + of.rise * progress)
+	var point := _focus_point(of) + _direction(of, progress) * reach
+	var terrain := Terrain.find(get_tree())
+	if of.from_ground and terrain != null:
+		point.y = terrain.height_at(point.x, point.z)
+	return point + Vector3.UP * (of.height + of.rise * progress)
 
 
 ## Segundos que dura el plano `index`: hasta que entra el siguiente de su acto.
@@ -292,15 +301,21 @@ func _focus_point(of: LobsterEntranceShot) -> Vector3:
 	if _boss == null:
 		return _arena_center()
 	var rig := _boss.rig
+	var point := rig.head_point()
 	match of.focus:
 		LobsterEntranceShot.Focus.CLAW:
 			# La pinza grande es la derecha.
-			return rig.claw_point(false)
+			point = rig.claw_point(false)
 		LobsterEntranceShot.Focus.BODY:
-			return rig.center_point() + Vector3.UP * rig.body_height()
+			point = rig.center_point() + Vector3.UP * rig.body_height()
 		LobsterEntranceShot.Focus.TAIL:
-			return rig.tail_point()
-	return rig.head_point()
+			point = rig.tail_point()
+	# Mientras la langosta está bajo la arena (enterrada o saliendo) se mira el
+	# lugar por donde va a salir, no un punto bajo tierra.
+	var terrain := Terrain.find(get_tree())
+	if terrain != null:
+		point.y = maxf(point.y, terrain.height_at(point.x, point.z))
+	return point
 
 
 ## El centro del equipo, a ras de sus pies.

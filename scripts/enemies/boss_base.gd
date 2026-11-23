@@ -355,8 +355,9 @@ func _drop_xp_gem() -> void:
 			return
 		gem.xp_value = value
 		var gem_angle := TAU * float(i) / float(boss_gem_count)
-		gem.global_position = global_position + Vector3.UP * 0.6 \
-				+ Vector3(cos(gem_angle), 0.0, sin(gem_angle)) * gem_ring_radius
+		gem.global_position = EnemyLoot.pickup_point(get_tree(), global_position
+				+ Vector3.UP * 0.6
+				+ Vector3(cos(gem_angle), 0.0, sin(gem_angle)) * gem_ring_radius)
 
 
 ## Los jefes siempre pagan curación: health_orb_count orbes en un anillo más
@@ -364,8 +365,9 @@ func _drop_xp_gem() -> void:
 func _drop_health_orbs() -> void:
 	for i in health_orb_count:
 		var orb_angle := TAU * (float(i) + 0.5) / float(maxi(health_orb_count, 1))
-		EnemyLoot.spawn_health_orb(get_tree(), global_position + Vector3.UP * 0.6
-				+ Vector3(cos(orb_angle), 0.0, sin(orb_angle)) * orb_ring_radius)
+		EnemyLoot.spawn_health_orb(get_tree(), EnemyLoot.pickup_point(get_tree(),
+				global_position + Vector3.UP * 0.6
+				+ Vector3(cos(orb_angle), 0.0, sin(orb_angle)) * orb_ring_radius))
 
 
 ## Contrato de marcador de mapa (grupo "map_markers"). Los enemigos comunes

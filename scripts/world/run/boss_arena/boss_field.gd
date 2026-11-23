@@ -77,6 +77,13 @@ func is_walkable(xz: Vector2) -> bool:
 	return _in_clearing(xz, 0.0) and not _in_cover(xz, 0.0)
 
 
+## True: lo que un jefe suelta en este campo (cofres, gemas, orbes) se corre
+## al lugar libre más cercano, fuera de las coberturas y del borde. Lo
+## preguntan EnemyLoot.drop_point y pickup_point.
+func clears_drops() -> bool:
+	return true
+
+
 ## True si en `xz` se puede COLOCAR algo: dentro del claro y a place_margin
 ## más `margin` metros (hasta asked_margin_cap) de su borde y de cada cobertura.
 func can_place(xz: Vector2, margin: float = 0.0) -> bool:

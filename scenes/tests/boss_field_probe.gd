@@ -9,9 +9,12 @@ extends Node
 ##   Probe field size:   radio del claro, el ataque más largo del jefe con el
 ##                       raider más rápido, el largo de su cuerpo y si entra.
 ##   Probe field covers: cuántas coberturas hay, si chocan en la capa del
-##                       mundo, si tapan a un raider de pie, y el lugar que
+##                       mundo, si tapan a un raider de pie, el lugar que
 ##                       queda entre ellas, hasta el borde y hasta los puntos
-##                       de llegada del equipo y del jefe.
+##                       de llegada del equipo y del jefe, y cuántas muestras
+##                       de su parte de arriba quedan tan bajas que un raider
+##                       se quedaría parado encima a ras de suelo (low_tops,
+##                       tiene que dar 0).
 ##   Probe field ground: muestras del claro fuera de las coberturas donde un
 ##                       raider (a pie o volando) choca con algo: tiene que
 ##                       dar 0.
@@ -19,7 +22,11 @@ extends Node
 ##                       raider: tiene que dar 0.
 ##   Probe field: arena=<id> ok=true|false
 ## y al final «Probe field: done arenas=<n> failed=<n>».
+## Con BONK_FIELD_ARENA=<res:// de una escena> mide esa escena en lugar de la
+## arena de cada fila: es la forma de comprobar que la sonda falla con un
+## campo roto (una cobertura corrida, un estorbo en el claro).
 
+const ARENA_ENV: String = "BONK_FIELD_ARENA"
 ## Cápsula de un raider, en metros.
 const RAIDER_RADIUS: float = 0.4
 const RAIDER_HEIGHT: float = 1.8
@@ -46,6 +53,11 @@ const RIM_HEIGHTS: Array[float] = [0.0, 4.0, 8.0, 12.0, 14.0]
 ## Direcciones y alturas de los rayos que prueban si una cobertura tapa a un raider.
 const SIGHT_DIRECTIONS: int = 12
 const SIGHT_HEIGHTS: Array[float] = [0.3, 0.9, 1.7]
+## Alto mínimo, en metros sobre el suelo, de cualquier parte de una cobertura
+## que frene, y la grilla (medio lado y paso, en metros) con que se busca.
+const LOW_TOP_MIN: float = 1.0
+const TOP_SCAN_REACH: float = 9.0
+const TOP_SCAN_STEP: float = 0.3
 ## Segundos que espera a que el jefe tome su pose antes de medirlo.
 const SETTLE_SECONDS: float = 0.4
 
@@ -70,7 +82,12 @@ func arena_root() -> Node3D:
 
 func _check(row: Dictionary) -> bool:
 	var id := String(row.id)
-	_arena = BossArenaCatalog.scene_of(row, "arena_scene").instantiate() as BossArena
+	var scene := BossArenaCatalog.scene_of(row, "arena_scene")
+	var other := OS.get_environment(ARENA_ENV)
+	if not other.is_empty():
+		scene = load(other) as PackedScene
+		print("Probe field: measuring %s in place of %s" % [other, id])
+	_arena = scene.instantiate() as BossArena
 	add_child(_arena)
 	var field := get_tree().get_first_node_in_group(&"arena_bounds") as BossField
 	var boss := _add_boss(row)
@@ -158,10 +175,12 @@ func _check_covers(id: String, field: BossField, body: float) -> bool:
 	var reveal := _flat(_arena.boss_origin())
 	var on_layer := 0
 	var hide_min := SIGHT_DIRECTIONS
+	var low_tops := 0
 	for cover: Node3D in covers:
 		if _on_world_layer(cover):
 			on_layer += 1
 		hide_min = mini(hide_min, _hidden_directions(cover))
+		low_tops += _low_tops(id, cover)
 	var gap_min := INF
 	var rim_gap_min := INF
 	var spawn_min := INF
@@ -177,11 +196,40 @@ func _check_covers(id: String, field: BossField, body: float) -> bool:
 	var ok := covers.size() >= COVERS_MIN and covers.size() <= COVERS_MAX \
 			and outlines.size() == covers.size() and on_layer == covers.size() \
 			and hide_min == SIGHT_DIRECTIONS and gap_min >= room and rim_gap_min >= room \
-			and spawn_min >= POINT_CLEARANCE and reveal_min >= POINT_CLEARANCE
-	print("Probe field covers: arena=%s count=%d outlines=%d on_world_layer=%d hide_min=%d/%d gap_min=%.1f rim_gap_min=%.1f room=%.1f landing_min=%.1f reveal_min=%.1f ok=%s" % [
+			and spawn_min >= POINT_CLEARANCE and reveal_min >= POINT_CLEARANCE and low_tops == 0
+	print("Probe field covers: arena=%s count=%d outlines=%d on_world_layer=%d hide_min=%d/%d gap_min=%.1f rim_gap_min=%.1f room=%.1f landing_min=%.1f reveal_min=%.1f low_tops=%d ok=%s" % [
 			id, covers.size(), outlines.size(), on_layer, hide_min, SIGHT_DIRECTIONS, gap_min,
-			rim_gap_min, room, spawn_min, reveal_min, ok])
+			rim_gap_min, room, spawn_min, reveal_min, low_tops, ok])
 	return ok
+
+
+## Cuántas muestras de la parte de arriba de `cover` quedan a menos de
+## LOW_TOP_MIN metros del suelo: rayos hacia abajo en una grilla alrededor de
+## ella. La primera sale en una línea aparte, con su lugar y su alto.
+func _low_tops(id: String, cover: Node3D) -> int:
+	var space := _arena.get_world_3d().direct_space_state
+	var centre := cover.global_position
+	var steps := int(TOP_SCAN_REACH / TOP_SCAN_STEP)
+	var low := 0
+	for column: int in range(-steps, steps + 1):
+		for row: int in range(-steps, steps + 1):
+			var x := centre.x + float(column) * TOP_SCAN_STEP
+			var z := centre.z + float(row) * TOP_SCAN_STEP
+			var ground := _ground(x, z)
+			var query := PhysicsRayQueryParameters3D.create(Vector3(x, ground + COLUMN_HEIGHT * 2.0, z),
+					Vector3(x, ground - 1.0, z), WORLD_LAYER)
+			var hit := space.intersect_ray(query)
+			var collider := hit.get("collider") as Node
+			if collider == null or not (collider == cover or cover.is_ancestor_of(collider)):
+				continue
+			var top := (hit.position as Vector3).y - ground
+			if top >= LOW_TOP_MIN:
+				continue
+			if low == 0:
+				print("Probe field covers detail: arena=%s low_top=%s@(%.1f,%.1f) top=%.2fm" % [
+						id, cover.name, x, z, top])
+			low += 1
+	return low
 
 
 ## True si `cover` (o un cuerpo suyo) choca en la capa del mundo.

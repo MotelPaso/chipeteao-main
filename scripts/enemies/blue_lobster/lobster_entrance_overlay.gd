@@ -25,9 +25,21 @@ extends CanvasLayer
 ## Escala desde la que entra (1 = sin crecer).
 @export var card_pop_from: float = 0.55
 
+@export_group("Agua en la pantalla")
+## Segundo del rapto en que el agua empieza a subir por la pantalla.
+@export var flood_from: float = 3.9
+## Sonido de la pantalla que se inunda (fila de Sfx.SOUND_LIBRARY; vacío = ninguno).
+@export var flood_sfx: StringName = &"abduction_flood"
+## Segundos que tarda el agua en irse en burbujas con el primer plano del fondo del mar.
+@export var uncover_seconds: float = 0.7
+
 @export_group("Saltar")
 ## Segundos desde el corte hasta que aparece la indicación de saltar: el rapto va primero.
 @export var skip_hint_delay: float = 1.2
+## Opacidad (0-1) de la placa de tinta detrás de la indicación de saltar: sin ella no se lee sobre la arena clara.
+@export_range(0.0, 1.0) var skip_plate_alpha: float = 0.55
+## Píxeles que esa placa sobresale alrededor de la indicación.
+@export var skip_plate_margin: float = 8.0
 
 @export_group("Destello")
 ## Color de los destellos a pantalla completa.
@@ -49,8 +61,12 @@ var _card_shown: bool = false
 var _opened_at: float = -1.0
 var _flash_tween: Tween = null
 var _card_tween: Tween = null
+var _skip_plate: StyleBoxFlat = null
 ## True mientras el agua tapa la pantalla entera.
 var _covered: bool = false
+var _flood_sounded: bool = false
+## Segundo del fondo del mar en que la pantalla empezó a destaparse (< 0 = sigue tapada).
+var _uncover_from: float = -1.0
 
 @onready var _card: Control = %Card
 @onready var _card_frame: Panel = %CardFrame
@@ -72,6 +88,9 @@ func _ready() -> void:
 	_title.add_theme_color_override("font_color", UiTheme.INK)
 	_card.visible = false
 	_flood.visible = false
+	_skip_plate = UiTheme.flat(Color(UiTheme.INK, skip_plate_alpha),
+			roundi(card_corner_radius * 0.5))
+	_skip_hint.draw.connect(_draw_skip_plate)
 	_card.resized.connect(_center_pivots)
 	_center_pivots()
 
@@ -91,6 +110,8 @@ func open(title: String) -> void:
 	_card_shown = false
 	_staged = true
 	_opened_at = -1.0
+	_flood_sounded = false
+	_uncover_from = -1.0
 	_skip_hint.visible = false
 	visible = true
 	_flash_to(cut_flash_alpha, cut_flash_seconds)
@@ -120,6 +141,31 @@ func show_flood(level: float, dissolve: float) -> void:
 	var material := _flood.material as ShaderMaterial
 	material.set_shader_parameter(&"level", clampf(level, 0.0, 1.0))
 	material.set_shader_parameter(&"dissolve", clampf(dissolve, 0.0, 1.0))
+
+
+## Un frame del rapto, que va en su segundo `seconds` de `total`: el agua
+## sube por la pantalla desde flood_from y al final la tapa entera.
+func flood_rising(seconds: float, total: float) -> void:
+	var level := clampf((seconds - flood_from) / maxf(total - flood_from, 0.01), 0.0, 1.0)
+	if level > 0.0 and not _flood_sounded:
+		_flood_sounded = true
+		Sfx.play(flood_sfx)
+	show_flood(level, 0.0)
+
+
+## La pantalla empieza a destaparse en el segundo `seconds` del fondo del mar.
+## Solo cuenta la primera vez que se pide.
+func begin_uncover(seconds: float) -> void:
+	if _uncover_from < 0.0:
+		_uncover_from = seconds
+
+
+## Un frame del fondo del mar, en su segundo `seconds`: el agua tapa la
+## pantalla hasta begin_uncover() y después se va en burbujas.
+func flood_clearing(seconds: float) -> void:
+	var dissolve := 0.0 if _uncover_from < 0.0 \
+			else (seconds - _uncover_from) / maxf(uncover_seconds, 0.01)
+	show_flood(1.0, dissolve)
 
 
 ## True mientras el agua tapa la pantalla entera.
@@ -184,6 +230,13 @@ func _flash_to(alpha: float, seconds: float) -> void:
 func _after_flash() -> void:
 	if not _staged:
 		visible = false
+
+
+## La placa de tinta detrás de la indicación de saltar (se dibuja en su
+## contenedor, por debajo de la tecla, el texto y la barra).
+func _draw_skip_plate() -> void:
+	_skip_hint.draw_style_box(_skip_plate,
+			Rect2(Vector2.ZERO, _skip_hint.size).grow(skip_plate_margin))
 
 
 ## La tarjeta crece y el marco gira alrededor de su centro.

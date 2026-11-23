@@ -11,6 +11,7 @@
 [ext_resource type="Shader" path="res://assets/shaders/flood_cover.gdshader" id="9_flood"]
 [ext_resource type="Script" path="res://scripts/enemies/blue_lobster/lobster_abduction_fx.gd" id="10_fx"]
 [ext_resource type="Shader" path="res://assets/shaders/water_column.gdshader" id="11_column"]
+[ext_resource type="Script" path="res://scripts/enemies/blue_lobster/lobster_entrance_actors.gd" id="12_actors"]
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_backdrop"]
 shader = ExtResource("1_lobster_backdrop")
@@ -181,8 +182,9 @@ at_seconds = 4.43
 focus = 2
 distance = 12.0
 around_degrees = 22.0
-height = 0.2
-look_lift = 1.5
+height = 0.9
+from_ground = true
+look_lift = -1.0
 fov = 56.0
 push_in = 1.5
 hit_shake = 1.0
@@ -222,7 +224,7 @@ hit_shake = 0.5
 script = ExtResource("4_lobster_entrance_shot")
 at_seconds = 8.69
 focus = 2
-distance = 12.5
+distance = 14.5
 around_degrees = 20.0
 height = 1.4
 look_lift = -0.6
@@ -236,12 +238,12 @@ sfx = &"lobster_roar"
 [node name="Seabed8" type="Node" parent="Camera"]
 script = ExtResource("4_lobster_entrance_shot")
 at_seconds = 10.72
-distance = 6.0
+distance = 7.0
 around_degrees = 5.0
 height = 0.7
-look_lift = -0.7
+look_lift = -1.55
 fov = 46.0
-push_in = -2.2
+push_in = -1.0
 hit_shake = 0.5
 pose = &"CROUCH"
 sfx = &"lobster_hiss"
@@ -326,42 +328,45 @@ scale_amount_curve = SubResource("Curve_swell")
 [node name="SandBurst" type="CPUParticles3D" parent="Fx"]
 cast_shadow = 0
 emitting = false
-amount = 180
-lifetime = 2.0
+amount = 110
+lifetime = 0.8
 one_shot = true
 explosiveness = 0.95
 mesh = SubResource("SphereMesh_sand")
 emission_shape = 1
-emission_sphere_radius = 3.0
+emission_sphere_radius = 2.2
 direction = Vector3(0, 1, 0)
-spread = 60.0
-gravity = Vector3(0, -7, 0)
-initial_velocity_min = 4.0
-initial_velocity_max = 11.0
+spread = 78.0
+gravity = Vector3(0, -16, 0)
+initial_velocity_min = 5.0
+initial_velocity_max = 9.0
 damping_min = 1.0
 damping_max = 2.0
-scale_amount_min = 0.8
-scale_amount_max = 2.8
+scale_amount_min = 0.4
+scale_amount_max = 1.3
 scale_amount_curve = SubResource("Curve_swell")
 
 [node name="BubbleBurst" type="CPUParticles3D" parent="Fx"]
 cast_shadow = 0
 emitting = false
-amount = 90
-lifetime = 1.6
+amount = 45
+lifetime = 1.1
 one_shot = true
 explosiveness = 0.85
 mesh = SubResource("SphereMesh_bubble")
 emission_shape = 1
-emission_sphere_radius = 3.5
+emission_sphere_radius = 2.6
 direction = Vector3(0, 1, 0)
 spread = 35.0
 gravity = Vector3(0, 3, 0)
-initial_velocity_min = 5.0
-initial_velocity_max = 12.0
-scale_amount_min = 0.6
-scale_amount_max = 2.0
+initial_velocity_min = 4.0
+initial_velocity_max = 9.0
+scale_amount_min = 0.3
+scale_amount_max = 0.8
 scale_amount_curve = SubResource("Curve_swell")
+
+[node name="Actors" type="Node" parent="."]
+script = ExtResource("12_actors")
 
 [node name="Overlay" type="CanvasLayer" parent="."]
 layer = 9

@@ -5,9 +5,10 @@ extends StaticBody3D
 ## enterrado y el otro con su uña de punta. Hierro oxidado con percebes y unos
 ## eslabones de cadena tirados al costado. Es una cobertura de la pelea.
 ##
-## Solo frenan tres cajas que nacen en la arena: la caña baja, la cruz con la
-## uña parada y el brazo enterrado. La cadena es adorno (no frena, no pasa de
-## medio metro). Todo sale de `shape_seed`: la misma semilla, la misma ancla.
+## Solo frenan las cajas que nacen en la arena y suben más de
+## LOW_PIECE_HEIGHT: la caña baja y la cruz con la uña parada. El brazo
+## enterrado y la cadena apenas asoman y son adorno (no frenan). Todo sale de
+## `shape_seed`: la misma semilla, la misma ancla.
 
 ## Grupo que lee quien marca el suelo tapado por las coberturas.
 const COVER_GROUP: StringName = &"boss_cover"
@@ -15,6 +16,10 @@ const COVER_GROUP: StringName = &"boss_cover"
 const SINK: float = 0.5
 ## Metros de holgura entre la malla y las cajas que la rodean.
 const PAD: float = 0.25
+## Una pieza que no sube más que esto sobre la arena, en metros, es adorno: no
+## frena. Con una caja tan baja un raider se quedaría parado encima, a ras de
+## suelo y dentro de la huella de la cobertura.
+const LOW_PIECE_HEIGHT: float = 1.0
 ## Lados de los tubos (caña y brazos).
 const TUBE_SIDES: int = 8
 ## Tramos de cada brazo.
@@ -107,15 +112,19 @@ func _ready() -> void:
 	var low := Vector2(INF, INF)
 	var high := Vector2(-INF, -INF)
 	for points: PackedVector3Array in _cover_point_sets():
+		if not _is_cover(points):
+			continue
 		for point: Vector3 in points:
 			low = low.min(Vector2(point.x, point.z))
 			high = high.max(Vector2(point.x, point.z))
-	var middle := (low + high) * 0.5
-	_crown -= Vector3(middle.x, 0.0, middle.y)
+	if low.x <= high.x:
+		var middle := (low + high) * 0.5
+		_crown -= Vector3(middle.x, 0.0, middle.y)
 	var names: Array[String] = ["CrownCover", "ShankCover", "BuriedArmCover"]
 	var sets := _cover_point_sets()
 	for index in sets.size():
-		_add_box_around(sets[index], names[index])
+		if _is_cover(sets[index]):
+			_add_box_around(sets[index], names[index])
 	var mesh := LowPolyMesh.new(shape_seed)
 	_build_shank(mesh)
 	_build_arms(mesh)
@@ -168,6 +177,15 @@ func _cover_point_sets() -> Array[PackedVector3Array]:
 				arm_radius))
 	buried.append_array(_fluke_outline(-1.0))
 	return [crown, shank, buried]
+
+
+## True si la pieza que encierra `points` sube lo bastante sobre la arena
+## como para frenar (ver LOW_PIECE_HEIGHT).
+func _is_cover(points: PackedVector3Array) -> bool:
+	var top := -INF
+	for point: Vector3 in points:
+		top = maxf(top, point.y)
+	return top >= LOW_PIECE_HEIGHT
 
 
 ## Una caja derecha que nace bajo la arena y encierra `points` (en planta),

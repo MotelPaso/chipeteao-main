@@ -16,6 +16,10 @@ extends Node3D
 ## (BossArenaHost.enter_arena) y unos frames para que lo nuevo se dibuje una
 ## vez: ahí no corre ningún reloj ni suena la canción, así un tirón no atrasa
 ## ningún corte.
+## Este nodo es el DIRECTOR: lleva el reloj y decide qué plano entra. Cada
+## hijo hace lo suyo: Camera encuadra, Actors mueve a la langosta y al equipo,
+## Fx pone el agua del mundo, Overlay la de la pantalla y el cartel, y Music
+## la canción.
 ##
 ## Mientras dura, el MUNDO está congelado (WorldFreeze), el HUD oculto y en
 ## co-op queda una sola vista a pantalla completa. EL RELOJ es tiempo de
@@ -47,12 +51,8 @@ const Act := LobsterEntranceShot.Act
 @export_group("Rapto")
 ## Segundos del rapto en el mapa, del primer chorro a la pantalla inundada. Va sin canción.
 @export var abduction_seconds: float = 5.2
-## Segundo del rapto en que el agua empieza a subir por la pantalla.
-@export var flood_from: float = 3.9
 ## Sonido con que empieza el rapto (fila de Sfx.SOUND_LIBRARY; vacío = ninguno).
 @export var start_sfx: StringName = &"lobster_rumble"
-## Sonido de la pantalla que se inunda (fila de Sfx.SOUND_LIBRARY; vacío = ninguno).
-@export var flood_sfx: StringName = &"abduction_flood"
 
 @export_group("Fondo del mar")
 ## Segundos de introducción de la canción: lo que dura el acto del fondo del mar. La pelea empieza cuando la canción entra de lleno.
@@ -63,15 +63,8 @@ const Act := LobsterEntranceShot.Act
 @export var cover_frames: int = 2
 ## Frames con la pantalla tapada, ya en el fondo del mar, antes de que arranquen la canción y el reloj. Lo que se dibuja por primera vez ahí (la arena entera) cuesta un tirón: con la canción ya sonando, los cortes quedarían atrasados respecto de sus golpes.
 @export var warmup_frames: int = 6
-## Segundos que tarda el agua de la pantalla en irse en burbujas con el primer plano del fondo.
-@export var uncover_seconds: float = 0.7
 ## Segundos que la canción puede adelantarse al reloj antes de que la cinemática salte a alcanzarla. 0 = no la alcanza (la canción se reacomoda sola).
 @export var catch_up_after: float = 0.06
-## Segundos que tarda la langosta en salir de la arena y metros que salta al hacerlo.
-@export var eruption_seconds: float = 0.6
-@export var eruption_height: float = 5.2
-## Metros que espera enterrada antes de salir.
-@export var buried_depth: float = 2.8
 
 @export_group("Saltar")
 ## Acción que cada raider mantiene para saltar la cinemática.
@@ -100,16 +93,10 @@ var _skip_held: float = 0.0
 var _skip_armed: bool = false
 ## True desde que alguien saltó la cinemática hasta que termina.
 var _skipping: bool = false
-var _flood_sounded: bool = false
-## Segundo del acto en que la pantalla empezó a destaparse y segundos que
-## lleva la langosta saliendo de la arena (< 0 = todavía no).
-var _uncover_from: float = -1.0
-var _erupting: float = -1.0
 var _title: String = ""
-## Los raiders escondidos mientras el equipo «cae» (se devuelven al tocar fondo).
-var _hidden_party: Array[Node3D] = []
 
 @onready var _camera: LobsterEntranceCamera = $Camera
+@onready var _actors: LobsterEntranceActors = $Actors
 @onready var _music: BossSong = $Music
 @onready var _overlay: LobsterEntranceOverlay = $Overlay
 @onready var _fx: LobsterAbductionFx = $Fx
@@ -155,9 +142,6 @@ func play(host: BossArenaHost) -> void:
 	_skip_held = 0.0
 	_skip_armed = false
 	_skipping = false
-	_flood_sounded = false
-	_uncover_from = -1.0
-	_erupting = -1.0
 	var party := host.party().bodies()
 	# El encuadre mide el mapa: tiene que pasar antes de congelarlo.
 	_camera.stage(Act.ABDUCTION, RunRoot.stage_parent(get_tree()) as Node3D, party, null)
@@ -242,12 +226,7 @@ func _tick_abduction(delta: float) -> void:
 	_elapsed += delta
 	_follow_shots(Act.ABDUCTION, delta)
 	_fx.show_abduction(_clock)
-	var flood := clampf((_clock - flood_from) / maxf(abduction_seconds - flood_from, 0.01),
-			0.0, 1.0)
-	if flood > 0.0 and not _flood_sounded:
-		_flood_sounded = true
-		Sfx.play(flood_sfx)
-	_overlay.show_flood(flood, 0.0)
+	_overlay.flood_rising(_clock, abduction_seconds)
 	_overlay.show_progress(_elapsed, INF, _skip_held / maxf(skip_hold_seconds, 0.01))
 	if _tick_skip(delta):
 		_skipping = true
@@ -277,16 +256,12 @@ func _enter_world() -> void:
 		return
 	_boss = boss
 	_freeze.keep(boss)
-	boss.rig.visible = false
-	boss.rig.fidgets = false
-	boss.rig.set_near_fade(false)
-	boss.rig.add_visual_layer(LobsterEntranceCamera.ISOLATION_LAYER)
 	var party := _host.party().bodies()
+	_actors.enter(boss, party)
 	_camera.stage(Act.SEABED, _host.boss_arena(), party, boss)
-	_hide_party(party)
 	# La cámara ya mira el primer plano del fondo: lo que se dibuja bajo el
 	# agua en estos frames es lo que se va a ver.
-	_camera.cut_to(_camera.shot_at(Act.SEABED, _first_seconds(Act.SEABED)))
+	_camera.cut_to(_camera.first_shot(Act.SEABED))
 	_warmup_left = maxi(warmup_frames, 1)
 
 
@@ -319,13 +294,8 @@ func _tick_seabed(delta: float) -> void:
 	_catch_up_with_song()
 	_follow_shots(Act.SEABED, delta)
 	_fx.follow(_camera)
-	if _boss.rig.visible:
-		# No le saca los ojos de encima a quien mira.
-		_boss.rig.gaze_at(_camera.global_position)
-	_tick_eruption(delta)
-	var dissolve := 0.0 if _uncover_from < 0.0 \
-			else (_clock - _uncover_from) / maxf(uncover_seconds, 0.01)
-	_overlay.show_flood(1.0, dissolve)
+	_actors.tick(delta, _camera.global_position)
+	_overlay.flood_clearing(_clock)
 	_overlay.show_progress(_elapsed, title_seconds(), _skip_held / maxf(skip_hold_seconds, 0.01))
 	_music.follow(_clock, delta)
 	if _tick_skip(delta):
@@ -363,10 +333,10 @@ func _enter_shot(index: int) -> void:
 	if shot == null:
 		return
 	_shot_index = index
-	if shot.act == Act.SEABED and _uncover_from < 0.0:
+	if shot.act == Act.SEABED:
 		# El primer corte del fondo del mar destapa la pantalla.
-		_uncover_from = _clock
-	_stage_event(shot.event)
+		_overlay.begin_uncover(_clock)
+	_actors.play(shot.event, _fx, _host.boss_arena() if _host != null else null)
 	if _boss != null and not shot.pose.is_empty() and LobsterRig.Pose.has(String(shot.pose)):
 		_boss.rig.set_pose(LobsterRig.Pose[String(shot.pose)])
 		_boss.rig.snap_to_pose()
@@ -380,42 +350,6 @@ func _enter_shot(index: int) -> void:
 			+ " blocking=%d view=%d/%d") % [index + 1, _clock, _music.position_text(),
 			shot.isolated, _camera.hidden_count(), act_name(), _camera.blocking_count(),
 			view.x, view.y])
-
-
-## Lo que pide el plano que entra: ver LobsterEntranceShot.event.
-func _stage_event(event: StringName) -> void:
-	match event:
-		&"bury":
-			if _boss != null:
-				_boss.rig.visible = true
-				_boss.rig.sink = buried_depth
-				_boss.rig.set_mound(1.0)
-				_boss.rig.set_dust(true)
-		&"land":
-			_fx.set_descent(false)
-			_show_party()
-			if _host != null and _host.boss_arena() != null:
-				_fx.land(_host.boss_arena().spawn_origin())
-		&"erupt":
-			if _boss != null:
-				_boss.rig.visible = true
-				_boss.rig.sink = 0.0
-				_boss.rig.set_mound(0.0)
-				_boss.rig.set_dust(false)
-				_erupting = 0.0
-				_fx.erupt(_boss.global_position)
-
-
-## La langosta sale de la arena: salta y vuelve a caer en su lugar.
-func _tick_eruption(delta: float) -> void:
-	if _erupting < 0.0:
-		return
-	_erupting += delta
-	var along := clampf(_erupting / maxf(eruption_seconds, 0.01), 0.0, 1.0)
-	_boss.rig.lift = eruption_height * sin(along * PI)
-	if along >= 1.0:
-		_boss.rig.lift = 0.0
-		_erupting = -1.0
 
 
 ## La cinemática terminó (o alguien la saltó): devuelve todo y avisa a la langosta.
@@ -445,16 +379,8 @@ func _release() -> void:
 	_freeze.thaw()
 	if _fx != null:
 		_fx.clear()
-	_show_party()
-	if is_instance_valid(_boss):
-		_boss.rig.visible = true
-		_boss.rig.fidgets = true
-		_boss.rig.sink = 0.0
-		_boss.rig.lift = 0.0
-		_boss.rig.set_mound(0.0)
-		_boss.rig.set_dust(false)
-		_boss.rig.set_near_fade(true)
-		_boss.rig.gaze_ahead()
+	if _actors != null:
+		_actors.release()
 	if not _taken_over:
 		return
 	_taken_over = false
@@ -487,28 +413,6 @@ func _on_run_ended(_victory: bool) -> void:
 
 
 # --- privados ---------------------------------------------------------------------
-
-## El segundo en que entra el primer plano de `act`.
-func _first_seconds(act: Act) -> float:
-	var times := _camera.shot_times(act)
-	return times[0] if not times.is_empty() else 0.0
-
-
-## Esconde a los raiders mientras el equipo «cae»: ya están parados en la
-## arena, y la cámara que baja los vería esperándose a sí mismos.
-func _hide_party(party: Array[Node3D]) -> void:
-	for raider: Node3D in party:
-		if is_instance_valid(raider) and raider.visible:
-			raider.visible = false
-			_hidden_party.append(raider)
-
-
-func _show_party() -> void:
-	for raider: Node3D in _hidden_party:
-		if is_instance_valid(raider):
-			raider.visible = true
-	_hidden_party.clear()
-
 
 ## True cuando algún raider mantuvo la acción de saltar lo suficiente. Quien
 ## la venía manteniendo desde antes (cargando un altar, reanimando) primero
