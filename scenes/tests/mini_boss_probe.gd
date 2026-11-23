@@ -360,9 +360,13 @@ func _print_hazards() -> void:
 
 # --- fotos (solo con BONK_SHOT_DIR) -------------------------------------------------
 
+## La cinemática de minijefe que está en curso, o null. Es la del viaje a su
+## arena (cuelga de BossArenaHost): la del jefe de etapa está en el mismo
+## grupo y es asunto de StageBossProbe.
 func _cinematic() -> Node:
 	for node: Node in _tree.get_nodes_in_group(&"boss_cinematic"):
-		if node.has_method(&"is_calm_active") and bool(node.call(&"is_calm_active")):
+		if node.get_parent() is BossArenaHost and node.has_method(&"is_calm_active") \
+				and bool(node.call(&"is_calm_active")):
 			return node
 	return null
 

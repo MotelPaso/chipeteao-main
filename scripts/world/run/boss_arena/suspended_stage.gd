@@ -67,6 +67,12 @@ func restore(root: RunRoot) -> Node3D:
 	tree.call_group("world_director", "resume_stage")
 	tree.call_group("fog", "set_away", false)
 	tree.call_group("hud", "set_maps_away", false)
+	# La flecha de objetivo del HUD estuvo apuntando al portal de la arena del
+	# jefe: si la etapa ya tenía abierto su portal de salida, vuelve a él.
+	for node: Node in descendants(stage):
+		var way_out := node as ExitPortal
+		if way_out != null and way_out.available:
+			tree.call_group("boss_ui", "track_objective", way_out)
 	return stage
 
 

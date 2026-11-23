@@ -65,21 +65,16 @@ var _encounter: Dictionary = {}
 var _schedule: RefCounted = null
 ## La arena de la etapa mientras espera fuera del árbol.
 var _stage := SuspendedStage.new()
-var _boss_arena: BossArena = null
-var _boss: BossBase = null
-var _omen: Node = null
-var _cinematic: Node = null
-var _portal: Node3D = null
 ## Segundo de etapa en que el equipo dejó el mapa.
 var _left_at: float = 0.0
-## Segundos de juego que faltan para lo que sigue a la muerte del jefe (< 0 = nada pendiente).
-var _exit_left: float = -1.0
 ## Jefes del mapa que murieron con su pago al partir.
 var _rivals_slain: int = 0
 ## True desde que el viaje en curso imprimió su línea de cierre.
 var _closed: bool = false
 
 @onready var _party := TripParty.new(get_tree())
+## El presagio, la cinemática, la arena, el jefe y el portal del viaje en curso.
+@onready var _cast := TripCast.new(self)
 
 
 ## EL acceso, como toda búsqueda entre escenas de este proyecto.
@@ -110,14 +105,11 @@ func _exit_tree() -> void:
 
 
 func _physics_process(delta: float) -> void:
-	if _exit_left < 0.0:
+	if not _cast.exit_pending():
 		set_physics_process(false)
-		return
-	_exit_left -= delta
-	if _exit_left > 0.0:
-		return
-	# Si todavía no se puede (un fundido en curso), se reintenta en el próximo frame.
-	_exit_left = -1.0 if _open_exit() else 0.0
+	elif _cast.count_exit(delta) and _open_exit():
+		# Si todavía no se puede (un fundido en curso), se reintenta en el próximo frame.
+		_cast.exit_done()
 
 
 # --- lo que piden el horario de jefes, la cinemática, el portal y el harness ------
@@ -145,12 +137,12 @@ func suspended_arena() -> Node3D:
 
 ## La arena del jefe en curso, o null.
 func boss_arena() -> BossArena:
-	return _boss_arena if is_instance_valid(_boss_arena) else null
+	return _cast.boss_arena()
 
 
 ## El jefe del viaje en curso, o null.
 func boss() -> BossBase:
-	return _boss if is_instance_valid(_boss) else null
+	return _cast.boss()
 
 
 ## El equipo del viaje: dónde estaba cada raider al partir (lo lee el harness).
@@ -172,15 +164,10 @@ func boss_title() -> String:
 ## Empieza el presagio de `encounter`, que dura `seconds` hasta el viaje.
 ## Sin escena de presagio en la fila no hace nada.
 func begin_omen(encounter: Dictionary, seconds: float) -> void:
-	if is_instance_valid(_omen) or is_busy():
+	if _cast.has_omen() or is_busy():
 		return
 	omen_beginning.emit()
-	_omen = BossArenaCatalog.instance_of(encounter, "omen_scene")
-	if _omen == null:
-		return
-	add_child(_omen)
-	if _omen.has_method(&"begin"):
-		_omen.call(&"begin", BossArenaCatalog.boss_title(encounter), seconds)
+	_cast.begin_omen(encounter, seconds)
 
 
 ## True si un viaje puede EMPEZAR ahora: sin otro en curso, con la partida
@@ -201,7 +188,7 @@ func begin_trip(encounter: Dictionary, schedule: RefCounted) -> bool:
 	_phase = Phase.LEAVING
 	_encounter = encounter
 	_schedule = schedule
-	_exit_left = -1.0
+	_cast.exit_done()
 	_closed = false
 	# Lo que cuelga de la arena y tiene la pausa (ruleta, vendedor) se cierra
 	# antes de tocar nada: con la arena suspendida, nadie podría devolverla.
@@ -209,11 +196,7 @@ func begin_trip(encounter: Dictionary, schedule: RefCounted) -> bool:
 	_party.remember()
 	trip_began.emit()
 	_rivals_slain = SuspendedStage.slay_rival_bosses(get_tree())
-	_cinematic = BossArenaCatalog.instance_of(encounter, "cinematic_scene")
-	if _cinematic != null:
-		add_child(_cinematic)
-		_cinematic.call(&"play", self)
-	else:
+	if not _cast.play_cinematic(encounter):
 		_leave_through_fade()
 	return true
 
@@ -226,7 +209,7 @@ func begin_trip(encounter: Dictionary, schedule: RefCounted) -> bool:
 func prepare_departure() -> void:
 	if _phase != Phase.LEAVING:
 		return
-	_end_omen()
+	_cast.end_omen()
 	var root := _run_root()
 	if root != null:
 		SuspendedStage.finish_dying(root.arena_root())
@@ -241,37 +224,29 @@ func enter_arena() -> BossBase:
 	if _phase != Phase.LEAVING or root == null or not RunState.run_active:
 		return null
 	var stage := root.arena_root()
-	var arena := BossArenaCatalog.instance_of(_encounter, "arena_scene") as BossArena
-	if stage == null or arena == null:
+	var arena := _cast.make_arena(_encounter) if stage != null else null
+	if arena == null:
 		push_error("BossArenaHost: the arena scene root is not a BossArena.")
 		return null
 	get_tree().call_group(BlockingUi.CLOSABLE_GROUP, "dismiss")
 	_party.clear_weapon_fields()
 	# Por si nadie lo pidió antes: el mapa se guarda con su cielo de siempre.
-	_end_omen()
+	_cast.end_omen()
 	stage_suspending.emit(stage)
 	_left_at = RunState.stage_time
 	_stage.suspend(root, stage)
 	_phase = Phase.AWAY
-	_boss_arena = arena
 	# Línea de log para los soaks: el mapa de la etapa quedó suspendido.
 	print("Boss arena: left %s for %s at %.1fs party=%d" % [
 			String(stage.get("map_id")), arena.map_id, RunState.stage_time,
 			_party.bodies().size()])
-	# Antes del add_child, como RunRoot._load_stage: lo que entra al árbol ya
-	# pregunta por arena_root().
-	root.set_live_arena(arena)
-	root.arena_host().add_child(arena)
-	# Si una cinemática tiene el mundo congelado, la arena nueva también lo está.
-	WorldFreeze.hold_late(arena)
-	# El sol de esta arena recibe la calidad gráfica, como el de cada etapa.
-	Settings.apply_graphics()
+	_cast.hang_arena(root)
 	get_tree().call_group("run_systems", "place_party", arena.spawn_origin())
 	_party.notify_world_changed()
-	_boss = _spawn_boss(arena)
+	var boss := _cast.spawn_boss(_encounter, arena, _schedule, _on_boss_died)
 	print("Boss arena: entered %s at %.1fs" % [arena.map_id, RunState.stage_time])
 	arena_entered.emit(arena)
-	return _boss
+	return boss
 
 
 ## Saca del mapa suspendido a la horda normal que quedó en él (sin pagar
@@ -287,14 +262,24 @@ func can_return() -> bool:
 	return _phase == Phase.AWAY and RunState.run_active and not ScreenFade.is_busy()
 
 
-## Pide la vuelta al mapa de la etapa. `reason` es RETURN_PORTAL (alguien
-## tomó el portal) o RETURN_TIMEOUT (se cerró solo). Devuelve false si no
+## Pide la SALIDA de la arena del jefe: adónde lleva lo dice la fila del
+## viaje (su campo exit). `reason` es RETURN_PORTAL (alguien tomó el portal) o
+## RETURN_TIMEOUT (se cerró solo). Devuelve false si no puede empezar ahora.
+func request_exit(reason: String) -> bool:
+	var exit := String(_encounter.get("exit", BossArenaCatalog.EXIT_RETURN))
+	if exit == BossArenaCatalog.EXIT_RETURN:
+		return request_return(reason)
+	push_warning("BossArenaHost: unknown exit '%s'." % exit)
+	return false
+
+
+## Pide la vuelta al mapa de la etapa (ver request_exit). Devuelve false si no
 ## puede empezar ahora.
 func request_return(reason: String) -> bool:
 	if not can_return():
 		return false
 	_phase = Phase.RETURNING
-	_exit_left = -1.0
+	_cast.exit_done()
 	# Línea de log para los soaks.
 	print("Boss arena: returning reason=%s at %.1fs" % [reason, RunState.stage_time])
 	_return_through_fade()
@@ -307,15 +292,15 @@ func request_return(reason: String) -> bool:
 ## recorra. No coloca al equipo: la etapa siguiente lo hace.
 func abandon_trip(reason: String) -> void:
 	if _phase == Phase.IDLE:
-		_end_omen()
+		_cast.end_omen()
 		return
 	_close_trip(reason)
-	_free_cinematic()
+	_cast.free_cinematic()
 	var root := _run_root()
 	if root != null and suspended_arena() != null:
 		_dispose_boss_arena(root)
 		_stage.restore(root)
-	_end_omen()
+	_cast.end_omen()
 	_forget_trip()
 
 
@@ -354,10 +339,10 @@ func _return_to_stage() -> void:
 	get_tree().call_group(BlockingUi.CLOSABLE_GROUP, "dismiss")
 	_party.collect_loot(boss_arena())
 	_party.clear_weapon_fields()
-	_free_cinematic()
+	_cast.free_cinematic()
 	_dispose_boss_arena(root)
 	var stage := _stage.restore(root)
-	_end_omen()
+	_cast.end_omen()
 	_party.place_back()
 	_party.notify_world_changed()
 	var schedule := _schedule
@@ -372,33 +357,13 @@ func _return_to_stage() -> void:
 			String(stage.get("map_id")) if stage != null else "?", RunState.stage_time, away])
 
 
-## Libera la arena del jefe con el portal y el jefe y, primero, lo que los
-## pools tienen vivo en ella (y solo en ella).
+## Libera la arena del jefe, con su jefe y su portal, avisando antes a quien observa.
 func _dispose_boss_arena(root: RunRoot) -> void:
-	_portal = null
-	_boss = null
-	var arena := boss_arena()
-	_boss_arena = null
+	var arena := _cast.take_arena()
 	if arena == null:
 		return
 	arena_leaving.emit(arena)
-	Pools.release_live_under(arena)
-	if arena.get_parent() != null:
-		arena.get_parent().remove_child(arena)
-	if root.arena_root() == arena:
-		root.set_live_arena(null)
-	# free() y no queue_free(): la arena de la etapa vuelve a colgarse en este
-	# mismo frame y dos arenas vivas responderían a los mismos grupos.
-	arena.free()
-
-
-## Libera la cinemática ya: su salida devuelve el mundo, la pantalla y la canción.
-func _free_cinematic() -> void:
-	if is_instance_valid(_cinematic):
-		if _cinematic.get_parent() != null:
-			_cinematic.get_parent().remove_child(_cinematic)
-		_cinematic.free()
-	_cinematic = null
+	_cast.free_arena(root, arena)
 
 
 ## Cierra un viaje que no vuelve: una línea con la razón (una sola por viaje)
@@ -418,79 +383,36 @@ func _forget_trip() -> void:
 	_phase = Phase.IDLE
 	_encounter = {}
 	_schedule = null
-	_boss = null
-	_portal = null
-	_exit_left = -1.0
+	_cast.forget()
 	_party.forget()
-	_free_cinematic()
-
-
-## Termina el presagio: devuelve el cielo del mapa y se va.
-func _end_omen() -> void:
-	if is_instance_valid(_omen):
-		if _omen.has_method(&"release"):
-			_omen.call(&"release")
-		_omen.queue_free()
-	_omen = null
+	_cast.free_cinematic()
 
 
 ## La partida terminó (toda la party cayó, o alguien extrajo). Con un viaje en
 ## curso no hay vuelta: se deja todo como está y se anota la razón.
 func _on_run_ended(_victory: bool) -> void:
-	_exit_left = -1.0
+	_cast.exit_done()
 	if _phase == Phase.IDLE:
 		return
 	_close_trip(ABANDON_EXTRACT if _party.anyone_alive() else ABANDON_WIPE)
 
 
-# --- el jefe ----------------------------------------------------------------------
-
-## Crea el jefe de la fila en su punto de la arena, mirando al equipo, y se lo
-## presenta al horario de jefes que pidió el viaje (grado, contadores y log).
-func _spawn_boss(arena: BossArena) -> BossBase:
-	var node := BossArenaCatalog.instance_of(_encounter, "boss_scene")
-	if node == null:
-		return null
-	var body := node as BossBase
-	if body == null:
-		node.free()
-		push_warning("BossArenaHost: boss scene root does not extend BossBase.")
-		return null
-	arena.boss_parent().add_child(body)
-	var at := arena.boss_origin()
-	body.global_position = at
-	var toward := arena.spawn_origin() - at
-	toward.y = 0.0
-	if toward.length_squared() > 0.0001:
-		body.rotation.y = atan2(-toward.x, -toward.z)
-	if _schedule != null and _schedule.has_method(&"on_trip_boss"):
-		_schedule.call(&"on_trip_boss", body)
-	var health := Health.find_in(body)
-	if health != null:
-		health.died.connect(_on_boss_died, CONNECT_ONE_SHOT)
-	return body
-
+# --- la salida --------------------------------------------------------------------
 
 func _on_boss_died() -> void:
 	if not is_away():
 		return
-	_exit_left = maxf(float(_encounter.get("exit_delay", 0.0)), 0.0)
+	_cast.arm_exit(float(_encounter.get("exit_delay", 0.0)))
 	set_physics_process(true)
 
 
 ## Lo que sigue a la caída del jefe: el portal de la fila o, sin portal, la
-## vuelta directa. False si todavía no se puede (se reintenta).
+## salida directa. False si todavía no se puede (se reintenta).
 func _open_exit() -> bool:
 	var arena := boss_arena()
-	if arena == null:
+	if arena == null or _cast.open_portal(_encounter, arena):
 		return true
-	_portal = BossArenaCatalog.instance_of(_encounter, "portal_scene") as Node3D
-	if _portal == null:
-		return request_return(RETURN_TIMEOUT)
-	arena.add_child(_portal)
-	if _portal.has_method(&"open"):
-		_portal.call(&"open", self, arena.portal_origin())
-	return true
+	return request_exit(RETURN_TIMEOUT)
 
 
 # --- utilitarios ------------------------------------------------------------------

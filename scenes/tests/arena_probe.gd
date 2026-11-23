@@ -260,7 +260,9 @@ var _run_ended_at: float = -1.0
 
 var _frames: int = 0
 var _walking: bool = true
-var _waypoint: Vector3 = Vector3.ZERO
+## Adónde camina el recorrido. INF = todavía no eligió ninguno (y no ZERO: el
+## origen es un punto válido, y ahí se abre el portal de la arena de un jefe).
+var _waypoint: Vector3 = Vector3.INF
 var _leg_time_left: float = 0.0
 var _linger_left: float = 0.0
 var _interact_timer: float = 0.0
@@ -1770,7 +1772,7 @@ func _drive_walk(delta: float) -> void:
 	var reached := _flat(lead.global_position).distance_to(_flat(_waypoint)) <= WAYPOINT_REACHED
 	if is_instance_valid(_target) and _target.player_in_range:
 		reached = true
-	if _waypoint == Vector3.ZERO or _leg_time_left <= 0.0 or reached:
+	if _waypoint == Vector3.INF or _leg_time_left <= 0.0 or reached:
 		if reached:
 			_legs_reached += 1
 			# Quieto al llegar: los altares Charge necesitan una canalización sin
@@ -2248,7 +2250,8 @@ func _nearest_interactable(from: Vector3) -> Interactable:
 	var nearest_dist := INF
 	for node: Node in _all_interactables(get_tree().current_scene):
 		var spot := node as Interactable
-		if spot == null or not spot.available or not spot.is_inside_tree():
+		if spot == null or not spot.available or not spot.is_inside_tree() \
+				or _trip.ignores(spot):
 			continue
 		var tried_at: float = _visited.get(spot.get_instance_id(), -INF)
 		if RunState.run_time - tried_at < REVISIT_COOLDOWN:

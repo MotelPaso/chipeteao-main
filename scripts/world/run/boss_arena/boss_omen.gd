@@ -10,8 +10,7 @@ extends Node
 ## Mythos: nunca toca un recurso compartido. Mientras dura, el clima vuelve a
 ## ESTE cielo; al soltarlo vuelve al de antes, y si hay un clima en curso su
 ## tinte vuelve con él.
-## La tarjeta es como las del menú principal: un marco de color con contorno
-## de tinta y sombra dura, apenas girado (solo gira el marco, no el texto).
+## La tarjeta es el nodo Notice (StickerNotice): cómo se ve vive ahí.
 ## Contratos por nombre: begin, release y la línea "Boss omen:".
 
 @export_group("Cielo")
@@ -44,18 +43,6 @@ extends Node
 @export var countdown_text: String = "La marea sube · %d s"
 ## Segunda línea cuando la cuenta llegó a cero y el viaje todavía no empieza.
 @export var arriving_text: String = "La marea llegó"
-## Color del marco de la tarjeta.
-@export var card_color: Color = UiTheme.SHARD_BLUE
-## Giro del marco, en grados (el texto no gira).
-@export var card_tilt_degrees: float = 1.5
-## Grosor del contorno de tinta, en píxeles.
-@export var card_border_width: int = 4
-## Radio de las esquinas, en píxeles.
-@export var card_corner_radius: int = 16
-## Sombra dura de la tarjeta (desplazamiento en píxeles).
-@export var card_shadow_offset: Vector2 = Vector2(0.0, 6.0)
-## Segundos que tarda la tarjeta en entrar de golpe.
-@export var card_pop_seconds: float = 0.3
 ## Sonido con que empieza el presagio (fila de Sfx.SOUND_LIBRARY; vacío = ninguno).
 @export var begin_sfx: StringName = &"omen_swell"
 
@@ -71,24 +58,10 @@ var _rise: float = 0.0
 var _rising: float = 0.0
 var _title: String = ""
 
-@onready var _notice: CanvasLayer = $Notice
-@onready var _card: Control = %Card
-@onready var _card_frame: Panel = %CardFrame
-@onready var _title_label: Label = %Title
-@onready var _countdown_label: Label = %Countdown
+@onready var _notice: StickerNotice = $Notice
 
 
 func _ready() -> void:
-	_notice.visible = false
-	var style := UiTheme.flat(card_color, card_corner_radius)
-	style.border_color = UiTheme.INK
-	style.set_border_width_all(card_border_width)
-	UiTheme.add_hard_shadow(style, card_shadow_offset)
-	_card_frame.add_theme_stylebox_override("panel", style)
-	_card_frame.rotation_degrees = card_tilt_degrees
-	_title_label.add_theme_font_override("font", UiTheme.display_font())
-	_title_label.add_theme_color_override("font_color", UiTheme.INK)
-	_countdown_label.add_theme_color_override("font_color", UiTheme.INK)
 	set_process(false)
 
 
@@ -106,9 +79,8 @@ func begin(boss_title: String, seconds: float) -> void:
 	_title = boss_title
 	_due = RunState.stage_time + maxf(seconds, 0.0)
 	_take_sky(minf(tint_seconds, maxf(seconds, 0.0)))
-	_title_label.text = notice_text % boss_title if notice_text.contains("%s") else notice_text
-	_show_countdown()
-	_pop_card()
+	_notice.show_notice(notice_text % boss_title if notice_text.contains("%s")
+			else notice_text, _countdown())
 	Sfx.play(begin_sfx)
 	set_process(true)
 	# Línea de log para los soaks: el presagio y cuánto cambia el sol.
@@ -121,7 +93,7 @@ func begin(boss_title: String, seconds: float) -> void:
 ## tarjeta se va. Se puede llamar siempre.
 func release() -> void:
 	set_process(false)
-	_notice.visible = false
+	_notice.hide_notice()
 	if _sky == null:
 		return
 	# El clima vuelve desde ahora al cielo de antes.
@@ -188,23 +160,18 @@ func _with_weather(look: HellSky.Palette) -> HellSky.Palette:
 # --- tarjeta ----------------------------------------------------------------------
 
 ## La cuenta regresiva, con el reloj de la etapa (una cinemática lo detiene).
-## La tarjeta se esconde con el HUD: una cinemática o el viaje la tapan.
+## Con el viaje ya empezado la tarjeta se va: lo que sigue es la cinemática.
 func _show_countdown() -> void:
-	var hud := get_tree().get_first_node_in_group(&"hud") as CanvasItem
-	var left := ceili(_due - RunState.stage_time)
-	_countdown_label.text = countdown_text % left if left > 0 else arriving_text
 	var host := get_parent() as BossArenaHost
-	_notice.visible = (hud == null or hud.visible) and (host == null or not host.is_busy())
+	if host != null and host.is_busy():
+		_notice.hide_notice()
+		return
+	_notice.set_subtitle(_countdown())
 
 
-## La tarjeta entra de golpe: crece desde chica alrededor de su centro.
-func _pop_card() -> void:
-	_card.pivot_offset = _card.size * 0.5
-	_card_frame.pivot_offset = _card_frame.size * 0.5
-	_card.scale = Vector2.ONE * 0.6
-	var tween := create_tween()
-	tween.tween_property(_card, "scale", Vector2.ONE, card_pop_seconds) \
-			.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+func _countdown() -> String:
+	var left := ceili(_due - RunState.stage_time)
+	return countdown_text % left if left > 0 else arriving_text
 
 
 func _color_text(color: Color) -> String:

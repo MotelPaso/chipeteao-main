@@ -34,7 +34,7 @@ const ARENA_LIBRARY: Array[Dictionary] = [
 		"omen_scene": "res://scenes/enemies/blue_lobster/LobsterOmen.tscn",
 		"omen_seconds": 30.0,
 		"cinematic_scene": "res://scenes/enemies/blue_lobster/LobsterEntrance.tscn",
-		"portal_scene": "",
+		"portal_scene": "res://scenes/world/boss_arenas/BossArenaPortal.tscn",
 		"exit": "return",
 		"exit_delay": 2.5,
 	},
