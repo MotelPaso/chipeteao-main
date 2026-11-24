@@ -34,7 +34,7 @@ enum Growth { BRANCH, FAN, BRAIN, SPONGE, TABLE }
 ## Metros entre una fila y la siguiente.
 @export var row_gap: float = 5.5
 ## Metros entre rocas vecinas de la primera fila (las de afuera van más separadas).
-@export var rock_spacing: float = 4.2
+@export_range(0.5, 30.0, 0.1) var rock_spacing: float = 4.2
 ## Radio mínimo de una roca de la primera fila, en metros.
 @export var rock_radius_min: float = 2.0
 ## Radio máximo de una roca de la primera fila, en metros.

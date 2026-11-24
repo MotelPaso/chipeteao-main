@@ -48,9 +48,10 @@ func _ready() -> void:
 
 
 func _process(_delta: float) -> void:
-	# Con el HUD oculto (una cinemática) la tarjeta tampoco se ve.
-	var hud := get_tree().get_first_node_in_group(&"hud") as CanvasItem
-	visible = _shown and (hud == null or hud.visible)
+	# Con el HUD oculto (una cinemática) la tarjeta tampoco se ve. El HUD es un
+	# CanvasLayer: su `visible` se lee por nombre.
+	var hud := get_tree().get_first_node_in_group(&"hud")
+	visible = _shown and (hud == null or bool(hud.get(&"visible")))
 
 
 ## Muestra la tarjeta con este título y esta línea debajo; entra de golpe.

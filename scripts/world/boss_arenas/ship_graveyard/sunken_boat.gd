@@ -37,7 +37,7 @@ const FILL_STEPS: int = 14
 ## Alto del casco de la quilla a la borda, en metros.
 @export var sloop_depth: float = 3.2
 ## Ángulo con que la proa sale de la arena, en grados.
-@export var sloop_angle_deg: float = 35.0
+@export_range(5.0, 85.0, 0.5) var sloop_angle_deg: float = 35.0
 ## Metros bajo la arena que queda el punto más alto del corte.
 @export var bury_depth: float = 1.5
 ## Alto del muñón del mástil sobre la cubierta, en metros.

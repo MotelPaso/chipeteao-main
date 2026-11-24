@@ -40,7 +40,7 @@ vec3 turn_y(vec3 v, float angle) {
 
 void vertex() {
 	float phase = INSTANCE_CUSTOM.x;
-	belly = smoothstep(0.015, -0.04, VERTEX.y);
+	belly = 1.0 - smoothstep(-0.04, 0.015, VERTEX.y);
 
 	// La cola se mece más hacia la punta.
 	float flap = wiggle_angle * COLOR.a * sin(TIME * wiggle_speed + phase * 61.0);

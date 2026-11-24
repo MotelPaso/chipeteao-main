@@ -198,6 +198,11 @@ func parked_count() -> int:
 
 
 func _finish_release(node: Node3D, id: int) -> void:
+	# Ya la terminó release_live_under (la arena de un jefe se liberaba en ese
+	# mismo frame): esta llamada diferida llega tarde y no toca un nodo que el
+	# pool quizá ya volvió a entregar.
+	if not _pending_release.has(id):
+		return
 	_pending_release.erase(id)
 	_live.erase(id)
 	# La escena del nodo puede haberse desarmado entre release() y esta

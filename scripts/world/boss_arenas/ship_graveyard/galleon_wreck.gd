@@ -45,7 +45,7 @@ const RIB_OVERHANG: float = 1.2
 ## Semilla de la forma: la misma semilla da el mismo casco.
 @export var shape_seed: int = 0
 ## Largo de la mitad, desde el corte, en metros.
-@export var length: float = 30.0
+@export_range(4.0, 80.0, 0.5) var length: float = 30.0
 ## Manga (ancho máximo del casco), en metros.
 @export var beam: float = 10.0
 ## Alto del casco de la quilla a la borda, en metros.

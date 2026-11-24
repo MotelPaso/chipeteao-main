@@ -64,7 +64,7 @@ void fragment() {
 			+ (noise2(vec2(UV.x * 6.0, TIME * 1.3)) - 0.5) * 0.8;
 	// Con level en 1 el borde queda por encima de la pantalla, olas incluidas.
 	float line = level * (1.0 + wave_height * 4.0) - wave_height * 2.0 + wave * wave_height;
-	float under = smoothstep(line + 0.003, line - 0.003, up);
+	float under = 1.0 - smoothstep(line - 0.003, line + 0.003, up);
 	float depth = clamp((line - up) / 0.7, 0.0, 1.0);
 	vec3 water = mix(shallow_color, deep_color, depth);
 	// Franjas de luz que bajan desde la superficie.

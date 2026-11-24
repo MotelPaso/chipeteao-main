@@ -26,7 +26,7 @@ const HOLE_COLUMNS: int = 2
 ## Semilla de la forma: la misma semilla da el mismo casco.
 @export var shape_seed: int = 0
 ## Largo del pedazo, en metros.
-@export var length: float = 9.0
+@export_range(2.0, 30.0, 0.5) var length: float = 9.0
 ## Alto máximo del borde de arriba, en metros.
 @export var height: float = 4.6
 ## Cuánto se curva: metros que el centro sobresale respecto de las puntas.
