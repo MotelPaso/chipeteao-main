@@ -5,8 +5,11 @@ extends RefCounted
 ## modelos del reparto de adentro (los del kit de supervivencia, con su
 ## textura): el bosque de afuera es el mismo bosque, y arde igual. Cada trozo
 ## es una malla hija del ForestEdge: una superficie por material de modelo y
-## otra de color de vértice para matas, helechos y troncos. Los valores son
-## exports de ForestEdge (grupos «Franja»); ninguna escena usa este script.
+## otra de color de vértice para matas, helechos y troncos. Ninguna pieza
+## asoma adentro de la arena: cada una guarda su propio radio más
+## ForestEdge.wall_gap con el muro (no tienen colisión, así que lo que
+## asomara se atravesaría). Los valores son exports de ForestEdge (grupos
+## «Franja»); ninguna escena usa este script.
 
 ## Lados de la franja, en orden: norte, este, sur y oeste (norte = -Z), con su
 ## dirección hacia afuera; después vienen las cuatro esquinas.
@@ -14,16 +17,22 @@ const SIDES: Array[Vector2] = [Vector2(0, -1), Vector2(1, 0), Vector2(0, 1), Vec
 const CORNERS: Array[Vector2] = [Vector2(-1, -1), Vector2(1, -1), Vector2(1, 1), Vector2(-1, 1)]
 ## Tipo de trozo para su semilla (ver ForestEdge.chunk_seed).
 const SEED_KIND: int = 1
+## Radios que llega un arbusto desde su pie: el segundo bulto va corrido 0.7
+## y LowPolyMesh.blob ondula cada bulto un 20 %.
+const BUSH_REACH: float = 1.5
+## Puntos a lo largo de un tronco caído en que se mide su distancia al muro.
+const LOG_SAMPLES: int = 5
 
 
 ## Un modelo listo para copiar en un trozo: sus triángulos sueltos (sin
-## índices), su material y su alto a escala 1.
+## índices), su material y su radio en planta a escala 1 (lo más lejos del eje
+## vertical que llega un vértice).
 class Kit extends RefCounted:
 	var positions := PackedVector3Array()
 	var normals := PackedVector3Array()
 	var uvs := PackedVector2Array()
 	var material: Material = null
-	var height: float = 1.0
+	var radius: float = 0.0
 
 
 ## Los trozos de la franja: los tramos de cada lado y las cuatro esquinas.
@@ -59,66 +68,27 @@ static func kit(scene: PackedScene) -> Kit:
 	var order: PackedInt32Array = arrays[Mesh.ARRAY_INDEX] if arrays[Mesh.ARRAY_INDEX] != null \
 			else PackedInt32Array(range(vertices.size()))
 	var turn := place.basis.inverse().transposed()
-	var top := 0.0
 	for index: int in order:
 		var at := place * vertices[index]
 		out.positions.append(at)
 		out.normals.append(turn * normals[index])
 		out.uvs.append(uvs[index])
-		top = maxf(top, at.y)
-	out.height = maxf(top, 0.01)
+		out.radius = maxf(out.radius, Vector2(at.x, at.z).length())
 	root.free()
 	return out
 
 
 ## Arma el trozo `job` como hijo de `edge`.
 static func build(edge: ForestEdge, job: Dictionary) -> void:
-	var outside := edge.outside()
 	var side := int(job["side"])
 	var index := int(job["index"])
 	var rng := RandomNumberGenerator.new()
 	rng.seed = edge.chunk_seed(SEED_KIND, side, index)
 	var paint := LowPolyMesh.new(rng.randi())
 	var models: Dictionary[Material, Array] = {}
-	var area := _area(edge, side)
-	var trunks := PackedVector2Array()
-	var most := maxf(edge.trees_at_wall, edge.trees_at_back)
-	var trees := edge.tree_kits()
-	for attempt in ceili(area / 100.0 * most * 1.4):
-		var xz := _point(edge, rng, side, index)
-		var d := outside.distance_out(xz.x, xz.y)
-		if d < edge.near_from or d > outside.reach or trees.is_empty():
-			continue
-		var depth := d / outside.reach
-		if rng.randf() * most > lerpf(edge.trees_at_wall, edge.trees_at_back, depth) \
-				or not _apart(xz, trunks, edge.tree_spacing):
-			continue
-		trunks.append(xz)
-		var width := rng.randf_range(edge.tree_width_min, edge.tree_width_max)
-		var tall := rng.randf_range(edge.tree_height_min, edge.tree_height_max) \
-				* (1.0 + edge.back_height_boost * depth)
-		_copy(models, trees[rng.randi() % trees.size()] as Kit, _frame(outside, xz,
-				rng.randf() * TAU, Vector3(width, tall, width) * edge.tree_scale))
-	edge.tally("trees", trunks.size())
-	var rock := edge.rock_kit() as Kit
-	var rocks := 0
-	for attempt in roundi(area / 100.0 * edge.rocks_per_100):
-		var xz := _point(edge, rng, side, index)
-		if rock == null or outside.distance_out(xz.x, xz.y) < 1.0 or not _apart(xz, trunks, 2.0):
-			continue
-		var size := rng.randf_range(edge.rock_scale_min, edge.rock_scale_max)
-		_copy(models, rock, _frame(outside, xz, rng.randf() * TAU,
-				Vector3(size, size * rng.randf_range(0.7, 1.2), size)))
-		rocks += 1
-	edge.tally("rocks", rocks)
-	for attempt in roundi(area / 100.0 * edge.bushes_per_100):
-		var xz := _point(edge, rng, side, index)
-		if outside.distance_out(xz.x, xz.y) >= 0.6:
-			_bush(edge, paint, rng, Vector3(xz.x, outside.height_at(xz.x, xz.y), xz.y))
-	for attempt in edge.logs_per_chunk:
-		var xz := _point(edge, rng, side, index)
-		if outside.distance_out(xz.x, xz.y) > edge.near_from and _apart(xz, trunks, 3.0):
-			_log(edge, paint, rng, outside, xz)
+	var trunks := _plant_trees(edge, rng, side, index, models)
+	_place_rocks(edge, rng, side, index, models, trunks)
+	_add_undergrowth(edge, rng, side, index, paint, trunks)
 	var mesh := _commit(models, paint)
 	if mesh.get_surface_count() == 0:
 		return
@@ -131,6 +101,72 @@ static func build(edge: ForestEdge, job: Dictionary) -> void:
 	for surface in mesh.get_surface_count():
 		edge.tally("faces", (mesh.surface_get_arrays(surface)[Mesh.ARRAY_VERTEX]
 				as PackedVector3Array).size() / 3)
+
+
+## Los árboles del trozo, más tupidos y más altos hacia afuera; ninguna copa
+## asoma adentro de la arena. Devuelve dónde quedaron los troncos.
+static func _plant_trees(edge: ForestEdge, rng: RandomNumberGenerator, side: int, index: int,
+		models: Dictionary[Material, Array]) -> PackedVector2Array:
+	var outside := edge.outside()
+	var trunks := PackedVector2Array()
+	var trees := edge.tree_kits()
+	if trees.is_empty():
+		return trunks
+	var most := maxf(edge.trees_at_wall, edge.trees_at_back)
+	for attempt in ceili(_area(edge, side) / 100.0 * most * 1.4):
+		var xz := _point(edge, rng, side, index)
+		var d := outside.distance_out(xz.x, xz.y)
+		if d < edge.near_from or d > outside.reach:
+			continue
+		var depth := d / outside.reach
+		if rng.randf() * most > lerpf(edge.trees_at_wall, edge.trees_at_back, depth) \
+				or not _apart(xz, trunks, edge.tree_spacing):
+			continue
+		var width := rng.randf_range(edge.tree_width_min, edge.tree_width_max)
+		var tall := rng.randf_range(edge.tree_height_min, edge.tree_height_max) \
+				* (1.0 + edge.back_height_boost * depth)
+		var model := trees[rng.randi() % trees.size()] as Kit
+		if d < model.radius * width * edge.tree_scale + edge.wall_gap:
+			continue
+		trunks.append(xz)
+		_copy(models, model, _frame(outside, xz, rng.randf() * TAU,
+				Vector3(width, tall, width) * edge.tree_scale))
+	edge.tally("trees", trunks.size())
+	return trunks
+
+
+## Las rocas del trozo, lejos de los troncos y sin asomar adentro de la arena.
+static func _place_rocks(edge: ForestEdge, rng: RandomNumberGenerator, side: int, index: int,
+		models: Dictionary[Material, Array], trunks: PackedVector2Array) -> void:
+	var rock := edge.rock_kit() as Kit
+	if rock == null:
+		return
+	var outside := edge.outside()
+	var rocks := 0
+	for attempt in roundi(_area(edge, side) / 100.0 * edge.rocks_per_100):
+		var xz := _point(edge, rng, side, index)
+		var size := rng.randf_range(edge.rock_scale_min, edge.rock_scale_max)
+		if outside.distance_out(xz.x, xz.y) < rock.radius * size + edge.wall_gap \
+				or not _apart(xz, trunks, 2.0):
+			continue
+		_copy(models, rock, _frame(outside, xz, rng.randf() * TAU,
+				Vector3(size, size * rng.randf_range(0.7, 1.2), size)))
+		rocks += 1
+	edge.tally("rocks", rocks)
+
+
+## Las matas, los helechos y los troncos caídos del trozo.
+static func _add_undergrowth(edge: ForestEdge, rng: RandomNumberGenerator, side: int,
+		index: int, paint: LowPolyMesh, trunks: PackedVector2Array) -> void:
+	var outside := edge.outside()
+	for attempt in roundi(_area(edge, side) / 100.0 * edge.bushes_per_100):
+		var xz := _point(edge, rng, side, index)
+		_bush(edge, paint, rng, Vector3(xz.x, outside.height_at(xz.x, xz.y), xz.y),
+				outside.distance_out(xz.x, xz.y) - edge.wall_gap)
+	for attempt in edge.logs_per_chunk:
+		var xz := _point(edge, rng, side, index)
+		if outside.distance_out(xz.x, xz.y) > edge.near_from and _apart(xz, trunks, 3.0):
+			_log(edge, paint, rng, outside, xz)
 
 
 ## La transformación de un modelo parado en `xz` sobre el suelo de afuera,
@@ -208,12 +244,16 @@ static func _apart(xz: Vector2, taken: PackedVector2Array, gap: float) -> bool:
 	return true
 
 
-## Un arbusto (dos bultos) o un helecho (hojas en abanico).
+## Un arbusto (dos bultos) o un helecho (hojas en abanico) con el pie en
+## `foot`, si cabe entero en `room` metros alrededor del pie (lo que lo separa
+## del muro); si no cabe, no se pone.
 static func _bush(edge: ForestEdge, mesh: LowPolyMesh, rng: RandomNumberGenerator,
-		foot: Vector3) -> void:
+		foot: Vector3, room: float) -> void:
 	var tone := edge.bush_color.lerp(edge.bush_bright, rng.randf())
 	if rng.randf() < 0.55:
 		var radius := rng.randf_range(0.5, 1.2)
+		if radius * BUSH_REACH > room:
+			return
 		mesh.blob(foot + Vector3.UP * radius * 0.5, Vector3(radius, radius * 0.75, radius), tone,
 				5, 3, 0.2)
 		mesh.blob(foot + Vector3(radius * 0.7, radius * 0.3, 0.0),
@@ -221,9 +261,12 @@ static func _bush(edge: ForestEdge, mesh: LowPolyMesh, rng: RandomNumberGenerato
 		return
 	var fronds := rng.randi_range(5, 7)
 	var turn := rng.randf() * TAU
+	# Las hojas más largas miden 1.6 m: más cerca del muro, se acortan.
+	if room < 0.9:
+		return
 	for frond in fronds:
 		var angle := turn + TAU * float(frond) / float(fronds)
-		var reach := rng.randf_range(0.9, 1.6)
+		var reach := minf(rng.randf_range(0.9, 1.6), room)
 		var out := Vector3(cos(angle), 0.0, sin(angle))
 		var side := Vector3(-out.z, 0.0, out.x)
 		var bend := foot + out * reach * 0.5 + Vector3.UP * reach * 0.55
@@ -234,12 +277,17 @@ static func _bush(edge: ForestEdge, mesh: LowPolyMesh, rng: RandomNumberGenerato
 				bend + Vector3.DOWN)
 
 
-## Un tronco caído: un prisma de cinco lados tendido sobre el suelo.
+## Un tronco caído: un prisma de cinco lados tendido sobre el suelo. No se
+## pone si alguna parte suya quedaría a menos de su radio y wall_gap del muro.
 static func _log(edge: ForestEdge, mesh: LowPolyMesh, rng: RandomNumberGenerator,
 		outside: OutsideRelief, xz: Vector2) -> void:
 	var along := Vector2.from_angle(rng.randf() * TAU)
 	var length := rng.randf_range(4.0, 8.0)
 	var radius := rng.randf_range(0.35, 0.6)
+	for sample in LOG_SAMPLES:
+		var point := xz + along * length * (float(sample) / float(LOG_SAMPLES - 1) - 0.5)
+		if outside.distance_out(point.x, point.y) < radius + edge.wall_gap:
+			return
 	var ends: Array[PackedVector3Array] = []
 	for point: Vector2 in [xz - along * length * 0.5, xz + along * length * 0.5]:
 		var center := Vector3(point.x, outside.height_at(point.x, point.y) + radius * 0.6, point.y)

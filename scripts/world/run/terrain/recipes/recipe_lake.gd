@@ -3,12 +3,15 @@ extends RefCounted
 ## La receta EL LAGO DE LA ISLA (ver ReliefRecipes): un lago hundido frente
 ## al punto de aparición, alimentado por un brazo de río que entra por una
 ## punta y sale por la otra, con una ISLA en el medio que lleva el Árbol
-## Hueco. Un muelle de piedra (un puente, con sus escaleras al agua) va de la
-## orilla del lado del equipo a la isla, y la isla baja al fondo del lago por sus
-## rampas. El lago es un cañón que se ensancha (ReliefLayout.Ravine.half_at);
-## la isla, una zona que se apoya en su fondo y llega al nivel del llano. La
-## pieza opcional "falls" pone una meseta-manantial junto al brazo de río
-## arriba: la cascada cae al brazo y el río baja al lago.
+## Hueco. Un muelle de piedra (un puente) va de la orilla del lado del equipo
+## a la isla, con sus escaleras al agua solo del lado de la orilla; la isla
+## baja al fondo del lago por sus rampas, que se ponen después del muelle y
+## lo esquivan. Sin escena de puente (ReliefSettings.bridge_scene vacío) no
+## hay muelle: a la isla se llega por sus rampas. El lago es un cañón que se
+## ensancha (ReliefLayout.Ravine.half_at); la isla, una zona que se apoya en
+## su fondo y llega al nivel del llano. La pieza opcional "falls" pone una
+## meseta-manantial junto al brazo de río arriba: la cascada cae al brazo y
+## el río baja al lago.
 
 ## Edita aquí (no hay Inspector); los valores de diseño están en
 ## ReliefSettings (grupo «Receta: el lago de la isla»).
@@ -27,8 +30,6 @@ const ISLAND_SHIFT: float = 8.0
 ## Largo mínimo y máximo del muelle, en metros.
 const PIER_MIN: float = 12.0
 const PIER_MAX: float = 30.0
-## Radianes que separan el muelle de una rampa de la isla, como mínimo.
-const PIER_RAMP_GAP: float = 0.7
 ## Metros que el camino de la isla se queda antes del Árbol Hueco.
 const LANDMARK_STOP: float = 8.0
 ## La meseta-manantial: metros pasada la rampa del brazo de río arriba hasta
@@ -45,14 +46,12 @@ const SHRINK_STEPS: int = 5
 const ARM_DEEP_MIN: float = 6.0
 
 
-## El trazado del lago; false si el lago, la isla o el muelle no cupieron.
+## El trazado del lago; false si el lago o la isla (con su muelle) no cupieron.
 static func try_plan(layout: ReliefLayout, rng: RandomNumberGenerator, calm: bool) -> bool:
 	var s := layout.settings
 	if not _place_lake(layout, rng, calm):
 		return false
 	if not _place_island(layout, rng, calm):
-		return false
-	if not _place_pier(layout):
 		return false
 	if bool(layout.options.get("road", true)):
 		_lay_road(layout)
@@ -61,8 +60,8 @@ static func try_plan(layout: ReliefLayout, rng: RandomNumberGenerator, calm: boo
 		RecipeKit.place_springhead(layout, rng, calm, ravine.points[0].length()
 				>= ravine.points[ravine.points.size() - 1].length(), SPRING_FROM,
 				Vector2(s.lake_spring_radius_min, s.lake_spring_radius_max))
-	if not RecipeKit.add_buttes(layout, rng, calm, maxi(s.butte_count_min - 1, 0),
-			maxi(s.butte_count_max - 1, 1)):
+	# El lago ocupa mucho llano: un cerro menos de cada lado del rango.
+	if not RecipeKit.add_fewer_buttes(layout, rng, calm, 1, 1):
 		return false
 	ReliefPlanner.place_hills(layout, rng)
 	return true
@@ -125,9 +124,11 @@ static func _fits(layout: ReliefLayout) -> bool:
 	return true
 
 
-## La isla: en el medio del lago, con agua de sobra alrededor y una o dos
-## rampas que bajan al fondo a lo largo del eje. Es la zona más alta de la
-## receta (`top`): ahí va el Árbol Hueco.
+## La isla: en el medio del lago, con agua de sobra alrededor, su muelle (si
+## hay escena de puente) y una o dos rampas que bajan al fondo a lo largo del
+## eje. El muelle va primero: las rampas lo esquivan a él y a sus escaleras
+## (ReliefRamps). Es la zona más alta de la receta (`top`): ahí va el Árbol
+## Hueco.
 static func _place_island(layout: ReliefLayout, rng: RandomNumberGenerator, calm: bool) -> bool:
 	var s := layout.settings
 	var ravine := layout.ravine
@@ -145,8 +146,13 @@ static func _place_island(layout: ReliefLayout, rng: RandomNumberGenerator, calm
 		island.center = frame[0]
 		if not _island_fits(layout, island):
 			continue
+		var index := layout.zones.size()
+		var crossings := layout.crossings.size()
+		if s.bridge_scene != null and not _place_pier(layout, island, index, at):
+			continue
 		if not ReliefRamps.place(layout, island, frame[1].angle() + (0.0 if calm else rng.randf_range(-0.3, 0.3)),
 				ReliefPlanner.jitters(rng, s.butte_ways_max, calm), 1, s.butte_ways_max):
+			layout.crossings.resize(crossings)
 			continue
 		layout.zones.append(island)
 		return true
@@ -166,21 +172,17 @@ static func _island_fits(layout: ReliefLayout, island: ReliefLayout.Zone) -> boo
 	return true
 
 
-## El muelle: de la pared del lado del punto de aparición a la isla, de
-## frente, sin cruzarse con una rampa de la isla.
-static func _place_pier(layout: ReliefLayout) -> bool:
-	var ravine := layout.ravine
-	var index := layout.zones.size() - 1
-	var island := layout.zones[index]
-	var at := layout.ravine_coords(island.center).x
+## El muelle de la isla `island` (que tendrá el índice `index`, centrada a
+## `at` metros del inicio del eje): de frente, de la pared del lado del punto
+## de aparición a su orilla. False si queda más corto o más largo que
+## PIER_MIN..PIER_MAX.
+static func _place_pier(layout: ReliefLayout, island: ReliefLayout.Zone, index: int,
+		at: float) -> bool:
 	var frame := layout.ravine_frame(at)
 	var left := Vector2(-frame[1].y, frame[1].x)
 	var side := 1 if (-frame[0]).dot(left) >= 0.0 else -1
-	var wall := frame[0] + left * (float(side) * ravine.half_at(at))
+	var wall := frame[0] + left * (float(side) * layout.ravine.half_at(at))
 	var toward := (wall - island.center).normalized()
-	for ramp: ReliefLayout.Ramp in island.ramps:
-		if absf(angle_difference(ramp.angle, toward.angle())) < PIER_RAMP_GAP:
-			return false
 	var shore := island.center + toward * layout.zone_radius(island, toward.angle())
 	var span := wall.distance_to(shore)
 	if span < PIER_MIN or span > PIER_MAX:

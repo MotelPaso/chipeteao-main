@@ -19,7 +19,9 @@ extends Node3D
 ## edge:`). Cada trozo se siembra con la semilla de partida del scatter, esta
 ## sal y su lugar: la misma semilla da el mismo bosque, y no saca números de
 ## ningún otro RNG. No tiene colisión: los muros del Perimeter son lo único
-## que frena. Sin suelo de afuera (Terrain.outside_relief() nulo) no arma nada.
+## que frena, así que ninguna pieza de la franja asoma adentro de la arena
+## (cada una guarda su radio más `wall_gap` con el muro). Sin suelo de afuera
+## (Terrain.outside_relief() nulo) no arma nada.
 
 ## Avisa que el bosque de afuera terminó de armarse.
 signal built
@@ -42,6 +44,8 @@ const SEED_SALT: int = 0x464F5245
 @export var near_chunk: float = 20.0
 ## Metros desde el muro donde empiezan los árboles de la franja.
 @export var near_from: float = 2.5
+## Metros libres entre el muro y el borde de cada árbol, roca, mata o tronco (nada asoma adentro).
+@export var wall_gap: float = 0.3
 ## Árboles por cada 100 m² de franja junto al muro.
 @export var trees_at_wall: float = 1.4
 ## Árboles por cada 100 m² de franja en su fondo (más tupido hacia afuera).
@@ -81,8 +85,9 @@ const SEED_SALT: int = 0x464F5245
 @export var rock_scale_min: float = 3.0
 ## Escala máxima de una roca de la franja.
 @export var rock_scale_max: float = 7.5
-## Verde oscuro y verde claro de los arbustos y helechos.
+## Verde oscuro de los arbustos y helechos (cada mata mezcla los dos verdes).
 @export var bush_color: Color = Color(0.2, 0.55, 0.32)
+## Verde claro de los arbustos y helechos.
 @export var bush_bright: Color = Color(0.4, 0.72, 0.42)
 ## Color de los troncos caídos.
 @export var log_color: Color = Color(0.5, 0.33, 0.22)
@@ -94,15 +99,17 @@ const SEED_SALT: int = 0x464F5245
 @export var far_chunk: float = 80.0
 ## Paso de la malla del manto, en metros.
 @export var canopy_step: float = 8.0
-## Metros desde el muro donde empieza el manto, y cuánto varía ese borde.
+## Metros desde el muro donde empieza el manto.
 @export var canopy_from: float = 16.0
+## Metros que ese borde del manto se adelanta o se atrasa a lo largo del muro.
 @export var canopy_from_jitter: float = 4.0
 ## Metros que el manto tarda en llegar a su alto, desde su borde.
 @export var canopy_rise: float = 7.0
 ## Metros entre dos entrantes del borde del manto, a lo largo del muro.
 @export var canopy_edge_wave: float = 45.0
-## Alto del manto sobre el suelo, en metros, y cuánto suben y bajan las copas.
+## Alto del manto sobre el suelo, en metros.
 @export var canopy_height: float = 10.0
+## Metros que suben y bajan las copas del manto sobre ese alto.
 @export var canopy_bumps: float = 5.0
 ## Ancho de cada bulto de copas del manto, en metros.
 @export var canopy_bump_size: float = 11.0
@@ -112,9 +119,11 @@ const SEED_SALT: int = 0x464F5245
 @export var spires_per_chunk: int = 16
 ## Peñascos de roca que asoman del manto, por trozo, como mucho.
 @export var crags_per_chunk: int = 1
-## Verde oscuro y verde claro del manto, y el de los pinos que asoman.
+## Verde oscuro del manto (cada cuadro mezcla los dos verdes).
 @export var canopy_dark: Color = Color(0.2, 0.45, 0.32)
+## Verde claro del manto.
 @export var canopy_bright: Color = Color(0.32, 0.6, 0.42)
+## Verde de los pinos que asoman sobre el manto.
 @export var spire_color: Color = Color(0.22, 0.5, 0.36)
 
 var _terrain: Terrain = null

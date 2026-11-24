@@ -10,6 +10,8 @@
 # selector bosque dunas cienaga recetas etapa coop mythos minijefe. Un nombre
 # que no existe sale con exit 2 antes de correr nada, y una corrida parcial
 # termina en «VERIFICACIÓN PARCIAL (pasos: …)», nunca en «VERIFICACIÓN OK».
+# Con BONK_RELIEF_RECIPE delante también es parcial: los soaks de co-op,
+# Mythos y la langosta juegan esa receta en vez de la que fija cada uno.
 #
 # 360 s no es arbitrario: por debajo, el recorrido del harness no da tiempo a
 # cruzar una arena de 240x240 y la puerta de cobertura no puede exigir nada.
@@ -51,9 +53,11 @@
 #   - una etapa con RELIEVE POR ZONAS (el Bosque Hueco) no imprime sus
 #     barridos, alguno no da cero, la pendiente pasa de su cota, o el bot
 #     del soak del bosque no pisa una zona elevada ni cruza un puente.
-#   - el soak del bosque no arma la receta que fija (RECETA_PASEO) con al
-#     menos un puente, o un arranque del paso de RECETAS no arma la receta
-#     que pide, reporta errores o ensucia un barrido del relieve.
+#   - un soak largo del bosque no arma la receta que fija (RECETA_PASEO,
+#     RECETA_COOP, RECETA_MYTHOS, RECETA_MINIJEFE) con su pieza propia (el
+#     de arena, además, con al menos un puente), o un arranque del paso de
+#     RECETAS no arma la receta que pide entera (sin trazado de reserva y con
+#     su pieza propia), reporta errores o ensucia un barrido del relieve.
 #   - el soak del MINIJEFE no ve llegar a la Langosta Azul, su entrada no
 #     congela el mundo o no devuelve la pantalla, la pelea no empieza y
 #     termina exactamente una vez, o 5 s después de morir queda algo suyo.
@@ -221,18 +225,41 @@ chequear_relieve() {
 	fi
 }
 
-# El soak del Bosque Hueco fija su receta: el bot tiene que pisar una zona
-# elevada y cruzar un puente, y la Montaña Escalonada trae las dos cosas en
-# toda semilla. Las demás recetas se prueban en el paso «recetas». Falla si
-# el log no muestra esa receta con al menos un puente: si el interruptor
-# dejara de forzarla, el paseo mediría otro mapa sin avisar.
+# Los soaks largos que arrancan en el Bosque Hueco fijan su receta, así toda
+# receta juega al menos una partida larga en cada corrida. El de arena juega
+# la Montaña Escalonada: el bot tiene que pisar una zona elevada y cruzar un
+# puente, y ella trae las dos cosas en toda semilla. Co-op, Mythos y la
+# langosta juegan las otras tres; el de etapa sortea las suyas (con la
+# semilla 4242, la Montaña Escalonada y, a la vuelta, el Lago de la Isla).
+# Con BONK_RELIEF_RECIPE delante, esos tres (no el de arena) juegan esa.
 RECETA_PASEO="massif"
-chequear_receta_fija() {
+RECETA_COOP="${BONK_RELIEF_RECIPE:-twin}"
+RECETA_MYTHOS="${BONK_RELIEF_RECIPE:-lake}"
+RECETA_MINIJEFE="${BONK_RELIEF_RECIPE:-river}"
+# Falla si alguna etapa del bosque del log no armó la receta `$2` (sin su
+# sufijo :reserve) o le falta su pieza propia (`own=ok` en `Relief pieces:`);
+# con "puente", también si no tiene al menos un puente. Si el interruptor
+# dejara de forzarla, el soak mediría otro mapa sin avisar.
+chequear_receta() {
 	local log="$1"
-	local receta="$2"
-	if ! grep -qE "^Relief layout: hollow_woods .* bridges=[1-9][0-9]* .* recipe=$receta\$" "$log"; then
+	local receta="${2%:reserve}"
+	local puente="${3:-}"
+	local mal=0
+	if ! grep -q '^Relief layout: hollow_woods ' "$log" \
+			|| grep '^Relief layout: hollow_woods ' "$log" | grep -qv " recipe=$receta\$"; then
+		echo "  FALLO (relieve): el soak no armó la receta '$receta' en todas sus etapas del bosque"
+		mal=1
+	elif [ -n "$puente" ] && ! grep -qE '^Relief layout: hollow_woods .* bridges=[1-9][0-9]* ' "$log"; then
 		echo "  FALLO (relieve): el soak no armó la receta '$receta' con al menos un puente"
-		grep -n '^Relief layout: ' "$log" | head -3
+		mal=1
+	fi
+	if ! grep -q '^Relief pieces: hollow_woods ' "$log" \
+			|| grep '^Relief pieces: hollow_woods ' "$log" | grep -qv ' own=ok '; then
+		echo "  FALLO (relieve): una etapa del bosque no armó la pieza propia de su receta"
+		mal=1
+	fi
+	if [ "$mal" -ne 0 ]; then
+		grep -n '^Relief layout: \|^Relief pieces: ' "$log" | head -4
 		FALLOS=$((FALLOS + 1))
 	fi
 }
@@ -389,7 +416,7 @@ for ARENA in HollowWoods AshDunes Gloomfen; do
 	# El relieve primero: sus barridos se miran aunque un chequeo de abajo
 	# corte la vuelta con `continue`.
 	if [ "$ARENA" = "HollowWoods" ]; then
-		chequear_receta_fija "$LOG" "$RECETA_PASEO"
+		chequear_receta "$LOG" "$RECETA_PASEO" puente
 		chequear_relieve "$LOG" paseo
 	fi
 
@@ -449,20 +476,22 @@ done
 
 # --- Recetas del relieve ------------------------------------------------------
 # El Bosque Hueco arma una receta distinta según la semilla (ReliefRecipes):
-# los soaks de arriba y de abajo ven una o dos. Este paso arranca CADA receta,
-# forzada con BONK_RELIEF_RECIPE, en dos semillas y le pasa el grep de errores
-# y los barridos del relieve, así ninguna receta queda sin probar porque la
-# semilla de los soaks no la sortea. La lista sale de ReliefRecipes.IDS: una
-# receta nueva entra sola. BONK_STAGE_FAST=1 apaga el aviso de niebla de una
-# corrida corta (en 5 s nadie explora nada).
+# cada soak largo juega una sola (ver RECETA_PASEO). Este paso arranca CADA
+# receta, forzada con BONK_RELIEF_RECIPE, en dos semillas y le pasa el grep
+# de errores y los barridos del relieve, y exige su trazado de verdad (no el
+# de reserva) con su pieza propia, así ninguna receta queda sin probar. La
+# lista sale de ReliefRecipes.IDS: una receta nueva entra sola. BONK_STAGE_FAST=1
+# apaga el aviso de niebla de una corrida corta (en 5 s nadie explora nada).
 RECETAS_SEMILLAS=(4242 7)
 RECETAS_FRAMES=300
 if corre recetas; then
 echo "== recetas del relieve (HollowWoods, ${#RECETAS_SEMILLAS[@]} semillas por receta) =="
 fase
 RECETAS=()
-read -r -a RECETAS <<< "$(grep -m1 '^const IDS: ' scripts/world/run/terrain/relief_recipes.gd \
-	| grep -o '"[a-z_]*"' | tr -d '"' | tr '\n' ' ')"
+# Los ids de IDS, desde su línea hasta la que cierra la lista: así sirve
+# aunque la lista ocupe varias líneas.
+read -r -a RECETAS <<< "$(awk '/^const IDS: /{on=1} on{print} on && /\]$/{exit}' \
+	scripts/world/run/terrain/relief_recipes.gd | grep -o '&"[a-z_]*"' | tr -d '&"' | tr '\n' ' ')"
 if [ "${#RECETAS[@]}" -eq 0 ]; then
 	echo "  FALLO: no se pudo leer la lista de recetas (IDS en relief_recipes.gd)"
 	FALLOS=$((FALLOS + 1))
@@ -482,10 +511,13 @@ for RECETA in ${RECETAS[@]+"${RECETAS[@]}"}; do
 			grep -nE "$PATRON_ERROR" "$RECETA_LOG" | head -30
 			FALLOS=$((FALLOS + 1))
 		fi
-		if ! grep -qE "^Relief layout: hollow_woods .* recipe=$RECETA\$" "$RECETA_LOG" \
-				|| ! grep -q "^Relief pieces: hollow_woods recipe=$RECETA " "$RECETA_LOG"; then
-			echo "  FALLO: el arranque no armó la receta '$RECETA' (semilla $SEMILLA)"
-			grep -n '^Relief layout: \|^Relief pieces: ' "$RECETA_LOG" | head -3
+		chequear_receta "$RECETA_LOG" "$RECETA"
+		# Con las semillas fijas, cada receta cabe entera: el de reserva es un
+		# trazado de emergencia y probarlo aquí escondería una receta rota.
+		if ! grep -qE "^Relief layout: hollow_woods .* fallback=false .* recipe=$RECETA\$" \
+				"$RECETA_LOG"; then
+			echo "  FALLO: el arranque de '$RECETA' cayó en su trazado de reserva (semilla $SEMILLA)"
+			grep -n '^Relief layout: ' "$RECETA_LOG" | head -3
 			FALLOS=$((FALLOS + 1))
 		fi
 		chequear_relieve "$RECETA_LOG"
@@ -589,9 +621,10 @@ COOP_LOG="$LOGDIR/soak_coop.log"
 # las SubViewports además del sol de cada etapa.
 BONK_ARENA="res://scenes/world/HollowWoods.tscn" BONK_PLAYERS=2 BONK_STAGE_FAST=1 \
 	BONK_GODMODE=1 BONK_DOWN_NOW=45 BONK_SEED=4242 BONK_GAME_SEED=4242 \
-	BONK_GRAPHICS=1 BONK_SAVE_PATH="$(save_path_for coop)" \
+	BONK_GRAPHICS=1 BONK_SAVE_PATH="$(save_path_for coop)" BONK_RELIEF_RECIPE="$RECETA_COOP" \
 	godot --headless --fixed-fps 60 --quit-after "$FRAMES" \
 	res://scenes/tests/ArenaProbe.tscn >"$COOP_LOG" 2>&1
+chequear_receta "$COOP_LOG" "$RECETA_COOP"
 
 if grep -qE "$PATRON_ERROR" "$COOP_LOG"; then
 	echo "  FALLO: errores en tiempo de ejecución"
@@ -666,9 +699,10 @@ fase
 MYTHOS_LOG="$LOGDIR/soak_mythos.log"
 BONK_ARENA="res://scenes/world/HollowWoods.tscn" BONK_GODMODE=1 BONK_SEED=4242 \
 	BONK_GAME_SEED=4242 BONK_STAGE_BOSS_AT=60 BONK_STAGE_GOAL=90 \
-	BONK_SAVE_PATH="$(save_path_for mythos)" \
+	BONK_SAVE_PATH="$(save_path_for mythos)" BONK_RELIEF_RECIPE="$RECETA_MYTHOS" \
 	godot --headless --fixed-fps 60 --quit-after "$MYTHOS_FRAMES" \
 	res://scenes/tests/ArenaProbe.tscn >"$MYTHOS_LOG" 2>&1
+chequear_receta "$MYTHOS_LOG" "$RECETA_MYTHOS"
 
 if grep -qE "$PATRON_ERROR" "$MYTHOS_LOG"; then
 	echo "  FALLO: errores en tiempo de ejecución"
@@ -767,9 +801,10 @@ fase
 LOBSTER_LOG="$LOGDIR/soak_minijefe.log"
 BONK_ARENA="res://scenes/world/HollowWoods.tscn" BONK_GODMODE=1 BONK_SEED=4242 \
 	BONK_GAME_SEED=4242 BONK_MINI_BOSS_AT=60 \
-	BONK_SAVE_PATH="$(save_path_for minijefe)" \
+	BONK_SAVE_PATH="$(save_path_for minijefe)" BONK_RELIEF_RECIPE="$RECETA_MINIJEFE" \
 	godot --headless --fixed-fps 60 --quit-after "$LOBSTER_FRAMES" \
 	res://scenes/tests/ArenaProbe.tscn >"$LOBSTER_LOG" 2>&1
+chequear_receta "$LOBSTER_LOG" "$RECETA_MINIJEFE"
 
 if grep -qE "$PATRON_ERROR" "$LOBSTER_LOG"; then
 	echo "  FALLO: errores en tiempo de ejecución"
@@ -887,13 +922,17 @@ fi
 
 echo
 echo "Tiempo total: $(( SECONDS / 60 )) min $(( SECONDS % 60 )) s"
-# Una corrida con VERIFICAR_PASOS no probó todo: nunca dice OK.
-if [ -n "$PASOS" ]; then
+# Una corrida con VERIFICAR_PASOS (unos pasos) o con BONK_RELIEF_RECIPE (una
+# sola receta en los soaks del bosque) no probó todo: nunca dice OK.
+PARCIAL=""
+[ -n "$PASOS" ] && PARCIAL="pasos: $PASOS"
+[ -n "${BONK_RELIEF_RECIPE:-}" ] && PARCIAL="${PARCIAL:+$PARCIAL; }receta: $BONK_RELIEF_RECIPE"
+if [ -n "$PARCIAL" ]; then
 	if [ "$FALLOS" -eq 0 ]; then
-		echo "VERIFICACIÓN PARCIAL (pasos: $PASOS) — logs en $LOGDIR"
+		echo "VERIFICACIÓN PARCIAL ($PARCIAL) — logs en $LOGDIR"
 		exit 0
 	fi
-	echo "VERIFICACIÓN FALLIDA: $FALLOS problema(s) (pasos: $PASOS) — logs en $LOGDIR"
+	echo "VERIFICACIÓN FALLIDA: $FALLOS problema(s) ($PARCIAL) — logs en $LOGDIR"
 	exit 1
 fi
 if [ "$FALLOS" -eq 0 ]; then

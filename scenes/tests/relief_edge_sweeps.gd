@@ -11,8 +11,10 @@ extends RefCounted
 ##   edge  el suelo de AFUERA del muro: si es la malla del Terrain con el
 ##         material del suelo (material=terrain), cuánto se aparta del borde
 ##         de la arena sobre el muro (seam_max, por la función de altura) y
-##         cuánto se aparta la malla de esa función (mesh_max). `bad` cuenta
-##         las muestras del muro que se apartan más de SEAM_LIMIT: tiene que dar 0.
+##         cuánto se aparta la malla de esa función (mesh_max; inf si la malla
+##         no sigue pasado el muro). `bad` cuenta las muestras del muro que se
+##         apartan más de SEAM_LIMIT, más una si mesh_max pasa de SEAM_LIMIT:
+##         tiene que dar 0.
 ##
 ## Nunca se afloja una tolerancia para hacerlos pasar: cede el relieve.
 
@@ -96,8 +98,15 @@ static func edge(terrain: Terrain, ground_shader_path: String) -> void:
 				if notes.size() < DETAIL_LIMIT:
 					notes.append("edge seam %.3f at (%.1f, %.1f)" % [gap, wall.x, wall.y])
 			run += SEAM_STEP
+	# La malla misma: tiene que seguir pasado el muro y pegada a la función.
+	var mesh_gap := _mesh_gap(view, terrain, half)
+	if mesh_gap > SEAM_LIMIT:
+		bad += 1
+		if notes.size() < DETAIL_LIMIT:
+			notes.append("edge mesh missing past the wall" if is_inf(mesh_gap)
+					else "edge mesh off the outside height by %.3f" % mesh_gap)
 	print("Relief sweep: edge material=%s reach=%.1f seam_max=%.3f mesh_max=%.3f samples=%d bad=%d" % [
-			material, outside.reach, seam, _mesh_gap(view, terrain, half), samples, bad])
+			material, outside.reach, seam, mesh_gap, samples, bad])
 	for note: String in notes:
 		print("Relief sweep detail: %s" % note)
 
