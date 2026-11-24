@@ -344,6 +344,8 @@ func _return_to_stage() -> void:
 	_dispose_boss_arena(root)
 	var stage := _stage.restore(root)
 	_cast.end_omen()
+	# Un cambio de calidad gráfica hecho en la arena del jefe llega al sol del mapa.
+	Settings.apply_graphics()
 	_party.place_back()
 	_party.notify_world_changed()
 	var schedule := _schedule
