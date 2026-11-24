@@ -188,14 +188,14 @@ Los archivos clave para tocar contenido son los **catálogos** en `scripts/syste
 
 ## Verificación
 
-**El comando por defecto tras cualquier cambio** es el script de verificación: hace el import, el **lint de catálogos**, el **harness de UI**, la **sonda del campo** de las arenas de jefe, un soak de las **tres** arenas, un **cuarto soak de etapa** que cruza de mapa y un **quinto soak de co-op** con dos raiders, y falla si alguno ensucia el log, se cuelga, no ejercita nada, pierde progreso al cruzar o no reanima a nadie. Tarda entre ~16 y ~75 minutos según cuánto crezca la horda.
+**El comando por defecto tras cualquier cambio** es el script de verificación: hace el import, el **lint de catálogos**, el **harness de UI**, la **sonda del campo** de las arenas de jefe, un soak de las **tres** arenas, un **cuarto soak de etapa** que cruza de mapa, un **quinto soak de co-op** con dos raiders, un **sexto del jefe de etapa** (Mythos) y un **séptimo del minijefe** (el viaje entero a la arena de la Langosta Azul), y falla si alguno ensucia el log, se cuelga, no ejercita nada, pierde progreso al cruzar o no reanima a nadie. Tarda entre ~16 y ~75 minutos según cuánto crezca la horda.
 
 ```sh
 tools/verificar.sh            # 360 s de partida por arena (el modo estándar)
 tools/verificar.sh 720        # corrida larga, para cambios de ritmo tardío
 ```
 
-**Nunca con menos de 360 s**: por debajo, la puerta de cobertura de interactuables se salta en silencio y el script imprime OK sin haber exigido nada. La corrida completa (3 × 360 s + 1 × 720 s + 1 × 360 s de co-op + 1 × 450 s del jefe de etapa + 1 × 390 s del minijefe + lint + harness de UI + import) tarda **entre ~16 y ~75 minutos**: el reloj lo manda el tamaño de la horda y no el número de frames — medido en dos corridas de la misma cabeza y las mismas semillas, 16 min y 75 min, con el soak de co-op moviéndose entre 78 s y 32 min. El script imprime los segundos de cada fase y el total.
+**Nunca con menos de 360 s**: por debajo, la puerta de cobertura de interactuables se salta en silencio y el script imprime OK sin haber exigido nada. La corrida completa (3 × 360 s + 1 × 720 s + 1 × 360 s de co-op + 1 × 450 s del jefe de etapa + 1 × 390 s del minijefe + lint + harness de UI + sonda del campo + import) tarda **entre ~16 y ~75 minutos**: el reloj lo manda el tamaño de la horda y no el número de frames — medido en dos corridas de la misma cabeza y las mismas semillas, 16 min y 75 min, con el soak de co-op moviéndose entre 78 s y 32 min. El script imprime los segundos de cada fase y el total.
 
 Falla (exit 1) si el import, el lint, el harness de UI o un soak imprimen errores/warnings de Godot, si una arena no llega al final de su soak, si no alcanza la cobertura mínima (el raider tiene que pasar de nivel 3; en corridas de ≥240 s tiene que abrir un cofre, cargar un altar o usar un portal), si un soak **godmode** termina su partida sola, o si el soak de etapa no abre su portal, no cruza a las Dunas de Ceniza, deja algo vivo al cruzar, pierde progreso o no vuelve a producir un evento de cielo en el mapa nuevo. Los logs quedan en `$TMPDIR/bonkraiders-verify/` y cada arena imprime su resumen `nivel=… cofres=… altares=… portales=…`.
 

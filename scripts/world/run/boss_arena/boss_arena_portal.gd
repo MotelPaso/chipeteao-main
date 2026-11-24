@@ -1,6 +1,6 @@
 class_name BossArenaPortal
 extends Interactable
-## El PORTAL DE SALIDA de la arena de un jefe (BossArenaPortal.tscn, campo
+## El PORTAL DE REGRESO de la arena de un jefe (BossArenaPortal.tscn, campo
 ## portal_scene de su fila en BossArenaCatalog). BossArenaHost lo cuelga de
 ## la arena cuando el jefe muere y llama a open().
 ##

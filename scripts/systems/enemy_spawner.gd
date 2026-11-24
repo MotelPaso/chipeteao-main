@@ -205,11 +205,13 @@ const ELITE_CHANCE_CAP: float = 0.6
 ## Minuto de etapa en que llega el jefe del bioma.
 @export var boss_spawn_minute: float = 5.0
 ## Escena del minijefe de esta arena: llega sin aviso en mini_boss_spawn_minute
-## y el jefe del bioma espera a que muera. Vacío = la arena no tiene minijefe.
+## y el jefe del bioma espera a que muera. Si tiene fila en BossArenaCatalog no
+## llega al mapa: su presagio empieza omen_seconds antes y a su minuto el equipo
+## viaja a su arena. Vacío = la arena no tiene minijefe.
 @export var mini_boss_scene: PackedScene
 ## Minuto de etapa en que llega el minijefe.
 @export var mini_boss_spawn_minute: float = 5.0
-## Si el minijefe pelea SOLO: desde que llega no aparece ningún enemigo normal (ni flujo, ni hordas, ni jaurías, ni lluvia de enemigos) y el respiro tras su muerte es total. La horda que ya estaba en la arena se la lleva él al empezar la pelea.
+## Si el minijefe pelea SOLO: desde que llega no aparece ningún enemigo normal (ni flujo, ni hordas, ni jaurías, ni lluvia de enemigos) y el respiro tras su muerte es total. La horda que ya estaba en la arena se la lleva él al empezar la pelea. Con arena propia (BossArenaCatalog) pelea solo igual y la horda del mapa se barre igual: apagado solo quita el corte de spawns y el respiro al volver.
 @export var mini_boss_fights_alone: bool = true
 ## Minuto de etapa en que llega su revancha Ancestral (el jefe de etapa).
 @export var elder_spawn_minute: float = 11.0

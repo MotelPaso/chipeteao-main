@@ -28,7 +28,7 @@ const STATE_NAMES: Array[StringName] = [&"low", &"rising", &"high", &"ebbing"]
 @export_group("Ritmo")
 ## Segundos que tarda en subir (menos que lo que tarda la cinemática en mostrar el claro).
 @export var rise_seconds: float = 4.5
-## Segundos que tarda en bajar si alguien le pide ebb().
+## Segundos que tarda en bajar si alguien le pide ebb(). Hoy nadie lo pide: en el Cementerio de barcos la marea se va con la arena, así que cambiar esto no se nota.
 @export var ebb_seconds: float = 3.5
 
 @export_group("Corales")
