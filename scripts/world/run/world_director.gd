@@ -374,14 +374,18 @@ func random_altar_weather() -> String:
 	return _weather.random_altar_weather()
 
 
-## Un charco de ácido durante la lluvia radiactiva (EnemyBase al morir).
+## Un charco de ácido durante la lluvia radiactiva (EnemyBase al morir). Con
+## la etapa suspendida su clima no corre: un jefe que muere en su arena propia
+## no deja el charco de la lluvia del mapa.
 func spawn_acid_pool(at: Vector3) -> void:
+	if _suspended:
+		return
 	_weather.spawn_acid_pool(at)
 
 
-## Verdadero mientras `id` sea el clima activo.
+## Verdadero mientras `id` sea el clima activo (con la etapa suspendida, ninguno).
 func is_weather_active(id: String) -> bool:
-	return _weather.is_weather_active(id)
+	return not _suspended and _weather.is_weather_active(id)
 
 
 ## La arena cambió de cielo (HellTransformation): los climas vuelven desde
