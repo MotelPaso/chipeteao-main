@@ -77,7 +77,7 @@ func _physics_process(delta: float) -> void:
 		_leave(_reason)
 		return
 	_left -= delta
-	_notice.set_subtitle(countdown_text % maxi(ceili(_left), 0))
+	_notice.set_subtitle(_countdown(maxi(ceili(_left), 0)))
 	if _left <= 0.0:
 		_leave(BossArenaHost.RETURN_TIMEOUT)
 
@@ -88,7 +88,7 @@ func open(host: BossArenaHost, origin: Vector3) -> void:
 	_host = host
 	_left = maxf(close_seconds, 0.0)
 	global_position = _open_spot(origin)
-	_notice.show_notice(notice_text, countdown_text % ceili(_left))
+	_notice.show_notice(notice_text, _countdown(ceili(_left)))
 	get_tree().call_group("boss_ui", "track_objective", self)
 	Sfx.play(open_sfx)
 	set_physics_process(true)
@@ -117,6 +117,11 @@ func _leave(reason: String) -> void:
 	_notice.hide_notice()
 	if _host != null and _host.request_exit(reason):
 		set_physics_process(false)
+
+
+## La segunda línea de la tarjeta. Un countdown_text sin %d se muestra tal cual.
+func _countdown(seconds: int) -> String:
+	return countdown_text % seconds if countdown_text.contains("%d") else countdown_text
 
 
 ## El punto más cercano a `origin` donde cabe el portal, a ras de suelo.

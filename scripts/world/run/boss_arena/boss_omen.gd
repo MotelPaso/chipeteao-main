@@ -14,22 +14,29 @@ extends Node
 ## Contratos por nombre: begin, release y la línea "Boss omen:".
 
 @export_group("Cielo")
-## Cielo del presagio a pleno: los cuatro colores del cielo, de arriba abajo.
+## Color de lo alto del cielo con el presagio a pleno.
 @export var sky_top: Color = Color(0.02, 0.1, 0.3)
+## Color del cielo en el horizonte con el presagio a pleno.
 @export var sky_horizon: Color = Color(0.1, 0.38, 0.66)
+## Color de la mitad de abajo del cielo, junto al horizonte, con el presagio a pleno.
 @export var ground_horizon: Color = Color(0.06, 0.26, 0.48)
+## Color de lo más bajo del cielo con el presagio a pleno.
 @export var ground_bottom: Color = Color(0.01, 0.05, 0.15)
-## Color y fuerza del sol con el presagio a pleno.
+## Color del sol con el presagio a pleno.
 @export var sun_color: Color = Color(0.62, 0.82, 1.0)
+## Fuerza del sol con el presagio a pleno (energía de la luz; 1 = la normal).
 @export var sun_energy: float = 1.0
-## Color y fuerza de la luz ambiente con el presagio a pleno.
+## Color de la luz ambiente con el presagio a pleno.
 @export var ambient_color: Color = Color(0.36, 0.52, 0.96)
+## Fuerza de la luz ambiente con el presagio a pleno (1 = la normal).
 @export var ambient_energy: float = 1.15
-## Color y espesor de la niebla con el presagio a pleno.
+## Color de la niebla con el presagio a pleno.
 @export var fog_color: Color = Color(0.08, 0.32, 0.62)
+## Espesor de la niebla con el presagio a pleno (densidad de la niebla del Environment).
 @export var fog_density: float = 0.016
-## Color del suelo lejano y de las colinas del horizonte con el presagio a pleno.
+## Color del suelo lejano con el presagio a pleno.
 @export var backdrop_ground: Color = Color(0.05, 0.2, 0.38)
+## Color de las colinas del horizonte con el presagio a pleno.
 @export var backdrop_hills: Color = Color(0.07, 0.27, 0.5)
 ## Cuánto de ese cielo toma el mapa (0 = nada, 1 = entero).
 @export_range(0.0, 1.0) var strength: float = 0.85
@@ -169,9 +176,12 @@ func _show_countdown() -> void:
 	_notice.set_subtitle(_countdown())
 
 
+## La segunda línea de la tarjeta. Un countdown_text sin %d se muestra tal cual.
 func _countdown() -> String:
 	var left := ceili(_due - RunState.stage_time)
-	return countdown_text % left if left > 0 else arriving_text
+	if left <= 0:
+		return arriving_text
+	return countdown_text % left if countdown_text.contains("%d") else countdown_text
 
 
 func _color_text(color: Color) -> String:

@@ -18,8 +18,9 @@ extends Node3D
 @export_group("Chorros")
 ## Chorros que brotan alrededor de cada raider.
 @export_range(1, 12) var geysers_per_raider: int = 6
-## Metros mínimos y máximos de un chorro a su raider.
+## Metros mínimos de un chorro a su raider.
 @export var geyser_ring_min: float = 3.2
+## Metros máximos de un chorro a su raider.
 @export var geyser_ring_max: float = 7.5
 ## Segundo del rapto en que brota el primer chorro.
 @export var geyser_from: float = 0.1
@@ -29,8 +30,9 @@ extends Node3D
 @export var geyser_rise_seconds: float = 0.28
 ## Radio de un chorro, en metros.
 @export var geyser_radius: float = 0.85
-## Altura mínima y máxima de un chorro, en metros.
+## Altura mínima de un chorro, en metros.
 @export var geyser_height_min: float = 5.0
+## Altura máxima de un chorro, en metros.
 @export var geyser_height_max: float = 10.0
 ## Tramos de agua de cada chorro.
 @export_range(3, 10) var geyser_segments: int = 6
@@ -42,15 +44,17 @@ extends Node3D
 @export var wall_from: float = 1.5
 ## Segundo del rapto en que termina de cerrarse.
 @export var wall_closed_at: float = 4.6
-## Radio de la pared al levantarse y ya cerrada, en metros.
+## Radio de la pared al levantarse, en metros.
 @export var wall_radius_open: float = 10.5
+## Radio de la pared ya cerrada, en metros.
 @export var wall_radius_closed: float = 2.4
 ## Altura de la pared ya cerrada, en metros.
 @export var wall_height: float = 12.0
 ## Tramos de agua de la pared de cada raider.
 @export_range(6, 32) var wall_segments: int = 18
-## Vueltas por segundo que da la pared al empezar y al cerrarse.
+## Vueltas por segundo que da la pared al empezar.
 @export var wall_turns_open: float = 0.25
+## Vueltas por segundo que da la pared al cerrarse.
 @export var wall_turns_closed: float = 0.9
 ## Grados que cada tramo se inclina hacia donde gira.
 @export var wall_lean_degrees: float = 26.0
