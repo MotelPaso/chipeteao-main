@@ -150,6 +150,7 @@ func _id_libraries() -> Array[Array]:
 		["EVENT_LIBRARY", WORLD_DIRECTOR.EVENT_LIBRARY, "id"],
 		["WEATHER_CATALOG", WEATHER_DIRECTOR.WEATHER_CATALOG, "id"],
 		["PACT_LIBRARY", CurseShrine.PACT_LIBRARY, "id"],
+		["ARENA_LIBRARY", BossArenaCatalog.ARENA_LIBRARY, "id"],
 	]
 
 
@@ -200,9 +201,11 @@ func _check_paths_exist() -> void:
 		["ITEM_LIBRARY", ItemCatalog.ITEM_LIBRARY, "id"],
 		["POWERUP_LIBRARY", PowerUpCatalog.POWERUP_LIBRARY, "id"],
 		["TOME_LIBRARY", Tome.TOME_LIBRARY, "id"],
+		["ARENA_LIBRARY", BossArenaCatalog.ARENA_LIBRARY, "id"],
 	]
 	var path_keys: Array[String] = ["scene", "weapon_scene", "scene_path", "icon",
-			"model_scene"]
+			"model_scene", "boss_scene", "arena_scene", "omen_scene", "cinematic_scene",
+			"portal_scene"]
 	for entry: Array in sources:
 		var library_name := String(entry[0])
 		var library: Array[Dictionary] = entry[1]

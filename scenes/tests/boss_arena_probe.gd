@@ -77,9 +77,14 @@ func tick(frames: int) -> void:
 	_frames = frames
 	_bind_once()
 	for index: int in range(_world_reports.size() - 1, -1, -1):
-		if frames >= int(_world_reports[index]["at_frame"]):
-			_print_world(String(_world_reports[index]["where"]))
-			_world_reports.remove_at(index)
+		var report := _world_reports[index]
+		# La línea de afuera se toma ya en la pelea: durante la cinemática los
+		# mapas se esconden por ella, no por el viaje.
+		if frames < int(report["at_frame"]) \
+				or (String(report["where"]) == "away" and _cinematic_playing()):
+			continue
+		_print_world(String(report["where"]))
+		_world_reports.remove_at(index)
 	if _tamper_at_frame >= 0 and frames >= _tamper_at_frame:
 		_tamper_at_frame = -1
 		_tamper_stage()
@@ -173,6 +178,14 @@ func _print_world(where: String) -> void:
 	if where == "away":
 		line += " %s" % _map_fields()
 	print(line)
+
+
+## True mientras una cinemática de jefe tiene la pantalla.
+func _cinematic_playing() -> bool:
+	for node: Node in _tree.get_nodes_in_group(&"boss_cinematic"):
+		if node.has_method(&"is_calm_active") and bool(node.call(&"is_calm_active")):
+			return true
+	return false
 
 
 ## Lo que ven los mapas con el equipo fuera: cuántos marcadores hay en el

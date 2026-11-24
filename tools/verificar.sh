@@ -199,10 +199,10 @@ chequear_relieve() {
 MINIJEFE_UNA_VEZ=(
 	'^Boss omen: Langosta Azul in=[0-9.]+s sun=\([0-9.,]+\)->\([0-9.,]+\) at [0-9.]+s'
 	'^Spawns held: mini boss fights alone at [0-9.]+s'
-	'^Boss arena: left hollow_woods for ship_graveyard at [0-9.]+s party=[0-9]+'
+	'^Boss arena: left hollow_woods for ship_graveyard at [0-9.]+s party=[1-9][0-9]*'
 	'^Boss arena: entered ship_graveyard at [0-9.]+s'
 	'^Boss spawned: Langosta Azul at [0-9.]+s'
-	'^Probe mini world: where=away arena_root=1 arena_bounds=1 terrain=1 enemy_spawner=1 world_environments=1 live=ship_graveyard map_markers=[0-9]+ stage_markers=0 '
+	'^Probe mini world: where=away arena_root=1 arena_bounds=1 terrain=1 enemy_spawner=1 world_environments=1 live=ship_graveyard map_markers=[0-9]+ stage_markers=0 overlay_markers=-?[0-9]+ maps_shown=0$'
 	'^Probe mini calm: frames=[0-9]+ seconds=[0-9.]+ healths=[0-9]+ changed=0 born=0 '
 	'^Boss cinematic: ended after=[0-9.]+s skipped=false '
 	'^Langosta Azul scaling: life=1 '
@@ -217,7 +217,7 @@ MINIJEFE_UNA_VEZ=(
 	'^Probe mini return loot: gems_left=0 orbs_left=0 chests_lost=[0-9]+$'
 	'^Probe mini portal closed: reason=(portal|timeout) '
 	'^Probe mini trip: snapshot equal=true diffs=0 sky=equal enemies_left=0 '
-	'^Probe mini spots: raiders=[0-9]+ moved_max=[0-9.]+m within=true off_floor=0 unanchored=0$'
+	'^Probe mini spots: raiders=[1-9][0-9]* moved_max=[0-9.]+m within=true off_floor=0 unanchored=0$'
 	'^Boss arena: back in hollow_woods at [0-9.]+s away=[0-9.]+s'
 	'^Probe mini leftovers: boss_arenas=0 cinematics=0 portals=0 tides=0 covers=0$'
 	'^Probe mini world: where=back arena_root=1 arena_bounds=1 terrain=1 enemy_spawner=1 world_environments=1 live=hollow_woods$'
@@ -229,13 +229,20 @@ MINIJEFE_UNA_VEZ=(
 # La pantalla y el mundo en cada parte de la cinemática: tomados en el bosque
 # y en el fondo del mar, y devueltos enteros (con la marea alta) al terminar.
 MINIJEFE_PANTALLA=(
-	'^Probe mini stage: reason=entrance hud_visible=false .*cinematic_camera=true .*world_frozen=true clock_running=false tide=[a-z]+$'
-	'^Probe mini stage: reason=seabed hud_visible=false .*cinematic_camera=true .*world_frozen=true clock_running=false tide=[a-z]+$'
-	'^Probe mini stage: reason=entrance_end hud_visible=true .*cinematic_camera=false .*world_frozen=false clock_running=true tide=high$'
+	'^Probe mini stage: reason=entrance hud_visible=false .*cinematic_camera=true song_playing=false world_frozen=true clock_running=false tide=[a-z]+$'
+	'^Probe mini stage: reason=seabed hud_visible=false .*cinematic_camera=true song_playing=true world_frozen=true clock_running=false tide=[a-z]+$'
+	'^Probe mini stage: reason=entrance_end hud_visible=true .*cinematic_camera=false song_playing=true world_frozen=false clock_running=true tide=high$'
 )
 revisar_minijefe() {
 	local log="$1"
 	local patron veces
+	# Sin log no hay nada que revisar: con grep -c sobre un archivo que no
+	# existe, cada conteo saldría vacío y ninguna comprobación fallaría.
+	if [ ! -s "$log" ]; then
+		echo "  FALLO (minijefe): no hay log del soak ($log)"
+		FALLOS=$((FALLOS + 1))
+		return
+	fi
 	for patron in "${MINIJEFE_UNA_VEZ[@]}"; do
 		veces=$(grep -cE "$patron" "$log")
 		if [ "$veces" -ne 1 ]; then
@@ -272,7 +279,7 @@ revisar_minijefe() {
 		FALLOS=$((FALLOS + 1))
 	fi
 	# El equipo viaja entero: al llegar, al empezar la pelea y al volver.
-	veces=$(grep -cE '^Probe mini party: at=(arrived|fight|back) raiders=[0-9]+ lost=0 ' "$log")
+	veces=$(grep -cE '^Probe mini party: at=(arrived|fight|back) raiders=[1-9][0-9]* lost=0 ' "$log")
 	if [ "$veces" -ne 3 ] || grep '^Probe mini party: ' "$log" | grep -qv ' lost=0 '; then
 		echo "  FALLO (minijefe): el equipo perdió algo en el viaje, o falta una de sus tres líneas"
 		grep -n '^Probe mini party: ' "$log" | head -4
@@ -289,8 +296,13 @@ revisar_minijefe() {
 		echo "  FALLO (minijefe): la langosta usó $veces ataque(s) distinto(s) (se esperan al menos 3)"
 		FALLOS=$((FALLOS + 1))
 	fi
-	if ! grep -q '^Spawns resumed at ' "$log"; then
-		echo "  FALLO (minijefe): los spawns no volvieron después de la vuelta al mapa"
+	# Los spawns vuelven DESPUÉS de la vuelta: el respiro se cuenta desde ahí.
+	local vuelta reanudan
+	vuelta=$(sed -n 's/^Boss arena: back in [a-z_]* at \([0-9.]*\)s .*/\1/p' "$log" | head -1)
+	reanudan=$(sed -n 's/^Spawns resumed at \([0-9.]*\)s.*/\1/p' "$log" | head -1)
+	if [ -z "$vuelta" ] || [ -z "$reanudan" ] \
+		|| ! awk -v a="$vuelta" -v b="$reanudan" 'BEGIN { exit (b + 0 >= a + 0) ? 0 : 1 }'; then
+		echo "  FALLO (minijefe): los spawns no volvieron después de la vuelta al mapa (vuelta=${vuelta:-?} reanudan=${reanudan:-?})"
 		FALLOS=$((FALLOS + 1))
 	fi
 }
@@ -673,16 +685,16 @@ fi
 # muerte final, la puerta, el portal y el cruce de etapa. Fuera de la cuenta
 # de interactuables, como el de etapa.
 # A los 60 s y no más tarde: la pelea dura entre 2 y 3 minutos y el raider
-# tiene que cruzar el portal ANTES del jefe del minuto 5. Con ese jefe y su
-# horda encima, el raider del soak (casi sin daño a esa altura) queda
-# rodeado y no llega.
+# tiene que cruzar el portal después. BONK_MINI_BOSS_AT deja a la Langosta
+# Azul fuera de este soak (su viaje del minuto 5 se llevaba al equipo justo
+# cuando iba hacia el portal); la mide el soak del minijefe.
 MYTHOS_SECS=450
 MYTHOS_FRAMES=$(( MYTHOS_SECS * 60 ))
 echo "== soak jefe de etapa (HollowWoods, Mythos, ${MYTHOS_SECS}s de partida) =="
 fase
 MYTHOS_LOG="$LOGDIR/soak_mythos.log"
 BONK_ARENA="res://scenes/world/HollowWoods.tscn" BONK_GODMODE=1 BONK_SEED=4242 \
-	BONK_GAME_SEED=4242 BONK_STAGE_BOSS_AT=60 BONK_STAGE_GOAL=90 \
+	BONK_GAME_SEED=4242 BONK_STAGE_BOSS_AT=60 BONK_STAGE_GOAL=90 BONK_MINI_BOSS_AT=100000 \
 	BONK_SAVE_PATH="$(save_path_for mythos)" \
 	godot --headless --fixed-fps 60 --quit-after "$MYTHOS_FRAMES" \
 	res://scenes/tests/ArenaProbe.tscn >"$MYTHOS_LOG" 2>&1

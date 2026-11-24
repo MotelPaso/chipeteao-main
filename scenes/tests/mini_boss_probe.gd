@@ -146,6 +146,20 @@ func _tick_calm() -> void:
 		_stage_reports.append({"left": STAGE_REPORT_FRAMES, "reason": "entrance_end"})
 
 
+## Si el mapa de la etapa tiene cortados sus spawns. Con el equipo en la arena
+## de un jefe se le pregunta al spawner del mapa suspendido: el que responde al
+## grupo es el de la arena, que nunca saca a nadie.
+func _stage_holding() -> bool:
+	var host := BossArenaHost.find(_tree)
+	var stage := host.suspended_arena() if host != null else null
+	if stage == null:
+		return EnemySpawner.is_holding(_tree)
+	for node: Node in SuspendedStage.descendants(stage):
+		if node is EnemySpawner:
+			return (node as EnemySpawner).spawns_held()
+	return false
+
+
 ## Cuenta a los otros enemigos vivos mientras el minijefe pelea.
 func _tick_alone(boss: Node3D) -> void:
 	if boss == null or _now - _fight_from < ALONE_AFTER:
@@ -233,7 +247,7 @@ func _on_state_changed(from: StringName, to: StringName, boss: Node3D) -> void:
 		_watch_death(boss)
 	if from == &"arrival" and to != &"" and to != &"dead":
 		_fight_from = _now
-		_alone_held = EnemySpawner.is_holding(_tree)
+		_alone_held = _stage_holding()
 		_others_max = 0
 	if to == &"dead" and _fight_from >= 0.0:
 		print("Probe mini fight: took=%.1fs at %.1fs" % [_now - _fight_from, _now])
