@@ -303,16 +303,21 @@ func _crosses(from: Vector2, to: Vector2, polygon: PackedVector2Array) -> bool:
 
 
 ## Arma la huella de cada cobertura con sus formas de colisión. Se guarda una
-## sola vez, con la arena ya armada (las coberturas no se mueven); mientras
-## la arena se construye se vuelve a medir, porque una cobertura puede no
-## tener todavía sus formas.
+## sola vez, en cuanto todas las coberturas armaron sus formas (las coberturas
+## no se mueven); antes se vuelve a medir en cada pregunta.
 func _build_footprints() -> void:
 	if _footprints_built or not is_inside_tree():
 		return
 	var arena := get_parent()
-	_footprints_built = arena == null or arena.is_node_ready()
+	# Las coberturas entran a su grupo al entrar al árbol y arman sus formas en
+	# su _ready: con todas listas, la huella ya no cambia y se guarda.
+	var found := covers()
+	var all_ready := true
+	for cover: Node3D in found:
+		all_ready = all_ready and cover.is_node_ready()
+	_footprints_built = arena == null or arena.is_node_ready() or all_ready
 	_footprints.clear()
-	for cover: Node3D in covers():
+	for cover: Node3D in found:
 		var points := PackedVector2Array()
 		for node: Node in _collision_holders(cover):
 			points.append_array(_shape_outline(node as CollisionShape3D))

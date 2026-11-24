@@ -88,9 +88,6 @@ surface_material = SubResource("ShaderMaterial_sand")
 [node name="Reef" type="Node3D" parent="." unique_id=352334055]
 script = ExtResource("7_reef")
 
-[node name="Scatter" type="Node3D" parent="." unique_id=958735680]
-script = ExtResource("8_scatter")
-
 [node name="Landmarks" type="Node3D" parent="." unique_id=490269370]
 script = ExtResource("10_grounded")
 
@@ -167,6 +164,9 @@ shape_seed = 3
 transform = Transform3D(-0.46947157, 0, 0.88294756, 0, 1, 0, -0.88294756, 0, -0.46947157, 22.3, 0, -20.07)
 script = ExtResource("15_hull")
 shape_seed = 3
+
+[node name="Scatter" type="Node3D" parent="." unique_id=958735680]
+script = ExtResource("8_scatter")
 
 [node name="Kelp" type="Node3D" parent="." unique_id=1936942546]
 script = ExtResource("17_kelp")

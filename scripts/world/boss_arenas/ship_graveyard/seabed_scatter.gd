@@ -9,8 +9,9 @@ extends Node3D
 ## Cada tipo es UN MultiMesh (una malla chica armada con LowPolyMesh y
 ## repetida con otro giro, tamaño y color), así que todo esto son siete
 ## dibujos. Nada cae dentro de una cobertura: se le pregunta al nodo
-## "arena_bounds" de la arena. Va después del Terrain en el árbol: apoya cada
-## pieza en la altura de la arena.
+## "arena_bounds" de la arena. Va después del Terrain y de las coberturas en el
+## árbol: apoya cada pieza en la altura de la arena, y las coberturas ya armaron
+## sus formas en su _ready.
 
 ## Intentos por pieza antes de darla por perdida (cayó en una cobertura).
 const PLACE_TRIES: int = 6
