@@ -145,6 +145,10 @@ static func _place_bridge(scatter: Node3D, terrain: Terrain,
 	bridge.overlap = BRIDGE_OVERLAP
 	bridge.stair_reach = settings.bridge_stair_reach
 	bridge.shape_seed = run_seed
+	# El tablero corre por +X local hacia la cabecera A (ver abajo).
+	for end: float in [-1.0, 1.0]:
+		if not crossing.has_stairs(end):
+			bridge.stairless_end = int(end)
 	# El fondo del cañón ondula: la obra baja hasta su punto más hondo bajo
 	# el puente y al pie de las escaleras, así ninguna queda colgando.
 	var side := Vector2(-crossing.axis.y, crossing.axis.x)

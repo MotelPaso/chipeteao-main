@@ -2,14 +2,15 @@ class_name Bridge
 extends StaticBody3D
 ## El Gran Puente del cañón: un puente de piedra de arcos ABIERTOS. Se cruza
 ## por arriba, entre barandas, y se pasa por debajo; a cada lado de cada
-## estribo baja una escalera hasta el fondo. Escena:
+## estribo baja una escalera hasta el fondo (salvo del extremo
+## `stairless_end`: el muelle de una isla). Escena:
 ## scenes/world/props/Bridge.tscn.
 ##
 ## El origen está en el centro de la cara de arriba del tablero; el tablero
 ## corre a lo largo de X y el cañón a lo largo de Z. Quien lo coloca
-## (ReliefDressing) le da `span`, `width`, `drop`, `overlap` y `stair_reach`
-## ANTES de add_child: _ready arma la cantería (BridgeMasonry) y las formas
-## de colisión.
+## (ReliefDressing) le da `span`, `width`, `drop`, `overlap`, `stair_reach` y
+## `stairless_end` ANTES de add_child: _ready arma la cantería (BridgeMasonry)
+## y las formas de colisión.
 ##
 ## Bajo el tablero no hay pared que trepar. La horda que persigue a alguien
 ## parado en el puente entra por las cabeceras: se lo dice ReliefLanes, que
@@ -116,6 +117,10 @@ extends StaticBody3D
 
 ## Semilla del tono de cada sillar; la fija quien coloca el puente.
 var shape_seed: int = 0
+## El extremo del tablero (-1 o +1 a lo largo de X) del que no bajan escaleras,
+## o 0 si bajan de los dos. Lo fija quien coloca el puente: el muelle de una
+## isla no las lleva del lado de la isla (ReliefLayout.Crossing.has_stairs).
+var stairless_end: int = 0
 
 var _flames: Array[Node3D] = []
 var _clock: float = 0.0
@@ -143,6 +148,11 @@ func _process(delta: float) -> void:
 func deck_ends() -> PackedVector3Array:
 	var reach := global_transform.basis.x * (span * 0.5 + overlap)
 	return PackedVector3Array([global_position - reach, global_position + reach])
+
+
+## True si del extremo `side` (-1 o +1 a lo largo de X) bajan escaleras.
+func has_stairs(side: float) -> bool:
+	return roundi(side) != stairless_end
 
 
 ## Ancho del tablero entre las caras de afuera de las barandas, en metros.
@@ -253,6 +263,8 @@ func _build_collision() -> void:
 		_add_box(Vector3(side * (span * 0.5 + (overlap - nose) * 0.5),
 				-deck_thickness - (deep - deck_thickness) * 0.5, 0.0),
 				Vector3(nose + overlap, deep - deck_thickness, width))
+		if not has_stairs(side):
+			continue
 		for turn: float in [-1.0, 1.0]:
 			_add_hull(stair_hull(side, turn))
 	for index in pier_count:
@@ -287,6 +299,20 @@ func _build_barriers() -> void:
 			holder.shape = shape
 			holder.position = tower_spot(side, turn) + Vector3.UP * tower_height * 0.5
 			barriers.add_child(holder)
+		# Donde no bajan escaleras, el ala del estribo (fuera de la baranda) se
+		# dibuja hasta el tablero pero su macizo termina bajo él: sin el descanso
+		# de la escalera encima, quedaría una repisa a la que nadie llega. Se
+		# cierra hasta el tablero como obstáculo, igual que la baranda.
+		if has_stairs(side):
+			continue
+		for turn: float in [-1.0, 1.0]:
+			var wing_box := BoxShape3D.new()
+			wing_box.size = Vector3(nose + overlap, deck_thickness, wing)
+			var wing_holder := CollisionShape3D.new()
+			wing_holder.shape = wing_box
+			wing_holder.position = Vector3(side * (span * 0.5 + (overlap - nose) * 0.5),
+					-deck_thickness * 0.5, turn * (deck_width() + wing) * 0.5)
+			barriers.add_child(wing_holder)
 
 
 func _add_box(center: Vector3, size: Vector3) -> void:

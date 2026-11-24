@@ -52,7 +52,8 @@ func build() -> MeshInstance3D:
 		_parapet(side)
 		_lintel(side)
 		for turn: float in [-1.0, 1.0]:
-			_stairs(side, turn)
+			if _bridge.has_stairs(side):
+				_stairs(side, turn)
 			_tower(side, turn)
 	return _mesh.instance("Stone")
 

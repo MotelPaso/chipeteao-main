@@ -19,8 +19,10 @@ extends RefCounted
 ## La receta sale de la semilla de partida con su propio RNG (esta sal) y los
 ## pesos de ReliefSettings (grupo «Recetas»); las piezas opcionales de cada
 ## receta (el manantial del río, la cascada del lago, el camino), de otro RNG
-## con otra sal. Ninguno saca números del trazado ni de la partida. BONK_RELIEF_RECIPE=<id> fuerza una receta y <id>:reserve su
-## trazado de reserva; un id que no existe es un error.
+## con otra sal. Ninguno saca números del trazado ni de la partida.
+## BONK_RELIEF_RECIPE=<id> fuerza una receta y <id>:reserve su trazado de
+## reserva; un id que no existe es un error. Cada receta declara su pieza
+## propia en own_pieces: el harness la exige en la línea `Relief pieces:`.
 
 ## Las recetas, en orden de sorteo. Son llaves internas: no se renombran.
 const IDS: Array[StringName] = [&"massif", &"river", &"twin", &"lake"]
@@ -86,6 +88,23 @@ static func options(settings: ReliefSettings, id: StringName, run_seed: int) -> 
 	if id != &"twin":
 		picked["road"] = rng.randf() < settings.road_chance
 	return picked
+
+
+## La pieza propia de la receta `id`, la que ninguna otra arma: las llaves de
+## la línea `Relief pieces:` (ReliefPieces) con lo mínimo que tiene que haber.
+## Vacío si la receta no la declara (el harness lo da por fallo: una receta
+## nueva declara aquí la suya).
+static func own_pieces(id: StringName) -> Dictionary:
+	match id:
+		&"massif":
+			return {"stepped_mountain": 1}
+		&"river":
+			return {"ravine": 1}
+		&"twin":
+			return {"twin_mounts": 2}
+		&"lake":
+			return {"lake": 1, "island": 1}
+	return {}
 
 
 ## Un trazado entero de la receta de `layout`; false si una pieza

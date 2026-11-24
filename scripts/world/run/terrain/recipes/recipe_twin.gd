@@ -18,7 +18,6 @@ const STRETCH := Vector2(1.05, 1.3)
 
 ## El trazado del paso; false si un monte o los cerros no cupieron.
 static func try_plan(layout: ReliefLayout, rng: RandomNumberGenerator, calm: bool) -> bool:
-	var s := layout.settings
 	var facing := PI * 0.25 + PI * 0.5 * float(rng.randi_range(0, 3)) if calm \
 			else rng.randf() * TAU
 	var out := Vector2.from_angle(facing)
@@ -27,8 +26,8 @@ static func try_plan(layout: ReliefLayout, rng: RandomNumberGenerator, calm: boo
 	for side: float in [1.0, -1.0]:
 		if not _place_mount(layout, rng, calm, out * side, valley):
 			return false
-	if not RecipeKit.add_buttes(layout, rng, calm, maxi(s.butte_count_min - 1, 0),
-			maxi(s.butte_count_max - 2, 1)):
+	# Los dos montes ocupan el llano: uno menos del mínimo y dos menos del máximo.
+	if not RecipeKit.add_fewer_buttes(layout, rng, calm, 1, 2):
 		return false
 	ReliefPlanner.place_hills(layout, rng)
 	return true

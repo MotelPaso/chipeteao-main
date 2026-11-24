@@ -261,24 +261,9 @@ func snap(position: Vector3) -> Vector3:
 
 
 ## Imagen cenital del relieve para el minimapa y el mapa: el tinte del
-## bioma, sombreado por altura. `px_per_meter` suele ser bastante menor que 1
-## (un mapa de 121 px para 240 m es 0.5).
+## bioma, sombreado por altura (ver TerrainMap).
 func map_image(px_per_meter: float) -> Image:
-	var pixels := maxi(int(round(size * px_per_meter)), 8)
-	var image := Image.create_empty(pixels, pixels, false, Image.FORMAT_RGBA8)
-	var base := _biome_tint()
-	var span := maxf(max_height - min_height, 0.001)
-	for py in pixels:
-		var z := (float(py) + 0.5) / float(pixels) * size - size * 0.5
-		for px in pixels:
-			var x := (float(px) + 0.5) / float(pixels) * size - size * 0.5
-			# Sombreado por altura: más oscuro en las hondonadas y más claro
-			# en las cimas, para que el relieve se lea hasta en 121 px.
-			var shade := clampf((height_at(x, z) - min_height) / span, 0.0, 1.0)
-			var tint := base.lerp(base.lightened(map_peak_lighten), shade)
-			tint = tint.darkened(map_hollow_darken * (1.0 - shade))
-			image.set_pixel(px, py, tint)
-	return image
+	return TerrainMap.image(self, px_per_meter)
 
 
 ## Lado de la arena en metros según el scatter (grupo "arena_bounds"): el
@@ -362,83 +347,12 @@ func _build_relief() -> void:
 		_outside = OutsideRelief.new(_layout, _run_seed())
 
 
+## Las alturas clásicas, sin relieve por zonas (ver TerrainHeights).
 func _build_heights() -> void:
-	var noise := FastNoiseLite.new()
-	noise.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH
-	noise.seed = _run_seed()
-	noise.frequency = 1.0 / maxf(feature_size, 1.0)
-	noise.fractal_octaves = maxi(octaves, 1)
-	# Primero la retícula gruesa (ver noise_step), luego bilineal a 1 m.
-	var lattice := maxi(int(ceil(size / maxf(noise_step, 0.5))) + 1, 2)
-	var coarse := PackedFloat32Array()
-	coarse.resize(lattice * lattice)
-	var half := size * 0.5
-	for lz in lattice:
-		var z := -half + float(lz) * noise_step
-		for lx in lattice:
-			var x := -half + float(lx) * noise_step
-			coarse[lz * lattice + lx] = noise.get_noise_2d(x, z) * amplitude
-	_heights.resize(_samples * _samples)
-	min_height = INF
-	max_height = -INF
-	for iz in _samples:
-		var z := -half + float(iz) * SAMPLE_METERS
-		for ix in _samples:
-			var x := -half + float(ix) * SAMPLE_METERS
-			var h := _sample_coarse(coarse, lattice, x, z)
-			h *= _rim_falloff(x, z)
-			h = _apply_pads(x, z, h)
-			_heights[iz * _samples + ix] = h
-			min_height = minf(min_height, h)
-			max_height = maxf(max_height, h)
-	if min_height == INF:
-		min_height = 0.0
-		max_height = 0.0
-
-
-## Lectura bilineal de la retícula gruesa de ruido en un XZ de mundo.
-func _sample_coarse(coarse: PackedFloat32Array, lattice: int, x: float, z: float) -> float:
-	var half := size * 0.5
-	var fx := clampf((x + half) / noise_step, 0.0, float(lattice - 1))
-	var fz := clampf((z + half) / noise_step, 0.0, float(lattice - 1))
-	var ix := int(fx)
-	var iz := int(fz)
-	var nx := mini(ix + 1, lattice - 1)
-	var nz := mini(iz + 1, lattice - 1)
-	var tx := fx - float(ix)
-	var tz := fz - float(iz)
-	var h00 := coarse[iz * lattice + ix]
-	var h10 := coarse[iz * lattice + nx]
-	var h01 := coarse[nz * lattice + ix]
-	var h11 := coarse[nz * lattice + nx]
-	return lerpf(lerpf(h00, h10, tx), lerpf(h01, h11, tx), tz)
-
-
-## 1 en el centro, bajando a 0 dentro de rim_flat_band del borde: los muros
-## del perímetro son estáticos y el disco del backdrop es plano, así que el
-## suelo tiene que ser plano donde se encuentran.
-func _rim_falloff(x: float, z: float) -> float:
-	var half := size * 0.5
-	var edge := minf(half - absf(x), half - absf(z))
-	if edge >= rim_flat_band:
-		return 1.0
-	return smoothstep(0.0, 1.0, maxf(edge, 0.0) / maxf(rim_flat_band, 0.001))
-
-
-## Aplana `h` hacia 0 dentro de un claro y vuelve al ruido en pad_blend.
-## Gana el claro más fuerte, así dos claros superpuestos no se suman.
-func _apply_pads(x: float, z: float, h: float) -> float:
-	var flat := 0.0
-	for pad: Dictionary in _pads:
-		var center: Vector2 = pad["center"]
-		var radius: float = pad["radius"]
-		var distance := Vector2(x, z).distance_to(center)
-		if distance >= radius + pad_blend:
-			continue
-		var strength := 1.0 if distance <= radius \
-				else 1.0 - smoothstep(0.0, 1.0, (distance - radius) / pad_blend)
-		flat = maxf(flat, strength)
-	return lerpf(h, 0.0, flat)
+	var built := TerrainHeights.build(self, _samples, _pads, _run_seed())
+	_heights = built["heights"]
+	min_height = built["min"]
+	max_height = built["max"]
 
 
 ## Malla de render desde arreglos empaquetados (TerrainMesh): la cuadrícula
@@ -478,17 +392,6 @@ func _build_collider() -> void:
 		_collision.name = "CollisionShape3D"
 		add_child(_collision)
 	_collision.shape = shape
-
-
-## Tinte del suelo para map_image(): el ground_color del nodo de
-## backdrop_path, para que el mapa se lea como el mismo lugar.
-func _biome_tint() -> Color:
-	var backdrop := get_node_or_null(backdrop_path) if not backdrop_path.is_empty() else null
-	if backdrop != null:
-		var value: Variant = backdrop.get("ground_color")
-		if value is Color:
-			return value
-	return FALLBACK_MAP_TINT
 
 
 ## Nombre de la arena de este terreno, para el log de construcción.

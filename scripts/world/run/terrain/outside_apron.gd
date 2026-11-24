@@ -11,6 +11,7 @@ extends RefCounted
 ## Terrain sigue siendo el cuadrado de la arena y los muros del Perimeter son
 ## lo único que frena.
 
+
 ## Agrega la franja a `arrays`, los arreglos de ReliefMesh.arrays: una
 ## cuadrícula de `verts` × `verts` vértices cada `step` metros que empieza en
 ## (-half, -half), seguida de sus vértices extra. Devuelve los triángulos que agregó.
@@ -21,14 +22,22 @@ static func append(arrays: Array, verts: int, step: float, half: float,
 		return 0
 	var side := verts + ring * 2
 	var vertices: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
-	var normals: PackedVector3Array = arrays[Mesh.ARRAY_NORMAL]
-	var uvs: PackedVector2Array = arrays[Mesh.ARRAY_TEX_UV]
+	var first := vertices.size()
+	var table := _index_table(side, ring, verts, first)
+	_add_vertices(arrays, table, side, ring, step, half, outside, first)
+	var added := _face_indices(table, side, ring, verts)
 	var indices: PackedInt32Array = arrays[Mesh.ARRAY_INDEX]
-	# Índice de cada vértice de la cuadrícula grande: los de adentro son los
-	# de la arena (solo se usan los del borde), los de afuera son nuevos.
+	indices.append_array(added)
+	arrays[Mesh.ARRAY_INDEX] = indices
+	return added.size() / 3
+
+
+## El índice de cada vértice de la cuadrícula grande (`side` × `side`): los de
+## adentro son los de la arena (solo se usan los del borde); los de afuera,
+## nuevos, desde `first` en orden de fila.
+static func _index_table(side: int, ring: int, verts: int, first: int) -> PackedInt32Array:
 	var table := PackedInt32Array()
 	table.resize(side * side)
-	var first := vertices.size()
 	var added := 0
 	for gz in side:
 		for gx in side:
@@ -39,21 +48,29 @@ static func append(arrays: Array, verts: int, step: float, half: float,
 			else:
 				table[gz * side + gx] = first + added
 				added += 1
-	vertices.resize(first + added)
-	normals.resize(first + added)
-	uvs.resize(first + added)
-	# Primero todas las alturas (las de adentro, de la malla de la arena): la
-	# normal de cada vértice nuevo sale de sus vecinos en esta tabla.
+	return table
+
+
+## Los vértices nuevos de afuera, con su altura, su normal y su UV (el XZ del
+## mundo, como ReliefMesh). La normal de cada uno sale de sus vecinos, así que
+## primero se leen todas las alturas, las de adentro de la malla de la arena.
+static func _add_vertices(arrays: Array, table: PackedInt32Array, side: int, ring: int,
+		step: float, half: float, outside: OutsideRelief, first: int) -> void:
+	var vertices: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
+	var normals: PackedVector3Array = arrays[Mesh.ARRAY_NORMAL]
+	var uvs: PackedVector2Array = arrays[Mesh.ARRAY_TEX_UV]
+	var total := first + side * side - (side - ring * 2) * (side - ring * 2)
+	vertices.resize(total)
+	normals.resize(total)
+	uvs.resize(total)
 	var heights := PackedFloat32Array()
 	heights.resize(side * side)
 	for gz in side:
 		for gx in side:
 			var index := table[gz * side + gx]
-			if index < first:
-				heights[gz * side + gx] = vertices[index].y
-			else:
-				heights[gz * side + gx] = outside.height_at(-half + float(gx - ring) * step,
-						-half + float(gz - ring) * step)
+			heights[gz * side + gx] = vertices[index].y if index < first \
+					else outside.height_at(-half + float(gx - ring) * step,
+							-half + float(gz - ring) * step)
 	for gz in side:
 		for gx in side:
 			var index := table[gz * side + gx]
@@ -64,27 +81,29 @@ static func append(arrays: Array, verts: int, step: float, half: float,
 			vertices[index] = Vector3(x, heights[gz * side + gx], z)
 			normals[index] = _normal(heights, side, gx, gz, step)
 			uvs[index] = Vector2(x, z)
-	var faces := 0
+	arrays[Mesh.ARRAY_VERTEX] = vertices
+	arrays[Mesh.ARRAY_NORMAL] = normals
+	arrays[Mesh.ARRAY_TEX_UV] = uvs
+
+
+## Los índices de los dos triángulos de cada cuadrado de la franja (los de la
+## arena ya están en la malla), horarios vistos desde +Y como ReliefMesh._quad.
+static func _face_indices(table: PackedInt32Array, side: int, ring: int,
+		verts: int) -> PackedInt32Array:
+	var indices := PackedInt32Array()
 	for gz in side - 1:
 		for gx in side - 1:
 			var cx := gx - ring
 			var cz := gz - ring
-			# Los cuadrados de la arena ya están en la malla.
 			if cx >= 0 and cz >= 0 and cx < verts - 1 and cz < verts - 1:
 				continue
 			var top_left := table[gz * side + gx]
 			var top_right := table[gz * side + gx + 1]
 			var bottom_left := table[(gz + 1) * side + gx]
 			var bottom_right := table[(gz + 1) * side + gx + 1]
-			# Horarios vistos desde +Y, como ReliefMesh._quad.
 			indices.append_array(PackedInt32Array([top_left, top_right, bottom_left,
 					top_right, bottom_right, bottom_left]))
-			faces += 2
-	arrays[Mesh.ARRAY_VERTEX] = vertices
-	arrays[Mesh.ARRAY_NORMAL] = normals
-	arrays[Mesh.ARRAY_TEX_UV] = uvs
-	arrays[Mesh.ARRAY_INDEX] = indices
-	return faces
+	return indices
 
 
 ## Normal del vértice (gx, gz) de la tabla de alturas `heights` (lado

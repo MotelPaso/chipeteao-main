@@ -109,6 +109,17 @@ static func add_buttes(layout: ReliefLayout, rng: RandomNumberGenerator, calm: b
 	return placed >= low or calm
 
 
+## Como add_buttes, con `fewer_low` cerros menos que butte_count_min y
+## `fewer_high` menos que butte_count_max: las recetas con piezas grandes dejan
+## menos llano. Con butte_count_max en 0 no sale ninguno.
+static func add_fewer_buttes(layout: ReliefLayout, rng: RandomNumberGenerator, calm: bool,
+		fewer_low: int, fewer_high: int) -> bool:
+	var s := layout.settings
+	var high := maxi(s.butte_count_max - fewer_high, 0)
+	var low := mini(maxi(s.butte_count_min - fewer_low, 0), high)
+	return add_buttes(layout, rng, calm, low, high)
+
+
 ## True si el tramo recto de `a` a `b` no pisa el cañón (con margen) ni una
 ## zona elevada. Los últimos metros antes de `b` (una cabecera de puente, a
 ## pasos del borde) no miran el margen del cañón.

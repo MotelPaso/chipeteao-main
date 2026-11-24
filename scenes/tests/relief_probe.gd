@@ -17,17 +17,9 @@ extends RefCounted
 ##      Probe relief: crossed bridge …
 ## 4. RETIENE, solo con BONK_HOLD_AT=high|ravine|bridge: deja al raider
 ##    quieto a 8 m del corte más alto de la zona más alta, en el medio del
-##    fondo del cañón o en el medio del puente más largo (si la receta de
-##    la etapa no tiene ese lugar, lo dice en una línea `Probe hold: at=…
-##    missing` y no lo retiene), y cuenta las
-##    LLEGADAS: enemigos que aparecieron 3 m o más arriba o abajo de su nivel
-##    y se le acercaron a 3 m (y a no más de 1.5 m de altura). Imprime una
-##    línea `Probe hold:` por ventana de 20 s y un resumen al salir; el
-##    resumen dice además cuántos enemigos lo alcanzaron en total
-##    (`reached`), hayan aparecido en su nivel o en otro.
+##    fondo del cañón o en el medio del puente más largo, y cuenta las
+##    llegadas (ReliefHold, relief_hold.gd).
 
-const HOLD_ENV := "BONK_HOLD_AT"
-const HOLD_PLACES: Array[String] = ["high", "ravine", "bridge"]
 ## Solo depuración: BONK_RELIEF_DUMP=x,z[,radio] imprime el grafo alrededor
 ## de ese punto (ReliefSweeps.dump).
 const DUMP_ENV := "BONK_RELIEF_DUMP"
@@ -36,19 +28,13 @@ const DUMP_ENV := "BONK_RELIEF_DUMP"
 const START_FRAMES: int = 10
 ## Segundo del reloj de la etapa en que la colocación se barre otra vez.
 const PLACEMENT_AGAIN_AT: float = 120.0
-## La sonda de llegada (ver la cabecera), en metros y segundos.
+## Metros hacia dentro del corte más alto donde queda el punto alto (el del
+## paseo y el de BONK_HOLD_AT=high).
 const HOLD_INSET: float = 8.0
-const HOLD_SPAWN_GAP: float = 3.0
-const HOLD_ARRIVE_RANGE: float = 3.0
-const HOLD_ARRIVE_LEVEL: float = 1.5
-const HOLD_WINDOW: float = 20.0
-const HOLD_WINDOWS_FROM: float = 30.0
 ## Radio y ventana de altura con que se busca la celda abierta del punto
 ## alto, en metros.
 const HIGH_SNAP: float = 7.0
 const HIGH_LEVEL: float = 2.0
-## Metros que el raider retenido puede correrse antes de volver a su punto.
-const HOLD_DRIFT: float = 1.0
 ## El paseo: a cuántos metros cuenta que llegó a un punto y cuántos segundos
 ## le da a cada tramo antes de pasar al siguiente.
 const TOUR_REACHED: float = 2.5
@@ -60,9 +46,9 @@ const DECK_JUMP: float = 2.6
 
 var nav := ReliefNav.new()
 var sweeps := ReliefSweeps.new()
+var hold := ReliefHold.new()
 
 var _tree: SceneTree = null
-var _hold_at: String = ""
 var _start_frame: int = -1
 var _active: bool = false
 var _clock: float = 0.0
@@ -79,25 +65,10 @@ var _crossed: bool = false
 ## Por qué cabecera entró el raider a cada puente (una entrada por cruce):
 ## +1, -1 o 0 si no está encima.
 var _deck_sides := PackedInt32Array()
-var _hold_point: Vector3 = Vector3.INF
-var _holding: bool = false
-## Enemigos ya vistos: true si aparecieron a otro nivel (candidatos a llegada).
-var _candidates: Dictionary[int, bool] = {}
-var _arrived: Dictionary[int, bool] = {}
-## Enemigos que se le acercaron al retenido, hayan aparecido donde sea.
-var _reached: Dictionary[int, bool] = {}
-var _window: int = 0
-var _window_arrivals: int = 0
-var _arrivals: int = 0
-var _empty_windows: int = 0
 
 
 func _init(tree: SceneTree) -> void:
 	_tree = tree
-	_hold_at = OS.get_environment(HOLD_ENV).strip_edges()
-	if not _hold_at.is_empty() and not HOLD_PLACES.has(_hold_at):
-		push_error("ArenaProbe: %s must be one of %s, got '%s'" % [HOLD_ENV, HOLD_PLACES, _hold_at])
-		_hold_at = ""
 
 
 ## Una etapa nueva: lo de la anterior ya no vale y el barrido se agenda.
@@ -109,8 +80,7 @@ func on_stage_changed(frames: int) -> void:
 	_thawed_frames = 0
 	_tour.clear()
 	_tour_index = 0
-	_holding = false
-	_hold_point = Vector3.INF
+	hold.reset()
 	_deck_sides.clear()
 	nav.reset()
 
@@ -141,8 +111,8 @@ func tick(delta: float, frames: int, lead: CharacterBody3D, raiders: Array[RID])
 	if lead == null:
 		return swept
 	_watch_feats(lead)
-	if _holding:
-		_watch_hold(lead)
+	if hold.holding:
+		hold.watch(_tree, lead, _clock)
 	elif _tour_index < _tour.size():
 		_advance_tour(delta, lead)
 	return swept
@@ -162,25 +132,24 @@ func wants_jump(slot: int) -> bool:
 ## El punto adonde el arnés tiene que llevar al líder antes que a cualquier
 ## otra cosa (el paseo), o Vector3.INF si no hay ninguno.
 func forced_goal() -> Vector3:
-	if not _active or _holding or _tour_index >= _tour.size():
+	if not _active or hold.holding or _tour_index >= _tour.size():
 		return Vector3.INF
 	return _tour[_tour_index]
 
 
 ## True mientras BONK_HOLD_AT retiene al líder en su punto.
 func hold_active() -> bool:
-	return _active and _holding
+	return _active and hold.holding
 
 
 ## Dónde está retenido el líder (válido con hold_active()).
 func hold_point() -> Vector3:
-	return _hold_point
+	return hold.point
 
 
 ## True si el líder retenido se corrió y tiene que volver a su punto.
 func hold_drifted(lead: Node3D) -> bool:
-	return Vector2(lead.global_position.x - _hold_point.x,
-			lead.global_position.z - _hold_point.z).length() > HOLD_DRIFT
+	return hold.drifted(lead)
 
 
 ## Las líneas de cierre del soak.
@@ -189,12 +158,8 @@ func report() -> void:
 		return
 	print("Probe relief: tour stood=%s crossed=%s legs=%d/%d" % [
 			_stood, _crossed, _tour_index, _tour.size()])
-	if _hold_at.is_empty():
-		return
-	_close_window(true)
-	print("Probe hold summary: at=%s arrivals=%d candidates=%d empty_after_%d=%d reached=%d" % [
-			_hold_at, _arrivals, _candidates.values().count(true),
-			int(HOLD_WINDOWS_FROM), _empty_windows, _reached.size()])
+	if not hold.place.is_empty():
+		hold.report(_clock)
 
 
 # --- arranque ----------------------------------------------------------------------
@@ -212,7 +177,7 @@ func _begin(lead: CharacterBody3D, raiders: Array[RID]) -> void:
 	_layout = _terrain.relief_layout()
 	_stood = false
 	_crossed = false
-	if _hold_at.is_empty():
+	if hold.place.is_empty():
 		_plan_tour()
 	elif lead != null:
 		_start_hold(lead)
@@ -288,7 +253,7 @@ func _advance_tour(delta: float, lead: CharacterBody3D) -> void:
 	var at := lead.global_position
 	_tour_leg_time += delta
 	var reached := Vector2(at.x - goal.x, at.z - goal.z).length() <= TOUR_REACHED \
-			and absf(at.y - goal.y) <= HOLD_ARRIVE_LEVEL
+			and absf(at.y - goal.y) <= ReliefHold.ARRIVE_LEVEL
 	if not reached and _tour_leg_time < TOUR_LEG_TIMEOUT:
 		return
 	if not reached:
@@ -341,99 +306,16 @@ func _watch_feats(lead: CharacterBody3D) -> void:
 
 # --- sonda de llegada --------------------------------------------------------------
 
+## El punto del lugar que pidió BONK_HOLD_AT, y la sonda que retiene ahí al líder.
 func _start_hold(lead: CharacterBody3D) -> void:
-	match _hold_at:
+	var at := Vector3.INF
+	match hold.place:
 		"high":
-			_hold_point = _high_point()
+			at = _high_point()
 		"ravine":
-			_hold_point = _ravine_point()
+			at = ReliefHold.ravine_point(_layout, _terrain)
 		"bridge":
 			var crossing := _longest_crossing()
 			if crossing != null:
-				_hold_point = Vector3(crossing.center.x, crossing.level, crossing.center.y)
-	if _hold_point == Vector3.INF:
-		# La receta de esta etapa no tiene ese lugar (un mapa sin cañón ni
-		# puente): se dice en su línea y el raider no se retiene.
-		print("Probe hold: at=%s missing (recipe=%s has no such place)" % [_hold_at,
-				_layout.recipe])
-		return
-	_holding = true
-	_candidates.clear()
-	_arrived.clear()
-	_reached.clear()
-	_window = 0
-	_window_arrivals = 0
-	lead.global_position = _hold_point + Vector3.UP * 0.2
-	lead.velocity = Vector3.ZERO
-	print("Probe hold: at=%s point=(%.1f, %.1f, %.1f)" % [
-			_hold_at, _hold_point.x, _hold_point.y, _hold_point.z])
-
-
-## El medio del tramo de fondo más largo del cañón. Lo parten los puentes y
-## los collados: se recorre el eje metro a metro y se queda con la racha más
-## larga a fondo completo que no cae bajo un tablero.
-func _ravine_point() -> Vector3:
-	var ravine := _layout.ravine
-	if ravine == null:
-		return Vector3.INF
-	var best := Vector2.ZERO
-	var run_from := -1.0
-	var along := 0.0
-	while along <= ravine.length + 1.0:
-		var deep := along <= ravine.length \
-				and _layout.ravine_drop(along) >= ravine.depth - 0.01
-		for crossing: ReliefLayout.Crossing in _layout.crossings:
-			if absf(along - crossing.s) <= crossing.width * 0.5:
-				deep = false
-		if deep and run_from < 0.0:
-			run_from = along
-		elif not deep and run_from >= 0.0:
-			if along - run_from > best.y - best.x:
-				best = Vector2(run_from, along)
-			run_from = -1.0
-		along += 1.0
-	if best.y <= best.x:
-		return Vector3.INF
-	var flat := _layout.ravine_frame((best.x + best.y) * 0.5)[0]
-	return Vector3(flat.x, _terrain.height_at(flat.x, flat.y), flat.y)
-
-
-func _watch_hold(lead: CharacterBody3D) -> void:
-	var at := lead.global_position
-	for node: Node in _tree.get_nodes_in_group(&"enemies"):
-		var body := node as Node3D
-		if body == null or not body.is_inside_tree():
-			continue
-		var id := body.get_instance_id()
-		var where := body.global_position
-		if not _candidates.has(id):
-			_candidates[id] = absf(where.y - _hold_point.y) >= HOLD_SPAWN_GAP
-		var close := Vector2(where.x - at.x, where.z - at.z).length() <= HOLD_ARRIVE_RANGE \
-				and absf(where.y - at.y) <= HOLD_ARRIVE_LEVEL
-		if close:
-			_reached[id] = true
-		if not _candidates[id] or _arrived.has(id):
-			continue
-		if close:
-			_arrived[id] = true
-			_arrivals += 1
-			_window_arrivals += 1
-	# Ventanas de 20 s que empiezan en el segundo 10: 10-30, 30-50, …
-	var window := floori((_clock - (HOLD_WINDOWS_FROM - HOLD_WINDOW)) / HOLD_WINDOW)
-	if window > _window:
-		_close_window(false)
-		_window = window
-		_window_arrivals = 0
-
-
-func _close_window(partial: bool) -> void:
-	if not _holding:
-		return
-	var from := HOLD_WINDOWS_FROM - HOLD_WINDOW + float(_window) * HOLD_WINDOW
-	var to := minf(from + HOLD_WINDOW, _clock)
-	if to - from < 1.0:
-		return
-	print("Probe hold: at=%s window=%d-%ds arrivals=%d%s" % [_hold_at, int(from), int(round(to)),
-			_window_arrivals, " (partial)" if partial else ""])
-	if not partial and from >= HOLD_WINDOWS_FROM and _window_arrivals == 0:
-		_empty_windows += 1
+				at = Vector3(crossing.center.x, crossing.level, crossing.center.y)
+	hold.start(at, _layout.recipe, lead)

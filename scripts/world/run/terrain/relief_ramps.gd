@@ -168,8 +168,8 @@ static func _ramp_fits(layout: ReliefLayout, zone: ReliefLayout.Zone,
 
 
 ## True si `ramp` de una isla cabe: baja al fondo hondo del lago, lejos de
-## sus paredes, de los puentes (escaleras incluidas) y de las otras rampas
-## de la isla.
+## sus paredes, del muelle (tablero y escaleras: RecipeLake lo pone antes que
+## las rampas) y de las otras rampas de la isla.
 static func _island_ramp_fits(layout: ReliefLayout, zone: ReliefLayout.Zone,
 		ramp: ReliefLayout.Ramp) -> bool:
 	var ravine := layout.ravine
@@ -183,16 +183,32 @@ static func _island_ramp_fits(layout: ReliefLayout, zone: ReliefLayout.Zone,
 				return false
 			if layout.ravine_drop(coords.x) < ravine.depth - 0.01:
 				return false
-			for crossing: ReliefLayout.Crossing in layout.crossings:
-				var local := probe - crossing.center
-				if absf(local.dot(crossing.axis)) <= crossing.span * 0.5 + RAMP_GAP \
-						and absf(local.dot(Vector2(-crossing.axis.y, crossing.axis.x))) \
-						<= crossing.width * 0.5 + layout.settings.bridge_stair_reach + RAMP_GAP:
-					return false
+			if _near_crossing(layout, probe):
+				return false
 	for other: ReliefLayout.Ramp in zone.ramps:
 		if _arc_gap(ramp, other) < RAMP_SPACING:
 			return false
 	return true
+
+
+## True si `point` queda a menos de RAMP_GAP del tablero de un cruce o de una
+## de sus escaleras. Cada escalera baja junto a su cabecera (ocupa unos 6 m a
+## lo largo del puente, Bridge.stair_out) y se aparta hasta bridge_stair_reach
+## a cada costado; un muelle no tiene las del lado de la isla.
+static func _near_crossing(layout: ReliefLayout, point: Vector2) -> bool:
+	var reach := layout.settings.bridge_stair_reach
+	for crossing: ReliefLayout.Crossing in layout.crossings:
+		var local := point - crossing.center
+		var along := local.dot(crossing.axis)
+		var across := absf(local.dot(Vector2(-crossing.axis.y, crossing.axis.x)))
+		var half := crossing.span * 0.5
+		if absf(along) <= half + RAMP_GAP and across <= crossing.width * 0.5 + RAMP_GAP:
+			return true
+		for end: float in [-1.0, 1.0]:
+			if crossing.has_stairs(end) and absf(along - end * half) <= RAMP_GAP \
+					and across <= crossing.width * 0.5 + reach + RAMP_GAP:
+				return true
+	return false
 
 
 ## True si la zona de índice `index` es un ancestro de `zone`.

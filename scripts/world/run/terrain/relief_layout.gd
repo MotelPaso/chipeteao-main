@@ -161,6 +161,13 @@ class Crossing extends RefCounted:
 	## Índice de la isla donde aterriza un muelle, o -1.
 	var island: int = -1
 
+	## True si del extremo `end` (+1 = la cabecera A, -1 = la B, a lo largo de
+	## `axis`) bajan escaleras al fondo. Un muelle no las tiene del lado de la
+	## isla (la B): una escalera recta se despegaría de su orilla curva, y la
+	## isla baja al agua por sus rampas.
+	func has_stairs(end: float) -> bool:
+		return island < 0 or end > 0.0
+
 
 ## Una loma ancha del nivel del bosque.
 class Hill extends RefCounted:
