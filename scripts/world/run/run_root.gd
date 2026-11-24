@@ -179,11 +179,13 @@ func _place_party() -> void:
 func _swap_stage() -> void:
 	var from_index := RunState.stage_index
 	var from_id := String(MapCatalog.MAP_LIBRARY[from_index % MapCatalog.MAP_LIBRARY.size()].id)
-	var was_paused := _freeze_world()
 	# Si el equipo está en la arena de un jefe (o en camino), el viaje termina
 	# aquí: su arena se libera y la de la etapa vuelve a ser la viva, así el
-	# desmontaje y el barrido de abajo la recorren como en cualquier cambio.
+	# congelado, el desmontaje y el barrido de abajo la recorren como en
+	# cualquier cambio. Va antes del congelado para que el spawner de la etapa,
+	# que vuelve al árbol, también se detenga.
 	get_tree().call_group(BossArenaHost.GROUP, "abandon_trip", BossArenaHost.ABANDON_ADVANCE)
+	var was_paused := _freeze_world()
 	# Lo que lleva el equipo, leído de los nodos vivos (la otra mitad del par
 	# se imprime al final).
 	_print_carry()
