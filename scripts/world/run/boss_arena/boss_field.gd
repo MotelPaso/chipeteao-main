@@ -8,9 +8,10 @@ extends Node3D
 ##
 ## El claro es el círculo de `clearing_radius` metros alrededor de este nodo.
 ## Las COBERTURAS son los cuerpos del grupo "boss_cover" de la misma arena: su
-## huella en el suelo sale de sus propias formas de colisión, así lo que
-## bloquea es exactamente lo que choca. Fuera del claro y dentro de una
-## cobertura no se camina ni se coloca nada.
+## huella en el suelo sale de sus propias formas de colisión (el contorno
+## convexo de todas: apenas más que lo que choca). Fuera del claro y dentro de
+## una cobertura no se camina ni se coloca nada, y encima de una cobertura
+## nadie se queda parado (CoverPerch).
 ##
 ## También levanta el BORDE: un anillo de paredes altas sin dibujo justo
 ## donde termina el claro (como los muros Perimeter de un mapa), para que
@@ -50,12 +51,20 @@ const RANDOM_TRIES: int = 64
 ## Tramos rectos con que se arma el anillo: más tramos, más redondo.
 @export_range(12, 96) var wall_segments: int = 48
 
+@export_group("Coberturas")
+## Segundos que un raider puede quedarse parado ENCIMA de una cobertura antes de bajar solo a la arena libre más cercana: las coberturas son para esconderse detrás, no para pelear desde arriba.
+@export var perch_seconds: float = 0.4
+## Metros sobre la arena desde los que un raider apoyado dentro de la huella de una cobertura cuenta como encima de ella.
+@export var perch_height: float = 1.0
+
 ## Huella en el suelo de cada cobertura: {polygon, center, radius}. `polygon`
 ## es el contorno convexo (PackedVector2Array, XZ de mundo) y `center`/`radius`
 ## el círculo que lo envuelve. Se arma la primera vez que alguien pregunta.
 var _footprints: Array[Dictionary] = []
 var _footprints_built: bool = false
 var _rng := RandomNumberGenerator.new()
+## Nadie se queda parado encima de una cobertura (ver CoverPerch).
+@onready var _perch := CoverPerch.new(self)
 
 
 func _enter_tree() -> void:
@@ -67,6 +76,10 @@ func _enter_tree() -> void:
 func _ready() -> void:
 	_rng.seed = randi()
 	_raise_wall()
+
+
+func _physics_process(delta: float) -> void:
+	_perch.tick(delta, perch_seconds, perch_height, place_margin)
 
 
 # --- Fachada del grupo "arena_bounds": otros nodos llaman estos métodos por

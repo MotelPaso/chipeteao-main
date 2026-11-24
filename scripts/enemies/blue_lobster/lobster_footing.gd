@@ -66,8 +66,8 @@ static func _fits_on(body: LobsterBody, terrain: Terrain, spot: Vector3, level: 
 
 
 ## Altura de lo primero que cruza el rayo de `from` a `to` en la capa del
-## mundo, sin contar a los personajes (raiders, la langosta, la horda); -INF si
-## no cruza nada.
+## mundo, sin contar a los personajes (raiders, la langosta, la horda) ni a las
+## coberturas de su arena, que no son un piso; -INF si no cruza nada.
 static func _first_hit(body: LobsterBody, from: Vector3, to: Vector3) -> float:
 	var space := body.get_world_3d().direct_space_state
 	if space == null:
@@ -78,7 +78,8 @@ static func _first_hit(body: LobsterBody, from: Vector3, to: Vector3) -> float:
 				LobsterBody.WORLD_MASK, skip))
 		if hit.is_empty():
 			return -INF
-		if not hit["collider"] is CharacterBody3D:
+		var collider := hit["collider"] as Node
+		if not collider is CharacterBody3D and not collider.is_in_group(BossField.COVER_GROUP):
 			return (hit["position"] as Vector3).y
 		skip.append(hit["rid"] as RID)
 	return -INF

@@ -5,8 +5,9 @@ extends StaticBody3D
 ## (tubos con ramas, abanicos y perillas). Es una cobertura de la pelea.
 ##
 ## Frena un cilindro que nace bajo la arena. La cúpula y los corales bajos
-## quedan dentro de él; solo lo que pasa de `overhang_height` puede asomar
-## hasta `overhang` metros. Todo sale de `shape_seed`.
+## quedan dentro de su radio (la cúpula asoma por arriba, hasta `dome_top`);
+## solo lo que pasa de `overhang_height` puede salirse hacia los lados hasta
+## `overhang` metros. Todo sale de `shape_seed`.
 
 ## Grupo que lee quien marca el suelo tapado por las coberturas.
 const COVER_GROUP: StringName = &"boss_cover"

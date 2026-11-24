@@ -109,6 +109,7 @@ xp_gem_scene = ExtResource("3_XpGem")
 points_value = 25
 possessable = false
 aim_height = 1.4
+can_climb = false
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="." unique_id=318249890]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.4, 0)
