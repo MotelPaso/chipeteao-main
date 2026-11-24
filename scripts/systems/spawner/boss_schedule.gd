@@ -69,10 +69,12 @@ var _mini_boss_at: float = -1.0
 ## True mientras vive un minijefe que pelea solo (mini_boss_fights_alone).
 var _mini_boss_alone: bool = false
 ## Viaje a la arena del minijefe: si su presagio ya empezó, si el equipo está
-## en camino o allá, y los segundos de presagio de su fila (-1 = sin leer).
+## en camino o allá, y su fila de BossArenaCatalog (vacía = llega al mapa),
+## leída una sola vez.
 var _mini_omen_started: bool = false
 var _mini_boss_away: bool = false
-var _mini_omen_lead: float = -1.0
+var _mini_encounter: Dictionary = {}
+var _mini_encounter_read: bool = false
 ## Segundos tras la vuelta en que el harness pide otro viaje (-1 = no).
 var _mini_boss_again: float = -1.0
 ## El jefe de etapa que abre la puerta, desde que llega hasta que muere.
@@ -245,7 +247,7 @@ func _tick_mini_boss() -> void:
 	var spawner := _spawner
 	if spawner.mini_boss_scene == null or _mini_boss_spawned or spawns_held():
 		return
-	var encounter := BossArenaCatalog.for_boss(spawner.mini_boss_scene)
+	var encounter := _mini_boss_encounter()
 	var host := BossArenaHost.find(spawner.get_tree()) if not encounter.is_empty() else null
 	if host != null:
 		_tick_mini_boss_trip(encounter, host)
@@ -329,10 +331,15 @@ func _mini_boss_due() -> float:
 ## Segundos de presagio del minijefe: los de su fila en BossArenaCatalog, o
 ## 0 si no tiene arena propia. Durante el presagio los demás jefes esperan.
 func _mini_boss_lead() -> float:
-	if _mini_omen_lead < 0.0:
-		var encounter := BossArenaCatalog.for_boss(_spawner.mini_boss_scene)
-		_mini_omen_lead = maxf(float(encounter.get("omen_seconds", 0.0)), 0.0)
-	return _mini_omen_lead
+	return maxf(float(_mini_boss_encounter().get("omen_seconds", 0.0)), 0.0)
+
+
+## La fila de BossArenaCatalog del minijefe (vacía = sin arena propia).
+func _mini_boss_encounter() -> Dictionary:
+	if not _mini_encounter_read:
+		_mini_encounter_read = true
+		_mini_encounter = BossArenaCatalog.for_boss(_spawner.mini_boss_scene)
+	return _mini_encounter
 
 
 ## True mientras el jefe del bioma tiene que esperar al minijefe: ya le toca

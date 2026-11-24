@@ -227,6 +227,7 @@ func enter_arena() -> BossBase:
 	var arena := _cast.make_arena(_encounter) if stage != null else null
 	if arena == null:
 		push_error("BossArenaHost: the arena scene root is not a BossArena.")
+		_give_up_trip()
 		return null
 	get_tree().call_group(BlockingUi.CLOSABLE_GROUP, "dismiss")
 	_party.clear_weapon_fields()
@@ -377,6 +378,15 @@ func _close_trip(reason: String) -> void:
 	_schedule = null
 	if schedule != null and schedule.has_method(&"on_trip_over"):
 		schedule.call(&"on_trip_over")
+
+
+## El cambio de mundo no pudo pasar: el equipo se queda en el mapa y el
+## horario de jefes se entera (si no, esperaría una vuelta para siempre). La
+## cinemática que lo pidió ya se soltó sola y se libera al final del frame.
+func _give_up_trip() -> void:
+	_close_trip("")
+	_cast.drop_cinematic()
+	_forget_trip()
 
 
 func _forget_trip() -> void:

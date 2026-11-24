@@ -79,6 +79,14 @@ func free_cinematic() -> void:
 
 # --- arena ------------------------------------------------------------------------
 
+## Suelta la cinemática sin liberarla en el acto: la libera el motor al final
+## del frame (la que pidió el cambio de mundo sigue corriendo su propio paso).
+func drop_cinematic() -> void:
+	if is_instance_valid(_cinematic):
+		_cinematic.queue_free()
+	_cinematic = null
+
+
 ## La arena del jefe del viaje en curso, o null.
 func boss_arena() -> BossArena:
 	return _arena if is_instance_valid(_arena) else null

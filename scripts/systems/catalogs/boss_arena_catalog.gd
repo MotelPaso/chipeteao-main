@@ -47,13 +47,14 @@ const SCENE_META: StringName = &"boss_arena_scene"
 
 
 ## La fila del jefe cuya escena es `scene`, o vacío si ese jefe no tiene
-## arena propia (o `scene` es null).
+## arena propia (o `scene` es null). Una fila sin `arena_scene`, o con una
+## que no existe, cuenta como sin arena: ese jefe llega al mapa.
 static func for_boss(scene: PackedScene) -> Dictionary:
 	if scene == null:
 		return {}
 	for row: Dictionary in ARENA_LIBRARY:
 		if String(row.boss_scene) == scene.resource_path:
-			return row
+			return row if ResourceLoader.exists(String(row.get("arena_scene", ""))) else {}
 	return {}
 
 
