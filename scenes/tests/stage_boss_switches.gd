@@ -2,8 +2,11 @@ class_name StageBossSwitches
 extends RefCounted
 ## La mitad de StageBossProbe que ACTÚA sobre la partida. Solo hace algo con
 ## variables de entorno nuevas; sin ellas no toca nada:
-##   BONK_CINEMATIC_SKIP=1  mantiene la acción de saltar apenas pasa un
-##                          segundo de cinemática
+##   BONK_CINEMATIC_SKIP=<s>  mantiene la acción de saltar desde ese segundo
+##                          de cinemática (1 = apenas pasa un segundo). La de
+##                          un minijefe con arena propia dura más: con 1 salta
+##                          en el rapto, con 6.5 en el descenso y con 11 en la
+##                          revelación
 ##   BONK_PAUSE_AT=<s>      a ese segundo abre el menú de pausa, mueve el
 ##                          slider de Música, espera y lo cierra
 ##   BONK_EXTRACT_AT=<s>    extrae la party a ese segundo
@@ -36,8 +39,6 @@ const ADVANCE_AT_ENV := "BONK_ADVANCE_AT"
 const BOSS_HURT_AT_ENV := "BONK_BOSS_HURT_AT"
 const DEFAULT_WEATHER := "blood_moon"
 
-## Segundos de cinemática antes de empezar a mantener el salto.
-const SKIP_AFTER: float = 1.0
 ## Segundos que el menú de pausa queda abierto.
 const PAUSE_HOLD: float = 3.0
 ## Segundos que un panel cerrable puede tener la pausa antes de cerrarlo.
@@ -49,7 +50,8 @@ enum PauseStep { IDLE, OPENING, HOLDING, CLOSING, DONE }
 
 var _tree: SceneTree = null
 var _now: float = 0.0
-var _skip: bool = false
+## Segundo de cinemática desde el que se mantiene el salto (< 0 = no se salta).
+var _skip_after: float = -1.0
 var _skip_held: StringName = &""
 var _pause_at: float = -1.0
 var _pause_step: PauseStep = PauseStep.IDLE
@@ -70,7 +72,7 @@ var _release_next: Array[StringName] = []
 
 func _init(host: Node) -> void:
 	_tree = host.get_tree()
-	_skip = OS.get_environment(SKIP_ENV) == "1"
+	_skip_after = _env_seconds(SKIP_ENV)
 	_pause_at = _env_seconds(PAUSE_AT_ENV)
 	_extract_at = _env_seconds(EXTRACT_AT_ENV)
 	_wipe_at = _env_seconds(WIPE_AT_ENV)
@@ -113,10 +115,10 @@ func _cinematic() -> Node:
 
 ## BONK_CINEMATIC_SKIP: mantiene la acción real de saltar del slot 0.
 func _tick_skip() -> void:
-	if not _skip:
+	if _skip_after < 0.0:
 		return
 	var cinematic := _cinematic()
-	var want := cinematic != null and float(cinematic.call(&"calm_elapsed")) >= SKIP_AFTER
+	var want := cinematic != null and float(cinematic.call(&"calm_elapsed")) >= _skip_after
 	if want:
 		if _skip_held.is_empty():
 			_skip_held = Coop.action(0, cinematic.call(&"skip_action"))

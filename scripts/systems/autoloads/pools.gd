@@ -90,6 +90,14 @@ func release_all_live() -> void:
 		_pools_by_path[path].release_all_live()
 
 
+## Recupera lo que cuelga de `root` de TODOS los pools, y solo eso: la arena
+## de un jefe se libera y lo que quedó vivo en el mapa de la etapa (gemas,
+## orbes, charcos) sigue donde está.
+func release_live_under(root: Node) -> void:
+	for path: String in _pools_by_path:
+		_pools_by_path[path].release_live_under(root)
+
+
 func _ready() -> void:
 	for row: Dictionary in POOLS:
 		_register(String(row["name"]), row["scene"] as PackedScene,

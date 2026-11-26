@@ -131,34 +131,56 @@ func release(node: Node3D) -> void:
 ## no hace nada.
 func release_all_live() -> void:
 	for id: int in _live.keys():
+		_reclaim(id)
+
+
+## Recupera ya cada instancia viva que cuelga de `root`, y solo esas: la arena
+## de un jefe se va y lo que quedó en el mapa de la etapa sigue donde está.
+func release_live_under(root: Node) -> void:
+	if root == null:
+		return
+	for id: int in _live.keys():
 		var node: Node3D = _live[id]
-		_live.erase(id)
-		if not is_instance_valid(node) or node.is_queued_for_deletion():
+		if not is_instance_valid(node) or not root.is_ancestor_of(node):
 			continue
-		# Ya hay una liberación en curso; su _finish_release diferido lo
-		# guardará. Tocarlo aquí lo guardaría dos veces.
 		if _pending_release.has(id):
-			continue
-		var parent := node.get_parent()
-		if parent == null:
-			continue
-		node.visible = false
-		node.set_meta(META_PROCESS, node.is_processing())
-		node.set_meta(META_PHYSICS_PROCESS, node.is_physics_processing())
-		node.set_physics_process(false)
-		node.set_process(false)
-		var area := node as Area3D
-		if area != null:
-			node.set_meta(META_MONITORING, area.monitoring)
-			node.set_meta(META_MONITORABLE, area.monitorable)
-			area.monitoring = false
-			area.monitorable = false
-		parent.remove_child(node)
-		if _parked.size() >= max_free:
-			node.queue_free()
-			continue
-		_parked.append(node)
-		peak_parked = maxi(peak_parked, _parked.size())
+			# Su liberación diferida todavía no corrió y `root` se libera en este
+			# mismo frame: se termina ahora (la diferida lo va a encontrar guardado).
+			_finish_release(node, id)
+		else:
+			_reclaim(id)
+
+
+## Saca de _live la instancia `id` y la guarda en el acto, sin salto diferido.
+func _reclaim(id: int) -> void:
+	var node: Node3D = _live[id]
+	_live.erase(id)
+	if not is_instance_valid(node) or node.is_queued_for_deletion():
+		return
+	# Ya hay una liberación en curso; su _finish_release diferido lo
+	# guardará. Tocarlo aquí lo guardaría dos veces.
+	if _pending_release.has(id):
+		return
+	var parent := node.get_parent()
+	if parent == null:
+		return
+	node.visible = false
+	node.set_meta(META_PROCESS, node.is_processing())
+	node.set_meta(META_PHYSICS_PROCESS, node.is_physics_processing())
+	node.set_physics_process(false)
+	node.set_process(false)
+	var area := node as Area3D
+	if area != null:
+		node.set_meta(META_MONITORING, area.monitoring)
+		node.set_meta(META_MONITORABLE, area.monitorable)
+		area.monitoring = false
+		area.monitorable = false
+	parent.remove_child(node)
+	if _parked.size() >= max_free:
+		node.queue_free()
+		return
+	_parked.append(node)
+	peak_parked = maxi(peak_parked, _parked.size())
 
 
 ## Contadores para la sonda de rendimiento y los soaks.
@@ -176,6 +198,11 @@ func parked_count() -> int:
 
 
 func _finish_release(node: Node3D, id: int) -> void:
+	# Ya la terminó release_live_under (la arena de un jefe se liberaba en ese
+	# mismo frame): esta llamada diferida llega tarde y no toca un nodo que el
+	# pool quizá ya volvió a entregar.
+	if not _pending_release.has(id):
+		return
 	_pending_release.erase(id)
 	_live.erase(id)
 	# La escena del nodo puede haberse desarmado entre release() y esta

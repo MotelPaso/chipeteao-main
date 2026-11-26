@@ -77,7 +77,7 @@ shading_mode = 0
 albedo_color = Color(0.65, 0.97, 1, 1)
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_dirt"]
-albedo_color = Color(0.2, 0.15, 0.1, 1)
+albedo_color = Color(0.66, 0.6, 0.46, 1)
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_speck"]
 shading_mode = 0
@@ -109,6 +109,7 @@ xp_gem_scene = ExtResource("3_XpGem")
 points_value = 25
 possessable = false
 aim_height = 1.4
+can_climb = false
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="." unique_id=318249890]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.4, 0)
@@ -1029,7 +1030,7 @@ burnout_seconds = 10.0
 
 [node name="Burnout" type="Node" parent="." unique_id=1148480433]
 script = ExtResource("11_boss_burnout")
-announce_text = "%s se agota fuera del agua"
+announce_text = "%s se queda sin fuerzas"
 
 [node name="Life" type="Node" parent="." unique_id=1247244105]
 script = ExtResource("12_lobster_life")

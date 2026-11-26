@@ -101,6 +101,9 @@ func _exit_tree() -> void:
 ## pitch_jitter < 0 significa "el del id" (default_pitch_jitter para
 ## jittered_ids, ninguno para el resto); pasa una fracción para forzarlo.
 func play(id: StringName, volume_db_offset: float = 0.0, pitch_jitter: float = -1.0) -> void:
+	# Un id vacío es «ningún sonido»: así lo usan los campos de sonido de las escenas.
+	if id == &"":
+		return
 	var stream := _stream_of(id)
 	if stream == null:
 		push_warning("Sfx: unknown sound id '%s'" % id)

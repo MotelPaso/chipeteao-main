@@ -60,6 +60,8 @@ const MARSH_PHASES: Array[Dictionary] = [
 const ELITE_CHANCE_CAP: float = 0.25
 
 @export_group("Escenas y fases")
+## Encendido solo en la arena de un jefe (BossArena): este spawner no genera a nadie ni lleva horario de jefes, y solo queda para el «Tiempo detenido» y para responder al grupo "enemy_spawner". En un mapa de etapa va apagado.
+@export var dormant: bool = false
 ## Tabla de fases de spawn de esta arena (ver PhasePreset).
 @export var phase_preset: PhasePreset = PhasePreset.FOREST
 ## Escena del tipo "grunt"; cada tipo que usa la tabla de esta arena necesita
@@ -215,11 +217,13 @@ const ELITE_CHANCE_CAP: float = 0.25
 ## Minuto de etapa en que llega el jefe del bioma.
 @export var boss_spawn_minute: float = 5.0
 ## Escena del minijefe de esta arena: llega sin aviso en mini_boss_spawn_minute
-## y el jefe del bioma espera a que muera. Vacío = la arena no tiene minijefe.
+## y el jefe del bioma espera a que muera. Si tiene fila en BossArenaCatalog no
+## llega al mapa: su presagio empieza omen_seconds antes y a su minuto el equipo
+## viaja a su arena. Vacío = la arena no tiene minijefe.
 @export var mini_boss_scene: PackedScene
 ## Minuto de etapa en que llega el minijefe.
 @export var mini_boss_spawn_minute: float = 5.0
-## Si el minijefe pelea SOLO: desde que llega no aparece ningún enemigo normal (ni flujo, ni hordas, ni jaurías, ni lluvia de enemigos) y el respiro tras su muerte es total. La horda que ya estaba en la arena se la lleva él al empezar la pelea.
+## Si el minijefe pelea SOLO: desde que llega no aparece ningún enemigo normal (ni flujo, ni hordas, ni jaurías, ni lluvia de enemigos) y el respiro tras su muerte es total. La horda que ya estaba en la arena se la lleva él al empezar la pelea. Con arena propia (BossArenaCatalog) pelea solo igual y la horda del mapa se barre igual: apagado solo quita el corte de spawns y el respiro al volver.
 @export var mini_boss_fights_alone: bool = true
 ## Minuto de etapa en que llega su revancha Ancestral (el jefe de etapa). Al matarlo se supera la etapa (ver RunManager.stage_goal).
 @export var elder_spawn_minute: float = 10.0
@@ -300,11 +304,15 @@ func _ready() -> void:
 	add_to_group("enemy_spawner")
 	_points.read_bounds()
 	_drops.read_boost_switch()
-	_validate_phase_scenes()
+	if not dormant:
+		_validate_phase_scenes()
 
 
 func _physics_process(delta: float) -> void:
 	_freeze.tick(delta)
+	if dormant:
+		# La arena de un jefe: ni flujo, ni hordas, ni horario de jefes.
+		return
 	_bosses.tick_relief(delta)
 	_scaling.tick(delta)
 	_scaling.tick_endless_log()
@@ -599,9 +607,10 @@ func spawn_bonus_boss() -> bool:
 	return _bosses.spawn_boss(1.0) != null
 
 
-## True mientras el jefe de etapa propio pelea solo: nada aparece.
+## True mientras el jefe de etapa propio pelea solo: nada aparece. En la
+## arena de un jefe (dormant) es siempre true.
 func spawns_held() -> bool:
-	return _bosses.spawns_held()
+	return dormant or _bosses.spawns_held()
 
 
 ## Lo mismo, para quien solo tiene el árbol: el clima, los jefes ocultos, el
@@ -638,7 +647,7 @@ func make_enemy_at(pos: Vector3, force_elite: bool = false,
 	# pasan por aquí, así que la regla de espacio libre no se le puede olvidar
 	# a un llamador nuevo. Los muestreadores de posición ya prefieren puntos
 	# libres; esto es lo que pasa cuando no hay ninguno.
-	if _bosses.spawns_held():
+	if spawns_held():
 		return null
 	if not _points.has_player_clearance(pos):
 		_points.register_clearance_skip()

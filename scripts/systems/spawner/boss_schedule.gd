@@ -22,6 +22,10 @@ extends RefCounted
 ## deja la arena: dos llegadas a la vez pisarían sus cinemáticas. Si pelea
 ## solo (mini_boss_fights_alone), mientras vive tampoco sale ningún enemigo
 ## normal, igual que con el jefe de etapa.
+## Un minijefe con ARENA PROPIA (una fila en BossArenaCatalog) no aparece en
+## el mapa: omen_seconds antes de su hora empieza su presagio y a su hora el
+## equipo viaja a su arena (BossArenaHost). El hueco se gasta solo si el viaje
+## arrancó, y desde el presagio hasta la vuelta los demás jefes esperan.
 
 ## Interruptor del harness: BONK_STAGE_BOSS_AT=<segundos> trae al jefe de
 ## etapa en ese segundo de la etapa y no en elder_spawn_minute. Solo
@@ -35,6 +39,10 @@ const STAGE_BOSS_GROUP: StringName = &"stage_boss"
 const MINI_BOSS_AT_ENV: String = "BONK_MINI_BOSS_AT"
 ## Grupo del minijefe (lo lee el harness; nunca es el del jefe de etapa).
 const MINI_BOSS_GROUP: StringName = &"mini_boss"
+## Interruptor del harness: BONK_MINI_BOSS_AGAIN=<segundos> hace que el
+## minijefe con arena propia vuelva UNA vez más, esos segundos después de que
+## el equipo regresa de su arena. Solo pruebas; nada del juego lo pone.
+const MINI_BOSS_AGAIN_ENV: String = "BONK_MINI_BOSS_AGAIN"
 
 var _spawner: EnemySpawner = null
 var _boss_spawned: bool = false
@@ -60,6 +68,15 @@ var _mini_boss: BossBase = null
 var _mini_boss_at: float = -1.0
 ## True mientras vive un minijefe que pelea solo (mini_boss_fights_alone).
 var _mini_boss_alone: bool = false
+## Viaje a la arena del minijefe: si su presagio ya empezó, si el equipo está
+## en camino o allá, y su fila de BossArenaCatalog (vacía = llega al mapa),
+## leída una sola vez.
+var _mini_omen_started: bool = false
+var _mini_boss_away: bool = false
+var _mini_encounter: Dictionary = {}
+var _mini_encounter_read: bool = false
+## Segundos tras la vuelta en que el harness pide otro viaje (-1 = no).
+var _mini_boss_again: float = -1.0
 ## El jefe de etapa que abre la puerta, desde que llega hasta que muere.
 ## _stage_boss_watched va aparte: una referencia a un nodo liberado se lee
 ## como null.
@@ -77,6 +94,10 @@ func _init(spawner: EnemySpawner) -> void:
 	if forced_mini.is_valid_float():
 		_mini_boss_at = maxf(forced_mini.to_float(), 0.0)
 		print("BossSchedule: mini boss forced at %.0fs" % _mini_boss_at)
+	var again := OS.get_environment(MINI_BOSS_AGAIN_ENV)
+	if again.is_valid_float():
+		_mini_boss_again = maxf(again.to_float(), 0.0)
+		print("BossSchedule: mini boss comes again %.0fs after the return" % _mini_boss_again)
 
 
 ## Factor del intervalo de los spawns regulares: más lento con un jefe vivo
@@ -117,7 +138,7 @@ func tick() -> void:
 	var spawner := _spawner
 	# Un minijefe que se fue sin morir (algo lo liberó) no deja la arena sin
 	# enemigos para siempre.
-	if _mini_boss_alone and not _mini_boss_alive():
+	if _mini_boss_alone and not _mini_boss_away and not _mini_boss_alive():
 		_on_mini_boss_died()
 	# Lo mismo con el jefe de etapa: si se fue sin morir, su hueco vuelve a
 	# abrirse (los spawns no quedan cortados y la puerta todavía puede abrirse).
@@ -181,6 +202,14 @@ func spawn_boss(stat_multiplier: float, title_override: String = "",
 		boss.boss_title = title_override
 	spawner.add_child(boss)
 	boss.global_position = at
+	_enlist_boss(boss, stat_multiplier, warn)
+	return boss
+
+
+## Lo que sigue a poner un jefe en su lugar, sea en el mapa (spawn_boss) o en
+## su arena propia (on_trip_boss): su grado, los contadores, el aviso y el log.
+func _enlist_boss(boss: BossBase, stat_multiplier: float, warn: bool) -> void:
+	var spawner := _spawner
 	# Todos los factores entran en UNA llamada a apply_tier, así
 	# tier_body_scale se aplica una vez por jefe y un jefe base (todo 1.0)
 	# queda exactamente base. Los tres canales son distintos a propósito:
@@ -211,29 +240,89 @@ func spawn_boss(stat_multiplier: float, title_override: String = "",
 	# Log de una línea (convención de RunManager) para que los soaks
 	# confirmen que el horario de jefes se disparó.
 	print("Boss spawned: %s at %.1fs" % [boss.boss_title, RunState.stage_time])
-	return boss
 
 
 ## El minijefe de la arena: llega una vez por etapa y sin aviso. Como el
-## jefe del bioma, espera mientras un jefe de etapa pelea solo.
+## jefe del bioma, espera mientras un jefe de etapa pelea solo. Con arena
+## propia no llega al mapa: el equipo viaja a ella (_tick_mini_boss_trip).
 func _tick_mini_boss() -> void:
 	var spawner := _spawner
-	if spawner.mini_boss_scene == null or _mini_boss_spawned or spawns_held() \
-			or RunState.stage_time < _mini_boss_due():
+	if spawner.mini_boss_scene == null or _mini_boss_spawned or spawns_held():
+		return
+	var encounter := _mini_boss_encounter()
+	var host := BossArenaHost.find(spawner.get_tree()) if not encounter.is_empty() else null
+	if host != null:
+		_tick_mini_boss_trip(encounter, host)
+		return
+	if RunState.stage_time < _mini_boss_due():
 		return
 	var boss := spawn_boss(1.0, "", spawner.mini_boss_scene, false)
 	if boss == null:
 		return
 	_mini_boss_spawned = true
+	_hold_for_mini_boss()
+	_watch_mini_boss(boss)
+
+
+## El minijefe con arena propia: su presagio empieza omen_seconds antes de su
+## hora (con menos tiempo por delante, dura lo que quede: nunca se salta) y a
+## su hora empieza el viaje. Si el viaje no puede empezar (toda la party
+## derribada, un fundido en curso), se reintenta en el próximo tick.
+func _tick_mini_boss_trip(encounter: Dictionary, host: BossArenaHost) -> void:
+	var due := _mini_boss_due()
+	if not _mini_omen_started:
+		if RunState.stage_time < due - _mini_boss_lead():
+			return
+		_mini_omen_started = true
+		host.begin_omen(encounter, maxf(due - RunState.stage_time, 0.0))
+	if RunState.stage_time < due or not host.begin_trip(encounter, self):
+		return
+	_mini_boss_spawned = true
+	_mini_boss_away = true
+	_hold_for_mini_boss()
+
+
+## Desde que al minijefe le toca, si pelea solo, el mapa no saca a nadie más.
+func _hold_for_mini_boss() -> void:
+	if not _spawner.mini_boss_fights_alone:
+		return
+	_mini_boss_alone = true
+	# Log de una línea para los soaks: desde aquí no aparece nadie más.
+	print("Spawns held: mini boss fights alone at %.1fs" % RunState.stage_time)
+
+
+## El minijefe ya existe (en el mapa o en su arena): entra a su grupo y, si
+## pelea solo, su muerte abre el respiro sin spawns.
+func _watch_mini_boss(boss: BossBase) -> void:
 	_mini_boss = boss
 	boss.add_to_group(MINI_BOSS_GROUP)
-	if spawner.mini_boss_fights_alone:
-		_mini_boss_alone = true
-		# Log de una línea para los soaks: desde aquí no aparece nadie más.
-		print("Spawns held: mini boss fights alone at %.1fs" % RunState.stage_time)
-		var health := Health.find_in(boss)
-		if health != null:
-			health.died.connect(_on_mini_boss_died, CONNECT_ONE_SHOT)
+	if not _mini_boss_alone:
+		return
+	var health := Health.find_in(boss)
+	if health != null:
+		health.died.connect(_on_mini_boss_died, CONNECT_ONE_SHOT)
+
+
+## BossArenaHost: el jefe del viaje ya está en su arena. Lleva el mismo
+## grado, los mismos contadores y la misma línea de log que uno que llega al
+## mapa (ver _enlist_boss); el spawner de este horario está fuera del árbol.
+func on_trip_boss(boss: BossBase) -> void:
+	_enlist_boss(boss, 1.0, false)
+	_watch_mini_boss(boss)
+
+
+## BossArenaHost: el viaje terminó y el equipo está otra vez en este mapa.
+func on_trip_over() -> void:
+	_mini_boss_away = false
+	if _mini_boss_again < 0.0:
+		return
+	# Interruptor del harness: el hueco se abre una vez más.
+	_mini_boss_at = RunState.stage_time + _mini_boss_again
+	_mini_boss_again = -1.0
+	_mini_boss_spawned = false
+	_mini_omen_started = false
+	_mini_boss = null
+	print("BossSchedule: mini boss comes again at %.0fs" % _mini_boss_at)
 
 
 ## Segundo de etapa en que llega el minijefe.
@@ -241,14 +330,29 @@ func _mini_boss_due() -> float:
 	return _mini_boss_at if _mini_boss_at >= 0.0 else _spawner.mini_boss_spawn_minute * 60.0
 
 
+## Segundos de presagio del minijefe: los de su fila en BossArenaCatalog, o
+## 0 si no tiene arena propia. Durante el presagio los demás jefes esperan.
+func _mini_boss_lead() -> float:
+	return maxf(float(_mini_boss_encounter().get("omen_seconds", 0.0)), 0.0)
+
+
+## La fila de BossArenaCatalog del minijefe (vacía = sin arena propia).
+func _mini_boss_encounter() -> Dictionary:
+	if not _mini_encounter_read:
+		_mini_encounter_read = true
+		_mini_encounter = BossArenaCatalog.for_boss(_spawner.mini_boss_scene)
+	return _mini_encounter
+
+
 ## True mientras el jefe del bioma tiene que esperar al minijefe: ya le toca
-## llegar y todavía no llegó, sigue vivo, o corre el respiro tras su muerte.
+## llegar (o ya corre su presagio) y todavía no llegó, el equipo está en su
+## arena, sigue vivo, o corre el respiro tras su muerte.
 func _mini_boss_holds_boss() -> bool:
 	if _spawner.mini_boss_scene == null:
 		return false
 	if not _mini_boss_spawned:
-		return RunState.stage_time >= _mini_boss_due()
-	return _mini_boss_alive() or _relief_timer > 0.0
+		return RunState.stage_time >= _mini_boss_due() - _mini_boss_lead()
+	return _mini_boss_away or _mini_boss_alive() or _relief_timer > 0.0
 
 
 ## True mientras el jefe de etapa tiene que esperar al minijefe: ya le toca
@@ -259,8 +363,8 @@ func _mini_boss_holds_stage_boss() -> bool:
 	if _spawner.mini_boss_scene == null:
 		return false
 	if not _mini_boss_spawned:
-		return RunState.stage_time >= _mini_boss_due()
-	return _in_arena(_mini_boss)
+		return RunState.stage_time >= _mini_boss_due() - _mini_boss_lead()
+	return _mini_boss_away or _in_arena(_mini_boss)
 
 
 ## True mientras `boss` sigue en la arena, vivo o en su caída. Sin tipo a

@@ -1,0 +1,37 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scripts/world/run/boss_arena/boss_arena_portal.gd" id="1_portal"]
+[ext_resource type="PackedScene" path="res://scenes/world/director/PortalVisual.tscn" id="2_visual"]
+[ext_resource type="PackedScene" path="res://scenes/ui/StickerNotice.tscn" id="3_notice"]
+
+[node name="BossArenaPortal" type="Area3D"]
+collision_layer = 0
+collision_mask = 1
+monitorable = false
+script = ExtResource("1_portal")
+prompt_text = "[E] Volver al mapa"
+prompt_height = 4.2
+
+[node name="Visual" parent="." instance=ExtResource("2_visual")]
+ring_half_thickness = 0.16
+ring_height = 0.07
+ring_alpha = 0.95
+ring_spin = 0.55
+pillar_height = 11.0
+pillar_top_radius = 1.3
+pillar_alpha = 0.3
+idle_pulse_speed = 2.2
+idle_pulse_amount = 0.08
+light_energy = 2.4
+light_range = 9.0
+light_height = 2.0
+frame_stones = 8
+frame_gap = 0.65
+frame_height_min = 2.8
+frame_height_max = 3.4
+frame_width = 0.75
+frame_lintels = true
+
+[node name="Notice" parent="." instance=ExtResource("3_notice")]
+card_color = Color(1, 0.823529, 0.247059, 1)
+card_tilt_degrees = -1.5

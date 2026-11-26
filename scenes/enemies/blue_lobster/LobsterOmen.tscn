@@ -1,0 +1,9 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scripts/world/run/boss_arena/boss_omen.gd" id="1_omen"]
+[ext_resource type="PackedScene" path="res://scenes/ui/StickerNotice.tscn" id="2_notice"]
+
+[node name="LobsterOmen" type="Node"]
+script = ExtResource("1_omen")
+
+[node name="Notice" parent="." instance=ExtResource("2_notice")]

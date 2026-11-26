@@ -24,6 +24,7 @@ extends CanvasLayer
 ##   on_stage_started(arena)           WorldDirector, al empezar cada etapa
 ##   set_quake_offset(shift)           WeatherDirector (terremoto)
 ##   set_cinematic(active)             la cinemática de un jefe (mythos_cinematic.gd)
+##   set_maps_away(away)               BossArenaHost, mientras el equipo está en la arena de un jefe
 ## El soak (scenes/tests/arena_probe.gd) lee `offset` de este nodo por el grupo "hud".
 
 @export_group("Vida")
@@ -235,6 +236,12 @@ func set_quake_offset(shift: Vector2) -> void:
 func set_cinematic(active: bool) -> void:
 	visible = not active
 	_view_widgets.set_cinematic(active)
+
+
+## El equipo está en la arena de un jefe (o volvió): mientras tanto no hay
+## minimapa ni mapa de Tab, que solo saben dibujar el mapa de la etapa.
+func set_maps_away(away: bool) -> void:
+	_view_widgets.set_away(away)
 
 
 ## Color de una barra de vida según la vida: hp_low_color en 0, mezclado hasta

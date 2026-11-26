@@ -133,7 +133,9 @@ class TimedBeacon:
 ## lo leen aquí con get("active_weather").
 var active_weather: Dictionary:
 	get:
-		return _weather.active_weather if _weather != null else {}
+		# Con la etapa suspendida el clima sigue guardado pero no corre: para
+		# el HUD y los altares es como si no hubiera ninguno.
+		return _weather.active_weather if _weather != null and not _suspended else {}
 ## Todos los climas vivos a la vez (luna, lluvia y desastre pueden coincidir);
 ## el chip del HUD los lee con get("active_weathers").
 var active_weathers: Array[Dictionary]:
@@ -151,6 +153,9 @@ var _beat_timer: float = 0.0
 var _beats_fired: int = 0
 ## Balizas vivas (portal de salida, estrella...).
 var _beacons: Array[TimedBeacon] = []
+## True mientras el equipo está en la arena de un jefe y la etapa espera
+## fuera del árbol (ver suspend_stage).
+var _suspended: bool = false
 
 ## El clima (RunSystems.tscn > WorldDirector > Weather).
 @onready var _weather: WeatherDirector = $Weather
@@ -217,6 +222,7 @@ func _start_horde() -> bool:
 ## de inicio; después Arena llama a scatter.place_props(), cuyas zonas
 ## vedadas ven así las posiciones nuevas.
 func on_stage_started(arena: Node3D) -> void:
+	_suspended = false
 	set_physics_process(true)
 	_set_layout(_new_layout(arena))
 	# El clima olvida las luces de la arena anterior y vuelve a buscarlas.
@@ -256,6 +262,43 @@ func on_stage_ended() -> void:
 	_set_layout(_new_layout(null))
 
 
+## El equipo se va a la arena de un jefe (BossArenaHost) y la arena de la
+## etapa sale del árbol. El director deja de procesar SIN olvidar nada: el
+## reparto, el clima en curso, el reloj de eventos, las balizas y el portal de
+## salida quedan como están y siguen desde ahí en resume_stage(). Nada de esto
+## pasa por on_stage_ended / on_stage_started: la etapa es la misma.
+func suspend_stage() -> void:
+	_suspended = true
+	set_physics_process(false)
+	# Un terremoto a medias dejaría el HUD corrido todo el viaje.
+	get_tree().call_group("hud", "set_quake_offset", Vector2.ZERO)
+
+
+## El equipo volvió de la arena de un jefe: la etapa sigue donde quedó.
+func resume_stage() -> void:
+	_suspended = false
+	set_physics_process(true)
+
+
+## True mientras la etapa espera suspendida (lo lee el harness).
+func is_stage_suspended() -> bool:
+	return _suspended
+
+
+## El reloj de pulsos por minuto y el clima en curso, para quien compara la
+## etapa antes y después de un viaje a la arena de un jefe (el harness):
+## {event_timer, beats_fired, weather_id, weather_left}. `event_timer` conserva
+## su nombre de antes: hoy son los segundos que faltan para el próximo pulso.
+func stage_clock() -> Dictionary:
+	var weather := _weather.active_weather
+	return {
+		"event_timer": _beat_timer,
+		"beats_fired": _beats_fired,
+		"weather_id": String(weather.get("id", "")),
+		"weather_left": float(weather.get("time_left", 0.0)),
+	}
+
+
 ## Balizas vivas, para el barrido de etapa (RunRoot).
 func beacon_count() -> int:
 	return _beacons.size()
@@ -278,20 +321,29 @@ func start_sky_event(kind: String) -> void:
 	_weather.start_sky_event(kind)
 
 
-## Un charco de ácido durante la lluvia radiactiva (EnemyBase al morir).
+## Un charco de ácido durante la lluvia radiactiva (EnemyBase al morir). Con
+## la etapa suspendida su clima no corre: un jefe que muere en su arena propia
+## no deja el charco de la lluvia del mapa.
 func spawn_acid_pool(at: Vector3) -> void:
+	if _suspended:
+		return
 	_weather.spawn_acid_pool(at)
 
 
-## Verdadero mientras `id` sea el clima activo.
+## Verdadero mientras `id` sea el clima activo (con la etapa suspendida, ninguno).
 func is_weather_active(id: String) -> bool:
-	return _weather.is_weather_active(id)
+	return not _suspended and _weather.is_weather_active(id)
 
 
 ## La arena cambió de cielo (HellTransformation): los climas vuelven desde
 ## ahora a este sol y ambiente. Devuelve el Environment propio de la arena.
 func rebase_sky(sun_color: Color, sun_energy: float, ambient_color: Color,
 		ambient_energy: float) -> Environment:
+	# El cielo que guarda el clima es el de la etapa. Con la etapa suspendida
+	# la arena viva es la de un jefe: quien cambie SU cielo trabaja sobre su
+	# propia copia (HellSky lo hace cuando esto devuelve null).
+	if _suspended:
+		return null
 	return _weather.rebase_sky(sun_color, sun_energy, ambient_color, ambient_energy)
 
 
@@ -299,7 +351,7 @@ func rebase_sky(sun_color: Color, sun_energy: float, ambient_color: Color,
 ## (sun_color, sun_energy, ambient_color, ambient_energy): lo pide quien va
 ## a cambiar el cielo por un rato y devolverlo con rebase_sky().
 func sky_base() -> Dictionary:
-	return _weather.sky_base()
+	return {} if _suspended else _weather.sky_base()
 
 
 ## Un StageLayout para `arena` (null = vacío) con las distancias del reparto.

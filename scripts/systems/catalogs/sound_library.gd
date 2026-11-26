@@ -110,6 +110,25 @@ const ROWS: Dictionary[StringName, Dictionary] = {
 	&"lobster_scare": {
 		"stream": preload("res://assets/audio/sfx/lobster_scare.wav"), "volume_db": -1.0,
 	},
+	&"omen_swell": {
+		"stream": preload("res://assets/audio/sfx/omen_swell.wav"), "volume_db": -4.0,
+	},
+	&"abduction_geyser": {
+		"stream": preload("res://assets/audio/sfx/abduction_geyser.wav"), "volume_db": -7.0,
+		"rate_limit": 8, "jitter": true,
+	},
+	&"abduction_whirlpool": {
+		"stream": preload("res://assets/audio/sfx/abduction_whirlpool.wav"), "volume_db": -3.0,
+	},
+	&"abduction_flood": {
+		"stream": preload("res://assets/audio/sfx/abduction_flood.wav"), "volume_db": -2.0,
+	},
+	&"seabed_landing": {
+		"stream": preload("res://assets/audio/sfx/seabed_landing.wav"), "volume_db": -4.0,
+	},
+	&"return_portal": {
+		"stream": preload("res://assets/audio/sfx/return_portal.wav"), "volume_db": -5.0,
+	},
 	&"boss_die": {
 		"stream": preload("res://assets/audio/sfx/boss_die.wav"), "volume_db": -2.0,
 	},

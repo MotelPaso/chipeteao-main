@@ -1,25 +1,15 @@
 class_name LobsterArrival
 extends Node
-## La llegada de la Langosta Azul (nodo Arrival de BlueLobster.tscn). Trae la
-## escena de la ENTRADA (el susto, LobsterEntrance) y la de la MAREA que tiñe
-## el mapa (LobsterTide) y las cuelga de la ARENA, no de la langosta: siguen
-## ahí cuando ella ya murió, hasta que su canción termina de apagarse y la
-## marea termina de bajar. Con entrada, la langosta llega sin que se la vea y
-## sin barra, flecha ni marcador: todo eso aparece cuando empieza la pelea.
-## Sin entrada, este nodo lleva la llegada simple de un jefe: aparece dentro
-## de un anillo, ruge y, pasados plain_seconds, empieza a pelear.
+## La llegada de la Langosta Azul (nodo Arrival de BlueLobster.tscn). Hay dos:
+##   - En su arena propia la trae LA CINEMÁTICA del viaje (LobsterEntrance, que
+##     cuelga de BossArenaHost): la langosta nace escondida, sin barra, flecha
+##     ni marcador, y espera a que la cinemática la muestre y le diga que la
+##     pelea empieza.
+##   - Sin cinemática en curso (un mapa que la invoca directamente, una
+##     prueba suelta) llega sola: aparece dentro de un anillo, ruge y,
+##     pasados plain_seconds, empieza a pelear.
 ## La llegada termina cuando alguien llama a BlueLobster.finish_entrance(): la
-## entrada, o este nodo en la llegada simple.
-
-@export_group("Entrada")
-## Escena de la entrada: es la dueña del reloj de la llegada y de la canción. Vacío = llegada simple.
-@export var entrance_scene: PackedScene = preload(
-		"res://scenes/enemies/blue_lobster/LobsterEntrance.tscn")
-
-@export_group("Marea")
-## Escena que deja el mapa como bajo el mar mientras la langosta vive (cielo azul, reflejos, corales y burbujas). Vacío = el mapa no cambia.
-@export var tide_scene: PackedScene = preload(
-		"res://scenes/enemies/blue_lobster/LobsterTide.tscn")
+## cinemática, o este nodo en la llegada simple.
 
 @export_group("Llegada simple")
 ## Segundos que tarda en empezar a pelear desde que aparece.
@@ -30,33 +20,20 @@ extends Node
 @export var plain_roar_sfx: StringName = &"boss_roar"
 
 var _boss: BlueLobster = null
-var _entrance: LobsterEntrance = null
-var _tide: LobsterTide = null
 var _plain_left: float = 0.0
 
 
 ## Arranca la llegada con la langosta ya ubicada en la arena.
 func begin(boss: BlueLobster) -> void:
 	_boss = boss
-	var stage := RunRoot.stage_parent(get_tree())
-	if entrance_scene != null and stage != null:
-		_entrance = entrance_scene.instantiate() as LobsterEntrance
-		if _entrance != null:
-			stage.add_child(_entrance)
-	# La marea sube desde ya: cuando la entrada muestra el mapa, ya está azul.
-	if tide_scene != null and stage != null:
-		_tide = tide_scene.instantiate() as LobsterTide
-		if _tide != null:
-			stage.add_child(_tide)
-			_tide.begin(boss.global_position)
-	var seconds := _entrance.intro_seconds if _entrance != null else plain_seconds
+	var cinematic := _running_cinematic()
 	# Línea de log para los soaks: la llegada se mide desde aquí.
-	print("%s entrance started: seconds=%.2f plain=%s at %.1fs" % [
-			boss.boss_title, seconds, _entrance == null, RunState.stage_time])
-	if _entrance != null:
+	print("%s entrance started: seconds=%.2f plain=%s at %.1fs" % [boss.boss_title,
+			cinematic.intro_seconds if cinematic != null else plain_seconds,
+			cinematic == null, RunState.stage_time])
+	if cinematic != null:
 		# Sin aviso: ni barra, ni flecha, ni marcador hasta que empiece la pelea.
 		boss.hide_presence()
-		_entrance.play(boss)
 		return
 	_plain_left = plain_seconds
 	boss.pop_in(plain_ring_radius)
@@ -72,13 +49,19 @@ func tick(delta: float) -> void:
 		_boss.finish_entrance(plain_seconds, false)
 
 
-## La langosta murió: su canción se apaga de a poco y la marea baja. Su caída
-## sigue aunque otro jefe congele el mundo mientras tanto (la calma de
-## Mythos): no queda a medias, quieta en el aire, todo lo que dura.
+## La langosta murió: su canción se apaga de a poco. Su caída sigue aunque
+## otro jefe congele el mundo mientras tanto (la calma de Mythos): no queda a
+## medias, quieta en el aire, todo lo que dura.
 func on_boss_dead() -> void:
 	if _boss != null and is_instance_valid(_boss):
 		WorldFreeze.exempt(_boss)
-	if _entrance != null and is_instance_valid(_entrance):
-		_entrance.fade_out_song()
-	if _tide != null and is_instance_valid(_tide):
-		_tide.ebb()
+	get_tree().call_group(LobsterEntrance.GROUP, &"fade_out_song")
+
+
+## La cinemática de la langosta que está en curso, o null.
+func _running_cinematic() -> LobsterEntrance:
+	for node: Node in get_tree().get_nodes_in_group(LobsterEntrance.GROUP):
+		var cinematic := node as LobsterEntrance
+		if cinematic != null and cinematic.is_calm_active():
+			return cinematic
+	return null

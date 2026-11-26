@@ -11,26 +11,28 @@
 [ext_resource type="Script" uid="uid://dl7cxjlsx8uhj" path="res://scripts/systems/fog_of_war.gd" id="9_fog"]
 [ext_resource type="Script" uid="uid://dxhi11f116ra8" path="res://scripts/world/run/director/weather_director.gd" id="10_weather"]
 [ext_resource type="Script" uid="uid://dmb3y3asfkd04" path="res://scripts/world/run/director/stage_fixtures.gd" id="11_fixtures"]
-[ext_resource type="Script" path="res://scripts/systems/party/party_power.gd" id="12_power"]
+[ext_resource type="Script" uid="uid://cixl32ratdnd3" path="res://scripts/systems/party/party_power.gd" id="12_power"]
 
 [node name="RunSystems" type="Node3D" unique_id=2086446746]
 script = ExtResource("1_runsys")
 
 [node name="Player" parent="." unique_id=1511789428 instance=ExtResource("2_player")]
+air_acceleration = 40.0
+slide_friction = 6.0
 
 [node name="RunManager" type="Node" parent="." unique_id=164659691]
 script = ExtResource("3_runmgr")
 
-[node name="PartyPower" type="Node" parent="."]
+[node name="PartyPower" type="Node" parent="." unique_id=1011693565]
 script = ExtResource("12_power")
 
 [node name="WorldDirector" type="Node" parent="." unique_id=1873970074]
 script = ExtResource("8_director")
 
-[node name="Weather" type="Node" parent="WorldDirector"]
+[node name="Weather" type="Node" parent="WorldDirector" unique_id=358112037]
 script = ExtResource("10_weather")
 
-[node name="StageFixtures" type="Node" parent="WorldDirector"]
+[node name="StageFixtures" type="Node" parent="WorldDirector" unique_id=780599072]
 script = ExtResource("11_fixtures")
 
 [node name="UpgradeCardUI" parent="." unique_id=1865859061 instance=ExtResource("4_cardui")]

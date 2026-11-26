@@ -39,6 +39,10 @@ var _map: MapDraw = null
 var _refresh_left: float = 0.0
 var _minimaps: Array[Minimap] = []
 var _overlays: Array[MapOverlay] = []
+## Las dos razones para esconder los mapas: una cinemática en curso y el
+## equipo fuera del mapa de la etapa.
+var _cinematic: bool = false
+var _away: bool = false
 
 @onready var _slot: Control = $MinimapSlot
 
@@ -87,13 +91,30 @@ func on_stage_started(arena: Node3D = null) -> void:
 ## CanvasLayer solo oculta a sus hijos directos, y estos cuelgan de este nodo
 ## (los mapas de Tab, además, en su propia capa).
 func set_cinematic(active: bool) -> void:
+	_cinematic = active
+	_apply_hidden()
+
+
+## Con el equipo en la arena de un jefe (BossArenaHost) los mapas tampoco se
+## muestran: el suelo, la niebla y los marcadores que dibujan son del mapa de
+## la etapa, que quedó suspendido. Vuelven cuando el equipo regresa.
+func set_away(away: bool) -> void:
+	_away = away
+	_apply_hidden()
+
+
+## Minimapas a la vista y mapas de Tab disponibles solo sin cinemática y con
+## el equipo en el mapa de la etapa.
+func _apply_hidden() -> void:
+	var hidden := _cinematic or _away
 	for minimap: Minimap in _minimaps:
 		if is_instance_valid(minimap):
-			minimap.visible = not active
+			minimap.visible = not hidden
 	for overlay: MapOverlay in _overlays:
 		if is_instance_valid(overlay):
-			overlay.visible = false
-			overlay.set_process(not active)
+			if hidden:
+				overlay.visible = false
+			overlay.set_process(not hidden)
 
 
 func _anchor_to_cell(control: Control, cell: Rect2) -> void:

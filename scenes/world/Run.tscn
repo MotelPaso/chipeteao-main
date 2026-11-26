@@ -1,7 +1,8 @@
-[gd_scene load_steps=3 format=3]
+[gd_scene load_steps=4 format=3]
 
 [ext_resource type="Script" path="res://scripts/world/run/run_root.gd" id="1_runroot"]
 [ext_resource type="PackedScene" uid="uid://crunsy5te2m8a" path="res://scenes/world/RunSystems.tscn" id="2_runsystems"]
+[ext_resource type="Script" path="res://scripts/world/run/boss_arena/boss_arena_host.gd" id="3_bossarenahost"]
 
 [node name="Run" type="Node3D"]
 script = ExtResource("1_runroot")
@@ -9,3 +10,6 @@ script = ExtResource("1_runroot")
 [node name="RunSystems" parent="." instance=ExtResource("2_runsystems")]
 
 [node name="ArenaHost" type="Node3D" parent="."]
+
+[node name="BossArenaHost" type="Node" parent="."]
+script = ExtResource("3_bossarenahost")

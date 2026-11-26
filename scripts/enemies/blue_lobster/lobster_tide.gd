@@ -1,75 +1,42 @@
 class_name LobsterTide
 extends Node3D
-## La MAREA de la Langosta Azul (LobsterTide.tscn): mientras ella vive, el
-## mapa queda como bajo el mar. La langosta la instancia bajo la arena cuando
-## llega (nodo Arrival de BlueLobster.tscn) y le pide ebb() cuando muere.
-##   - El CIELO se va al azul: sol, ambiente, niebla, colores del cielo y
-##     horizonte. Usa el mismo ayudante de cielo de arena que el infierno de
-##     Mythos (HellSky) y le dice al clima cuál es ahora el cielo «original»
-##     (WorldDirector.rebase_sky), así una luna o una lluvia que termine en
-##     plena pelea vuelve al azul. Al bajar la marea devuelve el de antes.
+## La MAREA de la Langosta Azul (LobsterTide.tscn, nodo Tide de
+## ShipGraveyard.tscn): lo que hace que su arena se sienta bajo el mar además
+## de la luz y el paisaje, que son de la escena de la arena.
 ##   - REFLEJOS de agua sobre el suelo (nodo Caustics: una copia de la malla
 ##     del terreno que solo suma luz).
-##   - CORALES que brotan del suelo alrededor (nodos Branches y Bulbs, dos
-##     MultiMesh). Son solo decoración: no chocan con nada.
+##   - CORALES que brotan de la arena por todo el claro (nodos Branches y
+##     Bulbs, dos MultiMesh). Son solo decoración: no chocan con nada, y dejan
+##     libres el lugar donde aterriza el equipo, el lugar donde aparece la
+##     langosta y las coberturas.
 ##   - BURBUJAS alrededor de cada raider, de pie o caído (el nodo Bubbles es
 ##     la plantilla). Cada nube es de un raider: si cae uno, las de los demás
 ##     no cambian de dueño.
-## Nunca toca un recurso compartido: el cielo es la copia propia de la arena,
-## y todo lo demás cuelga de este nodo y se va con él.
-## Procesa aunque el mundo esté congelado: sube durante la entrada de la
-## langosta, así cuando la cámara muestra el mapa ya está azul.
-## Si el mapa ya tiene otra transformación (el infierno de Mythos), no le
-## toca el cielo: solo retira lo suyo.
-## Contrato por nombre (lo lee el harness): grupo "lobster_tide" y
-## state_name().
+## Empieza sola cuando la arena entra al árbol y sube mientras la cinemática
+## todavía tiene el mundo congelado (por eso procesa en PAUSABLE): cuando la
+## cámara muestra el claro, los corales ya brotaron. Se va con la arena.
+## Va después del Terrain en el árbol: copia su malla.
+## Contrato por nombre (lo lee el harness): grupo "lobster_tide",
+## state_name() y las líneas "Lobster tide:".
 
 enum State { LOW, RISING, HIGH, EBBING }
 
 const GROUP := &"lobster_tide"
-## Grupo de la transformación de mapa de un jefe de etapa (HellTransformation).
-const OTHER_TRANSFORMATION_GROUP := &"stage_transformation"
 ## Nombre de cada estado para el harness, en el orden de State.
 const STATE_NAMES: Array[StringName] = [&"low", &"rising", &"high", &"ebbing"]
 
 @export_group("Ritmo")
-## Segundos que tarda en subir (menos que lo que tarda la entrada en mostrar el mapa).
+## Segundos que tarda en subir (menos que lo que tarda la cinemática en mostrar el claro).
 @export var rise_seconds: float = 4.5
-## Segundos que tarda en bajar cuando la langosta muere.
+## Segundos que tarda en bajar si alguien le pide ebb(). Hoy nadie lo pide: en el Cementerio de barcos la marea se va con la arena, así que cambiar esto no se nota.
 @export var ebb_seconds: float = 3.5
-
-@export_group("Cielo de la marea")
-## Color del cielo arriba.
-@export var sky_top: Color = Color(0.02, 0.1, 0.3)
-## Color del cielo en el horizonte.
-@export var sky_horizon: Color = Color(0.1, 0.38, 0.66)
-## Color del suelo lejano en el horizonte (parte baja del cielo).
-@export var ground_horizon: Color = Color(0.06, 0.26, 0.48)
-## Color de la parte más baja del cielo.
-@export var ground_bottom: Color = Color(0.01, 0.05, 0.15)
-## Color del sol. Con poco rojo los raiders y lo que brilla en tonos cálidos se apagan: no lo bajes de 0.5.
-@export var sun_color: Color = Color(0.62, 0.82, 1.0)
-## Energía del sol.
-@export var sun_energy: float = 1.0
-## Color de la luz ambiente. Igual que el sol: con muy poco rojo todo lo cálido se ve gris.
-@export var ambient_color: Color = Color(0.36, 0.52, 0.96)
-## Energía de la luz ambiente.
-@export var ambient_energy: float = 1.15
-## Color de la niebla.
-@export var fog_color: Color = Color(0.08, 0.32, 0.62)
-## Densidad de la niebla (el bosque trae 0.007).
-@export var fog_density: float = 0.016
-## Color del suelo lejano del horizonte.
-@export var backdrop_ground: Color = Color(0.05, 0.2, 0.38)
-## Color de las colinas del horizonte.
-@export var backdrop_hills: Color = Color(0.07, 0.27, 0.5)
 
 @export_group("Corales")
 ## Cuántos grupos de corales brotan.
 @export var coral_sites: int = 64
-## Metros alrededor de donde llegó la langosta hasta los que brotan.
-@export var coral_reach: float = 60.0
-## Metros alrededor de donde llegó la langosta que quedan libres (ahí filma la entrada).
+## Metros desde el centro de la arena hasta los que brotan.
+@export var coral_reach: float = 50.0
+## Metros que quedan libres alrededor de donde aterriza el equipo y de donde aparece el jefe (ahí filma la cinemática).
 @export var coral_clearance: float = 14.0
 ## Metros alrededor de cada raider que quedan libres al brotar.
 @export var raider_clearance: float = 4.0
@@ -102,13 +69,6 @@ var _state: State = State.LOW
 var _clock: float = 0.0
 ## Cuánta marea hay ahora (0-1).
 var _amount: float = 0.0
-var _sky: HellSky = null
-## El cielo del que parte el cambio en curso, el de la marea y el de antes.
-var _from: HellSky.Palette = null
-var _deep: HellSky.Palette = null
-var _original: HellSky.Palette = null
-## False si otra transformación del mapa ya es dueña del cielo.
-var _owns_sky: bool = false
 ## La nube de burbujas de cada raider, por su id de instancia.
 var _bubbles: Dictionary[int, CPUParticles3D] = {}
 
@@ -125,122 +85,60 @@ func _ready() -> void:
 	_bubble_template.emitting = false
 	_show(0.0)
 	set_process(false)
+	begin()
 
 
 func _exit_tree() -> void:
-	# Si este nodo se va con la marea puesta y la arena sigue, el cielo vuelve.
-	if _owns_sky and _sky != null and _amount > 0.0 and not _other_transformation():
-		_sky.write(_original)
+	if _state != State.LOW:
+		_state = State.LOW
+		# Línea de log para los soaks: la marea se fue con su arena.
+		print("Lobster tide: gone at %.1fs" % RunState.stage_time)
 
 
 func _process(delta: float) -> void:
 	_follow_raiders()
 	if _state == State.RISING:
 		_clock += delta
-		var raised := smoothstep(0.0, 1.0, clampf(_clock / maxf(rise_seconds, 0.01), 0.0, 1.0))
-		_write_sky(_deep, raised)
-		_show(raised)
+		_show(smoothstep(0.0, 1.0, clampf(_clock / maxf(rise_seconds, 0.01), 0.0, 1.0)))
 		if _clock >= rise_seconds:
 			_state = State.HIGH
 			# Línea de log para los soaks.
 			print("Lobster tide: high at %.1fs" % RunState.stage_time)
 	elif _state == State.EBBING:
 		_clock += delta
-		var lowered := smoothstep(0.0, 1.0, clampf(_clock / maxf(ebb_seconds, 0.01), 0.0, 1.0))
-		_write_sky(_original, lowered)
-		_show(1.0 - lowered)
+		_show(1.0 - smoothstep(0.0, 1.0, clampf(_clock / maxf(ebb_seconds, 0.01), 0.0, 1.0)))
 		if _clock >= ebb_seconds:
-			_owns_sky = false
-			print("Lobster tide: gone at %.1fs" % RunState.stage_time)
 			queue_free()
 
 
-# --- lo que piden la langosta y el harness ----------------------------------------
+# --- lo que piden la arena y el harness -------------------------------------------
 
-## Sube la marea. `origin` es donde llegó la langosta: los corales brotan a su
-## alrededor, dejando libre el lugar donde la filma la entrada.
-func begin(origin: Vector3) -> void:
+## Sube la marea: los reflejos, los corales por todo el claro y las burbujas.
+func begin() -> void:
 	if _state != State.LOW:
 		return
-	_take_sky()
 	_lay_caustics()
-	_plant_corals(origin)
+	_plant_corals()
 	_state = State.RISING
 	_clock = 0.0
 	set_process(true)
-	print("Lobster tide: rising over %.1fs sky=%s at %.1fs" % [
-			rise_seconds, _owns_sky, RunState.stage_time])
+	print("Lobster tide: rising over %.1fs at %.1fs" % [rise_seconds, RunState.stage_time])
 
 
-## Baja la marea (la langosta murió) y este nodo se libera al terminar.
+## Baja la marea y este nodo se libera al terminar.
 func ebb() -> void:
 	if _state == State.EBBING or _state == State.LOW:
 		return
-	_owns_sky = _owns_sky and not _other_transformation()
-	if _owns_sky:
-		_from = _sky.current()
 	for cloud: CPUParticles3D in _bubbles.values():
 		cloud.emitting = false
 	_state = State.EBBING
 	_clock = 0.0
-	print("Lobster tide: ebbing over %.1fs sky=%s at %.1fs" % [
-			ebb_seconds, _owns_sky, RunState.stage_time])
+	print("Lobster tide: ebbing over %.1fs at %.1fs" % [ebb_seconds, RunState.stage_time])
 
 
 ## En qué anda: "low", "rising", "high" o "ebbing" (lo lee el harness).
 func state_name() -> StringName:
 	return STATE_NAMES[_state]
-
-
-# --- cielo ------------------------------------------------------------------------
-
-## Toma el cielo de la arena y guarda el de antes, sin el tinte del clima que
-## esté en curso, para poder devolverlo.
-func _take_sky() -> void:
-	var arena := RunRoot.stage_parent(get_tree()) as Node3D
-	if arena == null or _other_transformation():
-		return
-	# Antes de collect(): ahí el cielo «original» del clima pasa a ser el de la marea.
-	var base := _weather_base()
-	_deep = HellSky.Palette.make(sky_top, sky_horizon, ground_horizon, ground_bottom,
-			sun_color, sun_energy, ambient_color, ambient_energy, fog_color, fog_density)
-	_sky = HellSky.new()
-	_sky.collect(get_tree(), arena, _deep)
-	_from = _sky.current()
-	_original = _sky.current()
-	if not base.is_empty():
-		_original.sun_color = base["sun_color"]
-		_original.sun_energy = base["sun_energy"]
-		_original.ambient_color = base["ambient_color"]
-		_original.ambient_energy = base["ambient_energy"]
-	_owns_sky = true
-
-
-## El cielo a `weight` (0-1) del camino entre el de partida y `target`. En
-## esos segundos el sol y el ambiente tienen un solo dueño: el clima que
-## estuviera tiñendo o volviendo queda cortado y vuelve después a `target`.
-func _write_sky(target: HellSky.Palette, weight: float) -> void:
-	if not _owns_sky:
-		return
-	if _other_transformation():
-		_owns_sky = false
-		return
-	HellSky.rebase_weather(get_tree(), target)
-	_sky.write(_from.blend(target, weight))
-	_sky.blend_backdrop(backdrop_ground, backdrop_hills,
-			weight if target == _deep else 1.0 - weight)
-
-
-## El cielo «original» que guarda el clima ahora, o vacío si no hay director.
-func _weather_base() -> Dictionary:
-	var director := get_tree().get_first_node_in_group(&"world_director")
-	if director == null or not director.has_method(&"sky_base"):
-		return {}
-	return director.call(&"sky_base") as Dictionary
-
-
-func _other_transformation() -> bool:
-	return get_tree().get_first_node_in_group(OTHER_TRANSFORMATION_GROUP) != null
 
 
 # --- decoración -------------------------------------------------------------------
@@ -271,14 +169,15 @@ func _lay_caustics() -> void:
 	_caustics.global_transform = ground.global_transform
 
 
-## Reparte los grupos de corales alrededor de `origin`, en lugares donde se
-## puede poner algo (_fits_corals), y arma las dos MultiMesh. Usa su propio azar: no toca el
-## RNG de la partida.
-func _plant_corals(origin: Vector3) -> void:
+## Reparte los grupos de corales por el claro, en lugares donde se puede poner
+## algo (_fits_corals), y arma las dos MultiMesh. Usa su propio azar: no toca
+## el RNG de la partida.
+func _plant_corals() -> void:
 	var rng := RandomNumberGenerator.new()
 	rng.randomize()
 	var bounds := get_tree().get_first_node_in_group(&"arena_bounds")
 	var terrain := Terrain.find(get_tree())
+	var keep_clear := _clear_points()
 	var branches: Array[Transform3D] = []
 	var branch_data: Array[Color] = []
 	var bulbs: Array[Transform3D] = []
@@ -288,11 +187,11 @@ func _plant_corals(origin: Vector3) -> void:
 	while planted < coral_sites and tries > 0:
 		tries -= 1
 		var angle := rng.randf() * TAU
-		var reach := lerpf(coral_clearance, coral_reach, sqrt(rng.randf()))
-		var site := origin + Vector3(cos(angle), 0.0, sin(angle)) * reach
+		var site := global_position + Vector3(cos(angle), 0.0, sin(angle)) \
+				* coral_reach * sqrt(rng.randf())
 		if bounds != null and not _fits_corals(bounds, site):
 			continue
-		if _near_raider(site):
+		if _near_any(site, keep_clear, coral_clearance) or _near_raider(site):
 			continue
 		planted += 1
 		for _branch: int in rng.randi_range(branches_min, maxi(branches_max, branches_min)):
@@ -302,7 +201,7 @@ func _plant_corals(origin: Vector3) -> void:
 			var tilt := deg_to_rad(rng.randf_range(0.0, branch_tilt_degrees))
 			var basis := Basis(Vector3.UP, turn) * Basis(Vector3.RIGHT, tilt)
 			var foot := site + Vector3(cos(turn), 0.0, sin(turn)) * rng.randf_range(0.0, site_radius)
-			foot.y = terrain.height_at(foot.x, foot.z) if terrain != null else origin.y
+			foot.y = terrain.height_at(foot.x, foot.z) if terrain != null else site.y
 			var delay := rng.randf()
 			# El cilindro mide 1 de alto y 1 de diámetro y va centrado.
 			branches.append(Transform3D(
@@ -327,9 +226,27 @@ func _fill(multimesh: MultiMesh, transforms: Array[Transform3D], data: Array[Col
 		multimesh.set_instance_custom_data(index, data[index])
 
 
-## True si en `site` cabe un grupo de corales: lejos de cortes, rampas,
-## puentes y props (arena_bounds.can_place con site_radius de margen), o al
-## menos sobre una celda caminable si el mapa no tiene esa pregunta.
+## Los lugares que la cinemática necesita despejados: donde aterriza el equipo
+## y donde aparece el jefe (los da la arena, si es una BossArena).
+func _clear_points() -> Array[Vector3]:
+	var points: Array[Vector3] = []
+	var arena := get_parent() as BossArena
+	if arena != null:
+		points.append(arena.spawn_origin())
+		points.append(arena.boss_origin())
+	return points
+
+
+func _near_any(point: Vector3, places: Array[Vector3], gap: float) -> bool:
+	for place: Vector3 in places:
+		if Vector2(place.x - point.x, place.z - point.z).length() < gap:
+			return true
+	return false
+
+
+## True si en `site` cabe un grupo de corales: dentro del claro y lejos de las
+## coberturas (arena_bounds.can_place con site_radius de margen), o al menos
+## sobre suelo caminable si el mapa no tiene esa pregunta.
 func _fits_corals(bounds: Node, site: Vector3) -> bool:
 	var xz := Vector2(site.x, site.z)
 	if bounds.has_method(&"can_place"):

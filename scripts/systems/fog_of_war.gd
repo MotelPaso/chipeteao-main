@@ -77,6 +77,14 @@ func reset_for_stage(arena: Node3D) -> void:
 	_rebuild(half)
 
 
+## El equipo se fue a la arena de un jefe (BossArenaHost) o volvió de ella.
+## Mientras está fuera la niebla no se pinta: los raiders caminan por otro
+## mundo y sus posiciones no son del mapa que esta imagen cubre. No borra
+## nada: al volver, el mapa sigue explorado tal como quedó.
+func set_away(away: bool) -> void:
+	set_physics_process(not away)
+
+
 func _rebuild(half_extent: float) -> void:
 	_half_extent = half_extent
 	_pixels = maxi(int(round(half_extent * 2.0 / maxf(meters_per_pixel, 0.5))), 8)
