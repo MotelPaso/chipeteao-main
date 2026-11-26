@@ -1,0 +1,10 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scripts/systems/pickups/xp_gem_merger.gd" id="1_merger"]
+[ext_resource type="Script" path="res://scenes/tests/xp_gem_merge_probe.gd" id="2_probe"]
+
+[node name="XpGemMergeProbe" type="Node3D"]
+script = ExtResource("2_probe")
+
+[node name="XpGemMerger" type="Node" parent="."]
+script = ExtResource("1_merger")

@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Verificación headless del proyecto: import limpio + lint de catálogos +
-# sonda del campo de las arenas de jefe + harness de UI + harness del selector
+# sonda de fusión de gemas + sonda del campo de las arenas de jefe +
+# harness de UI + harness del selector
 # + soak por arena + arranques de cada receta del relieve + soak de etapa +
 # soak de co-op + soak del jefe de etapa (Mythos) + soak del minijefe (la
 # Langosta Azul y el viaje a su arena).
@@ -9,8 +10,8 @@
 #      sobre un log ya escrito; ver esa función)
 #
 # PASOS: VERIFICAR_PASOS=mythos,minijefe corre solo esos pasos, en el orden
-# de siempre; sin la variable corre todos. Los nombres: import lint campo ui
-# selector bosque dunas cienaga recetas etapa coop mythos minijefe. Un nombre
+# de siempre; sin la variable corre todos. Los nombres: import lint gemas campo
+# ui selector bosque dunas cienaga recetas etapa coop mythos minijefe. Un nombre
 # que no existe sale con exit 2 antes de correr nada, y una corrida parcial
 # termina en «VERIFICACIÓN PARCIAL (pasos: …)», nunca en «VERIFICACIÓN OK».
 # Con BONK_RELIEF_RECIPE delante también es parcial: los soaks de co-op,
@@ -38,7 +39,8 @@
 #   - el import, el lint, el harness de UI, el del selector o algún soak
 #     reporta errores/warnings de Godot
 #   - el lint de catálogos no imprime CADA una de sus comprobaciones con
-#     rows > 0, o el harness de UI no completa CADA uno de sus pasos
+#     rows > 0, la sonda de fusión no conserva la XP, o el harness de UI no
+#     completa CADA uno de sus pasos
 #   - el harness del selector no aprueba CADA tamaño de ventana (layout sin
 #     cortes y navegación con control completa)
 #   - una arena no llega al final del soak (se colgó o murió antes)
@@ -86,7 +88,7 @@ FALLOS=0
 INTERACCIONES=0
 
 # --- Selector de pasos ------------------------------------------------------
-PASOS_TODOS=(import lint campo ui selector bosque dunas cienaga recetas etapa coop mythos minijefe)
+PASOS_TODOS=(import lint gemas campo ui selector bosque dunas cienaga recetas etapa coop mythos minijefe)
 PASOS="${VERIFICAR_PASOS:-}"
 PASOS="${PASOS// /}"
 if [ -n "$PASOS" ]; then
@@ -467,6 +469,27 @@ else
 fi
 fase_fin
 fi  # lint
+
+if corre gemas; then
+# --- Fusión de gemas de XP ---------------------------------------------------
+# Comprueba que juntar gemas conserva la XP, no la recoge al fusionar y deja
+# intactas las gemas que ya vuelan hacia un raider.
+echo "== fusión de gemas de XP =="
+fase
+GEM_LOG="$LOGDIR/xp_gem_merge_probe.log"
+BONK_SAVE_PATH="$(save_path_for gemas)" \
+	godot --headless --fixed-fps 60 --quit-after 240 \
+	res://scenes/tests/XpGemMergeProbe.tscn >"$GEM_LOG" 2>&1
+GEM_ESPERADO='^Probe gem merge: done ok=1 before=24 after=20 merged=4 xp_before=48 xp_after=48 homing=1 pooled=4 scaled=1 xp_unchanged=1$'
+if grep -qE "$PATRON_ERROR" "$GEM_LOG" || ! grep -qE "$GEM_ESPERADO" "$GEM_LOG"; then
+	echo "  FALLO: la sonda de fusión de gemas no pasó"
+	grep -n '^Probe gem merge:\|ERROR:\|SCRIPT ERROR' "$GEM_LOG" | head -12
+	FALLOS=$((FALLOS + 1))
+else
+	echo "  ok"
+fi
+fase_fin
+fi  # gemas
 
 if corre campo; then
 # --- Campo de las arenas de jefe --------------------------------------------

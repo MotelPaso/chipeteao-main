@@ -85,6 +85,22 @@ func vacuum() -> void:
 	_speed = maxf(_speed, vacuum_speed)
 
 
+## True si sigue en el suelo y puede unirse a otro recolectable: ni recogido
+## ni volando ya hacia un raider.
+func can_merge() -> bool:
+	return not _collected and not _homing
+
+
+## Edad del recolectable, para que una fusión no acorte la vida del que queda.
+func age_seconds() -> float:
+	return _age
+
+
+## Deja la edad más joven de las dos gemas que se fusionan.
+func keep_age_at_most(seconds: float) -> void:
+	_age = minf(_age, maxf(seconds, 0.0))
+
+
 func _physics_process(delta: float) -> void:
 	_age += delta
 	_visual.rotate_y(spin_speed * delta)
@@ -137,6 +153,15 @@ func _release_to_pool() -> void:
 	if group != &"" and is_in_group(group):
 		remove_from_group(group)
 	Pools.release(self)
+
+
+## Sale del grupo vivo y vuelve al pool SIN cobrar ni sonar: lo usa la fusión
+## de gemas, que conserva la XP en la gema que sobrevive.
+func release_for_merge() -> void:
+	if _collected:
+		return
+	_collected = true
+	_release_to_pool()
 
 
 # --- Ganchos de subclase ----------------------------------------------------
