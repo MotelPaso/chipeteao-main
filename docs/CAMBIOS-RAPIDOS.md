@@ -426,6 +426,8 @@ La lógica vive en ayudantes de `scripts/systems/spawner/` (`SpawnScaling`, `Spa
 | Power-up en el suelo (tamaño, brillo, luz, duración, desvanecimiento, arcoíris de la estrella) | `scenes/systems/PowerUpPickup.tscn` > sus nodos y la raíz | la malla de `Gem`, `light_energy`; `lifetime`, `fade_time`, `spin_speed`, `star_hue_hz` en la raíz |
 | Ronda de la estrella (velocidad, saltos, a qué distancia mira un muro, cuánto desnivel la hace rebotar al pie de un acantilado) | `scripts/systems/pickups/powerup_pickup.gd` → grupo «Ronda de la estrella» | `roam_speed`, `hop_height`, `hop_hz`, `roam_probe`, `roam_max_rise` |
 | Orbe de vida (imán, curación, duración) | `scenes/systems/HealthOrb.tscn` > HealthOrb | `magnet_radius`, `heal_fraction`, `lifetime` |
+| Cuándo se juntan las gemas de XP (cuántas, a qué distancia, cuántas parejas por momento) | `scenes/world/RunSystems.tscn` > XpGemMerger (grupo «Fusión») | `merge_threshold`, `merge_distance`, `max_merges_per_check`, `check_seconds` |
+| Tamaño del cristal cuando una gema junta XP | `scripts/systems/pickups/xp_gem.gd` (grupo «Tamaño») | `base_size_scale`, `full_size_value`, `full_size_scale` |
 | Sacudida de cámara | `scenes/systems/Juice.tscn` > Juice (grupo «Sacudida de cámara») | `kill_shake_*`, `hurt_shake_*`, `boss_death_shake_*`, `crit_shake_*` |
 | Cámara lenta al crítico o al matar un jefe | Juice.tscn > Juice («Hit-stop») | `crit_stop_scale`, `crit_stop_duration` (0 = sin pausa al crítico), `boss_death_stop_*` |
 | Destello blanco al golpear | Juice.tscn > Juice («Destello de golpe») | `flash_duration`, `flash_color` |

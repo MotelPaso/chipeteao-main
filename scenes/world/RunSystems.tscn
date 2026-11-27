@@ -12,6 +12,7 @@
 [ext_resource type="Script" uid="uid://dxhi11f116ra8" path="res://scripts/world/run/director/weather_director.gd" id="10_weather"]
 [ext_resource type="Script" uid="uid://dmb3y3asfkd04" path="res://scripts/world/run/director/stage_fixtures.gd" id="11_fixtures"]
 [ext_resource type="Script" uid="uid://cixl32ratdnd3" path="res://scripts/systems/party/party_power.gd" id="12_power"]
+[ext_resource type="Script" path="res://scripts/systems/pickups/xp_gem_merger.gd" id="13_gemmerge"]
 
 [node name="RunSystems" type="Node3D" unique_id=2086446746]
 script = ExtResource("1_runsys")
@@ -25,6 +26,9 @@ script = ExtResource("3_runmgr")
 
 [node name="PartyPower" type="Node" parent="." unique_id=1011693565]
 script = ExtResource("12_power")
+
+[node name="XpGemMerger" type="Node" parent="."]
+script = ExtResource("13_gemmerge")
 
 [node name="WorldDirector" type="Node" parent="." unique_id=1873970074]
 script = ExtResource("8_director")
