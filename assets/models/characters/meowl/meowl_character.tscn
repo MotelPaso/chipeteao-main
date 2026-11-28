@@ -1,8 +1,10 @@
-[gd_scene format=3]
+[gd_scene load_steps=3 format=3]
 
 [ext_resource type="PackedScene" path="res://assets/models/characters/meowl/meowl.glb" id="1_model"]
+[ext_resource type="Script" path="res://assets/models/characters/meowl/meowl_character.gd" id="2_script"]
 
 [node name="MeowlCharacter" type="Node3D"]
+script = ExtResource("2_script")
 
 [node name="Model" parent="." instance=ExtResource("1_model")]
-transform = Transform3D(-1.7, 0, 0, 0, 1.7, 0, 0, 0, -1.7, 0, 0.0, 0)
+transform = Transform3D(-1.7, 0, 0, 0, 1.7, 0, 0, 0, -1.7, 0, 0, 0)

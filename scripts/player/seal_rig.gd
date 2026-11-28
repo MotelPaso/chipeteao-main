@@ -16,7 +16,7 @@ const TINT_MATERIAL_PREFIX := "Azul personaje"
 
 ## Cuerpo cuando la fila no nombra modelo: la escena envoltorio de la foca,
 ## que ya trae su giro y su escala 0.6 (un .glb crudo pediría model_scale).
-const DEFAULT_MODEL_SCENE := "res://assets/models/foca_character.tscn"
+const DEFAULT_MODEL_SCENE := "res://assets/models/characters/foca/foca_character.tscn"
 
 ## Nombre del nodo basura que se oculta (el piso horneado de la foca); otros
 ## modelos pueden no tenerlo.
